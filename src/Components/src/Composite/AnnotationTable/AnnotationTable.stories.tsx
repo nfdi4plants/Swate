@@ -143,11 +143,20 @@ export const EditTermCellRaw: Story = {
     await userEvent.clear(activeCell);
     await userEvent.clear(activeCell);
     await userEvent.clear(activeCell);
-    await userEvent.type(activeCell, "leco instrument", { delay: 50 });
+    await userEvent.type(activeCell, "leco", { delay: 50 });
+
+    await waitFor(
+      async () => {
+        const debugValue = activeCell.getAttribute("data-debugresultcount");
+        expect(debugValue ? parseInt(debugValue, 10) : 0).toBeGreaterThan(0);
+      },
+      { timeout: 5000 },
+    );
+
     await userEvent.keyboard("{Enter}");
 
     await waitFor(async () => {
-      const updatedCell = await canvas.findByText("leco instrument");
+      const updatedCell = await canvas.findByText("leco");
       expect(updatedCell).toBeVisible();
     });
   },

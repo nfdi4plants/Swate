@@ -90,3 +90,22 @@ Check out the following files for more specific contribution guidelines:
 
 > [!IMPORTANT]
 > Use VS Code or Rider for development, as they allow autoformatting via Fantomas on file save. This ensures that the code style is consistent across the project and reduces the amount of formatting-related comments in pull requests.
+
+## Zen
+
+> The GitHub API consolidates the Zen of GitHub in its own codebase, in 14 aphorisms:
+
+- Responsive is better than fast
+- It’s not fully shipped until it’s fast
+- Anything added dilutes everything else
+- Practicality beats purity
+- Approachable is better than simple
+- Mind your words, they are important
+- Speak like a human
+- Half measures are as bad as nothing at all
+- Encourage flow
+- Non-blocking is better than blocking
+- Favor focus over features
+- Avoid administrative distraction
+- Design for failure
+- Keep it logically awesome

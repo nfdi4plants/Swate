@@ -458,7 +458,7 @@ type Main =
             )
         )
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Entry(?debug: bool) =
 
         let startAssay =

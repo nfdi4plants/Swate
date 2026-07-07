@@ -13,15 +13,97 @@ open Swate.Components.Shared.ProvenanceGrouping.Edit
 open Swate.Components.Shared.ProvenanceGrouping.Fixtures
 open Swate.Components.Shared.ProvenanceGrouping.Session
 
+module Fixture = Swate.Components.Shared.ProvenanceGrouping.Fixtures
+
+let private sourceRef (tableName: string) : ProvenanceSourceRef = Fixture.source tableName tableName
+
+let private pendingModelSource = sourceRef "__pending-model-source__"
+
+let private anchor
+    (tableName: string)
+    (processName: ProvenanceProcessName option)
+    (header: ProvenancePropertyHeader)
+    (inputNames: string list)
+    (outputNames: string list)
+    : ProvenanceWritebackAnchor =
+    Fixture.anchor (sourceRef tableName) processName header inputNames outputNames
+
+let private anchorOfOrigin (origin: ProvenancePropertyOrigin) : ProvenanceWritebackAnchor =
+    match origin with
+    | ProvenancePropertyOrigin.Real anchor
+    | ProvenancePropertyOrigin.Virtual anchor -> anchor
+
+let private replaceOriginSource
+    (oldSource: ProvenanceSourceRef)
+    (newSource: ProvenanceSourceRef)
+    (origin: ProvenancePropertyOrigin)
+    : ProvenancePropertyOrigin =
+    let replace (anchor: ProvenanceWritebackAnchor) : ProvenanceWritebackAnchor =
+        if anchor.Source.Id = oldSource.Id then
+            { anchor with Source = newSource }
+        else
+            anchor
+
+    match origin with
+    | ProvenancePropertyOrigin.Real anchor -> ProvenancePropertyOrigin.Real(replace anchor)
+    | ProvenancePropertyOrigin.Virtual anchor -> ProvenancePropertyOrigin.Virtual(replace anchor)
+
+let private propertyValue
+    id
+    (header: ProvenancePropertyHeader)
+    (value: ProvenanceValue)
+    (unit: ProvenanceTerm option)
+    (source: ProvenanceWritebackAnchor option)
+    : ProvenancePropertyValue =
+    let origin =
+        source
+        |> Option.map ProvenancePropertyOrigin.Real
+        |> Option.defaultValue (ProvenancePropertyOrigin.Real(Fixture.anchor pendingModelSource None header [] []))
+
+    Fixture.propertyValue id header value unit origin
+
+let private inputSet id (tableName: string) header name propertyValueIds : ProvenanceSet =
+    Fixture.inputSet id (sourceRef tableName) header name propertyValueIds
+
+let private outputSet id (tableName: string) header name propertyValueIds : ProvenanceSet =
+    Fixture.outputSet id (sourceRef tableName) header name propertyValueIds
+
+let private connection id (tableName: string) processName inputSetId outputSetId : ProvenanceConnection =
+    Fixture.connection id (sourceRef tableName) processName inputSetId outputSetId
+
+let private model
+    (tableName: string)
+    (propertyValues: ProvenancePropertyValue list)
+    (inputSets: ProvenanceSet list)
+    (outputSets: ProvenanceSet list)
+    (connections: ProvenanceConnection list)
+    : ProvenanceModel =
+    let modelSource = sourceRef tableName
+
+    let propertyValues =
+        propertyValues
+        |> List.map (fun value -> {
+            value with
+                Origin = value.Origin |> replaceOriginSource pendingModelSource modelSource
+        })
+
+    Fixture.model modelSource propertyValues inputSets outputSets connections
+
+(*
+    The helpers above keep older behavior-focused tests compact while mapping
+    their table-name shorthand onto the explicit source/origin model.
+*)
+
 let typeTests =
     testList "Types" [
         testCase "loaded input set carries the actual input name"
         <| fun _ ->
             let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+            let assaySource = sourceRef "assay-table"
 
             let inputSet = {
                 Id = "input-a"
-                TableName = "assay-table"
+                Source = assaySource
                 Header = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
                 Name = "Input A"
                 PropertyValueIds = [ "pv-species-a" ]
@@ -33,30 +115,27 @@ let typeTests =
                 Header = species
                 Value = ProvenanceValue.Text "Arabidopsis"
                 Unit = None
-                Source =
-                    Some {
-                        TableName = "previous-table"
-                        ProcessId = None
-                        ProcessName = Some "previous-process"
-                        Header = species
-                        InputNames = [ "Ancestor A" ]
-                        OutputNames = []
-                    }
+                Origin =
+                    ProvenancePropertyOrigin.Real(
+                        anchor "previous-table" (Some "previous-process") species [ "Ancestor A" ] []
+                    )
             }
 
             Expect.equal inputSet.Name "Input A" "Loaded input name should live on the set."
             Expect.equal inputSet.PropertyValueIds [ propertyValue.Id ] "Set should point to property value occurrence."
 
-            match propertyValue.Source with
-            | Some source ->
-                Expect.equal source.TableName "previous-table" "Collapsed value should keep writeback table metadata."
-            | None -> failwith "Expected collapsed value source."
+            Expect.equal
+                (anchorOfOrigin propertyValue.Origin).Source.Name
+                "previous-table"
+                "Collapsed value should keep writeback table metadata."
 
         testCase "inherited property helpers replace and remove connection-specific pointers"
         <| fun _ ->
+            let assaySource = sourceRef "assay-table"
+
             let inputSet = {
                 Id = "input-a"
-                TableName = "assay-table"
+                Source = assaySource
                 Header = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
                 Name = "Input A"
                 PropertyValueIds = []
@@ -196,13 +275,10 @@ let modelTests =
             let value = built.PropertyValues.["pv-previous-treatment-a"]
             Expect.equal built.InputSets.Count 1 "Only loaded sets should be first-class sets."
 
-            match value.Source with
-            | Some source ->
-                Expect.equal
-                    source.TableName
-                    "previous-study-table"
-                    "Collapsed previous-context values should keep their source table."
-            | None -> failwith "Expected a previous-context source anchor."
+            Expect.equal
+                (anchorOfOrigin value.Origin).Source.Name
+                "previous-study-table"
+                "Collapsed previous-context values should keep their source table."
     ]
 
 let private validModel () =
@@ -754,7 +830,7 @@ let groupingTests =
             Expect.isEmpty connections "One-sided models must not invent display connections."
     ]
 
-let private sourceFromLoadedMembershipModel () =
+let private sourceOriginModel () =
     let species = propertyHeader FixtureKinds.characteristicProperty "Species"
     let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
     let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
@@ -767,7 +843,12 @@ let private sourceFromLoadedMembershipModel () =
     model
         "assay-table"
         [
-            propertyValue pvId species (ProvenanceValue.Text "Arabidopsis") None None
+            propertyValue
+                pvId
+                species
+                (ProvenanceValue.Text "Arabidopsis")
+                None
+                (Some(anchor "assay-table" (Some "assay-process") species [ "Input A" ] [ "Output A" ]))
         ]
         [
             inputSet setAId "assay-table" inputHeader "Input A" [ pvId ]
@@ -1036,6 +1117,18 @@ let editTests =
                     "Model should contain new connection."
             | other -> failwithf "Expected one AddLoadedConnection patch, got %A" other
 
+        testCase "connecting an already-connected pair is a no-op"
+        <| fun _ ->
+            let model = validModel ()
+
+            match connectSets "input-a" "output-a" None model with
+            | Ok(nextModel, []) ->
+                Expect.equal
+                    nextModel.Connections.Count
+                    model.Connections.Count
+                    "Re-connecting an already-connected pair must not create a duplicate connection."
+            | other -> failwithf "Expected a no-op duplicate connect, got %A" other
+
         testCase "removeConnection removes the loaded connection and its inherited values"
         <| fun _ ->
             let model = validModel ()
@@ -1077,9 +1170,9 @@ let editTests =
                 Expect.equal connectionId "missing-connection" "Error should carry the missing connection id."
             | other -> failwithf "Expected ConnectionNotFound, got %A" other
 
-        testCase "updatePropertyValue finds anchor from loaded set membership when Source is None"
+        testCase "updatePropertyValue reads complete real origin anchor directly"
         <| fun _ ->
-            let model = sourceFromLoadedMembershipModel ()
+            let model = sourceOriginModel ()
 
             match updatePropertyValue "pv-species-a" (ProvenanceValue.Text "A. thaliana") None model with
             | Ok(nextModel, [ ProvenanceTablePatch.UpdatePropertyValue(propertyValueId, source, _, newValue, _) ]) ->
@@ -1097,10 +1190,76 @@ let editTests =
 
                 Expect.equal newValue (ProvenanceValue.Text "A. thaliana") "Patch should carry edited value."
 
-                Expect.isSome
-                    nextModel.PropertyValues.["pv-species-a"].Source
-                    "Model should persist the derived source anchor."
+                match nextModel.PropertyValues.["pv-species-a"].Origin with
+                | ProvenancePropertyOrigin.Real anchor ->
+                    Expect.equal anchor.Source.Name "assay-table" "Model should keep the real source anchor."
+                | ProvenancePropertyOrigin.Virtual _ -> failwith "Expected the edited value to keep a real origin."
             | other -> failwithf "Expected one UpdatePropertyValue patch, got %A" other
+
+        testCase "createLoadedPropertyValue stores a complete virtual origin anchor"
+        <| fun _ ->
+            let model = validModel ()
+            let treatment = propertyHeader FixtureKinds.characteristicProperty "Treatment"
+
+            let command = {
+                Target = ProvenancePropertyTarget.Connections [ "connection-a" ]
+                CopiedFrom = None
+                Header = treatment
+                Value = ProvenanceValue.Text "Drought"
+                Unit = None
+            }
+
+            match createLoadedPropertyValue command model with
+            | Ok(nextModel, [ ProvenanceTablePatch.AddLoadedPropertyValue _ ]) ->
+                let created =
+                    nextModel.PropertyValues
+                    |> Map.toList
+                    |> List.map snd
+                    |> List.find (fun value -> value.Header = treatment)
+
+                match created.Origin with
+                | ProvenancePropertyOrigin.Virtual anchor ->
+                    Expect.equal anchor.Source model.Source "Virtual origin should use the loaded model source."
+                    Expect.equal anchor.ProcessName (Some "assay-process") "Connection process should be captured."
+                    Expect.equal anchor.InputNames [ "Input A" ] "Virtual anchor should capture target input names."
+                    Expect.equal anchor.OutputNames [ "Output A" ] "Virtual anchor should capture target output names."
+                | ProvenancePropertyOrigin.Real _ -> failwith "Expected caller-created values to be virtual."
+            | other -> failwithf "Expected one AddLoadedPropertyValue patch, got %A" other
+
+        testCase "updating a virtual property value emits an update patch"
+        <| fun _ ->
+            let model = validModel ()
+            let treatment = propertyHeader FixtureKinds.characteristicProperty "Treatment"
+
+            let command = {
+                Target = ProvenancePropertyTarget.InputSets [ "input-c" ]
+                CopiedFrom = None
+                Header = treatment
+                Value = ProvenanceValue.Text "Drought"
+                Unit = None
+            }
+
+            let withVirtualValue =
+                match createLoadedPropertyValue command model with
+                | Ok(nextModel, _) -> nextModel
+                | Error error -> failwithf "Unexpected createLoadedPropertyValue error: %A" error
+
+            let virtualId =
+                withVirtualValue.PropertyValues
+                |> Map.toList
+                |> List.pick (fun (id, value) -> if value.Header = treatment then Some id else None)
+
+            match updatePropertyValue virtualId (ProvenanceValue.Text "Edited") None withVirtualValue with
+            | Ok(_, [ ProvenanceTablePatch.UpdatePropertyValue(propertyValueId, _, oldValue, newValue, _) ]) ->
+                Expect.equal propertyValueId virtualId "Patch should identify the edited virtual occurrence."
+
+                Expect.equal
+                    oldValue
+                    (ProvenanceValue.Text "Drought")
+                    "Patch should carry the value from before the edit."
+
+                Expect.equal newValue (ProvenanceValue.Text "Edited") "Patch should carry the edited value."
+            | other -> failwithf "Expected exactly one UpdatePropertyValue patch for a virtual value, got %A" other
     ]
 
 let fixtureTests =
@@ -1119,10 +1278,7 @@ let fixtureTests =
             let previousValues =
                 model.InputSets.["input-a"].PropertyValueIds
                 |> List.choose (fun propertyValueId -> model.PropertyValues.TryFind propertyValueId)
-                |> List.filter (fun value ->
-                    value.Source
-                    |> Option.exists (fun source -> source.TableName = "previous-study-table")
-                )
+                |> List.filter (fun value -> (anchorOfOrigin value.Origin).Source.Name = "previous-study-table")
 
             Expect.isNonEmpty previousValues "Fixture should include collapsed previous-context property value."
 
@@ -1186,7 +1342,7 @@ let sessionTests =
         <| fun _ ->
             let session = Session.init (sampleModel ())
 
-            match Session.addLayer { SelectedSets = [] } session with
+            match Session.addLayer { Name = "Layer 2"; SelectedSets = [] } session with
             | Ok(next, patches) ->
                 let layer = Session.activeLayer next
 
@@ -1218,6 +1374,72 @@ let sessionTests =
                 Expect.isEmpty patches "Layer derivation should not write ARC data."
             | Error error -> failwithf "Expected layer addition success, got %A" error
 
+        testCase "addLayer uses entered name as temporary source identity"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+
+            match
+                Session.addLayer
+                    {
+                        Name = "Extraction"
+                        SelectedSets = [ ProvenanceSide.Output, "output-a" ]
+                    }
+                    session
+            with
+            | Ok(next, patches) ->
+                let layer = Session.activeLayer next
+                let projected = layer.Model.InputSets |> Map.toList |> List.exactlyOne |> snd
+
+                Expect.equal layer.Label "Extraction" "Layer label should use the entered source name."
+
+                Expect.equal
+                    layer.Model.Source.Id
+                    $"{layer.Id}:Extraction"
+                    "Temporary source id should be namespaced with the layer id so same-named layers cannot collide."
+
+                Expect.equal layer.Model.Source.Name "Extraction" "Temporary source name should use the entered name."
+                Expect.equal projected.Source layer.Model.Source "Projected sets should belong to the new source."
+                Expect.isEmpty patches "Layer naming is view/session state only."
+            | Error error -> failwithf "Expected named layer addition success, got %A" error
+
+        testCase "two added layers with the same name get distinct source ids"
+        <| fun _ ->
+            let withLayerTwo =
+                match
+                    Session.addLayer
+                        {
+                            Name = "Processing"
+                            SelectedSets = []
+                        }
+                        (Session.init (sampleModel ()))
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let onLayerOne =
+                match Session.selectLayer "layer-1" withLayerTwo with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected selectLayer error: %A" error
+
+            let withLayerThree =
+                match
+                    Session.addLayer
+                        {
+                            Name = "Processing"
+                            SelectedSets = []
+                        }
+                        onLayerOne
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let ids =
+                withLayerThree.Layers
+                |> List.map (fun layer -> layer.Model.Source.Id)
+                |> List.distinct
+
+            Expect.hasLength ids withLayerThree.Layers.Length "Every layer must own a unique Source.Id."
+
         testCase "addLayer treats selected active inputs as new layer inputs"
         <| fun _ ->
             let session = Session.init (sampleModel ())
@@ -1225,6 +1447,7 @@ let sessionTests =
             match
                 Session.addLayer
                     {
+                        Name = "Layer 2"
                         SelectedSets = [ ProvenanceSide.Input, "input-a" ]
                     }
                     session
@@ -1270,6 +1493,7 @@ let sessionTests =
             match
                 Session.addLayer
                     {
+                        Name = "Layer 2"
                         SelectedSets = [ ProvenanceSide.Output, "output-a" ]
                     }
                     initial
@@ -1294,6 +1518,7 @@ let sessionTests =
             let session = Session.init (sampleModel ())
 
             let selected = {
+                Name = "Layer 2"
                 SelectedSets = [
                     ProvenanceSide.Input, "input-a"
                     ProvenanceSide.Output, "output-b"
@@ -1334,6 +1559,7 @@ let sessionTests =
                 match
                     Session.addLayer
                         {
+                            Name = "Layer 2"
                             SelectedSets = [ ProvenanceSide.Output, "output-a" ]
                         }
                         first
@@ -1394,6 +1620,7 @@ let sessionTests =
             let layered =
                 Session.init (sampleModel ())
                 |> Session.addLayer {
+                    Name = "Layer 2"
                     SelectedSets = [ ProvenanceSide.Output, "output-d" ]
                 }
                 |> function
@@ -1454,6 +1681,7 @@ let sessionTests =
             let layered =
                 Session.init (sampleModel ())
                 |> Session.addLayer {
+                    Name = "Layer 2"
                     SelectedSets = [ ProvenanceSide.Output, "output-d" ]
                 }
                 |> function
@@ -1527,6 +1755,7 @@ let sessionTests =
             let layered =
                 Session.init (sampleModel ())
                 |> Session.addLayer {
+                    Name = "Layer 2"
                     SelectedSets = [ ProvenanceSide.Output, "output-a" ]
                 }
                 |> function
@@ -1583,6 +1812,7 @@ let sessionTests =
             let layered =
                 Session.init (sampleModel ())
                 |> Session.addLayer {
+                    Name = "Layer 2"
                     SelectedSets = [ ProvenanceSide.Output, "output-a" ]
                 }
                 |> function
@@ -1632,6 +1862,7 @@ let sessionTests =
                 match
                     Session.addLayer
                         {
+                            Name = "Layer 2"
                             SelectedSets = [ ProvenanceSide.Output, "output-d" ]
                         }
                         first
@@ -1688,6 +1919,7 @@ let sessionTests =
             let layered =
                 Session.init (sampleModel ())
                 |> Session.addLayer {
+                    Name = "Layer 2"
                     SelectedSets = [ ProvenanceSide.Output, "output-d" ]
                 }
                 |> function
@@ -1777,6 +2009,7 @@ let sessionTests =
             let layered =
                 Session.init (sampleModel ())
                 |> Session.addLayer {
+                    Name = "Layer 2"
                     SelectedSets = [ ProvenanceSide.Output, "output-a" ]
                 }
                 |> function
@@ -1847,7 +2080,7 @@ let sessionTests =
 
             Expect.isNonEmpty (Session.activeLayer initial).Model.OutputSets "Real output endpoints remain visible."
 
-            match Session.addLayer { SelectedSets = [] } initial with
+            match Session.addLayer { Name = "Layer 2"; SelectedSets = [] } initial with
             | Ok(next, patches) ->
                 let layer = Session.activeLayer next
                 Expect.isNonEmpty layer.Model.InputSets "Current outputs should seed the next displayed input side."
@@ -1869,6 +2102,220 @@ let sessionTests =
             | Error(SessionError.EditFailed(EditError.ConnectionNotFound connectionId)) ->
                 Expect.equal connectionId "missing-connection" "Removed target identity should be returned."
             | other -> failwithf "Expected missing-connection session error, got %A" other
+
+        testCase "freshly created property value ids never collide with other layers"
+        <| fun _ ->
+            let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
+            let analysis = propertyHeader FixtureKinds.parameterProperty "Analysis"
+
+            let createValue target value session =
+                match
+                    Session.createCurrentLoadedPropertyValue
+                        {
+                            Target = target
+                            CopiedFrom = None
+                            Header = analysis
+                            Value = value
+                            Unit = None
+                        }
+                        session
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected createCurrentLoadedPropertyValue error: %A" error
+
+            let built =
+                model "assay-table" [] [] [
+                    outputSet "output-a" "assay-table" outputHeader "Output A" []
+                    outputSet "output-b" "assay-table" outputHeader "Output B" []
+                ] []
+
+            // Layer 1 gets two generated values (one per output); layer 2 is seeded
+            // from output-a only, so it starts out knowing about only the first one.
+            let withLayerOneValues =
+                Session.init built
+                |> createValue (ProvenancePropertyTarget.OutputSets [ "output-a" ]) (ProvenanceValue.Text "First")
+                |> createValue (ProvenancePropertyTarget.OutputSets [ "output-b" ]) (ProvenanceValue.Text "Second")
+
+            let layered =
+                match
+                    Session.addLayer
+                        {
+                            Name = "Layer 2"
+                            SelectedSets = [ ProvenanceSide.Output, "output-a" ]
+                        }
+                        withLayerOneValues
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let projectedId =
+                (Session.activeLayer layered).Model.InputSets
+                |> Map.toList
+                |> List.exactlyOne
+                |> fst
+
+            let withNewValue =
+                layered
+                |> createValue
+                    (ProvenancePropertyTarget.InputSets [ projectedId ])
+                    (ProvenanceValue.Text "LayerTwoOwnValue")
+
+            let newId =
+                (Session.activeLayer withNewValue).Model.PropertyValues
+                |> Map.toList
+                |> List.pick (fun (id, value) ->
+                    if value.Value = ProvenanceValue.Text "LayerTwoOwnValue" then
+                        Some id
+                    else
+                        None
+                )
+
+            let layerOneIds =
+                (Session.layerById "layer-1" withNewValue).Model.PropertyValues
+                |> Map.toList
+                |> List.map fst
+                |> Set.ofList
+
+            Expect.isFalse
+                (layerOneIds.Contains newId)
+                $"Fresh id '{newId}' collides with an unrelated layer-1 property value."
+
+        testCase "layer switch never overwrites an unrelated same-id value in another layer"
+        <| fun _ ->
+            let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
+            let analysis = propertyHeader FixtureKinds.parameterProperty "Analysis"
+
+            let createValue target value session =
+                match
+                    Session.createCurrentLoadedPropertyValue
+                        {
+                            Target = target
+                            CopiedFrom = None
+                            Header = analysis
+                            Value = value
+                            Unit = None
+                        }
+                        session
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected createCurrentLoadedPropertyValue error: %A" error
+
+            let built =
+                model "assay-table" [] [] [
+                    outputSet "output-a" "assay-table" outputHeader "Output A" []
+                    outputSet "output-b" "assay-table" outputHeader "Output B" []
+                ] []
+
+            let withLayerOneValues =
+                Session.init built
+                |> createValue (ProvenancePropertyTarget.OutputSets [ "output-a" ]) (ProvenanceValue.Text "First")
+                |> createValue (ProvenancePropertyTarget.OutputSets [ "output-b" ]) (ProvenanceValue.Text "Second")
+
+            let outputBValueId =
+                (Session.layerById "layer-1" withLayerOneValues).Model.OutputSets.["output-b"].PropertyValueIds
+                |> List.exactlyOne
+
+            let layered =
+                match
+                    Session.addLayer
+                        {
+                            Name = "Layer 2"
+                            SelectedSets = [ ProvenanceSide.Output, "output-a" ]
+                        }
+                        withLayerOneValues
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let projectedId =
+                (Session.activeLayer layered).Model.InputSets
+                |> Map.toList
+                |> List.exactlyOne
+                |> fst
+
+            let withNewValue =
+                layered
+                |> createValue
+                    (ProvenancePropertyTarget.InputSets [ projectedId ])
+                    (ProvenanceValue.Text "LayerTwoOwnValue")
+
+            let onLayerOne =
+                match Session.selectLayer "layer-1" withNewValue with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected selectLayer error: %A" error
+
+            let dirtied =
+                match
+                    Session.updatePropertyValue outputBValueId (ProvenanceValue.Text "EditedOnLayerOne") None onLayerOne
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected updatePropertyValue error: %A" error
+
+            let backOnLayerTwo =
+                match Session.selectLayer "layer-2" dirtied with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected selectLayer error: %A" error
+
+            // The corruption does not overwrite the value record in place (that would
+            // be too easy to spot) - it silently drops newId from the projected set's
+            // own reference list, because copySetData's "is this id local to me"
+            // check keys purely on string identity and an unrelated layer-1 value
+            // happens to share that identity. So the real observable is whether the
+            // set can still reach its own value at all, not just whether an orphaned
+            // entry remains sitting in the PropertyValues map.
+            let hasLayerTwoOwnValue session =
+                let layer2 = Session.layerById "layer-2" session
+                let projectedSet = layer2.Model.InputSets.[projectedId]
+
+                ProvenanceSet.effectivePropertyValueIds projectedSet
+                |> List.choose (fun id -> layer2.Model.PropertyValues.TryFind id)
+                |> List.exists (fun value -> value.Value = ProvenanceValue.Text "LayerTwoOwnValue")
+
+            Expect.isTrue
+                (hasLayerTwoOwnValue backOnLayerTwo)
+                "Layer-2's own value must remain attached to its set after an unrelated layer-1 edit and focus switch."
+
+        testCase "session patch log accumulates leaf edits exactly once"
+        <| fun _ ->
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+            let session = Session.init (sampleModel ())
+
+            let session1, patches1 =
+                match Session.connectSets "input-d" "output-a" None session with
+                | Ok(next, patches) -> next, patches
+                | Error error -> failwithf "Unexpected connectSets error: %A" error
+
+            Expect.equal session1.PatchLog patches1 "First edit: log equals its own delta."
+
+            let session2, patches2 =
+                match
+                    Session.createLoadedSet
+                        {
+                            Side = ProvenanceSide.Input
+                            Header = inputHeader
+                            Name = "Input E"
+                        }
+                        session1
+                with
+                | Ok(next, patches) -> next, patches
+                | Error error -> failwithf "Unexpected createLoadedSet error: %A" error
+
+            Expect.equal session2.PatchLog (patches1 @ patches2) "Log is append-only across edits, no duplicates."
+
+        testCase "restoring a prior session snapshot also restores its patch log"
+        <| fun _ ->
+            let before = Session.init (sampleModel ())
+
+            let after =
+                match Session.connectSets "input-d" "output-a" None before with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected connectSets error: %A" error
+
+            Expect.isNonEmpty after.PatchLog "Sanity: the edit added a log entry."
+
+            Expect.isEmpty
+                before.PatchLog
+                "Undo restoring the pre-edit snapshot must retract its patch log too, since PatchLog lives on the session."
     ]
 
 let uiStateTests =
@@ -1897,6 +2344,7 @@ let uiStateTests =
                 match
                     Session.addLayer
                         {
+                            Name = "Layer 2"
                             SelectedSets = [ ProvenanceSide.Output, "output-a" ]
                         }
                         session
@@ -2191,11 +2639,73 @@ let uiStateTests =
             Expect.equal manual.PendingMemberResolution None "Choosing manual should close the prompt."
 
             Expect.equal
-                manual.ExpandedGroup
-                (Some(ProvenanceSide.Input, pending.InputGroupId))
-                "Choosing manual should expand the input group."
+                manual.ExpandedGroups
+                (Set.ofList [
+                    ProvenanceSide.Input, pending.InputGroupId
+                    ProvenanceSide.Output, pending.OutputGroupId
+                ])
+                "Choosing manual should expand exactly the two pending groups."
 
             Expect.equal manual.Detail None "Choosing manual should clear the detail panel."
+
+        testCase "publish error clears pending prompts but keeps the error"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let layer = Session.activeLayer session
+
+            let pendingBatch: Types.PendingAssignmentBatch = {
+                Batch = { Adds = []; Overwrites = [] }
+                AffectedSideCount = 1
+                AffectedValueCount = 1
+                AffectedGroupCount = 1
+                AffectedEntityCount = 1
+            }
+
+            let pendingResolution: Types.PendingMemberResolution = {
+                LayerId = layer.Id
+                InputGroupId = "input:Species=Arabidopsis"
+                OutputGroupId = "output:Analysis=Mass Spectrometry"
+                InputMemberCount = 1
+                OutputMemberCount = 1
+            }
+
+            let state =
+                State.init session
+                |> State.AssignmentBatch.set pendingBatch
+                |> State.MemberResolution.request pendingResolution
+
+            let next = State.Publish.onError "boom" state
+
+            Expect.isNone next.PendingAssignmentBatch "An assignment-batch prompt must not survive a failed publish."
+            Expect.isNone next.PendingMemberResolution "A member-resolution prompt must not survive a failed publish."
+            Expect.equal next.Error (Some "boom") "The error message itself must still be shown."
+
+        testCase "publish success clears pending prompts and re-syncs derived state"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+
+            let pendingBatch: Types.PendingAssignmentBatch = {
+                Batch = { Adds = []; Overwrites = [] }
+                AffectedSideCount = 1
+                AffectedValueCount = 1
+                AffectedGroupCount = 1
+                AffectedEntityCount = 1
+            }
+
+            let state =
+                State.init session
+                |> State.AssignmentBatch.set pendingBatch
+                |> fun state -> {
+                    state with
+                        Error = Some "stale"
+                        Hint = Some "stale"
+                }
+
+            let next = State.Publish.onSuccess session state
+
+            Expect.isNone next.PendingAssignmentBatch "A confirmed batch must not remain pending after success."
+            Expect.isNone next.Error "A successful publish must clear a previous error."
+            Expect.isNone next.Hint "A successful publish must clear a previous hint."
 
         testCase "property value drop plan adds only when every group member has no value for the property"
         <| fun _ ->
@@ -2378,66 +2888,73 @@ let uiStateTests =
         testCase "set and clear property color"
         <| fun _ ->
             let session = Session.init (sampleModel ())
+            let layer = Session.activeLayer session
             let state = State.init session
             let header = propertyHeader FixtureKinds.characteristicProperty "Species"
+            let context = State.PropertyColors.visibleColorContextForLayer session layer
 
-            let withColor = State.PropertyColors.setColor header "#2563eb" state
-            let key = { Header = header }
+            let withColor = State.PropertyColors.setColor context.Id header "#2563eb" state
+
+            let key: Types.VisiblePropertyColorKey = {
+                ContextId = context.Id
+                Header = header
+            }
 
             Expect.equal
                 withColor.PropertyColors.ManualPropertyColors.[key]
                 "#2563eb"
-                "Property color should be set by header."
+                "Property color should be set by visible context and header."
 
-            let cleared = State.PropertyColors.clearColor header withColor
+            let cleared = State.PropertyColors.clearColor context.Id header withColor
 
             Expect.isFalse
                 (cleared.PropertyColors.ManualPropertyColors.ContainsKey key)
                 "Property color should be cleared."
 
-        testCase "set and clear layer color"
+        testCase "set and clear source color"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let sourceId = (Session.activeLayer session).Model.Source.Id
+            let state = State.init session
+
+            let withColor = State.PropertyColors.setSourceColor sourceId "#16a34a" state
+            Expect.equal withColor.PropertyColors.SourceColors.[sourceId] "#16a34a" "Source color should be set."
+
+            let cleared = State.PropertyColors.clearSourceColor sourceId withColor
+            Expect.isFalse (cleared.PropertyColors.SourceColors.ContainsKey sourceId) "Source color should be cleared."
+
+        testCase "source colors are assigned once per live source"
         <| fun _ ->
             let session = Session.init (sampleModel ())
             let state = State.init session
 
-            let withColor = State.PropertyColors.setLayerColor "layer-1" "#16a34a" state
-            Expect.equal withColor.PropertyColors.LayerColors.["layer-1"] "#16a34a" "Layer color should be set."
-
-            let cleared = State.PropertyColors.clearLayerColor "layer-1" withColor
-            Expect.isFalse (cleared.PropertyColors.LayerColors.ContainsKey "layer-1") "Layer color should be cleared."
-
-        testCase "layer colors are assigned once per conceptual layer"
-        <| fun _ ->
-            let session = Session.init (sampleModel ())
-            let state = State.init session
-
-            let afterEnsure = State.PropertyColors.ensureLayerColors session state
+            let afterEnsure = State.PropertyColors.ensureSourceColors session state
 
             Expect.equal
-                afterEnsure.LayerColors.Count
-                session.LayerOrder.Length
-                "Each conceptual layer should receive exactly one automatic color."
+                afterEnsure.SourceColors.Count
+                2
+                "The fixture's current and previous sources should receive automatic colors."
 
             Expect.isTrue
-                (afterEnsure.LayerColors.ContainsKey "layer-1")
-                "Initial conceptual layer should have an automatic color."
+                (afterEnsure.SourceColors.ContainsKey "fixture:assay-table")
+                "Initial source should have an automatic color."
 
-            Expect.isFalse
-                (afterEnsure.LayerColors.ContainsKey "layer-1-input"
-                 || afterEnsure.LayerColors.ContainsKey "layer-1-output")
-                "Input and output side ids should not receive separate default colors."
+            Expect.isTrue
+                (afterEnsure.SourceColors.ContainsKey "fixture:previous-study-table")
+                "Attached previous source should have an automatic color."
 
-        testCase "automatic colors do not overwrite existing manual layer colors"
+        testCase "automatic colors do not overwrite existing manual source colors"
         <| fun _ ->
             let session = Session.init (sampleModel ())
+            let sourceId = (Session.activeLayer session).Model.Source.Id
             let state = State.init session
 
-            let withManual = State.PropertyColors.setLayerColor "layer-1" "#be185d" state
-            let afterEnsure = State.PropertyColors.ensureLayerColors session withManual
+            let withManual = State.PropertyColors.setSourceColor sourceId "#be185d" state
+            let afterEnsure = State.PropertyColors.ensureSourceColors session withManual
 
-            Expect.equal afterEnsure.LayerColors.["layer-1"] "#be185d" "Manual layer color should be preserved."
+            Expect.equal afterEnsure.SourceColors.[sourceId] "#be185d" "Manual source color should be preserved."
 
-        testCase "stale layer colors are removed during cleanup"
+        testCase "stale source colors are removed during cleanup"
         <| fun _ ->
             let session = Session.init (sampleModel ())
             let state = State.init session
@@ -2446,13 +2963,78 @@ let uiStateTests =
                 state with
                     PropertyColors = {
                         state.PropertyColors with
-                            LayerColors = Map.ofList [ "nonexistent", "#000000" ]
+                            SourceColors = Map.ofList [ "nonexistent", "#000000" ]
+                            SourceColorSetOrder = Map.ofList [ "nonexistent", 0 ]
+                            NextSourceColorSetOrder = 1
                     }
             }
 
-            let afterEnsure = State.PropertyColors.ensureLayerColors session withStale
+            let afterEnsure = State.PropertyColors.ensureSourceColors session withStale
 
-            Expect.isFalse (afterEnsure.LayerColors.ContainsKey "nonexistent") "Stale layer color should be removed."
+            Expect.isFalse (afterEnsure.SourceColors.ContainsKey "nonexistent") "Stale source color should be removed."
+
+            Expect.isFalse
+                (afterEnsure.SourceColorSetOrder.ContainsKey "nonexistent")
+                "Stale source color order should be removed."
+
+        testCase "setting a shelf folder color for one duplicate-named layer leaves the other alone"
+        <| fun _ ->
+            let withLayerTwo =
+                match
+                    Session.addLayer
+                        {
+                            Name = "Processing"
+                            SelectedSets = []
+                        }
+                        (Session.init (sampleModel ()))
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let onLayerOne =
+                match Session.selectLayer "layer-1" withLayerTwo with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected selectLayer error: %A" error
+
+            let session =
+                match
+                    Session.addLayer
+                        {
+                            Name = "Processing"
+                            SelectedSets = []
+                        }
+                        onLayerOne
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let layerTwo = Session.layerById "layer-2" session
+            let layerThree = Session.layerById "layer-3" session
+
+            // Sides.ensure auto-assigns every live source a distinct default color;
+            // capture layer-3's before recoloring layer-2 so the assertion below
+            // catches the two layers sharing one color slot, not just a `None`.
+            let uiState = State.init session |> State.Sides.ensure session
+
+            let colorOf (state: Types.UiState) sourceId =
+                state.PropertyColors.SourceColors |> Map.tryFind sourceId
+
+            let layerThreeColorBefore = colorOf uiState layerThree.Model.Source.Id
+
+            let folderId = PropertyFolders.sourceFolderId layerTwo.Model.Source
+
+            let recolored =
+                PropertyShelf.setFolderColor session folderId (Some "#ff0000") uiState
+
+            Expect.equal
+                (colorOf recolored layerTwo.Model.Source.Id)
+                (Some "#ff0000")
+                "The targeted duplicate-named layer's folder should receive the color."
+
+            Expect.equal
+                (colorOf recolored layerThree.Model.Source.Id)
+                layerThreeColorBefore
+                "The other same-named layer's automatic color must not change."
 
         testCase "default filter state uses Any filter and ValueCountDesc sort"
         <| fun _ ->
@@ -2538,11 +3120,12 @@ let uiStateTests =
             let session = Session.init (sampleModel ())
             let layer = Session.activeLayer session
             let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+            let context = State.PropertyColors.visibleColorContextForLayer session layer
 
             let uiState =
                 State.init session
                 |> State.Filters.setSearch "Arabidopsis"
-                |> State.PropertyColors.setColor species "#2563eb"
+                |> State.PropertyColors.setColor context.Id species "#2563eb"
 
             let projection =
                 PropertyProjection.railProjectionWithFilters session layer.Id ProvenanceSide.Output layer.Model uiState
@@ -2566,11 +3149,18 @@ let uiStateTests =
 
             Expect.isEmpty emptyProjection.Headers "Search should remove non-matching property headers."
 
-        testCase "attached previous context does not receive an automatic property color"
+        testCase "source colors are used for single-origin rail headers"
         <| fun _ ->
             let session = Session.init (sampleModel ())
             let layer = Session.activeLayer session
-            let state = State.init session
+
+            let state =
+                let state = State.init session
+
+                {
+                    state with
+                        PropertyColors = State.PropertyColors.ensureSourceColors session state
+                }
 
             let previousTreatment =
                 propertyHeader FixtureKinds.characteristicProperty "Previous Treatment"
@@ -2584,8 +3174,163 @@ let uiStateTests =
 
             Expect.equal
                 projection.ColorByHeader.[previousTreatment]
-                None
-                "Attached previous context should not receive an automatic source color."
+                (state.PropertyColors.SourceColors |> Map.tryFind "fixture:previous-study-table")
+                "Single-origin headers should use their source color."
+
+        testCase "manual visible property color overrides only that property"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let layer = Session.activeLayer session
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+            let temperature = propertyHeader FixtureKinds.parameterProperty "Temperature"
+            let context = State.PropertyColors.visibleColorContextForLayer session layer
+
+            let state =
+                State.init session
+                |> State.PropertyColors.setSourceColor layer.Model.Source.Id "#16a34a"
+                |> State.PropertyColors.setColor context.Id species "#2563eb"
+
+            let projection =
+                PropertyProjection.railProjectionWithFilters session layer.Id ProvenanceSide.Output layer.Model state
+
+            Expect.equal projection.ColorByHeader.[species] (Some "#2563eb") "Manual color should win for Species."
+
+            Expect.equal
+                projection.ColorByHeader.[temperature]
+                (Some "#16a34a")
+                "Other current-source headers should keep the source color."
+
+        testCase "multi-origin visible header uses last changed origin source color"
+        <| fun _ ->
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+
+            let built =
+                model
+                    "assay-table"
+                    [
+                        propertyValue
+                            "pv-current-species"
+                            species
+                            (ProvenanceValue.Text "Arabidopsis")
+                            None
+                            (Some(anchor "assay-table" None species [ "Input A" ] []))
+                        propertyValue
+                            "pv-previous-species"
+                            species
+                            (ProvenanceValue.Text "Arabidopsis")
+                            None
+                            (Some(anchor "previous-table" None species [ "Ancestor A" ] []))
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" [
+                            "pv-current-species"
+                            "pv-previous-species"
+                        ]
+                    ] [] []
+
+            let session = Session.init built
+            let layer = Session.activeLayer session
+
+            let state =
+                State.init session
+                |> State.PropertyColors.setSourceColor layer.Model.Source.Id "#2563eb"
+                |> State.PropertyColors.setSourceColor "previous-table" "#be185d"
+
+            let projection =
+                PropertyProjection.railProjectionWithFilters session layer.Id ProvenanceSide.Input layer.Model state
+
+            Expect.equal
+                projection.ColorByHeader.[species]
+                (Some "#be185d")
+                "A multi-origin header should use the most recently changed origin source color."
+
+        testCase "same header shares manual color in downstream connected layer"
+        <| fun _ ->
+            let layered =
+                Session.init (sampleModel ())
+                |> Session.addLayer {
+                    Name = "Layer 2"
+                    SelectedSets = [ ProvenanceSide.Output, "output-a" ]
+                }
+                |> function
+                    | Ok(next, _) -> next
+                    | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let layer1 = Session.layerById "layer-1" layered
+            let layer2 = Session.layerById "layer-2" layered
+            let analysis = propertyHeader FixtureKinds.parameterProperty "Analysis"
+            let context = State.PropertyColors.visibleColorContextForLayer layered layer2
+
+            let state =
+                State.init layered
+                |> State.PropertyColors.setColor context.Id analysis "#2563eb"
+
+            let upstreamProjection =
+                PropertyProjection.railProjectionWithFilters layered layer1.Id ProvenanceSide.Output layer1.Model state
+
+            let downstreamProjection =
+                PropertyProjection.railProjectionWithFilters layered layer2.Id ProvenanceSide.Input layer2.Model state
+
+            Expect.equal
+                upstreamProjection.ColorByHeader.[analysis]
+                (Some "#2563eb")
+                "Upstream visible header should use the manual color."
+
+            Expect.equal
+                downstreamProjection.ColorByHeader.[analysis]
+                (Some "#2563eb")
+                "Connected downstream visible header should share the root manual color."
+
+        testCase "same header can have different manual colors in independent visible color contexts"
+        <| fun _ ->
+            let baseSession = Session.init (sampleModel ())
+            let layer1 = Session.activeLayer baseSession
+            let independentModel = inputOnlyModel ()
+
+            let independentLayer = {
+                Id = "layer-2"
+                Label = "Independent"
+                InputSideId = "layer-2-input"
+                OutputSideId = "layer-2-output"
+                Model = independentModel
+            }
+
+            let session = {
+                baseSession with
+                    Layers = baseSession.Layers @ [ independentLayer ]
+                    LayerOrder = baseSession.LayerOrder @ [ independentLayer.Id ]
+                    ActiveLayerId = independentLayer.Id
+                    ReferenceLinks = []
+            }
+
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+
+            let state =
+                State.init session
+                |> State.PropertyColors.setColor layer1.Id species "#2563eb"
+                |> State.PropertyColors.setColor independentLayer.Id species "#be185d"
+
+            let layer1Projection =
+                PropertyProjection.railProjectionWithFilters session layer1.Id ProvenanceSide.Output layer1.Model state
+
+            let independentProjection =
+                PropertyProjection.railProjectionWithFilters
+                    session
+                    independentLayer.Id
+                    ProvenanceSide.Input
+                    independentLayer.Model
+                    state
+
+            Expect.equal
+                layer1Projection.ColorByHeader.[species]
+                (Some "#2563eb")
+                "Layer 1 should use its own visible-context color."
+
+            Expect.equal
+                independentProjection.ColorByHeader.[species]
+                (Some "#be185d")
+                "Independent layer should use its own visible-context color for the same header."
 
         testCase "current input properties default to output rail when connected to outputs"
         <| fun _ ->
@@ -2744,28 +3489,21 @@ let sourceTests =
             let value = layer.Model.PropertyValues.["pv-input-a-species"]
             let source = Session.propertyValueSourceInfo layer value
 
-            Expect.isSome source "A fixture property value should expose source metadata."
+            match source with
+            | Some source ->
+                Expect.equal source.TableName (Some "assay-table") "Origin source name should be exposed."
+                Expect.equal source.ProcessName (Some "assay-process") "Origin process name should be exposed."
+                Expect.isTrue source.IsCurrentTable "Fixture value should belong to the current source."
+            | None -> failwith "A fixture property value should expose source metadata."
 
-        testCase "property source info falls back to loaded membership"
-        <| fun _ ->
-            let session = Session.init (sampleModel ())
-            let layer = Session.activeLayer session
-            let original = layer.Model.PropertyValues.["pv-input-a-species"]
-            let withoutSource = { original with Source = None }
-            let source = Session.propertyValueSourceInfo layer withoutSource
-
-            Expect.equal
-                (source |> Option.bind _.TableName)
-                (Some layer.Model.LoadedTableName)
-                "Membership fallback should keep current table context."
-
-        testCase "property origin uses conceptual upstream layer id"
+        testCase "property origin in session returns stored source origin"
         <| fun _ ->
             let session = Session.init (sampleModel ())
 
             match
                 Session.addLayer
                     {
+                        Name = "Layer 2"
                         SelectedSets = [ ProvenanceSide.Output, "output-a" ]
                     }
                     session
@@ -2779,8 +3517,10 @@ let sourceTests =
 
                 Expect.equal
                     origin
-                    (Some(PropertyOrigin.UpstreamLayer "layer-1"))
-                    "Origin should report conceptual upstream layer id."
+                    (active.Model.PropertyValues
+                     |> Map.tryFind propertyValueId
+                     |> Option.map _.Origin)
+                    "Origin lookup should return the stored real or virtual source origin."
             | Error error -> failwithf "Unexpected addLayer error: %A" error
     ]
 

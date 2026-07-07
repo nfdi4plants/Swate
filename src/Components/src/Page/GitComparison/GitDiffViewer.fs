@@ -7,7 +7,7 @@ open Feliz
 [<Erase; Mangle(false)>]
 type GitDiffViewer =
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Viewer
         (
             wordDiffText: string,

@@ -73,7 +73,7 @@ type ErrorModal =
             prop.children [ ErrorModal.MessageBlock request.Message; details ]
         ]
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Modal
         (
             isOpen: bool,

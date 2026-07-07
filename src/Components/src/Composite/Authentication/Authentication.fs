@@ -443,7 +443,7 @@ type Authentication =
             |]
     }
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Entry(?user) =
         let accounts, setAccounts = React.useState (defaultArg user AuthStateDto.Empty)
 

@@ -87,7 +87,7 @@ type ArcVaultActions =
         )
 
     /// This component displays the ARC vault name and provides actions related to the ARC vault, such as copying the local path or opening the folder in the file explorer.
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member ArcVaultActions(arcRootPath: string, onCopyPath: string -> unit, onOpenArcFolder: unit -> unit) =
         let arcName = arcRootPath |> ArcIO.getArcRootPath
 

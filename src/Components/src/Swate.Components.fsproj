@@ -214,10 +214,24 @@
     
     <Compile Include="Page\ProvenanceGrouping\Types.fs" />
     <Compile Include="Page\ProvenanceGrouping\State.fs" />
+    <Compile Include="Page\ProvenanceGrouping\ViewSupport.fs" />
+    <Compile Include="Page\ProvenanceGrouping\Interaction.fs" />
+    <Compile Include="Page\ProvenanceGrouping\PropertyModel.fs" />
+    <Compile Include="Page\ProvenanceGrouping\EndpointAndAssignment.fs" />
     <Compile Include="Page\ProvenanceGrouping\Helper.fs" />
+    <Compile Include="Page\ProvenanceGrouping\ControlsSupport.fs" />
     <Compile Include="Page\ProvenanceGrouping\Controls.fs" />
     <Compile Include="Page\ProvenanceGrouping\GroupCard.fs" />
+    <Compile Include="Page\ProvenanceGrouping\ConnectorTypes.fs" />
+    <Compile Include="Page\ProvenanceGrouping\ConnectorMeasurement.fs" />
+    <Compile Include="Page\ProvenanceGrouping\ConnectorPaths.fs" />
+    <Compile Include="Page\ProvenanceGrouping\ConnectorRendering.fs" />
     <Compile Include="Page\ProvenanceGrouping\ConnectorOverlay.fs" />
+    <Compile Include="Page\ProvenanceGrouping\EditorActions.fs" />
+    <Compile Include="Page\ProvenanceGrouping\EditorLayout.fs" />
+    <Compile Include="Page\ProvenanceGrouping\EditorPropertyShelf.fs" />
+    <Compile Include="Page\ProvenanceGrouping\EditorPanels.fs" />
+    <Compile Include="Page\ProvenanceGrouping\EditorSurface.fs" />
     <Compile Include="Page\ProvenanceGrouping\ProvenanceGrouping.fs" />
     <Compile Include="Page\SettingsPage\SettingsPage.fs" />
     <Compile Include="Page\Metadata\FormComponents\Helpers.fs" />

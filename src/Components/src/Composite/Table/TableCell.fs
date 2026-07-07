@@ -3,7 +3,6 @@ namespace Swate.Components.Composite.Table
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Composite.Table.Context
-open Swate.Components.Composite.Table.Types
 open Swate.Components.Composite.TermSearch
 open Swate.Components.Composite.TermSearch.Types
 open Fable.Core

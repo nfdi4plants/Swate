@@ -1,3 +1,7 @@
+## Git Rules
+
+- You MUST NEVER run any git write commands (commit, stage, push, pull, amend, etc.). Only read-only git commands are allowed (log, diff, status, show, etc.). When git write actions are needed, suggest the commands for the user to run themselves.
+
 ## ReactComponent design rules
 
 - **Purpose**: These guidelines are for components in `src/Components`, which are meant to be reusable and application-agnostic. They should not contain app-specific logic or state coupling.

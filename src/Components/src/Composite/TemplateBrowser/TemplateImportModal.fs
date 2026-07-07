@@ -10,7 +10,7 @@ open Swate.Components.Composite.Template.Types
 [<Erase; Mangle(false)>]
 type TemplateImportModal =
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member TemplateImportModal
         (
             isOpen,

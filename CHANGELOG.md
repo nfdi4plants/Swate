@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -  Update to ARCtrl 3.0 and updated dependencies
 -  Keep FilePicker upload buttons visible so users can overwrite previously selected files without clearing the list (by @Caroott)
+-  Refactor publishing for swate-components npm library. keep individual files intact, add source maps, update barrel index file. (by @Freymaurer)
 
 ## 1.0.7 - 2025-11-21
 

@@ -9,7 +9,7 @@ open Browser.Dom
 [<Erase; Mangle(false)>]
 type Landing =
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Wizard
         (
             draft: LandingDraft,

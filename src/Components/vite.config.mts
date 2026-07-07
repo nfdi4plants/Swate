@@ -2,16 +2,7 @@ import {defineConfig} from 'vite';
 import dts from 'vite-plugin-dts'
 import react from "@vitejs/plugin-react";
 import tailwindcss from '@tailwindcss/vite'
-
-const externalPackages = [
-    'react',
-    'react-dom',
-    'tailwindcss',
-    '@fable-org/fable-library-js',
-    "@floating-ui/react",
-    "@tanstack/react-virtual",
-    "@nfdi4plants/arctrl"
-]
+import pkg from './package.json';
 
 export default defineConfig({
     plugins: [
@@ -34,25 +25,28 @@ export default defineConfig({
         // Avoid runtime re-optimization reloads during Vitest browser runs in CI.
         include: ["react-dom/client"],
     },
-    build: {
+    build: { // changes to the build config below should be well tested. See README.md for more information.
+    // README.md: local dev -> release -> npm -> background info
+        minify: false,
         sourcemap: true,
         lib: {
-            entry: './src/index.js', // Entry file
-            name: "@nfdi4plants/swate-components",
-            formats: ['es', 'cjs'],
-            fileName: (format) => `index.${format}.js`,
+            entry: './src/index.ts',
+            formats: ['es'],
         },
         rollupOptions: {
-            // Exclude peer dependencies from the final bundle
-            external: (id) =>
-                externalPackages.includes(id) ||
-                id.startsWith('@fable-org/fable-library-js/'),
+            external: (id) => {
+                const externalPkgs = [
+                    ...Object.keys(pkg.dependencies ?? {}),
+                    ...Object.keys(pkg.peerDependencies ?? {}),
+                ];
+                return externalPkgs.some(p => id === p || id.startsWith(`${p}/`));
+            },
             output: {
-                globals: {
-                    react: 'React',
-                    'react-dom': 'ReactDOM',
-                    tailwindcss: "tailwindcss",
-                },
+                preserveModules: true,
+                preserveModulesRoot: 'src',
+                entryFileNames: '[name].js',
+                chunkFileNames: 'chunks/[name].js',
+                assetFileNames: 'assets/[name][extname]',
             },
         },
     },

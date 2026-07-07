@@ -116,7 +116,8 @@ Vitest.describe (
                     |> List.map (fun id -> model.PropertyValues.[id].Header.Category.Name)
 
                 Vitest.expect(result.Selection).toEqual (assaySelection)
-                Vitest.expect(model.LoadedTableName).toBe ("assay-table")
+                Vitest.expect(model.Source.Id).toBe ("assay:assay-1:assay-table")
+                Vitest.expect(model.Source.Name).toBe ("assay-table")
                 Vitest.expect(valueNames |> List.contains "Organism").toBe (true)
         )
 
@@ -137,7 +138,8 @@ Vitest.describe (
                 let model = ProvenanceModelDto.toModel cloned.Model
 
                 Vitest.expect(cloned.Selection).toEqual (assaySelection)
-                Vitest.expect(model.LoadedTableName).toBe ("assay-table")
+                Vitest.expect(model.Source.Id).toBe ("assay:assay-1:assay-table")
+                Vitest.expect(model.Source.Name).toBe ("assay-table")
         )
 
         Vitest.test (
@@ -180,5 +182,11 @@ Vitest.describe (
                 match organism.Value with
                 | ProvenanceValue.Term term -> Vitest.expect(term.Name).toBe ("Plant")
                 | other -> failwithf "Expected organism value to round-trip as term, got %A" other
+
+                match organism.Origin with
+                | ProvenancePropertyOrigin.Real anchor ->
+                    Vitest.expect(anchor.Source.Id).toBe ("study:study-1:study-table")
+                    Vitest.expect(anchor.Source.Name).toBe ("study-table")
+                | ProvenancePropertyOrigin.Virtual _ -> failwith "Expected converted DTO value to keep a real origin."
         )
 )

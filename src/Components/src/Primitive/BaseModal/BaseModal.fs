@@ -139,7 +139,7 @@ type BaseModal =
                 )
         ]
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Modal
         (
             isOpen: bool,

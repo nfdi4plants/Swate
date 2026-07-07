@@ -234,6 +234,93 @@
     }
 }
 
+/* ProvenanceGrouping connector motion. Kept in sync with src/Components/tailwind.css
+   (like scrollbar-fade below): the Renderer builds its own Tailwind bundle, so custom
+   utilities from the components package must be repeated here. */
+@keyframes swt-connector-draw {
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+@keyframes swt-connector-flow {
+    to {
+        /* One dash period (6 + 4), so the loop is seamless. */
+        stroke-dashoffset: -10;
+    }
+}
+
+@keyframes swt-motion-fade-in {
+    from {
+        opacity: 0;
+    }
+}
+
+@keyframes swt-motion-pop-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+}
+
+@layer swt-utilities {
+    .swt\:connector-draw-in {
+        stroke-dasharray: 1;
+        stroke-dashoffset: 1;
+        animation: swt-connector-draw 320ms ease-out forwards;
+    }
+
+    .swt\:connector-fade-in {
+        animation: swt-motion-fade-in 240ms ease-out;
+    }
+
+    .swt\:connector-flow {
+        animation: swt-connector-flow 450ms linear infinite;
+    }
+
+    /* Connection handles: opaque equivalents of the old translucent fills, so the
+       connector lines ending underneath cannot bleed through the dot. Idle matches
+       the old dimmed look (70% primary at 55% element opacity); the strong states
+       match the fully opted-in look. */
+    .swt\:connector-handle {
+        background-color: color-mix(in oklch, var(--color-primary) 40%, var(--color-base-100));
+        border-color: color-mix(in oklch, var(--color-primary) 55%, var(--color-base-100));
+    }
+
+    .swt\:connector-handle:hover,
+    .swt\:connector-handle:focus-visible,
+    .swt\:connector-handle-strong {
+        background-color: color-mix(in oklch, var(--color-primary) 70%, var(--color-base-100));
+        border-color: var(--color-primary);
+    }
+
+    /* Entry animations for expanding editor content. fade-in is opacity-only and is
+       used for containers holding connector anchors, so measured positions stay
+       truthful; pop-in adds a small slide for anchor-free content. */
+    .swt\:motion-fade-in {
+        animation: swt-motion-fade-in 180ms ease-out;
+    }
+
+    .swt\:motion-pop-in {
+        animation: swt-motion-pop-in 180ms ease-out;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .swt\:connector-draw-in,
+        .swt\:connector-fade-in,
+        .swt\:connector-flow,
+        .swt\:motion-fade-in,
+        .swt\:motion-pop-in {
+            animation: none;
+        }
+
+        .swt\:connector-draw-in {
+            stroke-dasharray: none;
+            stroke-dashoffset: 0;
+        }
+    }
+}
+
 @layer swt-utilities {
     /* Scrollbar utilities: keep constant width, fade thumb on hover (no layout shift) */
     .swt\:scrollbar-fade {
