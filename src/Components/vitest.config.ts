@@ -33,6 +33,11 @@ export default mergeConfig(
           test: {
             name: 'storybook',
             fileParallelism: false,
+            maxConcurrency: 1,
+            // Give interaction-heavy play functions headroom on slow CI runners
+            // so the whole test does not abort before its (now longer) waitFor
+            // guards can resolve. Pairs with asyncUtilTimeout in vitest.setup.ts.
+            testTimeout: 30_000,
             // Enable browser mode
             browser: {
               enabled: true,

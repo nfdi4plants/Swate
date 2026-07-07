@@ -200,7 +200,6 @@ type FolderedDraggableList =
             ]
             prop.ariaLabel $"Drag {item.Label}"
             if draggable.isDragging then
-                prop.custom ("aria-hidden", true)
                 prop.tabIndex -1
             match item.Tooltip with
             | Some tooltip when tooltip <> "" ->

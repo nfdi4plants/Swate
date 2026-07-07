@@ -17,12 +17,6 @@ type PropertyValueSourceInfo = {
     IsCurrentTable: bool
 }
 
-[<RequireQualifiedAccess>]
-type PropertyOrigin =
-    | Current of layerId: ProvenanceLayerId * side: ProvenanceSide
-    | UpstreamLayer of layerId: ProvenanceLayerId
-    | PreviousContext of source: PropertyValueSourceInfo
-
 type ProvenanceLayer = {
     Id: ProvenanceLayerId
     Label: string
@@ -64,6 +58,12 @@ type ProvenanceSession = {
     ActiveLayerId: ProvenanceLayerId
     ReferenceLinks: ProvenanceReferenceLink list
     DirtyPropertyValueIds: Set<ProvenancePropertyValueId>
+    /// Ordered log of every writeback patch produced since the session was
+    /// created. This - not the per-change delta returned alongside a
+    /// SessionResult - is the source of truth for the future "apply" button:
+    /// it lives on the session, so undo (which restores a session snapshot)
+    /// retracts already-emitted patches for free.
+    PatchLog: ProvenanceTablePatch list
 } with
     // Temporary adapter for component migration. Remove after downstream callers stop using pair terminology.
     member this.Pairs =
@@ -80,6 +80,7 @@ type SessionError =
     | EditFailed of EditError
 
 type AddLayerCommand = {
+    Name: ProvenanceSourceName
     SelectedSets: (ProvenanceSide * ProvenanceSetId) list
 }
 
@@ -92,15 +93,12 @@ module Session =
         | ProvenanceSide.Input -> $"{layerId}-input"
         | ProvenanceSide.Output -> $"{layerId}-output"
 
-    let private layerLabel index =
-        if index = 1 then "Layer 1" else $"Layer {index}"
-
-    let init model =
+    let init (model: ProvenanceModel) =
         let layerId = "layer-1"
 
         let layer = {
             Id = layerId
-            Label = layerLabel 1
+            Label = model.Source.Name
             InputSideId = sideId layerId ProvenanceSide.Input
             OutputSideId = sideId layerId ProvenanceSide.Output
             Model = model
@@ -112,6 +110,7 @@ module Session =
             ActiveLayerId = layer.Id
             ReferenceLinks = []
             DirtyPropertyValueIds = Set.empty
+            PatchLog = []
         }
 
     let tryLayer layerId session =
@@ -174,12 +173,26 @@ module Session =
             let layerIndex = nextIndex session
             let layerId = $"layer-{layerIndex}"
 
+            // Id is namespaced with layerId (unique per session) so two layers
+            // added with the same entered name never collide: everything keyed
+            // by Source.Id (colors, "current table" detection, and the PG-1
+            // property-value id namespace) would otherwise conflate them.
+            let source = {
+                Id = $"{layerId}:{command.Name}"
+                Name = command.Name
+            }
+
             let inputs, links =
                 selectedSets
                 |> List.mapi (fun seedIndex (side, setId) ->
-                    let source = (setAt side setId current).Value
+                    let selectedSet = (setAt side setId current).Value
                     let nextId = nextInputSetId layerId side seedIndex setId
-                    let projected = { source with Id = nextId }
+
+                    let projected = {
+                        selectedSet with
+                            Id = nextId
+                            Source = source
+                    }
 
                     let link = {
                         Source = {
@@ -212,11 +225,11 @@ module Session =
 
             let pair = {
                 Id = layerId
-                Label = layerLabel layerIndex
+                Label = source.Name
                 InputSideId = sideId layerId ProvenanceSide.Input
                 OutputSideId = sideId layerId ProvenanceSide.Output
                 Model = {
-                    LoadedTableName = current.Model.LoadedTableName
+                    Source = source
                     PropertyValues = projectedPropertyValues
                     InputSets = inputs
                     OutputSets = Map.empty
@@ -244,16 +257,25 @@ module Session =
 
     let private mapEditError = Result.mapError SessionError.EditFailed
 
+    /// Appends a leaf edit's emitted patches to the session's authoritative
+    /// PatchLog. Applied only at the six leaf edit functions - composites
+    /// (updatePropertyValues, removeConnections, copyPropertyValueToLoadedTarget,
+    /// EditorActions batch helpers) call those leaves and must not wrap again,
+    /// or patches would be logged twice.
+    let private withLoggedPatches (result: SessionResult) : SessionResult =
+        result
+        |> Result.map (fun (next, patches) ->
+            {
+                next with
+                    PatchLog = next.PatchLog @ patches
+            },
+            patches
+        )
+
     let private updateLayerModel layerId model session =
         match tryLayer layerId session with
         | None -> Error(SessionError.LayerNotFound layerId)
         | Some layer -> Ok(replaceLayer { layer with Model = model } session)
-
-    let private activeRef side setId session = {
-        LayerId = session.ActiveLayerId
-        Side = side
-        SetId = setId
-    }
 
     let private layerAtRef reference session = layerById reference.LayerId session
 
@@ -469,11 +491,6 @@ module Session =
     // Temporary adapter for component migration. Remove after downstream callers stop using pair terminology.
     let selectPair layerId session : SessionResult = selectLayer layerId session
 
-    let rec private nativeOwner reference session =
-        match session.ReferenceLinks |> List.tryFind (fun link -> link.Next = reference) with
-        | Some link -> nativeOwner link.Previous session
-        | None -> reference
-
     let updatePropertyValue propertyValueId value unit session : SessionResult =
         let layer = activeLayer session
 
@@ -489,6 +506,7 @@ module Session =
                 patches
             )
         )
+        |> withLoggedPatches
 
     let private validatePropertyValueUpdate propertyValueId value unit session =
         let layer = activeLayer session
@@ -534,6 +552,7 @@ module Session =
             updateLayerModel layer.Id model session
             |> Result.map (fun next -> next, patches)
         )
+        |> withLoggedPatches
 
     let createLoadedPropertyValue (command: CreateLoadedPropertyValueCommand) session : SessionResult =
         let layer = activeLayer session
@@ -544,6 +563,7 @@ module Session =
             updateLayerModel layer.Id model session
             |> Result.map (fun next -> next, patches)
         )
+        |> withLoggedPatches
 
     let copyPropertyValueToLoadedTarget propertyValueId (target: ProvenancePropertyTarget) session : SessionResult =
         let layer = activeLayer session
@@ -570,6 +590,7 @@ module Session =
             updateLayerModel layer.Id model session
             |> Result.map (fun next -> next, patches)
         )
+        |> withLoggedPatches
 
     let connectSets inputSetId outputSetId processName session : SessionResult =
         let layer = activeLayer session
@@ -580,6 +601,7 @@ module Session =
             updateLayerModel layer.Id model session
             |> Result.map (fun next -> next, patches)
         )
+        |> withLoggedPatches
 
     let removeConnection connectionId session : SessionResult =
         let layer = activeLayer session
@@ -590,6 +612,7 @@ module Session =
             updateLayerModel layer.Id model session
             |> Result.map (fun next -> next, patches)
         )
+        |> withLoggedPatches
 
     let removeConnections connectionIds session : SessionResult =
         connectionIds
@@ -605,94 +628,34 @@ module Session =
             (Ok(session, []))
 
     let private sourceInfoFromAnchor
-        (layer: ProvenanceLayer)
+        (currentSource: ProvenanceSourceRef)
         (source: ProvenanceWritebackAnchor)
         : PropertyValueSourceInfo =
         {
-            TableName = Some source.TableName
+            TableName = Some source.Source.Name
             ProcessId = source.ProcessId
             ProcessName = source.ProcessName
             InputNames = source.InputNames
             OutputNames = source.OutputNames
-            IsCurrentTable = source.TableName = layer.Model.LoadedTableName
+            IsCurrentTable = source.Source.Id = currentSource.Id
         }
-
-    let private propertyValueSourceFromLoadedMembership
-        (layer: ProvenanceLayer)
-        (propertyValue: ProvenancePropertyValue)
-        : PropertyValueSourceInfo option =
-        let inputSets =
-            layer.Model.InputSets
-            |> values
-            |> List.filter (fun set -> ProvenanceSet.effectivePropertyValueIds set |> List.contains propertyValue.Id)
-
-        let outputSets =
-            layer.Model.OutputSets
-            |> values
-            |> List.filter (fun set -> ProvenanceSet.effectivePropertyValueIds set |> List.contains propertyValue.Id)
-
-        match inputSets, outputSets with
-        | [], [] -> None
-        | _ ->
-            Some {
-                TableName = Some layer.Model.LoadedTableName
-                ProcessId = None
-                ProcessName = None
-                InputNames = inputSets |> List.map (fun set -> set.Name) |> List.distinct
-                OutputNames = outputSets |> List.map (fun set -> set.Name) |> List.distinct
-                IsCurrentTable = true
-            }
 
     let propertyValueSourceInfo
         (layer: ProvenanceLayer)
         (propertyValue: ProvenancePropertyValue)
         : PropertyValueSourceInfo option =
-        propertyValue.Source
-        |> Option.map (sourceInfoFromAnchor layer)
-        |> Option.orElseWith (fun () -> propertyValueSourceFromLoadedMembership layer propertyValue)
-
-    let private ownerReferences
-        (propertyValueId: ProvenancePropertyValueId)
-        (session: ProvenanceSession)
-        : ProvenanceSetReference list =
-        let layer = activeLayer session
-
-        [
-            for setId, set in layer.Model.InputSets |> Map.toList do
-                if ProvenanceSet.effectivePropertyValueIds set |> List.contains propertyValueId then
-                    yield activeRef ProvenanceSide.Input setId session
-            for setId, set in layer.Model.OutputSets |> Map.toList do
-                if ProvenanceSet.effectivePropertyValueIds set |> List.contains propertyValueId then
-                    yield activeRef ProvenanceSide.Output setId session
-        ]
-        |> List.map (fun reference -> nativeOwner reference session)
-        |> List.distinct
-
-    let private layerIdForReference
-        (reference: ProvenanceSetReference)
-        (_session: ProvenanceSession)
-        : ProvenanceLayerId =
-        reference.LayerId
+        match propertyValue.Origin with
+        | ProvenancePropertyOrigin.Real source
+        | ProvenancePropertyOrigin.Virtual source -> Some(sourceInfoFromAnchor layer.Model.Source source)
 
     let propertyValueOriginInSession
         (layerId: ProvenanceLayerId)
-        (side: ProvenanceSide)
+        (_side: ProvenanceSide)
         (propertyValueId: ProvenancePropertyValueId)
         (session: ProvenanceSession)
-        : PropertyOrigin option =
-        match tryLayer layerId session with
-        | None -> None
-        | Some layer ->
+        : ProvenancePropertyOrigin option =
+        tryLayer layerId session
+        |> Option.bind (fun layer ->
             layer.Model.PropertyValues.TryFind propertyValueId
-            |> Option.map (fun propertyValue ->
-                let scoped = { session with ActiveLayerId = layerId }
-
-                match propertyValueSourceInfo layer propertyValue with
-                | Some source when source.TableName <> Some layer.Model.LoadedTableName ->
-                    PropertyOrigin.PreviousContext source
-                | _ ->
-                    match ownerReferences propertyValueId scoped with
-                    | owner :: _ when owner.LayerId = layerId -> PropertyOrigin.Current(layerId, side)
-                    | owner :: _ -> PropertyOrigin.UpstreamLayer(layerIdForReference owner scoped)
-                    | [] -> PropertyOrigin.Current(layerId, side)
-            )
+            |> Option.map (fun propertyValue -> propertyValue.Origin)
+        )

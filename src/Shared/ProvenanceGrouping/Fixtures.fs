@@ -28,8 +28,10 @@ let ioHeader kind text = { Kind = kind; Text = text }
 
 let propertyHeader kind name = { Kind = kind; Category = term name }
 
-let anchor tableName processName header inputNames outputNames : ProvenanceWritebackAnchor = {
-    TableName = tableName
+let source id name : ProvenanceSourceRef = { Id = id; Name = name }
+
+let anchor source processName header inputNames outputNames : ProvenanceWritebackAnchor = {
+    Source = source
     ProcessId = None
     ProcessName = processName
     Header = header
@@ -37,35 +39,41 @@ let anchor tableName processName header inputNames outputNames : ProvenanceWrite
     OutputNames = outputNames
 }
 
-let propertyValue id header value unit source : ProvenancePropertyValue = {
+let real source processName header inputNames outputNames =
+    ProvenancePropertyOrigin.Real(anchor source processName header inputNames outputNames)
+
+let virtualOrigin source processName header inputNames outputNames =
+    ProvenancePropertyOrigin.Virtual(anchor source processName header inputNames outputNames)
+
+let propertyValue id header value unit origin : ProvenancePropertyValue = {
     Id = id
     Header = header
     Value = value
     Unit = unit
+    Origin = origin
+}
+
+let inputSet id source header name propertyValueIds : ProvenanceSet = {
+    Id = id
     Source = source
-}
-
-let inputSet id tableName header name propertyValueIds : ProvenanceSet = {
-    Id = id
-    TableName = tableName
     Header = header
     Name = name
     PropertyValueIds = propertyValueIds
     InheritedPropertyValueIds = Map.empty
 }
 
-let outputSet id tableName header name propertyValueIds : ProvenanceSet = {
+let outputSet id source header name propertyValueIds : ProvenanceSet = {
     Id = id
-    TableName = tableName
+    Source = source
     Header = header
     Name = name
     PropertyValueIds = propertyValueIds
     InheritedPropertyValueIds = Map.empty
 }
 
-let connection id tableName processName inputSetId outputSetId : ProvenanceConnection = {
+let connection id source processName inputSetId outputSetId : ProvenanceConnection = {
     Id = id
-    TableName = tableName
+    Source = source
     ProcessId = None
     ProcessName = processName
     InputSetId = inputSetId
@@ -73,14 +81,14 @@ let connection id tableName processName inputSetId outputSetId : ProvenanceConne
 }
 
 let model
-    (loadedTableName: ProvenanceTableName)
+    (source: ProvenanceSourceRef)
     (propertyValues: ProvenancePropertyValue list)
     (inputSets: ProvenanceSet list)
     (outputSets: ProvenanceSet list)
     (connections: ProvenanceConnection list)
     : ProvenanceModel =
     {
-        LoadedTableName = loadedTableName
+        Source = source
         PropertyValues = propertyValues |> List.map (fun value -> value.Id, value) |> Map.ofList
         InputSets = inputSets |> List.map (fun set -> set.Id, set) |> Map.ofList
         OutputSets = outputSets |> List.map (fun set -> set.Id, set) |> Map.ofList
@@ -92,6 +100,8 @@ let model
     |> ProvenanceModel.refreshInheritedOutputProperties
 
 let sampleModel () : ProvenanceModel =
+    let assaySource = source "fixture:assay-table" "assay-table"
+    let previousSource = source "fixture:previous-study-table" "previous-study-table"
     let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
     let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
     let species = propertyHeader FixtureKinds.characteristicProperty "Species"
@@ -108,163 +118,191 @@ let sampleModel () : ProvenanceModel =
             species
             (ProvenanceValue.Text "Arabidopsis")
             None
-            (Some(anchor "assay-table" (Some "assay-process") species [ "Input A" ] []))
+            (real assaySource (Some "assay-process") species [ "Input A" ] [])
         propertyValue
             "pv-input-b-species"
             species
             (ProvenanceValue.Text "Arabidopsis")
             None
-            (Some(anchor "assay-table" (Some "assay-process") species [ "Input B" ] []))
+            (real assaySource (Some "assay-process") species [ "Input B" ] [])
         propertyValue
             "pv-input-c-species"
             species
             (ProvenanceValue.Text "Arabidopsis")
             None
-            (Some(anchor "assay-table" (Some "assay-process") species [ "Input C" ] []))
+            (real assaySource (Some "assay-process") species [ "Input C" ] [])
         propertyValue
             "pv-input-d-species"
             species
             (ProvenanceValue.Text "Chlamydomonas")
             None
-            (Some(anchor "assay-table" (Some "assay-process") species [ "Input D" ] []))
+            (real assaySource (Some "assay-process") species [ "Input D" ] [])
         propertyValue
             "pv-input-a-temperature"
             temperature
             (ProvenanceValue.Text "12 C")
             None
-            (Some(anchor "assay-table" (Some "assay-process") temperature [ "Input A" ] []))
+            (real assaySource (Some "assay-process") temperature [ "Input A" ] [])
         propertyValue
             "pv-input-b-temperature"
             temperature
             (ProvenanceValue.Text "12 C")
             None
-            (Some(anchor "assay-table" (Some "assay-process") temperature [ "Input B" ] []))
+            (real assaySource (Some "assay-process") temperature [ "Input B" ] [])
         propertyValue
             "pv-input-c-temperature"
             temperature
             (ProvenanceValue.Text "24 C")
             None
-            (Some(anchor "assay-table" (Some "assay-process") temperature [ "Input C" ] []))
+            (real assaySource (Some "assay-process") temperature [ "Input C" ] [])
         propertyValue
             "pv-output-a-analysis"
             analysis
             (ProvenanceValue.Text "Mass Spectrometry")
             None
-            (Some(anchor "assay-table" (Some "assay-process") analysis [] [ "Output A" ]))
+            (real assaySource (Some "assay-process") analysis [] [ "Output A" ])
         propertyValue
             "pv-output-b-analysis"
             analysis
             (ProvenanceValue.Text "Mass Spectrometry")
             None
-            (Some(anchor "assay-table" (Some "assay-process") analysis [] [ "Output B" ]))
+            (real assaySource (Some "assay-process") analysis [] [ "Output B" ])
         propertyValue
             "pv-output-c-analysis"
             analysis
             (ProvenanceValue.Text "LC-MS")
             None
-            (Some(anchor "assay-table" (Some "assay-process") analysis [] [ "Output C" ]))
+            (real assaySource (Some "assay-process") analysis [] [ "Output C" ])
         propertyValue
             "pv-output-b-replicate-1"
             replicate
             (ProvenanceValue.Text "1")
             None
-            (Some(anchor "assay-table" (Some "assay-process") replicate [ "Input A" ] [ "Output B" ]))
+            (real assaySource (Some "assay-process") replicate [ "Input A" ] [ "Output B" ])
         propertyValue
             "pv-output-b-replicate-2"
             replicate
             (ProvenanceValue.Text "2")
             None
-            (Some(anchor "assay-table" (Some "assay-process") replicate [ "Input B" ] [ "Output B" ]))
+            (real assaySource (Some "assay-process") replicate [ "Input B" ] [ "Output B" ])
         propertyValue
             "pv-previous-treatment-a"
             previousTreatment
             (ProvenanceValue.Text "Drought")
             None
-            (Some(anchor "previous-study-table" (Some "previous-process") previousTreatment [ "Ancestor A" ] []))
+            (real previousSource (Some "previous-process") previousTreatment [ "Ancestor A" ] [])
     ]
 
     let inputSets = [
-        inputSet "input-a" "assay-table" inputHeader "Input A" [
+        inputSet "input-a" assaySource inputHeader "Input A" [
             "pv-input-a-species"
             "pv-input-a-temperature"
             "pv-previous-treatment-a"
         ]
-        inputSet "input-b" "assay-table" inputHeader "Input B" [ "pv-input-b-species"; "pv-input-b-temperature" ]
-        inputSet "input-c" "assay-table" inputHeader "Input C" [ "pv-input-c-species"; "pv-input-c-temperature" ]
-        inputSet "input-d" "assay-table" inputHeader "Input D" [ "pv-input-d-species" ]
+        inputSet "input-b" assaySource inputHeader "Input B" [ "pv-input-b-species"; "pv-input-b-temperature" ]
+        inputSet "input-c" assaySource inputHeader "Input C" [ "pv-input-c-species"; "pv-input-c-temperature" ]
+        inputSet "input-d" assaySource inputHeader "Input D" [ "pv-input-d-species" ]
     ]
 
     let outputSets = [
-        outputSet "output-a" "assay-table" outputHeader "Output A" [ "pv-output-a-analysis" ]
-        outputSet "output-b" "assay-table" outputHeader "Output B" [
+        outputSet "output-a" assaySource outputHeader "Output A" [ "pv-output-a-analysis" ]
+        outputSet "output-b" assaySource outputHeader "Output B" [
             "pv-output-b-analysis"
             "pv-output-b-replicate-1"
             "pv-output-b-replicate-2"
         ]
-        outputSet "output-c" "assay-table" outputHeader "Output C" [ "pv-output-c-analysis" ]
-        outputSet "output-d" "assay-table" outputHeader "Output D" []
-        outputSet "output-e" "assay-table" outputHeader "Output E" []
+        outputSet "output-c" assaySource outputHeader "Output C" [ "pv-output-c-analysis" ]
+        outputSet "output-d" assaySource outputHeader "Output D" []
+        outputSet "output-e" assaySource outputHeader "Output E" []
     ]
 
     let connections = [
-        connection "connection-a" "assay-table" (Some "assay-process") "input-a" "output-a"
-        connection "connection-b" "assay-table" (Some "assay-process") "input-a" "output-b"
-        connection "connection-c" "assay-table" (Some "assay-process") "input-b" "output-b"
-        connection "connection-d" "assay-table" (Some "assay-process") "input-c" "output-c"
-        connection "connection-e" "assay-table" (Some "assay-process") "input-d" "output-d"
+        connection "connection-a" assaySource (Some "assay-process") "input-a" "output-a"
+        connection "connection-b" assaySource (Some "assay-process") "input-a" "output-b"
+        connection "connection-c" assaySource (Some "assay-process") "input-b" "output-b"
+        connection "connection-d" assaySource (Some "assay-process") "input-c" "output-c"
+        connection "connection-e" assaySource (Some "assay-process") "input-d" "output-d"
     ]
 
-    model "assay-table" propertyValues inputSets outputSets connections
+    model assaySource propertyValues inputSets outputSets connections
 
 let sampleSession () : ProvenanceSession = sampleModel () |> Session.init
 
 let inputOnlyModel () : ProvenanceModel =
+    let inputOnlySource = source "fixture:input-only-table" "input-only-table"
     let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
     let species = propertyHeader FixtureKinds.characteristicProperty "Species"
 
     model
-        "input-only-table"
+        inputOnlySource
         [
-            propertyValue "pv-input-only-species" species (ProvenanceValue.Text "Arabidopsis") None None
+            propertyValue
+                "pv-input-only-species"
+                species
+                (ProvenanceValue.Text "Arabidopsis")
+                None
+                (real inputOnlySource None species [ "Input Only A" ] [])
         ]
         [
-            inputSet "input-only-a" "input-only-table" inputHeader "Input Only A" [ "pv-input-only-species" ]
+            inputSet "input-only-a" inputOnlySource inputHeader "Input Only A" [ "pv-input-only-species" ]
         ] [] []
 
 let outputOnlyModel () : ProvenanceModel =
+    let outputOnlySource = source "fixture:output-only-table" "output-only-table"
     let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
     let analysis = propertyHeader FixtureKinds.parameterProperty "Analysis"
 
     model
-        "output-only-table"
+        outputOnlySource
         [
-            propertyValue "pv-output-only-analysis" analysis (ProvenanceValue.Text "LC-MS") None None
+            propertyValue
+                "pv-output-only-analysis"
+                analysis
+                (ProvenanceValue.Text "LC-MS")
+                None
+                (real outputOnlySource None analysis [] [ "Output Only A" ])
         ]
         [] [
-            outputSet "output-only-a" "output-only-table" outputHeader "Output Only A" [ "pv-output-only-analysis" ]
+            outputSet "output-only-a" outputOnlySource outputHeader "Output Only A" [ "pv-output-only-analysis" ]
         ] []
 
 let switchablePropertyModel () : ProvenanceModel =
+    let switchableSource = source "fixture:switchable-table" "switchable-table"
     let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
     let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
     let batch = propertyHeader FixtureKinds.parameterProperty "Batch"
 
     model
-        "switchable-table"
+        switchableSource
         [
-            propertyValue "pv-input-a-batch" batch (ProvenanceValue.Text "A") None None
-            propertyValue "pv-output-a-batch" batch (ProvenanceValue.Text "A") None None
-            propertyValue "pv-output-b-batch" batch (ProvenanceValue.Text "B") None None
+            propertyValue
+                "pv-input-a-batch"
+                batch
+                (ProvenanceValue.Text "A")
+                None
+                (real switchableSource None batch [ "Input A" ] [])
+            propertyValue
+                "pv-output-a-batch"
+                batch
+                (ProvenanceValue.Text "A")
+                None
+                (real switchableSource None batch [] [ "Output A" ])
+            propertyValue
+                "pv-output-b-batch"
+                batch
+                (ProvenanceValue.Text "B")
+                None
+                (real switchableSource None batch [] [ "Output B" ])
         ]
         [
-            inputSet "input-a" "switchable-table" inputHeader "Input A" [ "pv-input-a-batch" ]
-            inputSet "input-b" "switchable-table" inputHeader "Input B" []
+            inputSet "input-a" switchableSource inputHeader "Input A" [ "pv-input-a-batch" ]
+            inputSet "input-b" switchableSource inputHeader "Input B" []
         ] [
-            outputSet "output-a" "switchable-table" outputHeader "Output A" [ "pv-output-a-batch" ]
-            outputSet "output-b" "switchable-table" outputHeader "Output B" [ "pv-output-b-batch" ]
+            outputSet "output-a" switchableSource outputHeader "Output A" [ "pv-output-a-batch" ]
+            outputSet "output-b" switchableSource outputHeader "Output B" [ "pv-output-b-batch" ]
         ] [
-            connection "connection-a" "switchable-table" None "input-a" "output-a"
-            connection "connection-b" "switchable-table" None "input-b" "output-b"
+            connection "connection-a" switchableSource None "input-a" "output-a"
+            connection "connection-b" switchableSource None "input-b" "output-b"
         ]
 
 let typedSampleModel () : ProvenanceModel =
@@ -295,7 +333,7 @@ let typedSampleModel () : ProvenanceModel =
             instrument
             (ProvenanceValue.Term instrumentValue)
             None
-            (Some(anchor "assay-table" (Some "assay-process") instrument [] [ "Output A" ]))
+            (real baseModel.Source (Some "assay-process") instrument [] [ "Output A" ])
 
     let outputA = {
         baseModel.OutputSets.["output-a"] with
@@ -312,16 +350,24 @@ let typedSampleModel () : ProvenanceModel =
     }
 
 let dataOutputOnlyModel () : ProvenanceModel =
+    let dataOutputOnlySource =
+        source "fixture:data-output-only-table" "data-output-only-table"
+
     let outputHeader = ioHeader FixtureKinds.dataEndpoint "Output [Data]"
     let analysis = propertyHeader FixtureKinds.parameterProperty "Analysis"
 
     model
-        "data-output-only-table"
+        dataOutputOnlySource
         [
-            propertyValue "pv-data-output-analysis" analysis (ProvenanceValue.Text "LC-MS") None None
+            propertyValue
+                "pv-data-output-analysis"
+                analysis
+                (ProvenanceValue.Text "LC-MS")
+                None
+                (real dataOutputOnlySource None analysis [] [ "Data Output A" ])
         ]
         [] [
-            outputSet "data-output-only-a" "data-output-only-table" outputHeader "Data Output A" [
+            outputSet "data-output-only-a" dataOutputOnlySource outputHeader "Data Output A" [
                 "pv-data-output-analysis"
             ]
         ] []

@@ -135,7 +135,9 @@ module private SelectionSurface =
     [<Emit("$0.closest($1)")>]
     let private closest (_element: Browser.Types.Element) (_selector: string) : Browser.Types.Element = jsNative
 
-    let shouldSelect (event: Browser.Types.MouseEvent) =
+    /// True when the click hit the card body itself rather than one of the
+    /// interactive controls (buttons, checkboxes, handles) hosted on it.
+    let shouldActivate (event: Browser.Types.MouseEvent) =
         let targetObj: obj = box event.target
 
         if isNull targetObj then
@@ -160,6 +162,7 @@ type GroupCard =
         (
             category: string,
             valueText: string,
+            valueIdentity: string,
             paletteClasses: string,
             isHighlighted: bool,
             setHighlighted: bool -> unit,
@@ -200,6 +203,8 @@ type GroupCard =
             prop.ariaLabel label
             prop.custom ("aria-pressed", isFocused)
             prop.custom ("data-hovered", isHighlighted)
+            // Lets the drop feedback find and flash the tab a dropped value created.
+            prop.custom ("data-provenance-grouping-value", valueIdentity)
             match testId with
             | Some testId -> prop.testId testId
             | None -> ()
@@ -315,6 +320,18 @@ type GroupCard =
         let focusedTabIndex, setFocusedTabIndex = React.useStateWithUpdater<int option> None
         let articleRef = React.useElementRef ()
         let density = React.useContext Density.context
+        let hoverStore = React.useContext HoverHighlight.context
+        let connectionInteraction = React.useContext ConnectionDragHints.context
+
+        // Hovering a card lights up its connectors and the connected opposite cards.
+        // Suppressed while connecting so the highlight cannot fight drop feedback.
+        let publishHover () =
+            if connectionInteraction.SourceSide.IsNone && not isValueChipDragging then
+                HoverHighlight.set { Side = side; GroupId = group.Id } hoverStore
+
+        let clearHover () = HoverHighlight.clear hoverStore
+
+        React.useEffectOnce (fun () -> FsReact.createDisposable (fun () -> HoverHighlight.clear hoverStore))
 
         let droppable =
             DndKit.useDroppable (
@@ -370,9 +387,33 @@ type GroupCard =
             | ProvenanceSide.Input -> "swt:left-full swt:ml-2"
             | ProvenanceSide.Output -> "swt:right-full swt:mr-2"
 
-        let handleSelectionClick (event: Browser.Types.MouseEvent) =
-            if SelectionSurface.shouldSelect event then
-                onSelect ()
+        let memberPropertyAnchorEdge =
+            match side with
+            | ProvenanceSide.Input -> "swt:top-1/2 swt:left-0 swt:-translate-x-1/2 swt:-translate-y-1/2"
+            | ProvenanceSide.Output -> "swt:top-1/2 swt:right-0 swt:translate-x-1/2 swt:-translate-y-1/2"
+
+        // The card body is the expand surface; selection lives on an explicit
+        // checkbox so the most common click (open the group) is the default one.
+        let handleExpandClick (event: Browser.Types.MouseEvent) =
+            if SelectionSurface.shouldActivate event then
+                onExpand ()
+
+        let selectionCheckbox =
+            Html.input [
+                prop.type'.checkbox
+                prop.className "swt:checkbox swt:checkbox-xs swt:checkbox-primary swt:shrink-0"
+                prop.isChecked selected
+                prop.onChange (fun (_: bool) -> onSelect ())
+                prop.ariaLabel (
+                    if selected then
+                        $"Deselect group {title}"
+                    else
+                        $"Select group {title}"
+                )
+                prop.title "Select this group: dropped values and new layers apply to all selected groups"
+                if defaultArg debug false then
+                    prop.testId $"provenance-group-select-{side}-{group.Id}"
+            ]
 
         Html.article [
             match key with
@@ -381,11 +422,17 @@ type GroupCard =
             prop.ref setArticleRef
             prop.custom ("data-provenance-group-node", DragDrop.groupNodeId side group.Id)
             prop.custom ("data-provenance-group-drop-id", DragDrop.groupDropId side group.Id)
+            prop.onMouseEnter (fun _ -> publishHover ())
+            prop.onMouseLeave (fun _ -> clearHover ())
             prop.className [
                 // Cards size to their content (the column aligns them toward their rail),
                 // so the gap between the two card columns grows for group connectors. The
                 // edge handles are positioned on the card border and move with its width.
                 "swt:relative swt:flex swt:w-fit swt:max-w-full swt:flex-col swt:rounded-box swt:border swt:bg-base-100 swt:shadow-sm"
+                "swt:transition-shadow swt:duration-150 hover:swt:shadow-md"
+                // Cards connected to the hovered opposite card are marked imperatively
+                // through this data attribute; see the hover-highlight store.
+                "data-[provenance-related=true]:swt:ring-2 data-[provenance-related=true]:swt:ring-primary/35"
                 match density with
                 | Density.EditorDensity.Compact -> "swt:gap-1 swt:p-1.5"
                 | _ -> "swt:gap-1.5 swt:p-2.5"
@@ -395,6 +442,10 @@ type GroupCard =
                     "swt:border-base-300"
                 if droppable.isOver && isValueChipDragging then
                     "swt:ring-2 swt:ring-primary"
+                // While a value chip is in flight every card is a legal target, so
+                // they all pick up a faint ring instead of staying inert until hover.
+                elif isValueChipDragging then
+                    "swt:ring-1 swt:ring-primary/25"
             ]
             if defaultArg debug false then
                 prop.testId $"provenance-group-{side}-{group.Id}"
@@ -426,10 +477,11 @@ type GroupCard =
                     // so the type line sits above its name to mirror the expanded member rows.
                     Html.div [
                         prop.className "swt:flex swt:cursor-pointer swt:items-start swt:gap-2"
-                        prop.onClick handleSelectionClick
+                        prop.onClick handleExpandClick
                         if defaultArg debug false then
-                            prop.testId $"provenance-group-select-surface-{side}-{group.Id}"
+                            prop.testId $"provenance-group-expand-surface-{side}-{group.Id}"
                         prop.children [
+                            selectionCheckbox
                             Html.div [
                                 prop.className "swt:flex swt:min-w-0 swt:grow swt:flex-col swt:gap-0.5"
                                 prop.title title
@@ -494,9 +546,9 @@ type GroupCard =
 
                     Html.div [
                         prop.className "swt:flex swt:min-w-0 swt:cursor-pointer swt:flex-col swt:gap-2"
-                        prop.onClick handleSelectionClick
+                        prop.onClick handleExpandClick
                         if defaultArg debug false then
-                            prop.testId $"provenance-group-select-surface-{side}-{group.Id}"
+                            prop.testId $"provenance-group-expand-surface-{side}-{group.Id}"
                         prop.children [
                             Html.div [
                                 prop.className [
@@ -518,6 +570,10 @@ type GroupCard =
                                         GroupCard.OrganizerTab(
                                             category,
                                             valueText,
+                                            DragDrop.groupingValueIdentity
+                                                groupingValue.Key.Header
+                                                groupingValue.Value
+                                                groupingValue.Unit,
                                             tabPalette.[index % tabPalette.Length],
                                             (hoveredTabIndex = Some index || focusedTabIndex = Some index),
                                             (fun highlighted ->
@@ -535,8 +591,9 @@ type GroupCard =
                                 ]
                             ]
                             Html.div [
-                                prop.className "swt:flex swt:items-center swt:gap-1"
+                                prop.className "swt:flex swt:items-center swt:gap-2"
                                 prop.children [
+                                    selectionCheckbox
                                     // The expand trigger is drawn as a folder: a clipped back
                                     // panel with its own index tab, the members' type symbols
                                     // resting inside, and a front pocket they tuck behind.
@@ -599,7 +656,9 @@ type GroupCard =
                 if expanded then
                     Html.ul [
                         prop.className [
-                            "swt:space-y-1 swt:border-t swt:border-base-300 swt:pt-2"
+                            // fade-in only: the member rows carry connector anchors, so a
+                            // slide would put the measured positions off during entry.
+                            "swt:space-y-1 swt:border-t swt:border-base-300 swt:pt-2 swt:motion-fade-in"
                             match density with
                             | Density.EditorDensity.Compact -> "swt:text-xs"
                             | _ -> "swt:text-sm"
@@ -616,9 +675,21 @@ type GroupCard =
                                     ParentGroupId = Some group.Id
                                 }
 
+                                let memberPropertyAnchor: ConnectionHandleRef = {
+                                    Kind = ConnectionHandleKind.GroupMemberPropertyAnchor
+                                    Side = side
+                                    Id = member'.SetId
+                                    ParentGroupId = Some group.Id
+                                }
+
                                 Html.li [
                                     prop.className "swt:relative"
                                     prop.children [
+                                        Controls.ConnectionAnchor(
+                                            memberPropertyAnchor,
+                                            memberPropertyAnchorEdge,
+                                            ?debug = debug
+                                        )
                                         Html.div [
                                             prop.className "swt:flex swt:items-center swt:gap-2"
                                             prop.children [
@@ -663,7 +734,7 @@ type GroupCard =
                                                 prop.className [
                                                     // The viewport cap keeps the popover readable when the
                                                     // editor itself is narrower than the preferred width.
-                                                    "swt:absolute swt:top-0 swt:z-30 swt:w-72 swt:max-w-[60vw] swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 swt:shadow-lg"
+                                                    "swt:absolute swt:top-0 swt:z-30 swt:w-72 swt:max-w-[60vw] swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 swt:shadow-lg swt:motion-pop-in"
                                                     memberDetailsPosition
                                                 ]
                                                 if defaultArg debug false then
