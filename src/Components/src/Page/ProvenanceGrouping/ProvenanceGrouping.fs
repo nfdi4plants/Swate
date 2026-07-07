@@ -12,6 +12,7 @@ open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
 open Swate.Components.Shared.ProvenanceGrouping.Edit
 open Swate.Components.Shared.ProvenanceGrouping.Session
+open Swate.Components.Shared.ProvenanceGrouping.Fixtures
 open Swate.Components.Page.ProvenanceGrouping.Types
 
 [<Erase; Mangle(false)>]
@@ -31,9 +32,10 @@ type ProvenanceGrouping =
         let openRail, setOpenRail = React.useState<ProvenanceSide option> None
         let density, setDensity = React.useState Density.EditorDensity.Comfortable
         let isPropertyShelfExpanded, setIsPropertyShelfExpanded = React.useState true
+        let isTutorialOpen, setIsTutorialOpen = React.useState false
 
-        let propertyShelfFolderExpansion, setPropertyShelfFolderExpansion =
-            React.useState<(ProvenanceLayerId * Set<string>) option> None
+        let propertyShelfActiveFolder, setPropertyShelfActiveFolder =
+            React.useState<(ProvenanceLayerId * string) option> None
 
         let showPropertyHeaderConnectors, setShowPropertyHeaderConnectors =
             React.useState true
@@ -304,24 +306,15 @@ type ProvenanceGrouping =
                 |]
             )
 
-        let defaultPropertyShelfFolderIds =
-            React.useMemo (
-                (fun () ->
-                    propertyShelfFolders
-                    |> List.tryHead
-                    |> Option.map (fun folder -> Set.singleton folder.Id)
-                    |> Option.defaultValue Set.empty
-                ),
-                [| box propertyShelfFolders |]
-            )
+        // The shelf falls back to its first tab internally, so only a
+        // selection made on the current layer is forwarded.
+        let propertyShelfActiveFolderId =
+            match propertyShelfActiveFolder with
+            | Some(selectedLayerId, folderId) when selectedLayerId = layer.Id -> Some folderId
+            | _ -> None
 
-        let propertyShelfExpandedFolderIds =
-            match propertyShelfFolderExpansion with
-            | Some(expandedLayerId, folderIds) when expandedLayerId = layer.Id -> folderIds
-            | _ -> defaultPropertyShelfFolderIds
-
-        let setPropertyShelfExpandedFolderIds folderIds =
-            setPropertyShelfFolderExpansion (Some(latestLayer.current.Id, folderIds))
+        let setPropertyShelfActiveFolderId folderId =
+            setPropertyShelfActiveFolder (Some(latestLayer.current.Id, folderId))
 
         let setPropertyShelfFolderColor folderId color =
             applyUiState (PropertyShelf.setFolderColor latestSession.current folderId color)
@@ -332,6 +325,8 @@ type ProvenanceGrouping =
                     Html.section [
                         prop.className
                             "swt:flex swt:min-w-0 swt:flex-col swt:gap-3 swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100/80 swt:p-3 swt:shadow-sm"
+                        // Always-on anchor for the interactive tutorial's spotlight.
+                        prop.custom ("data-tutorial", "provenance-property-shelf")
                         if debug then
                             prop.testId "provenance-property-shelf"
                         prop.children [
@@ -398,8 +393,8 @@ type ProvenanceGrouping =
                                     (fun _ item ->
                                         DragDrop.folderPropertyDragId item.Payload.SourceSide item.Payload.Header
                                     ),
-                                    expandedFolderIds = propertyShelfExpandedFolderIds,
-                                    onExpandedFolderIdsChange = setPropertyShelfExpandedFolderIds,
+                                    ?activeFolderId = propertyShelfActiveFolderId,
+                                    onActiveFolderIdChange = setPropertyShelfActiveFolderId,
                                     onSetFolderColor = setPropertyShelfFolderColor,
                                     className = "swt:min-w-0 swt:motion-pop-in",
                                     debug = debug
@@ -410,7 +405,7 @@ type ProvenanceGrouping =
                 [|
                     box propertyShelfFolders
                     box isPropertyShelfExpanded
-                    box propertyShelfExpandedFolderIds
+                    box propertyShelfActiveFolderId
                 |]
             )
 
@@ -1391,32 +1386,26 @@ type ProvenanceGrouping =
                             "swt:sticky swt:top-0 swt:z-20 swt:flex swt:flex-col swt:gap-4 swt:bg-base-200 swt:p-4"
                         prop.children [
                             Html.div [
-                                prop.className "swt:flex swt:flex-wrap swt:items-center swt:justify-between swt:gap-2"
+                                prop.className "swt:flex swt:min-w-0 swt:flex-wrap swt:items-center swt:gap-2"
+                                if debug then
+                                    prop.testId "provenance-top-controls"
                                 prop.children [
-                                    Controls.LayerTabs(
-                                        session,
-                                        (fun layerId ->
-                                            Session.selectLayer layerId latestSession.current |> publishResult false
-                                        ),
-                                        (fun name ->
-                                            let currentInputGroups, currentOutputGroups = latestGroups.current
-
-                                            EditorActions.addLayer
-                                                latestSession.current
-                                                latestLayer.current.Id
-                                                currentInputGroups
-                                                currentOutputGroups
-                                                latestUiState.current
-                                                name
-                                                publish
-                                        ),
-                                        sourceColors = uiState.PropertyColors.SourceColors,
-                                        onSetSourceColor = setSourceColor,
-                                        seedSummary = layerSeedSummary,
+                                    // Search, sort and filters sit on one line
+                                    // above the property shelf.
+                                    Controls.FilterToolbar(
+                                        uiState.Filters,
+                                        (fun text -> applyUiState (State.Filters.setSearch text)),
+                                        setPropertySort,
+                                        (fun sort -> applyUiState (State.Filters.setGroupSort sort)),
+                                        (fun filter -> applyUiState (State.Filters.setValueCountFilter filter)),
+                                        (fun filter -> applyUiState (State.Filters.setOriginFilter filter)),
                                         debug = debug
                                     )
                                     Html.div [
-                                        prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
+                                        prop.className
+                                            "swt:ml-auto swt:flex swt:shrink-0 swt:flex-wrap swt:items-center swt:gap-2"
+                                        if debug then
+                                            prop.testId "provenance-view-actions"
                                         prop.children [
                                             Html.button [
                                                 prop.type'.button
@@ -1510,20 +1499,27 @@ type ProvenanceGrouping =
                                                 prop.text "Compact"
                                             ]
                                             Controls.HelpLegend(debug = debug)
+                                            Html.button [
+                                                prop.type'.button
+                                                prop.className "swt:btn swt:btn-ghost swt:btn-xs"
+                                                prop.title "Open the interactive tutorial"
+                                                prop.ariaLabel "Open the interactive tutorial"
+                                                if debug then
+                                                    prop.testId "provenance-tutorial-trigger"
+                                                prop.onClick (fun _ -> setIsTutorialOpen true)
+                                                prop.children [
+                                                    Html.i [
+                                                        prop.className
+                                                            "swt:iconify swt:fluent--lightbulb-20-regular swt:size-4"
+                                                    ]
+                                                    Html.span "Tutorial"
+                                                ]
+                                            ]
                                         ]
                                     ]
                                 ]
                             ]
                             propertyShelf
-                            Controls.FilterToolbar(
-                                uiState.Filters,
-                                (fun text -> applyUiState (State.Filters.setSearch text)),
-                                setPropertySort,
-                                (fun sort -> applyUiState (State.Filters.setGroupSort sort)),
-                                (fun filter -> applyUiState (State.Filters.setValueCountFilter filter)),
-                                (fun filter -> applyUiState (State.Filters.setOriginFilter filter)),
-                                debug = debug
-                            )
                             // The selection bar keeps the otherwise invisible group
                             // selection visible: it drives fan-out drops and layer seeding.
                             if selectedGroupCount > 0 then
@@ -1630,6 +1626,46 @@ type ProvenanceGrouping =
                         connections
                         uiState.Detail
                         removeDisplayConnection
+
+                    // Layer navigation is pinned to the bottom, but only the
+                    // centered pagination control itself is visually boxed.
+                    Html.div [
+                        prop.className
+                            "swt:pointer-events-none swt:sticky swt:bottom-0 swt:z-20 swt:mt-auto swt:flex swt:justify-center swt:px-4 swt:py-2"
+                        prop.children [
+                            Controls.LayerPagination(
+                                session,
+                                (fun layerId ->
+                                    Session.selectLayer layerId latestSession.current |> publishResult false
+                                ),
+                                (fun name ->
+                                    let currentInputGroups, currentOutputGroups = latestGroups.current
+
+                                    EditorActions.addLayer
+                                        latestSession.current
+                                        latestLayer.current.Id
+                                        currentInputGroups
+                                        currentOutputGroups
+                                        latestUiState.current
+                                        name
+                                        publish
+                                ),
+                                sourceColors = uiState.PropertyColors.SourceColors,
+                                onSetSourceColor = setSourceColor,
+                                seedSummary = layerSeedSummary,
+                                debug = debug
+                            )
+                        ]
+                    ]
+
+                    // The tour runs on a sandboxed sample-data editor instance, so
+                    // trying the interactions cannot touch the host's session.
+                    if isTutorialOpen then
+                        ProvenanceTutorial.Modal(
+                            (fun () -> setIsTutorialOpen false),
+                            ProvenanceGrouping.Editor(sampleModel (), ignore, debug = debug),
+                            debug = debug
+                        )
                 ]
             ]
 

@@ -234,7 +234,7 @@ type Controls =
         )
 
     [<ReactComponent>]
-    static member LayerTabs
+    static member LayerPagination
         (
             session: ProvenanceSession,
             onSelect: ProvenanceLayerId -> unit,
@@ -248,6 +248,7 @@ type Controls =
             $"Layer {session.LayerOrder.Length + 1}"
 
         let isAddLayerOpen, setIsAddLayerOpen = React.useState false
+        let isLayerJumpOpen, setIsLayerJumpOpen = React.useState false
         let layerName, setLayerName = React.useState (defaultNextLayerName session)
 
         React.useEffect ((fun () -> setLayerName (defaultNextLayerName session)), [| box session.LayerOrder.Length |])
@@ -268,9 +269,6 @@ type Controls =
                     submitLayerName ()
                 )
                 prop.children [
-                    // Announces which entities will seed the new layer's inputs, so
-                    // the effect of the current selection (or its absence) is visible
-                    // before the layer is created.
                     match seedSummary with
                     | Some summary ->
                         Html.p [
@@ -296,64 +294,183 @@ type Controls =
                 ]
             ]
 
+        let activeIndex =
+            session.LayerOrder
+            |> List.tryFindIndex (fun layerId -> layerId = session.ActiveLayerId)
+            |> Option.defaultValue 0
+
+        let sourceColorOf (layer: ProvenanceLayer) =
+            sourceColors
+            |> Option.bind (fun colors -> colors |> Map.tryFind layer.Model.Source.Id)
+
+        let activeLayer = Session.layerById session.ActiveLayerId session
+
+        let arrowButton (label: string) (iconClass: string) (targetIndex: int) (testId: string) =
+            let target = session.LayerOrder |> List.tryItem targetIndex
+
+            Html.button [
+                prop.type'.button
+                prop.className [
+                    "swt:btn swt:btn-sm swt:btn-outline swt:w-10 swt:px-0"
+                    if target.IsNone then
+                        "swt:opacity-40"
+                ]
+                prop.title label
+                prop.ariaLabel label
+                prop.disabled target.IsNone
+                if target.IsSome && defaultArg debug false then
+                    prop.testId testId
+                prop.onClick (fun _ -> target |> Option.iter onSelect)
+                prop.children [
+                    Html.i [ prop.className $"swt:iconify {iconClass} swt:size-4" ]
+                ]
+            ]
+
+        let pageSlot layerId =
+            let layer = Session.layerById layerId session
+            let sourceColor = sourceColorOf layer
+            let isActive = layerId = session.ActiveLayerId
+
+            Html.button [
+                prop.key layerId
+                prop.type'.button
+                prop.title $"View provenance layer {layer.Model.Source.Name}"
+                prop.ariaLabel $"View provenance layer {layer.Model.Source.Name}"
+                prop.custom ("data-provenance-layer-page", layerId)
+                prop.className [
+                    "swt:btn swt:btn-sm swt:min-w-0 swt:px-3"
+                    if isActive then
+                        "swt:btn-primary swt:font-semibold"
+                    else
+                        "swt:btn-outline swt:opacity-60 swt:hover:opacity-100"
+                ]
+                prop.style [ style.custom ("width", "clamp(4.5rem, 18vw, 7rem)") ]
+                if defaultArg debug false then
+                    prop.testId $"provenance-layer-{layerId}"
+                    prop.custom ("data-provenance-layer-color", sourceColor |> Option.defaultValue "")
+                prop.onClick (fun _ -> onSelect layerId)
+                prop.children [
+                    match sourceColor with
+                    | Some color when color <> "" ->
+                        Html.span [
+                            prop.className "swt:size-2 swt:shrink-0 swt:rounded-full"
+                            prop.style [ style.backgroundColor color ]
+                        ]
+                    | _ -> Html.none
+                    Html.span [
+                        prop.className "swt:min-w-0 swt:truncate"
+                        prop.text layer.Model.Source.Name
+                    ]
+                ]
+            ]
+
+        let pageSlots =
+            let layerCount = session.LayerOrder.Length
+
+            if layerCount <= 3 then
+                [ 0..2 ] |> List.choose (fun index -> session.LayerOrder |> List.tryItem index)
+            elif activeIndex = 0 then
+                [ 0..2 ] |> List.choose (fun index -> session.LayerOrder |> List.tryItem index)
+            elif activeIndex = layerCount - 1 then
+                [ layerCount - 3 .. layerCount - 1 ]
+                |> List.choose (fun index -> session.LayerOrder |> List.tryItem index)
+            else
+                [ activeIndex - 1 .. activeIndex + 1 ]
+                |> List.choose (fun index -> session.LayerOrder |> List.tryItem index)
+
         Html.div [
-            prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
+            prop.className
+                "swt:pointer-events-auto swt:flex swt:max-w-full swt:min-w-0 swt:items-center swt:justify-center swt:gap-2 swt:rounded-box swt:border swt:border-base-content/20 swt:bg-base-100 swt:px-3 swt:py-2 swt:shadow-md swt:ring-1 swt:ring-base-300"
+            prop.style [ style.custom ("width", "min(40rem, calc(100vw - 2rem))") ]
+            prop.custom ("role", "navigation")
+            prop.ariaLabel "Layer pagination"
+            prop.custom ("data-tutorial", "provenance-layer-pagination")
+            if defaultArg debug false then
+                prop.testId "provenance-layer-pagination"
             prop.children [
-                for layerId in session.LayerOrder do
-                    let layer = Session.layerById layerId session
-
-                    let sourceColor =
-                        sourceColors
-                        |> Option.bind (fun colors -> colors |> Map.tryFind layer.Model.Source.Id)
-
-                    let layerButtonClasses = [
-                        "swt:btn swt:btn-sm swt:join-item"
-                        if layerId = session.ActiveLayerId then
-                            "swt:btn-primary"
-                        else
-                            "swt:btn-outline"
+                Html.div [
+                    prop.className "swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:justify-center swt:gap-1"
+                    if defaultArg debug false then
+                        prop.testId "provenance-layer-pages"
+                    prop.children [
+                        arrowButton
+                            "Previous layer"
+                            "swt:fluent--chevron-left-20-regular"
+                            (activeIndex - 1)
+                            "provenance-layer-prev"
+                        for layerId in pageSlots do
+                            pageSlot layerId
+                        arrowButton
+                            "Next layer"
+                            "swt:fluent--chevron-right-20-regular"
+                            (activeIndex + 1)
+                            "provenance-layer-next"
                     ]
-
-                    let swatchButtonClass =
-                        [
-                            yield! layerButtonClasses
-                            "swt:min-h-8 swt:w-8 swt:px-0"
-                        ]
-                        |> String.concat " "
-
-                    Html.div [
-                        prop.className "swt:join"
-                        prop.children [
-                            match onSetSourceColor with
-                            | Some setSourceColor ->
-                                Controls.LayerColorButton(
-                                    layer.Model.Source.Id,
-                                    sourceColor,
-                                    setSourceColor layer.Model.Source.Id,
-                                    triggerClassName = swatchButtonClass
-                                )
-                            | None ->
-                                Html.span [
-                                    prop.className [
-                                        yield! layerButtonClasses
-                                        "swt:min-h-8 swt:w-8 swt:px-0"
-                                    ]
-                                    match sourceColor with
-                                    | Some color when color <> "" -> prop.style [ style.backgroundColor color ]
-                                    | _ -> ()
+                ]
+                Popover.Popover(
+                    isOpen = isLayerJumpOpen,
+                    onOpenChange = setIsLayerJumpOpen,
+                    ?debug =
+                        (if defaultArg debug false then
+                             Some "provenance-layer-jump-popover"
+                         else
+                             None),
+                    children =
+                        React.Fragment [
+                            Popover.Trigger(
+                                Html.button [
+                                    prop.title "Jump to layer"
+                                    prop.ariaLabel "Jump to layer"
+                                    prop.type'.button
+                                    prop.className
+                                        "swt:btn swt:btn-sm swt:btn-outline swt:w-10 swt:px-0 swt:font-semibold"
+                                    if defaultArg debug false then
+                                        prop.testId "provenance-layer-jump"
+                                    prop.text "..."
                                 ]
-                            Html.button [
-                                prop.title $"View provenance layer {layer.Model.Source.Name}"
-                                prop.className layerButtonClasses
-                                prop.ariaLabel $"View provenance layer {layer.Model.Source.Name}"
-                                if defaultArg debug false then
-                                    prop.testId $"provenance-layer-{layerId}"
-                                    prop.custom ("data-provenance-layer-color", sourceColor |> Option.defaultValue "")
-                                prop.onClick (fun _ -> onSelect layerId)
-                                prop.children [ Html.span layer.Model.Source.Name ]
-                            ]
+                            )
+                            Popover.Content(
+                                children =
+                                    Html.div [
+                                        prop.className "swt:flex swt:min-w-48 swt:flex-col swt:gap-2 swt:p-2"
+                                        prop.children [
+                                            Html.label [ prop.className "swt:label"; prop.text "Jump to layer" ]
+                                            Html.select [
+                                                prop.className "swt:select swt:select-bordered swt:select-sm swt:w-full"
+                                                prop.ariaLabel "Select layer"
+                                                prop.title "Jump to a layer"
+                                                if defaultArg debug false then
+                                                    prop.testId "provenance-layer-select"
+                                                prop.value session.ActiveLayerId
+                                                prop.onChange (fun (layerId: string) ->
+                                                    onSelect layerId
+                                                    setIsLayerJumpOpen false
+                                                )
+                                                prop.children [
+                                                    for layerId in session.LayerOrder do
+                                                        let layer = Session.layerById layerId session
+
+                                                        Html.option [
+                                                            prop.key layerId
+                                                            prop.value layerId
+                                                            prop.text layer.Model.Source.Name
+                                                        ]
+                                                ]
+                                            ]
+                                        ]
+                                    ]
+                            )
                         ]
-                    ]
+                )
+                match onSetSourceColor with
+                | Some setSourceColor ->
+                    Controls.LayerColorButton(
+                        activeLayer.Model.Source.Id,
+                        sourceColorOf activeLayer,
+                        setSourceColor activeLayer.Model.Source.Id,
+                        triggerClassName = "swt:btn swt:btn-sm swt:btn-outline swt:min-h-8 swt:w-8 swt:px-0"
+                    )
+                | None -> Html.none
                 Popover.Popover(
                     isOpen = isAddLayerOpen,
                     onOpenChange = setIsAddLayerOpen,
@@ -926,6 +1043,8 @@ type Controls =
                     "swt:items-center swt:justify-center"
             ]
             prop.custom ("data-provenance-drop-state", dropState)
+            // Always-on anchor for the interactive tutorial's spotlight.
+            prop.custom ("data-tutorial", $"provenance-rail-{side}")
             if defaultArg debug false then
                 prop.testId $"provenance-property-rail-{side}"
 
@@ -1525,6 +1644,54 @@ type Controls =
                 ]
         )
 
+    /// The overall search over properties, values and groups. Debounced, so
+    /// typing updates the input immediately but filters only settle afterwards.
+    [<ReactComponent>]
+    static member SearchBar(searchText: string, onSearch: string -> unit, ?debug: bool) =
+        let searchDraft, setSearchDraft = React.useState searchText
+        let latestSearchText = React.useRef searchText
+        let latestOnSearch = React.useRef onSearch
+
+        // useLayoutEffect (not a render-phase write) so a discarded render
+        // under concurrent rendering / StrictMode never leaves these pointing
+        // at a searchText/onSearch value that was never actually committed.
+        React.useLayoutEffect (fun () ->
+            latestSearchText.current <- searchText
+            latestOnSearch.current <- onSearch
+        )
+
+        let debouncedSearchDraft = React.useDebounce (searchDraft, 300)
+
+        React.useEffect ((fun () -> setSearchDraft searchText), [| box searchText |])
+
+        React.useEffect (
+            (fun () ->
+                if debouncedSearchDraft <> latestSearchText.current then
+                    latestOnSearch.current debouncedSearchDraft
+            ),
+            [| box debouncedSearchDraft |]
+        )
+
+        Html.div [
+            prop.className "swt:relative swt:flex swt:w-40 swt:shrink-0 swt:items-center"
+            // Always-on anchor for the interactive tutorial's spotlight.
+            prop.custom ("data-tutorial", "provenance-search")
+            if defaultArg debug false then
+                prop.testId "provenance-search"
+            prop.children [
+                Html.i [
+                    prop.className
+                        "swt:iconify swt:fluent--search-20-regular swt:absolute swt:left-2 swt:size-4 swt:text-base-content/50"
+                ]
+                Html.input [
+                    prop.className "swt:input swt:input-bordered swt:input-sm swt:w-full swt:pl-8"
+                    prop.placeholder "Search properties & values..."
+                    prop.value searchDraft
+                    prop.onChange setSearchDraft
+                ]
+            ]
+        ]
+
     [<ReactComponent>]
     static member FilterToolbar
         (
@@ -1538,29 +1705,6 @@ type Controls =
         ) =
         let sortOpen, setSortOpen = React.useState false
         let groupSortOpen, setGroupSortOpen = React.useState false
-        let searchDraft, setSearchDraft = React.useState filters.SearchText
-        let latestSearchText = React.useRef filters.SearchText
-        let latestOnSearch = React.useRef onSearch
-
-        // useLayoutEffect (not a render-phase write) so a discarded render
-        // under concurrent rendering / StrictMode never leaves these pointing
-        // at a filters/onSearch value that was never actually committed.
-        React.useLayoutEffect (fun () ->
-            latestSearchText.current <- filters.SearchText
-            latestOnSearch.current <- onSearch
-        )
-
-        let debouncedSearchDraft = React.useDebounce (searchDraft, 300)
-
-        React.useEffect ((fun () -> setSearchDraft filters.SearchText), [| box filters.SearchText |])
-
-        React.useEffect (
-            (fun () ->
-                if debouncedSearchDraft <> latestSearchText.current then
-                    latestOnSearch.current debouncedSearchDraft
-            ),
-            [| box debouncedSearchDraft |]
-        )
 
         let propertySortOption sort label =
             let active = filters.PropertySort = sort
@@ -1618,25 +1762,13 @@ type Controls =
             ]
 
         Html.div [
-            prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2 swt:p-2"
+            prop.className "swt:flex swt:min-w-0 swt:shrink swt:flex-wrap swt:items-center swt:gap-2"
+            // Always-on anchor for the interactive tutorial's spotlight.
+            prop.custom ("data-tutorial", "provenance-filter-toolbar")
             if defaultArg debug false then
                 prop.testId "provenance-filter-toolbar"
             prop.children [
-                Html.div [
-                    prop.className "swt:relative swt:flex swt:items-center"
-                    prop.children [
-                        Html.i [
-                            prop.className
-                                "swt:iconify swt:fluent--search-20-regular swt:absolute swt:left-2 swt:size-4 swt:text-base-content/50"
-                        ]
-                        Html.input [
-                            prop.className "swt:input swt:input-bordered swt:input-sm swt:pl-8"
-                            prop.placeholder "Search properties & values..."
-                            prop.value searchDraft
-                            prop.onChange setSearchDraft
-                        ]
-                    ]
-                ]
+                Controls.SearchBar(filters.SearchText, onSearch, ?debug = debug)
                 Dropdown.Main(
                     sortOpen,
                     setSortOpen,
@@ -1688,7 +1820,7 @@ type Controls =
                         "swt:w-52 swt:max-w-none swt:menu swt:bg-base-200 swt:rounded-box swt:z-99 swt:p-2 swt:shadow-sm swt:top-110%"
                 )
                 Html.select [
-                    prop.className "swt:select swt:select-bordered swt:select-sm"
+                    prop.className "swt:select swt:select-bordered swt:select-sm swt:w-20 swt:shrink-0"
                     prop.ariaLabel "Filter by property value count"
                     prop.value (
                         match filters.ValueCountFilter with

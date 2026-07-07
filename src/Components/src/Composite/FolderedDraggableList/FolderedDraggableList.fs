@@ -17,21 +17,8 @@ module private FolderedDraggableListHelper =
         | Some c when c <> "" -> c
         | _ -> fallbackColor
 
-    [<Emit("$0.target && $0.target.closest && $0.target.closest('[data-folder-color-control]') !== null")>]
-    let isFolderColorControlEvent (_event: Browser.Types.Event) : bool = jsNative
-
     let effectiveColor (folder: FolderedDraggableFolder<'payload>) (item: FolderedDraggableItem<'payload>) =
         item.Color |> Option.orElse folder.Color
-
-    let expandedFolderId folders (expanded: Set<string>) =
-        folders
-        |> List.tryFind (fun folder -> expanded.Contains folder.Id)
-        |> Option.map (fun folder -> folder.Id)
-
-    let toggleExpanded folderId expandedFolderId =
-        match expandedFolderId with
-        | Some expandedFolderId when expandedFolderId = folderId -> Set.empty
-        | _ -> Set.singleton folderId
 
     let appendItemToFolder targetFolderId item folders =
         folders
@@ -45,12 +32,17 @@ module private FolderedDraggableListHelper =
                 folder
         )
 
+    let matchesSearch (query: string) (item: FolderedDraggableItem<'payload>) =
+        let query = query.Trim()
+
+        query = "" || item.Label.ToLowerInvariant().Contains(query.ToLowerInvariant())
+
     let canAcceptExternalDrop
-        (expandedFolder: FolderedDraggableFolder<'payload> option)
+        (activeFolder: FolderedDraggableFolder<'payload> option)
         (tryCreateItemFromExternalDrop: FolderedDraggableExternalDropHandler<'payload> option)
         (onFoldersChange: (FolderedDraggableFolder<'payload> list -> unit) option)
         =
-        expandedFolder.IsSome
+        activeFolder.IsSome
         && tryCreateItemFromExternalDrop.IsSome
         && onFoldersChange.IsSome
 
@@ -272,112 +264,55 @@ type FolderedDraggableList =
                 ]
         )
 
-    [<ReactComponent>]
-    static member private Folder<'payload>
-        (
-            folder: FolderedDraggableFolder<'payload>,
-            isExpanded: bool,
-            onToggle: unit -> unit,
-            ?onSetColor: string option -> unit,
-            ?debug: bool,
-            ?key: string
-        ) =
-        Html.div [
+    /// One index-card tab in the strip above the card body. The active tab
+    /// stays selected until another one is clicked - there is no toggle.
+    static member private FolderTab<'payload>
+        (folder: FolderedDraggableFolder<'payload>, isActive: bool, onSelect: unit -> unit, ?debug: bool, ?key: string)
+        =
+        Html.button [
             match key with
             | Some key -> prop.key key
             | None -> ()
-            prop.className "swt:relative swt:h-32 swt:w-36 swt:min-w-36 swt:flex-none"
+            prop.type'.button
+            prop.custom ("role", "tab")
+            prop.custom ("aria-selected", isActive)
+            prop.title folder.Name
+            prop.ariaLabel $"Show {folder.Name}"
             match folder.Color with
             | Some color when color <> "" -> prop.custom ("data-foldered-folder-color", color)
             | _ -> ()
-            prop.custom ("aria-expanded", isExpanded)
             if defaultArg debug false then
                 prop.testId $"foldered-draggable-folder-{folder.Id}"
+            prop.className [
+                "swt:flex swt:cursor-pointer swt:items-center swt:gap-2 swt:rounded-t-lg swt:border swt:border-b-0 swt:px-3 swt:py-1.5 swt:text-sm swt:transition-colors"
+                if isActive then
+                    // Sits on the card: same background, shared border, and the
+                    // strip's -mb-px pulls it over the card's top border. The
+                    // active tab claims the room for its full name first - it
+                    // only truncates once it alone exceeds the strip - while
+                    // the inactive tabs give way down to a slim remnant.
+                    "swt:min-w-0 swt:shrink swt:border-base-300 swt:bg-base-100 swt:font-semibold swt:text-primary"
+                else
+                    "swt:min-w-14 swt:max-w-48 swt:shrink-[9] swt:border-transparent swt:bg-base-200 swt:text-base-content/70 swt:hover:bg-base-300"
+            ]
+            prop.onClick (fun _ -> onSelect ())
             prop.children [
-                Html.button [
-                    prop.type'.button
-                    prop.className [
-                        "swt:btn swt:h-full swt:w-full swt:flex-col swt:items-stretch swt:justify-between swt:gap-2 swt:overflow-hidden swt:rounded-lg swt:border swt:p-3 swt:text-left swt:normal-case swt:shadow-sm swt:transition-all"
-                        if isExpanded then
-                            "swt:border-primary swt:bg-primary/10 swt:text-primary swt:ring-2 swt:ring-primary/20"
-                        else
-                            "swt:border-base-300 swt:bg-base-100 hover:swt:border-primary/60 hover:swt:bg-base-200"
+                match folder.Color with
+                | Some color when color <> "" ->
+                    Html.span [
+                        prop.className "swt:size-2.5 swt:shrink-0 swt:rounded-full swt:border swt:border-base-300"
+                        prop.custom ("data-foldered-color-swatch", "true")
+                        prop.style [ style.backgroundColor color ]
                     ]
-                    match folder.Color with
-                    | Some color when color <> "" && not isExpanded -> prop.style [ style.borderColor color ]
-                    | _ -> ()
-                    prop.custom ("aria-expanded", isExpanded)
-                    prop.title folder.Name
-                    prop.ariaLabel (
-                        if isExpanded then
-                            $"Collapse {folder.Name}"
-                        else
-                            $"Expand {folder.Name}"
-                    )
-                    prop.onClick (fun _ -> onToggle ())
-                    prop.children [
-                        Html.div [
-                            prop.className "swt:flex swt:items-start swt:justify-between swt:gap-2"
-                            prop.children [
-                                Html.i [
-                                    prop.className [
-                                        "swt:iconify swt:size-14 swt:shrink-0"
-                                        if isExpanded then
-                                            "swt:fluent--folder-open-24-regular"
-                                        else
-                                            "swt:fluent--folder-24-regular"
-                                    ]
-                                    match folder.Color with
-                                    | Some color when color <> "" -> prop.style [ style.color color ]
-                                    | _ -> ()
-                                ]
-                                Html.span [
-                                    prop.className "swt:badge swt:badge-sm swt:shrink-0"
-                                    prop.text (string folder.Items.Length)
-                                ]
-                            ]
-                        ]
-                        Html.div [
-                            prop.className "swt:flex swt:min-w-0 swt:flex-col swt:gap-2"
-                            prop.children [
-                                Html.span [
-                                    prop.className "swt:w-full swt:truncate swt:text-sm swt:font-semibold"
-                                    prop.text folder.Name
-                                ]
-                                Html.div [
-                                    prop.className "swt:flex swt:items-center swt:gap-2"
-                                    prop.children [
-                                        match onSetColor with
-                                        | Some _ ->
-                                            Html.span [
-                                                prop.className "swt:size-3 swt:shrink-0"
-                                                prop.custom ("aria-hidden", true)
-                                            ]
-                                        | None -> FolderedDraggableListHelper.colorSwatch folder.Color
-                                        Html.span [
-                                            prop.className "swt:text-xs swt:font-normal swt:text-base-content/70"
-                                            prop.text (
-                                                if folder.Items.Length = 1 then
-                                                    "1 item"
-                                                else
-                                                    $"{folder.Items.Length} items"
-                                            )
-                                        ]
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
+                | _ -> Html.none
+                Html.span [
+                    prop.className "swt:min-w-0 swt:truncate"
+                    prop.text folder.Name
                 ]
-                match onSetColor with
-                | Some setColor ->
-                    Html.div [
-                        prop.className "swt:absolute swt:bottom-3 swt:left-3 swt:z-10 swt:flex swt:items-center"
-                        prop.children [
-                            FolderedDraggableList.FolderColorButton(folder, setColor, key = $"{folder.Id}:color")
-                        ]
-                    ]
-                | None -> Html.none
+                Html.span [
+                    prop.className "swt:badge swt:badge-sm swt:shrink-0"
+                    prop.text (string folder.Items.Length)
+                ]
             ]
         ]
 
@@ -386,9 +321,9 @@ type FolderedDraggableList =
         (
             folders: FolderedDraggableFolder<'payload> list,
             dragId: FolderedDraggableFolder<'payload> -> FolderedDraggableItem<'payload> -> string,
-            ?expandedFolderIds: Set<string>,
-            ?defaultExpandedFolderIds: Set<string>,
-            ?onExpandedFolderIdsChange: Set<string> -> unit,
+            ?activeFolderId: string,
+            ?defaultActiveFolderId: string,
+            ?onActiveFolderIdChange: string -> unit,
             ?renderItemContent: FolderedDraggableItemRenderFn<'payload>,
             ?shelfDropId: string,
             ?tryCreateItemFromExternalDrop: FolderedDraggableExternalDropHandler<'payload>,
@@ -403,23 +338,27 @@ type FolderedDraggableList =
         let shelfDropId =
             defaultArg shelfDropId $"foldered-draggable-list-shelf-{generatedShelfDropId}"
 
-        let localExpanded, setLocalExpanded =
-            React.useState (defaultArg defaultExpandedFolderIds Set.empty)
+        let localActive, setLocalActive =
+            React.useState (defaultActiveFolderId: string option)
+
+        // One search draft per folder, so switching tabs never loses or leaks
+        // a card's search into another card.
+        let searchByFolder, setSearchByFolder = React.useState Map.empty<string, string>
 
         let activeDrag, setActiveDrag =
             React.useState (None: FolderedDraggableItemRender<'payload> option)
 
-        let expanded = expandedFolderIds |> Option.defaultValue localExpanded
-        let expandedFolderId = FolderedDraggableListHelper.expandedFolderId folders expanded
+        let requestedActiveId = activeFolderId |> Option.orElse localActive
 
-        let expandedFolder =
-            folders |> List.tryFind (fun folder -> Some folder.Id = expandedFolderId)
+        // A stale id (e.g. after the host swaps the folder set) falls back to
+        // the first tab instead of leaving the card empty.
+        let activeFolder =
+            folders
+            |> List.tryFind (fun folder -> Some folder.Id = requestedActiveId)
+            |> Option.orElse (List.tryHead folders)
 
         let canAcceptExternalDrop =
-            FolderedDraggableListHelper.canAcceptExternalDrop
-                expandedFolder
-                tryCreateItemFromExternalDrop
-                onFoldersChange
+            FolderedDraggableListHelper.canAcceptExternalDrop activeFolder tryCreateItemFromExternalDrop onFoldersChange
 
         let shelfDroppable =
             DndKit.useDroppable (
@@ -429,11 +368,11 @@ type FolderedDraggableList =
                 |}
             )
 
-        let setExpanded next =
-            onExpandedFolderIdsChange |> Option.iter (fun fn -> fn next)
+        let setActive folderId =
+            onActiveFolderIdChange |> Option.iter (fun fn -> fn folderId)
 
-            if expandedFolderIds.IsNone then
-                setLocalExpanded next
+            if activeFolderId.IsNone then
+                setLocalActive (Some folderId)
 
         let renderItemContent =
             renderItemContent
@@ -446,7 +385,7 @@ type FolderedDraggableList =
                     fun (event: DndKit.IDndKitEvent) ->
                         setActiveDrag None
 
-                        match expandedFolder, tryCreateItemFromExternalDrop, onFoldersChange with
+                        match activeFolder, tryCreateItemFromExternalDrop, onFoldersChange with
                         | Some targetFolder, Some tryCreateItemFromExternalDrop, Some onFoldersChange when
                             FolderedDraggableListHelper.isShelfDrop shelfDropId event
                             ->
@@ -469,7 +408,7 @@ type FolderedDraggableList =
 
         Html.section [
             prop.className [
-                "swt:flex swt:min-w-0 swt:flex-col swt:gap-4"
+                "swt:flex swt:min-w-0 swt:flex-col"
                 match className with
                 | Some className -> className
                 | None -> ()
@@ -477,68 +416,134 @@ type FolderedDraggableList =
             if debug then
                 prop.testId "foldered-draggable-list"
             prop.children [
+                // The tab strip overlaps the card's top border so the active
+                // tab reads as part of the card, index-card style.
                 Html.div [
+                    prop.custom ("role", "tablist")
                     prop.className
-                        "swt:flex swt:min-w-0 swt:flex-row swt:flex-nowrap swt:gap-3 swt:overflow-x-auto swt:overflow-y-hidden swt:pb-2"
+                        "swt:-mb-px swt:flex swt:min-w-0 swt:flex-row swt:flex-nowrap swt:items-end swt:gap-1 swt:overflow-x-auto swt:px-2"
+                    prop.style [ style.scrollbarGutter.stable ]
                     if debug then
                         prop.testId "foldered-draggable-folder-row"
                     prop.children [
                         for folder in folders do
-                            let isExpanded = Some folder.Id = expandedFolderId
+                            let isActive = activeFolder |> Option.exists (fun active -> active.Id = folder.Id)
 
-                            let onSetColor =
-                                onSetFolderColor
-                                |> Option.map (fun setFolderColor -> fun color -> setFolderColor folder.Id color)
-
-                            FolderedDraggableList.Folder(
+                            FolderedDraggableList.FolderTab(
                                 folder,
-                                isExpanded,
-                                (fun () ->
-                                    expandedFolderId
-                                    |> FolderedDraggableListHelper.toggleExpanded folder.Id
-                                    |> setExpanded
-                                ),
-                                ?onSetColor = onSetColor,
+                                isActive,
+                                (fun () -> setActive folder.Id),
                                 debug = debug,
                                 key = folder.Id
                             )
                     ]
                 ]
-                Html.div [
-                    prop.ref shelfDroppable.setNodeRef
-                    prop.className [
-                        "swt:min-h-24 swt:min-w-0 swt:rounded-lg swt:border swt:border-dashed swt:p-3 swt:transition-colors"
-                        if canAcceptExternalDrop && shelfDroppable.isOver then
-                            "swt:border-primary swt:bg-primary/10"
-                        else
-                            "swt:border-base-300 swt:bg-base-200/40"
-                    ]
-                    if debug then
-                        prop.testId "foldered-draggable-item-shelf"
-                    prop.children [
-                        Html.div [
-                            prop.className
-                                "swt:relative swt:flex swt:min-h-12 swt:min-w-0 swt:flex-row swt:flex-nowrap swt:items-center swt:gap-2 swt:overflow-x-auto swt:overflow-y-hidden swt:pb-1"
-                            if debug then
-                                prop.testId "foldered-draggable-item-row"
-                            prop.children [
-                                match expandedFolder with
-                                | Some folder ->
-                                    for item in folder.Items do
-                                        FolderedDraggableList.Item(
-                                            folder,
-                                            item,
-                                            dragId,
-                                            renderItemContent,
-                                            setActiveDrag,
-                                            debug = debug,
-                                            key = $"{folder.Id}:{item.Id}"
+                match activeFolder with
+                | Some folder ->
+                    let searchQuery = searchByFolder |> Map.tryFind folder.Id |> Option.defaultValue ""
+
+                    let visibleItems =
+                        folder.Items
+                        |> List.filter (FolderedDraggableListHelper.matchesSearch searchQuery)
+
+                    Html.div [
+                        prop.className
+                            "swt:flex swt:min-w-0 swt:flex-col swt:gap-2 swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100 swt:p-3"
+                        prop.custom ("role", "tabpanel")
+                        if debug then
+                            prop.testId "foldered-draggable-card"
+                        prop.children [
+                            Html.div [
+                                prop.className "swt:flex swt:min-w-0 swt:items-center swt:gap-2"
+                                prop.children [
+                                    Html.div [
+                                        prop.className "swt:relative swt:flex swt:min-w-0 swt:items-center"
+                                        prop.children [
+                                            Html.i [
+                                                prop.className
+                                                    "swt:iconify swt:fluent--search-20-regular swt:absolute swt:left-2 swt:size-3.5 swt:text-base-content/50"
+                                            ]
+                                            Html.input [
+                                                prop.className
+                                                    "swt:input swt:input-bordered swt:input-xs swt:w-44 swt:pl-7"
+                                                prop.placeholder $"Search in {folder.Name}..."
+                                                prop.ariaLabel $"Search in {folder.Name}"
+                                                if debug then
+                                                    prop.testId "foldered-draggable-search"
+                                                prop.value searchQuery
+                                                prop.onChange (fun (query: string) ->
+                                                    setSearchByFolder (searchByFolder |> Map.add folder.Id query)
+                                                )
+                                            ]
+                                        ]
+                                    ]
+                                    Html.span [
+                                        prop.className "swt:text-xs swt:text-base-content/70"
+                                        prop.text (
+                                            if searchQuery.Trim() <> "" then
+                                                $"{visibleItems.Length} of {folder.Items.Length} items"
+                                            elif folder.Items.Length = 1 then
+                                                "1 item"
+                                            else
+                                                $"{folder.Items.Length} items"
                                         )
-                                | None -> ()
+                                    ]
+                                    match onSetFolderColor with
+                                    | Some setFolderColor ->
+                                        Html.div [
+                                            prop.className "swt:ml-auto swt:flex swt:items-center"
+                                            prop.children [
+                                                FolderedDraggableList.FolderColorButton(
+                                                    folder,
+                                                    setFolderColor folder.Id,
+                                                    key = $"{folder.Id}:color"
+                                                )
+                                            ]
+                                        ]
+                                    | None -> Html.none
+                                ]
+                            ]
+                            Html.div [
+                                prop.ref shelfDroppable.setNodeRef
+                                prop.className [
+                                    "swt:min-h-16 swt:min-w-0 swt:rounded-lg swt:border swt:border-dashed swt:p-2 swt:transition-colors"
+                                    if canAcceptExternalDrop && shelfDroppable.isOver then
+                                        "swt:border-primary swt:bg-primary/10"
+                                    else
+                                        "swt:border-base-300 swt:bg-base-200/40"
+                                ]
+                                if debug then
+                                    prop.testId "foldered-draggable-item-shelf"
+                                prop.children [
+                                    Html.div [
+                                        prop.className
+                                            "swt:relative swt:flex swt:h-16 swt:min-w-0 swt:flex-row swt:flex-nowrap swt:items-start swt:gap-2 swt:overflow-x-auto swt:overflow-y-hidden swt:pb-1"
+                                        prop.style [ style.scrollbarGutter.stable ]
+                                        if debug then
+                                            prop.testId "foldered-draggable-item-row"
+                                        prop.children [
+                                            if visibleItems.IsEmpty && searchQuery.Trim() <> "" then
+                                                Html.p [
+                                                    prop.className "swt:px-1 swt:text-xs swt:text-base-content/60"
+                                                    prop.text $"No items match \"{searchQuery.Trim()}\"."
+                                                ]
+                                            for item in visibleItems do
+                                                FolderedDraggableList.Item(
+                                                    folder,
+                                                    item,
+                                                    dragId,
+                                                    renderItemContent,
+                                                    setActiveDrag,
+                                                    debug = debug,
+                                                    key = $"{folder.Id}:{item.Id}"
+                                                )
+                                        ]
+                                    ]
+                                ]
                             ]
                         ]
                     ]
-                ]
+                | None -> Html.none
                 DndKit.DragOverlay(
                     dropAnimation = {| duration = 0; easing = "linear" |},
                     children =

@@ -389,7 +389,7 @@ export const FolderColorPreviewSyncsLayerTabAndRailProperty: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await setFolderPreviewColor(canvas.getByTestId('foldered-draggable-folder-source-fixture-assay-table'), '#be185d');
+    await setFolderPreviewColor(canvas, canvas.getByTestId('foldered-draggable-folder-source-fixture-assay-table'), '#be185d');
 
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-layer-layer-1')).toHaveAttribute(
@@ -411,7 +411,7 @@ export const NonLayerFolderColorAppliesToShelfAndRailProperties: Story = {
       'foldered-draggable-folder-source-fixture-previous-study-table',
     );
 
-    await setFolderPreviewColor(previousContextFolder, '#0891b2');
+    await setFolderPreviewColor(canvas, previousContextFolder, '#0891b2');
 
     const previousContextShelf = await openShelfFolder(canvas, previousContextFolder);
     const shelfPropertyButton = previousContextShelf.getByRole('button', { name: /^Drag Previous Treatment$/ });
@@ -511,6 +511,28 @@ export const ToolbarUsesSinglePropertySortAndOriginButtons: Story = {
     const both = toolbar.getByRole('button', { name: /^Show current and upstream properties$/i });
     expect(both.querySelector('[class*="fluent--arrow-up-20"]')).toBeInTheDocument();
     expect(both.querySelector('[class*="fluent--circle-20-filled"]')).toBeInTheDocument();
+  },
+};
+
+export const TopControlsShareOneRowWhenSpaceAllows: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const topControls = canvas.getByTestId('provenance-top-controls');
+    const toolbar = canvas.getByTestId('provenance-filter-toolbar');
+    const search = canvas.getByTestId('provenance-search');
+    const viewActions = canvas.getByTestId('provenance-view-actions');
+    const valueFilter = canvas.getByRole('combobox', { name: 'Filter by property value count' });
+    const originFilter = canvas.getByRole('button', { name: /^Show upstream properties$/i });
+
+    const rowTop = (element: HTMLElement) => Math.round(element.getBoundingClientRect().top);
+
+    expect(topControls).toContainElement(toolbar);
+    expect(topControls).toContainElement(viewActions);
+    expect(rowTop(toolbar)).toBe(rowTop(search));
+    expect(rowTop(search)).toBe(rowTop(valueFilter));
+    expect(rowTop(search)).toBe(rowTop(originFilter));
+    expect(rowTop(toolbar)).toBe(rowTop(viewActions));
   },
 };
 
@@ -1856,14 +1878,15 @@ function shelfFolders(canvas: ReturnType<typeof within>) {
 }
 
 async function openShelfFolder(canvas: ReturnType<typeof within>, folder: HTMLElement) {
+  // Folders render as index-card tabs; clicking the tab activates its card.
   const folderTestId = folder.getAttribute('data-testid')!;
   const currentFolder = () => canvas.getByTestId(folderTestId);
 
-  if (currentFolder().getAttribute('aria-expanded') !== 'true') {
-    await userEvent.click(within(currentFolder()).getByRole('button', { name: /^Expand / }));
+  if (currentFolder().getAttribute('aria-selected') !== 'true') {
+    await userEvent.click(currentFolder());
   }
 
-  await waitFor(() => expect(currentFolder()).toHaveAttribute('aria-expanded', 'true'));
+  await waitFor(() => expect(currentFolder()).toHaveAttribute('aria-selected', 'true'));
   return within(canvas.getByTestId('foldered-draggable-item-row'));
 }
 
@@ -1874,6 +1897,14 @@ async function createLayer(canvas: ReturnType<typeof within>, name: string) {
   await userEvent.clear(input);
   await userEvent.type(input, name);
   await userEvent.click(dialog.getByRole('button', { name: 'Create layer' }));
+}
+
+function layerPageIds(canvas: ReturnType<typeof within>) {
+  return Array.from(
+    canvas
+      .getByTestId('provenance-layer-pages')
+      .querySelectorAll<HTMLElement>('[data-provenance-layer-page]'),
+  ).map((page) => page.getAttribute('data-provenance-layer-page'));
 }
 
 async function shelfProperty(canvas: ReturnType<typeof within>, propertyName: string) {
@@ -1920,8 +1951,12 @@ function propertyColorSwatch(property: HTMLElement) {
   return swatch;
 }
 
-async function setFolderPreviewColor(folder: HTMLElement, color: string) {
-  const trigger = within(folder).getByRole('button', { name: /^Set color for folder / });
+async function setFolderPreviewColor(canvas: ReturnType<typeof within>, folder: HTMLElement, color: string) {
+  // The color control sits in the active card's header, so the folder's tab
+  // must be active first.
+  await openShelfFolder(canvas, folder);
+  const card = canvas.getByTestId('foldered-draggable-card');
+  const trigger = within(card).getByRole('button', { name: /^Set color for folder / });
   const triggerLabel = trigger.getAttribute('aria-label') ?? '';
   const inputLabel = triggerLabel.replace(/^Set /, 'Choose ');
 
@@ -2476,6 +2511,50 @@ export const LayerTabsUseSourceColorsAndSideRails: Story = {
   },
 };
 
+export const LayerPaginationUsesNeighborWindowAndArrowSwitches: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await createLayer(canvas, 'Layer 2');
+    await createLayer(canvas, 'Layer 3');
+
+    const pagination = within(canvas.getByTestId('provenance-layer-pagination'));
+    expect(canvas.queryByTestId('provenance-layer-select')).not.toBeInTheDocument();
+    expect(pagination.getByTestId('provenance-add-layer')).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(layerPageIds(canvas)).toEqual(['layer-1', 'layer-2', 'layer-3']);
+      expect(canvas.getByTestId('provenance-layer-layer-3')).toHaveClass('swt:btn-primary');
+    });
+    expect(canvas.getByTestId('provenance-layer-layer-2')).toHaveClass('swt:opacity-50');
+    expect(canvas.queryByTestId('provenance-layer-next')).not.toBeInTheDocument();
+    expect(pagination.getByTestId('provenance-layer-prev').querySelector('[class*="fluent--chevron-left"]'))
+      .toBeInTheDocument();
+
+    await userEvent.click(pagination.getByTestId('provenance-layer-prev'));
+
+    await waitFor(() => {
+      expect(layerPageIds(canvas)).toEqual(['layer-1', 'layer-2', 'layer-3']);
+      expect(canvas.getByTestId('provenance-layer-layer-2')).toHaveClass('swt:btn-primary');
+    });
+    expect(canvas.getByTestId('provenance-layer-layer-1')).toHaveClass('swt:opacity-50');
+    expect(canvas.getByTestId('provenance-layer-layer-3')).toHaveClass('swt:opacity-50');
+    expect(pagination.getByTestId('provenance-layer-next').querySelector('[class*="fluent--chevron-right"]'))
+      .toBeInTheDocument();
+
+    await userEvent.click(pagination.getByTestId('provenance-layer-prev'));
+
+    await waitFor(() => {
+      expect(layerPageIds(canvas)).toEqual(['layer-1', 'layer-2', 'layer-3']);
+      expect(canvas.getByTestId('provenance-layer-layer-1')).toHaveClass('swt:btn-primary');
+    });
+    expect(canvas.queryByTestId('provenance-layer-prev')).not.toBeInTheDocument();
+    expect(pagination.getByTestId('provenance-layer-next').querySelector('[class*="fluent--chevron-right"]'))
+      .toBeInTheDocument();
+  },
+};
+
 export const AddsLayerFromMixedSelection: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
@@ -2531,8 +2610,8 @@ export const CreatesNamedLayer: Story = {
     await waitFor(() => {
       const layer = canvas.getByTestId('provenance-layer-layer-2');
       expect(layer).toHaveClass('swt:btn-primary');
-      expect(layer).toHaveTextContent('Extraction');
       expect(layer).toHaveAccessibleName('View provenance layer Extraction');
+      expect(layer).toHaveTextContent('Extraction');
     });
   },
 };
@@ -2609,5 +2688,58 @@ export const StrictModeSmoke: Story = {
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('No patches emitted.');
     });
+  },
+};
+
+export const OpensInteractiveTutorialOnSampleData: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByTestId('provenance-tutorial-trigger'));
+
+    const modal = within(canvas.getByTestId('provenance-tutorial-modal'));
+    expect(modal.getByText('Provenance editor tour')).toBeInTheDocument();
+    expect(within(modal.getByTestId('tutorial-step-card')).getByText('Welcome')).toBeInTheDocument();
+
+    // The feature list jumps straight to any step's explanation.
+    await userEvent.click(modal.getByTestId('tutorial-sidebar-step-members'));
+    expect(within(modal.getByTestId('tutorial-step-card')).getByText('Inspect group members')).toBeInTheDocument();
+
+    // Closing returns to the host editor without any writeback patches.
+    await userEvent.click(modal.getByTestId('tutorial-close'));
+    expect(canvas.queryByTestId('provenance-tutorial-modal')).not.toBeInTheDocument();
+    expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('No patches emitted.');
+  },
+};
+
+export const TutorialTaskStepCompletesInsideSandbox: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByTestId('provenance-tutorial-trigger'));
+    const modal = within(canvas.getByTestId('provenance-tutorial-modal'));
+
+    // Jump to the shelf-to-rail step and fulfil it by dragging Species into
+    // the sandbox's input rail; the polled condition marks the step completed
+    // and Skip becomes Next. The modal's feature list narrows the editor into
+    // the medium tier, so the rail sits behind its fold toggle first.
+    await userEvent.click(modal.getByTestId('tutorial-sidebar-step-shelf-to-rail'));
+    expect(modal.getByTestId('tutorial-next')).toHaveTextContent('Skip');
+    if (!modal.queryByTestId('provenance-property-rail-Input')) {
+      await userEvent.click(modal.getByTestId('provenance-rail-toggle-Input'));
+    }
+    const source = await shelfProperty(modal, 'Species');
+    await dragByPointer(source, modal.getByTestId('provenance-property-rail-Input'));
+    await waitFor(() => expect(modal.getByTestId('tutorial-next')).toHaveTextContent('Next'), { timeout: 5000 });
+    expect(within(modal.getByTestId('tutorial-task')).getByText('Completed:')).toBeInTheDocument();
+    await userEvent.click(modal.getByTestId('tutorial-next'));
+    expect(within(modal.getByTestId('tutorial-step-card')).getByText('Group by a property')).toBeInTheDocument();
+
+    // The click task completes in place as well; the user moves on themselves.
+    await userEvent.click(modal.getByTestId('provenance-property-Input-Species'));
+    await waitFor(() => expect(modal.getByTestId('tutorial-next')).toHaveTextContent('Next'), { timeout: 5000 });
+    expect(modal.getByText('2 of 12 features explored')).toBeInTheDocument();
+    await userEvent.click(modal.getByTestId('tutorial-next'));
+    expect(within(modal.getByTestId('tutorial-step-card')).getByText('Inspect group members')).toBeInTheDocument();
   },
 };
