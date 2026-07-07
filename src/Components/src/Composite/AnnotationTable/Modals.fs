@@ -875,7 +875,8 @@ module private CompositeCellEditModalHelper =
 
     let tryGetImportUnitTerm (oa: OntologyAnnotation) =
         let hasImportableName =
-            (System.String.IsNullOrWhiteSpace oa.NameText |> not) && (isNumber oa.NameText |> not)
+            (System.String.IsNullOrWhiteSpace oa.NameText |> not)
+            && (isNumber oa.NameText |> not)
 
         if hasImportableName && hasText oa.TermSourceREF && hasText oa.TermAccessionNumber then
             Term.fromOntologyAnnotation oa |> Some
@@ -937,15 +938,9 @@ type CompositeCellEditModal =
                     prop.children [
                         LayoutComponents.KeyValuePanel(
                             "Current cell",
-                            [
-                                "Value", value
-                                yield! annotationFields "Unit name" unit
-                            ]
+                            [ "Value", value; yield! annotationFields "Unit name" unit ]
                         )
-                        LayoutComponents.KeyValuePanel(
-                            "Result",
-                            annotationFields "Term name" term
-                        )
+                        LayoutComponents.KeyValuePanel("Result", annotationFields "Term name" term)
                     ]
                 ]
             ],
