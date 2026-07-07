@@ -520,24 +520,25 @@ type FileTree =
                     newName
 
         let confirmAssignNote () =
-            if not isDialogBusy then
+            promise {
                 match assignNoteDialogState.Target, selectedAssignableNote with
                 | None, _ -> closeDialog ()
                 | _, None -> FileTreeAssignNoteHelper.enqueueAssignNoteError errorModal.enqueue "Select a note."
                 | Some target, Some note ->
-                    FileTreeAssignNoteHelper.assignNoteToTarget
-                        {
-                            closeDialog = closeDialog
-                            setIsAssigning = setIsDialogBusy
-                            refreshGitStatus = gitStateCtx.refresh
-                            copyFileSystemItem = Api.ipcArcVaultApi.copyFileSystemItem
-                            movePath = Api.ipcArcVaultApi.movePath
-                            enqueueError = errorModal.enqueue
-                        }
-                        target
-                        note
-                        (assignNoteDialogState.AvailableAssets |> Seq.toList)
-                        selectedAssetDestinations
+                    do!
+                        FileTreeAssignNoteHelper.assignNoteToTarget
+                            {
+                                closeDialog = closeDialog
+                                refreshGitStatus = gitStateCtx.refresh
+                                copyFileSystemItem = Api.ipcArcVaultApi.copyFileSystemItem
+                                movePath = Api.ipcArcVaultApi.movePath
+                                enqueueError = errorModal.enqueue
+                            }
+                            target
+                            note
+                            (assignNoteDialogState.AvailableAssets |> Seq.toList)
+                            selectedAssetDestinations
+            }
 
         let createModalKind =
             activeCreateKind |> Option.defaultValue ArcExplorerNodeKind.Study
@@ -597,8 +598,7 @@ type FileTree =
                 assetDestinations = selectedAssetDestinations,
                 setAssetDestination = setAssetDestination,
                 close = closeDialog,
-                submit = confirmAssignNote,
-                isAssigning = isDialogBusy
+                submit = confirmAssignNote
             )
 
         match fileItem with

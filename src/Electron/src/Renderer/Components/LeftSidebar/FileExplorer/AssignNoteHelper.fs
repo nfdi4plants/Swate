@@ -11,7 +11,6 @@ open Swate.Electron.Shared.FileIOHelper
 
 type AssignNoteConfig = {
     closeDialog: unit -> unit
-    setIsAssigning: bool -> unit
     refreshGitStatus: unit -> unit
     copyFileSystemItem: CopyFileSystemItemRequest -> JS.Promise<Result<unit, exn>>
     movePath: MovePathRequest -> JS.Promise<Result<unit, exn>>
@@ -270,15 +269,13 @@ let assignNoteToTarget
     (note: AssignableNoteRef)
     (assets: AssignableNoteAssetRef list)
     (assetDestinations: Map<string, AssignNoteAssetDestination>)
-    =
+    : JS.Promise<unit> =
     let targetFolderPath = buildAssignedNoteFolderPath target note.NoteFolderName
 
-    if PathHelpers.pathsEqual note.SourceFolderPath targetFolderPath then
-        config.closeDialog ()
-    else
-        config.setIsAssigning true
-
-        promise {
+    promise {
+        if PathHelpers.pathsEqual note.SourceFolderPath targetFolderPath then
+            config.closeDialog ()
+        else
             let! copyResult =
                 config.copyFileSystemItem {
                     sourceRelativePath = note.SourceFolderPath
@@ -294,7 +291,5 @@ let assignNoteToTarget
                 | Ok() ->
                     config.refreshGitStatus ()
                     config.closeDialog ()
-        }
-        |> Promise.catch (fun error -> enqueueAssignNoteError config.enqueueError error.Message)
-        |> Promise.map (fun _ -> config.setIsAssigning false)
-        |> Promise.start
+    }
+    |> Promise.catch (fun error -> enqueueAssignNoteError config.enqueueError error.Message)

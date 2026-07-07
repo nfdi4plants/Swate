@@ -21,11 +21,11 @@ type AssignNoteModal =
             assetDestinations: Map<string, AssignNoteAssetDestination>,
             setAssetDestination: string -> AssignNoteAssetDestination option -> unit,
             close: unit -> unit,
-            submit: unit -> unit,
-            ?isAssigning: bool
+            submit: unit -> JS.Promise<unit>
         ) =
 
-        let isAssigning = defaultArg isAssigning false
+        let isRunning, setIsRunning = React.useState false
+        let isDisabled = isRunning
         let displayName = itemName |> Option.defaultValue "this target"
         let hasNotes = availableNotes.Count > 0
 
@@ -33,13 +33,25 @@ type AssignNoteModal =
             selectedNote |> Option.map _.SourceFolderPath |> Option.defaultValue ""
 
         let setClose isOpen =
-            if not isOpen then
+            if not isOpen && not isDisabled then
                 close ()
+
+        let onSubmit () =
+            promise {
+                if not isRunning then
+                    setIsRunning true
+
+                    try
+                        do! submit ()
+                    finally
+                        setIsRunning false
+            }
+            |> Promise.start
 
         let noteSelector =
             Html.select [
                 prop.className "swt:select swt:select-bordered swt:w-full"
-                prop.disabled (isAssigning || not hasNotes)
+                prop.disabled (isDisabled || not hasNotes)
                 prop.valueOrDefault selectedValue
                 prop.onChange (fun (value: string) ->
                     availableNotes
@@ -67,15 +79,15 @@ type AssignNoteModal =
                 prop.children [
                     Html.button [
                         prop.className "swt:btn swt:btn-ghost swt:btn-sm"
-                        prop.disabled isAssigning
+                        prop.disabled isDisabled
                         prop.onClick (fun _ -> close ())
                         prop.text "Cancel"
                     ]
                     Html.button [
                         prop.className "swt:btn swt:btn-primary swt:btn-sm"
-                        prop.disabled (isAssigning || selectedNote.IsNone)
-                        prop.onClick (fun _ -> submit ())
-                        prop.text (if isAssigning then "Assigning..." else "Assign")
+                        prop.disabled (isDisabled || selectedNote.IsNone)
+                        prop.onClick (fun _ -> onSubmit ())
+                        prop.text (if isRunning then "Assigning..." else "Assign")
                     ]
                 ]
             ]
@@ -90,7 +102,7 @@ type AssignNoteModal =
                         availableAssetDestinations,
                         assetDestinations,
                         setAssetDestination,
-                        isAssigning
+                        isDisabled
                     )
                 ]
             ]
@@ -101,7 +113,7 @@ type AssignNoteModal =
                 availableAssetDestinations,
                 assetDestinations,
                 setAssetDestination,
-                isAssigning
+                isDisabled
             )
 
         BaseModal.Modal(

@@ -686,6 +686,66 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "assign note modal disables interactions while submit is running",
+            fun () -> promise {
+                let note = assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
+                let asset = assignableAsset "notes/2026-06-15/Sampling_protocol/assets/data.csv" "data.csv"
+
+                let mutable submitCalls = 0
+                let mutable resolveSubmit: (unit -> unit) option = None
+
+                let submit () =
+                    submitCalls <- submitCalls + 1
+                    Promise.create (fun resolve _reject -> resolveSubmit <- Some resolve)
+
+                let! _container, cleanup =
+                    AssignNoteModal.AssignNoteModal(
+                        isOpen = true,
+                        itemName = Some "AssayA",
+                        selectedNote = Some note,
+                        setSelectedNote = ignore,
+                        availableNotes = ResizeArray [ note ],
+                        availableAssets = ResizeArray [ asset ],
+                        availableAssetDestinations = [ AssignNoteAssetDestination.Protocol ],
+                        assetDestinations = Map.ofList [ (asset.SourceRelativePath, AssignNoteAssetDestination.Protocol) ],
+                        setAssetDestination = (fun _ _ -> ()),
+                        close = ignore,
+                        submit = submit
+                    )
+                    |> renderToBody
+
+                try
+                    let modal =
+                        document.body.querySelector ("[data-testid='modal_arc-assign-note']") :?> HTMLElement
+
+                    let assignButton () =
+                        (modal.querySelectorAll "button").[2] :?> HTMLButtonElement
+
+                    let disabledStates () =
+                        let selectNodes = modal.querySelectorAll ("select")
+
+                        [|
+                            for index in 0 .. selectNodes.length - 1 do
+                                (selectNodes.[index] :?> HTMLSelectElement).disabled
+
+                            (assignButton ()).disabled
+                        |]
+
+                    Vitest.expect(disabledStates ()).toEqual ([| false; false; false; false |])
+
+                    assignButton().click ()
+
+                    do! waitUntil ((fun () -> submitCalls = 1 && resolveSubmit.IsSome), 50)
+                    do! waitUntil ((fun () -> disabledStates () |> Array.forall id), 50)
+
+                    resolveSubmit.Value ()
+                    do! waitUntil ((fun () -> disabledStates () |> Array.forall not), 50)
+                finally
+                    cleanup ()
+            }
+        )
+
+        Vitest.test (
             "asset selector header destination overwrites every asset selector",
             fun () -> promise {
                 let assets =
@@ -791,7 +851,6 @@ Vitest.describe (
 
                 let config: AssignNoteConfig = {
                     closeDialog = fun () -> closed <- true
-                    setIsAssigning = ignore
                     refreshGitStatus = ignore
                     copyFileSystemItem =
                         fun request -> promise {
@@ -824,9 +883,9 @@ Vitest.describe (
                     ]
                     |> Map.ofList
 
-                assignNoteToTarget config target note assets selectedDestinations
-                do! waitUntil ((fun () -> closed && copyRequests.Count = 1 && moveRequests.Count = 1), 50)
+                do! assignNoteToTarget config target note assets selectedDestinations
 
+                Vitest.expect(closed).toBe (true)
                 Vitest.expect(copyRequests.[0].sourceRelativePath).toBe ("notes/2026-06-15/Sampling_protocol")
                 Vitest.expect(copyRequests.[0].targetRelativePath).toBe ("assays/AssayA/protocols/Sampling_protocol")
                 Vitest.expect(copyRequests.[0].overwrite).toBe (true)
@@ -864,7 +923,6 @@ Vitest.describe (
 
                 let config: AssignNoteConfig = {
                     closeDialog = fun () -> closed <- true
-                    setIsAssigning = ignore
                     refreshGitStatus = ignore
                     copyFileSystemItem =
                         fun request -> promise {
@@ -889,10 +947,10 @@ Vitest.describe (
                     ]
                     |> Map.ofList
 
-                assignNoteToTarget config target note assets selectedDestinations
-                do! waitUntil ((fun () -> closed && copyRequests.Count = 1 && moveRequests.Count = 1), 50)
+                do! assignNoteToTarget config target note assets selectedDestinations
 
                 Vitest.expect(errors.Count).toBe (0)
+                Vitest.expect(closed).toBe (true)
                 Vitest.expect(copyRequests.[0].overwrite).toBe (true)
 
                 Vitest
