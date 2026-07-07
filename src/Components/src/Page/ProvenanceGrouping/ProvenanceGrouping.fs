@@ -20,16 +20,31 @@ type ProvenanceGrouping =
 
     [<ReactComponent(true)>]
     static member Main
-        (session: ProvenanceSession, onChange: ProvenanceEditorChange -> unit, ?height: int, ?debug: bool)
-        =
+        (
+            session: ProvenanceSession,
+            onChange: ProvenanceEditorChange -> unit,
+            ?height: int,
+            ?debug: bool,
+            ?initUiState: ProvenanceSession -> UiState,
+            ?initialOpenRail: ProvenanceSide
+        ) =
         let debug = defaultArg debug false
-        let rawUiState, setUiState = React.useState (fun () -> State.init session)
+
+        // The tutorial sandbox seeds checkpoints through initUiState (e.g.
+        // "Species already sits on the input rail"); regular hosts start fresh.
+        let rawUiState, setUiState =
+            React.useState (fun () ->
+                match initUiState with
+                | Some init -> init session
+                | None -> State.init session
+            )
+
         let activeDrag, setActiveDrag = React.useState<ActiveDrag option> None
         let surfaceRef = React.useElementRef ()
         let splitDrag = React.useRef (None: Splitter.SplitterSide option)
         let rootRef = React.useElementRef ()
         let tier, setTier = React.useState LayoutTier.Wide
-        let openRail, setOpenRail = React.useState<ProvenanceSide option> None
+        let openRail, setOpenRail = React.useState<ProvenanceSide option> initialOpenRail
         let density, setDensity = React.useState Density.EditorDensity.Comfortable
         let isPropertyShelfExpanded, setIsPropertyShelfExpanded = React.useState true
         let isTutorialOpen, setIsTutorialOpen = React.useState false
@@ -1660,10 +1675,22 @@ type ProvenanceGrouping =
 
                     // The tour runs on a sandboxed sample-data editor instance, so
                     // trying the interactions cannot touch the host's session.
+                    // The overlay rebuilds it from the step's checkpoint seed
+                    // whenever the active step's checkpoint changes.
                     if isTutorialOpen then
                         ProvenanceTutorial.Modal(
                             (fun () -> setIsTutorialOpen false),
-                            ProvenanceGrouping.Editor(sampleModel (), ignore, debug = debug),
+                            (fun checkpoint ->
+                                let seed = ProvenanceTutorialSteps.checkpointSeed checkpoint
+
+                                ProvenanceGrouping.Editor(
+                                    sampleModel (),
+                                    ignore,
+                                    debug = debug,
+                                    initUiState = seed.InitUiState,
+                                    ?initialOpenRail = seed.OpenRail
+                                )
+                            ),
                             debug = debug
                         )
                 ]
@@ -1708,12 +1735,25 @@ type ProvenanceGrouping =
 
     [<ReactComponent>]
     static member Editor
-        (initialModel: ProvenanceModel, onChange: ProvenanceEditorChange -> unit, ?height: int, ?debug: bool)
-        =
+        (
+            initialModel: ProvenanceModel,
+            onChange: ProvenanceEditorChange -> unit,
+            ?height: int,
+            ?debug: bool,
+            ?initUiState: ProvenanceSession -> UiState,
+            ?initialOpenRail: ProvenanceSide
+        ) =
         let session, setSession = React.useState (fun () -> Session.init initialModel)
 
         let change (next: ProvenanceEditorChange) =
             setSession next.Session
             onChange next
 
-        ProvenanceGrouping.Main(session, change, ?height = height, ?debug = debug)
+        ProvenanceGrouping.Main(
+            session,
+            change,
+            ?height = height,
+            ?debug = debug,
+            ?initUiState = initUiState,
+            ?initialOpenRail = initialOpenRail
+        )

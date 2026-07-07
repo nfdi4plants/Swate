@@ -32,6 +32,13 @@ type TutorialStep = {
     /// Try-it instruction shown emphasized under the description.
     Task: string option
     Advance: TutorialAdvance
+    /// Names the sandbox state this step starts from. Steps without one
+    /// inherit the nearest earlier checkpoint. Whenever the (inherited)
+    /// checkpoint of the active step differs from the one currently mounted,
+    /// the tutorial content is remounted through the host's render function -
+    /// so jumping or going back to a step always restores a state in which its
+    /// task can be fulfilled, no matter what earlier interactions changed.
+    Checkpoint: string option
 }
 
 /// Plain-function constructors so Storybook/TypeScript hosts can build steps
@@ -53,7 +60,8 @@ module Exports =
             description: string,
             targetSelector: string option,
             task: string option,
-            advance: TutorialAdvance
+            advance: TutorialAdvance,
+            checkpoint: string option
         ) : TutorialStep =
         {
             Id = id
@@ -62,4 +70,5 @@ module Exports =
             TargetSelector = targetSelector
             Task = task
             Advance = advance
+            Checkpoint = checkpoint
         }

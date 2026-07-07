@@ -4,6 +4,18 @@ open Fable.Core
 open Feliz
 open Swate.Components.Composite.TutorialOverlay
 open Swate.Components.Composite.TutorialOverlay.Types
+open Swate.Components.Shared.ProvenanceGrouping
+open Swate.Components.Shared.ProvenanceGrouping.Types
+open Swate.Components.Shared.ProvenanceGrouping.Session
+open Swate.Components.Page.ProvenanceGrouping.Types
+
+/// How the tutorial sandbox should be seeded when a checkpoint is (re)entered:
+/// the UI state the sample editor starts from and which rail begins unfolded
+/// on layouts that collapse the rails.
+type ProvenanceTutorialCheckpoint = {
+    InitUiState: ProvenanceSession -> UiState
+    OpenRail: ProvenanceSide option
+}
 
 /// The guided tour through the provenance editor's features. Selectors rely on
 /// always-rendered hooks: `data-tutorial` anchors, the stable `title`/`aria-label`
@@ -30,15 +42,20 @@ module ProvenanceTutorialSteps =
         TargetSelector = Some selector
         Task = None
         Advance = TutorialAdvance.Manual
+        Checkpoint = None
     }
 
-    let private task id title description selector instruction eventSelector = {
+    // Every hands-on step carries its own checkpoint, so jumping or going back
+    // to it always rebuilds the sandbox state its instructions assume - no
+    // matter what the user changed on other steps.
+    let private task id title description selector instruction eventSelector checkpoint = {
         Id = id
         Title = title
         Description = description
         TargetSelector = Some selector
         Task = Some instruction
         Advance = TutorialAdvance.OnEvent("click", eventSelector)
+        Checkpoint = Some checkpoint
     }
 
     let all: TutorialStep[] = [|
@@ -50,6 +67,7 @@ module ProvenanceTutorialSteps =
             TargetSelector = None
             Task = None
             Advance = TutorialAdvance.Manual
+            Checkpoint = None
         }
         explain
             "layers"
@@ -83,6 +101,7 @@ module ProvenanceTutorialSteps =
                 TutorialAdvance.OnCondition(fun container ->
                     container.querySelector speciesGroupButton |> isNull |> not
                 )
+            Checkpoint = Some "fresh-editor"
         }
         task
             "group"
@@ -91,6 +110,7 @@ module ProvenanceTutorialSteps =
             speciesGroupButton
             "Click the Species property in the left rail to group the inputs by species."
             speciesGroupButton
+            "species-on-rail"
         task
             "members"
             "Inspect group members"
@@ -98,6 +118,7 @@ module ProvenanceTutorialSteps =
             "button[title='Show members']"
             "Click 'Show members' on one of the grouped cards."
             "button[title='Show members']"
+            "species-grouped"
         task
             "values"
             "Property values"
@@ -107,6 +128,7 @@ module ProvenanceTutorialSteps =
             $"button[aria-label='Expand Species values'], {inputRail}"
             "Hover the Species property in the left rail, then click the chevron next to it to expand its values."
             "button[aria-label='Expand Species values']"
+            "species-values"
         {
             Id = "connect"
             Title = "Connect inputs to outputs"
@@ -121,6 +143,7 @@ module ProvenanceTutorialSteps =
                     "click",
                     "[data-provenance-connection-drop-id^='provenance-connection-drop|GroupCard|Output']"
                 )
+            Checkpoint = Some "species-connect"
         }
         explain
             "filters"
@@ -139,13 +162,51 @@ module ProvenanceTutorialSteps =
             "button[title='Add layer']"
     |]
 
+    // -- Checkpoint seeds ---------------------------------------------------
+    // Seeding applies exactly the state transitions the earlier hands-on steps
+    // would have produced (rail placement, grouping toggle), so a rebuilt
+    // sandbox is indistinguishable from one the user worked through.
+
+    let private speciesHeader =
+        Fixtures.propertyHeader Fixtures.FixtureKinds.characteristicProperty "Species"
+
+    let private withSpeciesOnInputRail (session: ProvenanceSession) (state: UiState) =
+        let layer = Session.activeLayer session
+        State.PropertyPlacement.place layer.Id ProvenanceSide.Input speciesHeader state
+
+    let private withSpeciesGrouped (session: ProvenanceSession) (state: UiState) =
+        let layer = Session.activeLayer session
+
+        withSpeciesOnInputRail session state
+        |> State.GroupingAssignments.toggleSide layer.InputSideId ProvenanceSide.Input speciesHeader
+
+    /// Resolves the overlay's (inherited) checkpoint key to the sandbox seed to
+    /// rebuild; unknown keys fall back to a fresh sample editor.
+    let checkpointSeed (checkpoint: string option) : ProvenanceTutorialCheckpoint =
+        match checkpoint with
+        | Some "species-on-rail" -> {
+            InitUiState = fun session -> State.init session |> withSpeciesOnInputRail session
+            OpenRail = Some ProvenanceSide.Input
+          }
+        | Some "species-grouped"
+        | Some "species-values"
+        | Some "species-connect" -> {
+            InitUiState = fun session -> State.init session |> withSpeciesGrouped session
+            OpenRail = Some ProvenanceSide.Input
+          }
+        | _ -> {
+            InitUiState = State.init
+            OpenRail = None
+          }
+
 [<Erase; Mangle(false)>]
 type ProvenanceTutorial =
 
     /// Full-screen tutorial: the interactive tour chrome wrapped around a
-    /// sandbox editor instance the host passes in (seeded with sample data).
+    /// sandboxed sample-data editor the host builds per checkpoint - the
+    /// overlay remounts it whenever the active step's checkpoint changes.
     [<ReactComponent>]
-    static member Modal(onClose: unit -> unit, editor: ReactElement, ?debug: bool) =
+    static member Modal(onClose: unit -> unit, renderEditor: string option -> ReactElement, ?debug: bool) =
         let debug = defaultArg debug false
 
         Html.div [
@@ -156,7 +217,7 @@ type ProvenanceTutorial =
                 TutorialOverlay.Main(
                     ProvenanceTutorialSteps.all,
                     onClose,
-                    editor,
+                    renderEditor,
                     title = "Provenance editor tour",
                     debug = debug
                 )

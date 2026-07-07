@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, userEvent, waitFor, within } from 'storybook/test';
+import { expect, fireEvent, userEvent, waitFor, within } from 'storybook/test';
 import { Main as TutorialOverlay } from './TutorialOverlay.fs.js';
 import {
   Exports_step as step,
@@ -46,7 +46,10 @@ const demoSteps: TutorialStep[] = [
     undefined,
     undefined,
     advanceManual(),
+    undefined,
   ),
+  // Each task step names its own checkpoint: entering it (from any direction)
+  // remounts the demo panel, so the task always starts from a known state.
   step(
     'water',
     'Watering',
@@ -54,6 +57,7 @@ const demoSteps: TutorialStep[] = [
     "[data-tutorial='demo-water']",
     'Click the Water plant button.',
     advanceOnEvent('click', "[data-tutorial='demo-water']"),
+    'water-task',
   ),
   step(
     'name',
@@ -62,6 +66,7 @@ const demoSteps: TutorialStep[] = [
     "[data-tutorial='demo-name']",
     undefined,
     advanceManual(),
+    'name-task',
   ),
   step(
     'outro',
@@ -70,6 +75,7 @@ const demoSteps: TutorialStep[] = [
     undefined,
     undefined,
     advanceManual(),
+    undefined,
   ),
 ];
 
@@ -82,9 +88,13 @@ function Harness() {
 
   return (
     <div className="swt:h-screen">
-      <TutorialOverlay steps={demoSteps} onClose={() => setClosed(true)} title="Plant care tour" debug={true}>
-        <DemoPanel />
-      </TutorialOverlay>
+      <TutorialOverlay
+        steps={demoSteps}
+        onClose={() => setClosed(true)}
+        title="Plant care tour"
+        debug={true}
+        render={() => <DemoPanel />}
+      />
     </div>
   );
 }
@@ -165,6 +175,55 @@ export const SkipMovesOnAndCloseExits: Story = {
 
     await userEvent.click(canvas.getByTestId('tutorial-close'));
     expect(canvas.getByTestId('tutorial-closed')).toBeInTheDocument();
+  },
+};
+
+export const RevisitingATaskStepRestoresItsCheckpoint: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // Complete the watering task, changing the underlying demo state.
+    await userEvent.click(await canvas.findByTestId('tutorial-sidebar-step-water'));
+    await userEvent.click(canvas.getByText(/Water plant \(0\)/));
+    expect(canvas.getByText(/Water plant \(1\)/)).toBeInTheDocument();
+
+    // Leaving for a step with another checkpoint and coming back remounts the
+    // content at the watering step's checkpoint: the task is doable again.
+    await userEvent.click(canvas.getByTestId('tutorial-next'));
+    expect(within(canvas.getByTestId('tutorial-step-card')).getByText('Naming')).toBeInTheDocument();
+    await userEvent.click(canvas.getByTestId('tutorial-back'));
+    expect(canvas.getByText(/Water plant \(0\)/)).toBeInTheDocument();
+
+    // Steps without their own checkpoint keep the running state: moving from
+    // Naming to Done (which inherits Naming's checkpoint) preserves the input.
+    await userEvent.click(canvas.getByTestId('tutorial-sidebar-step-name'));
+    await userEvent.type(canvas.getByTestId('tutorial-overlay').querySelector('input')!, 'Fern');
+    await userEvent.click(canvas.getByTestId('tutorial-next'));
+    expect(within(canvas.getByTestId('tutorial-step-card')).getByText('Done')).toBeInTheDocument();
+    expect(canvas.getByDisplayValue('Fern')).toBeInTheDocument();
+  },
+};
+
+export const StepCardIsDraggable: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const card = await canvas.findByTestId('tutorial-step-card');
+    const handle = canvas.getByTestId('tutorial-card-handle');
+    const before = card.getBoundingClientRect();
+
+    const handleRect = handle.getBoundingClientRect();
+    const startX = handleRect.left + 10;
+    const startY = handleRect.top + 5;
+    fireEvent.pointerDown(handle, { pointerId: 1, clientX: startX, clientY: startY });
+    fireEvent.pointerMove(handle, { pointerId: 1, clientX: startX + 120, clientY: startY + 80 });
+    fireEvent.pointerUp(handle, { pointerId: 1, clientX: startX + 120, clientY: startY + 80 });
+
+    await waitFor(() => {
+      const after = card.getBoundingClientRect();
+      expect(after.left).toBeCloseTo(before.left + 120, 0);
+      expect(after.top).toBeCloseTo(before.top + 80, 0);
+    });
   },
 };
 

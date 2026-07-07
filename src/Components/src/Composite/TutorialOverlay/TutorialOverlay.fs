@@ -30,6 +30,15 @@ module private TutorialSupport =
     [<Emit("$0.scrollIntoView({ block: 'nearest', inline: 'nearest' })")>]
     let scrollIntoView (_element: Element) : unit = jsNative
 
+    // Pointer capture keeps fast drags glued to the card handle; it is only an
+    // enhancement, so failures (e.g. synthetic events without an active
+    // pointer) must not break the drag itself.
+    [<Emit("(() => { try { $0.setPointerCapture($1); } catch {} })()")>]
+    let setPointerCapture (_element: obj) (_pointerId: float) : unit = jsNative
+
+    [<Emit("(() => { try { $0.releasePointerCapture($1); } catch {} })()")>]
+    let releasePointerCapture (_element: obj) (_pointerId: float) : unit = jsNative
+
     let measure (container: HTMLElement) (selector: string option) : SpotlightState =
         let host = container.getBoundingClientRect ()
 
@@ -60,6 +69,14 @@ module private TutorialSupport =
 
     let holePadding = 6.
 
+    /// Matches the card's `swt:w-80` class.
+    let cardWidth = 320.
+
+    /// Minimum distance between the card and the host edges / the spotlight.
+    let cardMargin = 12.
+
+    let cardGap = 14.
+
 [<Erase; Mangle(false)>]
 type TutorialOverlay =
 
@@ -69,10 +86,18 @@ type TutorialOverlay =
     /// restart from the beginning. Explanation steps block interactions outside
     /// the spotlight; hands-on task steps highlight every selector match (e.g.
     /// a drag source and its dropzone) and keep the whole UI interactive.
+    /// `render` receives the active step's (inherited) checkpoint and its
+    /// result is remounted whenever that checkpoint changes, so every step
+    /// starts from the state its instructions assume.
     [<ReactComponent(true)>]
     static member Main
-        (steps: TutorialStep[], onClose: unit -> unit, children: ReactElement, ?title: string, ?debug: bool)
-        =
+        (
+            steps: TutorialStep[],
+            onClose: unit -> unit,
+            render: string option -> ReactElement,
+            ?title: string,
+            ?debug: bool
+        ) =
         let title = defaultArg title "Interactive tutorial"
         let debug = defaultArg debug false
         let contentRef = React.useElementRef ()
@@ -81,12 +106,25 @@ type TutorialOverlay =
         let latestCompleted = React.useRef completed
         let spotlight, setSpotlight = React.useState<SpotlightState option> None
         let lastSpotlight = React.useRef (None: SpotlightState option)
+        // Bumped by "Play from start" so a restart always remounts the content,
+        // even when the checkpoint key alone would not change.
+        let generation, setGeneration = React.useState 0
 
         let currentStep =
             if steps.Length = 0 then
                 None
             else
                 Some steps.[min activeIndex (steps.Length - 1)]
+
+        // A step without its own checkpoint continues from the nearest earlier
+        // one; the content only remounts when this effective key changes.
+        let effectiveCheckpoint =
+            if steps.Length = 0 then
+                None
+            else
+                steps.[.. min activeIndex (steps.Length - 1)]
+                |> Array.rev
+                |> Array.tryPick (fun step -> step.Checkpoint)
 
         let markCompleted stepId =
             let next = Set.add stepId latestCompleted.current
@@ -191,6 +229,7 @@ type TutorialOverlay =
             latestCompleted.current <- Set.empty
             setCompleted Set.empty
             setActiveIndex 0
+            setGeneration (generation + 1)
 
         let closeButton testId =
             Html.button [
@@ -316,6 +355,64 @@ type TutorialOverlay =
                 ]
               ]
 
+        // The card is measured after every commit so placement can use its real
+        // height (its content changes with the step and completion state).
+        let cardRef = React.useElementRef ()
+        let cardHeight, setCardHeight = React.useState 220.
+
+        React.useLayoutEffect (fun () ->
+            match cardRef.current with
+            | Some card ->
+                let measured = card.getBoundingClientRect().height
+
+                if abs (measured - cardHeight) > 0.5 then
+                    setCardHeight measured
+            | None -> ()
+        )
+
+        // Dragging the card by its header overrides automatic placement until
+        // the next step; automatic placement resumes there.
+        let manualPosition, setManualPosition = React.useState<(float * float) option> None
+        let cardDragOffset = React.useRef (None: (float * float) option)
+
+        React.useEffect ((fun () -> setManualPosition None), [| box activeIndex |])
+
+        let startCardDrag (event: PointerEvent) =
+            // Buttons in the header (close) keep their click behavior.
+            if isNull (TutorialSupport.closest event.target "button") then
+                match cardRef.current with
+                | Some card ->
+                    let cardRect = card.getBoundingClientRect ()
+
+                    cardDragOffset.current <- Some(event.clientX - cardRect.left, event.clientY - cardRect.top)
+
+                    TutorialSupport.setPointerCapture event.currentTarget event.pointerId
+                    event.preventDefault ()
+                | None -> ()
+
+        let moveCardDrag (event: PointerEvent) =
+            match cardDragOffset.current, contentRef.current with
+            | Some(offsetX, offsetY), Some host ->
+                let hostRect = host.getBoundingClientRect ()
+
+                let left =
+                    event.clientX - hostRect.left - offsetX
+                    |> min (hostRect.width - TutorialSupport.cardWidth)
+                    |> max 0.
+
+                let top =
+                    event.clientY - hostRect.top - offsetY
+                    |> min (hostRect.height - cardHeight)
+                    |> max 0.
+
+                setManualPosition (Some(left, top))
+            | _ -> ()
+
+        let endCardDrag (event: PointerEvent) =
+            if cardDragOffset.current.IsSome then
+                cardDragOffset.current <- None
+                TutorialSupport.releasePointerCapture event.currentTarget event.pointerId
+
         let stepCard =
             match currentStep with
             | None -> Html.none
@@ -323,29 +420,63 @@ type TutorialOverlay =
                 let isStepDone = completed.Contains step.Id
 
                 let positionProps =
-                    match spotlight with
-                    | Some {
-                               Rects = rect :: _
+                    match manualPosition, spotlight with
+                    | Some(left, top), _ -> [ style.left (length.px left); style.top (length.px top) ]
+                    | None,
+                      Some {
+                               Rects = (first :: _) as rects
                                HostWidth = hostWidth
                                HostHeight = hostHeight
                            } ->
-                        let cardWidth = 320.
+                        // The card must never cover a highlighted element: try
+                        // below, above, right and left of the (first) spotlight
+                        // rect and take the first spot that clears every
+                        // highlight; if the layout leaves no clear spot, take
+                        // the one covering the least of it.
+                        let highlighted = if step.Task.IsSome then rects else [ first ]
+                        let cardW = TutorialSupport.cardWidth
+                        let margin = TutorialSupport.cardMargin
+                        let gap = TutorialSupport.holePadding + TutorialSupport.cardGap
 
-                        let left =
-                            rect.Left + rect.Width / 2. - cardWidth / 2.
-                            |> min (hostWidth - cardWidth - 12.)
-                            |> max 12.
+                        let clampLeft value =
+                            value |> min (hostWidth - cardW - margin) |> max margin
 
-                        if rect.Top + rect.Height <= hostHeight * 0.55 then
-                            [
-                                style.top (length.px (rect.Top + rect.Height + 14.))
-                                style.left (length.px left)
-                            ]
-                        else
-                            [
-                                style.bottom (length.px (hostHeight - rect.Top + 14.))
-                                style.left (length.px left)
-                            ]
+                        let clampTop value =
+                            value |> min (hostHeight - cardHeight - margin) |> max margin
+
+                        let centeredLeft = clampLeft (first.Left + first.Width / 2. - cardW / 2.)
+
+                        let centeredTop = clampTop (first.Top + first.Height / 2. - cardHeight / 2.)
+
+                        let candidates = [
+                            centeredLeft, clampTop (first.Top + first.Height + gap)
+                            centeredLeft, clampTop (first.Top - gap - cardHeight)
+                            clampLeft (first.Left + first.Width + gap), centeredTop
+                            clampLeft (first.Left - gap - cardW), centeredTop
+                        ]
+
+                        let overlapArea (left: float, top: float) (rect: SpotlightRect) =
+                            let pad = TutorialSupport.holePadding
+
+                            let overlapWidth =
+                                min (left + cardW) (rect.Left + rect.Width + pad) - max left (rect.Left - pad)
+
+                            let overlapHeight =
+                                min (top + cardHeight) (rect.Top + rect.Height + pad) - max top (rect.Top - pad)
+
+                            max 0. overlapWidth * max 0. overlapHeight
+
+                        let left, top =
+                            candidates
+                            |> List.tryFind (fun candidate ->
+                                highlighted |> List.forall (fun rect -> overlapArea candidate rect = 0.)
+                            )
+                            |> Option.defaultWith (fun () ->
+                                candidates
+                                |> List.minBy (fun candidate -> highlighted |> List.sumBy (overlapArea candidate))
+                            )
+
+                        [ style.left (length.px left); style.top (length.px top) ]
                     | _ -> [
                         style.top (length.percent 50)
                         style.left (length.percent 50)
@@ -354,6 +485,7 @@ type TutorialOverlay =
 
                 Html.div [
                     prop.key "tutorial-step-card"
+                    prop.ref cardRef
                     prop.className
                         "swt:absolute swt:z-50 swt:pointer-events-auto swt:flex swt:w-80 swt:max-w-[calc(100%-1.5rem)] swt:flex-col swt:gap-2 swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-4 swt:shadow-xl swt:motion-pop-in"
                     prop.style positionProps
@@ -361,7 +493,15 @@ type TutorialOverlay =
                         prop.testId "tutorial-step-card"
                     prop.children [
                         Html.div [
-                            prop.className "swt:flex swt:items-center swt:justify-between swt:gap-2"
+                            prop.className
+                                "swt:flex swt:cursor-move swt:touch-none swt:select-none swt:items-center swt:justify-between swt:gap-2"
+                            prop.title "Drag to move this card"
+                            prop.onPointerDown startCardDrag
+                            prop.onPointerMove moveCardDrag
+                            prop.onPointerUp endCardDrag
+                            prop.onPointerCancel endCardDrag
+                            if debug then
+                                prop.testId "tutorial-card-handle"
                             prop.children [
                                 Html.span [
                                     prop.className "swt:badge swt:badge-primary swt:badge-sm"
@@ -554,7 +694,13 @@ type TutorialOverlay =
                     prop.ref contentRef
                     prop.className "swt:relative swt:min-w-0 swt:flex-1 swt:overflow-hidden"
                     prop.children [
-                        children
+                        // The key remounts the content whenever the effective
+                        // checkpoint (or the restart generation) changes, so
+                        // the host rebuilds the state this step starts from.
+                        React.KeyedFragment(
+                            $"""tutorial-content-{generation}-{defaultArg effectiveCheckpoint "initial"}""",
+                            [ render effectiveCheckpoint ]
+                        )
                         Html.div [
                             prop.className "swt:absolute swt:inset-0 swt:z-40 swt:pointer-events-none"
                             prop.children [ yield! spotlightPanels; stepCard ]
