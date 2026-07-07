@@ -871,7 +871,7 @@ module private CompositeCellEditModalHelper =
 
     let private hasText = Option.exists (System.String.IsNullOrWhiteSpace >> not)
 
-    let private isNumber input = System.Double.TryParse(input) |> fst
+    let private isNumber (input: string) = System.Double.TryParse(input) |> fst
 
     let tryGetImportUnitTerm (oa: OntologyAnnotation) =
         let hasImportableName =
