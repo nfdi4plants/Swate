@@ -56,6 +56,10 @@ type CompositeCell with
             let header = header.Value
 
             match content with
+            // Clipboard fitting treats term/unit columns as variable-width cells, so a pasted
+            // value + unit can arrive here as one cell with two fields.
+            // Unitized columns are represented by term headers; missing unit metadata is restored
+            // later from a matching unit annotation when available.
             | [| value; unit |] when
                 header.IsTermColumn
                 && CompositeCell.isNumber value

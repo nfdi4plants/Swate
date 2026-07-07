@@ -216,27 +216,30 @@ type TestCases =
             Expect.equal arcTableIndex.y 0 "Move column target should stay on header row"
         | _ -> failwith "Move column menu entry should open move-column modal"
 
-    static member PasteCompactUnitsIntoParameterColumn() =
-        let table = Fixture.mkTable ()
-        let selectHandle = Fixture.mkSelectHandle (1, 2, 4, 4)
-        let clickedCell: CellCoordinate = {| x = 4; y = 1 |}
+    static member private MkUnitPasteTable(targetUnit: OntologyAnnotation, ?sourceUnit: OntologyAnnotation) =
+        let table = ARCtrl.ArcTable("UnitPasteTable", ResizeArray())
 
-        let pasteData = [|
-            [| "4"; "Degree Celsius" |]
-            [| "5"; "Degree Celsius" |]
-        |]
+        let cells =
+            [|
+                yield CompositeCell.createUnitized ("1", targetUnit)
+                match sourceUnit with
+                | Some sourceUnit -> yield CompositeCell.createUnitized ("2", sourceUnit)
+                | None -> ()
+            |]
+            |> ResizeArray
+
+        table.AddColumn(CompositeHeader.Parameter(OntologyAnnotation("Temperature", "TEMP", "TEMP:0001")), cells)
+        table
+
+    static member private PasteCellsInto(table: ArcTable, pasteData: string[][]) =
+        let selectHandle = Fixture.mkSelectHandle (1, 1, 1, 1)
+        let clickedCell: CellCoordinate = {| x = 1; y = 1 |}
 
         let pasteBehavior =
             AnnotationTableClipboard.predictPasteBehaviour (clickedCell, table, selectHandle, pasteData)
 
         match pasteBehavior with
         | PasteCases.PasteCells pasteColumns ->
-            let firstCell = pasteColumns.data.[0].Cells.[0]
-            let firstValue, firstUnit = firstCell.AsUnitized
-
-            Expect.equal firstValue "4" "Compact unit paste should preserve the numeric value"
-            Expect.equal firstUnit.NameText "Degree Celsius" "Compact unit paste should preserve the unit name"
-
             let mutable updatedTable = table
 
             AnnotationTableClipboard.pasteCells (
@@ -247,16 +250,77 @@ type TestCases =
                 (fun nextTable -> updatedTable <- nextTable)
             )
 
-            Expect.equal
-                (updatedTable.GetCellAt(3, 0).ToTabStr())
-                "4\tDegree Celsius\tUO\tUO:000000001"
-                "Pasting into an existing unitized column should enrich the compact unit with target metadata"
+            updatedTable, pasteColumns
+        | _ -> failwith "Unit paste should be predicted as PasteCells"
 
-            Expect.equal
-                (updatedTable.GetCellAt(3, 1).ToTabStr())
-                "5\tDegree Celsius\tUO\tUO:000000001"
-                "Pasting multiple compact unit rows should preserve units for each row"
-        | _ -> failwith "Compact unit paste should be predicted as PasteCells"
+    static member CompactUnitPasteRestoresMetadataFromMatchingUnit() =
+        let targetUnit = OntologyAnnotation("degree Celsius", "TARGET", "TARGET:0001")
+        let sourceUnit = OntologyAnnotation("degree Celsius", "ALTUNIT", "ALTUNIT:0001")
+        let table = TestCases.MkUnitPasteTable(targetUnit, sourceUnit = sourceUnit)
+        let pasteData = [| [| "4"; "degree Celsius" |] |]
+
+        let updatedTable, pasteColumns = TestCases.PasteCellsInto(table, pasteData)
+
+        let firstValue, firstUnit = pasteColumns.data.[0].Cells.[0].AsUnitized
+
+        Expect.equal firstValue "4" "Compact value-unit paste should preserve the numeric value"
+        Expect.equal firstUnit.NameText "degree Celsius" "Compact value-unit paste should preserve the unit name"
+        Expect.equal firstUnit.TermSourceREF None "Compact value-unit paste initially only contains the unit name"
+
+        Expect.equal
+            (updatedTable.GetCellAt(0, 0).ToTabStr())
+            "4\tdegree Celsius\tALTUNIT\tALTUNIT:0001"
+            "Compact value-unit paste should restore metadata from a matching unit, not from the target cell"
+
+    static member CompactUnitPasteDoesNotUseOnlyTargetMetadata() =
+        let targetUnit = OntologyAnnotation("degree Celsius", "TARGET", "TARGET:0001")
+        let table = TestCases.MkUnitPasteTable(targetUnit)
+        let pasteData = [| [| "4"; "degree Celsius" |] |]
+
+        let updatedTable, _ = TestCases.PasteCellsInto(table, pasteData)
+
+        Expect.equal
+            (updatedTable.GetCellAt(0, 0).ToTabStr())
+            "4\tdegree Celsius\t\t"
+            "Compact value-unit paste should not inherit metadata from the target cell alone"
+
+    static member ValueOnlyUnitPasteUsesTargetUnit() =
+        let targetUnit = OntologyAnnotation("degree Celsius", "TARGET", "TARGET:0001")
+        let table = TestCases.MkUnitPasteTable(targetUnit)
+        let pasteData = [| [| "4" |] |]
+
+        let updatedTable, _ = TestCases.PasteCellsInto(table, pasteData)
+
+        Expect.equal
+            (updatedTable.GetCellAt(0, 0).ToTabStr())
+            "4\tdegree Celsius\tTARGET\tTARGET:0001"
+            "Value-only unit paste should keep using the target unit"
+
+    static member FullUnitPasteKeepsGivenMetadata() =
+        let targetUnit = OntologyAnnotation("degree Celsius", "TARGET", "TARGET:0001")
+        let sourceUnit = OntologyAnnotation("degree Celsius", "ALTUNIT", "ALTUNIT:0001")
+        let table = TestCases.MkUnitPasteTable(targetUnit, sourceUnit = sourceUnit)
+        let pasteData = [| [| "4"; "degree Celsius"; "GIVEN"; "GIVEN:0001" |] |]
+
+        let updatedTable, _ = TestCases.PasteCellsInto(table, pasteData)
+
+        Expect.equal
+            (updatedTable.GetCellAt(0, 0).ToTabStr())
+            "4\tdegree Celsius\tGIVEN\tGIVEN:0001"
+            "Full value-unit-metadata paste should keep the given unit metadata"
+
+    static member CompactUnitPasteKeepsUnmatchedUnitNameOnly() =
+        let targetUnit = OntologyAnnotation("degree Celsius", "TARGET", "TARGET:0001")
+        let sourceUnit = OntologyAnnotation("kelvin", "ALTUNIT", "ALTUNIT:0002")
+        let table = TestCases.MkUnitPasteTable(targetUnit, sourceUnit = sourceUnit)
+        let pasteData = [| [| "4"; "meter" |] |]
+
+        let updatedTable, _ = TestCases.PasteCellsInto(table, pasteData)
+
+        Expect.equal
+            (updatedTable.GetCellAt(0, 0).ToTabStr())
+            "4\tmeter\t\t"
+            "Compact value-unit paste should keep an unmatched unit name without borrowing other metadata"
 
 let Main =
 
@@ -354,7 +418,15 @@ let Main =
             <| fun _ -> TestCases.IndexDeleteFirstRow()
             testCase "Header move column keeps 1-based header index"
             <| fun _ -> TestCases.HeaderMoveColumnUsesSelectedHeaderIndex()
-            testCase "Compact value-unit TSV paste preserves units"
-            <| fun _ -> TestCases.PasteCompactUnitsIntoParameterColumn()
+            testCase "Compact value-unit TSV paste restores metadata from matching unit"
+            <| fun _ -> TestCases.CompactUnitPasteRestoresMetadataFromMatchingUnit()
+            testCase "Compact value-unit TSV paste does not use target metadata alone"
+            <| fun _ -> TestCases.CompactUnitPasteDoesNotUseOnlyTargetMetadata()
+            testCase "Value-only TSV paste into unitized cell uses target unit"
+            <| fun _ -> TestCases.ValueOnlyUnitPasteUsesTargetUnit()
+            testCase "Full unit TSV paste keeps given metadata"
+            <| fun _ -> TestCases.FullUnitPasteKeepsGivenMetadata()
+            testCase "Compact value-unit TSV paste keeps unmatched unit without metadata"
+            <| fun _ -> TestCases.CompactUnitPasteKeepsUnmatchedUnitNameOnly()
         ]
     ]

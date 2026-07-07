@@ -335,6 +335,31 @@ type AnnotationTableClipboard =
             setTable
         ) =
 
+        let tryFindMatchingUnitMetadata
+            (unit: OntologyAnnotation)
+            (table: ArcTable)
+            (targetUnit: OntologyAnnotation option)
+            =
+
+            if not unit.hasName then
+                None
+            else
+                table.Columns
+                |> Seq.choose _.TryGetColumnUnits()
+                |> Seq.collect id
+                |> Seq.filter (fun candidate ->
+                    targetUnit
+                    |> Option.exists (fun target -> System.Object.ReferenceEquals(candidate, target))
+                    |> not
+                    && candidate.hasTermMetadata
+                    && unit.NameEquals candidate
+                )
+                |> Seq.distinctBy (fun unit -> unit.TermSourceREF, unit.TermAccessionNumber)
+                |> Seq.toList
+                |> function
+                    | [ candidate ] -> Some candidate
+                    | _ -> None
+
         let getCorrectTargetForCell
             (currentCell: CompositeCell)
             (table: ArcTable)
@@ -342,35 +367,25 @@ type AnnotationTableClipboard =
             adaption
             =
 
-            if currentCell.isUnitized then
-                let targetCell =
-                    table.GetCellAt(targetCoordinate.x - adaption, targetCoordinate.y - adaption)
-
-                let value, unit = currentCell.AsUnitized
-
-                let unitNeedsMetadata =
-                    unit.isEmpty ()
-                    || Option.forall String.IsNullOrWhiteSpace unit.TermSourceREF
-                    || Option.forall String.IsNullOrWhiteSpace unit.TermAccessionNumber
-
-                let hasSameUnitName (targetTerm: OntologyAnnotation) =
-                    unit.isEmpty ()
-                    || String.Equals(unit.NameText, targetTerm.NameText, StringComparison.OrdinalIgnoreCase)
-
+            match currentCell with
+            | CompositeCell.Unitized(_, unit) when unit.hasTermMetadata -> currentCell
+            | CompositeCell.Unitized(value, unit) ->
                 let targetUnit =
-                    if targetCell.isUnitized then
-                        targetCell.AsUnitized |> snd |> Some
-                    elif targetCell.isTerm then
-                        targetCell.AsTerm |> Some
-                    else
-                        None
+                    match table.GetCellAt(targetCoordinate.x - adaption, targetCoordinate.y - adaption) with
+                    | CompositeCell.Unitized(_, unit)
+                    | CompositeCell.Term unit -> Some unit
+                    | _ -> None
 
-                match targetUnit with
-                | Some targetUnit when unitNeedsMetadata && hasSameUnitName targetUnit ->
-                    CompositeCell.createUnitized (value, targetUnit)
-                | _ -> currentCell
-            else
-                currentCell
+                let restoredUnit =
+                    if unit.hasName then
+                        tryFindMatchingUnitMetadata unit table targetUnit
+                    else
+                        targetUnit |> Option.filter _.hasTermMetadata
+
+                restoredUnit
+                |> Option.map (fun unit -> CompositeCell.createUnitized (value, unit))
+                |> Option.defaultValue currentCell
+            | _ -> currentCell
 
         let getCorrectTargetForHeader
             (currentHeader: CompositeHeader)
