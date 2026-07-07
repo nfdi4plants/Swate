@@ -234,21 +234,149 @@ type Controls =
         )
 
     [<ReactComponent>]
-    static member LayerPagination
+    static member private LayerPageArrow
         (
-            session: ProvenanceSession,
+            label: string,
+            iconClass: string,
+            target: ProvenanceLayerId option,
             onSelect: ProvenanceLayerId -> unit,
-            onAddLayer: ProvenanceSourceName -> unit,
-            ?debug: bool,
-            ?sourceColors: Map<ProvenanceSourceId, ProvenanceColor>,
-            ?onSetSourceColor: ProvenanceSourceId -> ProvenanceColor option -> unit,
-            ?seedSummary: string
+            testId: string,
+            ?debug: bool
         ) =
+        Html.button [
+            prop.type'.button
+            prop.className [
+                "swt:btn swt:btn-sm swt:btn-outline swt:w-10 swt:px-0"
+                if target.IsNone then
+                    "swt:opacity-40"
+            ]
+            prop.title label
+            prop.ariaLabel label
+            prop.disabled target.IsNone
+            if target.IsSome && defaultArg debug false then
+                prop.testId testId
+            prop.onClick (fun _ -> target |> Option.iter onSelect)
+            prop.children [
+                Html.i [ prop.className $"swt:iconify {iconClass} swt:size-4" ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member private LayerPageButton
+        (
+            layerId: ProvenanceLayerId,
+            name: string,
+            isActive: bool,
+            onSelect: ProvenanceLayerId -> unit,
+            ?sourceColor: ProvenanceColor,
+            ?debug: bool,
+            ?key: string
+        ) =
+        Html.button [
+            match key with
+            | Some key -> prop.key key
+            | None -> ()
+            prop.type'.button
+            prop.title $"View provenance layer {name}"
+            prop.ariaLabel $"View provenance layer {name}"
+            prop.custom ("data-provenance-layer-page", layerId)
+            prop.className [
+                "swt:btn swt:btn-sm swt:min-w-0 swt:px-3"
+                if isActive then
+                    "swt:btn-primary swt:font-semibold"
+                else
+                    "swt:btn-outline swt:opacity-50 swt:hover:opacity-100"
+            ]
+            // Equal-width slots keep the bar from resizing as the window moves.
+            prop.style [ style.custom ("width", "clamp(4.5rem, 18vw, 7rem)") ]
+            if defaultArg debug false then
+                prop.testId $"provenance-layer-{layerId}"
+                prop.custom ("data-provenance-layer-color", sourceColor |> Option.defaultValue "")
+            prop.onClick (fun _ -> onSelect layerId)
+            prop.children [
+                match sourceColor with
+                | Some color when color <> "" ->
+                    Html.span [
+                        prop.className "swt:size-2 swt:shrink-0 swt:rounded-full"
+                        prop.style [ style.backgroundColor color ]
+                    ]
+                | _ -> Html.none
+                Html.span [
+                    prop.className "swt:min-w-0 swt:truncate"
+                    prop.text name
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member private LayerJumpPopover
+        (session: ProvenanceSession, onSelect: ProvenanceLayerId -> unit, ?debug: bool)
+        =
+        let isOpen, setIsOpen = React.useState false
+
+        Popover.Popover(
+            isOpen = isOpen,
+            onOpenChange = setIsOpen,
+            ?debug =
+                (if defaultArg debug false then
+                     Some "provenance-layer-jump-popover"
+                 else
+                     None),
+            children =
+                React.Fragment [
+                    Popover.Trigger(
+                        Html.button [
+                            prop.title "Jump to layer"
+                            prop.ariaLabel "Jump to layer"
+                            prop.type'.button
+                            prop.className "swt:btn swt:btn-sm swt:btn-outline swt:w-10 swt:px-0 swt:font-semibold"
+                            if defaultArg debug false then
+                                prop.testId "provenance-layer-jump"
+                            prop.text "..."
+                        ]
+                    )
+                    Popover.Content(
+                        children =
+                            Html.div [
+                                prop.className "swt:flex swt:min-w-48 swt:flex-col swt:gap-2 swt:p-2"
+                                prop.children [
+                                    Html.label [ prop.className "swt:label"; prop.text "Jump to layer" ]
+                                    Html.select [
+                                        prop.className "swt:select swt:select-bordered swt:select-sm swt:w-full"
+                                        prop.ariaLabel "Select layer"
+                                        prop.title "Jump to a layer"
+                                        if defaultArg debug false then
+                                            prop.testId "provenance-layer-select"
+                                        prop.value session.ActiveLayerId
+                                        prop.onChange (fun (layerId: string) ->
+                                            onSelect layerId
+                                            setIsOpen false
+                                        )
+                                        prop.children [
+                                            for layerId in session.LayerOrder do
+                                                let layer = Session.layerById layerId session
+
+                                                Html.option [
+                                                    prop.key layerId
+                                                    prop.value layerId
+                                                    prop.text layer.Model.Source.Name
+                                                ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                    )
+                ]
+        )
+
+    [<ReactComponent>]
+    static member private AddLayerPopover
+        (session: ProvenanceSession, onAddLayer: ProvenanceSourceName -> unit, ?seedSummary: string, ?debug: bool)
+        =
         let defaultNextLayerName (session: ProvenanceSession) =
             $"Layer {session.LayerOrder.Length + 1}"
 
-        let isAddLayerOpen, setIsAddLayerOpen = React.useState false
-        let isLayerJumpOpen, setIsLayerJumpOpen = React.useState false
+        let isOpen, setIsOpen = React.useState false
         let layerName, setLayerName = React.useState (defaultNextLayerName session)
 
         React.useEffect ((fun () -> setLayerName (defaultNextLayerName session)), [| box session.LayerOrder.Length |])
@@ -259,45 +387,93 @@ type Controls =
             if not (String.IsNullOrWhiteSpace trimmed) then
                 onAddLayer trimmed
                 setLayerName (defaultNextLayerName session)
-                setIsAddLayerOpen false
+                setIsOpen false
 
-        let addLayerContent =
-            Html.form [
-                prop.className "swt:flex swt:min-w-56 swt:flex-col swt:gap-2"
-                prop.onSubmit (fun event ->
-                    event.preventDefault ()
-                    submitLayerName ()
-                )
-                prop.children [
-                    match seedSummary with
-                    | Some summary ->
-                        Html.p [
-                            prop.className "swt:max-w-56 swt:text-xs swt:text-base-content/70"
+        Popover.Popover(
+            isOpen = isOpen,
+            onOpenChange = setIsOpen,
+            ?debug =
+                (if defaultArg debug false then
+                     Some "provenance-add-layer-popover"
+                 else
+                     None),
+            children =
+                React.Fragment [
+                    Popover.Trigger(
+                        Html.button [
+                            prop.title "Add layer"
+                            prop.type'.button
+                            prop.className "swt:btn swt:btn-sm swt:btn-primary"
                             if defaultArg debug false then
-                                prop.testId "provenance-layer-seed-summary"
-                            prop.text summary
+                                prop.testId "provenance-add-layer"
+                            prop.children [
+                                Html.i [
+                                    prop.className "swt:iconify swt:fluent--add-square-multiple-20-regular swt:size-4"
+                                ]
+                                Html.span "Layer"
+                            ]
                         ]
-                    | None -> ()
-                    Html.label [ prop.className "swt:label"; prop.text "Layer name" ]
-                    Html.input [
-                        prop.ariaLabel "Layer name"
-                        prop.className "swt:input swt:input-bordered swt:input-sm"
-                        prop.required true
-                        prop.value layerName
-                        prop.onChange setLayerName
-                    ]
-                    Html.button [
-                        prop.type'.submit
-                        prop.className "swt:btn swt:btn-primary swt:btn-sm"
-                        prop.text "Create layer"
-                    ]
+                    )
+                    Popover.Content(
+                        children =
+                            Html.form [
+                                prop.className "swt:flex swt:min-w-56 swt:flex-col swt:gap-2 swt:p-2"
+                                prop.onSubmit (fun event ->
+                                    event.preventDefault ()
+                                    submitLayerName ()
+                                )
+                                prop.children [
+                                    // Announces which entities will seed the new layer's inputs, so
+                                    // the effect of the current selection (or its absence) is visible
+                                    // before the layer is created.
+                                    match seedSummary with
+                                    | Some summary ->
+                                        Html.p [
+                                            prop.className "swt:max-w-56 swt:text-xs swt:text-base-content/70"
+                                            if defaultArg debug false then
+                                                prop.testId "provenance-layer-seed-summary"
+                                            prop.text summary
+                                        ]
+                                    | None -> ()
+                                    Html.label [ prop.className "swt:label"; prop.text "Layer name" ]
+                                    Html.input [
+                                        prop.ariaLabel "Layer name"
+                                        prop.className "swt:input swt:input-bordered swt:input-sm"
+                                        prop.required true
+                                        prop.value layerName
+                                        prop.onChange setLayerName
+                                    ]
+                                    Html.button [
+                                        prop.type'.submit
+                                        prop.className "swt:btn swt:btn-primary swt:btn-sm"
+                                        prop.text "Create layer"
+                                    ]
+                                ]
+                            ]
+                    )
                 ]
-            ]
+        )
 
+    [<ReactComponent>]
+    static member LayerPagination
+        (
+            session: ProvenanceSession,
+            onSelect: ProvenanceLayerId -> unit,
+            onAddLayer: ProvenanceSourceName -> unit,
+            ?debug: bool,
+            ?sourceColors: Map<ProvenanceSourceId, ProvenanceColor>,
+            ?onSetSourceColor: ProvenanceSourceId -> ProvenanceColor option -> unit,
+            ?seedSummary: string
+        ) =
         let activeIndex =
             session.LayerOrder
             |> List.tryFindIndex (fun layerId -> layerId = session.ActiveLayerId)
             |> Option.defaultValue 0
+
+        // The active layer plus one neighbor on each side, clamped to the ends.
+        let visibleLayerIds =
+            let start = max 0 (min (activeIndex - 1) (session.LayerOrder.Length - 3))
+            session.LayerOrder |> List.skip start |> List.truncate 3
 
         let sourceColorOf (layer: ProvenanceLayer) =
             sourceColors
@@ -305,82 +481,10 @@ type Controls =
 
         let activeLayer = Session.layerById session.ActiveLayerId session
 
-        let arrowButton (label: string) (iconClass: string) (targetIndex: int) (testId: string) =
-            let target = session.LayerOrder |> List.tryItem targetIndex
-
-            Html.button [
-                prop.type'.button
-                prop.className [
-                    "swt:btn swt:btn-sm swt:btn-outline swt:w-10 swt:px-0"
-                    if target.IsNone then
-                        "swt:opacity-40"
-                ]
-                prop.title label
-                prop.ariaLabel label
-                prop.disabled target.IsNone
-                if target.IsSome && defaultArg debug false then
-                    prop.testId testId
-                prop.onClick (fun _ -> target |> Option.iter onSelect)
-                prop.children [
-                    Html.i [ prop.className $"swt:iconify {iconClass} swt:size-4" ]
-                ]
-            ]
-
-        let pageSlot layerId =
-            let layer = Session.layerById layerId session
-            let sourceColor = sourceColorOf layer
-            let isActive = layerId = session.ActiveLayerId
-
-            Html.button [
-                prop.key layerId
-                prop.type'.button
-                prop.title $"View provenance layer {layer.Model.Source.Name}"
-                prop.ariaLabel $"View provenance layer {layer.Model.Source.Name}"
-                prop.custom ("data-provenance-layer-page", layerId)
-                prop.className [
-                    "swt:btn swt:btn-sm swt:min-w-0 swt:px-3"
-                    if isActive then
-                        "swt:btn-primary swt:font-semibold"
-                    else
-                        "swt:btn-outline swt:opacity-60 swt:hover:opacity-100"
-                ]
-                prop.style [ style.custom ("width", "clamp(4.5rem, 18vw, 7rem)") ]
-                if defaultArg debug false then
-                    prop.testId $"provenance-layer-{layerId}"
-                    prop.custom ("data-provenance-layer-color", sourceColor |> Option.defaultValue "")
-                prop.onClick (fun _ -> onSelect layerId)
-                prop.children [
-                    match sourceColor with
-                    | Some color when color <> "" ->
-                        Html.span [
-                            prop.className "swt:size-2 swt:shrink-0 swt:rounded-full"
-                            prop.style [ style.backgroundColor color ]
-                        ]
-                    | _ -> Html.none
-                    Html.span [
-                        prop.className "swt:min-w-0 swt:truncate"
-                        prop.text layer.Model.Source.Name
-                    ]
-                ]
-            ]
-
-        let pageSlots =
-            let layerCount = session.LayerOrder.Length
-
-            if layerCount <= 3 then
-                [ 0..2 ] |> List.choose (fun index -> session.LayerOrder |> List.tryItem index)
-            elif activeIndex = 0 then
-                [ 0..2 ] |> List.choose (fun index -> session.LayerOrder |> List.tryItem index)
-            elif activeIndex = layerCount - 1 then
-                [ layerCount - 3 .. layerCount - 1 ]
-                |> List.choose (fun index -> session.LayerOrder |> List.tryItem index)
-            else
-                [ activeIndex - 1 .. activeIndex + 1 ]
-                |> List.choose (fun index -> session.LayerOrder |> List.tryItem index)
-
         Html.div [
             prop.className
                 "swt:pointer-events-auto swt:flex swt:max-w-full swt:min-w-0 swt:items-center swt:justify-center swt:gap-2 swt:rounded-box swt:border swt:border-base-content/20 swt:bg-base-100 swt:px-3 swt:py-2 swt:shadow-md swt:ring-1 swt:ring-base-300"
+            // A fixed bar width so the control does not shift as layer names change.
             prop.style [ style.custom ("width", "min(40rem, calc(100vw - 2rem))") ]
             prop.custom ("role", "navigation")
             prop.ariaLabel "Layer pagination"
@@ -393,75 +497,37 @@ type Controls =
                     if defaultArg debug false then
                         prop.testId "provenance-layer-pages"
                     prop.children [
-                        arrowButton
-                            "Previous layer"
-                            "swt:fluent--chevron-left-20-regular"
-                            (activeIndex - 1)
-                            "provenance-layer-prev"
-                        for layerId in pageSlots do
-                            pageSlot layerId
-                        arrowButton
-                            "Next layer"
-                            "swt:fluent--chevron-right-20-regular"
-                            (activeIndex + 1)
-                            "provenance-layer-next"
+                        Controls.LayerPageArrow(
+                            "Previous layer",
+                            "swt:fluent--chevron-left-20-regular",
+                            session.LayerOrder |> List.tryItem (activeIndex - 1),
+                            onSelect,
+                            "provenance-layer-prev",
+                            ?debug = debug
+                        )
+                        for layerId in visibleLayerIds do
+                            let layer = Session.layerById layerId session
+
+                            Controls.LayerPageButton(
+                                layerId,
+                                layer.Model.Source.Name,
+                                (layerId = session.ActiveLayerId),
+                                onSelect,
+                                ?sourceColor = sourceColorOf layer,
+                                ?debug = debug,
+                                key = layerId
+                            )
+                        Controls.LayerPageArrow(
+                            "Next layer",
+                            "swt:fluent--chevron-right-20-regular",
+                            session.LayerOrder |> List.tryItem (activeIndex + 1),
+                            onSelect,
+                            "provenance-layer-next",
+                            ?debug = debug
+                        )
                     ]
                 ]
-                Popover.Popover(
-                    isOpen = isLayerJumpOpen,
-                    onOpenChange = setIsLayerJumpOpen,
-                    ?debug =
-                        (if defaultArg debug false then
-                             Some "provenance-layer-jump-popover"
-                         else
-                             None),
-                    children =
-                        React.Fragment [
-                            Popover.Trigger(
-                                Html.button [
-                                    prop.title "Jump to layer"
-                                    prop.ariaLabel "Jump to layer"
-                                    prop.type'.button
-                                    prop.className
-                                        "swt:btn swt:btn-sm swt:btn-outline swt:w-10 swt:px-0 swt:font-semibold"
-                                    if defaultArg debug false then
-                                        prop.testId "provenance-layer-jump"
-                                    prop.text "..."
-                                ]
-                            )
-                            Popover.Content(
-                                children =
-                                    Html.div [
-                                        prop.className "swt:flex swt:min-w-48 swt:flex-col swt:gap-2 swt:p-2"
-                                        prop.children [
-                                            Html.label [ prop.className "swt:label"; prop.text "Jump to layer" ]
-                                            Html.select [
-                                                prop.className "swt:select swt:select-bordered swt:select-sm swt:w-full"
-                                                prop.ariaLabel "Select layer"
-                                                prop.title "Jump to a layer"
-                                                if defaultArg debug false then
-                                                    prop.testId "provenance-layer-select"
-                                                prop.value session.ActiveLayerId
-                                                prop.onChange (fun (layerId: string) ->
-                                                    onSelect layerId
-                                                    setIsLayerJumpOpen false
-                                                )
-                                                prop.children [
-                                                    for layerId in session.LayerOrder do
-                                                        let layer = Session.layerById layerId session
-
-                                                        Html.option [
-                                                            prop.key layerId
-                                                            prop.value layerId
-                                                            prop.text layer.Model.Source.Name
-                                                        ]
-                                                ]
-                                            ]
-                                        ]
-                                    ]
-                            )
-                        ]
-                )
+                Controls.LayerJumpPopover(session, onSelect, ?debug = debug)
                 match onSetSourceColor with
                 | Some setSourceColor ->
                     Controls.LayerColorButton(
@@ -471,41 +537,7 @@ type Controls =
                         triggerClassName = "swt:btn swt:btn-sm swt:btn-outline swt:min-h-8 swt:w-8 swt:px-0"
                     )
                 | None -> Html.none
-                Popover.Popover(
-                    isOpen = isAddLayerOpen,
-                    onOpenChange = setIsAddLayerOpen,
-                    ?debug =
-                        (if defaultArg debug false then
-                             Some "provenance-add-layer-popover"
-                         else
-                             None),
-                    children =
-                        React.Fragment [
-                            Popover.Trigger(
-                                Html.button [
-                                    prop.title "Add layer"
-                                    prop.type'.button
-                                    prop.className "swt:btn swt:btn-sm swt:btn-primary"
-                                    if defaultArg debug false then
-                                        prop.testId "provenance-add-layer"
-                                    prop.children [
-                                        Html.i [
-                                            prop.className
-                                                "swt:iconify swt:fluent--add-square-multiple-20-regular swt:size-4"
-                                        ]
-                                        Html.span "Layer"
-                                    ]
-                                ]
-                            )
-                            Popover.Content(
-                                children =
-                                    Html.div [
-                                        prop.className "swt:p-2"
-                                        prop.children [ addLayerContent ]
-                                    ]
-                            )
-                        ]
-                )
+                Controls.AddLayerPopover(session, onAddLayer, ?seedSummary = seedSummary, ?debug = debug)
             ]
         ]
 
