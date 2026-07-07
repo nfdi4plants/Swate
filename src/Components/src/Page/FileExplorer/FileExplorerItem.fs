@@ -287,8 +287,8 @@ type FileExplorerItem =
         let hasStatusControl = Helper.isLfs item || statusAction.IsSome
 
         let stickyRowClasses =
-            if stickyTopOffset.IsSome then
-                "swt:sticky swt:bg-base-100 swt:border-b swt:border-base-content/10 swt:shadow-sm"
+            if isExpanded then
+                "swt:bg-base-100 swt:border-b swt:border-base-content/10 swt:shadow-sm"
             else
                 ""
 
