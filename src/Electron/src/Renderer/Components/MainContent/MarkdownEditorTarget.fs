@@ -37,7 +37,7 @@ let MarkdownEditorTarget (content: string) =
         React.useMemo (
             (fun _ ->
                 createAssetFilePickerAdapter
-                    Api.ipcFilePickerApi.pickExternalFilePaths
+                    Api.ipcFilePickerApi.pickFilePaths
                     NoteConversion.noteAssetsFolderName
                     (fun asset -> pendingImageAssetsRef.current <- pendingImageAssetsRef.current @ [ asset ])
             ),

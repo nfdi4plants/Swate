@@ -133,7 +133,7 @@ type IAuthApi = {
 
 /// Two Way Bridge: Renderer <-> Main
 type IFilePickerApi = {
-    pickExternalFilePaths: PickExternalFilePathsRequest -> JS.Promise<Result<string[], exn>>
+    pickFilePaths: PickExternalFilePathsRequest -> JS.Promise<Result<string[], exn>>
 }
 
 /// One Way Bridge: Main -> Renderer

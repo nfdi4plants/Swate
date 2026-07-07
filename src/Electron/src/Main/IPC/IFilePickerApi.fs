@@ -40,7 +40,7 @@ let private openFileDialogProperties (allowMultiple: bool option) = [|
 |]
 
 let api (event: IpcMainInvokeEvent) : IFilePickerApi = {
-    pickExternalFilePaths =
+    pickFilePaths =
         fun (request: PickExternalFilePathsRequest) -> promise {
             try
                 let properties = openFileDialogProperties request.allowMultiple
