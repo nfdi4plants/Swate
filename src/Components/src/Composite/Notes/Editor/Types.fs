@@ -14,7 +14,6 @@ type NotesDraft = {
     DateCreated: System.DateTime option
     Tags: ResizeArray<OntologyAnnotation>
     MainText: string
-    SelectedExistingTarget: ExistingTargetRef option
 } with
 
     static member init = {
@@ -22,7 +21,6 @@ type NotesDraft = {
         DateCreated = Some System.DateTime.Today
         Tags = ResizeArray()
         MainText = ""
-        SelectedExistingTarget = None
     }
 
 type NotesUiState = {

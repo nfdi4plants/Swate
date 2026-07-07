@@ -22,6 +22,16 @@ module IPCTypesHelper =
 
 open IPCTypesHelper
 
+[<Literal>]
+let DroppedFilePathsRegisteredChannel = "swate:dropped-file-paths-registered"
+
+[<JS.Pojo>]
+type DroppedFilePathRegistration = { key: string; absolutePath: string }
+
+/// Creates a stable lookup key from browser File metadata; Unit Separator avoids ambiguous joins for normal names.
+let createDroppedFilePathKey (name: string) (size: int) (lastModified: float) (mimeType: string) =
+    String.concat "\u001F" [ name; string size; string lastModified; mimeType ]
+
 type CreateArcRequest = { identifier: string; initGit: bool }
 
 /// Two Way Bridge: Renderer <-> Main
@@ -134,6 +144,7 @@ type IAuthApi = {
 /// Two Way Bridge: Renderer <-> Main
 type IFilePickerApi = {
     pickFilePaths: PickExternalFilePathsRequest -> JS.Promise<Result<string[], exn>>
+    resolveDroppedFilePath: string -> JS.Promise<Result<string, exn>>
 }
 
 /// One Way Bridge: Main -> Renderer

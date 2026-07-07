@@ -5,6 +5,35 @@ open Feliz
 open Swate.Components.Primitive.BaseModal
 open Swate.Components.Page.FileExplorer.Types
 
+module private AssignNoteModalHelper =
+
+    type AssetDestinationState = {
+        NoteKey: string option
+        AssetDestinations: Map<string, AssignNoteAssetDestination>
+    }
+
+    let selectedNoteKey (selectedNote: AssignableNoteRef option) =
+        selectedNote |> Option.map _.SourceFolderPath
+
+    let defaultAssetDestinations
+        (availableDestinations: AssignNoteAssetDestination list)
+        (assets: seq<AssignableNoteAssetRef>)
+        =
+        match availableDestinations |> List.tryHead with
+        | None -> Map.empty
+        | Some defaultDestination ->
+            assets
+            |> Seq.map (fun asset -> asset.SourceRelativePath, defaultDestination)
+            |> Map.ofSeq
+
+    let updateAssetDestination noteKey currentAssetDestinations assetPath destination = {
+        NoteKey = noteKey
+        AssetDestinations =
+            match destination with
+            | Some destination -> currentAssetDestinations |> Map.add assetPath destination
+            | None -> currentAssetDestinations |> Map.remove assetPath
+    }
+
 [<Erase; Mangle(false)>]
 type AssignNoteModal =
 
@@ -18,16 +47,54 @@ type AssignNoteModal =
             availableNotes: ResizeArray<AssignableNoteRef>,
             availableAssets: ResizeArray<AssignableNoteAssetRef>,
             availableAssetDestinations: AssignNoteAssetDestination list,
-            assetDestinations: Map<string, AssignNoteAssetDestination>,
-            setAssetDestination: string -> AssignNoteAssetDestination option -> unit,
             close: unit -> unit,
-            submit: unit -> JS.Promise<unit>
+            submit: AssignableNoteRef -> Map<string, AssignNoteAssetDestination> -> JS.Promise<unit>
         ) =
 
         let isRunning, setIsRunning = React.useState false
+
+        let selectedNoteKey = AssignNoteModalHelper.selectedNoteKey selectedNote
+
+        let defaultAssetDestinations =
+            AssignNoteModalHelper.defaultAssetDestinations availableAssetDestinations availableAssets
+
+        let initialAssetDestinationState: AssignNoteModalHelper.AssetDestinationState = {
+            NoteKey = selectedNoteKey
+            AssetDestinations = defaultAssetDestinations
+        }
+
+        let assetDestinationState, setAssetDestinationState =
+            React.useStateWithUpdater initialAssetDestinationState
+
         let isDisabled = isRunning
         let displayName = itemName |> Option.defaultValue "this target"
         let hasNotes = availableNotes.Count > 0
+
+        let assetDestinations =
+            if assetDestinationState.NoteKey = selectedNoteKey then
+                assetDestinationState.AssetDestinations
+            else
+                setAssetDestinationState (fun _ -> {
+                    NoteKey = selectedNoteKey
+                    AssetDestinations = defaultAssetDestinations
+                })
+
+                defaultAssetDestinations
+
+        let setAssetDestination assetPath destination =
+            setAssetDestinationState (fun currentState ->
+                let currentAssetDestinations =
+                    if currentState.NoteKey = selectedNoteKey then
+                        currentState.AssetDestinations
+                    else
+                        defaultAssetDestinations
+
+                AssignNoteModalHelper.updateAssetDestination
+                    selectedNoteKey
+                    currentAssetDestinations
+                    assetPath
+                    destination
+            )
 
         let selectedValue =
             selectedNote |> Option.map _.SourceFolderPath |> Option.defaultValue ""
@@ -38,13 +105,16 @@ type AssignNoteModal =
 
         let onSubmit () =
             promise {
-                if not isRunning then
+                match selectedNote with
+                | None -> ()
+                | Some note when not isRunning ->
                     setIsRunning true
 
                     try
-                        do! submit ()
+                        do! submit note assetDestinations
                     finally
                         setIsRunning false
+                | Some _ -> ()
             }
             |> Promise.start
 

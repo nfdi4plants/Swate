@@ -38,6 +38,7 @@ let MarkdownEditorTarget (content: string) =
             (fun _ ->
                 createAssetFilePickerAdapter
                     Api.ipcFilePickerApi.pickFilePaths
+                    Api.ipcFilePickerApi.resolveDroppedFilePath
                     NoteConversion.noteAssetsFolderName
                     (fun asset -> pendingImageAssetsRef.current <- pendingImageAssetsRef.current @ [ asset ])
             ),

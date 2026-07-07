@@ -137,7 +137,6 @@ let private createConfirmRenameConfig
         selectedTreePath = Some selectedTreePath
         pageState = pageState
         closeRenameModal = fun () -> probe.Closed <- true
-        setIsRenaming = ignore
         setSelection = fun selection -> probe.RenamedSelection <- Some selection
         refreshGitStatus = fun () -> probe.GitStatusRefreshCount <- probe.GitStatusRefreshCount + 1
         reloadPreviewByPath =
@@ -355,8 +354,7 @@ Vitest.describe (
                         (Some(Renderer.Types.PageState.ArcFilePage(ArcFiles.Assay(ArcAssay.init "OldAssay"))))
                         probe
 
-                RenameWorkflow.confirmRenameItem config "NewAssay"
-                do! waitUntil ((fun () -> probe.RenameRequest.IsSome && probe.Closed), 50)
+                do! RenameWorkflow.confirmRenameItem config "NewAssay"
 
                 expectRenameRequest probe "assays/OldAssay" "NewAssay"
                 Vitest.expect(probe.RenamedSelection.IsSome).toBe (true)
@@ -382,8 +380,7 @@ Vitest.describe (
                         (Some(Renderer.Types.PageState.TextPage "old content"))
                         probe
 
-                RenameWorkflow.confirmRenameItem config "new.txt"
-                do! waitUntil ((fun () -> probe.RenameRequest.IsSome && probe.Closed), 50)
+                do! RenameWorkflow.confirmRenameItem config "new.txt"
 
                 expectRenameRequest probe "assays/AssayA/protocols/old.txt" "new.txt"
                 Vitest.expect(probe.RenamedSelection.IsSome).toBe (true)

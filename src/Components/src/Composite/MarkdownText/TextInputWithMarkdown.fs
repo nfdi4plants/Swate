@@ -91,17 +91,7 @@ type TextInputWithMarkdown =
         let activePrompt, setActivePrompt =
             React.useState (None: MarkdownPromptPlugin option)
 
-        let promptInput, setPromptInput = React.useState ""
-        let promptError, setPromptError = React.useState (None: string option)
-
-        let promptFiles, setPromptFiles =
-            React.useStateWithUpdater ([]: MarkdownPromptFile list)
-
-        let promptFileDropActive, setPromptFileDropActive = React.useState false
-
         let textareaRef = React.useElementRef ()
-        let promptInputRef = React.useInputRef ()
-        let promptFileInputRef = React.useInputRef ()
         let commandOrchestratorRef = React.useRef<TextAreaCommandOrchestrator option> None
         let promptSelectionRef = React.useRef (None: (int * int) option)
         let isMountedRef = React.useRef true
@@ -187,185 +177,56 @@ type TextInputWithMarkdown =
             | Some textarea -> textarea.selectionStart, textarea.selectionEnd
             | None -> tempValue.Length, tempValue.Length
 
-        let appendPromptFilesAndClearError (files: MarkdownPromptFile list) =
-            if isMountedRef.current then
-                setPromptFiles (fun currentFiles ->
-                    let combined = currentFiles @ files
-                    PluginTextInputHelpers.normalizePromptFiles activePrompt combined
-                )
-
-                if promptError.IsSome then
-                    setPromptError None
-
-        let applyPickedPromptFiles (files: MarkdownPromptFile list) =
-            let accepted, rejected =
-                PluginTextInputHelpers.partitionFilesByAccept activePrompt files
-
-            if not (List.isEmpty accepted) then
-                appendPromptFilesAndClearError accepted
-
-            if not (List.isEmpty rejected) && isMountedRef.current then
-                setPromptError (Some(PluginTextInputHelpers.rejectedFilesMessage activePrompt rejected))
-
-        let removePromptFileAtIndex (indexToRemove: int) =
-            setPromptFiles (fun currentFiles ->
-                currentFiles
-                |> List.indexed
-                |> List.choose (fun (index, file) -> if index = indexToRemove then None else Some file)
-            )
-
-        let promptFilePickerOptions () = {
-            AcceptTypes = PluginTextInputHelpers.activePromptAcceptTypes activePrompt
-            AllowMultiple = Some(PluginTextInputHelpers.activePromptAllowsMultipleFiles activePrompt)
-        }
-
-        let triggerPromptFileSelection () =
-            promise {
-                match filePickerAdapter with
-                | Some adapter ->
-                    // Preferred substitution point for runtime-specific file pickers.
-                    let! files = adapter.PickFiles(promptFilePickerOptions ())
-
-                    applyPickedPromptFiles files
-                | None ->
-                    // Built-in fallback: standard browser file input dialog.
-                    promptFileInputRef.current |> Option.iter (fun input -> input.click ())
-            }
-            |> Promise.catch (fun err ->
-                if isMountedRef.current then
-                    setPromptError (Some $"File selection failed: {string err}")
-            )
-            |> Promise.start
-
-        let handlePromptFileChange =
-            fun (files: File list) ->
-                let selected = files |> List.map PluginTextInputHelpers.toPromptFile
-                applyPickedPromptFiles selected
-
-                // Reset the input value so selecting the same file triggers onChange.
-                promptFileInputRef.current |> Option.iter (fun input -> input.value <- "")
-
-        let handlePromptDrop =
-            fun (e: DragEvent) ->
-                e.preventDefault ()
-                e.stopPropagation ()
-                setPromptFileDropActive false
-
-                match filePickerAdapter with
-                | Some adapter ->
-                    promise {
-                        let! files = adapter.PickFiles(promptFilePickerOptions ())
-
-                        if List.isEmpty files then
-                            setPromptError (Some "No files were selected.")
-                        else
-                            applyPickedPromptFiles files
-                    }
-                    |> Promise.catch (fun err ->
-                        if isMountedRef.current then
-                            setPromptError (Some $"File selection failed: {string err}")
-                    )
-                    |> Promise.start
-                | None ->
-                    let files =
-                        if isNull e.dataTransfer || isNull e.dataTransfer.files then
-                            []
-                        else
-                            [
-                                for i in 0 .. int e.dataTransfer.files.length - 1 do
-                                    let file = e.dataTransfer.files.item i
-
-                                    if not (isNull file) then
-                                        yield PluginTextInputHelpers.toPromptFile file
-                            ]
-
-                    if List.isEmpty files then
-                        setPromptError (Some "No files were dropped.")
-                    else
-                        applyPickedPromptFiles files
-
         let openPromptDialog (prompt: MarkdownPromptPlugin) =
             let startIndex, endIndex = getSelectionOrEnd ()
             promptSelectionRef.current <- Some(startIndex, endIndex)
-            setPromptInput ""
-            setPromptError None
-            setPromptFiles (fun _ -> [])
-            setPromptFileDropActive false
             setActivePrompt (Some prompt)
 
-        let submitPromptDialog () =
-            match activePrompt with
-            | None -> ()
-            | Some prompt ->
-                let applyPromptResult (nextValue: string) ((nextSelectionStart, nextSelectionEnd): int * int) =
-                    if isMountedRef.current then
-                        setTempValue nextValue
-                        startedChange.current <- true
-                        promptSelectionRef.current <- Some(nextSelectionStart, nextSelectionEnd)
-                        setActivePrompt None
-                        setPromptInput ""
-                        setPromptError None
-                        setPromptFiles (fun _ -> [])
-                        setPromptFileDropActive false
+        let closePromptDialog (_: bool) = setActivePrompt None
 
-                match PluginTextInputHelpers.activePromptInputMode activePrompt with
-                | MarkdownPromptInputMode.Text ->
-                    match prompt.Validate promptInput with
-                    | Error message -> setPromptError (Some message)
-                    | Ok() ->
-                        let startIndex, endIndex =
-                            match promptSelectionRef.current with
-                            | Some(startIndex, endIndex) -> startIndex, endIndex
-                            | None -> getSelectionOrEnd ()
+        let promptSelectionOrCurrent () =
+            match promptSelectionRef.current with
+            | Some(startIndex, endIndex) -> startIndex, endIndex
+            | None -> getSelectionOrEnd ()
 
-                        let nextValue, selection = prompt.Apply tempValue startIndex endIndex promptInput
+        let applyPromptResult (nextValue: string) ((nextSelectionStart, nextSelectionEnd): int * int) =
+            if isMountedRef.current then
+                setTempValue nextValue
+                startedChange.current <- true
+                promptSelectionRef.current <- Some(nextSelectionStart, nextSelectionEnd)
+                setActivePrompt None
 
-                        applyPromptResult nextValue selection
+        let submitTextPrompt (prompt: MarkdownPromptPlugin) (promptInput: string) = promise {
+            match prompt.Validate promptInput with
+            | Error message -> failwith message
+            | Ok() ->
+                let startIndex, endIndex = promptSelectionOrCurrent ()
+                let nextValue, selection = prompt.Apply tempValue startIndex endIndex promptInput
 
-                | MarkdownPromptInputMode.File ->
-                    let selectedFiles =
-                        promptFiles |> PluginTextInputHelpers.normalizePromptFiles activePrompt
+                applyPromptResult nextValue selection
+        }
 
-                    if List.isEmpty selectedFiles then
-                        setPromptError (Some "Select at least one file.")
-                    else
-                        match prompt.ApplyFiles with
-                        | None -> setPromptError (Some "This plugin does not support file input.")
-                        | Some applyFiles ->
-                            promise {
-                                let mutable resolvedFiles: (MarkdownPromptFile * string) list = []
+        let submitFilePrompt (prompt: MarkdownPromptPlugin) (selectedFiles: MarkdownPromptFile list) = promise {
+            match prompt.ApplyFiles with
+            | None -> failwith "This plugin does not support file input."
+            | Some applyFiles ->
+                try
+                    let mutable resolvedFiles: (MarkdownPromptFile * string) list = []
 
-                                for file in selectedFiles do
-                                    let! resolvedPath =
-                                        PluginTextInputHelpers.resolvePromptFilePath filePickerAdapter file
+                    for file in selectedFiles do
+                        let! resolvedPath = PluginTextInputHelpers.resolvePromptFilePath filePickerAdapter file
 
-                                    resolvedFiles <- (file, resolvedPath) :: resolvedFiles
+                        resolvedFiles <- (file, resolvedPath) :: resolvedFiles
 
-                                return List.rev resolvedFiles
-                            }
-                            |> Promise.map (fun resolvedFiles ->
-                                if isMountedRef.current then
-                                    let startIndex, endIndex =
-                                        match promptSelectionRef.current with
-                                        | Some(startIndex, endIndex) -> startIndex, endIndex
-                                        | None -> getSelectionOrEnd ()
+                    let startIndex, endIndex = promptSelectionOrCurrent ()
 
-                                    let nextValue, selection = applyFiles tempValue startIndex endIndex resolvedFiles
+                    let nextValue, selection =
+                        applyFiles tempValue startIndex endIndex (List.rev resolvedFiles)
 
-                                    applyPromptResult nextValue selection
-                            )
-                            |> Promise.catch (fun err ->
-                                if isMountedRef.current then
-                                    setPromptError (Some $"Could not resolve file paths: {string err}")
-                            )
-                            |> Promise.start
-
-        let closePromptDialog (_: bool) =
-            setActivePrompt None
-            setPromptError None
-            setPromptInput ""
-            setPromptFiles (fun _ -> [])
-            setPromptFileDropActive false
+                    applyPromptResult nextValue selection
+                with exn ->
+                    failwith $"Could not resolve file paths: {string exn}"
+        }
 
         let activePlugins = PluginRegistry.activePlugins plugins
         let pluginCommands = PluginRegistry.activeCommands plugins
@@ -445,15 +306,6 @@ type TextInputWithMarkdown =
             if classes.IsSome then
                 classes.Value
         ]
-
-        let promptViewModel = PluginTextInputHelpers.promptViewModel activePrompt
-
-        let handlePromptInputChange =
-            fun (text: string) ->
-                setPromptInput text
-
-                if promptError.IsSome then
-                    setPromptError None
 
         Html.div [
             prop.className (
@@ -594,26 +446,18 @@ type TextInputWithMarkdown =
                         prop.text validationError.Value
                     ]
 
-                MarkdownPluginPromptModal.View(
-                    {
-                        IsOpen = activePrompt.IsSome
-                        SetIsOpen = closePromptDialog
-                        PromptViewModel = promptViewModel
-                        PromptInput = promptInput
-                        PromptError = promptError
-                        PromptFiles = promptFiles
-                        PromptFileDropActive = promptFileDropActive
-                        PromptInputRef = promptInputRef
-                        PromptFileInputRef = promptFileInputRef
-                        SetPromptFileDropActive = setPromptFileDropActive
-                        OnPromptInputChange = handlePromptInputChange
-                        OnPromptFileChange = handlePromptFileChange
-                        OnTriggerPromptFileSelection = triggerPromptFileSelection
-                        OnPromptDrop = handlePromptDrop
-                        OnRemovePromptFileAtIndex = removePromptFileAtIndex
-                        OnSubmitPromptDialog = submitPromptDialog
-                    }
-                )
+                match activePrompt with
+                | Some prompt ->
+                    MarkdownPluginPromptModal.View(
+                        {
+                            SetIsOpen = closePromptDialog
+                            Prompt = prompt
+                            FilePickerAdapter = filePickerAdapter
+                            OnSubmitTextPrompt = submitTextPrompt
+                            OnSubmitFilePrompt = submitFilePrompt
+                        }
+                    )
+                | None -> Html.none
             ]
         ]
 

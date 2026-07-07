@@ -1,5 +1,6 @@
 namespace Renderer.Components.LeftSidebar.FileExplorer
 
+open Fable.Core
 open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
@@ -10,7 +11,6 @@ module FileTreeDeleteWorkflow =
     type ConfirmDeleteConfig = {
         pendingDeleteItem: FileItem option
         closeDeleteModal: unit -> unit
-        setIsDeleting: bool -> unit
         enqueueError: ErrorModalRequest -> unit
     }
 
@@ -24,13 +24,13 @@ module FileTreeDeleteWorkflow =
     let tryGetRelativePath (item: FileItem) : string option =
         item.Path |> Option.map PathHelpers.normalizeCanonicalRelativePath
 
-    let confirmDeleteItem (config: ConfirmDeleteConfig) =
+    let confirmDeleteItem (config: ConfirmDeleteConfig) : JS.Promise<unit> =
         match config.pendingDeleteItem |> Option.bind tryGetRelativePath with
-        | None -> config.closeDeleteModal ()
-        | Some deletePath when ArcEntityPathRules.isDeletePathAllowed deletePath |> not -> config.closeDeleteModal ()
+        | None -> promise { config.closeDeleteModal () }
+        | Some deletePath when ArcEntityPathRules.isDeletePathAllowed deletePath |> not -> promise {
+            config.closeDeleteModal ()
+          }
         | Some deletePath ->
-            config.setIsDeleting true
-
             promise {
                 let! deleteResult = Api.ipcArcVaultApi.deletePath deletePath
 
@@ -39,5 +39,3 @@ module FileTreeDeleteWorkflow =
                 | Error exn -> applyDeleteError config exn.Message
             }
             |> Promise.catch (fun exn -> applyDeleteError config exn.Message)
-            |> Promise.map (fun _ -> config.setIsDeleting false)
-            |> Promise.start

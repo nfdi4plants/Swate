@@ -17,11 +17,8 @@ type CreateFileSystemItemModal =
             kind: FileSystemItemKind,
             parentName: string option,
             close: unit -> unit,
-            submit: string -> unit,
-            ?isCreating: bool
+            submit: string -> JS.Promise<unit>
         ) =
-
-        let isCreating = defaultArg isCreating false
 
         let label = fileSystemCreateKindLabel kind
         let actionLabel = $"Create {label}"
@@ -38,7 +35,6 @@ type CreateFileSystemItemModal =
             validate = validateRenameName,
             submitLabel = actionLabel,
             validationMessage = "Name is required and must not contain path separators.",
-            isBusy = isCreating,
             busyLabel = "Creating...",
             debug = "file-system-create"
         )

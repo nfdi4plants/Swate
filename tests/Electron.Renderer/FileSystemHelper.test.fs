@@ -1,10 +1,12 @@
 module ElectronRenderer.FileSystemHelperTests
 
 open System
+open Browser.Types
 open Renderer.Components.Helper.FileSystemHelper
 open Swate.Components.Composite.MarkdownText.Plugins
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.IPCTypes
 open Vitest
 
 let private expectSourceId (file: MarkdownPromptFile) =
@@ -14,17 +16,29 @@ let private expectSourceId (file: MarkdownPromptFile) =
         sourceId
     | None -> failwith $"Expected '{file.Name}' to have a source id."
 
+let private unresolvedDroppedFilePath _ = promise {
+    return Error(exn "Could not resolve the selected image source path.")
+}
+
 let private createAssetAdapter pickPaths =
     let pendingAssets = ResizeArray<ExternalAssetLink>()
 
     let adapter =
-        createAssetFilePickerAdapterWithPathPicker pickPaths "assets" (fun asset -> pendingAssets.Add asset)
+        createAssetFilePickerAdapter pickPaths unresolvedDroppedFilePath "assets" (fun asset -> pendingAssets.Add asset)
 
     adapter, pendingAssets
 
 let private expectAsset (asset: ExternalAssetLink) sourceAbsolutePath markdownRelativePath =
     Vitest.expect(asset.sourceAbsolutePath).toBe (sourceAbsolutePath)
     Vitest.expect(asset.markdownRelativePath).toBe (markdownRelativePath)
+
+let private browserFile name size lastModified mimeType : File =
+    unbox {|
+        name = name
+        size = size
+        lastModified = lastModified
+        ``type`` = mimeType
+    |}
 
 Vitest.describe (
     "FileSystemHelper",
@@ -267,6 +281,39 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "createAssetFilePickerAdapter resolves dropped images through the dropped file path bridge",
+            fun () -> promise {
+                let pendingAssets = ResizeArray<ExternalAssetLink>()
+                let expectedKey = createDroppedFilePathKey "dropped-image.png" 42 1234. "image/png"
+
+                let adapter =
+                    createAssetFilePickerAdapter
+                        (fun _ -> promise { return Ok [||] })
+                        (fun key -> promise {
+                            if key = expectedKey then
+                                return Ok "C:/outside/dropped-image.png"
+                            else
+                                return Error(exn "Unexpected dropped image key.")
+                        })
+                        "assets"
+                        (fun asset -> pendingAssets.Add asset)
+
+                let promptFile: MarkdownPromptFile = {
+                    Name = "dropped-image.png"
+                    MimeType = Some "image/png"
+                    SourceId = None
+                    BrowserFile = Some(browserFile "dropped-image.png" 42 1234. "image/png")
+                }
+
+                let! markdownPath = adapter.ResolveMarkdownPath promptFile
+
+                Vitest.expect(markdownPath).toBe ("assets/dropped-image.png")
+                Vitest.expect(pendingAssets.Count).toBe (1)
+                expectAsset pendingAssets.[0] "C:/outside/dropped-image.png" "assets/dropped-image.png"
+            }
+        )
+
+        Vitest.test (
             "createAssetFilePickerAdapter rejects browser files that were not selected through the main picker",
             fun () -> promise {
                 let adapter, pendingAssets =
@@ -276,7 +323,7 @@ Vitest.describe (
                     Name = "dropped-image.png"
                     MimeType = Some "image/png"
                     SourceId = None
-                    BrowserFile = Some(unbox (obj ()))
+                    BrowserFile = Some(browserFile "dropped-image.png" 42 1234. "image/png")
                 }
 
                 try

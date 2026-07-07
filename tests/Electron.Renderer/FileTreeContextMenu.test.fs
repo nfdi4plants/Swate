@@ -637,7 +637,9 @@ Vitest.describe (
                     AssignNoteAssetSelector.AssignNoteAssetSelector(
                         assets,
                         availableDestinations,
-                        createDefaultAssetDestinations availableDestinations assets,
+                        Map.ofList [
+                            (assets.[0].SourceRelativePath, AssignNoteAssetDestination.Protocol)
+                        ],
                         (fun _ _ -> ())
                     )
                     |> renderToBody
@@ -663,7 +665,9 @@ Vitest.describe (
                     AssignNoteAssetSelector.AssignNoteAssetSelector(
                         assets,
                         availableDestinations,
-                        createDefaultAssetDestinations availableDestinations assets,
+                        Map.ofList [
+                            (assets.[0].SourceRelativePath, AssignNoteAssetDestination.Protocol)
+                        ],
                         (fun _ _ -> ())
                     )
                     |> renderToBody
@@ -686,16 +690,25 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "assign note modal disables interactions while submit is running",
+            "assign note modal disables interactions and submits selected asset destinations",
             fun () -> promise {
                 let note = assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
-                let asset = assignableAsset "notes/2026-06-15/Sampling_protocol/assets/data.csv" "data.csv"
+
+                let asset =
+                    assignableAsset "notes/2026-06-15/Sampling_protocol/assets/data.csv" "data.csv"
 
                 let mutable submitCalls = 0
+                let mutable submittedNote: AssignableNoteRef option = None
+
+                let mutable submittedDestinations: Map<string, AssignNoteAssetDestination> option =
+                    None
+
                 let mutable resolveSubmit: (unit -> unit) option = None
 
-                let submit () =
+                let submit note assetDestinations =
                     submitCalls <- submitCalls + 1
+                    submittedNote <- Some note
+                    submittedDestinations <- Some assetDestinations
                     Promise.create (fun resolve _reject -> resolveSubmit <- Some resolve)
 
                 let! _container, cleanup =
@@ -706,9 +719,10 @@ Vitest.describe (
                         setSelectedNote = ignore,
                         availableNotes = ResizeArray [ note ],
                         availableAssets = ResizeArray [ asset ],
-                        availableAssetDestinations = [ AssignNoteAssetDestination.Protocol ],
-                        assetDestinations = Map.ofList [ (asset.SourceRelativePath, AssignNoteAssetDestination.Protocol) ],
-                        setAssetDestination = (fun _ _ -> ()),
+                        availableAssetDestinations = [
+                            AssignNoteAssetDestination.Protocol
+                            AssignNoteAssetDestination.Dataset
+                        ],
                         close = ignore,
                         submit = submit
                     )
@@ -717,6 +731,9 @@ Vitest.describe (
                 try
                     let modal =
                         document.body.querySelector ("[data-testid='modal_arc-assign-note']") :?> HTMLElement
+
+                    let selectAt index =
+                        (modal.querySelectorAll "select").[index] :?> HTMLSelectElement
 
                     let assignButton () =
                         (modal.querySelectorAll "button").[2] :?> HTMLButtonElement
@@ -732,13 +749,28 @@ Vitest.describe (
                         |]
 
                     Vitest.expect(disabledStates ()).toEqual ([| false; false; false; false |])
+                    Vitest.expect((selectAt 2).value).toBe ("protocol")
+
+                    changeSelectValue (selectAt 2) "dataset"
+                    do! Promise.sleep 0
 
                     assignButton().click ()
 
                     do! waitUntil ((fun () -> submitCalls = 1 && resolveSubmit.IsSome), 50)
                     do! waitUntil ((fun () -> disabledStates () |> Array.forall id), 50)
 
-                    resolveSubmit.Value ()
+                    Vitest.expect(submittedNote).toEqual (Some note)
+
+                    match submittedDestinations with
+                    | Some destinations ->
+                        Vitest.expect(destinations.Count).toBe (1)
+
+                        Vitest
+                            .expect(destinations |> Map.tryFind asset.SourceRelativePath)
+                            .toEqual (Some AssignNoteAssetDestination.Dataset)
+                    | None -> failwith "Expected submit to receive asset destinations."
+
+                    resolveSubmit.Value()
                     do! waitUntil ((fun () -> disabledStates () |> Array.forall not), 50)
                 finally
                     cleanup ()
@@ -799,6 +831,65 @@ Vitest.describe (
                                  Some AssignNoteAssetDestination.Dataset)
                             |]
                         )
+                finally
+                    cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "assign note modal header destination submits every asset destination",
+            fun () -> promise {
+                let note = assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
+
+                let assets =
+                    ResizeArray [
+                        assignableAsset "notes/2026-06-15/Sampling_protocol/assets/data.csv" "data.csv"
+                        assignableAsset "notes/2026-06-15/Sampling_protocol/assets/diagram.png" "diagram.png"
+                    ]
+
+                let mutable submittedDestinations: Map<string, AssignNoteAssetDestination> option =
+                    None
+
+                let submit _ assetDestinations =
+                    submittedDestinations <- Some assetDestinations
+                    promise { return () }
+
+                let! _container, cleanup =
+                    AssignNoteModal.AssignNoteModal(
+                        isOpen = true,
+                        itemName = Some "AssayA",
+                        selectedNote = Some note,
+                        setSelectedNote = ignore,
+                        availableNotes = ResizeArray [ note ],
+                        availableAssets = assets,
+                        availableAssetDestinations = [
+                            AssignNoteAssetDestination.Protocol
+                            AssignNoteAssetDestination.Dataset
+                        ],
+                        close = ignore,
+                        submit = submit
+                    )
+                    |> renderToBody
+
+                try
+                    let modal =
+                        document.body.querySelector ("[data-testid='modal_arc-assign-note']") :?> HTMLElement
+
+                    changeSelectValue ((modal.querySelectorAll "select").[1] :?> HTMLSelectElement) "dataset"
+                    do! Promise.sleep 0
+
+                    ((modal.querySelectorAll "button").[2] :?> HTMLButtonElement).click ()
+                    do! waitUntil ((fun () -> submittedDestinations.IsSome), 50)
+
+                    match submittedDestinations with
+                    | Some destinations ->
+                        Vitest.expect(destinations.Count).toBe (2)
+
+                        for asset in assets do
+                            Vitest
+                                .expect(destinations |> Map.tryFind asset.SourceRelativePath)
+                                .toEqual (Some AssignNoteAssetDestination.Dataset)
+                    | None -> failwith "Expected submit to receive asset destinations."
                 finally
                     cleanup ()
             }

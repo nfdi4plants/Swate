@@ -6,6 +6,7 @@ open Fable.Core
 open Swate.Components.Composite.MarkdownText.Plugins
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.IPCTypes
 
 type ExternalAssetLink = {
     sourceAbsolutePath: string
@@ -33,6 +34,7 @@ let internal imageFileExtensions = [|
     "webp"
 |]
 
+/// Converts browser accept tokens into Electron dialog filter extensions.
 let internal fileExtensionsFromAcceptTypes (acceptTypes: string option) =
     let extensions =
         acceptTypes
@@ -120,6 +122,7 @@ let private assetMarkdownPath assetFolderName (fileName: string) =
     else
         $"{assetFolder}/{imageFileName}"
 
+/// Looks up paths produced by the explicit file picker before falling back to dropped-file resolution.
 let private tryGetStoredAbsolutePath (absolutePathsById: Dictionary<string, string>) (sourceId: string option) =
     match sourceId with
     | Some sourceId when not (String.IsNullOrWhiteSpace sourceId) ->
@@ -139,12 +142,19 @@ let private copyRequestForAsset parentPath asset = {
     overwrite = true
 }
 
-let internal createAssetFilePickerAdapterWithPathPicker
-    (pickPaths: PickExternalFilePathsRequest -> JS.Promise<Result<string[], exn>>)
+/// Adapts markdown file prompts to Electron file picking and main-owned dropped-file path resolution.
+let createAssetFilePickerAdapter
+    (pickExternalFilePaths: PickExternalFilePathsRequest -> JS.Promise<Result<string[], exn>>)
+    (resolveDroppedFilePath: string -> JS.Promise<Result<string, exn>>)
     (assetFolderName: string)
     (addAsset: ExternalAssetLink -> unit)
     =
     let absolutePathsById = Dictionary<string, string>()
+
+    let addResolvedAsset file sourceAbsolutePath =
+        let asset = externalAssetLink assetFolderName file sourceAbsolutePath
+        addAsset asset
+        asset.markdownRelativePath
 
     let toPromptFile absolutePath =
         let sourceAbsolutePath = PathHelpers.normalizePath absolutePath
@@ -164,7 +174,7 @@ let internal createAssetFilePickerAdapterWithPathPicker
         PickFiles =
             (fun options -> promise {
                 match!
-                    pickPaths {
+                    pickExternalFilePaths {
                         filterExtensions = fileExtensionsFromAcceptTypes options.AcceptTypes
                         allowMultiple = options.AllowMultiple
                     }
@@ -174,23 +184,28 @@ let internal createAssetFilePickerAdapterWithPathPicker
                 | Error error -> return raise error
             })
         ResolveMarkdownPath =
+            // Picked files are resolved from local adapter state; dropped files resolve through main by key.
             (fun file -> promise {
                 match tryGetStoredAbsolutePath absolutePathsById file.SourceId with
-                | Some sourceAbsolutePath ->
-                    let asset = externalAssetLink assetFolderName file sourceAbsolutePath
-                    addAsset asset
-                    return asset.markdownRelativePath
-                | _ -> return raise (exn "Could not resolve the selected image source path.")
+                | Some sourceAbsolutePath -> return addResolvedAsset file sourceAbsolutePath
+                | None ->
+                    match file.BrowserFile with
+                    | Some browserFile ->
+                        let key =
+                            createDroppedFilePathKey
+                                browserFile.name
+                                browserFile.size
+                                browserFile.lastModified
+                                browserFile.``type``
+
+                        match! resolveDroppedFilePath key with
+                        | Ok sourceAbsolutePath -> return addResolvedAsset file sourceAbsolutePath
+                        | Error error -> return raise error
+                    | None -> return raise (exn "Could not resolve the selected image source path.")
             })
     }
 
-let createAssetFilePickerAdapter
-    (pickExternalFilePaths: PickExternalFilePathsRequest -> JS.Promise<Result<string[], exn>>)
-    (assetFolderName: string)
-    (addAsset: ExternalAssetLink -> unit)
-    =
-    createAssetFilePickerAdapterWithPathPicker pickExternalFilePaths assetFolderName addAsset
-
+/// Writes markdown first, then copies any resolved external assets beside the saved file.
 let writeFileWithOptionalExternalAssetLinks
     (writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>)
     (createFileSystemItem: CreateFileSystemItemRequest -> JS.Promise<Result<string, exn>>)
