@@ -275,7 +275,7 @@ type FileExplorerItem =
             ?onDeleteItem: FileItem -> unit,
             ?canDeleteItem: FileItem -> bool,
             ?statusAction: ContextMenuItem,
-            ?stickyTopOffset: int,
+            ?stickyDepth: int,
             ?children: ReactElement
         ) =
         let canCreateItem = defaultArg canCreateItem (fun (_: FileItem) -> false)
@@ -286,11 +286,9 @@ type FileExplorerItem =
         let canDeleteFromDirectory = canDeleteItem item && onDeleteItem.IsSome
         let hasStatusControl = Helper.isLfs item || statusAction.IsSome
 
-        let stickyRowClasses =
-            if isExpanded then
-                "swt:bg-base-100 swt:border-b swt:border-base-content/10 swt:shadow-sm"
-            else
-                ""
+        let effectiveStickyDepth = if isExpanded then stickyDepth else None
+
+        let stickyParentRowHeightPx = 32
 
         let directoryToggleIconClass =
             if isExpanded then
@@ -303,18 +301,21 @@ type FileExplorerItem =
                 prop.custom ("data-file-item-id", item.Id)
                 prop.className [
                     "swt:group swt:w-full swt:px-2 swt:py-1 swt:cursor-default"
-                    stickyRowClasses
+                    if isExpanded then
+                        "swt:bg-base-100 swt:border-b swt:border-base-content/10 swt:shadow-sm"
+
                     rowHighlightClass
                 ]
                 prop.style [
                     style.display.flex
                     style.width (length.percent 100)
                     yield!
-                        stickyTopOffset
-                        |> Option.map (fun offset -> [
+                        effectiveStickyDepth
+                        |> Option.map (fun depth -> [
                             style.position.sticky
-                            style.top offset
-                            style.zIndex (100 - (offset / 32))
+                            style.top (depth * stickyParentRowHeightPx)
+                            // Parent rows need to layer above nested sticky rows; raise the base for very deep trees.
+                            style.zIndex (100 - depth)
                         ])
                         |> Option.defaultValue []
                 ]

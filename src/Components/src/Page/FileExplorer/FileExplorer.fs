@@ -270,7 +270,6 @@ type FileExplorer =
             )
 
         let selectedPathIds = model.SelectedPath |> List.map _.Id |> Set.ofList
-        let stickyParentRowHeightPx = 32
 
         let rec renderItem depth item =
             let isSelected = model.SelectedId = Some item.Id
@@ -314,9 +313,9 @@ type FileExplorer =
                     else
                         None
 
-                let stickyTopOffset =
-                    if delegateHorizontalScrollToParent && childrenTree.IsSome then
-                        Some(depth * stickyParentRowHeightPx)
+                let stickyDepth =
+                    if delegateHorizontalScrollToParent then
+                        Some depth
                     else
                         None
 
@@ -340,7 +339,7 @@ type FileExplorer =
                     ?onDeleteItem = onDeleteItem,
                     canDeleteItem = canDeleteItem,
                     ?statusAction = statusAction,
-                    ?stickyTopOffset = stickyTopOffset,
+                    ?stickyDepth = stickyDepth,
                     ?children = childrenTree
                 )
             else
