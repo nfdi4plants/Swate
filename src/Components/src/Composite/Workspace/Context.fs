@@ -6,7 +6,21 @@ open Feliz
 open Swate.Components.Composite.Workspace.Types
 open Swate.Components.JsBindings
 
-type WorkspaceCtxValue = {
+type WorkspaceDndContext = {
+    onDragStart: DndKit.IDndKitEvent -> unit
+    handleDragEnd: DndKit.IDndKitEvent -> unit
+    isDragging: bool
+}
+
+let WorkspaceDndCtx =
+    React.createContext<WorkspaceDndContext> (
+        Unchecked.defaultof<WorkspaceDndContext>
+    )
+
+[<Hook>]
+let useWorkspaceDndCtx () = React.useContext WorkspaceDndCtx
+
+type WorkspaceContext = {
     layout: Pane
     setLayout: Pane -> unit
     panes: Map<string, WorkspacePaneState>
@@ -14,8 +28,6 @@ type WorkspaceCtxValue = {
     contentMap: Map<string, ReactElement>
     activeTabId: string option
     setActiveTabId: string option -> unit
-    handleDragEnd: DndKit.IDndKitEvent -> unit
-    onDragStart: DndKit.IDndKitEvent -> unit
     debug: bool
     closeTab: string -> unit
     closeOthers: string -> unit
@@ -24,14 +36,14 @@ type WorkspaceCtxValue = {
 }
 
 let WorkspaceCtx =
-    React.createContext<WorkspaceCtxValue> (
-        Unchecked.defaultof<WorkspaceCtxValue>
+    React.createContext<WorkspaceContext> (
+        Unchecked.defaultof<WorkspaceContext>
     )
 
 [<Hook>]
 let useWorkspaceCtx () = React.useContext WorkspaceCtx
 
-type PaneCtxValue = {
+type PaneContext = {
     paneId: string
     tabs: WorkspaceTab array
     tabOrder: string array
@@ -40,8 +52,8 @@ type PaneCtxValue = {
 }
 
 let PaneCtx =
-    React.createContext<PaneCtxValue> (
-        Unchecked.defaultof<PaneCtxValue>
+    React.createContext<PaneContext> (
+        Unchecked.defaultof<PaneContext>
     )
 
 [<Hook>]

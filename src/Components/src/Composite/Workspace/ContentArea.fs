@@ -40,7 +40,8 @@ open ContentAreaHelper
 type ContentArea =
 
     [<ReactComponent>]
-    static member EdgeDropZone(paneId: string, dir: EdgeDirection, isEnabled: bool) =
+    static member EdgeDropZone(paneId: string, dir: EdgeDirection, isEnabled: bool, ?debug: bool) =
+        let debug = defaultArg debug false
         let edgeId = DndId.write (EdgeZone(paneId, dir))
         let droppable = DndKit.useDroppable ({| id = edgeId; disabled = not isEnabled |})
 
@@ -50,6 +51,8 @@ type ContentArea =
             Html.div [
                 prop.ref droppable.setNodeRef
                 prop.className (edgeZoneClass dir)
+                if debug then
+                    prop.testId $"workspace-edge-{paneId}-{EdgeDirection.toString dir}"
                 prop.children [
                     Html.div [
                         prop.className (edgeOverlayClass dir droppable.isOver)
@@ -61,6 +64,7 @@ type ContentArea =
     static member ContentArea(paneId: string) =
         let paneCtx = usePaneCtx ()
         let workspaceCtx = useWorkspaceCtx ()
+        let dndCtx = useWorkspaceDndCtx ()
 
         let contentMap = workspaceCtx.contentMap
         let activeTabId = workspaceCtx.activeTabId
@@ -78,6 +82,15 @@ type ContentArea =
             if workspaceCtx.debug then
                 prop.testId $"workspace-content-{paneId}"
             prop.children [
+                Html.button [
+                    prop.onClick (fun _ ->
+                        for dir in [ EdgeDirection.Top; EdgeDirection.Bottom; EdgeDirection.Left; EdgeDirection.Right ] do
+                            let canSplit = canSplit dir
+                            console.log($"{dir}: {canSplit}")
+                    )
+                    prop.className "swt:btn swt:btn-xs"
+                    prop.text "Debug"
+                ]
                 yield! [
                     for (tabId, content) in contentMap |> Map.toArray do
                         Html.div [
@@ -98,7 +111,9 @@ type ContentArea =
                     ]
                 | _ -> ()
 
-                for dir in [ EdgeDirection.Top; EdgeDirection.Bottom; EdgeDirection.Left; EdgeDirection.Right ] do
-                    ContentArea.EdgeDropZone(paneId, dir, canSplit dir)
+
+                if dndCtx.isDragging then
+                    for dir in [ EdgeDirection.Top; EdgeDirection.Bottom; EdgeDirection.Left; EdgeDirection.Right ] do
+                        ContentArea.EdgeDropZone(paneId, dir, canSplit dir, workspaceCtx.debug)
             ]
         ]

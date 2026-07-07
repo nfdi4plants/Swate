@@ -26,7 +26,7 @@ import {GitLabEntry as DataHubBrowser} from '../src/Page/DataHubBrowser/DataHubB
 import {Entry as ARCSelectorEntry} from '../src/Composite/ArcSelector/ArcSelector.fs.ts';
 import {Entry as ArcFileEditor} from '../src/Page/ArcFileEditor/ArcFileEditor.fs.ts';
 import {Entry as SettingsPage} from '../src/Page/SettingsPage/SettingsPage.fs.ts';
-import {Workspace} from '../src/Composite/Workspace/Workspace.fs.ts';
+import {Entry as Workspace} from '../src/Composite/Workspace/Workspace.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -227,7 +227,7 @@ function ArcFileEditorContainer() {
 }
 
 function WorkspaceContainer() {
-  return <Workspace />
+  return <Workspace />;
 }
 
 const App = () => {

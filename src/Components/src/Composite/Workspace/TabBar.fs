@@ -70,7 +70,16 @@ type TabBar =
             prop.dataWorkspaceTabId tab.Id
             prop.dataWorkspacePaneId paneId
             yield! dndProps
-            prop.onClick (fun _ -> workspaceCtx.setActiveTabId (Some tab.Id))
+            prop.onMouseUp (fun e -> 
+                console.log(e.button)
+                match e.button with
+                | 0. ->
+                    workspaceCtx.setActiveTabId (Some tab.Id)
+                | 1. ->
+                    onClose tab.Id
+                | _ ->
+                    ()
+            )
             prop.children [
                 match tab.Icon with
                 | Some icon ->
@@ -86,6 +95,7 @@ type TabBar =
                         e.stopPropagation ()
                         onClose tab.Id
                     )
+                    prop.onMouseUp (fun e -> e.stopPropagation ())
                     prop.children [
                         Html.i [
                             prop.className "swt:iconify swt:fluent--dismiss-12-filled swt:size-3.5"

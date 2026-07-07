@@ -39,10 +39,12 @@ type Workspace =
         =
         let ctx = useWorkspaceCtx ()
 
+        let dndCtx = useWorkspaceDndCtx ()
+
         DndKit.useDndMonitor (
             {|
-                onDragStart = ctx.onDragStart
-                onDragEnd = ctx.handleDragEnd
+                onDragStart = dndCtx.onDragStart
+                onDragEnd = dndCtx.handleDragEnd
             |}
         )
 
@@ -70,7 +72,7 @@ type Workspace =
             contentMap: Map<string, ReactElement>,
             onTabsChange: WorkspaceTab list -> unit,
             onActiveTabChange: string option -> unit,
-            ?activeTabId: string option,
+            ?initialActiveTabId: string option,
             ?ref: IRefValue<IWorkspaceHandle option>,
             ?className: string,
             ?debug: bool
@@ -94,7 +96,7 @@ type Workspace =
                 ]
             )
 
-        let initialActive = defaultArg activeTabId None
+        let initialActive = defaultArg initialActiveTabId None
 
         let activeTabId, setActiveTabId =
             React.useState initialActive
@@ -218,28 +220,6 @@ type Workspace =
 
                 member _.closeTab(tabId: string) =
                     closeTab tabId
-
-                member _.openTab(tab: WorkspaceTab) =
-                    let targetPaneId =
-                        match activeTabId with
-                        | Some id ->
-                            findPaneContainingTab panes id
-                            |> Option.defaultValue initialPaneId
-                        | None -> initialPaneId
-                    let newPanes =
-                        panes
-                        |> Map.change targetPaneId (fun optState ->
-                            optState |> Option.map (fun s -> WorkspacePaneState.addTab s tab)
-                        )
-                    setPanes newPanes
-                    setActiveTabId (Some tab.Id)
-                    let allTabs =
-                        newPanes
-                        |> Map.toArray
-                        |> Array.collect (fun (_, ps) -> ps.tabs)
-                        |> Array.toList
-                    onTabsChange allTabs
-                    onActiveTabChange (Some tab.Id)
             }
 
         React.useImperativeHandle (
@@ -252,6 +232,81 @@ type Workspace =
             (fun () -> onActiveTabChange activeTabId),
             [| box activeTabId |]
         )
+
+        // -- Sync panes from tabs prop --
+
+        let syncPanesFromTabs () =
+            let currentTabIds =
+                panes
+                |> Map.toArray
+                |> Array.collect (fun (_, ps) -> ps.tabs |> Array.map _.Id)
+                |> Set.ofArray
+
+            let propTabIds = tabs |> List.map _.Id |> Set.ofList
+
+            let toAdd = tabs |> List.filter (fun t -> not (currentTabIds.Contains t.Id))
+            let toRemoveIds = currentTabIds - propTabIds
+
+            if toAdd.IsEmpty && toRemoveIds.IsEmpty then
+                ()
+            else
+                let mutable newPanes = panes
+                let mutable newLayout = layout
+
+                for tab in toAdd do
+                    let targetPaneId =
+                        match activeTabId with
+                        | Some id ->
+                            findPaneContainingTab panes id
+                            |> Option.defaultValue initialPaneId
+                        | None -> initialPaneId
+                    let current =
+                        newPanes
+                        |> Map.tryFind targetPaneId
+                        |> Option.defaultValue WorkspacePaneState.Empty
+                    newPanes <- newPanes |> Map.add targetPaneId (WorkspacePaneState.addTab current tab)
+
+                for tabId in toRemoveIds do
+                    match findPaneContainingTab newPanes tabId with
+                    | Some paneId ->
+                        newPanes <-
+                            newPanes
+                            |> Map.change paneId (fun opt ->
+                                opt |> Option.map (fun s -> WorkspacePaneState.removeTab s tabId)
+                            )
+                        match newPanes |> Map.tryFind paneId with
+                        | Some s when s.tabs.Length = 0 ->
+                            newPanes <- newPanes |> Map.remove paneId
+                            match Pane.removeLeaf newLayout paneId with
+                            | Some cleaned -> newLayout <- cleaned
+                            | None -> ()
+                        | _ -> ()
+                    | None -> ()
+
+                setLayout newLayout
+                setPanes newPanes
+
+                let allTabs =
+                    newPanes
+                    |> Map.toArray
+                    |> Array.collect (fun (_, ps) -> ps.tabs)
+
+                let activeStillExists =
+                    match activeTabId with
+                    | Some id -> allTabs |> Array.exists (fun t -> t.Id = id)
+                    | None -> false
+
+                if not activeStillExists then
+                    match allTabs with
+                    | [||] ->
+                        setActiveTabId None
+                        onActiveTabChange None
+                    | _ ->
+                        let nextActive = allTabs.[0].Id
+                        setActiveTabId (Some nextActive)
+                        onActiveTabChange (Some nextActive)
+
+        React.useEffect (syncPanesFromTabs, [| box tabs |])
 
         // -- DnD setup --
 
@@ -290,12 +345,16 @@ type Workspace =
 
                 // Branch 1: Split creation via edge zone
                 | Some (Tab(sourcePaneId, tabId)), Some (EdgeZone(targetPaneId, _) as edgeId) ->
+                    let sourceState = panes |> Map.tryFind sourcePaneId
+                    let isSingleTabSelfSplit =
+                        sourcePaneId = targetPaneId &&
+                        (sourceState |> Option.exists (fun s -> s.tabs.Length = 1))
+                    if isSingleTabSelfSplit then () else
                     match edgeId.edgeToSplitDirection() with
                     | Some direction ->
                         let newLeafId = freshPaneId ()
                         match Pane.splitLeaf layout targetPaneId direction newLeafId with
                         | Some newLayout ->
-                            let sourceState = panes |> Map.tryFind sourcePaneId
                             let tabToMove = sourceState |> Option.bind (fun s -> s.tabs |> Array.tryFind (fun t -> t.Id = tabId))
                             match tabToMove with
                             | Some tab ->
@@ -389,7 +448,7 @@ type Workspace =
 
         // -- Context value --
 
-        let workspaceCtxValue: WorkspaceCtxValue = {
+        let workspaceCtxValue: WorkspaceContext = {
             layout = layout
             setLayout = setLayout
             panes = panes
@@ -397,13 +456,17 @@ type Workspace =
             contentMap = contentMap
             activeTabId = activeTabId
             setActiveTabId = setActiveTabId
-            handleDragEnd = handleDragEnd
-            onDragStart = onDragStart
             debug = debug
             closeTab = closeTab
             closeOthers = closeOthers
             closeAll = closeAll
             closeAllInPane = closeAllInPane
+        }
+
+        let workspaceDndCtxValue: WorkspaceDndContext = {
+            handleDragEnd = handleDragEnd
+            onDragStart = onDragStart
+            isDragging = activeDrag |> Option.isSome
         }
 
         Html.div [
@@ -417,13 +480,80 @@ type Workspace =
             if debug then
                 prop.testId "workspace-root"
             prop.children [
-                WorkspaceCtx.Provider(
-                    workspaceCtxValue,
-                    DndKit.DndContext(
-                        sensors = sensors,
-                        collisionDetection = DndKit.closestCenter,
-                        children = Workspace.WorkspaceInner(activeDrag, workspaceElementRef)
+                WorkspaceDndCtx.Provider(
+                    workspaceDndCtxValue,
+                    WorkspaceCtx.Provider(
+                        workspaceCtxValue,
+                        DndKit.DndContext(
+                            sensors = sensors,
+                            collisionDetection = DndKit.closestCenter,
+                            children = Workspace.WorkspaceInner(activeDrag, workspaceElementRef)
+                        )
                     )
+                )
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member Entry() =
+
+        let genNewTab () : Types.WorkspaceTab = 
+            let guid = System.Guid.NewGuid().ToString("N")
+            {
+                Id = guid
+                Label = $"Tab {guid.Substring(0, 8)}"
+                Icon = Some "swt:iconify swt:fluent--document-24-regular"
+            }
+
+
+        let initialTabs = [
+            genNewTab ()
+            genNewTab ()
+            genNewTab ()
+        ]
+
+        let renderContent = fun (tab: Types.WorkspaceTab) ->
+            Html.div [
+                prop.className "swt:size-full swt:flex swt:flex-col swt:overflow-hidden swt:grow"
+                prop.children [
+                    Html.div [
+                        prop.className "swt:p-4"
+                        prop.text $"Content for {tab.Label}"
+                    ]
+                ]
+            ]
+
+        let tabs, setTabs = React.useState<Types.WorkspaceTab list> initialTabs
+
+        let contentMap = React.useMemo ((fun () ->
+
+            Map.ofList [
+                for tab in tabs do
+                    yield (tab.Id, renderContent tab)
+            ]
+        ), [| box tabs |])
+
+        Html.div [
+            prop.className "swt:flex swt:flex-col swt:gap-2 swt:h-screen swt:w-screen swt:overflow-hidden"
+            prop.children [
+                Html.div [
+                    Html.button [
+                        prop.className "swt:btn swt:btn-primary swt:m-2"
+                        prop.text "Add Tab"
+                        prop.onClick (fun _ ->
+                            let newTab = genNewTab ()
+                            console.log($"Adding new tab: {newTab.Label}")
+                            setTabs (tabs @ [newTab])
+                        )
+                    ]
+                ]
+                Workspace.Workspace(
+                    tabs = tabs,
+                    contentMap = contentMap,
+                    initialActiveTabId = (if tabs.Length > 0 then Some tabs.[0].Id else None),
+                    onTabsChange = setTabs,
+                    onActiveTabChange = (fun _ -> ()),
+                    debug = true
                 )
             ]
         ]

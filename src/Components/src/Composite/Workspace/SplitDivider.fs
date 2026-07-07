@@ -40,7 +40,6 @@ type SplitDivider =
             let onMove (e: PointerEvent) =
                 if dragging.current then
                     let parent = (e.target :?> HTMLElement).parentElement
-
                     match parent with
                     | null -> ()
                     | _ ->
@@ -52,6 +51,7 @@ type SplitDivider =
                             | SplitDirection.Vertical ->
                                 (e.clientY - rect.top) / rect.height
                         let clamped = max 0.15 (min 0.85 newRatio)
+                        console.log($"Clamped ratio: {clamped}")
                         onRatioChange clamped
                         setStoredRatio clamped
 
@@ -71,9 +71,11 @@ type SplitDivider =
             match key with
             | Some k -> prop.key k
             | None -> ()
-            prop.onPointerDown (fun _ -> dragging.current <- true)
+            prop.onPointerDown (fun _ -> 
+                dragging.current <- true
+            )
             prop.className [
-                "swt:shrink-0 swt:select-none swt:transition-colors swt:hover:bg-primary swt:z-10"
+                "swt:shrink-0 swt:select-none swt:transition-colors swt:bg-base-content swt:hover:bg-primary swt:z-10"
                 match direction with
                 | SplitDirection.Horizontal -> "swt:w-1 swt:cursor-col-resize swt:h-full"
                 | SplitDirection.Vertical -> "swt:h-1 swt:cursor-row-resize swt:w-full"

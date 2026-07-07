@@ -18,7 +18,7 @@ type SplitDirection =
 [<RequireQualifiedAccess>]
 type Pane =
     | Leaf of paneId: string
-    | Split of direction: SplitDirection * first: Pane * second: Pane * ratio: float
+    | Split of direction: SplitDirection * first: Pane * second: Pane
 
 type WorkspacePaneState = {
     tabs: WorkspaceTab array
@@ -35,7 +35,6 @@ type WorkspacePaneState = {
 type IWorkspaceHandle =
     abstract activateTab: string -> unit
     abstract closeTab: string -> unit
-    abstract openTab: WorkspaceTab -> unit
 
 type ContextMenuSpawnData = {
     tabId: string

@@ -1,5 +1,6 @@
 module Swate.Components.Composite.Workspace.Helper.PaneTree
 
+open Swate.Components
 open System
 open Swate.Components.Composite.Workspace.Types
 
@@ -11,14 +12,14 @@ type Pane with
     static member leafIds(pane: Pane) : string list =
         match pane with
         | Pane.Leaf id -> [ id ]
-        | Pane.Split(_, first, second, _) ->
+        | Pane.Split(_, first, second) ->
             Pane.leafIds first @ Pane.leafIds second
 
     /// Returns the max depth of the tree. Root leaf = 0, each split adds 1. Max = 2.
     static member depth(pane: Pane) : int =
         match pane with
         | Pane.Leaf _ -> 0
-        | Pane.Split(_, first, second, _) ->
+        | Pane.Split(_, first, second) ->
             1 + max (Pane.depth first) (Pane.depth second)
 
     /// Checks if a leaf can be split in the given direction.
@@ -32,25 +33,15 @@ type Pane with
     ///   Split(Horizontal, Leaf("a"), Leaf("b")) — "a" can split Vertical → true
     ///   Split(Horizontal, Leaf("a"), Leaf("b")) — "a" can split Horizontal → false (already Horizontal at this depth)
     ///   Split(Horizontal, Split(Vertical, Leaf("a"), Leaf("c")), Leaf("b")) — "a" can split anything → false (depth 2 reached)
-    static member canSplitLeaf(pane: Pane) (targetLeafId: string) (direction: SplitDirection) : bool =
-        let rec findParentDirection (pane: Pane) (leafId: string) : SplitDirection option =
-            match pane with
-            | Pane.Leaf _ -> None
-            | Pane.Split(dir, Pane.Leaf id, _, _) when id = leafId -> Some dir
-            | Pane.Split(dir, _, Pane.Leaf id, _) when id = leafId -> Some dir
-            | Pane.Split(_, first, second, _) ->
-                match findParentDirection first leafId with
-                | Some d -> Some d
-                | None -> findParentDirection second leafId
+    static member canSplitLeaf(rootPane: Pane) (targetLeafId: string) (direction: SplitDirection) : bool =
 
-        if not (Pane.leafIds pane |> List.contains targetLeafId) then
+        match rootPane with
+        | Pane.Leaf id when id = targetLeafId -> true
+        | Pane.Leaf _ -> false // this should never happen
+        | Pane.Split(dir, Pane.Leaf id, _) when id = targetLeafId && dir <> direction -> true
+        | Pane.Split(dir, _, Pane.Leaf id) when id = targetLeafId && dir <> direction -> true
+        | Pane.Split(_, _, _) ->
             false
-        else
-            match findParentDirection pane targetLeafId with
-            | Some parentDir ->
-                parentDir <> direction && Pane.depth pane < 2
-            | None ->
-                Pane.depth pane < 2
 
     /// Splits the leaf pane with the given id, replacing it with a Split node
     /// containing the original leaf and a new empty leaf.
@@ -73,15 +64,15 @@ type Pane with
             let rec split (pane: Pane) : Pane option =
                 match pane with
                 | Pane.Leaf id when id = targetLeafId ->
-                    Pane.Split(direction, Pane.Leaf id, Pane.Leaf newLeafId, 0.5)
+                    Pane.Split(direction, Pane.Leaf id, Pane.Leaf newLeafId)
                     |> Some
                 | Pane.Leaf _ -> None
-                | Pane.Split(dir, first, second, ratio) ->
+                | Pane.Split(dir, first, second) ->
                     match split first with
-                    | Some newFirst -> Pane.Split(dir, newFirst, second, ratio) |> Some
+                    | Some newFirst -> Pane.Split(dir, newFirst, second) |> Some
                     | None ->
                         match split second with
-                        | Some newSecond -> Pane.Split(dir, first, newSecond, ratio) |> Some
+                        | Some newSecond -> Pane.Split(dir, first, newSecond) |> Some
                         | None -> None
 
             split pane
@@ -99,7 +90,7 @@ type Pane with
         match pane with
         | Pane.Leaf id when id = leafId -> None
         | Pane.Leaf _ -> Some pane
-        | Pane.Split(dir, first, second, _) ->
+        | Pane.Split(dir, first, second) ->
             match first with
             | Pane.Leaf id when id = leafId -> Some second
             | _ ->
@@ -107,8 +98,8 @@ type Pane with
                 | Pane.Leaf id when id = leafId -> Some first
                 | _ ->
                     match Pane.removeLeaf first leafId with
-                    | Some newFirst -> Pane.Split(dir, newFirst, second, 0.5) |> Some
+                    | Some newFirst -> Pane.Split(dir, newFirst, second) |> Some
                     | None ->
                         match Pane.removeLeaf second leafId with
-                        | Some newSecond -> Pane.Split(dir, first, newSecond, 0.5) |> Some
+                        | Some newSecond -> Pane.Split(dir, first, newSecond) |> Some
                         | None -> None
