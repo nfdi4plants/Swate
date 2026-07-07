@@ -406,14 +406,17 @@ export const AddUnitTransform: Story = {
     await openTransformAction(canvasElement, "cell-1-3", /^Add Unit\b/i);
 
     const modal = await screen.findByRole("dialog", { name: /Add Unit/i });
+    const modalView = within(modal);
+
     expect(modal).toHaveAttribute("data-testid", "modal_Transform_AddUnit");
     expect(modal).toHaveTextContent("Add Unit");
-    expect(within(modal).getByText("Unit")).toBeInTheDocument();
-    expect(within(modal).getByTestId("term-search-input")).toBeInTheDocument();
+    expect(modalView.getByText("Unit")).toBeInTheDocument();
+    const termSearchInput = modalView.getByTestId("term-search-input");
+    expect(termSearchInput).toBeInTheDocument();
+    expect(termSearchInput).toHaveValue("SCIEX instrument model");
 
-    expect(within(modal).queryByText(/Use cell term/i)).not.toBeInTheDocument();
-    expect(within(modal).queryByText(/Keep value/i)).not.toBeInTheDocument();
-    expect(within(modal).queryByText(/Keep unit/i)).not.toBeInTheDocument();
+    expect(modalView.queryByText(/Keep value/i)).not.toBeInTheDocument();
+    expect(modalView.queryByText(/Keep unit/i)).not.toBeInTheDocument();
   },
 };
 
@@ -429,28 +432,32 @@ export const RemoveUnitTransform: Story = {
     await openTransformAction(canvasElement, "cell-1-5", /^Remove Unit\b/i);
 
     const modal = await screen.findByRole("dialog", { name: /Remove Unit/i });
+    const modalView = within(modal);
+
     expect(modal).toHaveAttribute("data-testid", "modal_Transform_RemoveUnit");
     expect(modal).toHaveTextContent("Remove Unit");
-    expect(within(modal).getByText("Current cell")).toBeInTheDocument();
-    expect(within(modal).getByText("Result")).toBeInTheDocument();
-    expect(within(modal).getByText("Value")).toBeInTheDocument();
-    expect(within(modal).getByText("Unit name")).toBeInTheDocument();
-    expect(within(modal).getByText("Term name")).toBeInTheDocument();
-    expect(within(modal).getByText("degree celsius")).toBeInTheDocument();
-    expect(within(modal).getAllByText("0").length).toBeGreaterThan(0);
+    expect(modalView.getByText("Current cell")).toBeInTheDocument();
+    expect(modalView.getByText("Result")).toBeInTheDocument();
+    expect(modalView.getByText("degree celsius")).toBeInTheDocument();
+    expect(modalView.getAllByText("0").length).toBeGreaterThan(0);
 
-    expect(within(modal).queryByText(/Keep value/i)).not.toBeInTheDocument();
-    expect(within(modal).queryByText(/Keep unit/i)).not.toBeInTheDocument();
-
-    const submitButton = within(modal).getByRole("button", {
-      name: /^Submit$/i,
+    const keepValueButton = modalView.getByRole("button", {
+      name: /Keep value as term/i,
     });
-    await userEvent.click(submitButton);
+    const keepUnitButton = modalView.getByRole("button", {
+      name: /Keep unit as term/i,
+    });
+    expect(keepValueButton).toHaveAttribute("aria-pressed", "true");
+
+    await userEvent.click(keepUnitButton);
+    expect(keepUnitButton).toHaveAttribute("aria-pressed", "true");
+
+    await userEvent.click(modalView.getByRole("button", { name: /^Submit$/i }));
 
     await waitFor(() => {
       const updatedCell = canvas.getByTestId("cell-1-5");
-      expect(updatedCell).toHaveTextContent("0");
-      expect(updatedCell).not.toHaveTextContent(/degree celsius/i);
+      expect(updatedCell).toHaveTextContent(/degree celsius/i);
+      expect(updatedCell).not.toHaveTextContent("0");
     });
   },
 };

@@ -867,6 +867,21 @@ type TransformConfig =
             ]
         ]
 
+module private CompositeCellEditModalHelper =
+
+    let private hasText = Option.exists (System.String.IsNullOrWhiteSpace >> not)
+
+    let private isNumber input = System.Double.TryParse(input) |> fst
+
+    let tryGetImportUnitTerm (oa: OntologyAnnotation) =
+        let hasImportableName =
+            (System.String.IsNullOrWhiteSpace oa.NameText |> not) && (isNumber oa.NameText |> not)
+
+        if hasImportableName && hasText oa.TermSourceREF && hasText oa.TermAccessionNumber then
+            Term.fromOntologyAnnotation oa |> Some
+        else
+            None
+
 [<Mangle(false); Erase>]
 type CompositeCellEditModal =
 
@@ -874,7 +889,31 @@ type CompositeCellEditModal =
     static member RemoveUnit(cell: CompositeCell, header: CompositeHeader, setTerm: OntologyAnnotation -> unit, rmv) =
 
         let value, unit = cell.AsUnitized
-        let term = OntologyAnnotation.create value
+        let keepValueAsTerm, setKeepValueAsTerm = React.useState true
+
+        let term =
+            if keepValueAsTerm then
+                OntologyAnnotation.create value
+            else
+                unit
+
+        let annotationFields nameLabel (oa: OntologyAnnotation) = [
+            nameLabel, oa.NameText
+            "Term source REF", oa.TermSourceREF |> Option.defaultValue ""
+            "Term accession number", oa.TermAccessionNumber |> Option.defaultValue ""
+        ]
+
+        let choiceButton (label: string, isSelected: bool, onSelect: unit -> unit) =
+            Html.button [
+                prop.type'.button
+                prop.custom ("aria-pressed", isSelected)
+                prop.className [
+                    "swt:btn swt:join-item swt:flex-1"
+                    if isSelected then "swt:btn-primary" else "swt:btn-outline"
+                ]
+                prop.onClick (fun _ -> onSelect ())
+                prop.text label
+            ]
 
         let submit =
             fun () ->
@@ -887,24 +926,25 @@ type CompositeCellEditModal =
             Html.div "Remove Unit",
             React.Fragment [
                 Html.div [
+                    prop.className "swt:join swt:w-full"
+                    prop.children [
+                        choiceButton ("Keep value as term", keepValueAsTerm, fun () -> setKeepValueAsTerm true)
+                        choiceButton ("Keep unit as term", not keepValueAsTerm, fun () -> setKeepValueAsTerm false)
+                    ]
+                ]
+                Html.div [
                     prop.className "swt:grid swt:grid-cols-1 swt:gap-4 swt:md:grid-cols-2"
                     prop.children [
                         LayoutComponents.KeyValuePanel(
                             "Current cell",
                             [
                                 "Value", value
-                                "Unit name", unit.NameText
-                                "Term source REF", unit.TermSourceREF |> Option.defaultValue ""
-                                "Term accession number", unit.TermAccessionNumber |> Option.defaultValue ""
+                                yield! annotationFields "Unit name" unit
                             ]
                         )
                         LayoutComponents.KeyValuePanel(
                             "Result",
-                            [
-                                "Term name", term.NameText
-                                "Term source REF", term.TermSourceREF |> Option.defaultValue ""
-                                "Term accession number", term.TermAccessionNumber |> Option.defaultValue ""
-                            ]
+                            annotationFields "Term name" term
                         )
                     ]
                 ]
@@ -919,7 +959,7 @@ type CompositeCellEditModal =
 
         let initUnit =
             match cell with
-            | CompositeCell.Term oa -> None
+            | CompositeCell.Term oa -> CompositeCellEditModalHelper.tryGetImportUnitTerm oa
             | CompositeCell.Unitized(_, oa) ->
                 let unitTerm =
                     if oa.isEmpty () then
@@ -1023,8 +1063,7 @@ type CompositeCellEditModal =
         //contentClassInfo = CompositeCellEditModal.BaseModalContentClassOverride
         )
 
-    [<ReactComponent>]
-    static member AddUnitModal
+    static member private TransformCell
         (compositeCell: CompositeCell, header: CompositeHeader, setCell: CompositeCell -> unit, rmv: unit -> unit)
         =
         match compositeCell with
@@ -1045,30 +1084,18 @@ type CompositeCellEditModal =
                 CompositeCellEditModal.FreeTextToData(compositeCell, header, setData, rmv)
             else
                 Html.none
+
+    [<ReactComponent>]
+    static member AddUnitModal
+        (compositeCell: CompositeCell, header: CompositeHeader, setCell: CompositeCell -> unit, rmv: unit -> unit)
+        =
+        CompositeCellEditModal.TransformCell(compositeCell, header, setCell, rmv)
 
     [<ReactComponent>]
     static member CompositeCellTransformModal
         (compositeCell: CompositeCell, header: CompositeHeader, setCell: CompositeCell -> unit, rmv: unit -> unit)
         =
-
-        match compositeCell with
-        | CompositeCell.Term _ ->
-            let setUnit =
-                fun term -> setCell (CompositeCell.Unitized(compositeCell.AsTerm.NameText, term))
-
-            CompositeCellEditModal.AddUnit(compositeCell, header, setUnit, rmv)
-        | CompositeCell.Unitized _ ->
-            let setTerm = fun unit -> setCell (CompositeCell.Term unit)
-            CompositeCellEditModal.RemoveUnit(compositeCell, header, setTerm, rmv)
-        | CompositeCell.Data _ ->
-            let setText = fun text -> setCell (CompositeCell.FreeText text)
-            CompositeCellEditModal.DataToFreeText(compositeCell, header, setText, rmv)
-        | CompositeCell.FreeText _ ->
-            if header.IsDataColumn then
-                let setData = fun (data: Data) -> setCell (CompositeCell.Data data)
-                CompositeCellEditModal.FreeTextToData(compositeCell, header, setData, rmv)
-            else
-                Html.none
+        CompositeCellEditModal.TransformCell(compositeCell, header, setCell, rmv)
 
 
 
