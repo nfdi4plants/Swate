@@ -314,7 +314,7 @@ type FileExplorerItem =
                         |> Option.map (fun depth -> [
                             style.position.sticky
                             style.top (depth * stickyParentRowHeightPx)
-                            // Parent rows need to layer above nested sticky rows; raise the base for very deep trees.
+                            // Parent rows need to layer above nested sticky rows. Very deep trees can exhaust this z-index base.
                             style.zIndex (100 - depth)
                         ])
                         |> Option.defaultValue []
