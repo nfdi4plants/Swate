@@ -1413,8 +1413,8 @@ export const RejectsOverwriteWhenTargetHasMultipleValues: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const source = await railValue(canvas, 'Output', 'Replicate', '1');
     await groupByProperty(canvas, 'Output', 'Replicate');
+    const source = await railValue(canvas, 'Output', 'Replicate', '1');
     const target = canvas.getByTestId('provenance-group-Output-output:Replicate=1 | 2');
 
     await dragByPointer(source, target);
