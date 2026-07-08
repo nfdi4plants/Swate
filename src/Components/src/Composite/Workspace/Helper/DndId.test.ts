@@ -6,9 +6,11 @@ import {
     DndId_TabBar,
     DndId_EdgeZone,
     DndId__edgeToSplitDirection as DndId_edgeToSplitDirection,
-    EdgeDirection_fromString_Z721C83C5 as EdgeDirection_fromString,
-    EdgeDirection_toString_74E923BE as EdgeDirection_toString,
 } from './DndId.fs.ts';
+import {
+    EdgeDirection_fromString_Z721C83C5 as EdgeDirection_fromString,
+    EdgeDirection_toString_174587BE as EdgeDirection_toString,
+} from '../Types.fs.ts';
 
 describe('DndId.write + DndId.read roundtrip', () => {
     it('Tab roundtrips correctly', () => {

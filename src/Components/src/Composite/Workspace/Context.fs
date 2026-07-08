@@ -6,6 +6,8 @@ open Feliz
 open Swate.Components.Composite.Workspace.Types
 open Swate.Components.JsBindings
 
+// -- DnD context (unchanged from current) --
+
 type WorkspaceDndContext = {
     onDragStart: DndKit.IDndKitEvent -> unit
     handleDragEnd: DndKit.IDndKitEvent -> unit
@@ -13,48 +15,61 @@ type WorkspaceDndContext = {
 }
 
 let WorkspaceDndCtx =
-    React.createContext<WorkspaceDndContext> (
-        Unchecked.defaultof<WorkspaceDndContext>
-    )
+    React.createContext<WorkspaceDndContext>(Unchecked.defaultof<WorkspaceDndContext>)
 
 [<Hook>]
 let useWorkspaceDndCtx () = React.useContext WorkspaceDndCtx
 
-type WorkspaceContext = {
-    layout: Pane
-    setLayout: Pane -> unit
-    panes: Map<string, WorkspacePaneState>
-    setPanes: Map<string, WorkspacePaneState> -> unit
-    contentMap: Map<string, ReactElement>
-    activeTabId: string option
-    setActiveTabId: string option -> unit
-    debug: bool
-    closeTab: string -> unit
-    closeOthers: string -> unit
-    closeAll: unit -> unit
-    closeAllInPane: string -> unit
+// -- Dispatch context (stable reference, never changes) --
+
+type WorkspaceDispatchContext = {
+    dispatch: obj -> unit
 }
 
-let WorkspaceCtx =
-    React.createContext<WorkspaceContext> (
-        Unchecked.defaultof<WorkspaceContext>
-    )
+let WorkspaceDispatchCtx =
+    React.createContext<WorkspaceDispatchContext>(Unchecked.defaultof<WorkspaceDispatchContext>)
 
 [<Hook>]
-let useWorkspaceCtx () = React.useContext WorkspaceCtx
+let useWorkspaceDispatchCtx () = React.useContext WorkspaceDispatchCtx
+
+// -- Layout context (changes on split/close pane) --
+
+type WorkspaceLayoutContext = {
+    layout: Layout
+}
+
+let WorkspaceLayoutCtx =
+    React.createContext<WorkspaceLayoutContext>(Unchecked.defaultof<WorkspaceLayoutContext>)
+
+[<Hook>]
+let useWorkspaceLayoutCtx () = React.useContext WorkspaceLayoutCtx
+
+// -- Pane state context (changes on tab operations) --
+
+type WorkspacePaneStateContext = {
+    panesMap: Map<PaneId, Pane<obj>>
+    focusedPane: PaneId
+    renderTabContent: obj -> ReactElement
+    renderTab: obj -> ReactElement
+    debug: bool
+}
+
+let WorkspacePaneStateCtx =
+    React.createContext<WorkspacePaneStateContext>(Unchecked.defaultof<WorkspacePaneStateContext>)
+
+[<Hook>]
+let useWorkspacePaneStateCtx () = React.useContext WorkspacePaneStateCtx
+
+// -- Per-pane context (created fresh per LeafNode) --
 
 type PaneContext = {
-    paneId: string
-    tabs: WorkspaceTab array
-    tabOrder: string array
-    activateTab: string -> unit
-    closeTab: string -> unit
+    paneId: PaneId
+    tabs: Tab<obj> array
+    focusedTab: TabId option
 }
 
 let PaneCtx =
-    React.createContext<PaneContext> (
-        Unchecked.defaultof<PaneContext>
-    )
+    React.createContext<PaneContext>(Unchecked.defaultof<PaneContext>)
 
 [<Hook>]
 let usePaneCtx () = React.useContext PaneCtx

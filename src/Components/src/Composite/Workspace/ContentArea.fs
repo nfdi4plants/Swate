@@ -7,7 +7,7 @@ open Swate.Components
 open Swate.Components.JsBindings
 open Swate.Components.Composite.Workspace.Types
 open Swate.Components.Composite.Workspace.Context
-open Swate.Components.Composite.Workspace.Helper.PaneTree
+open Swate.Components.Composite.Workspace.WorkspaceModel
 open Swate.Components.Composite.Workspace.Helper.DndId
 
 module private ContentAreaHelper =
@@ -29,6 +29,7 @@ module private ContentAreaHelper =
             | EdgeDirection.Bottom -> "swt:border-t-4"
             | EdgeDirection.Left -> "swt:border-r-4"
             | EdgeDirection.Right -> "swt:border-l-4"
+
         if isOver then
             $"swt:border-primary swt:bg-primary/20 {baseClass} swt:absolute swt:inset-0 swt:rounded swt:pointer-events-none"
         else
@@ -61,50 +62,48 @@ type ContentArea =
             ]
 
     [<ReactComponent>]
-    static member ContentArea(paneId: string) =
+    static member ContentArea(paneId: PaneId) =
         let paneCtx = usePaneCtx ()
-        let workspaceCtx = useWorkspaceCtx ()
+        let paneStateCtx = useWorkspacePaneStateCtx ()
+        let layoutCtx = useWorkspaceLayoutCtx ()
         let dndCtx = useWorkspaceDndCtx ()
 
-        let contentMap = workspaceCtx.contentMap
-        let activeTabId = workspaceCtx.activeTabId
-        let layout = workspaceCtx.layout
-
         let canSplit dir =
-            let splitDir =
-                match dir with
-                | EdgeDirection.Top | EdgeDirection.Bottom -> SplitDirection.Vertical
-                | EdgeDirection.Left | EdgeDirection.Right -> SplitDirection.Horizontal
-            Pane.canSplitLeaf layout paneId splitDir
+            ensureEdgeSplitAllowed paneId dir layoutCtx.layout
+
+        let focusedTab = paneCtx.focusedTab
+        let tabs = paneCtx.tabs
+        let pid = paneId.Value.ToString("N")
 
         Html.div [
             prop.className "swt:relative swt:min-h-0 swt:flex-1 swt:overflow-hidden"
-            if workspaceCtx.debug then
-                prop.testId $"workspace-content-{paneId}"
             prop.children [
-                yield! [
-                    for (tabId, content) in contentMap |> Map.toArray do
-                        Html.div [
-                            prop.key tabId
-                            prop.className "swt:h-full swt:w-full"
-                            prop.style [
-                                if Some tabId <> activeTabId then
-                                    style.display.none
-                            ]
-                            prop.children content
+                for tab in tabs do
+                    Html.div [
+                        prop.key tab.Id.Value
+                        prop.className "swt:h-full swt:w-full"
+                        prop.style [
+                            if Some tab.Id <> focusedTab then
+                                style.display.none
                         ]
-                ]
-                match activeTabId with
+                        prop.children (paneStateCtx.renderTabContent (box tab))
+                    ]
+                match focusedTab with
                 | None ->
                     Html.div [
-                        prop.className "swt:flex swt:size-full swt:items-center swt:justify-center swt:text-base-content/40 swt:text-sm"
+                        prop.className
+                            "swt:flex swt:size-full swt:items-center swt:justify-center swt:text-base-content/40 swt:text-sm"
                         prop.text "No open editors"
                     ]
                 | _ -> ()
 
-                if dndCtx.isDragging then
-                    // TODO: Make this a single component, which moves the overlay to the correct edge zone based on the current drag position
-                    for dir in [ EdgeDirection.Top; EdgeDirection.Bottom; EdgeDirection.Left; EdgeDirection.Right ] do
-                        ContentArea.EdgeDropZone(paneId, dir, canSplit dir, workspaceCtx.debug)
+                if dndCtx.isDragging || paneStateCtx.debug then
+                    for dir in [
+                        EdgeDirection.Top
+                        EdgeDirection.Bottom
+                        EdgeDirection.Left
+                        EdgeDirection.Right
+                    ] do
+                        ContentArea.EdgeDropZone(pid, dir, canSplit dir, paneStateCtx.debug)
             ]
         ]

@@ -3,27 +3,6 @@ module Swate.Components.Composite.Workspace.Helper.DndId
 open Fable.Core
 open Swate.Components.Composite.Workspace.Types
 
-[<StringEnum>]
-type EdgeDirection =
-    | Top
-    | Bottom
-    | Left
-    | Right
-
-type EdgeDirection with
-
-    static member fromString(str: string) : EdgeDirection option =
-        match str with
-        | "top" -> Some Top
-        | "bottom" -> Some Bottom
-        | "left" -> Some Left
-        | "right" -> Some Right
-        | _ -> None
-
-    static member toString(dir: EdgeDirection) : string = unbox<string> dir
-
-    
-
 type DndId =
     | Tab of paneId: string * tabId: string
     | TabBar of paneId: string

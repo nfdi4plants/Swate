@@ -635,7 +635,7 @@ let update (onErroCallback: exn -> unit) (model: WorkspaceModel<'T>) (msg: Msg<'
 type CompClass =
     [<ReactComponent>]
     static member MyComponent
-        (renderTabContent: Tab<'A> -> ReactElement, renderTab: Tab<'A> -> ReactElement, ?initialTabs: Tab<'A>[], ?initialActiveTabId: string, ?onErrorCallback: exn -> unit)
+        (renderTabContent: Tab<'A> -> ReactElement, ?renderTab: Tab<'A> -> ReactElement, ?initialTabs: Tab<'A>[], ?initialActiveTabId: string, ?onErrorCallback: exn -> unit)
         =
 
         let onErrorCallback = defaultArg onErrorCallback (fun exn -> Browser.Dom.console.error exn)

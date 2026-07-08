@@ -11,32 +11,32 @@ open Swate.Components.Composite.Workspace.Context
 type PaneNode =
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
-    static member LeafNode(paneId: string, ?key: string) =
-        let workspaceCtx = useWorkspaceCtx ()
-        let paneState =
-            workspaceCtx.panes
+    static member LeafNode(paneId: PaneId, ?key: string) =
+        let paneStateCtx = useWorkspacePaneStateCtx ()
+        let paneIdKey = paneId.Value.ToString("N")
+
+        let pane =
+            paneStateCtx.panesMap
             |> Map.tryFind paneId
             |> Option.defaultValue {
-                tabs = [||]
-                tabOrder = [||]
-                activeTabId = None
+                Id = paneId
+                Tabs = []
+                FocusedTab = None
             }
 
         let paneCtxValue: PaneContext = {
             paneId = paneId
-            tabs = paneState.tabs
-            tabOrder = paneState.tabOrder
-            activateTab = workspaceCtx.setActiveTabId << Some
-            closeTab = workspaceCtx.closeTab
+            tabs = pane.Tabs |> Array.ofList
+            focusedTab = pane.FocusedTab
         }
 
         PaneCtx.Provider(
             paneCtxValue,
             Html.div [
-                prop.key (defaultArg key paneId)
+                prop.key (defaultArg key paneIdKey)
                 prop.className "swt:flex swt:flex-col swt:min-w-0 swt:min-h-0 swt:flex-1 swt:overflow-hidden"
-                if workspaceCtx.debug then
-                    prop.testId $"workspace-pane-{paneId}"
+                if paneStateCtx.debug then
+                    prop.testId $"workspace-pane-{paneIdKey}"
                 prop.children [
                     TabBar.TabBar(paneId)
                     ContentArea.ContentArea(paneId)
@@ -44,36 +44,44 @@ type PaneNode =
             ]
         )
 
+    [<ReactComponent>]
+    static member private RenderLevel1 (lvl: Level1) (panePath: string) : ReactElement =
+        match lvl with
+        | Level1.Single leaf -> PaneNode.LeafNode(leaf)
+        | Level1.Split(dir, r, first, second) ->
+            PaneNode.SplitNode(dir, r, first, second, panePath)
+
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
-    static member SplitNode(direction, first, second, panePath: string, ?key: string) =
-        let workspaceCtx = useWorkspaceCtx ()
+    static member SplitNode
+        (
+            direction: SplitDirection,
+            ratio: float,
+            first: Leaf,
+            second: Leaf,
+            panePath: string,
+            ?key: string
+        )
+        =
+        let dispatchCtx = useWorkspaceDispatchCtx ()
+        let paneStateCtx = useWorkspacePaneStateCtx ()
 
         let dragging = React.useRef false
 
-        let storageKey = Keys.mkLocalStorageKey "workspace" "split" panePath
-        let splitContainerRef = React.useElementRef()
-
-        let (storedRatio, setStoredRatio) =
-            React.useLocalStorage (storageKey, 0.5)
-
+        let splitContainerRef = React.useElementRef ()
 
         let pointerPosition, setPointerPosition = React.useState (None: float option)
-        let throttledPointerPosition = React.useThrottle(pointerPosition, 16)
+        let throttledPointerPosition = React.useThrottle (pointerPosition, 16)
 
         let clampedRatio =
             match throttledPointerPosition with
-            | Some pos ->
-                let clamped = max 0.15 (min 0.85 pos)
-                Some clamped
+            | Some pos -> Some(max 0.15 (min 0.85 pos))
             | None -> None
 
-        // Combining throttle with local storage is not easy. Dragging the divider will only change the pointerPosition (throttled!). On update we recalculate the clampedRatio and if changed we update the local storage. This way we avoid updating the local storage on every pointer move event, which would be too frequent and cause performance issues.
         React.useEffect (
             (fun () ->
                 match clampedRatio with
                 | Some clamped ->
-                    if clamped <> storedRatio then
-                        setStoredRatio clamped
+                    dispatchCtx.dispatch (box (SetSplitRatio(panePath, clamped)))
                 | None -> ()
             ),
             [| box clampedRatio |]
@@ -88,19 +96,15 @@ type PaneNode =
                     | Some null -> ()
                     | Some splitContainer ->
                         let rect = splitContainer.getBoundingClientRect ()
-                        // depending on direction we need a different pointer position (x or y)
+
                         let directionalPointerPosition =
                             match direction with
-                            | SplitDirection.Horizontal ->
-                                let directionalPointerPosition = (e.clientX - rect.left) / rect.width
-                                directionalPointerPosition
-                            | SplitDirection.Vertical ->
-                                let directionalPointerPosition = (e.clientY - rect.top) / rect.height
-                                directionalPointerPosition
+                            | SplitDirection.Horizontal -> (e.clientX - rect.left) / rect.width
+                            | SplitDirection.Vertical -> (e.clientY - rect.top) / rect.height
+
                         setPointerPosition (Some directionalPointerPosition)
 
-            let stop (_: PointerEvent) =
-                dragging.current <- false
+            let stop (_: PointerEvent) = dragging.current <- false
 
             Browser.Dom.document.addEventListener ("pointermove", unbox onMove)
             Browser.Dom.document.addEventListener ("pointerup", unbox stop)
@@ -116,33 +120,30 @@ type PaneNode =
             | SplitDirection.Horizontal -> "swt:flex-row"
             | SplitDirection.Vertical -> "swt:flex-col"
 
-        let size1 = storedRatio * 100.0
+        let size1 = ratio * 100.0
         let size2 = 100.0 - size1
 
         Html.div [
             prop.key (defaultArg key panePath)
             prop.ref splitContainerRef
             prop.className $"swt:flex {flexDir} swt:min-w-0 swt:min-h-0 swt:flex-1 swt:overflow-hidden"
-            if workspaceCtx.debug then
+            if paneStateCtx.debug then
                 prop.testId $"workspace-split-{panePath}"
             prop.children [
                 Html.div [
                     prop.className "swt:flex swt:flex-col swt:min-w-0 swt:min-h-0 swt:overflow-hidden"
-                    prop.style [ 
+                    prop.style [
                         match direction with
                         | SplitDirection.Horizontal -> style.width (length.perc size1)
                         | SplitDirection.Vertical -> style.height (length.perc size1)
                     ]
-                    prop.children [ PaneNode.PaneNode(first, panePath + "/first") ]
+                    prop.children [ PaneNode.LeafNode(first) ]
                 ]
-                // SplitDivider.SplitDivider(direction, ratio, onRatioChange, panePath)
                 Html.div [
                     match key with
                     | Some k -> prop.key k
                     | None -> ()
-                    prop.onPointerDown (fun _ -> 
-                        dragging.current <- true
-                    )
+                    prop.onPointerDown (fun _ -> dragging.current <- true)
                     prop.className [
                         "swt:shrink-0 swt:select-none swt:transition-colors swt:bg-base-content swt:hover:bg-primary swt:z-10"
                         match direction with
@@ -152,24 +153,62 @@ type PaneNode =
                 ]
                 Html.div [
                     prop.className "swt:flex swt:flex-col swt:min-w-0 swt:min-h-0 swt:overflow-hidden"
-                    prop.style [ 
+                    prop.style [
                         match direction with
                         | SplitDirection.Horizontal -> style.width (length.perc size2)
                         | SplitDirection.Vertical -> style.height (length.perc size2)
                     ]
-                    prop.children [ PaneNode.PaneNode(second, panePath + "/second") ]
+                    prop.children [ PaneNode.LeafNode(second) ]
                 ]
             ]
         ]
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
-    static member PaneNode(pane: Pane, panePath: string, ?key: string) =
+    static member PaneNode(layout: Layout, panePath: string, ?key: string) =
 
-        match pane with
-        | Pane.Leaf paneId ->
-            PaneNode.LeafNode(paneId, ?key = key)
+        match layout with
+        | Layout.Single leaf -> PaneNode.LeafNode(leaf, ?key = key)
 
-        | Pane.Split(direction, first, second) ->
-            let nextPath = panePath + "/" + unbox<string> direction
-            PaneNode.SplitNode(direction, first, second, nextPath, ?key = key)
+        | Layout.Split(dir, ratio, l1, l2) ->
+            let nextPath = panePath + "/" + unbox<string> dir
 
+            let flexDir =
+                match dir with
+                | SplitDirection.Horizontal -> "swt:flex-row"
+                | SplitDirection.Vertical -> "swt:flex-col"
+
+            let size1 = ratio * 100.0
+            let size2 = 100.0 - size1
+
+            Html.div [
+                prop.key (defaultArg key panePath)
+                prop.className $"swt:flex {flexDir} swt:min-w-0 swt:min-h-0 swt:flex-1 swt:overflow-hidden"
+                prop.children [
+                    Html.div [
+                        prop.className "swt:flex swt:flex-col swt:min-w-0 swt:min-h-0 swt:overflow-hidden"
+                        prop.style [
+                            match dir with
+                            | SplitDirection.Horizontal -> style.width (length.perc size1)
+                            | SplitDirection.Vertical -> style.height (length.perc size1)
+                        ]
+                        prop.children [ PaneNode.RenderLevel1 l1 (nextPath + "/first") ]
+                    ]
+                    Html.div [
+                        prop.className [
+                            "swt:shrink-0 swt:select-none swt:transition-colors swt:bg-base-content swt:hover:bg-primary swt:z-10"
+                            match dir with
+                            | SplitDirection.Horizontal -> "swt:w-1 swt:cursor-col-resize swt:h-full"
+                            | SplitDirection.Vertical -> "swt:h-1 swt:cursor-row-resize swt:w-full"
+                        ]
+                    ]
+                    Html.div [
+                        prop.className "swt:flex swt:flex-col swt:min-w-0 swt:min-h-0 swt:overflow-hidden"
+                        prop.style [
+                            match dir with
+                            | SplitDirection.Horizontal -> style.width (length.perc size2)
+                            | SplitDirection.Vertical -> style.height (length.perc size2)
+                        ]
+                        prop.children [ PaneNode.RenderLevel1 l2 (nextPath + "/second") ]
+                    ]
+                ]
+            ]

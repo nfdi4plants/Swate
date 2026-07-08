@@ -11,22 +11,9 @@ open Swate.Components.Composite.Workspace.Helper.DndId
 
 module private TabBarHelper =
 
-    [<Literal>]
-    let TabIdDataKey = "workspace-tab-id"
-
-    [<Literal>]
-    let PaneIdDataKey = "workspace-pane-id"
-
     let dndObjectProps (obj: Swate.Components.JsBindings.IObject) : IReactProperty list =
         [ for key in Swate.Components.JsBindings.Object.keys obj do
-            prop.custom (key, obj.get key) ]
-
-    type prop with
-        static member dataWorkspaceTabId (tabId: string) : IReactProperty =
-            unbox ($"data-{TabIdDataKey}", tabId)
-
-        static member dataWorkspacePaneId (paneId: string) : IReactProperty =
-            unbox ($"data-{PaneIdDataKey}", paneId)
+              prop.custom (key, obj.get key) ]
 
 open TabBarHelper
 
@@ -35,10 +22,11 @@ type TabBar =
 
     [<ReactComponent>]
     static member private Tab
-        (tab: WorkspaceTab, index: int, paneId: string, isActive: bool, onClose: string -> unit, ?key: string)
+        (tab: Tab<obj>, index: int, paneIdKey: string, isActive: bool, ?key: string)
         =
-        let workspaceCtx = useWorkspaceCtx ()
-        let dragId = DndId.write (DndId.Tab(paneId, tab.Id))
+        let dispatchCtx = useWorkspaceDispatchCtx ()
+        let paneStateCtx = useWorkspacePaneStateCtx ()
+        let dragId = DndId.write (DndId.Tab(paneIdKey, tab.Id.Value))
 
         let sortable = DndKit.useSortable ({| id = dragId |})
 
@@ -67,25 +55,19 @@ type TabBar =
             | Some k -> prop.key k
             | None -> ()
             prop.className tabClass
-            prop.dataWorkspaceTabId tab.Id
-            prop.dataWorkspacePaneId paneId
+            prop.custom ("data-workspace-tab-id", tab.Id.Value)
+            prop.custom ("data-workspace-pane-id", paneIdKey)
             yield! dndProps
-            prop.onMouseUp (fun e -> 
-                console.log(e.button)
+            prop.onMouseUp (fun e ->
                 match e.button with
                 | 0. ->
-                    workspaceCtx.setActiveTabId (Some tab.Id)
+                    dispatchCtx.dispatch (box (FocusTab tab.Id))
                 | 1. ->
-                    onClose tab.Id
-                | _ ->
-                    ()
+                    dispatchCtx.dispatch (box (RemoveTab tab.Id))
+                | _ -> ()
             )
             prop.children [
-                match tab.Icon with
-                | Some icon ->
-                    Html.i [ prop.className [ icon; "swt:min-w-4" ] ]
-                | None -> ()
-                Html.span tab.Label
+                paneStateCtx.renderTab (box tab)
                 Html.button [
                     prop.type'.button
                     prop.className
@@ -93,7 +75,7 @@ type TabBar =
                     prop.ariaLabel $"Close {tab.Label}"
                     prop.onClick (fun e ->
                         e.stopPropagation ()
-                        onClose tab.Id
+                        dispatchCtx.dispatch (box (RemoveTab tab.Id))
                     )
                     prop.onMouseUp (fun e -> e.stopPropagation ())
                     prop.children [
@@ -106,21 +88,25 @@ type TabBar =
         ]
 
     [<ReactComponent>]
-    static member TabBar(paneId: string, ?key: string) =
+    static member TabBar(paneId: PaneId, ?key: string) =
         let paneCtx = usePaneCtx ()
-        let workspaceCtx = useWorkspaceCtx ()
+        let paneStateCtx = useWorkspacePaneStateCtx ()
+        let dispatchCtx = useWorkspaceDispatchCtx ()
 
         let tabs = paneCtx.tabs
-        let tabOrder = paneCtx.tabOrder
-        let activeTabId = workspaceCtx.activeTabId
+        let paneIdKey = paneId.Value.ToString("N")
 
         let dragIds =
             React.useMemo (
-                (fun () -> tabOrder |> Array.map (fun tabId -> DndId.write (DndId.Tab(paneId, tabId))) |> ResizeArray),
-                [| box tabOrder; box paneId |]
+                (fun () ->
+                    tabs
+                    |> Array.map (fun tab -> DndId.write (DndId.Tab(paneIdKey, tab.Id.Value)))
+                    |> ResizeArray
+                ),
+                [| box tabs; box paneIdKey |]
             )
 
-        let tabBarDroppable = DndKit.useDroppable ({| id = DndId.write (DndId.TabBar paneId) |})
+        let tabBarDroppable = DndKit.useDroppable ({| id = DndId.write (DndId.TabBar paneIdKey) |})
 
         Html.div [
             prop.ref tabBarDroppable.setNodeRef
@@ -129,28 +115,18 @@ type TabBar =
                 if tabBarDroppable.isOver then
                     "swt:bg-primary/10"
             ]
-            if workspaceCtx.debug then
-                prop.testId $"workspace-tabbar-{paneId}"
+            if paneStateCtx.debug then
+                prop.testId $"workspace-tabbar-{paneIdKey}"
             prop.children [
                 DndKit.SortableContext(
                     items = dragIds,
                     strategy = DndKit.horizontalListSortingStrategy,
                     children =
                         React.Fragment [
-                            for tabId in tabOrder do
-                                match tabs |> Array.tryFind (fun t -> t.Id = tabId) with
-                                | Some tab ->
-                                    let index = tabs |> Array.findIndex (fun t -> t.Id = tabId)
-                                    let isActive = activeTabId = Some tabId
-                                    TabBar.Tab(
-                                        tab,
-                                        index,
-                                        paneId,
-                                        isActive,
-                                        paneCtx.closeTab,
-                                        key = $"{paneId}:{tabId}"
-                                    )
-                                | None -> ()
+                            for tab in tabs do
+                                let index = tabs |> Array.findIndex (fun t -> t.Id = tab.Id)
+                                let isActive = paneCtx.focusedTab = Some tab.Id
+                                TabBar.Tab(tab, index, paneIdKey, isActive, key = $"{paneIdKey}:{tab.Id.Value}")
                         ]
                 )
             ]
