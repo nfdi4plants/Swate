@@ -368,6 +368,9 @@ type ProvenanceGrouping =
                                         prop.type'.button
                                         prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:size-8 swt:p-0"
                                         prop.custom ("aria-expanded", isPropertyShelfExpanded)
+                                        // Always-on anchor (paired with aria-expanded) so the
+                                        // tutorial can point at the toggle of a minimized shelf.
+                                        prop.custom ("data-tutorial", "provenance-property-shelf-toggle")
                                         prop.ariaLabel (
                                             if isPropertyShelfExpanded then
                                                 "Minimize annotation folders"

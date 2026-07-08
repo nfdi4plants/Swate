@@ -959,6 +959,9 @@ type Controls =
                 ]
                 if expanded then
                     Html.div [
+                        // Always-on anchor so the tutorial can ring the expanded
+                        // values without coupling to the debug test id.
+                        prop.custom ("data-tutorial-property-values", $"{side}:{header.Category.Name}")
                         prop.className [
                             // fade-in only: the chips carry connector anchors, so a slide
                             // would put the measured positions off during entry.

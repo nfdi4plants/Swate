@@ -421,6 +421,10 @@ type GroupCard =
             prop.ref setArticleRef
             prop.custom ("data-provenance-group-node", DragDrop.groupNodeId side group.Id)
             prop.custom ("data-provenance-group-drop-id", DragDrop.groupDropId side group.Id)
+            // Member count as an attribute so hosts (e.g. the tutorial) can
+            // single out cards whose connections resolve without a member
+            // pairing prompt (1x1 connects publish directly).
+            prop.custom ("data-provenance-card-members", string group.Members.Length)
             prop.onMouseEnter (fun _ -> publishHover ())
             prop.onMouseLeave (fun _ -> clearHover ())
             prop.className [
@@ -641,6 +645,8 @@ type GroupCard =
 
                 if expanded then
                     Html.ul [
+                        // Always-on anchor for the interactive tutorial's spotlight.
+                        prop.custom ("data-tutorial", "provenance-group-members")
                         prop.className [
                             // fade-in only: the member rows carry connector anchors, so a
                             // slide would put the measured positions off during entry.

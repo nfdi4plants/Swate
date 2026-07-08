@@ -281,6 +281,9 @@ type FolderedDraggableList =
             prop.custom ("aria-selected", isActive)
             prop.title folder.Name
             prop.ariaLabel $"Show {folder.Name}"
+            // Stable hook for hosts (e.g. tutorials) that must find a folder
+            // tab without coupling to the aria-label copy.
+            prop.custom ("data-foldered-folder-label", folder.Name)
             match folder.Color with
             | Some color when color <> "" -> prop.custom ("data-foldered-folder-color", color)
             | _ -> ()

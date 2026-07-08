@@ -2762,7 +2762,7 @@ export const TutorialTaskStepCompletesInsideSandbox: Story = {
     // The click task completes in place as well; the user moves on themselves.
     await userEvent.click(modal.getByTestId('provenance-property-Input-Species'));
     await waitFor(() => expect(modal.getByTestId('tutorial-next')).toHaveTextContent('Next'), { timeout: 5000 });
-    expect(modal.getByText('2 of 12 features explored')).toBeInTheDocument();
+    expect(modal.getByText('2 of 13 features explored')).toBeInTheDocument();
     await userEvent.click(modal.getByTestId('tutorial-next'));
     expect(within(modal.getByTestId('tutorial-step-card')).getByText('Inspect group members')).toBeInTheDocument();
   },

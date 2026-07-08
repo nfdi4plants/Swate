@@ -39,6 +39,48 @@ module private TutorialSupport =
     [<Emit("(() => { try { $0.releasePointerCapture($1); } catch {} })()")>]
     let releasePointerCapture (_element: obj) (_pointerId: float) : unit = jsNative
 
+    // Selector lists often pair a region with controls inside it (a rail and
+    // its chevron, say) so that folded layouts still get a highlight. When
+    // both exist, ringing the region around the control's own ring is just
+    // noise - the innermost matches carry the meaning.
+    let private contains (outer: SpotlightRect) (inner: SpotlightRect) =
+        outer.Left <= inner.Left
+        && outer.Top <= inner.Top
+        && outer.Left + outer.Width >= inner.Left + inner.Width
+        && outer.Top + outer.Height >= inner.Top + inner.Height
+
+    let holePadding = 6.
+
+    // The dim's cutouts are one even-odd SVG path, where overlapping holes
+    // cancel back into dim - so rects whose padded holes would intersect are
+    // fused into their bounding box and highlighted as one region.
+    let private intersectsPadded pad (a: SpotlightRect) (b: SpotlightRect) =
+        a.Left - pad < b.Left + b.Width + pad
+        && b.Left - pad < a.Left + a.Width + pad
+        && a.Top - pad < b.Top + b.Height + pad
+        && b.Top - pad < a.Top + a.Height + pad
+
+    let private boundingBox (a: SpotlightRect) (b: SpotlightRect) =
+        let left = min a.Left b.Left
+        let top = min a.Top b.Top
+
+        {
+            Top = top
+            Left = left
+            Width = max (a.Left + a.Width) (b.Left + b.Width) - left
+            Height = max (a.Top + a.Height) (b.Top + b.Height) - top
+        }
+
+    let private mergeOverlapping (rects: SpotlightRect list) =
+        let rec add merged rect =
+            match merged |> List.tryFind (intersectsPadded holePadding rect) with
+            | Some other ->
+                let rest = merged |> List.filter (fun existing -> existing <> other)
+                add rest (boundingBox rect other)
+            | None -> rect :: merged
+
+        rects |> List.fold add [] |> List.rev
+
     let measure (container: HTMLElement) (selector: string option) : SpotlightState =
         let host = container.getBoundingClientRect ()
 
@@ -61,13 +103,24 @@ module private TutorialSupport =
             )
             |> Option.defaultValue []
 
+        let rects =
+            rects
+            |> List.filter (fun rect ->
+                rects
+                |> List.exists (fun other ->
+                    // Strictly larger, so identical rects survive as a pair
+                    // instead of eliminating each other.
+                    contains rect other && rect.Width * rect.Height > other.Width * other.Height
+                )
+                |> not
+            )
+            |> mergeOverlapping
+
         {
             Rects = rects
             HostWidth = host.width
             HostHeight = host.height
         }
-
-    let holePadding = 6.
 
     /// Minimum distance between the card and the host edges / the spotlight.
     let cardMargin = 12.

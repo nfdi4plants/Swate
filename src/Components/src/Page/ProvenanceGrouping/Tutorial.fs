@@ -35,6 +35,31 @@ module ProvenanceTutorialSteps =
     let private inputRail =
         "[data-tutorial='provenance-rail-Input'], button[aria-label='Show input annotations']"
 
+    // The Species drag source can be hidden two ways before the drag can even
+    // start: the whole shelf minimized behind its toggle, or another folder
+    // tab active. Highlight whichever control currently leads to the item, so
+    // every click on the way to the drag is guided too.
+    let private speciesShelfSource =
+        "button[data-foldered-item-label='Species'], "
+        + "[role='tab'][data-foldered-folder-label='assay-table'][aria-selected='false'], "
+        + "[data-tutorial='provenance-property-shelf-toggle'][aria-expanded='false']"
+
+    // Every input-side card: they are what visibly merges when grouping kicks
+    // in, so the group step rings them alongside the button that causes it.
+    let private inputGroupCards =
+        "[data-provenance-group-node^='provenance-node::Input::']"
+
+    let private outputGroupCards =
+        "[data-provenance-group-node^='provenance-node::Output::']"
+
+    // The undo button enables on the first published edit, which makes it the
+    // success signal for free-form tasks whose outcome is an edit rather than
+    // a single click (assigning a value, creating a connection).
+    let private editPublished (container: Browser.Types.HTMLElement) =
+        container.querySelector "[data-tutorial='provenance-undo']:enabled"
+        |> isNull
+        |> not
+
     let private explain id title description selector = {
         Id = id
         Title = title
@@ -88,11 +113,11 @@ module ProvenanceTutorialSteps =
             Id = "shelf-to-rail"
             Title = "Pull an annotation onto a rail"
             Description = "Dragging an annotation out of its shelf folder onto a rail activates it for that side."
-            // Highlights the drag source (the Species shelf item, once its
-            // folder is open) and the dropzone (rail or, on folded layouts,
-            // its toggle) together; task steps keep the whole surface
-            // interactive so the drag can travel between them.
-            TargetSelector = Some $"button[data-foldered-item-label='Species'], {inputRail}"
+            // Highlights the way to the drag source (shelf toggle, folder
+            // tab, then the Species item itself) and the dropzone (rail or,
+            // on folded layouts, its toggle) together; task steps keep the
+            // whole surface interactive so the drag can travel between them.
+            TargetSelector = Some $"{speciesShelfSource}, {inputRail}"
             Task =
                 Some
                     "Drag Species from the assay-table card in the shelf onto the dashed left rail (unfold the rail first if it is collapsed)."
@@ -107,7 +132,9 @@ module ProvenanceTutorialSteps =
             "group"
             "Group by an annotation"
             "Clicking a rail annotation merges all entities that share a value into one card - four inputs become two species cards."
-            speciesGroupButton
+            // The input cards are in the spotlight too: they are what reacts
+            // to the click, merging from four cards into two.
+            $"{speciesGroupButton}, {inputGroupCards}"
             "Click the Species annotation in the left rail to group the inputs by species."
             speciesGroupButton
             "species-on-rail"
@@ -115,7 +142,9 @@ module ProvenanceTutorialSteps =
             "members"
             "Inspect group members"
             "Grouped cards summarize their members. Expanding a card lists every member with its own values and connection handles."
-            "button[data-tutorial='provenance-show-members']"
+            // The member list only exists after the click; the polling
+            // spotlight picks it up the moment it unfolds.
+            "button[data-tutorial='provenance-show-members'], [data-tutorial='provenance-group-members']"
             "Click 'Show members' on one of the grouped cards."
             "button[data-tutorial='provenance-show-members']"
             "species-grouped"
@@ -124,32 +153,47 @@ module ProvenanceTutorialSteps =
             "Annotation values"
             "A rail annotation expands into its distinct values. Drag a value chip onto a card to assign it to every member at once - or add brand-new values first."
             // The rail stays the fallback highlight for folded layouts, where
-            // the chevron does not exist until the rail is unfolded.
-            $"button[data-tutorial-expand-values='Input:Species'], {inputRail}"
+            // the chevron does not exist until the rail is unfolded; the
+            // values panel joins the spotlight once the chevron opens it, so
+            // the chips the description talks about are ringed as they appear.
+            $"button[data-tutorial-expand-values='Input:Species'], [data-tutorial-property-values='Input:Species'], {inputRail}"
             "Click the chevron next to the Species annotation in the left rail to expand its values."
             "button[data-tutorial-expand-values='Input:Species']"
             "species-values"
         {
+            Id = "assign"
+            Title = "Assign values to cards"
+            Description =
+                "Value chips are live: drop one onto a card and the value is assigned to every member of that card. Where a member already has a different value, a prompt asks before overwriting."
+            // Rings the expanded value chips (the drag sources) and the output
+            // cards - the drop targets without a species value, so the invited
+            // drop applies cleanly instead of hitting the overwrite prompt.
+            TargetSelector = Some $"[data-tutorial-property-values='Input:Species'], {outputGroupCards}"
+            Task = Some "Drag one of the species value chips onto an output card - outputs have no species value yet."
+            Advance = TutorialAdvance.OnCondition editPublished
+            Checkpoint = Some "species-values-expanded"
+        }
+        {
             Id = "connect"
             Title = "Connect inputs to outputs"
             Description =
-                "The round handles on the facing edges of cards create input-to-output connections. Drag from handle to handle, or tap one and then the other."
-            // Rings every card's connection handle, marking both ends of the
-            // tap-tap (or drag) gesture.
-            TargetSelector = Some "[data-provenance-connection-drop-id^='provenance-connection-drop|GroupCard|']"
+                "The round handles on the facing edges of cards create input-to-output connections; the dashed lines are connections the sample data already has. Drag from handle to handle, or tap one and then the other. Cards holding several members first ask how their members should pair up."
+            // Rings only the handles of single-member cards: connecting two of
+            // those publishes directly, so the invited gesture never runs into
+            // the member pairing prompt (multi-member handles stay usable,
+            // the prompt is just explained rather than spotlighted).
+            TargetSelector =
+                Some(
+                    "[data-provenance-card-members='1'] "
+                    + "[data-provenance-connection-drop-id^='provenance-connection-drop|GroupCard|']"
+                )
             Task =
                 Some
-                    "Connect an input card to an output card: drag between the round handles, or tap one and then the other."
-            // The undo button enables on the first published edit, and creating
-            // the connection is the only edit this step leads to - so both the
-            // drag and the tap-tap gesture complete it, while merely arming a
-            // handle (which publishes nothing) does not.
-            Advance =
-                TutorialAdvance.OnCondition(fun container ->
-                    container.querySelector "[data-tutorial='provenance-undo']:enabled"
-                    |> isNull
-                    |> not
-                )
+                    "Create a connection that does not exist yet - drag from the Chlamydomonas card's round handle to Output E's handle, or tap one and then the other."
+            // Creating the connection is the only edit this step leads to - so
+            // both the drag and the tap-tap gesture complete it, while merely
+            // arming a handle (which publishes nothing) does not.
+            Advance = TutorialAdvance.OnCondition editPublished
             Checkpoint = Some "species-connect"
         }
         explain
@@ -187,6 +231,12 @@ module ProvenanceTutorialSteps =
         withSpeciesOnInputRail session state
         |> State.GroupingAssignments.toggleSide layer.InputSideId ProvenanceSide.Input speciesHeader
 
+    let private withSpeciesValuesExpanded (session: ProvenanceSession) (state: UiState) =
+        let layer = Session.activeLayer session
+
+        withSpeciesGrouped session state
+        |> State.PropertyExpansion.toggle layer.Id ProvenanceSide.Input speciesHeader
+
     /// Resolves the overlay's (inherited) checkpoint key to the sandbox seed to
     /// rebuild; "fresh-editor" (the shelf-to-rail step) and unknown keys both
     /// fall back to a fresh sample editor with no rail unfolded.
@@ -200,6 +250,10 @@ module ProvenanceTutorialSteps =
         | Some "species-values"
         | Some "species-connect" -> {
             InitUiState = fun session -> State.init session |> withSpeciesGrouped session
+            OpenRail = Some ProvenanceSide.Input
+          }
+        | Some "species-values-expanded" -> {
+            InitUiState = fun session -> State.init session |> withSpeciesValuesExpanded session
             OpenRail = Some ProvenanceSide.Input
           }
         | _ -> {
