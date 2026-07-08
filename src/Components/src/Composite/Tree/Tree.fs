@@ -46,13 +46,15 @@ type Tree =
         let debug = defaultArg debug false
         let treeRef = React.useElementRef ()
         let scrollRef = React.useElementRef ()
+        let loadingNodeIdsRef = React.useRef<ResizeArray<string>> (ResizeArray())
+        let invalidatedNodeIdsRef = React.useRef<ResizeArray<string>> (ResizeArray())
 
         let treeState: TreeState<'T> = useTreeState defaultExpandedIds defaultSelectedIds
 
         let effectiveSelectedIds, setSelection =
             useControlledSelection selectedIds onSelectionChange treeState
 
-        useTreeApi apiRef treeState.SetLoadedChildren treeState.SetExpandedIds
+        useTreeApi apiRef loadingNodeIdsRef invalidatedNodeIdsRef treeState.SetLoadedChildren treeState.SetExpandedIds
 
         let lookup =
             React.useMemo (
@@ -99,6 +101,8 @@ type Tree =
                 isSelectionDisabled
                 isNodeSelectable
                 enableLazyLoading
+                loadingNodeIdsRef
+                invalidatedNodeIdsRef
                 treeState
                 lookup
                 focusedId
@@ -212,7 +216,7 @@ type Tree =
                 prop.testId "generic-tree"
             prop.className (TreeHelper.rootClasses styleFn)
             prop.children [
-                TreeCtx.Provider(Some(toBoxedContext contextValue), treeContent)
+                TreeCtx.Provider(Some(box contextValue), treeContent)
                 contextMenu
                 if debug then
                     Html.div [

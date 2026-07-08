@@ -24,5 +24,4 @@ module TreeDom =
         | None -> ()
 
     let focusNodeAfterRender treeRef nodeId =
-        focusNode treeRef nodeId
         Dom.requestAnimationFrame (fun () -> focusNode treeRef nodeId) |> ignore

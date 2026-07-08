@@ -48,38 +48,29 @@ module NodeState =
 
     let invalidateNode nodeId loadedChildren = loadedChildren |> Map.remove nodeId
 
-    let isBranch (node: TreeItem<'T>) = node.kind = TreeNodeKind.Branch
-
     let directChildren (loadedChildren: Map<string, TreeLoadState<'T>>) (node: TreeItem<'T>) =
         match loadedChildren |> Map.tryFind node.id |> Option.bind _.Children with
         | Some children -> Some children
         | None -> node.children
 
-    let childCount (dataSource: TreeDataSource<'T> option) loadedChildren (node: TreeItem<'T>) =
-        match directChildren loadedChildren node with
-        | Some children -> children.Length
-        | None ->
-            match node.childrenCount, dataSource with
-            | Some count, _ -> count
-            | None, Some source -> source.GetChildrenCount(Some node)
-            | None, None -> 0
-
-    let private hasExpandableChildCount count = count <> 0
-
-    let canExpand dataSource loadedChildren node =
-        if not (isBranch node) then
+    let canExpand
+        (dataSource: TreeDataSource<'T> option)
+        (loadedChildren: Map<string, TreeLoadState<'T>>)
+        (node: TreeItem<'T>)
+        =
+        if node.kind <> TreeNodeKind.Branch then
             false
         else
             match directChildren loadedChildren node, node.childrenCount, dataSource with
             | Some children, _, _ -> children.Length > 0
-            | None, Some count, _ -> hasExpandableChildCount count
-            | None, None, Some source -> source.GetChildrenCount(Some node) |> hasExpandableChildCount
+            | None, Some count, _ -> count > 0
+            | None, None, Some source -> source.GetChildrenCount(Some node) > 0
             | None, None, None -> false
 
     let flattenVisible dataSource loadedChildren expandedIds items =
         let nodes = ResizeArray<TreeVisibleNode<'T>>()
         let nodeMap = ResizeArray<string * TreeItem<'T>>()
-        let parentMap = ResizeArray<string * string option>()
+        let parentMap = ResizeArray<string * string>()
 
         let rec loop ancestors parentId depth (items: TreeItem<'T>[]) =
             for item in items do
@@ -91,7 +82,7 @@ module NodeState =
                     }
 
                     nodeMap.Add(item.id, item)
-                    parentMap.Add(item.id, parentId)
+                    parentId |> Option.iter (fun parentId -> parentMap.Add(item.id, parentId))
 
                     if expandedIds |> Set.contains item.id then
                         match directChildren loadedChildren item with
@@ -108,8 +99,7 @@ module NodeState =
             VisibleNodes = nodes.ToArray()
         }
 
-    let parentOf nodeId lookup =
-        lookup.Parents |> Map.tryFind nodeId |> Option.flatten
+    let parentOf nodeId lookup = lookup.Parents |> Map.tryFind nodeId
 
     let toggleExpanded nodeId expandedIds =
         if expandedIds |> Set.contains nodeId then

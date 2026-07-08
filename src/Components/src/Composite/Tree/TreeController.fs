@@ -5,27 +5,42 @@ open Feliz
 open Swate.Components.Composite.Tree.State
 open Swate.Components.Composite.Tree.Types
 
-let private isLoadActive (loadingNodeIdsRef: IRefValue<Set<string>>) nodeId loadedChildren =
+let private isLoadActive
+    (loadingNodeIdsRef: IRefValue<ResizeArray<string>>)
+    (invalidatedNodeIdsRef: IRefValue<ResizeArray<string>>)
+    nodeId
+    loadedChildren
+    =
     NodeState.hasActiveOrLoadedChildren nodeId loadedChildren
     || loadingNodeIdsRef.current.Contains nodeId
+    || invalidatedNodeIdsRef.current.Contains nodeId
 
-let private markLoadStarted (loadingNodeIdsRef: IRefValue<Set<string>>) nodeId =
-    loadingNodeIdsRef.current <- loadingNodeIdsRef.current |> Set.add nodeId
+let private markLoadStarted (loadingNodeIdsRef: IRefValue<ResizeArray<string>>) nodeId =
+    if not (loadingNodeIdsRef.current.Contains nodeId) then
+        loadingNodeIdsRef.current.Add nodeId
 
-let private markLoadFinished (loadingNodeIdsRef: IRefValue<Set<string>>) nodeId =
-    loadingNodeIdsRef.current <- loadingNodeIdsRef.current |> Set.remove nodeId
+let private markLoadFinished (loadingNodeIdsRef: IRefValue<ResizeArray<string>>) nodeId =
+    loadingNodeIdsRef.current.Remove nodeId |> ignore
+
+let private isLoadStillPending nodeId loadedChildren =
+    match loadedChildren |> Map.tryFind nodeId with
+    | Some state -> state.Status = TreeLazyLoadStatus.Loading
+    | None -> false
 
 let loadBranchChildren
     (dataSource: TreeDataSource<'T> option)
     enableLazyLoading
-    (loadingNodeIdsRef: IRefValue<Set<string>>)
+    (loadingNodeIdsRef: IRefValue<ResizeArray<string>>)
+    (invalidatedNodeIdsRef: IRefValue<ResizeArray<string>>)
     (loadedChildren: Map<string, TreeLoadState<'T>>)
     (setLoadedChildren: (Map<string, TreeLoadState<'T>> -> Map<string, TreeLoadState<'T>>) -> unit)
     (onError: exn -> unit)
     (node: TreeItem<'T>)
     =
     promise {
-        match dataSource, enableLazyLoading, isLoadActive loadingNodeIdsRef node.id loadedChildren with
+        match
+            dataSource, enableLazyLoading, isLoadActive loadingNodeIdsRef invalidatedNodeIdsRef node.id loadedChildren
+        with
         | Some source, true, false ->
             markLoadStarted loadingNodeIdsRef node.id
 
@@ -38,19 +53,36 @@ let loadBranchChildren
 
             try
                 let! children = source.GetTreeItems(Some node)
-                setLoadedChildren (NodeState.withLoaded node.id children)
+
+                if not (invalidatedNodeIdsRef.current.Remove node.id) then
+                    setLoadedChildren (fun current ->
+                        if isLoadStillPending node.id current then
+                            NodeState.withLoaded node.id children current
+                        else
+                            current
+                    )
+
                 markLoadFinished loadingNodeIdsRef node.id
             with ex ->
-                setLoadedChildren (NodeState.withLoadError node.id ex.Message)
+                if not (invalidatedNodeIdsRef.current.Remove node.id) then
+                    setLoadedChildren (fun current ->
+                        if isLoadStillPending node.id current then
+                            NodeState.withLoadError node.id ex.Message current
+                        else
+                            current
+                    )
+
+                    onError ex
+
                 markLoadFinished loadingNodeIdsRef node.id
-                onError ex
         | _ -> ()
     }
 
 let expandNode
     (dataSource: TreeDataSource<'T> option)
     enableLazyLoading
-    (loadingNodeIdsRef: IRefValue<Set<string>>)
+    (loadingNodeIdsRef: IRefValue<ResizeArray<string>>)
+    (invalidatedNodeIdsRef: IRefValue<ResizeArray<string>>)
     (loadedChildren: Map<string, TreeLoadState<'T>>)
     (expandedIds: Set<string>)
     (setExpandedIds: (Set<string> -> Set<string>) -> unit)
@@ -66,6 +98,7 @@ let expandNode
                 dataSource
                 enableLazyLoading
                 loadingNodeIdsRef
+                invalidatedNodeIdsRef
                 loadedChildren
                 setLoadedChildren
                 onError

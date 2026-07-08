@@ -58,7 +58,20 @@ let useControlledSelection
     effectiveSelectedIds, setSelection
 
 [<Hook>]
-let useTreeApi (apiRef: IRefValue<TreeApi option> option) setLoadedChildren setExpandedIds =
+let useTreeApi
+    (apiRef: IRefValue<TreeApi option> option)
+    (loadingNodeIdsRef: IRefValue<ResizeArray<string>>)
+    (invalidatedNodeIdsRef: IRefValue<ResizeArray<string>>)
+    setLoadedChildren
+    setExpandedIds
+    =
+    let markInvalidated nodeId =
+        if
+            loadingNodeIdsRef.current.Contains nodeId
+            && not (invalidatedNodeIdsRef.current.Contains nodeId)
+        then
+            invalidatedNodeIdsRef.current.Add nodeId
+
     React.useEffect (
         (fun () ->
             apiRef
@@ -67,10 +80,14 @@ let useTreeApi (apiRef: IRefValue<TreeApi option> option) setLoadedChildren setE
                     Some {
                         InvalidateNode =
                             fun nodeId ->
+                                markInvalidated nodeId
                                 setLoadedChildren (NodeState.invalidateNode nodeId)
                                 setExpandedIds (fun current -> current |> Set.remove nodeId)
                         InvalidateAll =
                             fun () ->
+                                for nodeId in loadingNodeIdsRef.current do
+                                    markInvalidated nodeId
+
                                 setLoadedChildren (fun _ -> Map.empty)
                                 setExpandedIds (fun _ -> Set.empty)
                     }
@@ -90,6 +107,8 @@ let useTreeNodeActions
     isSelectionDisabled
     isNodeSelectable
     enableLazyLoading
+    (loadingNodeIdsRef: IRefValue<ResizeArray<string>>)
+    (invalidatedNodeIdsRef: IRefValue<ResizeArray<string>>)
     (treeState: TreeState<'T>)
     (lookup: TreeRowLookup<'T>)
     focusedId
@@ -98,7 +117,6 @@ let useTreeNodeActions
     onError
     =
     let focusDom = TreeDom.focusNodeAfterRender treeRef
-    let loadingNodeIdsRef = React.useRef<Set<string>> (Set.empty)
 
     let focusById nodeId =
         TreeController.tryFocusById lookup treeState.SetFocusedId scrollToIndex focusDom nodeId
@@ -108,18 +126,13 @@ let useTreeNodeActions
             dataSource
             enableLazyLoading
             loadingNodeIdsRef
+            invalidatedNodeIdsRef
             treeState.LoadedChildren
             treeState.ExpandedIds
             treeState.SetExpandedIds
             treeState.SetLoadedChildren
             onError
             node
-
-    let hasMouseSelectionModifier (event: MouseEvent) =
-        event.shiftKey || event.ctrlKey || event.metaKey
-
-    let hasKeyboardSelectionModifier (event: KeyboardEvent) =
-        event.shiftKey || event.ctrlKey || event.metaKey
 
     let selectNode (node: TreeItem<'T>) extendSelection =
         TreeController.selectNode
@@ -172,7 +185,7 @@ let useTreeNodeActions
             if NodeState.canExpand dataSource treeState.LoadedChildren node then
                 expandNode node
 
-            selectNode node (hasKeyboardSelectionModifier event)
+            selectNode node (event.shiftKey || event.ctrlKey || event.metaKey)
         | _ -> ()
 
     {

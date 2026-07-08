@@ -75,7 +75,7 @@ type TreeLoadState<'T> = {
 
 type TreeRowLookup<'T> = {
     Nodes: Map<string, TreeItem<'T>>
-    Parents: Map<string, string option>
+    Parents: Map<string, string>
     VisibleNodes: TreeVisibleNode<'T>[]
 }
 
