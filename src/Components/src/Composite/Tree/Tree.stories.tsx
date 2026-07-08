@@ -140,6 +140,8 @@ export const MultiSelectionWithoutCheckboxes: Story = {
     const canvas = within(canvasElement);
 
     await expect(canvas.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(canvas.getByTestId("tree-node-arc/studies").className).toContain("swt:cursor-pointer");
+    expect(canvas.getByTestId("tree-node-arc/studies").className).toContain("swt:hover:bg-base-200");
     await userEvent.click(canvas.getByText("studies"));
     await expect(canvas.getByTestId("multi-selected")).toHaveTextContent("none");
     await waitFor(() => expect(canvas.queryByText("isa.study.xlsx")).not.toBeInTheDocument());
@@ -226,130 +228,27 @@ export const LazyLoadingCachesChildren: Story = {
 
     await userEvent.click(canvas.getByRole("button", { name: "Expand studies" }));
     await expectLoadingIndicator(canvasElement);
-    await expect(await canvas.findByText("Study 02")).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Invalidate studies cache" }));
+    await expect(canvas.getByRole("button", { name: "Expand studies" })).toBeVisible();
+    await delayed(undefined, 350);
+    await expect(canvas.queryByText("Study 02")).not.toBeInTheDocument();
     await expect(canvas.getByTestId("load-count")).toHaveTextContent("Loads: 1");
+
+    await userEvent.click(canvas.getByRole("button", { name: "Expand studies" }));
+    await expectLoadingIndicator(canvasElement);
+    await expect(await canvas.findByText("Study 02")).toBeVisible();
+    await expect(canvas.getByTestId("load-count")).toHaveTextContent("Loads: 2");
 
     await userEvent.click(canvas.getByRole("button", { name: "Collapse studies" }));
     await userEvent.click(canvas.getByRole("button", { name: "Expand studies" }));
-    await expect(canvas.getByTestId("load-count")).toHaveTextContent("Loads: 1");
+    await expect(canvas.getByTestId("load-count")).toHaveTextContent("Loads: 2");
 
     await userEvent.click(canvas.getByRole("button", { name: "Invalidate studies cache" }));
     await expect(canvas.getByRole("button", { name: "Expand studies" })).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: "Expand studies" }));
     await expectLoadingIndicator(canvasElement);
     await expect(await canvas.findByText("Study 02")).toBeVisible();
-    await expect(canvas.getByTestId("load-count")).toHaveTextContent("Loads: 2");
-  },
-};
-
-const CountedDataSourceBranchTree = () => {
-  const [loadLog, setLoadLog] = React.useState<string[]>([]);
-  const items = React.useMemo(() => [branch("arc/assays", "assays", undefined)], []);
-
-  const dataSource = React.useMemo(
-    () => ({
-      GetChildrenCount: (item: DemoNode | null | undefined) => (item?.id === "arc/assays" ? 1 : 0),
-      GetTreeItems: async (item: DemoNode | null | undefined) => {
-        setLoadLog((current) => [...current, item?.id ?? "root"]);
-        return item?.id === "arc/assays"
-          ? [branch("arc/assays/assay_02", "Assay 02", [leaf("arc/assays/assay_02/isa.assay.xlsx", "isa.assay.xlsx")])]
-          : [];
-      },
-    }),
-    [],
-  );
-
-  return (
-    <div className="swt:w-96 swt:space-y-2">
-      <Tree items={items} dataSource={dataSource as any} debug />
-      <div data-testid="unknown-count-load-log">Loaded: {loadLog.join("|") || "none"}</div>
-    </div>
-  );
-};
-
-export const DataSourceBranchClickExpandsCountedChildren: Story = {
-  render: () => <CountedDataSourceBranchTree />,
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-
-    await userEvent.click(canvas.getByText("assays"));
-    await expect(await canvas.findByText("Assay 02")).toBeVisible();
-    await expect(canvas.getByTestId("unknown-count-load-log")).toHaveTextContent("arc/assays");
-  },
-};
-
-const UnknownCountDataSourceBranchTree = () => {
-  const [loadLog, setLoadLog] = React.useState<string[]>([]);
-  const items = React.useMemo(() => [branch("arc/runs", "runs", undefined)], []);
-
-  const dataSource = React.useMemo(
-    () => ({
-      GetChildrenCount: (item: DemoNode | null | undefined) => (item?.id === "arc/runs" ? -1 : 0),
-      GetTreeItems: async (item: DemoNode | null | undefined) => {
-        setLoadLog((current) => [...current, item?.id ?? "root"]);
-        return item?.id === "arc/runs"
-          ? [branch("arc/runs/run_01", "Run 01", [leaf("arc/runs/run_01/isa.run.xlsx", "isa.run.xlsx")])]
-          : [];
-      },
-    }),
-    [],
-  );
-
-  return (
-    <div className="swt:w-96 swt:space-y-2">
-      <Tree items={items} dataSource={dataSource as any} debug />
-      <div data-testid="unknown-count-load-log">Loaded: {loadLog.join("|") || "none"}</div>
-    </div>
-  );
-};
-
-export const DataSourceUnknownCountBranchDoesNotExposeExpandAction: Story = {
-  render: () => <UnknownCountDataSourceBranchTree />,
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-
-    await expect(canvas.getByText("runs")).toBeVisible();
-    await expect(canvas.queryByRole("button", { name: "Expand runs" })).not.toBeInTheDocument();
-
-    await userEvent.click(canvas.getByText("runs"));
-    await expect(canvas.queryByText("Run 01")).not.toBeInTheDocument();
-    await expect(canvas.getByTestId("unknown-count-load-log")).toHaveTextContent("Loaded: none");
-  },
-};
-
-const KnownEmptyDataSourceBranchTree = () => {
-  const [loadLog, setLoadLog] = React.useState<string[]>([]);
-  const items = React.useMemo(() => [branch("arc/empty-folder", "empty folder", undefined)], []);
-
-  const dataSource = React.useMemo(
-    () => ({
-      GetChildrenCount: () => 0,
-      GetTreeItems: async (item: DemoNode | null | undefined) => {
-        setLoadLog((current) => [...current, item?.id ?? "root"]);
-        return [];
-      },
-    }),
-    [],
-  );
-
-  return (
-    <div className="swt:w-96 swt:space-y-2">
-      <Tree items={items} dataSource={dataSource as any} debug />
-      <div data-testid="empty-load-log">Loaded: {loadLog.join("|") || "none"}</div>
-    </div>
-  );
-};
-
-export const DataSourceKnownEmptyBranchDoesNotExposeExpandAction: Story = {
-  render: () => <KnownEmptyDataSourceBranchTree />,
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-
-    await expect(canvas.getByText("empty folder")).toBeVisible();
-    await expect(canvas.queryByRole("button", { name: "Expand empty folder" })).not.toBeInTheDocument();
-
-    await userEvent.click(canvas.getByText("empty folder"));
-    await expect(canvas.getByTestId("empty-load-log")).toHaveTextContent("Loaded: none");
+    await expect(canvas.getByTestId("load-count")).toHaveTextContent("Loads: 3");
   },
 };
 
@@ -362,9 +261,11 @@ const ParentAwareDataSourceTree = () => {
       GetChildrenCount: (item: DemoNode | null | undefined) => {
         switch (item?.id) {
           case "remote/arc":
-            return 3;
+            return 4;
           case "remote/arc/studies":
             return 1;
+          case "remote/arc/runs":
+            return -1;
           default:
             return 0;
         }
@@ -377,6 +278,7 @@ const ParentAwareDataSourceTree = () => {
           case "remote/arc":
             return [
               branch("remote/arc/studies", "studies", undefined),
+              branch("remote/arc/runs", "runs", undefined),
               branch("remote/arc/empty-folder", "empty folder", undefined),
               leaf("remote/arc/isa.investigation.xlsx", "isa.investigation.xlsx"),
             ];
@@ -406,6 +308,8 @@ export const DataSourceLoadsChildrenForExpandedBranch: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Expand Remote Swate ARC" }));
     await expect(await canvas.findByText("isa.investigation.xlsx")).toBeVisible();
     await expect(canvas.getByText("studies")).toBeVisible();
+    await expect(canvas.getByText("runs")).toBeVisible();
+    await expect(canvas.queryByRole("button", { name: "Expand runs" })).not.toBeInTheDocument();
     await expect(canvas.getByText("empty folder")).toBeVisible();
     await expect(canvas.queryByRole("button", { name: "Expand empty folder" })).not.toBeInTheDocument();
     await expect(canvas.getByTestId("datasource-load-log")).toHaveTextContent("remote/arc");
@@ -461,11 +365,12 @@ export const DataSourceInvalidateAllCache: Story = {
 
     await userEvent.click(canvas.getByRole("button", { name: "Expand workflows" }));
     await expectLoadingIndicator(canvasElement);
-    await expect(await canvas.findByText("Workflow 1")).toBeVisible();
-    await expect(canvas.getByTestId("datasource-invalidate-loads")).toHaveTextContent("Loads: 1");
-
     await userEvent.click(canvas.getByRole("button", { name: "Invalidate all datasource cache" }));
     await expect(canvas.getByRole("button", { name: "Expand workflows" })).toBeVisible();
+    await delayed(undefined, 350);
+    await expect(canvas.queryByText("Workflow 1")).not.toBeInTheDocument();
+    await expect(canvas.getByTestId("datasource-invalidate-loads")).toHaveTextContent("Loads: 1");
+
     await userEvent.click(canvas.getByRole("button", { name: "Expand workflows" }));
     await expectLoadingIndicator(canvasElement);
     await expect(await canvas.findByText("Workflow 2")).toBeVisible();
@@ -503,6 +408,8 @@ export const LazyLoadingErrorState: Story = {
 
     await userEvent.click(canvas.getByRole("button", { name: "Expand runs" }));
     await expect(await canvas.findByText("Error")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Expand runs" })).toBeVisible();
+    await expect(canvas.queryByRole("button", { name: "Collapse runs" })).not.toBeInTheDocument();
     await expect(canvas.getByTestId("lazy-error-message")).toHaveTextContent("Run metadata could not be loaded");
   },
 };
@@ -555,11 +462,18 @@ export const VirtualizedRows: Story = {
     await expect(canvas.getByRole("tree")).toHaveAttribute("data-tree-root", "true");
     await expect(canvas.getByText("Swate Demo ARC")).toBeVisible();
     await expect(canvas.getByText("Study 01")).toBeVisible();
-    await expect(canvasElement.querySelector("[data-tree-virtualized='true']")).toBeTruthy();
+    const virtualizedViewport = canvasElement.querySelector("[data-tree-virtualized='true']") as HTMLElement;
+    await expect(virtualizedViewport).toBeTruthy();
 
-    const rootNode = canvas.getByTestId("tree-node-arc");
-    rootNode.focus();
-    fireEvent.keyDown(rootNode, { key: "End" });
+    virtualizedViewport.scrollTop = virtualizedViewport.scrollHeight;
+    fireEvent.scroll(virtualizedViewport);
+
+    await waitFor(() => expect(canvas.getByText("Workflow 16")).toBeVisible());
+    await expect(canvas.queryByText("Study 01")).not.toBeInTheDocument();
+
+    const workflowNode = canvas.getByTestId("tree-node-arc/workflows/workflow_16");
+    workflowNode.focus();
+    fireEvent.keyDown(workflowNode, { key: "End" });
     await waitFor(() => expect(canvas.getByTestId("tree-node-arc/docs/changelog.md")).toHaveFocus());
 
     fireEvent.keyDown(canvas.getByTestId("tree-node-arc/docs/changelog.md"), { key: "Home" });
@@ -614,11 +528,36 @@ const CustomTree = () => {
       <Tree
         items={items}
         defaultExpandedIds={["arc/studies/study_04"]}
-        leading={(props) => <span className="swt:badge swt:badge-xs">{props.Depth}</span>}
+        leading={(props) => (
+          <span className="swt:badge swt:badge-xs">
+            {props.Node.kind === "branch" ? (props.IsExpanded ? "open" : "closed") : `depth-${props.Depth}`}
+          </span>
+        )}
         trailing={(props) =>
-          props.Node.data?.badge ? <span className="swt:badge swt:badge-primary swt:badge-sm">{props.Node.data.badge}</span> : null
+          props.Node.data?.badge ? (
+            <button type="button" className="swt:badge swt:badge-primary swt:badge-sm" onClick={(event) => props.Select(event as any)}>
+              {props.IsSelected ? "Selected" : props.Node.data.badge}
+            </button>
+          ) : null
         }
-        renderNode={(props) => <strong>{props.Node.label}</strong>}
+        renderNode={(props) => (
+          <span className="swt:flex swt:items-center swt:gap-2">
+            <strong>{props.IsFocused ? `${props.Node.label} focused` : props.Node.label}</strong>
+            {props.Node.kind === "branch" ? (
+              <button
+                type="button"
+                className="swt:btn swt:btn-ghost swt:btn-xs"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  props.Toggle();
+                }}
+              >
+                Custom toggle {props.Node.label}
+              </button>
+            ) : null}
+          </span>
+        )}
         styleFn={(kind, node, classes) => {
           if (!kind) return [...classes, "swt:border", "swt:border-info"];
           if (node?.id === "arc/studies/study_04") return [...classes, "swt:text-primary"];
@@ -637,9 +576,21 @@ export const CustomRenderingAndStyling: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByText("isa.study.xlsx")).toBeVisible();
     await expect(canvas.getByText("ISA")).toBeVisible();
+    await expect(canvas.getByText("open")).toBeVisible();
+    await expect(canvas.getByText("depth-1")).toBeVisible();
     await expect(canvas.getByTestId("generic-tree")).toHaveClass("swt:border-info");
     await expect(canvas.getByTestId("tree-node-arc/studies/study_04")).toHaveClass("swt:text-primary");
     await expect(canvas.getByTestId("tree-node-arc/studies/study_04/isa.study.xlsx")).toHaveClass("swt:text-accent");
+
+    await userEvent.click(canvas.getByRole("button", { name: "ISA" }));
+    await expect(canvas.getByText("Selected")).toBeVisible();
+
+    canvas.getByTestId("tree-node-arc/studies/study_04/isa.study.xlsx").focus();
+    await waitFor(() => expect(canvas.getByText("isa.study.xlsx focused")).toBeVisible());
+
+    await userEvent.click(canvas.getByRole("button", { name: "Custom toggle Study 04" }));
+    await waitFor(() => expect(canvas.queryByText("isa.study.xlsx focused")).not.toBeInTheDocument());
+    await expect(canvas.getByText("closed")).toBeVisible();
   },
 };
 

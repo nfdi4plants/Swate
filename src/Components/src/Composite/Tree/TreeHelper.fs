@@ -19,7 +19,7 @@ let selectedIdsArray selectedIds = selectedIds |> Set.toArray
 let nodeContainerClasses (props: TreeNodeProps<'T>) =
     let baseClasses = [
         "swt:group swt:flex swt:min-h-8 swt:w-full swt:min-w-0 swt:items-center swt:gap-1 swt:rounded-md swt:px-1 swt:py-0.5 swt:text-sm swt:outline-none"
-        if props.CanSelect then
+        if props.CanSelect || props.CanExpand then
             "swt:cursor-pointer swt:hover:bg-base-200"
         else
             "swt:cursor-default swt:opacity-80"

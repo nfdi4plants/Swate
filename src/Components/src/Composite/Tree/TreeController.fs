@@ -34,6 +34,7 @@ let loadBranchChildren
     (invalidatedNodeIdsRef: IRefValue<ResizeArray<string>>)
     (loadedChildren: Map<string, TreeLoadState<'T>>)
     (setLoadedChildren: (Map<string, TreeLoadState<'T>> -> Map<string, TreeLoadState<'T>>) -> unit)
+    (setExpandedIds: (Set<string> -> Set<string>) -> unit)
     (onError: exn -> unit)
     (node: TreeItem<'T>)
     =
@@ -72,6 +73,7 @@ let loadBranchChildren
                             current
                     )
 
+                    setExpandedIds (fun current -> current |> Set.remove node.id)
                     onError ex
 
                 markLoadFinished loadingNodeIdsRef node.id
@@ -101,6 +103,7 @@ let expandNode
                 invalidatedNodeIdsRef
                 loadedChildren
                 setLoadedChildren
+                setExpandedIds
                 onError
                 node
             |> Promise.start

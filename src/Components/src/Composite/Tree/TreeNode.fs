@@ -58,65 +58,33 @@ type TreeNode =
                 ]
 
         let leadingContent =
-            React.useMemo (
-                (fun () ->
-                    match props.Leading with
-                    | Some leading -> leading renderProps
+            match props.Leading with
+            | Some leading -> leading renderProps
+            | None ->
+                match node.leading with
+                | Some leading -> leading
+                | None ->
+                    match node.icon with
+                    | Some icon -> icon
                     | None ->
-                        match node.leading with
-                        | Some leading -> leading
-                        | None ->
-                            match node.icon with
-                            | Some icon -> icon
-                            | None ->
-                                Html.i [
-                                    prop.className [
-                                        $"swt:iconify {TreeHelper.defaultIcon node} swt:size-4 swt:shrink-0"
-                                    ]
-                                ]
-                ),
-                [|
-                    box props.Leading
-                    box node.leading
-                    box node.icon
-                    box node.kind
-                |]
-            )
+                        Html.i [
+                            prop.className [
+                                $"swt:iconify {TreeHelper.defaultIcon node} swt:size-4 swt:shrink-0"
+                            ]
+                        ]
 
         let nodeContent =
-            React.useMemo (
-                (fun () ->
-                    match props.RenderNode with
-                    | Some renderNode ->
-                        Html.div [
-                            prop.className "swt:min-w-0 swt:flex-1 swt:text-left"
-                            prop.children [ renderNode renderProps ]
-                        ]
-                    | None ->
-                        Html.span [
-                            prop.className "swt:min-w-0 swt:flex-1 swt:truncate swt:text-left"
-                            prop.text node.label
-                        ]
-                ),
-                [|
-                    box props.RenderNode
-                    box node.id
-                    box node.label
-                    box node.kind
-                    box node.data
-                    box node.childrenCount
-                    box node.icon
-                    box node.tooltip
-                    box node.leading
-                    box node.trailing
-                    box node.className
-                    box props.Row.Depth
-                    box props.IsExpanded
-                    box props.IsSelected
-                    box props.IsLoading
-                    box props.Error
-                |]
-            )
+            match props.RenderNode with
+            | Some renderNode ->
+                Html.div [
+                    prop.className "swt:min-w-0 swt:flex-1 swt:text-left"
+                    prop.children [ renderNode renderProps ]
+                ]
+            | None ->
+                Html.span [
+                    prop.className "swt:min-w-0 swt:flex-1 swt:truncate swt:text-left"
+                    prop.text node.label
+                ]
 
         let errorContent =
             match props.Error with
@@ -129,17 +97,12 @@ type TreeNode =
             | None -> Html.none
 
         let trailingContent =
-            React.useMemo (
-                (fun () ->
-                    match props.Trailing with
-                    | Some trailing -> trailing renderProps
-                    | None ->
-                        match node.trailing with
-                        | Some trailing -> trailing
-                        | None -> Html.none
-                ),
-                [| box props.Trailing; box node.trailing |]
-            )
+            match props.Trailing with
+            | Some trailing -> trailing renderProps
+            | None ->
+                match node.trailing with
+                | Some trailing -> trailing
+                | None -> Html.none
 
         Html.div [
             prop.role "treeitem"
