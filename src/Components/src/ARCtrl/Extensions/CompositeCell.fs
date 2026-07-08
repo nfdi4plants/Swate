@@ -2,6 +2,7 @@
 module ARCtrl.CompositeCellExtensions
 
 open ARCtrl
+open ARCtrl.Helper
 
 type CompositeCell with
 
@@ -42,10 +43,6 @@ type CompositeCell with
         | CompositeCell.Unitized _ -> CompositeCell.Unitized("", OntologyAnnotation())
         | CompositeCell.Data _ -> CompositeCell.Data(Data())
 
-    static member isNumber(input: string) =
-        let success, _ = System.Double.TryParse(input)
-        success
-
     /// <summary>
     ///
     /// </summary>
@@ -62,16 +59,11 @@ type CompositeCell with
             // later from a matching unit annotation when available.
             | [| value; unit |] when
                 header.IsTermColumn
-                && CompositeCell.isNumber value
+                && isNumber value
                 && not (System.String.IsNullOrWhiteSpace unit)
                 ->
                 CompositeCell.createUnitized (value, OntologyAnnotation.create unit)
-            | arr when
-                arr.Length > 0
-                && arr.Length < 4
-                && header.IsTermColumn
-                && CompositeCell.isNumber arr.[0]
-                ->
+            | arr when arr.Length > 0 && arr.Length < 4 && header.IsTermColumn && isNumber arr.[0] ->
                 CompositeCell.createUnitizedFromString (arr.[0]) |> _.ConvertToValidCell(header)
             | [| value; _ |] when header.IsTermColumn ->
                 CompositeCell.createFreeText value |> _.ConvertToValidCell(header)
