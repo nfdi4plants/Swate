@@ -520,7 +520,7 @@ type FolderedDraggableList =
                                 prop.children [
                                     Html.div [
                                         prop.className
-                                            "swt:relative swt:flex swt:h-16 swt:min-w-0 swt:flex-row swt:flex-nowrap swt:items-start swt:gap-2 swt:overflow-x-auto swt:overflow-y-hidden swt:pb-1"
+                                            "swt:relative swt:flex swt:min-h-16 swt:min-w-0 swt:flex-row swt:flex-nowrap swt:items-start swt:gap-2 swt:overflow-x-auto swt:overflow-y-hidden swt:pb-1"
                                         prop.style [ style.scrollbarGutter.stable ]
                                         if debug then
                                             prop.testId "foldered-draggable-item-row"
