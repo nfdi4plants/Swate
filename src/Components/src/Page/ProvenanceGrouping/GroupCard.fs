@@ -67,7 +67,8 @@ module private EntityType =
         ]
 
 /// Derives display text and property chips for one provenance group card.
-module private GroupCardData =
+/// Public so the detail panels can reuse the same title derivation.
+module GroupCardData =
 
     /// Loaded endpoint kind for one member, resolved from the side-specific set map.
     let endpointKind side (model: ProvenanceModel) (setId: ProvenanceSetId) =
@@ -77,12 +78,6 @@ module private GroupCardData =
             | ProvenanceSide.Output -> model.OutputSets
 
         sets.TryFind setId |> Option.map (fun set -> set.Header.Kind)
-
-    let values (group: DisplayGroup) (model: ProvenanceModel) =
-        group.Members
-        |> List.collect (fun member' -> member'.PropertyValueIds)
-        |> List.distinct
-        |> List.choose (fun id -> model.PropertyValues.TryFind id)
 
     let memberValues (member': DisplayMember) (model: ProvenanceModel) =
         member'.PropertyValueIds
@@ -99,7 +94,11 @@ module private GroupCardData =
 
     let title (group: DisplayGroup) =
         match tabs group with
-        | [] -> group.Members.Head.Name
+        | [] ->
+            group.Members
+            |> List.tryHead
+            |> Option.map (fun member' -> member'.Name)
+            |> Option.defaultValue group.Id
         | tabs ->
             tabs
             |> List.map (fun value ->
@@ -471,91 +470,77 @@ type GroupCard =
                         ]
                     | _ -> Html.none
 
-                match tabs with
-                | [] ->
-                    // A card without grouping values is always a single loaded endpoint,
-                    // so the type line sits above its name to mirror the expanded member rows.
-                    Html.div [
-                        prop.className "swt:flex swt:cursor-pointer swt:items-start swt:gap-2"
-                        prop.onClick handleExpandClick
-                        if defaultArg debug false then
-                            prop.testId $"provenance-group-expand-surface-{side}-{group.Id}"
-                        prop.children [
-                            selectionCheckbox
-                            Html.div [
-                                prop.className "swt:flex swt:min-w-0 swt:grow swt:flex-col swt:gap-0.5"
-                                prop.title title
-                                prop.children [
-                                    match GroupCardData.endpointKind side model group.Members.Head.SetId with
-                                    | Some kind -> EntityType.line (EntityType.descriptor kind)
-                                    | None -> Html.none
-                                    Html.h3 [
-                                        prop.className "swt:min-w-0 swt:truncate swt:text-sm swt:font-semibold"
+                // Every card is drawn as a file organizer: one tab per grouping value
+                // sits on top of a folder body that holds the members' type symbols.
+                // A card without grouping values is always a single loaded endpoint;
+                // it shares the same silhouette and gets one neutral name tab instead.
+                // Hovering or focusing a grouping-value tab highlights that value.
+                let symbolIcon (descriptor: EntityType.Descriptor) =
+                    Html.i [
+                        prop.className $"swt:iconify {descriptor.Icon} swt:size-4 swt:shrink-0"
+                    ]
+
+                let countLabel count =
+                    Html.span [
+                        prop.className "swt:text-xs swt:font-semibold"
+                        prop.text (string count)
+                    ]
+
+                // When few enough to fit, every member contributes one symbol
+                // side by side; otherwise the preview collapses to the dominant type
+                // symbol with a count.
+                let memberDescriptors =
+                    group.Members
+                    |> List.choose (fun member' ->
+                        GroupCardData.endpointKind side model member'.SetId
+                        |> Option.map EntityType.descriptor
+                    )
+
+                let maxInlineSymbols = 4
+
+                // The tab bar escapes the card padding so the tabs sit flush on the
+                // card's top edge, like register tabs on an archive folder.
+                let tabBarMargins =
+                    match density with
+                    | Density.EditorDensity.Compact -> "swt:-mx-1.5 swt:-mt-1.5"
+                    | _ -> "swt:-mx-2.5 swt:-mt-2.5"
+
+                // Each grouping-value tab gets its own color, like the colored index
+                // tabs of an expanding file organizer.
+                let tabPalette = [|
+                    "swt:bg-primary swt:text-primary-content"
+                    "swt:bg-secondary swt:text-secondary-content"
+                    "swt:bg-accent swt:text-accent-content"
+                    "swt:bg-info swt:text-info-content"
+                    "swt:bg-success swt:text-success-content"
+                    "swt:bg-warning swt:text-warning-content"
+                    "swt:bg-error swt:text-error-content"
+                |]
+
+                Html.div [
+                    prop.className "swt:flex swt:min-w-0 swt:cursor-pointer swt:flex-col swt:gap-2"
+                    prop.onClick handleExpandClick
+                    if defaultArg debug false then
+                        prop.testId $"provenance-group-expand-surface-{side}-{group.Id}"
+                    prop.children [
+                        Html.div [
+                            prop.className [
+                                "swt:flex swt:min-w-0 swt:items-end swt:gap-1 swt:border-b swt:border-base-300 swt:px-3 swt:pt-1"
+                                tabBarMargins
+                            ]
+                            prop.children [
+                                match tabs with
+                                | [] ->
+                                    // Neutral label tab: same silhouette as a grouping-value
+                                    // tab but muted and inert, so the endpoint name cannot
+                                    // be mistaken for a grouping value.
+                                    Html.span [
+                                        prop.className
+                                            "swt:min-w-0 swt:grow swt:truncate swt:rounded-t-md swt:bg-base-300 swt:px-3 swt:py-1 swt:text-xs swt:font-semibold swt:text-base-content/80"
+                                        prop.title title
                                         prop.text title
                                     ]
-                                ]
-                            ]
-                            connectionBadge
-                        ]
-                    ]
-                | tabs ->
-                    // A grouped card is drawn as a file organizer: one tab per grouping
-                    // value sits on top of a folder body that holds the members' type
-                    // symbols. Hovering or focusing a tab highlights that grouping value.
-                    let symbolIcon (descriptor: EntityType.Descriptor) =
-                        Html.i [
-                            prop.className $"swt:iconify {descriptor.Icon} swt:size-4 swt:shrink-0"
-                        ]
-
-                    let countLabel count =
-                        Html.span [
-                            prop.className "swt:text-xs swt:font-semibold"
-                            prop.text (string count)
-                        ]
-
-                    // When few enough to fit, every member contributes one symbol
-                    // side by side; otherwise the preview collapses to the dominant type
-                    // symbol with a count.
-                    let memberDescriptors =
-                        group.Members
-                        |> List.choose (fun member' ->
-                            GroupCardData.endpointKind side model member'.SetId
-                            |> Option.map EntityType.descriptor
-                        )
-
-                    let maxInlineSymbols = 4
-
-                    // The tab bar escapes the card padding so the tabs sit flush on the
-                    // card's top edge, like register tabs on an archive folder.
-                    let tabBarMargins =
-                        match density with
-                        | Density.EditorDensity.Compact -> "swt:-mx-1.5 swt:-mt-1.5"
-                        | _ -> "swt:-mx-2.5 swt:-mt-2.5"
-
-                    // Each tab gets its own color, like the colored index tabs of an
-                    // expanding file organizer.
-                    let tabPalette = [|
-                        "swt:bg-primary swt:text-primary-content"
-                        "swt:bg-secondary swt:text-secondary-content"
-                        "swt:bg-accent swt:text-accent-content"
-                        "swt:bg-info swt:text-info-content"
-                        "swt:bg-success swt:text-success-content"
-                        "swt:bg-warning swt:text-warning-content"
-                        "swt:bg-error swt:text-error-content"
-                    |]
-
-                    Html.div [
-                        prop.className "swt:flex swt:min-w-0 swt:cursor-pointer swt:flex-col swt:gap-2"
-                        prop.onClick handleExpandClick
-                        if defaultArg debug false then
-                            prop.testId $"provenance-group-expand-surface-{side}-{group.Id}"
-                        prop.children [
-                            Html.div [
-                                prop.className [
-                                    "swt:flex swt:min-w-0 swt:items-end swt:gap-1 swt:border-b swt:border-base-300 swt:px-3 swt:pt-1"
-                                    tabBarMargins
-                                ]
-                                prop.children [
+                                | tabs ->
                                     for index, groupingValue in List.indexed tabs do
                                         let category = groupingValue.Key.Header.Category.Name
 
@@ -588,70 +573,69 @@ type GroupCard =
                                                      None),
                                             key = $"{index}:{category}={valueText}"
                                         )
-                                ]
                             ]
-                            Html.div [
-                                prop.className "swt:flex swt:items-center swt:gap-2"
-                                prop.children [
-                                    selectionCheckbox
-                                    // The expand trigger is drawn as a folder: a clipped back
-                                    // panel with its own index tab, the members' type symbols
-                                    // resting inside, and a front pocket they tuck behind.
-                                    Html.button [
-                                        prop.type'.button
-                                        prop.ariaLabel "Show members"
-                                        prop.title "Show members"
-                                        prop.onClick (fun _ -> onExpand ())
-                                        prop.className
-                                            "swt:group swt:relative swt:w-fit swt:max-w-full swt:cursor-pointer"
-                                        prop.children [
-                                            Html.span [
-                                                prop.ariaHidden true
-                                                prop.className
-                                                    "swt:absolute swt:inset-0 swt:rounded-md swt:bg-base-300 swt:transition-colors swt:group-hover:bg-primary/30 swt:[clip-path:polygon(0_0,2.5rem_0,3.25rem_0.5rem,100%_0.5rem,100%_100%,0_100%)]"
-                                            ]
-                                            Html.span [
-                                                prop.ariaHidden true
-                                                prop.className
-                                                    "swt:relative swt:flex swt:min-h-9 swt:items-center swt:gap-1 swt:px-3 swt:pb-2.5 swt:pt-3.5 swt:text-base-content/80"
-                                                if defaultArg debug false then
-                                                    prop.testId $"provenance-group-symbols-{side}-{group.Id}"
-                                                prop.children [
-                                                    match memberDescriptors with
-                                                    | [] -> countLabel group.Members.Length
-                                                    | descriptors when descriptors.Length <= maxInlineSymbols ->
-                                                        for index, descriptor in List.indexed descriptors do
-                                                            Html.span [
-                                                                prop.key (string index)
-                                                                prop.children [ symbolIcon descriptor ]
-                                                            ]
-                                                    | descriptors ->
-                                                        let dominant =
-                                                            descriptors
-                                                            |> List.countBy (fun descriptor -> descriptor.Label)
-                                                            |> List.maxBy snd
-                                                            |> fst
+                        ]
+                        Html.div [
+                            prop.className "swt:flex swt:items-center swt:gap-2"
+                            prop.children [
+                                selectionCheckbox
+                                // The expand trigger is drawn as a folder: a clipped back
+                                // panel with its own index tab, the members' type symbols
+                                // resting inside, and a front pocket they tuck behind.
+                                Html.button [
+                                    prop.type'.button
+                                    prop.ariaLabel "Show members"
+                                    prop.title "Show members"
+                                    prop.onClick (fun _ -> onExpand ())
+                                    prop.className "swt:group swt:relative swt:w-fit swt:max-w-full swt:cursor-pointer"
+                                    prop.children [
+                                        Html.span [
+                                            prop.ariaHidden true
+                                            prop.className
+                                                "swt:absolute swt:inset-0 swt:rounded-md swt:bg-base-300 swt:transition-colors swt:group-hover:bg-primary/30 swt:[clip-path:polygon(0_0,2.5rem_0,3.25rem_0.5rem,100%_0.5rem,100%_100%,0_100%)]"
+                                        ]
+                                        Html.span [
+                                            prop.ariaHidden true
+                                            prop.className
+                                                "swt:relative swt:flex swt:min-h-9 swt:items-center swt:gap-1 swt:px-3 swt:pb-2.5 swt:pt-3.5 swt:text-base-content/80"
+                                            if defaultArg debug false then
+                                                prop.testId $"provenance-group-symbols-{side}-{group.Id}"
+                                            prop.children [
+                                                match memberDescriptors with
+                                                | [] -> countLabel group.Members.Length
+                                                | descriptors when descriptors.Length <= maxInlineSymbols ->
+                                                    for index, descriptor in List.indexed descriptors do
+                                                        Html.span [
+                                                            prop.key (string index)
+                                                            prop.children [ symbolIcon descriptor ]
+                                                        ]
+                                                | descriptors ->
+                                                    let dominant =
+                                                        descriptors
+                                                        |> List.countBy (fun descriptor -> descriptor.Label)
+                                                        |> List.maxBy snd
+                                                        |> fst
 
-                                                        let icon =
-                                                            descriptors
-                                                            |> List.find (fun descriptor -> descriptor.Label = dominant)
+                                                    let icon =
+                                                        descriptors
+                                                        |> List.find (fun descriptor -> descriptor.Label = dominant)
 
-                                                        symbolIcon icon
-                                                        countLabel descriptors.Length
-                                                ]
-                                            ]
-                                            Html.span [
-                                                prop.ariaHidden true
-                                                prop.className
-                                                    "swt:absolute swt:inset-x-0 swt:bottom-0 swt:h-[35%] swt:rounded-b-md swt:bg-base-200 swt:transition-colors swt:group-hover:bg-primary/20"
+                                                    symbolIcon icon
+                                                    countLabel descriptors.Length
                                             ]
                                         ]
+                                        Html.span [
+                                            prop.ariaHidden true
+                                            prop.className
+                                                "swt:absolute swt:inset-x-0 swt:bottom-0 swt:h-[35%] swt:rounded-b-md swt:bg-base-200 swt:transition-colors swt:group-hover:bg-primary/20"
+                                        ]
                                     ]
-                                    connectionBadge
                                 ]
+                                connectionBadge
                             ]
                         ]
                     ]
+                ]
 
                 if expanded then
                     Html.ul [

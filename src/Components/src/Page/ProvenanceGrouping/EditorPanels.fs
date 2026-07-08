@@ -236,20 +236,7 @@ module EditorPanels =
     let private groupTitle (groups: DisplayGroup list) groupId =
         groups
         |> List.tryFind (fun group -> group.Id = groupId)
-        |> Option.map (fun group ->
-            match group.GroupingValues with
-            | [] ->
-                group.Members
-                |> List.tryHead
-                |> Option.map (fun member' -> member'.Name)
-                |> Option.defaultValue groupId
-            | values ->
-                values
-                |> List.map (fun value ->
-                    $"{value.Key.Header.Category.Name}: {Formatting.formatValue value.Value value.Unit}"
-                )
-                |> String.concat ", "
-        )
+        |> Option.map GroupCardData.title
         |> Option.defaultValue groupId
 
     let connectionDetails

@@ -160,8 +160,9 @@ export const ExpandedGroupsShowMemberHoverValues: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    expect(within(canvas.getByText('Output A').closest('article')!).queryByRole('button', { name: 'Show members' }))
-      .not.toBeInTheDocument();
+    // Single-entry cards share the folder silhouette, so they expand the same way.
+    expect(within(canvas.getByText('Output A').closest('article')!).getByRole('button', { name: 'Show members' }))
+      .toBeInTheDocument();
 
     await groupByProperty(canvas, 'Output', 'Species');
     const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis'));
@@ -230,9 +231,13 @@ export const ShowsFileTypeForDataEndpoints: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    // A Data endpoint surfaces as a "File" type line above the single-entity card name.
+    // A Data endpoint shows its type as a document symbol in the folder body;
+    // the "File" type line appears on the expanded member row.
     const card = await waitFor(() => canvas.getByText('Data Output A').closest('article')!);
-    expect(card).toHaveTextContent('File');
+    expect(card.querySelector('[class*="fluent--document"]')).toBeInTheDocument();
+
+    await userEvent.click(within(card).getByRole('button', { name: 'Show members' }));
+    await waitFor(() => expect(card).toHaveTextContent('File'));
   },
 };
 
