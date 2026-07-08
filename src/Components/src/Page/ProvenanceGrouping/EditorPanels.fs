@@ -35,7 +35,7 @@ module EditorPanels =
             ]
             |> List.distinct
 
-        let headerText = headers |> List.tryHead |> Option.defaultValue "property"
+        let headerText = headers |> List.tryHead |> Option.defaultValue "annotation"
 
         let valueText =
             pending.Batch.Overwrites
@@ -53,7 +53,7 @@ module EditorPanels =
                 $"Apply {headerText} value to {pending.AffectedGroupCount} selected groups?"
             else
                 match headers with
-                | _ :: _ :: _ -> $"Overwrite {overwriteCount} values across {headers.Length} properties?"
+                | _ :: _ :: _ -> $"Overwrite {overwriteCount} values across {headers.Length} annotations?"
                 | _ when overwriteCount > 1 -> $"Overwrite {overwriteCount} {headerText} values?"
                 | _ -> $"Overwrite {headerText} value?"
 

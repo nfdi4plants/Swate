@@ -352,36 +352,27 @@ type ProvenanceGrouping =
                                         prop.className
                                             "swt:flex swt:min-w-0 swt:items-center swt:gap-2 swt:text-sm swt:font-medium"
                                         prop.children [
-                                            Html.i [
-                                                prop.className [
-                                                    "swt:iconify swt:size-5 swt:shrink-0"
-                                                    if isPropertyShelfExpanded then
-                                                        "swt:fluent--folder-open-24-regular"
-                                                    else
-                                                        "swt:fluent--folder-24-regular"
-                                                ]
-                                            ]
                                             Html.span [
                                                 prop.className "swt:min-w-0 swt:truncate"
-                                                prop.text "Available properties by source"
+                                                prop.text "Annotations"
                                             ]
                                         ]
                                     ]
                                     Html.button [
                                         prop.title (
                                             if isPropertyShelfExpanded then
-                                                "Minimize property folders"
+                                                "Minimize annotation folders"
                                             else
-                                                "Expand property folders"
+                                                "Expand annotation folders"
                                         )
                                         prop.type'.button
                                         prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:size-8 swt:p-0"
                                         prop.custom ("aria-expanded", isPropertyShelfExpanded)
                                         prop.ariaLabel (
                                             if isPropertyShelfExpanded then
-                                                "Minimize property folders"
+                                                "Minimize annotation folders"
                                             else
-                                                "Expand property folders"
+                                                "Expand annotation folders"
                                         )
                                         if debug then
                                             prop.testId "provenance-property-shelf-toggle"
@@ -1121,9 +1112,9 @@ type ProvenanceGrouping =
                         Html.button [
                             prop.title (
                                 if side = ProvenanceSide.Input then
-                                    "Hide input properties"
+                                    "Hide input annotations"
                                 else
-                                    "Hide output properties"
+                                    "Hide output annotations"
                             )
                             prop.type'.button
                             prop.className [
@@ -1131,7 +1122,7 @@ type ProvenanceGrouping =
                                 if side = ProvenanceSide.Output then
                                     "swt:self-end"
                             ]
-                            prop.ariaLabel $"Hide {railSideLabel side} properties"
+                            prop.ariaLabel $"Hide {railSideLabel side} annotations"
                             if debug then
                                 prop.testId $"provenance-rail-toggle-{side}"
                             prop.onClick (fun _ -> toggleRail side)
@@ -1155,21 +1146,21 @@ type ProvenanceGrouping =
                 Html.button [
                     prop.title (
                         if side = ProvenanceSide.Input then
-                            "Show input properties"
+                            "Show input annotations"
                         else
-                            "Show output properties"
+                            "Show output annotations"
                     )
                     prop.type'.button
                     prop.className
                         "swt:btn swt:btn-ghost swt:btn-xs swt:h-auto swt:min-h-24 swt:w-fit swt:px-1 swt:py-2"
-                    prop.ariaLabel $"Show {railSideLabel side} properties"
+                    prop.ariaLabel $"Show {railSideLabel side} annotations"
                     if debug then
                         prop.testId $"provenance-rail-toggle-{side}"
                     prop.onClick (fun _ -> toggleRail side)
                     prop.children [
                         Html.span [
                             prop.className "swt:[writing-mode:vertical-rl] swt:text-xs"
-                            prop.text "Properties"
+                            prop.text "Annotations"
                         ]
                     ]
                 ]
@@ -1184,9 +1175,9 @@ type ProvenanceGrouping =
                         prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:w-fit"
                         prop.ariaLabel (
                             if openRail = Some side then
-                                $"Hide {railSideLabel side} properties"
+                                $"Hide {railSideLabel side} annotations"
                             else
-                                $"Show {railSideLabel side} properties"
+                                $"Show {railSideLabel side} annotations"
                         )
                         if debug then
                             prop.testId $"provenance-rail-toggle-{side}"
@@ -1203,8 +1194,8 @@ type ProvenanceGrouping =
                             ]
                             Html.span (
                                 match side with
-                                | ProvenanceSide.Input -> "Input properties"
-                                | ProvenanceSide.Output -> "Output properties"
+                                | ProvenanceSide.Input -> "Input annotations"
+                                | ProvenanceSide.Output -> "Output annotations"
                             )
                         ]
                     ]
@@ -1442,9 +1433,9 @@ type ProvenanceGrouping =
                                             Html.button [
                                                 prop.title (
                                                     if showPropertyHeaderConnectors then
-                                                        "Hide property header connectors"
+                                                        "Hide annotation header connectors"
                                                     else
-                                                        "Show property header connectors"
+                                                        "Show annotation header connectors"
                                                 )
                                                 prop.type'.button
                                                 prop.className [
@@ -1457,9 +1448,9 @@ type ProvenanceGrouping =
                                                 prop.custom ("aria-pressed", showPropertyHeaderConnectors)
                                                 prop.ariaLabel (
                                                     if showPropertyHeaderConnectors then
-                                                        "Hide property header connectors"
+                                                        "Hide annotation header connectors"
                                                     else
-                                                        "Show property header connectors"
+                                                        "Show annotation header connectors"
                                                 )
                                                 if debug then
                                                     prop.testId "provenance-property-connectors-toggle"
@@ -1476,7 +1467,7 @@ type ProvenanceGrouping =
                                                                 "swt:fluent--eye-hide-20-regular"
                                                         ]
                                                     ]
-                                                    Html.span "Property connectors"
+                                                    Html.span "Annotation connectors"
                                                 ]
                                             ]
                                             Html.button [

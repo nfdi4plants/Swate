@@ -727,7 +727,7 @@ type GroupCard =
                                                     if memberValues.IsEmpty then
                                                         Html.p [
                                                             prop.className "swt:text-xs swt:text-base-content/60"
-                                                            prop.text "No property values"
+                                                            prop.text "No annotation values"
                                                         ]
                                                     else
                                                         Html.div [

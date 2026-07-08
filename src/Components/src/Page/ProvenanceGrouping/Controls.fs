@@ -199,11 +199,11 @@ type Controls =
                                 step
                                     1
                                     "Group"
-                                    "Click a property in a side rail to merge entities sharing its values into one card."
+                                    "Click an annotation in a side rail to merge entities sharing its values into one card."
                                 step
                                     2
                                     "Annotate"
-                                    "Expand a property's values and drag a value chip onto a card to set it for every member at once."
+                                    "Expand an annotation's values and drag a value chip onto a card to set it for every member at once."
                                 step
                                     3
                                     "Connect"
@@ -226,7 +226,7 @@ type Controls =
                                     (OriginSymbols.upstreamIcon "swt:size-4")
                                     "Value inherited from an upstream table"
                                 legendRow (lineSample false) "Input–output connection"
-                                legendRow (lineSample true) "Where a property or value occurs"
+                                legendRow (lineSample true) "Where an annotation or value occurs"
                             ]
                         ]
                     ]
@@ -1087,13 +1087,13 @@ type Controls =
                 if headers.IsEmpty then
                     Html.p [
                         prop.className "swt:text-sm swt:text-base-content/60 swt:text-center swt:py-8"
-                        prop.text "Drag properties here, then click one to group by it"
+                        prop.text "Drag annotations here, then click one to group by it"
                     ]
 
                     Html.div [
                         prop.className "swt:w-fit"
                         prop.children [
-                            Controls.AddValuePopover(None, onAddValue, label = "Add property", ?debug = debug)
+                            Controls.AddValuePopover(None, onAddValue, label = "Add annotation", ?debug = debug)
                         ]
                     ]
                 else
@@ -1103,7 +1103,7 @@ type Controls =
                             if side = ProvenanceSide.Output then
                                 "swt:self-end"
                         ]
-                        prop.title "Click a property to group this side's entities by its values"
+                        prop.title "Click an annotation to group this side's entities by its values"
                         prop.text "Group by"
                     ]
 
@@ -1161,7 +1161,7 @@ type Controls =
                                 "swt:self-end"
                         ]
                         prop.children [
-                            Controls.AddValuePopover(None, onAddValue, label = "Add property", ?debug = debug)
+                            Controls.AddValuePopover(None, onAddValue, label = "Add annotation", ?debug = debug)
                         ]
                     ]
             ]
@@ -1201,7 +1201,7 @@ type Controls =
         let category =
             nextHeader
             |> Option.map (fun next -> next.Category.Name)
-            |> Option.defaultValue "Property"
+            |> Option.defaultValue "Annotation"
 
         let nextValue = ValueDrafts.tryValue kind value term
         let canCreate = nextHeader.IsSome && nextValue.IsSome
@@ -1218,7 +1218,7 @@ type Controls =
                         Html.span [
                             prop.text (
                                 label
-                                |> Option.defaultValue (if header.IsSome then "Add value" else "Add property")
+                                |> Option.defaultValue (if header.IsSome then "Add value" else "Add annotation")
                             )
                         ]
                     ]
@@ -1237,7 +1237,7 @@ type Controls =
                         if header.IsNone then
                             Html.label [
                                 prop.className "swt:label"
-                                prop.text "Property category"
+                                prop.text "Annotation category"
                             ]
 
                             TermSearch.TermSearch(
@@ -1288,7 +1288,7 @@ type Controls =
                             prop.type'.submit
                             prop.disabled (not canCreate)
                             prop.className "swt:btn swt:btn-primary swt:btn-sm"
-                            prop.text (if header.IsSome then "Add value" else "Add property")
+                            prop.text (if header.IsSome then "Add value" else "Add annotation")
                         ]
                     ]
                 ],
@@ -1717,7 +1717,7 @@ type Controls =
                 ]
                 Html.input [
                     prop.className "swt:input swt:input-bordered swt:input-sm swt:w-full swt:pl-8"
-                    prop.placeholder "Search properties & values..."
+                    prop.placeholder "Search annotations & values..."
                     prop.value searchDraft
                     prop.onChange setSearchDraft
                 ]
@@ -1818,7 +1818,7 @@ type Controls =
                         ]
                     ],
                     React.Fragment [
-                        propertySortOption PropertySort.ValueCountDesc "Property Value Count"
+                        propertySortOption PropertySort.ValueCountDesc "Annotation Value Count"
                         propertySortOption PropertySort.NameAsc "Name"
                         propertySortOption PropertySort.ConnectionCountDesc "Connection Count"
                     ],
@@ -1853,7 +1853,7 @@ type Controls =
                 )
                 Html.select [
                     prop.className "swt:select swt:select-bordered swt:select-sm swt:w-20 swt:shrink-0"
-                    prop.ariaLabel "Filter by property value count"
+                    prop.ariaLabel "Filter by annotation value count"
                     prop.value (
                         match filters.ValueCountFilter with
                         | PropertyValueCountFilter.Any -> "Any"
@@ -1881,15 +1881,15 @@ type Controls =
                     prop.children [
                         originButton
                             PropertyOriginFilter.AnyUpstream
-                            "Show upstream properties"
+                            "Show upstream annotations"
                             (OriginSymbols.upstreamIcon "swt:size-4")
                         originButton
                             PropertyOriginFilter.CurrentOnly
-                            "Show current properties"
+                            "Show current annotations"
                             (OriginSymbols.currentIcon "swt:size-4")
                         originButton
                             PropertyOriginFilter.AnyOrigin
-                            "Show current and upstream properties"
+                            "Show current and upstream annotations"
                             (OriginSymbols.bothIcons "swt:size-4")
                     ]
                 ]
@@ -1917,11 +1917,11 @@ type Controls =
                     match currentColor with
                     | Some c when c <> "" -> prop.style [ style.backgroundColor c ]
                     | _ -> ()
-                    prop.ariaLabel $"Set color for property {header.Category.Name}"
+                    prop.ariaLabel $"Set color for annotation {header.Category.Name}"
                 ],
             content =
                 ColorPicker.content
-                    $"Choose color for property {header.Category.Name}"
+                    $"Choose color for annotation {header.Category.Name}"
                     draftColor
                     setDraftColor
                     onSetColor,

@@ -99,7 +99,7 @@ module SessionErrors =
     let private editText error =
         match error with
         | EditError.PropertyNotFound _ ->
-            "This property value no longer exists. It may have been changed by a newer edit."
+            "This annotation value no longer exists. It may have been changed by a newer edit."
         | EditError.SetNotFound setId -> $"The entity '{setId}' no longer exists in this layer."
         | EditError.ConnectionNotFound _ -> "This connection no longer exists."
         | EditError.TableNotLoaded tableName -> $"The table '{tableName}' is not loaded."
@@ -125,10 +125,10 @@ module AssignmentErrors =
         match error with
         | ValueAssignmentError.EmptyTarget -> "Drop a value onto a group with at least one entity."
         | ValueAssignmentError.MixedPropertyValueCounts header ->
-            $"Cannot assign {header.Category.Name}: every target must either have no value or exactly one value for this property."
+            $"Cannot assign {header.Category.Name}: every target must either have no value or exactly one value for this annotation."
         | ValueAssignmentError.MultiplePropertyValues(header, setIds) ->
             let targets = setIds |> String.concat ", "
-            $"Cannot overwrite {header.Category.Name}: {targets} already has multiple values for this property."
+            $"Cannot overwrite {header.Category.Name}: {targets} already has multiple values for this annotation."
 
 /// Session-changing actions that publish patches back to the host component.
 module EditorActions =

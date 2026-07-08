@@ -199,7 +199,7 @@ module EditorSurface =
                 prop.children [
                     Html.span [
                         prop.className "swt:min-w-0 swt:truncate"
-                        prop.text (label |> Option.defaultValue "Property")
+                        prop.text (label |> Option.defaultValue "Annotation")
                     ]
                 ]
             ]

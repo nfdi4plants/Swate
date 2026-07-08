@@ -33,7 +33,7 @@ module ProvenanceTutorialSteps =
     // On medium/narrow layouts the input rail folds behind a toggle button;
     // the fallback keeps the spotlight meaningful there.
     let private inputRail =
-        "[data-tutorial='provenance-rail-Input'], button[aria-label='Show input properties']"
+        "[data-tutorial='provenance-rail-Input'], button[aria-label='Show input annotations']"
 
     let private explain id title description selector = {
         Id = id
@@ -76,18 +76,18 @@ module ProvenanceTutorialSteps =
             "[data-tutorial='provenance-layer-pagination']"
         explain
             "shelf"
-            "Property shelf"
-            "All properties known for this layer, grouped into index-card tabs per source table. The active card lists its properties and has its own small search; properties wait here until you pull them onto a side rail."
+            "Annotation shelf"
+            "All annotations known for this layer, grouped into index-card tabs per source table. The active card lists its annotations and has its own small search; annotations wait here until you pull them onto a side rail."
             "[data-tutorial='provenance-property-shelf']"
         explain
             "rails"
-            "Property rails"
-            "The left rail holds input-side properties, the right rail output-side ones. Rails start empty; properties you drop here become available for grouping and annotation. On narrow screens the rails fold behind 'Properties' toggles."
+            "Annotation rails"
+            "The left rail holds input-side annotations, the right rail output-side ones. Rails start empty; annotations you drop here become available for grouping and value assignment. On narrow screens the rails fold behind 'Annotations' toggles."
             inputRail
         {
             Id = "shelf-to-rail"
-            Title = "Pull a property onto a rail"
-            Description = "Dragging a property out of its shelf folder onto a rail activates it for that side."
+            Title = "Pull an annotation onto a rail"
+            Description = "Dragging an annotation out of its shelf folder onto a rail activates it for that side."
             // Highlights the drag source (the Species shelf item, once its
             // folder is open) and the dropzone (rail or, on folded layouts,
             // its toggle) together; task steps keep the whole surface
@@ -105,10 +105,10 @@ module ProvenanceTutorialSteps =
         }
         task
             "group"
-            "Group by a property"
-            "Clicking a rail property merges all entities that share a value into one card - four inputs become two species cards."
+            "Group by an annotation"
+            "Clicking a rail annotation merges all entities that share a value into one card - four inputs become two species cards."
             speciesGroupButton
-            "Click the Species property in the left rail to group the inputs by species."
+            "Click the Species annotation in the left rail to group the inputs by species."
             speciesGroupButton
             "species-on-rail"
         task
@@ -121,12 +121,12 @@ module ProvenanceTutorialSteps =
             "species-grouped"
         task
             "values"
-            "Property values"
-            "A rail property expands into its distinct values. Drag a value chip onto a card to assign it to every member at once - or add brand-new values first."
+            "Annotation values"
+            "A rail annotation expands into its distinct values. Drag a value chip onto a card to assign it to every member at once - or add brand-new values first."
             // The chevron only enters the layout while its row is hovered, so
             // the rail stays the fallback highlight until then.
             $"button[aria-label='Expand Species values'], {inputRail}"
-            "Hover the Species property in the left rail, then click the chevron next to it to expand its values."
+            "Hover the Species annotation in the left rail, then click the chevron next to it to expand its values."
             "button[aria-label='Expand Species values']"
             "species-values"
         {
@@ -148,7 +148,7 @@ module ProvenanceTutorialSteps =
         explain
             "filters"
             "Search, sort and filter"
-            "The toolbar narrows big models down: search properties and groups, sort by name or connection count, and filter by value coverage or origin."
+            "The toolbar narrows big models down: search annotations and groups, sort by name or connection count, and filter by value coverage or origin."
             "[data-tutorial='provenance-filter-toolbar']"
         explain
             "undo"

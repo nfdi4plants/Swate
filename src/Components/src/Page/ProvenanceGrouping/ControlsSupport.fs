@@ -141,4 +141,4 @@ module TermSearchMapping =
 /// Creates editor-owned generic provenance kinds for user-created values.
 module KindNames =
 
-    let editorProperty = ProvenanceKind.create "editor:property" "Property"
+    let editorProperty = ProvenanceKind.create "editor:property" "Annotation"

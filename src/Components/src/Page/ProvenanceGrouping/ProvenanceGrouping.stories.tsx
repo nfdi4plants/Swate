@@ -345,10 +345,10 @@ export const PropertiesStartInOriginFoldersAndSideDropZonesAreEmpty: Story = {
       expect(within(canvas.getByTestId('foldered-draggable-item-row')).getByRole('button', { name: /^Drag Species$/ }))
         .toBeVisible());
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Minimize property folders' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Minimize annotation folders' }));
     await waitFor(() => expect(canvas.queryByTestId('foldered-draggable-list')).not.toBeInTheDocument());
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Expand property folders' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Expand annotation folders' }));
     await waitFor(() => expect(canvas.getByTestId('foldered-draggable-list')).toBeInTheDocument());
     await waitFor(() =>
       expect(within(canvas.getByTestId('foldered-draggable-item-row')).getByRole('button', { name: /^Drag Species$/ }))
@@ -502,18 +502,18 @@ export const ToolbarUsesSinglePropertySortAndOriginButtons: Story = {
     const canvas = within(canvasElement);
     const toolbar = within(canvas.getByTestId('provenance-filter-toolbar'));
 
-    expect(toolbar.getByPlaceholderText('Search properties & values...')).toBeInTheDocument();
+    expect(toolbar.getByPlaceholderText('Search annotations & values...')).toBeInTheDocument();
 
     await userEvent.click(toolbar.getByRole('button', { name: /^Sort By$/i }));
-    expect(toolbar.getByRole('button', { name: /^Property Value Count$/i })).toBeInTheDocument();
+    expect(toolbar.getByRole('button', { name: /^Annotation Value Count$/i })).toBeInTheDocument();
     expect(toolbar.getByRole('button', { name: /^Name$/i })).toBeInTheDocument();
     expect(toolbar.getAllByRole('button', { name: /^Connection Count$/i })).toHaveLength(1);
 
-    expect(toolbar.getByRole('button', { name: /^Show upstream properties$/i }).querySelector('[class*="fluent--arrow-up-20"]'))
+    expect(toolbar.getByRole('button', { name: /^Show upstream annotations$/i }).querySelector('[class*="fluent--arrow-up-20"]'))
       .toBeInTheDocument();
-    expect(toolbar.getByRole('button', { name: /^Show current properties$/i }).querySelector('[class*="fluent--circle-20-filled"]'))
+    expect(toolbar.getByRole('button', { name: /^Show current annotations$/i }).querySelector('[class*="fluent--circle-20-filled"]'))
       .toBeInTheDocument();
-    const both = toolbar.getByRole('button', { name: /^Show current and upstream properties$/i });
+    const both = toolbar.getByRole('button', { name: /^Show current and upstream annotations$/i });
     expect(both.querySelector('[class*="fluent--arrow-up-20"]')).toBeInTheDocument();
     expect(both.querySelector('[class*="fluent--circle-20-filled"]')).toBeInTheDocument();
   },
@@ -527,8 +527,8 @@ export const TopControlsShareOneRowWhenSpaceAllows: Story = {
     const toolbar = canvas.getByTestId('provenance-filter-toolbar');
     const search = canvas.getByTestId('provenance-search');
     const viewActions = canvas.getByTestId('provenance-view-actions');
-    const valueFilter = canvas.getByRole('combobox', { name: 'Filter by property value count' });
-    const originFilter = canvas.getByRole('button', { name: /^Show upstream properties$/i });
+    const valueFilter = canvas.getByRole('combobox', { name: 'Filter by annotation value count' });
+    const originFilter = canvas.getByRole('button', { name: /^Show upstream annotations$/i });
 
     const rowTop = (element: HTMLElement) => Math.round(element.getBoundingClientRect().top);
     const rowCenter = (element: HTMLElement) => {
@@ -554,7 +554,7 @@ export const SearchInputUpdatesImmediatelyButFiltersAfterDebounce: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const toolbar = within(canvas.getByTestId('provenance-filter-toolbar'));
-    const search = toolbar.getByPlaceholderText('Search properties & values...') as HTMLInputElement;
+    const search = toolbar.getByPlaceholderText('Search annotations & values...') as HTMLInputElement;
 
     await ensurePropertyInRail(canvas, 'Output', 'Species');
     await ensurePropertyInRail(canvas, 'Output', 'Analysis');
@@ -642,7 +642,7 @@ export const AddedRailPropertiesAreCurrentAndPinnedToTheirSide: Story = {
     expect(within(inputRail.getByTestId('provenance-property-Input-Treatment')).getByTitle('Current')).toBeInTheDocument();
     expect(outputRail.queryByTestId('provenance-property-Output-Treatment')).not.toBeInTheDocument();
 
-    await userEvent.click(within(canvas.getByTestId('provenance-filter-toolbar')).getByRole('button', { name: /^Show current properties$/i }));
+    await userEvent.click(within(canvas.getByTestId('provenance-filter-toolbar')).getByRole('button', { name: /^Show current annotations$/i }));
     await waitFor(() => expect(inputRail.getByTestId('provenance-property-Input-Treatment')).toBeInTheDocument());
     expect(outputRail.queryByTestId('provenance-property-Output-Treatment')).not.toBeInTheDocument();
 
@@ -682,7 +682,7 @@ export const PropertyRailExpandsValuesAndAddControls: Story = {
     const outputRail = within(canvas.getByTestId('provenance-property-rail-Output'));
 
     expect(outputRail.queryByText('Arabidopsis')).not.toBeInTheDocument();
-    expect(outputRail.getByText('Add property')).toBeInTheDocument();
+    expect(outputRail.getByText('Add annotation')).toBeInTheDocument();
 
     const panel = await expandProperty(canvas, 'Output', 'Species');
     const arabidopsis = panel.getByText('Arabidopsis').closest('button, div')!;
@@ -1284,7 +1284,7 @@ export const ConnectionDetailsShowEntityPairsWithoutPropertyCreation: Story = {
     expect(within(details).getByTestId('provenance-connection-pairs')).toHaveTextContent('→');
     expect(details).toHaveTextContent(/connection/i);
     expect(within(details).queryByText(/Add value/i)).not.toBeInTheDocument();
-    expect(within(details).queryByText(/Add property/i)).not.toBeInTheDocument();
+    expect(within(details).queryByText(/Add annotation/i)).not.toBeInTheDocument();
     expect(within(details).getByRole('button', { name: /remove connection/i })).toBeInTheDocument();
   },
 };
@@ -2108,8 +2108,8 @@ async function addRailProperty(
   valueText: string,
 ) {
   const rail = within(canvas.getByTestId(`provenance-property-rail-${side}`));
-  const addPropertyTrigger = within(rail.getByTestId('popover_trigger_provenance-add-value-Property'))
-    .getByText('Add property')
+  const addPropertyTrigger = within(rail.getByTestId('popover_trigger_provenance-add-value-Annotation'))
+    .getByText('Add annotation')
     .closest('button')!;
   fireEvent.click(addPropertyTrigger);
   const category = await waitFor(() => screen.getAllByTestId('term-search-input')[0]).catch(async () => {
@@ -2120,7 +2120,7 @@ async function addRailProperty(
   await userEvent.keyboard('{Escape}');
   await userEvent.type(screen.getByRole('textbox', { name: new RegExp(`${propertyName} value`, 'i') }), valueText);
   const submit = screen
-    .getAllByRole('button', { name: /^Add property$/i })
+    .getAllByRole('button', { name: /^Add annotation$/i })
     .find((button) => button.getAttribute('type') === 'submit')!;
   await userEvent.click(submit);
   await userEvent.keyboard('{Escape}');
@@ -2751,7 +2751,7 @@ export const TutorialTaskStepCompletesInsideSandbox: Story = {
     await waitFor(() => expect(modal.getByTestId('tutorial-next')).toHaveTextContent('Next'), { timeout: 5000 });
     expect(within(modal.getByTestId('tutorial-task')).getByText('Completed:')).toBeInTheDocument();
     await userEvent.click(modal.getByTestId('tutorial-next'));
-    expect(within(modal.getByTestId('tutorial-step-card')).getByText('Group by a property')).toBeInTheDocument();
+    expect(within(modal.getByTestId('tutorial-step-card')).getByText('Group by an annotation')).toBeInTheDocument();
 
     // The click task completes in place as well; the user moves on themselves.
     await userEvent.click(modal.getByTestId('provenance-property-Input-Species'));
