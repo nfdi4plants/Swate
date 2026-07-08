@@ -34,6 +34,7 @@ type TabId =
         let (TabId id) = this
         id
 
+[<Erase>]
 type PaneId =
     | PaneId of Guid
 
