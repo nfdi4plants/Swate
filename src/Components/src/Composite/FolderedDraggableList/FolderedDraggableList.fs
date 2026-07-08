@@ -417,11 +417,14 @@ type FolderedDraggableList =
                 prop.testId "foldered-draggable-list"
             prop.children [
                 // The tab strip overlaps the card's top border so the active
-                // tab reads as part of the card, index-card style.
+                // tab reads as part of the card, index-card style. It must be
+                // positioned so it paints above the card sibling - otherwise
+                // the card's top border draws over the active tab's bottom
+                // edge and visually cuts it off from the card.
                 Html.div [
                     prop.custom ("role", "tablist")
                     prop.className
-                        "swt:-mb-px swt:flex swt:min-w-0 swt:flex-row swt:flex-nowrap swt:items-end swt:gap-1 swt:overflow-x-auto swt:px-2"
+                        "swt:relative swt:z-10 swt:-mb-px swt:flex swt:min-w-0 swt:flex-row swt:flex-nowrap swt:items-end swt:gap-1 swt:overflow-x-auto swt:px-2"
                     prop.style [ style.scrollbarGutter.stable ]
                     if debug then
                         prop.testId "foldered-draggable-folder-row"
