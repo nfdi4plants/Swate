@@ -97,12 +97,12 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "folder path actions reveal the folder location only",
+            "folder path actions open the folder directly and reveal the folder location",
             fun () ->
                 let item = createFolderItem "AssayA" (Some "assays/AssayA")
                 let menuItems = pathActionContextMenuItems (createConfig ()) item
 
-                Vitest.expect(labels menuItems).toEqual ([| "Open Folder Location" |])
+                Vitest.expect(labels menuItems).toEqual ([| "Open Folder"; "Open folder location" |])
         )
 
         Vitest.test (
@@ -129,13 +129,47 @@ Vitest.describe (
                 let menuItems = pathActionContextMenuItems config item
 
                 let openFolderLocationItem =
-                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Open Folder Location")
+                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Open Folder")
 
                 openFolderLocationItem.OnClick()
                 do! Promise.sleep 0
 
                 Vitest.expect(revealedPath).toEqual (None)
                 Vitest.expect(openedPath).toEqual (Some "assays/AssayA")
+            }
+        )
+
+        Vitest.test (
+            "folder open folder location reveals the selected folder in its parent location",
+            fun () -> promise {
+                let item = createFolderItem "AssayA" (Some "assays/AssayA")
+                let mutable revealedPath: string option = None
+                let mutable openedPath: string option = None
+
+                let config = {
+                    createConfig () with
+                        openPathInFileExplorer =
+                            fun path -> promise {
+                                revealedPath <- Some path
+                                return Ok()
+                            }
+                        openPathWithDefaultApplication =
+                            fun path -> promise {
+                                openedPath <- Some path
+                                return Ok()
+                            }
+                }
+
+                let menuItems = pathActionContextMenuItems config item
+
+                let openFolderLocationItem =
+                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Open folder location")
+
+                openFolderLocationItem.OnClick()
+                do! Promise.sleep 0
+
+                Vitest.expect(revealedPath).toEqual (Some "assays/AssayA")
+                Vitest.expect(openedPath).toEqual (None)
             }
         )
 
@@ -201,6 +235,7 @@ Vitest.describe (
                     .toEqual (
                         [|
                             "Open"
+                            "Open Folder"
                             "Open Folder Location"
                             "<divider>"
                             "Copy Path"
