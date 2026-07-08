@@ -1687,7 +1687,7 @@ type ProvenanceGrouping =
                                 let seed = ProvenanceTutorialSteps.checkpointSeed checkpoint
 
                                 ProvenanceGrouping.Editor(
-                                    sampleModel (),
+                                    seed.Model(),
                                     ignore,
                                     debug = debug,
                                     initUiState = seed.InitUiState,

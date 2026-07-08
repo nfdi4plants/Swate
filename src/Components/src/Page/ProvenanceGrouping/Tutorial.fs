@@ -10,9 +10,10 @@ open Swate.Components.Shared.ProvenanceGrouping.Session
 open Swate.Components.Page.ProvenanceGrouping.Types
 
 /// How the tutorial sandbox should be seeded when a checkpoint is (re)entered:
-/// the UI state the sample editor starts from and which rail begins unfolded
-/// on layouts that collapse the rails.
+/// the sample model to load, the UI state the editor starts from, and which
+/// rail begins unfolded on layouts that collapse the rails.
 type ProvenanceTutorialCheckpoint = {
+    Model: unit -> ProvenanceModel
     InitUiState: ProvenanceSession -> UiState
     OpenRail: ProvenanceSide option
 }
@@ -49,8 +50,11 @@ module ProvenanceTutorialSteps =
     let private inputGroupCards =
         "[data-provenance-group-node^='provenance-node::Input::']"
 
-    let private outputGroupCards =
-        "[data-provenance-group-node^='provenance-node::Output::']"
+    // The extra input the assign checkpoint's model carries: the only card
+    // without a species value (inputs own one, outputs inherit one through
+    // their connections), so it is the one drop that assigns cleanly - and
+    // the one whose card visibly regroups on success.
+    let private inputECard = "[data-provenance-group-node$='input-e']"
 
     // The undo button enables on the first published edit, which makes it the
     // success signal for free-form tasks whose outcome is an edit rather than
@@ -164,12 +168,14 @@ module ProvenanceTutorialSteps =
             Id = "assign"
             Title = "Assign values to cards"
             Description =
-                "Value chips are live: drop one onto a card and the value is assigned to every member of that card. Where a member already has a different value, a prompt asks before overwriting."
-            // Rings the expanded value chips (the drag sources) and the output
-            // cards - the drop targets without a species value, so the invited
-            // drop applies cleanly instead of hitting the overwrite prompt.
-            TargetSelector = Some $"[data-tutorial-property-values='Input:Species'], {outputGroupCards}"
-            Task = Some "Drag one of the species value chips onto an output card - outputs have no species value yet."
+                "Value chips are live: drop one onto a card and the value is assigned to every member of that card. Input E has no species value yet, which is why it sits ungrouped - give it one and it joins the matching species card. Outputs need no drops at all: they inherit their values from connected inputs."
+            // Rings the expanded value chips (the drag sources) and Input E -
+            // the one card where the drop assigns cleanly and visibly (it
+            // regroups); every other card's own or inherited species value
+            // would route the drop into the overwrite handling instead.
+            TargetSelector = Some $"[data-tutorial-property-values='Input:Species'], {inputECard}"
+            Task =
+                Some "Drag a species value chip onto the ungrouped Input E card and watch it join that species group."
             Advance = TutorialAdvance.OnCondition editPublished
             Checkpoint = Some "species-values-expanded"
         }
@@ -237,26 +243,48 @@ module ProvenanceTutorialSteps =
         withSpeciesGrouped session state
         |> State.PropertyExpansion.toggle layer.Id ProvenanceSide.Input speciesHeader
 
+    /// The stock sample plus one input without any annotation values. Every
+    /// stock entity already has a species (inputs their own, outputs an
+    /// inherited one), so the assign step adds the one card a species drop
+    /// lands on cleanly - and it regroups on success, so the assignment is
+    /// impossible to miss.
+    let private assignSampleModel () =
+        let baseModel = Fixtures.sampleModel ()
+
+        let inputHeader =
+            Fixtures.ioHeader Fixtures.FixtureKinds.sampleEndpoint "Input [Sample Name]"
+
+        let inputE = Fixtures.inputSet "input-e" baseModel.Source inputHeader "Input E" []
+
+        {
+            baseModel with
+                InputSets = baseModel.InputSets |> Map.add inputE.Id inputE
+        }
+
     /// Resolves the overlay's (inherited) checkpoint key to the sandbox seed to
     /// rebuild; "fresh-editor" (the shelf-to-rail step) and unknown keys both
     /// fall back to a fresh sample editor with no rail unfolded.
     let checkpointSeed (checkpoint: string option) : ProvenanceTutorialCheckpoint =
         match checkpoint with
         | Some "species-on-rail" -> {
+            Model = Fixtures.sampleModel
             InitUiState = fun session -> State.init session |> withSpeciesOnInputRail session
             OpenRail = Some ProvenanceSide.Input
           }
         | Some "species-grouped"
         | Some "species-values"
         | Some "species-connect" -> {
+            Model = Fixtures.sampleModel
             InitUiState = fun session -> State.init session |> withSpeciesGrouped session
             OpenRail = Some ProvenanceSide.Input
           }
         | Some "species-values-expanded" -> {
+            Model = assignSampleModel
             InitUiState = fun session -> State.init session |> withSpeciesValuesExpanded session
             OpenRail = Some ProvenanceSide.Input
           }
         | _ -> {
+            Model = Fixtures.sampleModel
             InitUiState = State.init
             OpenRail = None
           }
