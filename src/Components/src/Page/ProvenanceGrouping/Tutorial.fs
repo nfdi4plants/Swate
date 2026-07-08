@@ -18,17 +18,17 @@ type ProvenanceTutorialCheckpoint = {
 }
 
 /// The guided tour through the provenance editor's features. Selectors rely on
-/// always-rendered hooks: `data-tutorial` anchors, the stable `title`/`aria-label`
-/// texts of toolbar buttons, and the `data-provenance-*` measurement attributes.
+/// always-rendered hooks only - `data-tutorial*` anchors and the
+/// `data-provenance-*` measurement attributes - never on `title`/`aria-label`
+/// copy, so rewording a button cannot silently break the tour.
 /// The tour runs against the sample fixture session, so the task steps can name
 /// concrete properties (Species) and predict which cards exist.
 module ProvenanceTutorialSteps =
 
-    // The Species rail button carries this title until Species is grouped, and
-    // it only exists at all once Species has been dragged out of the shelf -
-    // which makes it both the drag step's success condition and the group
-    // step's click target.
-    let private speciesGroupButton = "button[title='Group input entities by Species']"
+    // The Species rail button only exists once Species has been dragged out of
+    // the shelf - which makes it both the drag step's success condition and
+    // the group step's click target.
+    let private speciesGroupButton = "button[data-tutorial-group-by='Input:Species']"
 
     // On medium/narrow layouts the input rail folds behind a toggle button;
     // the fallback keeps the spotlight meaningful there.
@@ -92,7 +92,7 @@ module ProvenanceTutorialSteps =
             // folder is open) and the dropzone (rail or, on folded layouts,
             // its toggle) together; task steps keep the whole surface
             // interactive so the drag can travel between them.
-            TargetSelector = Some $"button[aria-label='Drag Species'], {inputRail}"
+            TargetSelector = Some $"button[data-foldered-item-label='Species'], {inputRail}"
             Task =
                 Some
                     "Drag Species from the assay-table card in the shelf onto the dashed left rail (unfold the rail first if it is collapsed)."
@@ -115,19 +115,19 @@ module ProvenanceTutorialSteps =
             "members"
             "Inspect group members"
             "Grouped cards summarize their members. Expanding a card lists every member with its own values and connection handles."
-            "button[title='Show members']"
+            "button[data-tutorial='provenance-show-members']"
             "Click 'Show members' on one of the grouped cards."
-            "button[title='Show members']"
+            "button[data-tutorial='provenance-show-members']"
             "species-grouped"
         task
             "values"
             "Annotation values"
             "A rail annotation expands into its distinct values. Drag a value chip onto a card to assign it to every member at once - or add brand-new values first."
-            // The chevron only enters the layout while its row is hovered, so
-            // the rail stays the fallback highlight until then.
-            $"button[aria-label='Expand Species values'], {inputRail}"
-            "Hover the Species annotation in the left rail, then click the chevron next to it to expand its values."
-            "button[aria-label='Expand Species values']"
+            // The rail stays the fallback highlight for folded layouts, where
+            // the chevron does not exist until the rail is unfolded.
+            $"button[data-tutorial-expand-values='Input:Species'], {inputRail}"
+            "Click the chevron next to the Species annotation in the left rail to expand its values."
+            "button[data-tutorial-expand-values='Input:Species']"
             "species-values"
         {
             Id = "connect"
@@ -154,12 +154,12 @@ module ProvenanceTutorialSteps =
             "undo"
             "Undo"
             "Every published edit can be taken back with one step - even after switching layers. The button is enabled whenever there is something to undo."
-            "button[title='Undo last change']"
+            "[data-tutorial='provenance-undo']"
         explain
             "add-layer"
             "Continue the chain"
             "Select cards with their checkboxes and press 'Add layer': the selection seeds the inputs of the new layer, growing the provenance chain table by table."
-            "button[title='Add layer']"
+            "[data-tutorial='provenance-add-layer']"
     |]
 
     // -- Checkpoint seeds ---------------------------------------------------
@@ -181,7 +181,8 @@ module ProvenanceTutorialSteps =
         |> State.GroupingAssignments.toggleSide layer.InputSideId ProvenanceSide.Input speciesHeader
 
     /// Resolves the overlay's (inherited) checkpoint key to the sandbox seed to
-    /// rebuild; unknown keys fall back to a fresh sample editor.
+    /// rebuild; "fresh-editor" (the shelf-to-rail step) and unknown keys both
+    /// fall back to a fresh sample editor with no rail unfolded.
     let checkpointSeed (checkpoint: string option) : ProvenanceTutorialCheckpoint =
         match checkpoint with
         | Some "species-on-rail" -> {

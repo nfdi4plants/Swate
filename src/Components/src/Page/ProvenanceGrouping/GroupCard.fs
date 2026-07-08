@@ -586,6 +586,8 @@ type GroupCard =
                                     prop.type'.button
                                     prop.ariaLabel "Show members"
                                     prop.title "Show members"
+                                    // Always-on anchor for the interactive tutorial's spotlight.
+                                    prop.custom ("data-tutorial", "provenance-show-members")
                                     prop.onClick (fun _ -> onExpand ())
                                     prop.className "swt:group swt:relative swt:w-fit swt:max-w-full swt:cursor-pointer"
                                     prop.children [

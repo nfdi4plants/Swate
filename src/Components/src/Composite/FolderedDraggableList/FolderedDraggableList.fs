@@ -191,6 +191,9 @@ type FolderedDraggableList =
                 | _ -> ()
             ]
             prop.ariaLabel $"Drag {item.Label}"
+            // Stable hook for hosts (e.g. tutorials) that must find an item
+            // without coupling to the aria-label copy.
+            prop.custom ("data-foldered-item-label", item.Label)
             if draggable.isDragging then
                 prop.tabIndex -1
             match item.Tooltip with

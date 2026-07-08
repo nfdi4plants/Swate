@@ -404,6 +404,8 @@ type Controls =
                             prop.title "Add layer"
                             prop.type'.button
                             prop.className "swt:btn swt:btn-sm swt:btn-primary"
+                            // Always-on anchor for the interactive tutorial's spotlight.
+                            prop.custom ("data-tutorial", "provenance-add-layer")
                             if defaultArg debug false then
                                 prop.testId "provenance-add-layer"
                             prop.children [
@@ -706,6 +708,9 @@ type Controls =
 
                 ]
                 prop.custom ("data-provenance-resize-node", "true")
+                // Always-on anchor so the tutorial can target this button
+                // without coupling to its title copy.
+                prop.custom ("data-tutorial-group-by", $"{side}:{header.Category.Name}")
                 if defaultArg debug false then
                     prop.testId $"provenance-property-{side}-{header.Category.Name}"
                 prop.onClick (fun _ -> onToggleSide header)
@@ -791,6 +796,9 @@ type Controls =
                 ]
                 if defaultArg debug false then
                     prop.testId $"provenance-property-expand-{side}-{header.Category.Name}"
+                // Always-on anchor so the tutorial can target the chevron
+                // without coupling to its aria-label copy.
+                prop.custom ("data-tutorial-expand-values", $"{side}:{header.Category.Name}")
                 prop.ariaLabel (
                     if expanded then
                         $"Collapse {header.Category.Name} values"

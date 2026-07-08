@@ -1418,6 +1418,10 @@ type ProvenanceGrouping =
                                                 prop.className "swt:btn swt:btn-xs swt:btn-ghost"
                                                 prop.title "Undo last change"
                                                 prop.ariaLabel "Undo last change"
+                                                // Always-on anchor for the interactive tutorial;
+                                                // its enabled state doubles as the connect step's
+                                                // "an edit was published" completion signal.
+                                                prop.custom ("data-tutorial", "provenance-undo")
                                                 prop.disabled undoSession.IsNone
                                                 if debug then
                                                     prop.testId "provenance-undo"
