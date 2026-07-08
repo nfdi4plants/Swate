@@ -28,15 +28,49 @@ module ConnectorSvg =
             "d" ==> $"path('{path}')"
             "transition"
             ==> (if animate then
-                     "d 160ms ease, stroke-width 120ms ease, stroke-opacity 120ms ease"
+                     "d 160ms ease, stroke-width 120ms ease, stroke-opacity 120ms ease, fill-opacity 120ms ease"
                  else
-                     "stroke-width 120ms ease, stroke-opacity 120ms ease")
+                     "stroke-width 120ms ease, stroke-opacity 120ms ease, fill-opacity 120ms ease")
         ]
 
-    let strokeElements (measured: MeasuredConnector) strokeWidth strokeOpacity animate isNew debug =
-        let strokeColor = measured.Color |> Option.defaultValue "currentColor"
-        let debugAttributes = debugAttributes debug measured
+    /// Fill opacity for sankey ribbons, derived from the caller's stroke
+    /// opacity scale (1.0 emphasized / 0.85 default / 0.3 receded). Ribbons
+    /// stay translucent on purpose: overlapping bands compound and read as a
+    /// denser flow instead of hiding each other.
+    let private ribbonFillOpacity strokeOpacity =
+        if strokeOpacity >= 1.0 then 0.7
+        elif strokeOpacity <= 0.3 then 0.12
+        else 0.4
 
+    /// Sankey band: one translucent fill, no halo - crossings are meant to
+    /// stack visually. A draw-in dash animation cannot work on a fill, so new
+    /// ribbons fade in.
+    let private ribbonElements
+        (measured: MeasuredConnector)
+        (ribbonPath: string)
+        fillColor
+        fillOpacity
+        animate
+        isNew
+        debug
+        =
+        [
+            Svg.path [
+                svg.d ribbonPath
+                svg.custom ("style", pathStyle ribbonPath animate)
+                svg.fill fillColor
+                svg.custom ("fillOpacity", fillOpacity)
+                svg.stroke "none"
+                svg.className (measured.ClassName + (if isNew then " swt:connector-fade-in" else ""))
+                match measured.Color with
+                | Some color -> svg.custom ("data-provenance-color", color)
+                | None -> ()
+                if measured.InteractiveConnection.IsNone then
+                    yield! debugAttributes debug measured
+            ]
+        ]
+
+    let private lineElements (measured: MeasuredConnector) strokeColor strokeWidth strokeOpacity animate isNew debug =
         // Freshly created solid connectors draw themselves in along the curve; new
         // dashed rail connectors fade in instead, because a dash offset animation
         // would fight their dash pattern.
@@ -90,9 +124,17 @@ module ConnectorSvg =
                 | Some color -> svg.custom ("data-provenance-color", color)
                 | None -> ()
                 if measured.InteractiveConnection.IsNone then
-                    yield! debugAttributes
+                    yield! debugAttributes debug measured
             ]
         ]
+
+    let strokeElements (measured: MeasuredConnector) strokeWidth strokeOpacity animate isNew debug =
+        let paintColor = measured.Color |> Option.defaultValue "currentColor"
+
+        match measured.RibbonPath with
+        | Some ribbonPath ->
+            ribbonElements measured ribbonPath paintColor (ribbonFillOpacity strokeOpacity) animate isNew debug
+        | None -> lineElements measured paintColor strokeWidth strokeOpacity animate isNew debug
 
 module ConnectorContextMenu =
 

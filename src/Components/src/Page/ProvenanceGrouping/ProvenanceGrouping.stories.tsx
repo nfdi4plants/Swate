@@ -526,13 +526,21 @@ export const TopControlsShareOneRowWhenSpaceAllows: Story = {
     const originFilter = canvas.getByRole('button', { name: /^Show upstream properties$/i });
 
     const rowTop = (element: HTMLElement) => Math.round(element.getBoundingClientRect().top);
+    const rowCenter = (element: HTMLElement) => {
+      const rect = element.getBoundingClientRect();
+      return rect.top + rect.height / 2;
+    };
 
     expect(topControls).toContainElement(toolbar);
     expect(topControls).toContainElement(viewActions);
     expect(rowTop(toolbar)).toBe(rowTop(search));
     expect(rowTop(search)).toBe(rowTop(valueFilter));
     expect(rowTop(search)).toBe(rowTop(originFilter));
-    expect(rowTop(toolbar)).toBe(rowTop(viewActions));
+    // The view actions are deliberately smaller (btn-xs) than the toolbar
+    // controls, so on the shared items-center row their tops differ while the
+    // vertical centers align; a wrap onto a second row would offset the
+    // center by a full row height.
+    expect(Math.abs(rowCenter(toolbar) - rowCenter(viewActions))).toBeLessThanOrEqual(1);
   },
 };
 

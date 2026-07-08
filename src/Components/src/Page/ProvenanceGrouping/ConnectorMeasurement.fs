@@ -24,6 +24,14 @@ module private ConnectorDom =
         )
         |> Map.ofArray
 
+    let groupNodes (container: HTMLElement) =
+        querySelectorAll container "[data-provenance-group-node]"
+        |> Array.choose (fun node ->
+            let id = node.getAttribute "data-provenance-group-node"
+            if isNull id then None else Some(id, node)
+        )
+        |> Map.ofArray
+
 /// Measures connection handles and builds SVG connector paths between them.
 module ConnectorMeasure =
 
@@ -31,6 +39,7 @@ module ConnectorMeasure =
         Container = container
         Origin = container.getBoundingClientRect ()
         Nodes = ConnectorDom.connectionNodes container
+        GroupNodes = ConnectorDom.groupNodes container
     }
 
     let private tryHandle (context: ConnectorMeasureContext) handle =
@@ -45,33 +54,42 @@ module ConnectorMeasure =
             Y = rect.top - origin.top + float context.Container.scrollTop + rect.height / 2.
         }
 
-    let pathBetweenPoints start finish =
-        let deltaX = finish.X - start.X
+    let private controlXs (startX: float) (finishX: float) =
+        let deltaX = finishX - startX
         let direction = if deltaX >= 0. then 1. else -1.
         // The bend scales with the horizontal span, so connectors between nearby
         // endpoints stay short stubs instead of looping past their targets.
         let bend = max 8. (abs deltaX / 2.)
-        let firstControlX = start.X + direction * bend
-        let secondControlX = finish.X - direction * bend
+        startX + direction * bend, finishX - direction * bend
+
+    let pathBetweenPoints start finish =
+        let firstControlX, secondControlX = controlXs start.X finish.X
         Some $"M {start.X} {start.Y} C {firstControlX} {start.Y}, {secondControlX} {finish.Y}, {finish.X} {finish.Y}"
+
+    /// Closed sankey-band outline between two card-edge segments: the top and
+    /// bottom curves share the horizontal bend of the centerline bezier, so a
+    /// band tapers smoothly between edge shares of different heights.
+    let private sankeyRibbonPath
+        (sourceX: float)
+        (sourceTop: float, sourceBottom: float)
+        (targetX: float)
+        (targetTop: float, targetBottom: float)
+        =
+        let firstControlX, secondControlX = controlXs sourceX targetX
+
+        $"M {sourceX} {sourceTop} "
+        + $"C {firstControlX} {sourceTop}, {secondControlX} {targetTop}, {targetX} {targetTop} "
+        + $"L {targetX} {targetBottom} "
+        + $"C {secondControlX} {targetBottom}, {firstControlX} {sourceBottom}, {sourceX} {sourceBottom} Z"
 
     /// Cubic-bezier midpoint of the same control points pathBetweenPoints uses.
     let midpointBetweenPoints start finish =
-        let deltaX = finish.X - start.X
-        let direction = if deltaX >= 0. then 1. else -1.
-        let bend = max 8. (abs deltaX / 2.)
-        let firstControlX = start.X + direction * bend
-        let secondControlX = finish.X - direction * bend
+        let firstControlX, secondControlX = controlXs start.X finish.X
 
         {
             X = (start.X + 3. * firstControlX + 3. * secondControlX + finish.X) / 8.
             Y = (start.Y + finish.Y) / 2.
         }
-
-    let pathBetweenHandles context source target =
-        match tryHandle context source, tryHandle context target with
-        | Some sourceNode, Some targetNode -> pathBetweenPoints (center context sourceNode) (center context targetNode)
-        | _ -> None
 
     let pathWithMidpointBetweenHandles context source target =
         match tryHandle context source, tryHandle context target with
@@ -82,6 +100,162 @@ module ConnectorMeasure =
             pathBetweenPoints start finish
             |> Option.map (fun path -> path, midpointBetweenPoints start finish)
         | _ -> None
+
+    /// One sankey ribbon to lay out: the connection key, its group-card
+    /// endpoints, and the weight deciding its share of each card edge.
+    type SankeyRibbonRequest = {
+        Key: string
+        Source: ConnectionHandleRef
+        Target: ConnectionHandleRef
+        Weight: float
+    }
+
+    /// Centerline, ribbon outline and midpoint of one laid-out sankey ribbon.
+    type SankeyRibbon = {
+        Path: string
+        RibbonPath: string
+        Midpoint: ConnectionPoint
+    }
+
+    type private SankeyRect = {
+        Left: float
+        Right: float
+        Top: float
+        Bottom: float
+    }
+
+    type private ResolvedRibbon = {
+        Request: SankeyRibbonRequest
+        SourceNodeId: string
+        TargetNodeId: string
+        SourceRect: SankeyRect
+        TargetRect: SankeyRect
+    }
+
+    let private cardRect (context: ConnectorMeasureContext) (node: HTMLElement) : SankeyRect =
+        let origin = context.Origin
+        let rect = node.getBoundingClientRect ()
+        let left = rect.left - origin.left + float context.Container.scrollLeft
+        let top = rect.top - origin.top + float context.Container.scrollTop
+
+        {
+            Left = left
+            Right = left + rect.width
+            Top = top
+            Bottom = top + rect.height
+        }
+
+    /// Lays out group-connection ribbons like a sankey chart: the ribbons
+    /// attached to a card split its facing edge proportionally to their
+    /// weights, so together they cover the card's whole side and follow its
+    /// size; each ribbon then tapers between its two edge shares. Ribbons on
+    /// one edge stack in the vertical order of their opposite cards, keeping
+    /// bundles from crossing right where they leave a card.
+    let measureSankeyRibbons
+        (context: ConnectorMeasureContext)
+        (requests: SankeyRibbonRequest list)
+        : Map<string, SankeyRibbon> =
+        // This runs once per animation frame while scrolling or dragging, and
+        // several ribbons usually share a card - read each card rect once.
+        let rectCache = System.Collections.Generic.Dictionary<string, SankeyRect>()
+
+        let cachedCardRect nodeId node =
+            match rectCache.TryGetValue nodeId with
+            | true, rect -> rect
+            | _ ->
+                let rect = cardRect context node
+                rectCache.[nodeId] <- rect
+                rect
+
+        let resolved =
+            requests
+            |> List.choose (fun request ->
+                let sourceNodeId = DragDrop.groupNodeId request.Source.Side request.Source.Id
+                let targetNodeId = DragDrop.groupNodeId request.Target.Side request.Target.Id
+
+                match context.GroupNodes.TryFind sourceNodeId, context.GroupNodes.TryFind targetNodeId with
+                | Some sourceNode, Some targetNode ->
+                    Some {
+                        Request = request
+                        SourceNodeId = sourceNodeId
+                        TargetNodeId = targetNodeId
+                        SourceRect = cachedCardRect sourceNodeId sourceNode
+                        TargetRect = cachedCardRect targetNodeId targetNode
+                    }
+                | _ -> None
+            )
+
+        let segments nodeIdOf (rectOf: ResolvedRibbon -> SankeyRect) (oppositeRectOf: ResolvedRibbon -> SankeyRect) =
+            resolved
+            |> List.groupBy nodeIdOf
+            |> List.collect (fun (_, ribbons) ->
+                let rect = rectOf ribbons.Head
+                let totalWeight = ribbons |> List.sumBy (fun ribbon -> max 1. ribbon.Request.Weight)
+                let height = rect.Bottom - rect.Top
+
+                ribbons
+                |> List.sortBy (fun ribbon ->
+                    let opposite = oppositeRectOf ribbon
+                    (opposite.Top + opposite.Bottom) / 2.
+                )
+                |> List.fold
+                    (fun (offset, allocated) ribbon ->
+                        let share = height * (max 1. ribbon.Request.Weight) / totalWeight
+
+                        offset + share,
+                        (ribbon.Request.Key, (rect.Top + offset, rect.Top + offset + share))
+                        :: allocated
+                    )
+                    (0., [])
+                |> snd
+            )
+            |> Map.ofList
+
+        let sourceSegments =
+            segments
+                (fun ribbon -> ribbon.SourceNodeId)
+                (fun ribbon -> ribbon.SourceRect)
+                (fun ribbon -> ribbon.TargetRect)
+
+        let targetSegments =
+            segments
+                (fun ribbon -> ribbon.TargetNodeId)
+                (fun ribbon -> ribbon.TargetRect)
+                (fun ribbon -> ribbon.SourceRect)
+
+        resolved
+        |> List.choose (fun ribbon ->
+            match sourceSegments.TryFind ribbon.Request.Key, targetSegments.TryFind ribbon.Request.Key with
+            | Some sourceSegment, Some targetSegment ->
+                // Ribbons run between whichever card edges face each other.
+                let sourceX, targetX =
+                    if ribbon.TargetRect.Left >= ribbon.SourceRect.Right then
+                        ribbon.SourceRect.Right, ribbon.TargetRect.Left
+                    else
+                        ribbon.SourceRect.Left, ribbon.TargetRect.Right
+
+                let start = {
+                    X = sourceX
+                    Y = (fst sourceSegment + snd sourceSegment) / 2.
+                }
+
+                let finish = {
+                    X = targetX
+                    Y = (fst targetSegment + snd targetSegment) / 2.
+                }
+
+                pathBetweenPoints start finish
+                |> Option.map (fun path ->
+                    ribbon.Request.Key,
+                    {
+                        Path = path
+                        RibbonPath = sankeyRibbonPath sourceX sourceSegment targetX targetSegment
+                        Midpoint = midpointBetweenPoints start finish
+                    }
+                )
+            | _ -> None
+        )
+        |> Map.ofList
 
     /// Rail connectors shorter than this are skipped entirely so dense layouts do not
     /// fill the rail gutters with overlapping stubs.

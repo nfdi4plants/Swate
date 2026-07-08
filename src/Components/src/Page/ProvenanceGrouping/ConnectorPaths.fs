@@ -41,6 +41,7 @@ module ConnectorPaths =
             Source = source
             Target = target
             SkipWhenClose = skipWhenClose
+            SankeyWeight = None
         }
 
     let private groupById (inputGroups: DisplayGroup list) (outputGroups: DisplayGroup list) side groupId =
@@ -121,19 +122,24 @@ module ConnectorPaths =
             )
         )
         |> List.map (fun connection ->
-            spec
-                $"connection:{connection.Id}"
-                "provenance-connection"
-                "swt:text-primary"
-                2.25
-                None
-                (Some connection)
-                (Some $"Select connection {connection.Id}")
-                None
-                false
-                (ConnectorHandles.group ProvenanceSide.Input connection.SourceGroupId)
-                (ConnectorHandles.group ProvenanceSide.Output connection.TargetGroupId)
-        )
+            // Group connectors paint as sankey ribbons instead of graph edges;
+            // weighting by the underlying connection count makes heavy bundles
+            // claim a wider share of their cards' edges.
+            {
+                spec
+                    $"connection:{connection.Id}"
+                    "provenance-connection"
+                    "swt:text-primary"
+                    2.25
+                    None
+                    (Some connection)
+                    (Some $"Select connection {connection.Id}")
+                    None
+                    false
+                    (ConnectorHandles.group ProvenanceSide.Input connection.SourceGroupId)
+                    (ConnectorHandles.group ProvenanceSide.Output connection.TargetGroupId) with
+                    SankeyWeight = Some(float connection.ConnectionIds.Length)
+            })
 
     let memberConnectionSpecs
         (model: ProvenanceModel)
@@ -437,6 +443,9 @@ module ConnectorPaths =
                 AriaLabel = None
                 Color = None
                 Midpoint = None
+                // Aiming keeps the classic line; only committed group
+                // connections render as ribbons.
+                RibbonPath = None
             })
         )
 
@@ -473,18 +482,41 @@ module ConnectorPaths =
     /// Resolves specs against the measured DOM; specs whose handles are missing or
     /// (for rail connectors) too close together are dropped.
     let measure context (specs: ConnectorSpec list) : MeasuredConnector list =
+        // Sankey ribbons cannot be measured one by one: every group connection
+        // claims a weighted share of its cards' facing edges, so they are laid
+        // out together first and looked up per spec below.
+        let sankeyRibbons =
+            specs
+            |> List.choose (fun spec ->
+                spec.SankeyWeight
+                |> Option.map (fun weight ->
+                    ({
+                        Key = spec.Key
+                        Source = spec.Source
+                        Target = spec.Target
+                        Weight = weight
+                    }
+                    : ConnectorMeasure.SankeyRibbonRequest)
+                )
+            )
+            |> ConnectorMeasure.measureSankeyRibbons context
+
         specs
         |> List.choose (fun spec ->
             let measured =
-                if spec.SkipWhenClose then
+                match spec.SankeyWeight with
+                | Some _ ->
+                    sankeyRibbons.TryFind spec.Key
+                    |> Option.map (fun ribbon -> ribbon.Path, Some ribbon.RibbonPath, Some ribbon.Midpoint)
+                | None when spec.SkipWhenClose ->
                     ConnectorMeasure.pathBetweenDistantHandles context spec.Source spec.Target
-                    |> Option.map (fun path -> path, None)
-                else
+                    |> Option.map (fun path -> path, None, None)
+                | None ->
                     ConnectorMeasure.pathWithMidpointBetweenHandles context spec.Source spec.Target
-                    |> Option.map (fun (path, midpoint) -> path, Some midpoint)
+                    |> Option.map (fun (path, midpoint) -> path, None, Some midpoint)
 
             measured
-            |> Option.map (fun (path, midpoint) -> {
+            |> Option.map (fun (path, ribbonPath, midpoint) -> {
                 Key = spec.Key
                 Path = path
                 TestId = spec.TestId
@@ -495,5 +527,6 @@ module ConnectorPaths =
                 AriaLabel = spec.AriaLabel
                 Color = spec.Color
                 Midpoint = midpoint
+                RibbonPath = ribbonPath
             })
         )
