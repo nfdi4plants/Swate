@@ -10,16 +10,16 @@ module private Helper =
 
         match layout with
         | Layout.Single id -> Layout.Single id
-        | Layout.Split(_, _, Level1.Single remove, Level1.Single keep)
-        | Layout.Split(_, _, Level1.Single keep, Level1.Single remove) when remove = toBeRemoved -> Layout.Single keep
-        | Layout.Split(_, _, Level1.Single remove, Level1.Split(p1, p2, p3, p4))
-        | Layout.Split(_, _, Level1.Split(p1, p2, p3, p4), Level1.Single remove) when remove = toBeRemoved ->
-            Layout.Split(p1, p2, Level1.Single p3, Level1.Single p4)
-        | Layout.Split(dir, r, Level1.Single keep, Level1.Split(_, _, keep1, remove))
-        | Layout.Split(dir, r, Level1.Single keep, Level1.Split(_, _, remove, keep1))
-        | Layout.Split(dir, r, Level1.Split(_, _, remove, keep1), Level1.Single keep)
-        | Layout.Split(dir, r, Level1.Split(_, _, keep1, remove), Level1.Single keep) when remove = toBeRemoved ->
-            Layout.Split(dir, r, Level1.Single keep, Level1.Single keep1)
+        | Layout.Split(_, _, _, Level1.Single remove, Level1.Single keep)
+        | Layout.Split(_, _, _, Level1.Single keep, Level1.Single remove) when remove = toBeRemoved -> Layout.Single keep
+        | Layout.Split(_, _, _, Level1.Single remove, Level1.Split(_, splitDir, splitRat, splitL1, splitL2))
+        | Layout.Split(_, _, _, Level1.Split(_, splitDir, splitRat, splitL1, splitL2), Level1.Single remove) when remove = toBeRemoved ->
+            Layout.Split(SplitId(Guid.NewGuid()), splitDir, splitRat, Level1.Single splitL1, Level1.Single splitL2)
+        | Layout.Split(_, dir, r, Level1.Single keep, Level1.Split(_, _, _, keep1, remove))
+        | Layout.Split(_, dir, r, Level1.Single keep, Level1.Split(_, _, _, remove, keep1))
+        | Layout.Split(_, dir, r, Level1.Split(_, _, _, remove, keep1), Level1.Single keep)
+        | Layout.Split(_, dir, r, Level1.Split(_, _, _, keep1, remove), Level1.Single keep) when remove = toBeRemoved ->
+            Layout.Split(SplitId(Guid.NewGuid()), dir, r, Level1.Single keep, Level1.Single keep1)
         | anyElse -> anyElse
 
     let splitPane (edge: EdgeDirection) (paneId: PaneId) (layout: Layout) : PaneId * Layout =
@@ -53,19 +53,19 @@ module private Helper =
             match lvl1 with
             | Level1.Single id when id = paneId ->
                 let split = splitSingleByEdge id
-                Level1.Split(split.direction, 0.5, split.first, split.second)
+                Level1.Split(SplitId(Guid.NewGuid()), split.direction, 0.5, split.first, split.second)
             | _ -> lvl1
 
         let nextLayout =
             match layout with
             | Layout.Single id when id = paneId ->
                 let split = splitSingleByEdge id
-                Layout.Split(split.direction, 0.5, Level1.Single split.first, Level1.Single split.second)
-            | Layout.Split(dir, _, _, _) when dir = targetDirection -> layout
-            | Layout.Split(dir, r, l1, l2) ->
+                Layout.Split(SplitId(Guid.NewGuid()), split.direction, 0.5, Level1.Single split.first, Level1.Single split.second)
+            | Layout.Split(_, dir, _, _, _) when dir = targetDirection -> layout
+            | Layout.Split(splitId, dir, r, l1, l2) ->
                 let updatedL1 = splitLevel1 l1
                 let updatedL2 = splitLevel1 l2
-                Layout.Split(dir, r, updatedL1, updatedL2)
+                Layout.Split(splitId, dir, r, updatedL1, updatedL2)
             | _ -> layout
 
         (newPaneId, nextLayout)
@@ -94,8 +94,8 @@ module private Helper =
                     isLeftAllowed = true
                     isRightAllowed = true
             |}
-        | Layout.Split(dir, _, Level1.Single targetId, _)
-        | Layout.Split(dir, _, _, Level1.Single targetId) when targetId = paneIdParam ->
+        | Layout.Split(_, dir, _, Level1.Single targetId, _)
+        | Layout.Split(_, dir, _, _, Level1.Single targetId) when targetId = paneIdParam ->
             match dir with
             | SplitDirection.Horizontal ->
                 {|
@@ -223,11 +223,11 @@ type WorkspaceModel<'T> with
             let collectPaneIds (layout: Layout) =
                 match layout with
                 | Layout.Single id -> [ id ]
-                | Layout.Split(_, _, l1, l2) ->
+                | Layout.Split(_, _, _, l1, l2) ->
                     let collectInnerIds (lvl1: Level1) =
                         match lvl1 with
                         | Level1.Single id -> [ id ]
-                        | Level1.Split(_, _, l1, l2) -> [ l1; l2 ]
+                        | Level1.Split(_, _, _, l1, l2) -> [ l1; l2 ]
 
                     collectInnerIds l1 @ collectInnerIds l2
 
@@ -473,26 +473,24 @@ type WorkspaceModel<'T> with
                 PanesMap = model.PanesMap |> Map.add paneId clearedPane
         }
 
-    static member SetSplitRatio (panePath: string) (ratio: float) (model: WorkspaceModel<'T>) =
+    static member SetSplitRatio (splitId: SplitId) (ratio: float) (model: WorkspaceModel<'T>) =
         let clamped = max 0.15 (min 0.85 ratio)
 
-        let rec updateLayout (path: string) (layout: Layout) : Layout =
+        let rec updateLayout (layout: Layout) : Layout =
             match layout with
-            | Layout.Split(dir, _, l1, l2) when path = panePath ->
-                Layout.Split(dir, clamped, l1, l2)
-            | Layout.Split(dir, r, l1, l2) ->
-                let firstPath = path + "/first"
-                let secondPath = path + "/second"
-                Layout.Split(dir, r, updateLevel1 firstPath l1, updateLevel1 secondPath l2)
+            | Layout.Split(id, dir, _, l1, l2) when id.Value = splitId.Value ->
+                Layout.Split(id, dir, clamped, l1, l2)
+            | Layout.Split(id, dir, r, l1, l2) ->
+                Layout.Split(id, dir, r, updateLevel1 l1, updateLevel1 l2)
             | _ -> layout
 
-        and updateLevel1 (path: string) (lvl: Level1) : Level1 =
+        and updateLevel1 (lvl: Level1) : Level1 =
             match lvl with
-            | Level1.Split(dir, _, l1, l2) when path = panePath ->
-                Level1.Split(dir, clamped, l1, l2)
+            | Level1.Split(id, dir, _, l1, l2) when id.Value = splitId.Value ->
+                Level1.Split(id, dir, clamped, l1, l2)
             | _ -> lvl
 
-        { model with Layout = updateLayout "" model.Layout }
+        { model with Layout = updateLayout model.Layout }
 
 let update (model: WorkspaceModel<'T>) (msg: Msg<'T>) : WorkspaceModel<'T> =
     let next =
@@ -544,9 +542,9 @@ let update (model: WorkspaceModel<'T>) (msg: Msg<'T>) : WorkspaceModel<'T> =
             |> WorkspaceModel.ClosePane paneId
             |> WorkspaceModel.CleanupEmptyPanes
 
-        | SetSplitRatio(panePath, ratio) ->
+        | SetSplitRatio(splitId, ratio) ->
             model
-            |> WorkspaceModel.SetSplitRatio panePath ratio
+            |> WorkspaceModel.SetSplitRatio splitId ratio
 
     next
     |> WorkspaceModel.EnsurePaneMapSync

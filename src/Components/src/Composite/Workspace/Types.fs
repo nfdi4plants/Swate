@@ -63,17 +63,25 @@ type Pane<'T> = {
     FocusedTab: TabId option
 }
 
+[<Erase>]
+type SplitId =
+    | SplitId of Guid
+
+    member this.Value =
+        let (SplitId id) = this
+        id
+
 type Leaf = PaneId
 
 [<RequireQualifiedAccess>]
 type Level1 =
     | Single of Leaf
-    | Split of SplitDirection * ratio: float * Leaf * Leaf
+    | Split of SplitId * SplitDirection * ratio: float * Leaf * Leaf
 
 [<RequireQualifiedAccess>]
 type Layout =
     | Single of Leaf
-    | Split of SplitDirection * ratio: float * Level1 * Level1
+    | Split of SplitId * SplitDirection * ratio: float * Level1 * Level1
 
 type WorkspaceModel<'T> = {
     Layout: Layout
@@ -91,7 +99,7 @@ type Msg<'T> =
     | ReorderTabs of pane: PaneId * fromIndex: int * toIndex: int
     | SplitPaneByTabMove of TabId * PaneId * EdgeDirection
     | ClosePane of PaneId
-    | SetSplitRatio of panePath: string * ratio: float
+    | SetSplitRatio of splitId: SplitId * ratio: float
 
 type ContextMenuSpawnData = {
     tabId: string

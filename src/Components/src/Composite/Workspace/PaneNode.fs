@@ -45,20 +45,20 @@ type PaneNode =
         )
 
     [<ReactComponent>]
-    static member private RenderLevel1 (lvl: Level1) (panePath: string) : ReactElement =
+    static member private RenderLevel1 (lvl: Level1) : ReactElement =
         match lvl with
         | Level1.Single leaf -> PaneNode.LeafNode(leaf)
-        | Level1.Split(dir, r, first, second) ->
-            PaneNode.SplitNode(dir, r, first, second, panePath)
+        | Level1.Split(splitId, dir, r, first, second) ->
+            PaneNode.SplitNode(splitId, dir, r, first, second)
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member SplitNode
         (
+            splitId: SplitId,
             direction: SplitDirection,
             ratio: float,
             first: Leaf,
             second: Leaf,
-            panePath: string,
             ?key: string
         )
         =
@@ -81,7 +81,7 @@ type PaneNode =
             (fun () ->
                 match clampedRatio with
                 | Some clamped ->
-                    dispatchCtx.dispatch (box (SetSplitRatio(panePath, clamped)))
+                    dispatchCtx.dispatch (box (SetSplitRatio(splitId, clamped)))
                 | None -> ()
             ),
             [| box clampedRatio |]
@@ -123,12 +123,14 @@ type PaneNode =
         let size1 = ratio * 100.0
         let size2 = 100.0 - size1
 
+        let splitIdKey = splitId.Value.ToString("N")
+
         Html.div [
-            prop.key (defaultArg key panePath)
+            prop.key (defaultArg key splitIdKey)
             prop.ref splitContainerRef
             prop.className $"swt:flex {flexDir} swt:min-w-0 swt:min-h-0 swt:flex-1 swt:overflow-hidden"
             if paneStateCtx.debug then
-                prop.testId $"workspace-split-{panePath}"
+                prop.testId $"workspace-split-{splitIdKey}"
             prop.children [
                 Html.div [
                     prop.className "swt:flex swt:flex-col swt:min-w-0 swt:min-h-0 swt:overflow-hidden"
@@ -164,12 +166,12 @@ type PaneNode =
         ]
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
-    static member PaneNode(layout: Layout, panePath: string, ?key: string) =
+    static member PaneNode(layout: Layout, ?key: string) =
 
         match layout with
         | Layout.Single leaf -> PaneNode.LeafNode(leaf, ?key = key)
 
-        | Layout.Split(dir, ratio, l1, l2) ->
+        | Layout.Split(splitId, dir, ratio, l1, l2) ->
             let dispatchCtx = useWorkspaceDispatchCtx ()
             let paneStateCtx = useWorkspacePaneStateCtx ()
 
@@ -189,7 +191,7 @@ type PaneNode =
                 (fun () ->
                     match clampedRatio with
                     | Some clamped ->
-                        dispatchCtx.dispatch (box (SetSplitRatio("", clamped)))
+                        dispatchCtx.dispatch (box (SetSplitRatio(splitId, clamped)))
                     | None -> ()
                 ),
                 [| box clampedRatio |]
@@ -231,12 +233,14 @@ type PaneNode =
             let size1 = ratio * 100.0
             let size2 = 100.0 - size1
 
+            let splitIdKey = splitId.Value.ToString("N")
+
             Html.div [
-                prop.key (defaultArg key panePath)
+                prop.key (defaultArg key splitIdKey)
                 prop.ref splitContainerRef
                 prop.className $"swt:flex {flexDir} swt:min-w-0 swt:min-h-0 swt:flex-1 swt:overflow-hidden"
                 if paneStateCtx.debug then
-                    prop.testId $"workspace-split-{panePath}"
+                    prop.testId $"workspace-split-{splitIdKey}"
                 prop.children [
                     Html.div [
                         prop.className "swt:flex swt:flex-col swt:min-w-0 swt:min-h-0 swt:overflow-hidden"
@@ -245,7 +249,7 @@ type PaneNode =
                             | SplitDirection.Horizontal -> style.width (length.perc size1)
                             | SplitDirection.Vertical -> style.height (length.perc size1)
                         ]
-                        prop.children [ PaneNode.RenderLevel1 l1 "/first" ]
+                        prop.children [ PaneNode.RenderLevel1 l1 ]
                     ]
                     Html.div [
                         prop.onPointerDown (fun _ -> dragging.current <- true)
@@ -263,7 +267,7 @@ type PaneNode =
                             | SplitDirection.Horizontal -> style.width (length.perc size2)
                             | SplitDirection.Vertical -> style.height (length.perc size2)
                         ]
-                        prop.children [ PaneNode.RenderLevel1 l2 "/second" ]
+                        prop.children [ PaneNode.RenderLevel1 l2 ]
                     ]
                 ]
             ]

@@ -260,7 +260,7 @@ type Workspace =
         )
 
         React.Fragment [
-            PaneNode.PaneNode(layoutCtx.layout, "root")
+            PaneNode.PaneNode(layoutCtx.layout)
             TabContextMenu.TabContextMenu(workspaceRef)
             DndKit.DragOverlay(
                 dropAnimation = {| duration = 0; easing = "linear" |},
