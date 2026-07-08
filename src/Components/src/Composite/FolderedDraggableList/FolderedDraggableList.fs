@@ -345,6 +345,21 @@ type FolderedDraggableList =
         // a card's search into another card.
         let searchByFolder, setSearchByFolder = React.useState Map.empty<string, string>
 
+        // Folders can disappear when the host swaps the folder set; drop their
+        // drafts so the map does not accumulate entries for dead folders.
+        React.useEffect (
+            (fun () ->
+                let folderIds = folders |> List.map (fun folder -> folder.Id) |> Set.ofList
+
+                let pruned =
+                    searchByFolder |> Map.filter (fun folderId _ -> folderIds.Contains folderId)
+
+                if pruned.Count <> searchByFolder.Count then
+                    setSearchByFolder pruned
+            ),
+            [| box folders |]
+        )
+
         let activeDrag, setActiveDrag =
             React.useState (None: FolderedDraggableItemRender<'payload> option)
 
