@@ -69,9 +69,6 @@ module private TutorialSupport =
 
     let holePadding = 6.
 
-    /// Matches the card's `swt:w-80` class.
-    let cardWidth = 320.
-
     /// Minimum distance between the card and the host edges / the spotlight.
     let cardMargin = 12.
 
@@ -365,17 +362,19 @@ type TutorialOverlay =
               ]
 
         // The card is measured after every commit so placement can use its real
-        // height (its content changes with the step and completion state).
+        // size: the height changes with the step and completion state, and the
+        // width falls below its swt:w-80 default when its max-width clamps in.
         let cardRef = React.useElementRef ()
-        let cardHeight, setCardHeight = React.useState 220.
+        let cardSize, setCardSize = React.useState ((320., 220.))
+        let cardWidth, cardHeight = cardSize
 
         React.useLayoutEffect (fun () ->
             match cardRef.current with
             | Some card ->
-                let measured = card.getBoundingClientRect().height
+                let rect = card.getBoundingClientRect ()
 
-                if abs (measured - cardHeight) > 0.5 then
-                    setCardHeight measured
+                if abs (rect.width - cardWidth) > 0.5 || abs (rect.height - cardHeight) > 0.5 then
+                    setCardSize (rect.width, rect.height)
             | None -> ()
         )
 
@@ -406,7 +405,7 @@ type TutorialOverlay =
 
                 let left =
                     event.clientX - hostRect.left - offsetX
-                    |> min (hostRect.width - TutorialSupport.cardWidth)
+                    |> min (hostRect.width - cardWidth)
                     |> max 0.
 
                 let top =
@@ -443,7 +442,7 @@ type TutorialOverlay =
                         // highlight; if the layout leaves no clear spot, take
                         // the one covering the least of it.
                         let highlighted = if step.Task.IsSome then rects else [ first ]
-                        let cardW = TutorialSupport.cardWidth
+                        let cardW = cardWidth
                         let margin = TutorialSupport.cardMargin
                         let gap = TutorialSupport.holePadding + TutorialSupport.cardGap
 
