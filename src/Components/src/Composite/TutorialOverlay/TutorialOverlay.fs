@@ -196,9 +196,18 @@ type TutorialOverlay =
                     | TutorialAdvance.OnEvent(eventType, selector) ->
                         let handler =
                             fun (event: Event) ->
+                                // Only events inside the wrapped content count: the
+                                // document-level listener would otherwise complete the
+                                // step from selector matches in unrelated host UI.
+                                let insideContent =
+                                    match contentRef.current with
+                                    | Some container ->
+                                        not (isNull event.target) && container.contains (unbox event.target)
+                                    | None -> false
+
                                 if
                                     isPending ()
-                                    && not (isNull event.target)
+                                    && insideContent
                                     && not (isNull (TutorialSupport.closest event.target selector))
                                 then
                                     markCompleted step.Id
