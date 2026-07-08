@@ -170,7 +170,58 @@ type PaneNode =
         | Layout.Single leaf -> PaneNode.LeafNode(leaf, ?key = key)
 
         | Layout.Split(dir, ratio, l1, l2) ->
-            let nextPath = panePath + "/" + unbox<string> dir
+            let dispatchCtx = useWorkspaceDispatchCtx ()
+            let paneStateCtx = useWorkspacePaneStateCtx ()
+
+            let dragging = React.useRef false
+
+            let splitContainerRef = React.useElementRef ()
+
+            let pointerPosition, setPointerPosition = React.useState (None: float option)
+            let throttledPointerPosition = React.useThrottle (pointerPosition, 16)
+
+            let clampedRatio =
+                match throttledPointerPosition with
+                | Some pos -> Some(max 0.15 (min 0.85 pos))
+                | None -> None
+
+            React.useEffect (
+                (fun () ->
+                    match clampedRatio with
+                    | Some clamped ->
+                        dispatchCtx.dispatch (box (SetSplitRatio("", clamped)))
+                    | None -> ()
+                ),
+                [| box clampedRatio |]
+            )
+
+            React.useEffectOnce (fun () ->
+
+                let onMove (e: PointerEvent) =
+                    if dragging.current then
+                        match splitContainerRef.current with
+                        | None
+                        | Some null -> ()
+                        | Some splitContainer ->
+                            let rect = splitContainer.getBoundingClientRect ()
+
+                            let directionalPointerPosition =
+                                match dir with
+                                | SplitDirection.Horizontal -> (e.clientX - rect.left) / rect.width
+                                | SplitDirection.Vertical -> (e.clientY - rect.top) / rect.height
+
+                            setPointerPosition (Some directionalPointerPosition)
+
+                let stop (_: PointerEvent) = dragging.current <- false
+
+                Browser.Dom.document.addEventListener ("pointermove", unbox onMove)
+                Browser.Dom.document.addEventListener ("pointerup", unbox stop)
+
+                FsReact.createDisposable (fun () ->
+                    Browser.Dom.document.removeEventListener ("pointermove", unbox onMove)
+                    Browser.Dom.document.removeEventListener ("pointerup", unbox stop)
+                )
+            )
 
             let flexDir =
                 match dir with
@@ -182,7 +233,10 @@ type PaneNode =
 
             Html.div [
                 prop.key (defaultArg key panePath)
+                prop.ref splitContainerRef
                 prop.className $"swt:flex {flexDir} swt:min-w-0 swt:min-h-0 swt:flex-1 swt:overflow-hidden"
+                if paneStateCtx.debug then
+                    prop.testId $"workspace-split-{panePath}"
                 prop.children [
                     Html.div [
                         prop.className "swt:flex swt:flex-col swt:min-w-0 swt:min-h-0 swt:overflow-hidden"
@@ -191,9 +245,10 @@ type PaneNode =
                             | SplitDirection.Horizontal -> style.width (length.perc size1)
                             | SplitDirection.Vertical -> style.height (length.perc size1)
                         ]
-                        prop.children [ PaneNode.RenderLevel1 l1 (nextPath + "/first") ]
+                        prop.children [ PaneNode.RenderLevel1 l1 "/first" ]
                     ]
                     Html.div [
+                        prop.onPointerDown (fun _ -> dragging.current <- true)
                         prop.className [
                             "swt:shrink-0 swt:select-none swt:transition-colors swt:bg-base-content swt:hover:bg-primary swt:z-10"
                             match dir with
@@ -208,7 +263,7 @@ type PaneNode =
                             | SplitDirection.Horizontal -> style.width (length.perc size2)
                             | SplitDirection.Vertical -> style.height (length.perc size2)
                         ]
-                        prop.children [ PaneNode.RenderLevel1 l2 (nextPath + "/second") ]
+                        prop.children [ PaneNode.RenderLevel1 l2 "/second" ]
                     ]
                 ]
             ]
