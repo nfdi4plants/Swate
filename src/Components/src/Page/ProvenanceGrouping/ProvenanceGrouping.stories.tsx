@@ -2540,6 +2540,8 @@ export const LayerPaginationUsesNeighborWindowAndArrowSwitches: Story = {
       expect(layerPageIds(canvas)).toEqual(['layer-1', 'layer-2', 'layer-3']);
       expect(canvas.getByTestId('provenance-layer-layer-3')).toHaveClass('swt:btn-primary');
     });
+    // The jump trigger doubles as the layer position indicator.
+    expect(pagination.getByTestId('provenance-layer-jump')).toHaveTextContent('3 / 3');
     expect(canvas.getByTestId('provenance-layer-layer-2')).toHaveClass('swt:opacity-50');
     expect(canvas.queryByTestId('provenance-layer-next')).not.toBeInTheDocument();
     expect(pagination.getByTestId('provenance-layer-prev').querySelector('[class*="fluent--chevron-left"]'))
@@ -2562,6 +2564,7 @@ export const LayerPaginationUsesNeighborWindowAndArrowSwitches: Story = {
       expect(layerPageIds(canvas)).toEqual(['layer-1', 'layer-2', 'layer-3']);
       expect(canvas.getByTestId('provenance-layer-layer-1')).toHaveClass('swt:btn-primary');
     });
+    expect(pagination.getByTestId('provenance-layer-jump')).toHaveTextContent('1 / 3');
     expect(canvas.queryByTestId('provenance-layer-prev')).not.toBeInTheDocument();
     expect(pagination.getByTestId('provenance-layer-next').querySelector('[class*="fluent--chevron-right"]'))
       .toBeInTheDocument();

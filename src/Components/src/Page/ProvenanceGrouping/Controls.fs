@@ -287,8 +287,10 @@ type Controls =
                 else
                     "swt:btn-outline swt:opacity-50 swt:hover:opacity-100"
             ]
-            // Equal-width slots keep the bar from resizing as the window moves.
-            prop.style [ style.custom ("width", "clamp(4.5rem, 18vw, 7rem)") ]
+            // Equal-width slots keep the bar from resizing as the window moves;
+            // percent-based so embeds at any width scale with their container
+            // instead of the viewport.
+            prop.style [ style.custom ("width", "clamp(4.5rem, 18%, 7rem)") ]
             if defaultArg debug false then
                 prop.testId $"provenance-layer-{layerId}"
                 prop.custom ("data-provenance-layer-color", sourceColor |> Option.defaultValue "")
@@ -314,6 +316,13 @@ type Controls =
         =
         let isOpen, setIsOpen = React.useState false
 
+        // The trigger doubles as the "layer x of n" indicator, so the window
+        // of three page buttons never hides how long the chain actually is.
+        let activeIndex =
+            session.LayerOrder
+            |> List.tryFindIndex (fun layerId -> layerId = session.ActiveLayerId)
+            |> Option.defaultValue 0
+
         Popover.Popover(
             isOpen = isOpen,
             onOpenChange = setIsOpen,
@@ -329,10 +338,11 @@ type Controls =
                             prop.title "Jump to layer"
                             prop.ariaLabel "Jump to layer"
                             prop.type'.button
-                            prop.className "swt:btn swt:btn-sm swt:btn-outline swt:w-10 swt:px-0 swt:font-semibold"
+                            prop.className
+                                "swt:btn swt:btn-sm swt:btn-outline swt:min-w-10 swt:shrink-0 swt:whitespace-nowrap swt:px-2 swt:font-semibold"
                             if defaultArg debug false then
                                 prop.testId "provenance-layer-jump"
-                            prop.text "..."
+                            prop.text $"{activeIndex + 1} / {session.LayerOrder.Length}"
                         ]
                     )
                     Popover.Content(
@@ -486,8 +496,10 @@ type Controls =
         Html.div [
             prop.className
                 "swt:pointer-events-auto swt:flex swt:max-w-full swt:min-w-0 swt:items-center swt:justify-center swt:gap-2 swt:rounded-box swt:border swt:border-base-content/20 swt:bg-base-100 swt:px-3 swt:py-2 swt:shadow-md swt:ring-1 swt:ring-base-300"
-            // A fixed bar width so the control does not shift as layer names change.
-            prop.style [ style.custom ("width", "min(40rem, calc(100vw - 2rem))") ]
+            // A fixed bar width so the control does not shift as layer names
+            // change; capped by the container, not the viewport, so embedded
+            // editors size the bar to themselves.
+            prop.style [ style.custom ("width", "min(40rem, 100%)") ]
             prop.custom ("role", "navigation")
             prop.ariaLabel "Layer pagination"
             prop.custom ("data-tutorial", "provenance-layer-pagination")
