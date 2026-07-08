@@ -48,10 +48,11 @@ type ConnectorSpec = {
     Target: ConnectionHandleRef
     /// Rail connectors drop out entirely when their endpoints are too close.
     SkipWhenClose: bool
-    /// Weight for connectors drawn as sankey ribbons (group connections): the
-    /// ribbon claims this share of each card edge relative to the other
-    /// ribbons attached there, so together they cover the card's full side.
-    /// None keeps the stroked-line rendering.
+    /// Weight for connectors drawn as sankey ribbons (group and member
+    /// connections): the ribbon claims this share of each endpoint edge (card
+    /// side or member-row side) relative to the other ribbons attached there,
+    /// so together they cover the edge completely. None keeps the
+    /// stroked-line rendering.
     SankeyWeight: float option
 }
 
@@ -93,4 +94,8 @@ type ConnectorMeasureContext = {
     /// Group-card elements by their `data-provenance-group-node` id; sankey
     /// ribbons measure whole card edges instead of the small handle circles.
     GroupNodes: Map<string, HTMLElement>
+    /// Member-row elements of expanded cards by their
+    /// `data-provenance-member-node` id; member-level sankey ribbons measure
+    /// whole row edges the way group ribbons measure card edges.
+    MemberNodes: Map<string, HTMLElement>
 }

@@ -32,6 +32,14 @@ module private ConnectorDom =
         )
         |> Map.ofArray
 
+    let memberNodes (container: HTMLElement) =
+        querySelectorAll container "[data-provenance-member-node]"
+        |> Array.choose (fun node ->
+            let id = node.getAttribute "data-provenance-member-node"
+            if isNull id then None else Some(id, node)
+        )
+        |> Map.ofArray
+
 /// Measures connection handles and builds SVG connector paths between them.
 module ConnectorMeasure =
 
@@ -40,6 +48,7 @@ module ConnectorMeasure =
         Origin = container.getBoundingClientRect ()
         Nodes = ConnectorDom.connectionNodes container
         GroupNodes = ConnectorDom.groupNodes container
+        MemberNodes = ConnectorDom.memberNodes container
     }
 
     let private tryHandle (context: ConnectorMeasureContext) handle =
@@ -101,8 +110,9 @@ module ConnectorMeasure =
             |> Option.map (fun path -> path, midpointBetweenPoints start finish)
         | _ -> None
 
-    /// One sankey ribbon to lay out: the connection key, its group-card
-    /// endpoints, and the weight deciding its share of each card edge.
+    /// One sankey ribbon to lay out: the connection key, its endpoints (a
+    /// collapsed group card or an expanded card's member row each), and the
+    /// weight deciding its share of each endpoint edge.
     type SankeyRibbonRequest = {
         Key: string
         Source: ConnectionHandleRef
@@ -145,12 +155,31 @@ module ConnectorMeasure =
             Bottom = top + rect.height
         }
 
-    /// Lays out group-connection ribbons like a sankey chart: the ribbons
-    /// attached to a card split its facing edge proportionally to their
-    /// weights, so together they cover the card's whole side and follow its
-    /// size; each ribbon then tapers between its two edge shares. Ribbons on
-    /// one edge stack in the vertical order of their opposite cards, keeping
-    /// bundles from crossing right where they leave a card.
+    /// A ribbon endpoint is the whole card for collapsed groups and the single
+    /// member row for expanded ones, so member-level ribbons split row edges
+    /// exactly like group ribbons split card edges.
+    let private tryRibbonNode (context: ConnectorMeasureContext) (handle: ConnectionHandleRef) =
+        match handle.Kind with
+        | ConnectionHandleKind.GroupCard ->
+            let nodeId = DragDrop.groupNodeId handle.Side handle.Id
+
+            context.GroupNodes.TryFind nodeId |> Option.map (fun node -> nodeId, node)
+        | ConnectionHandleKind.GroupMember ->
+            handle.ParentGroupId
+            |> Option.bind (fun groupId ->
+                let nodeId = DragDrop.memberNodeId handle.Side groupId handle.Id
+
+                context.MemberNodes.TryFind nodeId |> Option.map (fun node -> nodeId, node)
+            )
+        | _ -> None
+
+    /// Lays out group- and member-connection ribbons like a sankey chart: the
+    /// ribbons attached to an endpoint (card or member row) split its facing
+    /// edge proportionally to their weights, so together they cover the whole
+    /// side and follow its size; each ribbon then tapers between its two edge
+    /// shares. Ribbons on one edge stack in the vertical order of their
+    /// opposite endpoints, keeping bundles from crossing right where they
+    /// leave a card.
     let measureSankeyRibbons
         (context: ConnectorMeasureContext)
         (requests: SankeyRibbonRequest list)
@@ -170,11 +199,8 @@ module ConnectorMeasure =
         let resolved =
             requests
             |> List.choose (fun request ->
-                let sourceNodeId = DragDrop.groupNodeId request.Source.Side request.Source.Id
-                let targetNodeId = DragDrop.groupNodeId request.Target.Side request.Target.Id
-
-                match context.GroupNodes.TryFind sourceNodeId, context.GroupNodes.TryFind targetNodeId with
-                | Some sourceNode, Some targetNode ->
+                match tryRibbonNode context request.Source, tryRibbonNode context request.Target with
+                | Some(sourceNodeId, sourceNode), Some(targetNodeId, targetNode) ->
                     Some {
                         Request = request
                         SourceNodeId = sourceNodeId

@@ -668,6 +668,12 @@ type GroupCard =
 
                                 Html.li [
                                     prop.className "swt:relative"
+                                    // Sankey ribbons for member-level connections span this
+                                    // row's facing edge, the way group ribbons span card edges.
+                                    prop.custom (
+                                        "data-provenance-member-node",
+                                        DragDrop.memberNodeId side group.Id member'.SetId
+                                    )
                                     prop.children [
                                         Controls.ConnectionAnchor(
                                             memberPropertyAnchor,

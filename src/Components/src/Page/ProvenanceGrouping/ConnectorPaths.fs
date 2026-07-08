@@ -198,18 +198,25 @@ module ConnectorPaths =
                                 ConnectionIds = [ connectionId ]
                         }
 
-                        spec
-                            $"member:{displayConnection.Id}:{connectionId}"
-                            "provenance-member-connection"
-                            "swt:text-primary/70 swt:pointer-events-none"
-                            2.0
-                            None
-                            (Some singleConnection)
-                            (Some $"Select connection {displayConnection.Id}")
-                            None
-                            false
-                            source
-                            target
+                        // Member connectors are ribbons too, so expanding a card
+                        // fans its group ribbon out into per-member ribbons instead
+                        // of falling back to plain lines. Each stands for exactly
+                        // one underlying connection, hence the unit weight.
+                        {
+                            spec
+                                $"member:{displayConnection.Id}:{connectionId}"
+                                "provenance-member-connection"
+                                "swt:text-primary/70 swt:pointer-events-none"
+                                2.0
+                                None
+                                (Some singleConnection)
+                                (Some $"Select connection {displayConnection.Id}")
+                                None
+                                false
+                                source
+                                target with
+                                SankeyWeight = Some 1.
+                        }
                     )
                 )
         )

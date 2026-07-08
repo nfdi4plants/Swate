@@ -189,7 +189,7 @@ type ConnectorOverlay =
 
                     ConnectorObserver.observeMatching
                         container
-                        "[data-provenance-group-node],[data-provenance-connection-node],[data-provenance-resize-node]"
+                        "[data-provenance-group-node],[data-provenance-member-node],[data-provenance-connection-node],[data-provenance-resize-node]"
                         observer
 
                 let mutationFrame = ref (None: float option)
