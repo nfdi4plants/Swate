@@ -201,12 +201,14 @@ module ConnectorPaths =
                         // Member connectors are ribbons too, so expanding a card
                         // fans its group ribbon out into per-member ribbons instead
                         // of falling back to plain lines. Each stands for exactly
-                        // one underlying connection, hence the unit weight.
+                        // one underlying connection, hence the unit weight. The
+                        // visual path inherits pointer-events:none from the SVG
+                        // root; only the separate hit path opts back in.
                         {
                             spec
                                 $"member:{displayConnection.Id}:{connectionId}"
                                 "provenance-member-connection"
-                                "swt:text-primary/70 swt:pointer-events-none"
+                                "swt:text-primary/70"
                                 2.0
                                 None
                                 (Some singleConnection)
