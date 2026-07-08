@@ -42,9 +42,13 @@ type PaneId =
         let (PaneId id) = this
         id
 
+
+[<CompiledName("Tab")>] // Without this, Fable transpiles to ``Tab$1<T>``?
 type Tab<'T> = {
     Id: TabId
     Label: string
+    Icon: string option
+    ClassName: string option
     Payload: 'T
 }
 
@@ -59,12 +63,12 @@ type Leaf = PaneId
 [<RequireQualifiedAccess>]
 type Level1 =
     | Single of Leaf
-    | Split of SplitDirection * Leaf * Leaf
+    | Split of SplitDirection * ratio: float * Leaf * Leaf
 
 [<RequireQualifiedAccess>]
 type Layout =
     | Single of Leaf
-    | Split of SplitDirection * Level1 * Level1
+    | Split of SplitDirection * ratio: float * Level1 * Level1
 
 type WorkspaceModel<'T> = {
     /// This defines the visual layout of the workspace. Up tp a (2x2) grid of panes can be defined. Each pane is identified by its PaneId, which is used to look up the tabs in the Panes map.
@@ -94,18 +98,18 @@ module WorkspaceHelper =
         // If the layout is a single pane, we can't collapse it further.
         | Layout.Single id -> Layout.Single id
         // If we have ``Split(Single, Single)`` and one will be removed, we collapse to ``Single``
-        | Layout.Split(_, Level1.Single remove, Level1.Single keep)
-        | Layout.Split(_, Level1.Single keep, Level1.Single remove) when remove = toBeRemoved -> Layout.Single keep
+        | Layout.Split(_, _, Level1.Single remove, Level1.Single keep)
+        | Layout.Split(_, _, Level1.Single keep, Level1.Single remove) when remove = toBeRemoved -> Layout.Single keep
         // If we have ``Split(Single, Split)`` and the single will be removed, we replace the outer split with the inner split.
-        | Layout.Split(_, Level1.Single remove, Level1.Split(p1, p2, p3))
-        | Layout.Split(_, Level1.Split(p1, p2, p3), Level1.Single remove) when remove = toBeRemoved ->
-            Layout.Split(p1, Level1.Single p2, Level1.Single p3)
+        | Layout.Split(_, _, Level1.Single remove, Level1.Split(p1, p2, p3, p4))
+        | Layout.Split(_, _, Level1.Split(p1, p2, p3, p4), Level1.Single remove) when remove = toBeRemoved ->
+            Layout.Split(p1, p2, Level1.Single p3, Level1.Single p4)
         // If we have ``Split(Single, Split)`` and the inner Split contains the pane to be removed, we collapse the inner split to a single.
-        | Layout.Split(dir, Level1.Single keep, Level1.Split(_, keep1, remove))
-        | Layout.Split(dir, Level1.Single keep, Level1.Split(_, remove, keep1))
-        | Layout.Split(dir, Level1.Split(_, remove, keep1), Level1.Single keep)
-        | Layout.Split(dir, Level1.Split(_, keep1, remove), Level1.Single keep) when remove = toBeRemoved ->
-            Layout.Split(dir, Level1.Single keep, Level1.Single keep1)
+        | Layout.Split(dir, r, Level1.Single keep, Level1.Split(_, _, keep1, remove))
+        | Layout.Split(dir, r, Level1.Single keep, Level1.Split(_, _, remove, keep1))
+        | Layout.Split(dir, r, Level1.Split(_, _, remove, keep1), Level1.Single keep)
+        | Layout.Split(dir, r, Level1.Split(_, _, keep1, remove), Level1.Single keep) when remove = toBeRemoved ->
+            Layout.Split(dir, r, Level1.Single keep, Level1.Single keep1)
         | anyElse -> anyElse
 
     let splitPane (edge: EdgeDirection) (paneId: PaneId) (layout: Layout) : PaneId * Layout =
@@ -142,21 +146,21 @@ module WorkspaceHelper =
             match lvl1 with
             | Level1.Single id when id = paneId ->
                 let split = splitSingleByEdge id
-                Level1.Split(split.direction, split.first, split.second)
+                Level1.Split(split.direction, 0.5, split.first, split.second)
             | _ -> lvl1
 
         let nextLayout =
             match layout with
             | Layout.Single id when id = paneId ->
                 let split = splitSingleByEdge id
-                Layout.Split(split.direction, Level1.Single split.first, Level1.Single split.second)
+                Layout.Split(split.direction, 0.5, Level1.Single split.first, Level1.Single split.second)
             // Allow inner split only in opposite direction of the target direction.
             // This ensures that we don't create a 3x1 or 1x3 layout, but only a 2x2 layout.
-            | Layout.Split(dir, _, _) when dir = targetDirection -> layout
-            | Layout.Split(dir, l1, l2) ->
+            | Layout.Split(dir,_, _, _) when dir = targetDirection -> layout
+            | Layout.Split(dir, r, l1, l2) ->
                 let updatedL1 = splitLevel1 l1
                 let updatedL2 = splitLevel1 l2
-                Layout.Split(dir, updatedL1, updatedL2)
+                Layout.Split(dir, r, updatedL1, updatedL2)
             | _ -> layout
 
         (newPaneId, nextLayout)
@@ -188,8 +192,8 @@ module WorkspaceHelper =
                     isLeftAllowed = true
                     isRightAllowed = true
             |}
-        | Layout.Split(dir, Level1.Single targetId, _) 
-        | Layout.Split(dir, _, Level1.Single targetId) when targetId = paneIdParam ->
+        | Layout.Split(dir, _, Level1.Single targetId, _) 
+        | Layout.Split(dir, _, _, Level1.Single targetId) when targetId = paneIdParam ->
             match dir with
             | SplitDirection.Horizontal ->
                 {|
@@ -326,11 +330,11 @@ type WorkspaceModel<'T> with
             let collectPaneIds (layout: Layout) =
                 match layout with
                 | Layout.Single id -> [ id ]
-                | Layout.Split(_, l1, l2) ->
+                | Layout.Split(_,_, l1, l2) ->
                     let collectInnerIds (lvl1: Level1) =
                         match lvl1 with
                         | Level1.Single id -> [ id ]
-                        | Level1.Split(_, l1, l2) -> [ l1; l2 ]
+                        | Level1.Split(_,_, l1, l2) -> [ l1; l2 ]
 
                     collectInnerIds l1 @ collectInnerIds l2
 
@@ -410,23 +414,28 @@ type WorkspaceModel<'T> with
 
     static member FocusTab (tabId: TabId) (model: WorkspaceModel<'T>) =
 
-        let updatePane (pane: Pane<'T>) = {
-            pane with
-                Pane.FocusedTab = Some tabId
-        }
+        let pane = 
+            model.PanesMap
+            |> Map.tryPick (fun paneId pane ->
+                if pane.Tabs |> List.exists (fun t -> t.Id = tabId) then
+                    Some (paneId, pane)
+                else
+                    None
+            )
 
-        {
-            model with
-                PanesMap =
-                    model.PanesMap
-                    |> Map.map (fun _ pane ->
-                        if pane.Tabs |> List.exists (fun t -> t.Id = tabId) then
-                            updatePane pane
-                        else
-                            pane
-                    )
-        }
+        match pane with
+        | None -> model // Tab not found in any pane, return the model unchanged
+        | Some (paneId, pane) ->
+            let nextPane = { pane with FocusedTab = Some tabId }
+            {
+                model with
+                    FocusedPane = paneId
+                    PanesMap =
+                        model.PanesMap
+                        |> Map.add paneId nextPane
+            }
 
+        
     /// This function adds a tab to the workspace model.
     ///
     /// - The tab will be added to the currently focused pane.
@@ -480,6 +489,9 @@ type WorkspaceModel<'T> with
             )
 
         match nextSourcePane with
+        | Some (sourcePaneId, _, _) when sourcePaneId = targetPaneId ->
+            // Tab is already in the target pane, return the model unchanged
+            model
         | Some(sourcePaneId, toBeMovedTab, updatedSourcePane) ->
             /// This function finds the target pane and adds the tab to that pane, setting it as the focused tab.
             /// With this information, we can use ``Map.add`` to update the target pane.
@@ -560,55 +572,76 @@ type WorkspaceModel<'T> with
                 FocusedPane = newPaneId
         }
 
-let update (model: WorkspaceModel<'T>) (msg: Msg<'T>) : WorkspaceModel<'T> =
-    match msg with
-    | AddTab tab -> model |> WorkspaceModel.AddTab tab
-
-    | RemoveTab tabId -> model |> WorkspaceModel.RemoveTab tabId |> WorkspaceModel.CleanupEmptyPanes
-
-    | FocusTab tabId -> model |> WorkspaceModel.FocusTab tabId
-
-    | MoveTab(tabId, targetPaneId) ->
-
-        /// do not allow moving a tab 
-        let isAllowedTabMove = ensureTabMoveAllowed tabId model
-        if not isAllowedTabMove then
-            model // If the move is not allowed, we return the model unchanged.
-        else
+    /// This function removes all tabs from a specified pane, effectively clearing it.
+    /// 
+    /// - If the pane does not exist, the model remains unchanged.
+    /// - After clearing the tabs, the FocusedTab of the pane will be set to None.
+    /// - ⚠️ This function does not cleanup empty panes. Use ``CleanupEmptyPanes`` after this if needed.
+    static member RemoveAllTabsFromPane (paneId: PaneId) (model: WorkspaceModel<'T>) =
+        match model.PanesMap |> Map.tryFind paneId with
+        | Some pane ->
+            let updatedPane = { pane with Tabs = []; FocusedTab = None }
+            { model with PanesMap = model.PanesMap |> Map.add paneId updatedPane }
+        | None ->
+            // Pane not found, return the model unchanged
             model
-            |> WorkspaceModel.MoveTab tabId targetPaneId
-            |> WorkspaceModel.CleanupEmptyPanes
-        
-    | ReorderTabs(paneId, newOrder) ->
-        model
-        |> WorkspaceModel.ReorderTabs paneId newOrder
 
-    | SplitPaneByTabMove(tabId, paneId, edge) ->
-        let tabEdgeDropAllowed =
-            ensureTabEdgeDropAllowed tabId paneId edge model
-        
-        if not tabEdgeDropAllowed then
-            model // If the split is not allowed, we return the model unchanged.
-        else
+let update (onErroCallback: exn -> unit) (model: WorkspaceModel<'T>) (msg: Msg<'T>) : WorkspaceModel<'T> =
+    try 
+        match msg with
+        | AddTab tab -> model |> WorkspaceModel.AddTab tab
+
+        | RemoveTab tabId -> model |> WorkspaceModel.RemoveTab tabId |> WorkspaceModel.CleanupEmptyPanes
+
+        | FocusTab tabId -> model |> WorkspaceModel.FocusTab tabId
+
+        | MoveTab(tabId, targetPaneId) ->
+
+            /// do not allow moving a tab 
+            let isAllowedTabMove = ensureTabMoveAllowed tabId model
+            if not isAllowedTabMove then
+                model // If the move is not allowed, we return the model unchanged.
+            else
+                model
+                |> WorkspaceModel.MoveTab tabId targetPaneId
+                |> WorkspaceModel.CleanupEmptyPanes
+            
+        | ReorderTabs(paneId, newOrder) ->
             model
-            |> WorkspaceModel.SplitPane paneId edge
-            |> WorkspaceModel.MoveTab tabId model.FocusedPane
+            |> WorkspaceModel.ReorderTabs paneId newOrder
+
+        | SplitPaneByTabMove(tabId, paneId, edge) ->
+            let tabEdgeDropAllowed =
+                ensureTabEdgeDropAllowed tabId paneId edge model
+            
+            if not tabEdgeDropAllowed then
+                model // If the split is not allowed, we return the model unchanged.
+            else
+                model
+                |> WorkspaceModel.SplitPane paneId edge
+                |> fun current -> WorkspaceModel.MoveTab tabId current.FocusedPane current
+                |> WorkspaceModel.CleanupEmptyPanes
+
+        | ClosePane paneId ->
+            model
+            |> WorkspaceModel.RemoveAllTabsFromPane paneId
             |> WorkspaceModel.CleanupEmptyPanes
 
-    | ClosePane paneId ->
-        // Implementation for closing a pane would go here
-        model
-    // After any message, we ensure that the Panes map is in sync with the Layout and that the focus is valid.
-    |> WorkspaceModel.EnsurePaneMapSync
-    |> WorkspaceModel.EnsureValidFocus
+        // After any message, we ensure that the Panes map is in sync with the Layout and that the focus is valid.
+        |> WorkspaceModel.EnsurePaneMapSync
+        |> WorkspaceModel.EnsureValidFocus
+    with
+        | exn -> onErroCallback exn; model
 
 type CompClass =
     [<ReactComponent>]
     static member MyComponent
-        (renderTab: Tab<'A> -> ReactElement, ?initialTabs: Tab<'A>[], ?initialActiveTabId: string)
+        (renderTab: Tab<'A> -> ReactElement, ?initialTabs: Tab<'A>[], ?initialActiveTabId: string, ?onErrorCallback: exn -> unit)
         =
 
-        let model, dispatch = React.useReducer (update, WorkspaceModel.Init())
+        let onErrorCallback = defaultArg onErrorCallback (fun exn -> Browser.Dom.console.error exn)
+
+        let model, dispatch = React.useReducer (update onErrorCallback, WorkspaceModel.Init())
 
         Html.div [
 
