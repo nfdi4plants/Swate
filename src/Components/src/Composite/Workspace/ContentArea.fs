@@ -82,15 +82,6 @@ type ContentArea =
             if workspaceCtx.debug then
                 prop.testId $"workspace-content-{paneId}"
             prop.children [
-                Html.button [
-                    prop.onClick (fun _ ->
-                        for dir in [ EdgeDirection.Top; EdgeDirection.Bottom; EdgeDirection.Left; EdgeDirection.Right ] do
-                            let canSplit = canSplit dir
-                            console.log($"{dir}: {canSplit}")
-                    )
-                    prop.className "swt:btn swt:btn-xs"
-                    prop.text "Debug"
-                ]
                 yield! [
                     for (tabId, content) in contentMap |> Map.toArray do
                         Html.div [
@@ -111,8 +102,8 @@ type ContentArea =
                     ]
                 | _ -> ()
 
-
                 if dndCtx.isDragging then
+                    // TODO: Make this a single component, which moves the overlay to the correct edge zone based on the current drag position
                     for dir in [ EdgeDirection.Top; EdgeDirection.Bottom; EdgeDirection.Left; EdgeDirection.Right ] do
                         ContentArea.EdgeDropZone(paneId, dir, canSplit dir, workspaceCtx.debug)
             ]
