@@ -137,11 +137,18 @@ module ProvenanceTutorialSteps =
             // Rings every card's connection handle, marking both ends of the
             // tap-tap (or drag) gesture.
             TargetSelector = Some "[data-provenance-connection-drop-id^='provenance-connection-drop|GroupCard|']"
-            Task = Some "Tap the round handle on an input card, then tap the handle of an output card."
+            Task =
+                Some
+                    "Connect an input card to an output card: drag between the round handles, or tap one and then the other."
+            // The undo button enables on the first published edit, and creating
+            // the connection is the only edit this step leads to - so both the
+            // drag and the tap-tap gesture complete it, while merely arming a
+            // handle (which publishes nothing) does not.
             Advance =
-                TutorialAdvance.OnEvent(
-                    "click",
-                    "[data-provenance-connection-drop-id^='provenance-connection-drop|GroupCard|Output']"
+                TutorialAdvance.OnCondition(fun container ->
+                    container.querySelector "[data-tutorial='provenance-undo']:enabled"
+                    |> isNull
+                    |> not
                 )
             Checkpoint = Some "species-connect"
         }
