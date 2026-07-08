@@ -2714,6 +2714,9 @@ export const OpensInteractiveTutorialOnSampleData: Story = {
     expect(modal.getByText('Provenance editor tour')).toBeInTheDocument();
     expect(within(modal.getByTestId('tutorial-step-card')).getByText('Welcome')).toBeInTheDocument();
 
+    // The sandboxed editor must not offer a tutorial of its own (no nesting).
+    expect(modal.queryByTestId('provenance-tutorial-trigger')).not.toBeInTheDocument();
+
     // The feature list jumps straight to any step's explanation; the sandbox
     // remounts at that step's checkpoint, so the state its task needs (here:
     // inputs already grouped by Species) exists without doing earlier steps.

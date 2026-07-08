@@ -1509,22 +1509,27 @@ type ProvenanceGrouping =
                                                 prop.text "Compact"
                                             ]
                                             Controls.HelpLegend(debug = debug)
-                                            Html.button [
-                                                prop.type'.button
-                                                prop.className "swt:btn swt:btn-ghost swt:btn-xs"
-                                                prop.title "Open the interactive tutorial"
-                                                prop.ariaLabel "Open the interactive tutorial"
-                                                if debug then
-                                                    prop.testId "provenance-tutorial-trigger"
-                                                prop.onClick (fun _ -> setIsTutorialOpen true)
-                                                prop.children [
-                                                    Html.i [
-                                                        prop.className
-                                                            "swt:iconify swt:fluent--lightbulb-20-regular swt:size-4"
+                                            // The tutorial's sandboxed editor (marked by its
+                                            // initUiState seed) must not offer a tutorial of
+                                            // its own - task steps keep the whole surface
+                                            // interactive, so the trigger would nest modals.
+                                            if initUiState.IsNone then
+                                                Html.button [
+                                                    prop.type'.button
+                                                    prop.className "swt:btn swt:btn-ghost swt:btn-xs"
+                                                    prop.title "Open the interactive tutorial"
+                                                    prop.ariaLabel "Open the interactive tutorial"
+                                                    if debug then
+                                                        prop.testId "provenance-tutorial-trigger"
+                                                    prop.onClick (fun _ -> setIsTutorialOpen true)
+                                                    prop.children [
+                                                        Html.i [
+                                                            prop.className
+                                                                "swt:iconify swt:fluent--lightbulb-20-regular swt:size-4"
+                                                        ]
+                                                        Html.span "Tutorial"
                                                     ]
-                                                    Html.span "Tutorial"
                                                 ]
-                                            ]
                                         ]
                                     ]
                                 ]
