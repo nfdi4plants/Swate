@@ -78,6 +78,7 @@ type ComboBox =
                     |}
                     -> unit
         ) : ReactElement =
+
         let isOpen, setOpen = React.useState (false)
 
         let activeIndex, setActiveIndex = React.useState (None: int option)
@@ -133,7 +134,8 @@ type ComboBox =
 
             if System.String.IsNullOrWhiteSpace value |> not then
                 setOpen true
-                setActiveIndex (Some 0)
+
+                setActiveIndex None
             else
                 close ()
 

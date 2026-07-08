@@ -9,6 +9,11 @@ open Swate.Components.Shared.ProvenanceGrouping.Fixtures
 
 type ProvenanceEditorChange = {
     Session: ProvenanceSession
+    /// The delta introduced by this one change - empty for navigation-only
+    /// changes such as undo or a layer switch. Do not accumulate this across
+    /// calls for writeback: `Session.PatchLog` is the authoritative, ordered
+    /// log of every patch emitted so far, and it survives undo for free
+    /// because undo restores a session snapshot.
     Patches: ProvenanceTablePatch list
 }
 
@@ -54,6 +59,8 @@ type PendingAssignmentBatch = {
     Batch: PropertyAssignmentBatch
     AffectedSideCount: int
     AffectedValueCount: int
+    AffectedGroupCount: int
+    AffectedEntityCount: int
 }
 
 type PanelRatios = { Left: int; Middle: int; Right: int }
@@ -62,6 +69,7 @@ type PanelRatios = { Left: int; Middle: int; Right: int }
 type ConnectionHandleKind =
     | GroupCard
     | GroupMember
+    | GroupMemberPropertyAnchor
     | PropertyHeader
     | PropertyValue
     /// Measurement-only anchor on the property-facing edge of a group card.
@@ -93,10 +101,23 @@ type PendingMemberResolution = {
 
 type ProvenanceColor = string
 
+type ProvenanceColorContextId = string
+
+type VisiblePropertyColorContext = {
+    Id: ProvenanceColorContextId
+    DefaultSourceId: ProvenanceSourceId
+}
+
+type VisiblePropertyColorKey = {
+    ContextId: ProvenanceColorContextId
+    Header: ProvenancePropertyHeader
+}
+
 type PropertyColorSettings = {
-    ManualPropertyColors: Map<GroupingKey, ProvenanceColor>
-    LayerColors: Map<ProvenanceLayerId, ProvenanceColor>
-    FolderColors: Map<string, ProvenanceColor>
+    ManualPropertyColors: Map<VisiblePropertyColorKey, ProvenanceColor>
+    SourceColors: Map<ProvenanceSourceId, ProvenanceColor>
+    SourceColorSetOrder: Map<ProvenanceSourceId, int>
+    NextSourceColorSetOrder: int
 }
 
 [<RequireQualifiedAccess>]
@@ -123,8 +144,7 @@ type PropertyOriginFilter =
     | AnyOrigin
     | CurrentOnly
     | AnyUpstream
-    | UpstreamLayer of ProvenanceLayerId
-    | PreviousContext of tableName: ProvenanceTableName * processName: ProvenanceProcessName option
+    | Source of ProvenanceSourceId
 
 type FilterState = {
     SearchText: string
@@ -157,9 +177,12 @@ type UiState = {
     PendingMemberResolution: PendingMemberResolution option
     SelectedInputs: Set<ProvenanceLayerId * string>
     SelectedOutputs: Set<ProvenanceLayerId * string>
-    ExpandedGroup: (ProvenanceSide * string) option
+    /// Explicitly expanded group cards. Manual toggling keeps at most one entry;
+    /// manual connection resolution expands the two pending cards together.
+    ExpandedGroups: Set<ProvenanceSide * string>
     Detail: ProvenanceDetail option
     Error: string option
+    Hint: string option
     PropertyColors: PropertyColorSettings
     Filters: FilterState
 }
@@ -255,3 +278,9 @@ module Exports =
         StoryFixtures.createRetaggedTypedSampleSession ()
 
     let patchDetails patches = PatchPreview.patchDetails patches
+
+    /// The authoritative writeback log for a session - use this instead of
+    /// accumulating per-change `Patches` deltas host-side, so undo retracts
+    /// already-emitted patches instead of leaving them stranded.
+    let patchLog (session: ProvenanceSession) =
+        PatchPreview.patchDetails session.PatchLog

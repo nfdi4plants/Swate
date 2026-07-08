@@ -126,7 +126,7 @@ type internal CandidatePropertyValue = {
     Header: ProvenancePropertyHeader
     Value: ProvenanceValue
     Unit: ProvenanceTerm option
-    Source: ProvenanceWritebackAnchor option
+    Origin: ProvenancePropertyOrigin
     TargetInputSetIds: ProvenanceSetId list
     TargetOutputSetIds: ProvenanceSetId list
     WritebackLocation: ArcWritebackLocation
@@ -235,6 +235,11 @@ module internal Normalize =
         | ArcTableScope.Assay -> "assay"
         | ArcTableScope.Run -> "run"
 
+    let sourceRef (location: ArcTableLocation) : ProvenanceSourceRef = {
+        Id = $"{scopeText location.Scope}:{location.ParentIdentifier}:{location.TableName}"
+        Name = location.TableName
+    }
+
     let locationParts location = [
         scopeText location.Scope
         location.ParentIdentifier
@@ -324,7 +329,7 @@ module internal Normalize =
     let pairOutputNames (pair: ProcessPairContext) = pair.OutputName |> Option.toList
 
     let sourceAnchor (pair: ProcessPairContext) header : ProvenanceWritebackAnchor = {
-        TableName = pair.Location.TableName
+        Source = sourceRef pair.Location
         ProcessId = pair.ProcessId
         ProcessName = pair.ProcessName
         Header = header
@@ -405,7 +410,7 @@ module internal Dedup =
             |> Map.tryFind id
             |> Option.defaultValue {
                 Id = id
-                TableName = location.TableName
+                Source = Normalize.sourceRef location
                 Header = header
                 Name = name
                 PropertyValueIds = []
@@ -433,7 +438,7 @@ module internal Dedup =
             |> Map.tryFind id
             |> Option.defaultValue {
                 Id = id
-                TableName = location.TableName
+                Source = Normalize.sourceRef location
                 Header = header
                 Name = name
                 PropertyValueIds = []
@@ -476,7 +481,7 @@ module internal Dedup =
 
         let connection: ProvenanceConnection = {
             Id = id
-            TableName = location.TableName
+            Source = Normalize.sourceRef location
             ProcessId = processId
             ProcessName = processName
             InputSetId = inputSetId
@@ -542,22 +547,22 @@ module internal Dedup =
         | Some _ -> existing
         | None -> incoming
 
-    let private mergeSource
-        (existing: ProvenanceWritebackAnchor option)
-        (incoming: ProvenanceWritebackAnchor option)
-        : ProvenanceWritebackAnchor option =
+    let private mergeAnchor (left: ProvenanceWritebackAnchor) (right: ProvenanceWritebackAnchor) = {
+        left with
+            ProcessId = keepExisting left.ProcessId right.ProcessId
+            ProcessName = keepExisting left.ProcessName right.ProcessName
+            InputNames = mergeDistinct left.InputNames right.InputNames
+            OutputNames = mergeDistinct left.OutputNames right.OutputNames
+    }
+
+    let private mergeOrigin existing incoming =
         match existing, incoming with
-        | Some existing, Some incoming ->
-            Some {
-                existing with
-                    ProcessId = keepExisting existing.ProcessId incoming.ProcessId
-                    ProcessName = keepExisting existing.ProcessName incoming.ProcessName
-                    InputNames = mergeDistinct existing.InputNames incoming.InputNames
-                    OutputNames = mergeDistinct existing.OutputNames incoming.OutputNames
-            }
-        | Some existing, None -> Some existing
-        | None, Some incoming -> Some incoming
-        | None, None -> None
+        | ProvenancePropertyOrigin.Real left, ProvenancePropertyOrigin.Real right ->
+            ProvenancePropertyOrigin.Real(mergeAnchor left right)
+        | ProvenancePropertyOrigin.Virtual left, ProvenancePropertyOrigin.Virtual right ->
+            ProvenancePropertyOrigin.Virtual(mergeAnchor left right)
+        | ProvenancePropertyOrigin.Real _, ProvenancePropertyOrigin.Virtual _
+        | ProvenancePropertyOrigin.Virtual _, ProvenancePropertyOrigin.Real _ -> existing
 
     let addCandidateProperty (candidate: CandidatePropertyValue) (state: ConvertState) =
         let targetInputSetIds = candidate.TargetInputSetIds |> List.distinct
@@ -575,14 +580,14 @@ module internal Dedup =
                 match state.PropertyValues |> Map.tryFind id with
                 | Some existing -> {
                     existing with
-                        Source = mergeSource existing.Source candidate.Source
+                        Origin = mergeOrigin existing.Origin candidate.Origin
                   }
                 | None -> {
                     Id = id
                     Header = candidate.Header
                     Value = candidate.Value
                     Unit = candidate.Unit
-                    Source = candidate.Source
+                    Origin = candidate.Origin
                   }
 
             {
@@ -598,7 +603,7 @@ module internal Dedup =
     let toResult (loadedTable: ArcTableLocation) (state: ConvertState) : ArcProvenanceConversionResult = {
         Model =
             ({
-                LoadedTableName = loadedTable.TableName
+                Source = Normalize.sourceRef loadedTable
                 PropertyValues = state.PropertyValues
                 InputSets = state.InputSets
                 OutputSets = state.OutputSets
@@ -650,7 +655,7 @@ module internal LoadedTable =
             Header = header
             Value = value
             Unit = unit
-            Source = Some(Normalize.sourceAnchor pair header)
+            Origin = ProvenancePropertyOrigin.Real(Normalize.sourceAnchor pair header)
             TargetInputSetIds = targetInputSetIds
             TargetOutputSetIds = targetOutputSetIds
             WritebackLocation = Normalize.writebackLocation pair header columnIndex
@@ -730,9 +735,6 @@ module internal LoadedTable =
             )
         )
 
-    let outputFactorCandidates pair targetOutputSetIds output =
-        outputFactorCandidatesForTargets pair [] targetOutputSetIds output
-
     let previousOutputFactorCandidates pair targetInputSetIds output =
         outputFactorCandidatesForTargets pair targetInputSetIds [] output
 
@@ -808,7 +810,7 @@ module internal LoadedTable =
 
         inputCharacteristicCandidates pair inputValueTargetIds input
         @ outputCharacteristicCandidates pair outputValueTargetIds output
-        @ outputFactorCandidates pair outputValueTargetIds output
+        @ outputFactorCandidatesForTargets pair parameterInputTargetIds parameterOutputTargetIds output
         @ processParameterCandidates pair parameterInputTargetIds parameterOutputTargetIds proc
         @ processComponentCandidates pair parameterInputTargetIds parameterOutputTargetIds proc
 
