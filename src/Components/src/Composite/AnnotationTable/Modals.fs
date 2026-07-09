@@ -1059,12 +1059,6 @@ type CompositeCellEditModal =
                 Html.none
 
     [<ReactComponent>]
-    static member AddUnitModal
-        (compositeCell: CompositeCell, header: CompositeHeader, setCell: CompositeCell -> unit, rmv: unit -> unit)
-        =
-        CompositeCellEditModal.TransformCell(compositeCell, header, setCell, rmv)
-
-    [<ReactComponent>]
     static member CompositeCellTransformModal
         (compositeCell: CompositeCell, header: CompositeHeader, setCell: CompositeCell -> unit, rmv: unit -> unit)
         =
