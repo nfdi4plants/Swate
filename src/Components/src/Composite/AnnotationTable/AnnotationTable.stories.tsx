@@ -414,6 +414,20 @@ export const AddUnitTransform: Story = {
     const termSearchInput = modalView.getByTestId("term-search-input");
     expect(termSearchInput).toBeInTheDocument();
     expect(termSearchInput).toHaveValue("SCIEX instrument model");
+    const submitButton = modalView.getByRole("button", { name: /^Submit$/i });
+    expect(submitButton).toBeEnabled();
+
+    for (const invalidInput of ["", "42", "unfinished unit"]) {
+      await userEvent.clear(termSearchInput);
+      if (invalidInput) {
+        await userEvent.type(termSearchInput, invalidInput);
+      }
+      await waitFor(() => expect(termSearchInput).toHaveValue(invalidInput));
+      await waitFor(() => expect(submitButton).toBeDisabled());
+    }
+
+    await userEvent.keyboard("{Enter}");
+    expect(modal).toBeVisible();
 
     expect(modalView.queryByText(/Keep value/i)).not.toBeInTheDocument();
     expect(modalView.queryByText(/Keep unit/i)).not.toBeInTheDocument();

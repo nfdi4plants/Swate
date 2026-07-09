@@ -248,11 +248,21 @@ type FooterButtons =
             prop.onClick (fun _ -> rmv ())
         ]
 
-    static member Submit(submitOnClick: unit -> unit) =
+    static member Submit(submitOnClick: unit -> unit, ?disabled: bool) =
+        let disabled = defaultArg disabled false
+
         Html.button [
-            prop.className "swt:btn swt:btn-primary swt:ml-auto"
+            prop.className [
+                "swt:btn swt:btn-primary swt:ml-auto"
+                if disabled then
+                    "swt:btn-disabled"
+            ]
+            prop.disabled disabled
             prop.text "Submit"
-            prop.onClick (fun e -> submitOnClick ())
+            prop.onClick (fun _ ->
+                if not disabled then
+                    submitOnClick ()
+            )
         ]
 
 
@@ -873,15 +883,15 @@ module private CompositeCellEditModalHelper =
 
     let private isNumber (input: string) = System.Double.TryParse(input) |> fst
 
-    let tryGetImportUnitTerm (oa: OntologyAnnotation) =
-        let hasImportableName =
-            (System.String.IsNullOrWhiteSpace oa.NameText |> not)
-            && (isNumber oa.NameText |> not)
+    let isImportableUnitTerm (term: Term) =
+        match term.name with
+        | Some name when (System.String.IsNullOrWhiteSpace name |> not) && (isNumber name |> not) ->
+            hasText term.source && hasText term.id
+        | _ -> false
 
-        if hasImportableName && hasText oa.TermSourceREF && hasText oa.TermAccessionNumber then
-            Term.fromOntologyAnnotation oa |> Some
-        else
-            None
+    let tryGetImportUnitTerm (oa: OntologyAnnotation) =
+        let term = Term.fromOntologyAnnotation oa
+        term |> Option.where isImportableUnitTerm
 
 [<Mangle(false); Erase>]
 type CompositeCellEditModal =
@@ -954,27 +964,20 @@ type CompositeCellEditModal =
 
         let initUnit =
             match cell with
-            | CompositeCell.Term oa -> CompositeCellEditModalHelper.tryGetImportUnitTerm oa
-            | CompositeCell.Unitized(_, oa) ->
-                let unitTerm =
-                    if oa.isEmpty () then
-                        None
-                    else
-                        Term.fromOntologyAnnotation oa |> Some
-
-                unitTerm
+            | CompositeCell.Term oa
+            | CompositeCell.Unitized(_, oa) -> CompositeCellEditModalHelper.tryGetImportUnitTerm oa
             | _ -> failwith "AddUnit can only be used with term or unitized cells."
 
         let unitTerm, setUnitTerm = React.useState initUnit
+        let validUnitTerm = unitTerm |> Option.filter CompositeCellEditModalHelper.isImportableUnitTerm
 
         let submit =
             fun () ->
-                unitTerm
-                |> Option.map Term.toOntologyAnnotation
-                |> Option.defaultValue (OntologyAnnotation())
-                |> setUnit
-
-                rmv ()
+                validUnitTerm
+                |> Option.iter (fun term ->
+                    term |> Term.toOntologyAnnotation |> setUnit
+                    rmv ()
+                )
 
         BaseModal.Modal(
             true,
@@ -983,7 +986,7 @@ type CompositeCellEditModal =
             React.Fragment [
                 InputField.TermCombi(unitTerm, setUnitTerm, "Unit", rmv, submit, autofocus = true)
             ],
-            footer = React.Fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
+            footer = React.Fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit, disabled = validUnitTerm.IsNone) ],
             debug = "Transform_AddUnit"
         )
 
