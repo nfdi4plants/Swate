@@ -944,7 +944,9 @@ type CompositeCellEditModal =
             | _ -> failwith "AddUnit can only be used with term or unitized cells."
 
         let unitTerm, setUnitTerm = React.useState initUnit
-        let validUnitTerm = unitTerm |> Option.filter CompositeCellEditModalHelper.isImportableUnitTerm
+
+        let validUnitTerm =
+            unitTerm |> Option.filter CompositeCellEditModalHelper.isImportableUnitTerm
 
         let submit =
             fun () ->
@@ -961,7 +963,11 @@ type CompositeCellEditModal =
             React.Fragment [
                 InputField.TermCombi(unitTerm, setUnitTerm, "Unit", rmv, submit, autofocus = true)
             ],
-            footer = React.Fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit, disabled = validUnitTerm.IsNone) ],
+            footer =
+                React.Fragment [
+                    FooterButtons.Cancel(rmv)
+                    FooterButtons.Submit(submit, disabled = validUnitTerm.IsNone)
+                ],
             debug = "Transform_AddUnit"
         )
 
