@@ -158,6 +158,17 @@ type FileExplorer =
         let model, dispatch = React.useReducer (reducer, initialModel)
         let containerRef = React.useElementRef ()
 
+        let stickyRowHeights, setStickyRowHeights =
+            React.useStateWithUpdater (Map.empty<string, int>)
+
+        let handleStickyRowHeightChange (itemId: string) (height: int) =
+            setStickyRowHeights (fun heights ->
+                match heights |> Map.tryFind itemId with
+                | Some currentHeight when currentHeight = height -> heights
+                | _ -> heights |> Map.add itemId height
+            )
+            |> ignore
+
         let onDirectoryExpansionChange =
             onDirectoryExpansionChange
             |> Option.orElse onExpansionChange
@@ -271,7 +282,7 @@ type FileExplorer =
 
         let selectedPathIds = model.SelectedPath |> List.map _.Id |> Set.ofList
 
-        let rec renderItem depth item =
+        let rec renderItem depth stickyTopOffset item =
             let isSelected = model.SelectedId = Some item.Id
             let isInSelectedPath = selectedPathIds.Contains item.Id
             let isHighlighted = isSelected || isInSelectedPath
@@ -303,10 +314,17 @@ type FileExplorer =
                     if isExpanded then
                         match item.Children with
                         | Some children ->
+                            let childStickyTopOffset =
+                                if delegateHorizontalScrollToParent then
+                                    stickyTopOffset
+                                    + (stickyRowHeights |> Map.tryFind item.Id |> Option.defaultValue 0)
+                                else
+                                    stickyTopOffset
+
                             Some(
                                 Html.ul [
                                     prop.className "swt:ml-4"
-                                    prop.children (children |> List.map (renderItem (depth + 1)))
+                                    prop.children (children |> List.map (renderItem (depth + 1) childStickyTopOffset))
                                 ]
                             )
                         | None -> None
@@ -316,6 +334,18 @@ type FileExplorer =
                 let stickyDepth =
                     if delegateHorizontalScrollToParent then
                         Some depth
+                    else
+                        None
+
+                let rowStickyTopOffset =
+                    if delegateHorizontalScrollToParent then
+                        Some stickyTopOffset
+                    else
+                        None
+
+                let onStickyRowHeightChange =
+                    if delegateHorizontalScrollToParent then
+                        Some handleStickyRowHeightChange
                     else
                         None
 
@@ -340,6 +370,8 @@ type FileExplorer =
                     canDeleteItem = canDeleteItem,
                     ?statusAction = statusAction,
                     ?stickyDepth = stickyDepth,
+                    ?stickyTopOffset = rowStickyTopOffset,
+                    ?onStickyRowHeightChange = onStickyRowHeightChange,
                     ?children = childrenTree
                 )
             else
@@ -366,7 +398,7 @@ type FileExplorer =
                         Html.ul [
                             prop.testId "file-explorer-container"
                             prop.className listClassName
-                            prop.children (model.Items |> List.map (renderItem 0))
+                            prop.children (model.Items |> List.map (renderItem 0 0))
                         ]
                     ]
                 ]

@@ -422,13 +422,17 @@ const expectStickyParentRowsToStayVisible = async (canvasElement: HTMLElement) =
     ),
   );
 
-  for (const toggle of parentToggles) {
+  const parentRows = parentToggles.map((toggle) => {
     const parentRow = toggle.closest("[data-file-item-id]");
 
     if (!parentRow) {
       throw new Error(`Expected sticky parent row for ${toggle.getAttribute("aria-label")}.`);
     }
 
+    return parentRow;
+  });
+
+  for (const parentRow of parentRows) {
     await expect(parentRow).toHaveClass(/swt:bg-base-100/);
     await expect(parentRow).toHaveClass(/swt:border-b/);
     await expect(parentRow).toHaveClass(/swt:shadow-sm/);
@@ -439,12 +443,15 @@ const expectStickyParentRowsToStayVisible = async (canvasElement: HTMLElement) =
 
   await waitFor(() => {
     const viewportRect = viewport.getBoundingClientRect();
+    let expectedTop = viewportRect.top;
 
-    for (const toggle of parentToggles) {
-      const rect = toggle.getBoundingClientRect();
+    for (const parentRow of parentRows) {
+      const rect = parentRow.getBoundingClientRect();
 
-      expect(rect.top).toBeGreaterThanOrEqual(viewportRect.top - 1);
+      expect(rect.top).toBeGreaterThanOrEqual(expectedTop - 1);
+      expect(rect.top).toBeLessThanOrEqual(expectedTop + 1);
       expect(rect.bottom).toBeLessThanOrEqual(viewportRect.bottom + 1);
+      expectedTop = rect.bottom;
     }
   });
 };

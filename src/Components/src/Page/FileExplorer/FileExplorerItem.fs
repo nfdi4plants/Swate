@@ -2,6 +2,7 @@ namespace Swate.Components.Page.FileExplorer
 
 open Fable.Core
 open Feliz
+open Swate.Components.JsBindings
 open Swate.Components.Page.FileExplorer.Types
 
 [<Mangle(false); Erase>]
@@ -276,6 +277,8 @@ type FileExplorerItem =
             ?canDeleteItem: FileItem -> bool,
             ?statusAction: ContextMenuItem,
             ?stickyDepth: int,
+            ?stickyTopOffset: int,
+            ?onStickyRowHeightChange: string -> int -> unit,
             ?children: ReactElement
         ) =
         let canCreateItem = defaultArg canCreateItem (fun (_: FileItem) -> false)
@@ -287,9 +290,27 @@ type FileExplorerItem =
         let hasStatusControl = Helper.isLfs item || statusAction.IsSome
 
         let effectiveStickyDepth = if isExpanded then stickyDepth else None
-        let hasStickyTreatment = effectiveStickyDepth.IsSome
+        let effectiveStickyTopOffset = if isExpanded then stickyTopOffset else None
+        let hasStickyTreatment = effectiveStickyTopOffset.IsSome
 
-        let stickyParentRowHeightPx = 32
+        let rowObserverRef = React.useRef<ResizeObserver option> None
+
+        let setRowRef (element: Browser.Types.Element) =
+            rowObserverRef.current |> Option.iter (fun observer -> observer.disconnect ())
+            rowObserverRef.current <- None
+
+            match hasStickyTreatment, isNull element, onStickyRowHeightChange with
+            | true, false, Some onHeightChange ->
+                let row = unbox<Browser.Types.HTMLElement> element
+
+                let reportHeight () =
+                    onHeightChange item.Id (int row.offsetHeight)
+
+                reportHeight ()
+                let observer = ResizeObserver(reportHeight)
+                observer.observe row
+                rowObserverRef.current <- Some observer
+            | _ -> ()
 
         let directoryToggleIconClass =
             if isExpanded then
@@ -299,6 +320,7 @@ type FileExplorerItem =
 
         let rowChildren = [
             Html.div [
+                prop.ref setRowRef
                 prop.custom ("data-file-item-id", item.Id)
                 prop.className [
                     "swt:group swt:w-full swt:px-2 swt:py-1 swt:cursor-default"
@@ -311,12 +333,12 @@ type FileExplorerItem =
                     style.display.flex
                     style.width (length.percent 100)
                     yield!
-                        effectiveStickyDepth
-                        |> Option.map (fun depth -> [
+                        effectiveStickyTopOffset
+                        |> Option.map (fun topOffset -> [
                             style.position.sticky
-                            style.top (depth * stickyParentRowHeightPx)
+                            style.top topOffset
                             // Parent rows need to layer above nested sticky rows. Very deep trees can exhaust this z-index base.
-                            style.zIndex (100 - depth)
+                            style.zIndex (100 - defaultArg effectiveStickyDepth 0)
                         ])
                         |> Option.defaultValue []
                 ]
