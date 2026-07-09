@@ -106,7 +106,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "folder open folder opens the selected folder directly",
+            "Open Folder opens the selected folder directly",
             fun () -> promise {
                 let item = createFolderItem "AssayA" (Some "assays/AssayA")
                 let mutable revealedPath: string option = None
@@ -140,7 +140,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "folder open folder location reveals the selected folder in its parent location",
+            "Open Folder Location reveals the selected folder in its parent location",
             fun () -> promise {
                 let item = createFolderItem "AssayA" (Some "assays/AssayA")
                 let mutable revealedPath: string option = None
