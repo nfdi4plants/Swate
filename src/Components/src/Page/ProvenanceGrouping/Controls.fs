@@ -1741,6 +1741,7 @@ type Controls =
                 Html.input [
                     prop.className "swt:input swt:input-bordered swt:input-sm swt:w-full swt:pl-8"
                     prop.placeholder "Search annotations & values..."
+                    prop.ariaLabel "Search annotations & values"
                     prop.value searchDraft
                     prop.onChange setSearchDraft
                 ]

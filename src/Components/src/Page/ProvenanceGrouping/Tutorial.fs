@@ -32,9 +32,11 @@ module ProvenanceTutorialSteps =
     let private speciesGroupButton = "button[data-tutorial-group-by='Input:Species']"
 
     // On medium/narrow layouts the input rail folds behind a toggle button;
-    // the fallback keeps the spotlight meaningful there.
+    // the fallback keeps the spotlight meaningful there. Both anchors are
+    // always-rendered data-tutorial hooks, so rewording a label cannot break
+    // the tour (the toggle only carries its hook while the rail is folded).
     let private inputRail =
-        "[data-tutorial='provenance-rail-Input'], button[aria-label='Show input annotations']"
+        "[data-tutorial='provenance-rail-Input'], [data-tutorial='provenance-rail-toggle-Input']"
 
     // The Species drag source can be hidden two ways before the drag can even
     // start: the whole shelf minimized behind its toggle, or another folder

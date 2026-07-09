@@ -12,7 +12,6 @@ open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
 open Swate.Components.Shared.ProvenanceGrouping.Edit
 open Swate.Components.Shared.ProvenanceGrouping.Session
-open Swate.Components.Shared.ProvenanceGrouping.Fixtures
 open Swate.Components.Page.ProvenanceGrouping.Types
 
 [<Erase; Mangle(false)>]
@@ -1234,6 +1233,10 @@ type ProvenanceGrouping =
                     prop.className
                         "swt:btn swt:btn-ghost swt:btn-xs swt:h-auto swt:min-h-24 swt:w-fit swt:px-1 swt:py-2"
                     prop.ariaLabel $"Show {railSideLabel side} annotations"
+                    // Stable hook for the interactive tutorial: this collapsed
+                    // strip is the fallback spotlight target when the rail folds,
+                    // so the tour must find it without coupling to aria-label copy.
+                    prop.custom ("data-tutorial", $"provenance-rail-toggle-{side}")
                     if debug then
                         prop.testId $"provenance-rail-toggle-{side}"
                     prop.onClick (fun _ -> toggleRail side)
@@ -1259,6 +1262,11 @@ type ProvenanceGrouping =
                             else
                                 $"Show {railSideLabel side} annotations"
                         )
+                        // Stable hook for the interactive tutorial's fallback
+                        // spotlight, only while folded - once open, the rail
+                        // panel's own data-tutorial anchor is the target.
+                        if openRail <> Some side then
+                            prop.custom ("data-tutorial", $"provenance-rail-toggle-{side}")
                         if debug then
                             prop.testId $"provenance-rail-toggle-{side}"
                         prop.onClick (fun _ -> toggleRail side)
