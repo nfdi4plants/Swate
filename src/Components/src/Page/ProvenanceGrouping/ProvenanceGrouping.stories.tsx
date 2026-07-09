@@ -99,7 +99,7 @@ function HarnessState({
       )}
       <ProvenanceGrouping
         session={session}
-        height={680}
+        height={960}
         debug={debug}
         onChange={(change: any) => {
           setSession(change.Session);
