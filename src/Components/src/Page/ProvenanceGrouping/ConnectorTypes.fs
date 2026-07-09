@@ -24,6 +24,11 @@ type MeasuredConnector = {
     /// Curve midpoint, measured so summary badges (e.g. underlying-connection
     /// counts) can sit on the line without re-deriving the bezier.
     Midpoint: ConnectionPoint option
+    /// Closed sankey-ribbon outline. When set, the connector is painted as a
+    /// translucent filled band spanning its share of both card edges instead
+    /// of a stroked line; `Path` stays the centerline for the midpoint badge,
+    /// while the ribbon itself is the pointer target.
+    RibbonPath: string option
 }
 
 /// Logical connector between two handles, derived purely from model/UI state.
@@ -43,6 +48,12 @@ type ConnectorSpec = {
     Target: ConnectionHandleRef
     /// Rail connectors drop out entirely when their endpoints are too close.
     SkipWhenClose: bool
+    /// Weight for connectors drawn as sankey ribbons (group and member
+    /// connections): the ribbon claims this share of each endpoint edge (card
+    /// side or member-row side) relative to the other ribbons attached there,
+    /// so together they cover the edge completely. None keeps the
+    /// stroked-line rendering.
+    SankeyWeight: float option
 }
 
 type ConnectorOverlayState = {
@@ -80,4 +91,11 @@ type ConnectorMeasureContext = {
     Container: HTMLElement
     Origin: ClientRect
     Nodes: Map<string, HTMLElement>
+    /// Group-card elements by their `data-provenance-group-node` id; sankey
+    /// ribbons measure whole card edges instead of the small handle circles.
+    GroupNodes: Map<string, HTMLElement>
+    /// Member-row elements of expanded cards by their
+    /// `data-provenance-member-node` id; member-level sankey ribbons measure
+    /// whole row edges the way group ribbons measure card edges.
+    MemberNodes: Map<string, HTMLElement>
 }

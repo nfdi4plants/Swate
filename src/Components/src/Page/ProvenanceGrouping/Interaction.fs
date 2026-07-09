@@ -68,6 +68,9 @@ module DragDrop =
     let groupNodeId side groupId =
         $"provenance-node::{side}::{encode groupId}"
 
+    let memberNodeId side groupId setId =
+        $"provenance-member-node::{side}::{encode groupId}::{encode setId}"
+
     let private handleKindText kind =
         match kind with
         | ConnectionHandleKind.GroupCard -> "GroupCard"

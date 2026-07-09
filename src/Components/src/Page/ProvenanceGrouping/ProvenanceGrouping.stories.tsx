@@ -99,7 +99,7 @@ function HarnessState({
       )}
       <ProvenanceGrouping
         session={session}
-        height={680}
+        height={960}
         debug={debug}
         onChange={(change: any) => {
           setSession(change.Session);
@@ -160,8 +160,9 @@ export const ExpandedGroupsShowMemberHoverValues: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    expect(within(canvas.getByText('Output A').closest('article')!).queryByRole('button', { name: 'Show members' }))
-      .not.toBeInTheDocument();
+    // Single-entry cards share the folder silhouette, so they expand the same way.
+    expect(within(canvas.getByText('Output A').closest('article')!).getByRole('button', { name: 'Show members' }))
+      .toBeInTheDocument();
 
     await groupByProperty(canvas, 'Output', 'Species');
     const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis'));
@@ -230,9 +231,13 @@ export const ShowsFileTypeForDataEndpoints: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    // A Data endpoint surfaces as a "File" type line above the single-entity card name.
+    // A Data endpoint shows its type as a document symbol in the folder body;
+    // the "File" type line appears on the expanded member row.
     const card = await waitFor(() => canvas.getByText('Data Output A').closest('article')!);
-    expect(card).toHaveTextContent('File');
+    expect(card.querySelector('[class*="fluent--document"]')).toBeInTheDocument();
+
+    await userEvent.click(within(card).getByRole('button', { name: 'Show members' }));
+    await waitFor(() => expect(card).toHaveTextContent('File'));
   },
 };
 
@@ -340,10 +345,10 @@ export const PropertiesStartInOriginFoldersAndSideDropZonesAreEmpty: Story = {
       expect(within(canvas.getByTestId('foldered-draggable-item-row')).getByRole('button', { name: /^Drag Species$/ }))
         .toBeVisible());
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Minimize property folders' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Minimize annotation folders' }));
     await waitFor(() => expect(canvas.queryByTestId('foldered-draggable-list')).not.toBeInTheDocument());
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Expand property folders' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Expand annotation folders' }));
     await waitFor(() => expect(canvas.getByTestId('foldered-draggable-list')).toBeInTheDocument());
     await waitFor(() =>
       expect(within(canvas.getByTestId('foldered-draggable-item-row')).getByRole('button', { name: /^Drag Species$/ }))
@@ -389,7 +394,7 @@ export const FolderColorPreviewSyncsLayerTabAndRailProperty: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await setFolderPreviewColor(canvas.getByTestId('foldered-draggable-folder-source-fixture-assay-table'), '#be185d');
+    await setFolderPreviewColor(canvas, canvas.getByTestId('foldered-draggable-folder-source-fixture-assay-table'), '#be185d');
 
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-layer-layer-1')).toHaveAttribute(
@@ -411,7 +416,7 @@ export const NonLayerFolderColorAppliesToShelfAndRailProperties: Story = {
       'foldered-draggable-folder-source-fixture-previous-study-table',
     );
 
-    await setFolderPreviewColor(previousContextFolder, '#0891b2');
+    await setFolderPreviewColor(canvas, previousContextFolder, '#0891b2');
 
     const previousContextShelf = await openShelfFolder(canvas, previousContextFolder);
     const shelfPropertyButton = previousContextShelf.getByRole('button', { name: /^Drag Previous Treatment$/ });
@@ -497,20 +502,61 @@ export const ToolbarUsesSinglePropertySortAndOriginButtons: Story = {
     const canvas = within(canvasElement);
     const toolbar = within(canvas.getByTestId('provenance-filter-toolbar'));
 
-    expect(toolbar.getByPlaceholderText('Search properties & values...')).toBeInTheDocument();
+    expect(toolbar.getByPlaceholderText('Search annotations & values...')).toBeInTheDocument();
 
     await userEvent.click(toolbar.getByRole('button', { name: /^Sort By$/i }));
-    expect(toolbar.getByRole('button', { name: /^Property Value Count$/i })).toBeInTheDocument();
+    expect(toolbar.getByRole('button', { name: /^Annotation Value Count$/i })).toBeInTheDocument();
     expect(toolbar.getByRole('button', { name: /^Name$/i })).toBeInTheDocument();
     expect(toolbar.getAllByRole('button', { name: /^Connection Count$/i })).toHaveLength(1);
 
-    expect(toolbar.getByRole('button', { name: /^Show upstream properties$/i }).querySelector('[class*="fluent--arrow-up-20"]'))
+    expect(toolbar.getByRole('button', { name: /^Show upstream annotations$/i }).querySelector('[class*="fluent--arrow-up-20"]'))
       .toBeInTheDocument();
-    expect(toolbar.getByRole('button', { name: /^Show current properties$/i }).querySelector('[class*="fluent--circle-20-filled"]'))
+    expect(toolbar.getByRole('button', { name: /^Show current annotations$/i }).querySelector('[class*="fluent--circle-20-filled"]'))
       .toBeInTheDocument();
-    const both = toolbar.getByRole('button', { name: /^Show current and upstream properties$/i });
+    const both = toolbar.getByRole('button', { name: /^Show current and upstream annotations$/i });
     expect(both.querySelector('[class*="fluent--arrow-up-20"]')).toBeInTheDocument();
     expect(both.querySelector('[class*="fluent--circle-20-filled"]')).toBeInTheDocument();
+  },
+};
+
+export const TopControlsShareOneRowWhenSpaceAllows: Story = {
+  // The controls row wraps by design (flex-wrap) once it runs out of width, so
+  // this story must guarantee the ample width its name promises. At the default
+  // 1280px browser viewport the row sits right at the edge - it fits under one
+  // platform's font metrics and wraps under another's (Windows passes, Linux CI
+  // wraps by a row), which is what made this test flaky. A fixed wide wrapper
+  // pins the layout well clear of that edge so the single-row assertion is
+  // deterministic regardless of the runner's font rendering.
+  render: () => (
+    <div style={{ width: 1600 }}>
+      <Harness />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const topControls = canvas.getByTestId('provenance-top-controls');
+    const toolbar = canvas.getByTestId('provenance-filter-toolbar');
+    const search = canvas.getByTestId('provenance-search');
+    const viewActions = canvas.getByTestId('provenance-view-actions');
+    const valueFilter = canvas.getByRole('combobox', { name: 'Filter by annotation value count' });
+    const originFilter = canvas.getByRole('button', { name: /^Show upstream annotations$/i });
+
+    const rowTop = (element: HTMLElement) => Math.round(element.getBoundingClientRect().top);
+    const rowCenter = (element: HTMLElement) => {
+      const rect = element.getBoundingClientRect();
+      return rect.top + rect.height / 2;
+    };
+
+    expect(topControls).toContainElement(toolbar);
+    expect(topControls).toContainElement(viewActions);
+    expect(rowTop(toolbar)).toBe(rowTop(search));
+    expect(rowTop(search)).toBe(rowTop(valueFilter));
+    expect(rowTop(search)).toBe(rowTop(originFilter));
+    // The view actions are deliberately smaller (btn-xs) than the toolbar
+    // controls, so on the shared items-center row their tops differ while the
+    // vertical centers align; a wrap onto a second row would offset the
+    // center by a full row height.
+    expect(Math.abs(rowCenter(toolbar) - rowCenter(viewActions))).toBeLessThanOrEqual(1);
   },
 };
 
@@ -519,7 +565,7 @@ export const SearchInputUpdatesImmediatelyButFiltersAfterDebounce: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const toolbar = within(canvas.getByTestId('provenance-filter-toolbar'));
-    const search = toolbar.getByPlaceholderText('Search properties & values...') as HTMLInputElement;
+    const search = toolbar.getByPlaceholderText('Search annotations & values...') as HTMLInputElement;
 
     await ensurePropertyInRail(canvas, 'Output', 'Species');
     await ensurePropertyInRail(canvas, 'Output', 'Analysis');
@@ -607,7 +653,7 @@ export const AddedRailPropertiesAreCurrentAndPinnedToTheirSide: Story = {
     expect(within(inputRail.getByTestId('provenance-property-Input-Treatment')).getByTitle('Current')).toBeInTheDocument();
     expect(outputRail.queryByTestId('provenance-property-Output-Treatment')).not.toBeInTheDocument();
 
-    await userEvent.click(within(canvas.getByTestId('provenance-filter-toolbar')).getByRole('button', { name: /^Show current properties$/i }));
+    await userEvent.click(within(canvas.getByTestId('provenance-filter-toolbar')).getByRole('button', { name: /^Show current annotations$/i }));
     await waitFor(() => expect(inputRail.getByTestId('provenance-property-Input-Treatment')).toBeInTheDocument());
     expect(outputRail.queryByTestId('provenance-property-Output-Treatment')).not.toBeInTheDocument();
 
@@ -647,7 +693,7 @@ export const PropertyRailExpandsValuesAndAddControls: Story = {
     const outputRail = within(canvas.getByTestId('provenance-property-rail-Output'));
 
     expect(outputRail.queryByText('Arabidopsis')).not.toBeInTheDocument();
-    expect(outputRail.getByText('Add property')).toBeInTheDocument();
+    expect(outputRail.getByText('Add annotation')).toBeInTheDocument();
 
     const panel = await expandProperty(canvas, 'Output', 'Species');
     const arabidopsis = panel.getByText('Arabidopsis').closest('button, div')!;
@@ -1249,7 +1295,7 @@ export const ConnectionDetailsShowEntityPairsWithoutPropertyCreation: Story = {
     expect(within(details).getByTestId('provenance-connection-pairs')).toHaveTextContent('→');
     expect(details).toHaveTextContent(/connection/i);
     expect(within(details).queryByText(/Add value/i)).not.toBeInTheDocument();
-    expect(within(details).queryByText(/Add property/i)).not.toBeInTheDocument();
+    expect(within(details).queryByText(/Add annotation/i)).not.toBeInTheDocument();
     expect(within(details).getByRole('button', { name: /remove connection/i })).toBeInTheDocument();
   },
 };
@@ -1658,6 +1704,118 @@ export const AddsNewPropertyFromRail: Story = {
   },
 };
 
+export const HidingASideCentersTheRemainingSide: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    expect(canvas.getByTestId('provenance-property-rail-Output')).toBeInTheDocument();
+    expect(canvas.getByText('Output A')).toBeInTheDocument();
+
+    await userEvent.click(canvas.getByTestId('provenance-side-visibility-Output'));
+
+    await waitFor(() => {
+      expect(canvas.queryByTestId('provenance-property-rail-Output')).not.toBeInTheDocument();
+      expect(canvas.queryByText('Output A')).not.toBeInTheDocument();
+    });
+    // The kept side and its rail stay on screen; only the hidden side leaves.
+    expect(canvas.getByTestId('provenance-property-rail-Input')).toBeInTheDocument();
+    expect(canvas.getByText('Input A')).toBeInTheDocument();
+
+    // The visible side sits as a centered cluster: the rail is not flush to the
+    // left edge, the card column keeps a generous width (no compact-container
+    // downshift), and the empty space is balanced on both sides.
+    {
+      const surface = canvas.getByTestId('provenance-surface');
+      const groupColumn = Array.from(surface.children).find((element) =>
+        element.querySelector('[data-provenance-group-node^="provenance-node::Input::"]'),
+      ) as HTMLElement;
+      const sr = surface.getBoundingClientRect();
+      const railLeft = canvas.getByTestId('provenance-property-rail-Input').getBoundingClientRect().left;
+      const gc = groupColumn.getBoundingClientRect();
+      const leftGap = railLeft - sr.left;
+      const rightGap = sr.right - gc.right;
+      expect(gc.width).toBeGreaterThan(360);
+      expect(leftGap).toBeGreaterThan(24);
+      expect(rightGap).toBeGreaterThan(24);
+      // Equal spacers keep the cluster genuinely centered, not merely off the edge.
+      expect(Math.abs(leftGap - rightGap)).toBeLessThan(32);
+    }
+
+    await userEvent.click(canvas.getByTestId('provenance-side-visibility-Output'));
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-property-rail-Output')).toBeInTheDocument();
+      expect(canvas.getByText('Output A')).toBeInTheDocument();
+    });
+  },
+};
+
+export const SwitchableAnnotationFollowsVisibleSideWhenItsSideIsHidden: Story = {
+  render: () => <Harness fixture="switchableProperty" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // Drag Batch onto the output rail. Batch can switch sides because it exists
+    // on both input and output sets.
+    await ensurePropertyInRail(canvas, 'Output', 'Batch');
+    expect(canvas.queryByTestId('provenance-property-Input-Batch')).not.toBeInTheDocument();
+
+    // With outputs hidden, the switchable annotation moves onto the input rail.
+    await toggleSideVisibility(canvas, 'Output', () =>
+      expect(canvas.queryByTestId('provenance-property-rail-Output')).not.toBeInTheDocument(),
+    );
+    expect(canvas.getByTestId('provenance-property-Input-Batch')).toBeInTheDocument();
+
+    // The move is permanent: revealing the output side leaves Batch on the input
+    // rail rather than sending it back.
+    await toggleSideVisibility(canvas, 'Output', () =>
+      expect(canvas.getByTestId('provenance-property-rail-Output')).toBeInTheDocument(),
+    );
+    expect(canvas.getByTestId('provenance-property-Input-Batch')).toBeInTheDocument();
+    expect(canvas.queryByTestId('provenance-property-Output-Batch')).not.toBeInTheDocument();
+  },
+};
+
+export const GroupBothOnVisibleSideAppliesToHiddenSideWhenRevealed: Story = {
+  render: () => <Harness fixture="switchableProperty" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await toggleSideVisibility(canvas, 'Output', () =>
+      expect(canvas.queryByTestId('provenance-property-rail-Output')).not.toBeInTheDocument(),
+    );
+
+    // Batch now sits on the visible input rail; grouping "both" from here must
+    // still drive the hidden output side.
+    await showPropertyControls(canvas, 'Input', 'Batch');
+    for (
+      let attempt = 0;
+      attempt < 3 && !canvas.queryByTestId('provenance-group-Input-input:Batch=A');
+      attempt += 1
+    ) {
+      fireEvent.click(canvas.getByTestId('provenance-property-both-Input-Batch'));
+      await waitFor(
+        () => expect(canvas.getByTestId('provenance-group-Input-input:Batch=A')).toBeInTheDocument(),
+        { timeout: 1000 },
+      ).catch(() => undefined);
+    }
+    await waitFor(() =>
+      expect(canvas.getByTestId('provenance-group-Input-input:Batch=A')).toBeInTheDocument(),
+    );
+
+    // Showing the output side reveals the grouping the same action produced there.
+    await toggleSideVisibility(canvas, 'Output', () =>
+      expect(canvas.getByTestId('provenance-property-rail-Output')).toBeInTheDocument(),
+    );
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-group-Output-output:Batch=A')).toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Output-output:Batch=B')).toBeInTheDocument();
+    });
+  },
+};
+
 let nextPointerId = 100;
 
 function allocatePointerId() {
@@ -1856,15 +2014,36 @@ function shelfFolders(canvas: ReturnType<typeof within>) {
 }
 
 async function openShelfFolder(canvas: ReturnType<typeof within>, folder: HTMLElement) {
+  // Folders render as index-card tabs; clicking the tab activates its card.
   const folderTestId = folder.getAttribute('data-testid')!;
   const currentFolder = () => canvas.getByTestId(folderTestId);
 
-  if (currentFolder().getAttribute('aria-expanded') !== 'true') {
-    await userEvent.click(within(currentFolder()).getByRole('button', { name: /^Expand / }));
+  if (currentFolder().getAttribute('aria-selected') !== 'true') {
+    await userEvent.click(currentFolder());
   }
 
-  await waitFor(() => expect(currentFolder()).toHaveAttribute('aria-expanded', 'true'));
+  await waitFor(() => expect(currentFolder()).toHaveAttribute('aria-selected', 'true'));
   return within(canvas.getByTestId('foldered-draggable-item-row'));
+}
+
+// Clicking the visibility toggle right after a drag is flaky (dnd-kit's pointer
+// sensor can swallow the first click), so retry until the layout settles.
+async function toggleSideVisibility(
+  canvas: ReturnType<typeof within>,
+  side: 'Input' | 'Output',
+  settled: () => void | Promise<void>,
+) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    fireEvent.click(canvas.getByTestId(`provenance-side-visibility-${side}`));
+    try {
+      await waitFor(async () => await settled(), { timeout: 1500 });
+      return;
+    } catch {
+      // Retry the click on the next iteration.
+    }
+  }
+
+  await waitFor(async () => await settled());
 }
 
 async function createLayer(canvas: ReturnType<typeof within>, name: string) {
@@ -1874,6 +2053,14 @@ async function createLayer(canvas: ReturnType<typeof within>, name: string) {
   await userEvent.clear(input);
   await userEvent.type(input, name);
   await userEvent.click(dialog.getByRole('button', { name: 'Create layer' }));
+}
+
+function layerPageIds(canvas: ReturnType<typeof within>) {
+  return Array.from(
+    canvas
+      .getByTestId('provenance-layer-pages')
+      .querySelectorAll<HTMLElement>('[data-provenance-layer-page]'),
+  ).map((page) => page.getAttribute('data-provenance-layer-page'));
 }
 
 async function shelfProperty(canvas: ReturnType<typeof within>, propertyName: string) {
@@ -1920,8 +2107,12 @@ function propertyColorSwatch(property: HTMLElement) {
   return swatch;
 }
 
-async function setFolderPreviewColor(folder: HTMLElement, color: string) {
-  const trigger = within(folder).getByRole('button', { name: /^Set color for folder / });
+async function setFolderPreviewColor(canvas: ReturnType<typeof within>, folder: HTMLElement, color: string) {
+  // The color control sits in the active card's header, so the folder's tab
+  // must be active first.
+  await openShelfFolder(canvas, folder);
+  const card = canvas.getByTestId('foldered-draggable-card');
+  const trigger = within(card).getByRole('button', { name: /^Set color for folder / });
   const triggerLabel = trigger.getAttribute('aria-label') ?? '';
   const inputLabel = triggerLabel.replace(/^Set /, 'Choose ');
 
@@ -2060,8 +2251,8 @@ async function addRailProperty(
   valueText: string,
 ) {
   const rail = within(canvas.getByTestId(`provenance-property-rail-${side}`));
-  const addPropertyTrigger = within(rail.getByTestId('popover_trigger_provenance-add-value-Property'))
-    .getByText('Add property')
+  const addPropertyTrigger = within(rail.getByTestId('popover_trigger_provenance-add-value-Annotation'))
+    .getByText('Add annotation')
     .closest('button')!;
   fireEvent.click(addPropertyTrigger);
   const category = await waitFor(() => screen.getAllByTestId('term-search-input')[0]).catch(async () => {
@@ -2072,7 +2263,7 @@ async function addRailProperty(
   await userEvent.keyboard('{Escape}');
   await userEvent.type(screen.getByRole('textbox', { name: new RegExp(`${propertyName} value`, 'i') }), valueText);
   const submit = screen
-    .getAllByRole('button', { name: /^Add property$/i })
+    .getAllByRole('button', { name: /^Add annotation$/i })
     .find((button) => button.getAttribute('type') === 'submit')!;
   await userEvent.click(submit);
   await userEvent.keyboard('{Escape}');
@@ -2476,6 +2667,53 @@ export const LayerTabsUseSourceColorsAndSideRails: Story = {
   },
 };
 
+export const LayerPaginationUsesNeighborWindowAndArrowSwitches: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await createLayer(canvas, 'Layer 2');
+    await createLayer(canvas, 'Layer 3');
+
+    const pagination = within(canvas.getByTestId('provenance-layer-pagination'));
+    expect(canvas.queryByTestId('provenance-layer-select')).not.toBeInTheDocument();
+    expect(pagination.getByTestId('provenance-add-layer')).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(layerPageIds(canvas)).toEqual(['layer-1', 'layer-2', 'layer-3']);
+      expect(canvas.getByTestId('provenance-layer-layer-3')).toHaveClass('swt:btn-primary');
+    });
+    // The jump trigger doubles as the layer position indicator.
+    expect(pagination.getByTestId('provenance-layer-jump')).toHaveTextContent('3 / 3');
+    expect(canvas.getByTestId('provenance-layer-layer-2')).toHaveClass('swt:opacity-50');
+    expect(canvas.queryByTestId('provenance-layer-next')).not.toBeInTheDocument();
+    expect(pagination.getByTestId('provenance-layer-prev').querySelector('[class*="fluent--chevron-left"]'))
+      .toBeInTheDocument();
+
+    await userEvent.click(pagination.getByTestId('provenance-layer-prev'));
+
+    await waitFor(() => {
+      expect(layerPageIds(canvas)).toEqual(['layer-1', 'layer-2', 'layer-3']);
+      expect(canvas.getByTestId('provenance-layer-layer-2')).toHaveClass('swt:btn-primary');
+    });
+    expect(canvas.getByTestId('provenance-layer-layer-1')).toHaveClass('swt:opacity-50');
+    expect(canvas.getByTestId('provenance-layer-layer-3')).toHaveClass('swt:opacity-50');
+    expect(pagination.getByTestId('provenance-layer-next').querySelector('[class*="fluent--chevron-right"]'))
+      .toBeInTheDocument();
+
+    await userEvent.click(pagination.getByTestId('provenance-layer-prev'));
+
+    await waitFor(() => {
+      expect(layerPageIds(canvas)).toEqual(['layer-1', 'layer-2', 'layer-3']);
+      expect(canvas.getByTestId('provenance-layer-layer-1')).toHaveClass('swt:btn-primary');
+    });
+    expect(pagination.getByTestId('provenance-layer-jump')).toHaveTextContent('1 / 3');
+    expect(canvas.queryByTestId('provenance-layer-prev')).not.toBeInTheDocument();
+    expect(pagination.getByTestId('provenance-layer-next').querySelector('[class*="fluent--chevron-right"]'))
+      .toBeInTheDocument();
+  },
+};
+
 export const AddsLayerFromMixedSelection: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
@@ -2531,8 +2769,8 @@ export const CreatesNamedLayer: Story = {
     await waitFor(() => {
       const layer = canvas.getByTestId('provenance-layer-layer-2');
       expect(layer).toHaveClass('swt:btn-primary');
-      expect(layer).toHaveTextContent('Extraction');
       expect(layer).toHaveAccessibleName('View provenance layer Extraction');
+      expect(layer).toHaveTextContent('Extraction');
     });
   },
 };
@@ -2609,5 +2847,66 @@ export const StrictModeSmoke: Story = {
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('No patches emitted.');
     });
+  },
+};
+
+export const OpensInteractiveTutorialOnSampleData: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByTestId('provenance-tutorial-trigger'));
+
+    const modal = within(canvas.getByTestId('provenance-tutorial-modal'));
+    expect(modal.getByText('Provenance editor tour')).toBeInTheDocument();
+    expect(within(modal.getByTestId('tutorial-step-card')).getByText('Welcome')).toBeInTheDocument();
+
+    // The sandboxed editor must not offer a tutorial of its own (no nesting).
+    expect(modal.queryByTestId('provenance-tutorial-trigger')).not.toBeInTheDocument();
+
+    // The feature list jumps straight to any step's explanation; the sandbox
+    // remounts at that step's checkpoint, so the state its task needs (here:
+    // inputs already grouped by Species) exists without doing earlier steps.
+    await userEvent.click(modal.getByTestId('tutorial-sidebar-step-members'));
+    expect(within(modal.getByTestId('tutorial-step-card')).getByText('Inspect group members')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(modal.getByTestId('provenance-group-Input-input:Species=Arabidopsis')).toBeInTheDocument(),
+    );
+
+    // Closing returns to the host editor without any writeback patches.
+    await userEvent.click(modal.getByTestId('tutorial-close'));
+    expect(canvas.queryByTestId('provenance-tutorial-modal')).not.toBeInTheDocument();
+    expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('No patches emitted.');
+  },
+};
+
+export const TutorialTaskStepCompletesInsideSandbox: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByTestId('provenance-tutorial-trigger'));
+    const modal = within(canvas.getByTestId('provenance-tutorial-modal'));
+
+    // Jump to the shelf-to-rail step and fulfil it by dragging Species into
+    // the sandbox's input rail; the polled condition marks the step completed
+    // and Skip becomes Next. The modal's feature list narrows the editor into
+    // the medium tier, so the rail sits behind its fold toggle first.
+    await userEvent.click(modal.getByTestId('tutorial-sidebar-step-shelf-to-rail'));
+    expect(modal.getByTestId('tutorial-next')).toHaveTextContent('Skip');
+    if (!modal.queryByTestId('provenance-property-rail-Input')) {
+      await userEvent.click(modal.getByTestId('provenance-rail-toggle-Input'));
+    }
+    const source = await shelfProperty(modal, 'Species');
+    await dragByPointer(source, modal.getByTestId('provenance-property-rail-Input'));
+    await waitFor(() => expect(modal.getByTestId('tutorial-next')).toHaveTextContent('Next'), { timeout: 5000 });
+    expect(within(modal.getByTestId('tutorial-task')).getByText('Completed:')).toBeInTheDocument();
+    await userEvent.click(modal.getByTestId('tutorial-next'));
+    expect(within(modal.getByTestId('tutorial-step-card')).getByText('Group by an annotation')).toBeInTheDocument();
+
+    // The click task completes in place as well; the user moves on themselves.
+    await userEvent.click(modal.getByTestId('provenance-property-Input-Species'));
+    await waitFor(() => expect(modal.getByTestId('tutorial-next')).toHaveTextContent('Next'), { timeout: 5000 });
+    expect(modal.getByText('2 of 14 features explored')).toBeInTheDocument();
+    await userEvent.click(modal.getByTestId('tutorial-next'));
+    expect(within(modal.getByTestId('tutorial-step-card')).getByText('Inspect group members')).toBeInTheDocument();
   },
 };
