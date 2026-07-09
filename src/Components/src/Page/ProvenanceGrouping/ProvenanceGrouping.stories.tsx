@@ -1693,6 +1693,118 @@ export const AddsNewPropertyFromRail: Story = {
   },
 };
 
+export const HidingASideCentersTheRemainingSide: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    expect(canvas.getByTestId('provenance-property-rail-Output')).toBeInTheDocument();
+    expect(canvas.getByText('Output A')).toBeInTheDocument();
+
+    await userEvent.click(canvas.getByTestId('provenance-side-visibility-Output'));
+
+    await waitFor(() => {
+      expect(canvas.queryByTestId('provenance-property-rail-Output')).not.toBeInTheDocument();
+      expect(canvas.queryByText('Output A')).not.toBeInTheDocument();
+    });
+    // The kept side and its rail stay on screen; only the hidden side leaves.
+    expect(canvas.getByTestId('provenance-property-rail-Input')).toBeInTheDocument();
+    expect(canvas.getByText('Input A')).toBeInTheDocument();
+
+    // The visible side sits as a centered cluster: the rail is not flush to the
+    // left edge, the card column keeps a generous width (no compact-container
+    // downshift), and the empty space is balanced on both sides.
+    {
+      const surface = canvas.getByTestId('provenance-surface');
+      const groupColumn = Array.from(surface.children).find((element) =>
+        element.querySelector('[data-provenance-group-node^="provenance-node::Input::"]'),
+      ) as HTMLElement;
+      const sr = surface.getBoundingClientRect();
+      const railLeft = canvas.getByTestId('provenance-property-rail-Input').getBoundingClientRect().left;
+      const gc = groupColumn.getBoundingClientRect();
+      const leftGap = railLeft - sr.left;
+      const rightGap = sr.right - gc.right;
+      expect(gc.width).toBeGreaterThan(360);
+      expect(leftGap).toBeGreaterThan(24);
+      expect(rightGap).toBeGreaterThan(24);
+      // Equal spacers keep the cluster genuinely centered, not merely off the edge.
+      expect(Math.abs(leftGap - rightGap)).toBeLessThan(32);
+    }
+
+    await userEvent.click(canvas.getByTestId('provenance-side-visibility-Output'));
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-property-rail-Output')).toBeInTheDocument();
+      expect(canvas.getByText('Output A')).toBeInTheDocument();
+    });
+  },
+};
+
+export const SwitchableAnnotationFollowsVisibleSideWhenItsSideIsHidden: Story = {
+  render: () => <Harness fixture="switchableProperty" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // Drag Batch onto the output rail. Batch can switch sides because it exists
+    // on both input and output sets.
+    await ensurePropertyInRail(canvas, 'Output', 'Batch');
+    expect(canvas.queryByTestId('provenance-property-Input-Batch')).not.toBeInTheDocument();
+
+    // With outputs hidden, the switchable annotation moves onto the input rail.
+    await toggleSideVisibility(canvas, 'Output', () =>
+      expect(canvas.queryByTestId('provenance-property-rail-Output')).not.toBeInTheDocument(),
+    );
+    expect(canvas.getByTestId('provenance-property-Input-Batch')).toBeInTheDocument();
+
+    // The move is permanent: revealing the output side leaves Batch on the input
+    // rail rather than sending it back.
+    await toggleSideVisibility(canvas, 'Output', () =>
+      expect(canvas.getByTestId('provenance-property-rail-Output')).toBeInTheDocument(),
+    );
+    expect(canvas.getByTestId('provenance-property-Input-Batch')).toBeInTheDocument();
+    expect(canvas.queryByTestId('provenance-property-Output-Batch')).not.toBeInTheDocument();
+  },
+};
+
+export const GroupBothOnVisibleSideAppliesToHiddenSideWhenRevealed: Story = {
+  render: () => <Harness fixture="switchableProperty" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await toggleSideVisibility(canvas, 'Output', () =>
+      expect(canvas.queryByTestId('provenance-property-rail-Output')).not.toBeInTheDocument(),
+    );
+
+    // Batch now sits on the visible input rail; grouping "both" from here must
+    // still drive the hidden output side.
+    await showPropertyControls(canvas, 'Input', 'Batch');
+    for (
+      let attempt = 0;
+      attempt < 3 && !canvas.queryByTestId('provenance-group-Input-input:Batch=A');
+      attempt += 1
+    ) {
+      fireEvent.click(canvas.getByTestId('provenance-property-both-Input-Batch'));
+      await waitFor(
+        () => expect(canvas.getByTestId('provenance-group-Input-input:Batch=A')).toBeInTheDocument(),
+        { timeout: 1000 },
+      ).catch(() => undefined);
+    }
+    await waitFor(() =>
+      expect(canvas.getByTestId('provenance-group-Input-input:Batch=A')).toBeInTheDocument(),
+    );
+
+    // Showing the output side reveals the grouping the same action produced there.
+    await toggleSideVisibility(canvas, 'Output', () =>
+      expect(canvas.getByTestId('provenance-property-rail-Output')).toBeInTheDocument(),
+    );
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-group-Output-output:Batch=A')).toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Output-output:Batch=B')).toBeInTheDocument();
+    });
+  },
+};
+
 let nextPointerId = 100;
 
 function allocatePointerId() {
@@ -1901,6 +2013,26 @@ async function openShelfFolder(canvas: ReturnType<typeof within>, folder: HTMLEl
 
   await waitFor(() => expect(currentFolder()).toHaveAttribute('aria-selected', 'true'));
   return within(canvas.getByTestId('foldered-draggable-item-row'));
+}
+
+// Clicking the visibility toggle right after a drag is flaky (dnd-kit's pointer
+// sensor can swallow the first click), so retry until the layout settles.
+async function toggleSideVisibility(
+  canvas: ReturnType<typeof within>,
+  side: 'Input' | 'Output',
+  settled: () => void | Promise<void>,
+) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    fireEvent.click(canvas.getByTestId(`provenance-side-visibility-${side}`));
+    try {
+      await waitFor(async () => await settled(), { timeout: 1500 });
+      return;
+    } catch {
+      // Retry the click on the next iteration.
+    }
+  }
+
+  await waitFor(async () => await settled());
 }
 
 async function createLayer(canvas: ReturnType<typeof within>, name: string) {
@@ -2762,7 +2894,7 @@ export const TutorialTaskStepCompletesInsideSandbox: Story = {
     // The click task completes in place as well; the user moves on themselves.
     await userEvent.click(modal.getByTestId('provenance-property-Input-Species'));
     await waitFor(() => expect(modal.getByTestId('tutorial-next')).toHaveTextContent('Next'), { timeout: 5000 });
-    expect(modal.getByText('2 of 13 features explored')).toBeInTheDocument();
+    expect(modal.getByText('2 of 14 features explored')).toBeInTheDocument();
     await userEvent.click(modal.getByTestId('tutorial-next'));
     expect(within(modal.getByTestId('tutorial-step-card')).getByText('Inspect group members')).toBeInTheDocument();
   },

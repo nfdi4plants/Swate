@@ -208,6 +208,11 @@ module ProvenanceTutorialSteps =
             "The toolbar narrows big models down: search annotations and groups, sort by name or connection count, and filter by value coverage or origin."
             "[data-tutorial='provenance-filter-toolbar']"
         explain
+            "focus-side"
+            "Focus one side"
+            "The two panel buttons hide the input or output column so you can work on a single side, centered with its rail. Any annotation that can live on both sides moves onto the visible rail and stays there; one-sided annotations simply wait until you show the side again. Grouping and connections keep working exactly as before."
+            "[data-tutorial^='provenance-side-visibility-']"
+        explain
             "undo"
             "Undo"
             "Every published edit can be taken back with one step - even after switching layers. The button is enabled whenever there is something to undo."

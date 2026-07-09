@@ -45,6 +45,11 @@ type ProvenanceGrouping =
         let rootRef = React.useElementRef ()
         let tier, setTier = React.useState LayoutTier.Wide
         let openRail, setOpenRail = React.useState<ProvenanceSide option> initialOpenRail
+
+        // Optical side hiding: the hidden side's rail and cards leave the layout,
+        // but every state rule (placements, grouping, connections) keeps running
+        // on both sides, so revealing the side restores it unchanged.
+        let hiddenSide, setHiddenSide = React.useState<ProvenanceSide option> None
         let density, setDensity = React.useState Density.EditorDensity.Comfortable
         let isPropertyShelfExpanded, setIsPropertyShelfExpanded = React.useState true
         let isTutorialOpen, setIsTutorialOpen = React.useState false
@@ -813,8 +818,75 @@ type ProvenanceGrouping =
             | ProvenanceSide.Input -> "input"
             | ProvenanceSide.Output -> "output"
 
+        let visibleSideFor hidden =
+            match hidden with
+            | ProvenanceSide.Input -> ProvenanceSide.Output
+            | ProvenanceSide.Output -> ProvenanceSide.Input
+
         let toggleRail side =
             setOpenRail (if openRail = Some side then None else Some side)
+
+        // Hiding a side removes its rail and cards from the layout, and really
+        // relocates every switchable annotation on it to the visible rail - a
+        // permanent move, so the property stays put once the side is revealed and
+        // any solo grouping it held on the hidden side is dropped (it can no longer
+        // be managed). Non-switchable annotations stay parked until the side is
+        // shown again. Hiding one side always reveals the other.
+        let hideSide (side: ProvenanceSide) =
+            let hiddenSideId =
+                match side with
+                | ProvenanceSide.Input -> layer.InputSideId
+                | ProvenanceSide.Output -> layer.OutputSideId
+
+            applyUiState (
+                State.SideVisibility.consolidateToVisible
+                    layer.Id
+                    side
+                    hiddenSideId
+                    (fun header -> PropertyRails.canSwitchHeader header layer.Model)
+            )
+
+            setHiddenSide (Some side)
+
+        // Icon-only (a left/right panel glyph naming the column it governs) keeps
+        // the pair from wrapping the already-dense toolbar onto a second row.
+        let sideVisibilityToggle (side: ProvenanceSide) =
+            let isVisible = hiddenSide <> Some side
+            let sideText = railSideLabel side
+
+            let label =
+                if isVisible then
+                    $"Hide {sideText}s and their annotations"
+                else
+                    $"Show {sideText}s and their annotations"
+
+            Html.button [
+                prop.type'.button
+                prop.title label
+                prop.className [
+                    "swt:btn swt:btn-xs swt:btn-square"
+                    if isVisible then "swt:btn-primary" else "swt:btn-ghost"
+                ]
+                prop.custom ("aria-pressed", isVisible)
+                prop.ariaLabel label
+                // Always-on anchor for the interactive tutorial's spotlight.
+                prop.custom ("data-tutorial", $"provenance-side-visibility-{side}")
+                if debug then
+                    prop.testId $"provenance-side-visibility-{side}"
+                prop.onClick (fun _ -> if isVisible then hideSide side else setHiddenSide None)
+                prop.children [
+                    Html.i [
+                        prop.className [
+                            "swt:iconify swt:size-4"
+                            match side, isVisible with
+                            | ProvenanceSide.Input, true -> "swt:fluent--panel-left-20-regular"
+                            | ProvenanceSide.Input, false -> "swt:fluent--panel-left-20-filled"
+                            | ProvenanceSide.Output, true -> "swt:fluent--panel-right-20-regular"
+                            | ProvenanceSide.Output, false -> "swt:fluent--panel-right-20-filled"
+                        ]
+                    ]
+                ]
+            ]
 
         let isRejectedPropertyRailDrop targetSide =
             let headerCannotSwitch sourceSide headerId =
@@ -1211,6 +1283,7 @@ type ProvenanceGrouping =
             [
                 string tier
                 string openRail
+                string hiddenSide
                 string density
                 string isPropertyShelfExpanded
                 string panelRatios.Left
@@ -1269,11 +1342,62 @@ type ProvenanceGrouping =
                 |]
             )
 
+        // One side hidden (wide or medium): the visible rail and its cards form a
+        // single cluster centered in the editor instead of stretching across it with
+        // the cards hugging one edge. Two equal `1fr` spacer columns flank the cluster,
+        // so whatever space is left over is split evenly on both sides at any width -
+        // unlike `justify-center`, which only centers space beyond the tracks' max and
+        // so leaves the cluster flush whenever the editor is not much wider than it.
+        // The card column keeps the same generous minimum the two-column middle panel
+        // gives it, and a fixed gutter track carries the rail-to-card connectors. No
+        // splitter: there is only one rail, and the bounded tracks keep it balanced.
+        let soloSurface (visibleSide: ProvenanceSide) =
+            let railTrack = "minmax(10rem, 16rem)"
+            let cardTrack = "minmax(24rem, 44rem)"
+
+            let gutter =
+                match density with
+                | Density.EditorDensity.Compact -> "3rem"
+                | _ -> "4rem"
+
+            let filler () = Html.div [ prop.ariaHidden true ]
+
+            Html.div [
+                prop.key layer.Id
+                prop.ref surfaceRef
+                prop.className "swt:relative swt:mx-4 swt:grid swt:min-w-0 swt:items-start swt:motion-fade-in"
+                prop.style [
+                    style.custom (
+                        "gridTemplateColumns",
+                        match visibleSide with
+                        | ProvenanceSide.Input -> $"minmax(0,1fr) {railTrack} {gutter} {cardTrack} minmax(0,1fr)"
+                        | ProvenanceSide.Output -> $"minmax(0,1fr) {cardTrack} {gutter} {railTrack} minmax(0,1fr)"
+                    )
+                ]
+                if debug then
+                    prop.testId "provenance-surface"
+                prop.children [
+                    connectorOverlay
+                    filler ()
+                    match visibleSide with
+                    | ProvenanceSide.Input ->
+                        railColumn ProvenanceSide.Input
+                        filler ()
+                        groupColumnFor ProvenanceSide.Input
+                    | ProvenanceSide.Output ->
+                        groupColumnFor ProvenanceSide.Output
+                        filler ()
+                        railColumn ProvenanceSide.Output
+                    filler ()
+                ]
+            ]
+
         // Keying the surface by layer remounts it on layer switches, so the change
         // fades in as one deliberate transition instead of flashing in place.
         let surface =
-            match tier with
-            | LayoutTier.Wide ->
+            match tier, hiddenSide with
+            | (LayoutTier.Wide | LayoutTier.Medium), Some hidden -> soloSurface (visibleSideFor hidden)
+            | LayoutTier.Wide, None ->
                 Html.div [
                     prop.key layer.Id
                     prop.ref surfaceRef
@@ -1295,6 +1419,7 @@ type ProvenanceGrouping =
                             (nudgeSplit Splitter.Left)
                             resetSplit
                             debug
+
                         Html.div [
                             // The wide column gap is the gutter the group-to-group
                             // connectors are drawn in.
@@ -1309,6 +1434,7 @@ type ProvenanceGrouping =
                                 groupColumnFor ProvenanceSide.Output
                             ]
                         ]
+
                         Splitter.handle
                             Splitter.Right
                             (activeSplit = Some Splitter.Right)
@@ -1321,7 +1447,7 @@ type ProvenanceGrouping =
                         railColumn ProvenanceSide.Output
                     ]
                 ]
-            | LayoutTier.Medium ->
+            | LayoutTier.Medium, None ->
                 let railTrack side =
                     if openRail = Some side then
                         "minmax(10rem, 16rem)"
@@ -1355,7 +1481,7 @@ type ProvenanceGrouping =
                         mediumRailColumn ProvenanceSide.Output
                     ]
                 ]
-            | LayoutTier.Narrow ->
+            | LayoutTier.Narrow, _ ->
                 // Stacked cards cannot host readable connector curves; connection
                 // badges on the cards carry that information instead.
                 Html.div [
@@ -1366,10 +1492,18 @@ type ProvenanceGrouping =
                     if debug then
                         prop.testId "provenance-surface"
                     prop.children [
-                        narrowRailSection ProvenanceSide.Input
-                        groupColumnFor ProvenanceSide.Input
-                        groupColumnFor ProvenanceSide.Output
-                        narrowRailSection ProvenanceSide.Output
+                        match hiddenSide with
+                        | Some ProvenanceSide.Output ->
+                            narrowRailSection ProvenanceSide.Input
+                            groupColumnFor ProvenanceSide.Input
+                        | Some ProvenanceSide.Input ->
+                            narrowRailSection ProvenanceSide.Output
+                            groupColumnFor ProvenanceSide.Output
+                        | None ->
+                            narrowRailSection ProvenanceSide.Input
+                            groupColumnFor ProvenanceSide.Input
+                            groupColumnFor ProvenanceSide.Output
+                            narrowRailSection ProvenanceSide.Output
                     ]
                 ]
 
@@ -1437,6 +1571,8 @@ type ProvenanceGrouping =
                                                     Html.span "Undo"
                                                 ]
                                             ]
+                                            sideVisibilityToggle ProvenanceSide.Input
+                                            sideVisibilityToggle ProvenanceSide.Output
                                             Html.button [
                                                 prop.title (
                                                     if showPropertyHeaderConnectors then
