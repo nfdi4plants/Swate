@@ -14,6 +14,7 @@ type AssignNoteConfig = {
     refreshGitStatus: unit -> unit
     copyFileSystemItem: CopyFileSystemItemRequest -> JS.Promise<Result<unit, exn>>
     movePath: MovePathRequest -> JS.Promise<Result<unit, exn>>
+    deletePath: string -> JS.Promise<Result<unit, exn>>
     enqueueError: ErrorModalRequest -> unit
 }
 
@@ -237,39 +238,67 @@ let buildAssignedAssetTargetPath
         asset.RelativeAssetPath
     |]
 
-let private moveAssignedAssets config target note targetFolderPath assets assetDestinations =
-    let rec moveNext assets = promise {
-        match assets with
+let private createAssignedAssetMovePlans target note targetFolderPath assets assetDestinations : MovePathRequest list =
+    assets
+    |> List.choose (fun asset ->
+        match assetDestinations |> Map.tryFind asset.SourceRelativePath with
+        | None
+        | Some AssignNoteAssetDestination.Protocol -> None
+        | Some destination when assetDestinationExistsForTarget target destination |> not -> None
+        | Some destination ->
+            let sourcePath =
+                combineRelativePaths [|
+                    targetFolderPath
+                    NoteConversion.noteAssetsFolderName
+                    asset.RelativeAssetPath
+                |]
+
+            let targetPath = buildAssignedAssetTargetPath target note asset destination
+
+            let moveRequest: MovePathRequest = {
+                sourceRelativePath = sourcePath
+                targetRelativePath = targetPath
+                overwrite = false
+            }
+
+            Some moveRequest
+    )
+
+let private moveAssignedAssets (config: AssignNoteConfig) (movePlans: MovePathRequest list) =
+    let rec moveNext completedMoves remainingMoves = promise {
+        match remainingMoves with
         | [] -> return Ok()
-        | asset :: remainingAssets ->
-            match assetDestinations |> Map.tryFind asset.SourceRelativePath with
-            | None
-            | Some AssignNoteAssetDestination.Protocol -> return! moveNext remainingAssets
-            | Some destination when assetDestinationExistsForTarget target destination |> not ->
-                return! moveNext remainingAssets
-            | Some destination ->
-                let sourcePath =
-                    combineRelativePaths [|
-                        targetFolderPath
-                        NoteConversion.noteAssetsFolderName
-                        asset.RelativeAssetPath
-                    |]
+        | movePlan :: remainingMoves ->
+            let! moveResult = config.movePath movePlan
 
-                let targetPath = buildAssignedAssetTargetPath target note asset destination
-
-                let! moveResult =
-                    config.movePath {
-                        sourceRelativePath = sourcePath
-                        targetRelativePath = targetPath
-                        overwrite = true
-                    }
-
-                match moveResult with
-                | Ok() -> return! moveNext remainingAssets
-                | Error moveError -> return Error moveError
+            match moveResult with
+            | Ok() -> return! moveNext (movePlan :: completedMoves) remainingMoves
+            | Error moveError -> return Error(moveError, completedMoves)
     }
 
-    moveNext assets
+    moveNext [] movePlans
+
+let private cleanupFailedAssignment (config: AssignNoteConfig) targetFolderPath (completedMoves: MovePathRequest list) =
+    let rec rollbackNext (remainingMoves: MovePathRequest list) = promise {
+        match remainingMoves with
+        | [] -> return ()
+        | movePlan :: remainingMoves ->
+            let rollbackRequest: MovePathRequest = {
+                sourceRelativePath = movePlan.targetRelativePath
+                targetRelativePath = movePlan.sourceRelativePath
+                overwrite = true
+            }
+
+            let! _ = config.movePath rollbackRequest
+
+            return! rollbackNext remainingMoves
+    }
+
+    promise {
+        do! rollbackNext completedMoves
+        let! _ = config.deletePath targetFolderPath
+        return ()
+    }
 
 let assignNoteToTarget
     (config: AssignNoteConfig)
@@ -295,8 +324,13 @@ let assignNoteToTarget
             match copyResult with
             | Error copyError -> enqueueAssignNoteError config.enqueueError copyError.Message
             | Ok() ->
-                match! moveAssignedAssets config target note targetFolderPath assets assetDestinations with
-                | Error assetMoveError -> enqueueAssignNoteError config.enqueueError assetMoveError.Message
+                let movePlans =
+                    createAssignedAssetMovePlans target note targetFolderPath assets assetDestinations
+
+                match! moveAssignedAssets config movePlans with
+                | Error(assetMoveError, completedMoves) ->
+                    do! cleanupFailedAssignment config targetFolderPath completedMoves
+                    enqueueAssignNoteError config.enqueueError assetMoveError.Message
                 | Ok() ->
                     config.refreshGitStatus ()
                     config.closeDialog ()

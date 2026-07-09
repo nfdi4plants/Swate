@@ -92,6 +92,98 @@ let private assignableAsset sourceRelativePath relativeAssetPath : AssignableNot
     RelativeAssetPath = relativeAssetPath
 }
 
+let private sampleAssignableNoteRootPath = "notes/2026-06-15/Sampling_protocol"
+
+let private sampleAssignedNoteFolderPath =
+    "assays/AssayA/protocols/2026-06-15_Sampling_protocol"
+
+let private sampleAssignableAssetPath relativeAssetPath =
+    $"{sampleAssignableNoteRootPath}/assets/{relativeAssetPath}"
+
+let private sampleAssignedProtocolAssetPath relativeAssetPath =
+    $"{sampleAssignedNoteFolderPath}/assets/{relativeAssetPath}"
+
+let private sampleAssignedDatasetAssetPath relativeAssetPath =
+    $"assays/AssayA/dataset/2026-06-15_Sampling_protocol/assets/{relativeAssetPath}"
+
+type private AssignNoteTestHarness = {
+    Target: ExistingTargetRef
+    Note: AssignableNoteRef
+    CopyRequests: ResizeArray<CopyFileSystemItemRequest>
+    MoveRequests: ResizeArray<MovePathRequest>
+    DeleteRequests: ResizeArray<string>
+    Errors: ResizeArray<Swate.Components.Primitive.ErrorModal.Types.ErrorModalRequest>
+    Closed: bool ref
+    Refreshed: bool ref
+    Config: AssignNoteConfig
+}
+
+let private createAssignNoteHarness moveResult =
+    let copyRequests = ResizeArray<CopyFileSystemItemRequest>()
+    let moveRequests = ResizeArray<MovePathRequest>()
+    let deleteRequests = ResizeArray<string>()
+
+    let errors =
+        ResizeArray<Swate.Components.Primitive.ErrorModal.Types.ErrorModalRequest>()
+
+    let closed = ref false
+    let refreshed = ref false
+
+    {
+        Target = {
+            Name = "AssayA"
+            Kind = NotesTargetKind.Assay
+        }
+        Note = assignableNote sampleAssignableNoteRootPath "Sampling_protocol"
+        CopyRequests = copyRequests
+        MoveRequests = moveRequests
+        DeleteRequests = deleteRequests
+        Errors = errors
+        Closed = closed
+        Refreshed = refreshed
+        Config = {
+            closeDialog = fun () -> closed.Value <- true
+            refreshGitStatus = fun () -> refreshed.Value <- true
+            copyFileSystemItem =
+                fun request -> promise {
+                    copyRequests.Add request
+                    return Ok()
+                }
+            movePath =
+                fun request -> promise {
+                    moveRequests.Add request
+                    return moveResult request moveRequests.Count
+                }
+            deletePath =
+                fun path -> promise {
+                    deleteRequests.Add path
+                    return Ok()
+                }
+            enqueueError = errors.Add
+        }
+    }
+
+let private createSuccessfulAssignNoteHarness () =
+    createAssignNoteHarness (fun _ _ -> Ok())
+
+let private createFailingSecondMoveAssignNoteHarness () =
+    createAssignNoteHarness (fun _ moveCount ->
+        if moveCount = 2 then
+            Error(exn "asset move failed")
+        else
+            Ok()
+    )
+
+let private expectCopyRequest (request: CopyFileSystemItemRequest) sourcePath targetPath overwrite =
+    Vitest.expect(request.sourceRelativePath).toBe (sourcePath)
+    Vitest.expect(request.targetRelativePath).toBe (targetPath)
+    Vitest.expect(request.overwrite).toBe (overwrite)
+
+let private expectMoveRequest (request: MovePathRequest) sourcePath targetPath overwrite =
+    Vitest.expect(request.sourceRelativePath).toBe (sourcePath)
+    Vitest.expect(request.targetRelativePath).toBe (targetPath)
+    Vitest.expect(request.overwrite).toBe (overwrite)
+
 let private renderToBody (element: ReactElement) = promise {
     let container = document.createElement ("div") :?> HTMLDivElement
     document.body.appendChild container |> ignore
@@ -911,18 +1003,18 @@ Vitest.describe (
                     Kind = NotesTargetKind.Assay
                 }
 
-                let note = assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
+                let note = assignableNote sampleAssignableNoteRootPath "Sampling_protocol"
 
                 let asset =
-                    assignableAsset "notes/2026-06-15/Sampling_protocol/assets/diagram.png" "nested/diagram.png"
+                    assignableAsset (sampleAssignableAssetPath "diagram.png") "nested/diagram.png"
 
                 Vitest
                     .expect(buildAssignedAssetTargetPath target note asset AssignNoteAssetDestination.Protocol)
-                    .toBe ("assays/AssayA/protocols/2026-06-15_Sampling_protocol/assets/nested/diagram.png")
+                    .toBe (sampleAssignedProtocolAssetPath "nested/diagram.png")
 
                 Vitest
                     .expect(buildAssignedAssetTargetPath target note asset AssignNoteAssetDestination.Dataset)
-                    .toBe ("assays/AssayA/dataset/2026-06-15_Sampling_protocol/assets/nested/diagram.png")
+                    .toBe (sampleAssignedDatasetAssetPath "nested/diagram.png")
 
                 let studyTarget = {
                     Name = "StudyA"
@@ -937,134 +1029,89 @@ Vitest.describe (
         Vitest.test (
             "assignNoteToTarget copies the note and moves selected assets within the assigned copy",
             fun () -> promise {
-                let target = {
-                    Name = "AssayA"
-                    Kind = NotesTargetKind.Assay
-                }
-
-                let note = assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
-
-                let copyRequests = ResizeArray<CopyFileSystemItemRequest>()
-                let moveRequests = ResizeArray<MovePathRequest>()
-                let mutable closed = false
-
-                let config: AssignNoteConfig = {
-                    closeDialog = fun () -> closed <- true
-                    refreshGitStatus = ignore
-                    copyFileSystemItem =
-                        fun request -> promise {
-                            copyRequests.Add request
-                            return Ok()
-                        }
-                    movePath =
-                        fun request -> promise {
-                            moveRequests.Add request
-                            return Ok()
-                        }
-                    enqueueError = ignore
-                }
+                let harness = createSuccessfulAssignNoteHarness ()
 
                 let assets = [
-                    assignableAsset "notes/2026-06-15/Sampling_protocol/assets/unassigned.png" "unassigned.png"
-                    assignableAsset "notes/2026-06-15/Sampling_protocol/assets/protocol.png" "protocol.png"
-                    assignableAsset "notes/2026-06-15/Sampling_protocol/assets/data.csv" "data.csv"
-                    assignableAsset
-                        "notes/2026-06-15/Sampling_protocol/assets/nested/reference.pdf"
-                        "nested/reference.pdf"
+                    assignableAsset (sampleAssignableAssetPath "unassigned.png") "unassigned.png"
+                    assignableAsset (sampleAssignableAssetPath "protocol.png") "protocol.png"
+                    assignableAsset (sampleAssignableAssetPath "data.csv") "data.csv"
+                    assignableAsset (sampleAssignableAssetPath "nested/reference.pdf") "nested/reference.pdf"
                 ]
 
                 let selectedDestinations =
                     [
-                        "notes/2026-06-15/Sampling_protocol/assets/protocol.png", AssignNoteAssetDestination.Protocol
-                        "notes/2026-06-15/Sampling_protocol/assets/data.csv", AssignNoteAssetDestination.Dataset
-                        "notes/2026-06-15/Sampling_protocol/assets/nested/reference.pdf",
-                        AssignNoteAssetDestination.Resource
+                        sampleAssignableAssetPath "protocol.png", AssignNoteAssetDestination.Protocol
+                        sampleAssignableAssetPath "data.csv", AssignNoteAssetDestination.Dataset
+                        sampleAssignableAssetPath "nested/reference.pdf", AssignNoteAssetDestination.Resource
                     ]
                     |> Map.ofList
 
-                do! assignNoteToTarget config target note assets selectedDestinations
+                do! assignNoteToTarget harness.Config harness.Target harness.Note assets selectedDestinations
 
-                Vitest.expect(closed).toBe (true)
-                Vitest.expect(copyRequests.[0].sourceRelativePath).toBe ("notes/2026-06-15/Sampling_protocol")
+                Vitest.expect(harness.Closed.Value).toBe (true)
 
-                Vitest
-                    .expect(copyRequests.[0].targetRelativePath)
-                    .toBe ("assays/AssayA/protocols/2026-06-15_Sampling_protocol")
+                expectCopyRequest
+                    harness.CopyRequests.[0]
+                    sampleAssignableNoteRootPath
+                    sampleAssignedNoteFolderPath
+                    false
 
-                Vitest.expect(copyRequests.[0].overwrite).toBe (false)
+                expectMoveRequest
+                    harness.MoveRequests.[0]
+                    (sampleAssignedProtocolAssetPath "data.csv")
+                    (sampleAssignedDatasetAssetPath "data.csv")
+                    false
 
-                Vitest
-                    .expect(moveRequests.[0].sourceRelativePath)
-                    .toBe ("assays/AssayA/protocols/2026-06-15_Sampling_protocol/assets/data.csv")
-
-                Vitest
-                    .expect(moveRequests.[0].targetRelativePath)
-                    .toBe ("assays/AssayA/dataset/2026-06-15_Sampling_protocol/assets/data.csv")
-
-                Vitest.expect(moveRequests.[0].overwrite).toBe (true)
-                Vitest.expect(moveRequests.Count).toBe (1)
+                Vitest.expect(harness.MoveRequests.Count).toBe (1)
+                Vitest.expect(harness.DeleteRequests.Count).toBe (0)
             }
         )
 
         Vitest.test (
-            "assignNoteToTarget uses the dated assigned note folder before moving selected assets",
+            "assignNoteToTarget rolls back the copied note when an asset move fails",
             fun () -> promise {
-                let target = {
-                    Name = "AssayA"
-                    Kind = NotesTargetKind.Assay
-                }
-
-                let note = assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
-
-                let copyRequests = ResizeArray<CopyFileSystemItemRequest>()
-                let moveRequests = ResizeArray<MovePathRequest>()
-
-                let errors =
-                    ResizeArray<Swate.Components.Primitive.ErrorModal.Types.ErrorModalRequest>()
-
-                let mutable closed = false
-
-                let config: AssignNoteConfig = {
-                    closeDialog = fun () -> closed <- true
-                    refreshGitStatus = ignore
-                    copyFileSystemItem =
-                        fun request -> promise {
-                            copyRequests.Add request
-                            return Ok()
-                        }
-                    movePath =
-                        fun request -> promise {
-                            moveRequests.Add request
-                            return Ok()
-                        }
-                    enqueueError = errors.Add
-                }
+                let harness = createFailingSecondMoveAssignNoteHarness ()
 
                 let assets = [
-                    assignableAsset "notes/2026-06-15/Sampling_protocol/assets/data.csv" "data.csv"
+                    assignableAsset (sampleAssignableAssetPath "data.csv") "data.csv"
+                    assignableAsset (sampleAssignableAssetPath "nested/reference.pdf") "nested/reference.pdf"
                 ]
 
                 let selectedDestinations =
                     [
-                        "notes/2026-06-15/Sampling_protocol/assets/data.csv", AssignNoteAssetDestination.Dataset
+                        sampleAssignableAssetPath "data.csv", AssignNoteAssetDestination.Dataset
+                        sampleAssignableAssetPath "nested/reference.pdf", AssignNoteAssetDestination.Dataset
                     ]
                     |> Map.ofList
 
-                do! assignNoteToTarget config target note assets selectedDestinations
+                do! assignNoteToTarget harness.Config harness.Target harness.Note assets selectedDestinations
 
-                Vitest.expect(errors.Count).toBe (0)
-                Vitest.expect(closed).toBe (true)
-                Vitest.expect(copyRequests.[0].overwrite).toBe (false)
+                Vitest.expect(harness.Closed.Value).toBe (false)
+                Vitest.expect(harness.Refreshed.Value).toBe (false)
+                Vitest.expect(harness.Errors.Count).toBe (1)
+                Vitest.expect(harness.Errors.[0].Message).toContain ("asset move failed")
 
-                Vitest
-                    .expect(moveRequests.[0].sourceRelativePath)
-                    .toBe ("assays/AssayA/protocols/2026-06-15_Sampling_protocol/assets/data.csv")
+                Vitest.expect(harness.DeleteRequests.ToArray()).toEqual ([| sampleAssignedNoteFolderPath |])
 
-                Vitest
-                    .expect(moveRequests.[0].targetRelativePath)
-                    .toBe ("assays/AssayA/dataset/2026-06-15_Sampling_protocol/assets/data.csv")
+                Vitest.expect(harness.MoveRequests.Count).toBe (3)
 
-                Vitest.expect(moveRequests.[0].overwrite).toBe (true)
+                expectMoveRequest
+                    harness.MoveRequests.[0]
+                    (sampleAssignedProtocolAssetPath "data.csv")
+                    (sampleAssignedDatasetAssetPath "data.csv")
+                    false
+
+                expectMoveRequest
+                    harness.MoveRequests.[1]
+                    (sampleAssignedProtocolAssetPath "nested/reference.pdf")
+                    (sampleAssignedDatasetAssetPath "nested/reference.pdf")
+                    false
+
+                expectMoveRequest
+                    harness.MoveRequests.[2]
+                    (sampleAssignedDatasetAssetPath "data.csv")
+                    (sampleAssignedProtocolAssetPath "data.csv")
+                    true
             }
         )
 

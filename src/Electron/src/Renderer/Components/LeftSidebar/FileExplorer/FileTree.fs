@@ -486,6 +486,7 @@ type FileTree =
                             refreshGitStatus = gitStateCtx.refresh
                             copyFileSystemItem = Api.ipcArcVaultApi.copyFileSystemItem
                             movePath = Api.ipcArcVaultApi.movePath
+                            deletePath = Api.ipcArcVaultApi.deletePath
                             enqueueError = errorModal.enqueue
                         }
                         target
