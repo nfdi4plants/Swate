@@ -79,8 +79,12 @@ type Layout =
     | Split of SplitId * SplitDirection * ratio: float * Layout * Layout
 
 type WorkspaceModel<'T> = {
+    /// This defines the visual layout of the workspace. Each pane is identified by its PaneId, which is used to look up the tabs in the Panes map.
     Layout: Layout
+    /// Maps ``PaneId`` to ``Pane<'T>``. A ``Pane`` contains the tabs and tab focus.
     PanesMap: Map<PaneId, Pane<'T>>
+    /// The pane, which was last worked on. This can be switched to a tab in this pane, or was freshly created after a split.
+    /// This is used to determine where to place new tabs.
     FocusedPane: PaneId
 }
 

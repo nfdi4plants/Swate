@@ -12,7 +12,6 @@ import {
     Swate_Components_Composite_Workspace_Types_WorkspaceModel$1__WorkspaceModel$1_SplitPane_Static as WorkspaceModel_SplitPane,
     Swate_Components_Composite_Workspace_Types_WorkspaceModel$1__WorkspaceModel$1_ClosePane_Static as WorkspaceModel_ClosePane,
     Swate_Components_Composite_Workspace_Types_WorkspaceModel$1__WorkspaceModel$1_CleanupEmptyPanes_Static_5649D743 as WorkspaceModel_CleanupEmptyPanes,
-    ensureEdgeSplitAllowed,
 } from './WorkspaceModel.fs.ts';
 import {
     Tab,

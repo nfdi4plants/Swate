@@ -52,8 +52,8 @@ async function dragToBottomEdge(source: Element, target: Element) {
   const to = target.getBoundingClientRect();
   const fromX = from.left + from.width / 2;
   const fromY = from.top + from.height / 2;
-  const toX = to.right - 1;
-  const toY = to.bottom - 1;
+  const toX = to.left + to.width / 2;
+  const toY = to.top + to.height / 2;
   const deltaX = toX - fromX;
   const deltaY = toY - fromY;
   const distance = Math.hypot(deltaX, deltaY) || 1;
@@ -61,11 +61,11 @@ async function dragToBottomEdge(source: Element, target: Element) {
   const activationY = fromY + (deltaY / distance) * 8;
   fireEvent.pointerDown(source, { clientX: fromX, clientY: fromY, button: 0, buttons: 1, isPrimary: true, pointerId: 1 });
   await nextFrame();
-  fireEvent.pointerMove(document, { clientX: activationX, clientY: activationY, button: 0, buttons: 1, isPrimary: true, pointerId: 1 });
+  fireEvent.pointerMove(target, { clientX: activationX, clientY: activationY, button: 0, buttons: 1, isPrimary: true, pointerId: 1 });
   await nextFrame();
   fireEvent.pointerMove(document, { clientX: toX, clientY: toY, button: 0, buttons: 1, isPrimary: true, pointerId: 1 });
   await nextFrame();
-  fireEvent.pointerUp(document, { clientX: toX, clientY: toY, button: 0, buttons: 0, isPrimary: true, pointerId: 1 });
+  fireEvent.pointerUp(target, { clientX: toX, clientY: toY, button: 0, buttons: 0, isPrimary: true, pointerId: 1 });
   await nextFrame();
 }
 
@@ -280,7 +280,7 @@ export const SelfSplitBottomWithMultipleTabs: Story = {
     const paneId = canvas.getByTestId(/^workspace-pane-/).getAttribute('data-testid')!.replace('workspace-pane-', '');
     const bottomEdge = canvas.getByTestId(`workspace-edge-${paneId}-bottom`);
 
-    await dragToBottomEdge(utilsTab, bottomEdge);
+    await dragByPointer(utilsTab, bottomEdge);
 
     await waitFor(() => {
       expect(canvas.getByTestId(/^workspace-split-/)).toBeInTheDocument();

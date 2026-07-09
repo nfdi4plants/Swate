@@ -28,8 +28,11 @@ module private Helper =
     let splitPane (edge: EdgeDirection) (paneId: PaneId) (layout: Layout) : PaneId * Layout =
         let newPaneId: Leaf = PaneId(Guid.NewGuid())
         let newSplitId: SplitId = SplitId(Guid.NewGuid())
+        /// The direction the new ``Split`` should have
         let targetDirection = edge.AsSplitDirection()
 
+        /// Generic helper to split a single pane into two new panes based on the edge direction.
+        /// Edge direction determines which pane will be the first and which will be the second in the split.
         let splitSingleByEdge (leaf: Leaf) =
             match edge with
             | EdgeDirection.Top -> {|
@@ -74,6 +77,9 @@ module private Helper =
 
         (newPaneId, nextLayout)
 
+    /// This function checks if a tab can be moved to a target pane based on the current layout.
+    ///
+    /// - If there is a ``Layout.Single`` with a single tab, we do not allow moving the tab to another pane, as this would leave the source pane empty.
     let ensureTabMoveAllowed (tabId: TabId) (model: WorkspaceModel<'T>) =
         let isExistingIsLastTab =
             model.PanesMap
@@ -134,6 +140,11 @@ type WorkspaceModel<'T> with
             FocusedPane = id
         }
 
+    /// This function has one responsibility: Every pane in ``PanesMap`` must contain at least one tab.
+    ///
+    /// If a pane is empty:
+    /// - Remove it from the Panes map
+    /// - collapse any splits in the layout affected by the removed pane
     static member CleanupEmptyPanes(model: WorkspaceModel<'T>) =
         let toBeRemovedPaneIds =
             model.PanesMap
@@ -181,6 +192,9 @@ type WorkspaceModel<'T> with
                 PanesMap = updatedPanesMap
         }
 
+    /// - For every pane:
+    ///   - if ``FocusedTab`` no longer exists, set FocusedTab to another one.
+    /// - If ``FocusedPane`` no longer exists, set FocusedPane to another one.
     static member EnsureValidFocus(model: WorkspaceModel<'T>) =
         let updatedPanesMap =
             model.PanesMap
@@ -215,6 +229,10 @@ type WorkspaceModel<'T> with
                 None
         )
 
+    /// This function adds a tab to the workspace model.
+    ///
+    /// - The tab will be added to the currently focused pane.
+    /// - The newly added tab will be set as the focused tab in that pane.
     static member AddTab (tab: Tab<'T>) (model: WorkspaceModel<'T>) =
 
         let focusedPaneId = model.FocusedPane
@@ -238,6 +256,10 @@ type WorkspaceModel<'T> with
                         )
         }
 
+    /// This function removes a tab in the workspace model.
+    /// If the tab is not found, the model remains unchanged.
+    ///
+    /// ⚠️ This function does not handle focus or cleanup empty panes.
     static member RemoveTab (tabId: TabId) (model: WorkspaceModel<'T>) =
 
         let updatePane (pane: Pane<'T>) = {
@@ -315,6 +337,12 @@ type WorkspaceModel<'T> with
                 FocusedPane = focusedPane
         }
 
+    /// This function moves a tab from its current pane to a target pane.
+    ///
+    /// - If the tab is not found in any pane, the model remains unchanged.
+    /// - If the target pane does not exist, the model remains unchanged.
+    /// - After moving the tab, the moved tab will be set as the focused tab in the target pane.
+    /// - ⚠️ This function does not cleanup empty panes.
     static member MoveTab (tabId: TabId) (targetPaneId: PaneId) (model: WorkspaceModel<'T>) =
         let nextSourcePane =
             model.PanesMap
@@ -378,6 +406,10 @@ type WorkspaceModel<'T> with
                 { model with PanesMap = model.PanesMap |> Map.add paneId updatedPane }
         | None -> model
 
+    /// This function splits a pane into two new panes, based on the specified direction.
+    ///
+    /// - The original pane will be replaced by a split layout containing two new panes. With one of them keeping the original PaneId.
+    /// - An empty pane will be created with a new PaneId. The new pane will be added to the Panes map.
     static member SplitPane (paneId: PaneId) (direction: EdgeDirection) (model: WorkspaceModel<'T>) =
         let newPaneId, nextLayout = splitPane direction paneId model.Layout
 

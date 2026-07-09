@@ -7,7 +7,6 @@ open Swate.Components
 open Swate.Components.JsBindings
 open Swate.Components.Composite.Workspace.Types
 open Swate.Components.Composite.Workspace.Context
-open Swate.Components.Composite.Workspace.WorkspaceModel
 open Swate.Components.Composite.Workspace.Helper.DndId
 
 module private ContentAreaHelper =
@@ -65,11 +64,7 @@ type ContentArea =
     static member ContentArea(paneId: PaneId) =
         let paneCtx = usePaneCtx ()
         let paneStateCtx = useWorkspacePaneStateCtx ()
-        let layoutCtx = useWorkspaceLayoutCtx ()
         let dndCtx = useWorkspaceDndCtx ()
-
-        let canSplit dir =
-            ensureEdgeSplitAllowed paneId dir layoutCtx.layout
 
         let focusedTab = paneCtx.focusedTab
         let tabs = paneCtx.tabs
@@ -104,6 +99,6 @@ type ContentArea =
                         EdgeDirection.Left
                         EdgeDirection.Right
                     ] do
-                        ContentArea.EdgeDropZone(pid, dir, canSplit dir, paneStateCtx.debug)
+                        ContentArea.EdgeDropZone(pid, dir, true, paneStateCtx.debug)
             ]
         ]
