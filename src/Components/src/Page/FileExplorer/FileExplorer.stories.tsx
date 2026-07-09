@@ -422,6 +422,18 @@ const expectStickyParentRowsToStayVisible = async (canvasElement: HTMLElement) =
     ),
   );
 
+  for (const toggle of parentToggles) {
+    const parentRow = toggle.closest("[data-file-item-id]");
+
+    if (!parentRow) {
+      throw new Error(`Expected sticky parent row for ${toggle.getAttribute("aria-label")}.`);
+    }
+
+    await expect(parentRow).toHaveClass(/swt:bg-base-100/);
+    await expect(parentRow).toHaveClass(/swt:border-b/);
+    await expect(parentRow).toHaveClass(/swt:shadow-sm/);
+  }
+
   viewport.scrollTop = 360;
   fireEvent.scroll(viewport);
 
@@ -435,6 +447,23 @@ const expectStickyParentRowsToStayVisible = async (canvasElement: HTMLElement) =
       expect(rect.bottom).toBeLessThanOrEqual(viewportRect.bottom + 1);
     }
   });
+};
+
+const expectExpandedNonStickyDirectoryRowsToStayUnframed = async (canvasElement: HTMLElement) => {
+  const canvas = within(canvasElement);
+  const folderLabel = await canvas.findByText("Initially Expanded");
+  const folderRow = folderLabel.closest("[data-file-item-id]");
+
+  await waitFor(() => expect(folderRow).toBeTruthy());
+
+  if (!folderRow) {
+    throw new Error("Expected expanded directory row.");
+  }
+
+  await expect(folderRow).not.toHaveClass(/swt:bg-base-100/);
+  await expect(folderRow).not.toHaveClass(/swt:border-b/);
+  await expect(folderRow).not.toHaveClass(/swt:shadow-sm/);
+  expect(window.getComputedStyle(folderRow).position).not.toBe("sticky");
 };
 
 const expectContextMenuCopy = async (
@@ -576,6 +605,7 @@ export const InitialExpandedHintIsApplied: StoryObj<typeof InitiallyExpandedFile
 
     await expect(await canvas.findByText("Initially Visible.txt")).toBeInTheDocument();
     await expect(canvas.getByRole("button", { name: "Collapse Initially Expanded" })).toBeInTheDocument();
+    await expectExpandedNonStickyDirectoryRowsToStayUnframed(canvasElement);
   },
 };
 

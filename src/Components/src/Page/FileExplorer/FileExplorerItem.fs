@@ -287,6 +287,7 @@ type FileExplorerItem =
         let hasStatusControl = Helper.isLfs item || statusAction.IsSome
 
         let effectiveStickyDepth = if isExpanded then stickyDepth else None
+        let hasStickyTreatment = effectiveStickyDepth.IsSome
 
         let stickyParentRowHeightPx = 32
 
@@ -301,7 +302,7 @@ type FileExplorerItem =
                 prop.custom ("data-file-item-id", item.Id)
                 prop.className [
                     "swt:group swt:w-full swt:px-2 swt:py-1 swt:cursor-default"
-                    if isExpanded then
+                    if hasStickyTreatment then
                         "swt:bg-base-100 swt:border-b swt:border-base-content/10 swt:shadow-sm"
 
                     rowHighlightClass
