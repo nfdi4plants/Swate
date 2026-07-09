@@ -8,22 +8,26 @@ module private Helper =
 
     let collapseRemovedPane (toBeRemoved: PaneId) (layout: Layout) =
 
+        let rec loop (layout: Layout) : Layout =
+            match layout with
+            | Layout.Split(_,_,_, Layout.Single remove, keep)
+            | Layout.Split(_,_,_, keep, Layout.Single remove) when remove = toBeRemoved ->
+                keep
+            | Layout.Split(splitId, dir, r, i1, i2) ->
+                let next1 = loop i1
+                let next2 = loop i2
+                Layout.Split(splitId, dir, r, next1, next2)
+            | _ -> layout
+
         match layout with
+        // If the layout is a single pane, we just return it as is
         | Layout.Single id -> Layout.Single id
-        | Layout.Split(_, _, _, Level1.Single remove, Level1.Single keep)
-        | Layout.Split(_, _, _, Level1.Single keep, Level1.Single remove) when remove = toBeRemoved -> Layout.Single keep
-        | Layout.Split(_, _, _, Level1.Single remove, Level1.Split(_, splitDir, splitRat, splitL1, splitL2))
-        | Layout.Split(_, _, _, Level1.Split(_, splitDir, splitRat, splitL1, splitL2), Level1.Single remove) when remove = toBeRemoved ->
-            Layout.Split(SplitId(Guid.NewGuid()), splitDir, splitRat, Level1.Single splitL1, Level1.Single splitL2)
-        | Layout.Split(_, dir, r, Level1.Single keep, Level1.Split(_, _, _, keep1, remove))
-        | Layout.Split(_, dir, r, Level1.Single keep, Level1.Split(_, _, _, remove, keep1))
-        | Layout.Split(_, dir, r, Level1.Split(_, _, _, remove, keep1), Level1.Single keep)
-        | Layout.Split(_, dir, r, Level1.Split(_, _, _, keep1, remove), Level1.Single keep) when remove = toBeRemoved ->
-            Layout.Split(SplitId(Guid.NewGuid()), dir, r, Level1.Single keep, Level1.Single keep1)
-        | anyElse -> anyElse
+        | Layout.Split(_, _, _, _, _) as split ->
+            loop split
 
     let splitPane (edge: EdgeDirection) (paneId: PaneId) (layout: Layout) : PaneId * Layout =
         let newPaneId: Leaf = PaneId(Guid.NewGuid())
+        let newSplitId: SplitId = SplitId(Guid.NewGuid())
         let targetDirection = edge.AsSplitDirection()
 
         let splitSingleByEdge (leaf: Leaf) =
@@ -49,84 +53,26 @@ module private Helper =
                 second = newPaneId
               |}
 
-        let splitLevel1 (lvl1: Level1) =
-            match lvl1 with
-            | Level1.Single id when id = paneId ->
-                let split = splitSingleByEdge id
-                Level1.Split(SplitId(Guid.NewGuid()), split.direction, 0.5, split.first, split.second)
-            | _ -> lvl1
+        let mutable isSplit = false
 
-        let nextLayout =
+        let rec loop (layout: Layout) = 
             match layout with
+            // Early exit if we have found the pane to split
+            | _ when isSplit -> layout
             | Layout.Single id when id = paneId ->
                 let split = splitSingleByEdge id
-                Layout.Split(SplitId(Guid.NewGuid()), split.direction, 0.5, Level1.Single split.first, Level1.Single split.second)
-            | Layout.Split(_, dir, _, _, _) when dir = targetDirection -> layout
-            | Layout.Split(splitId, dir, r, l1, l2) ->
-                let updatedL1 = splitLevel1 l1
-                let updatedL2 = splitLevel1 l2
-                Layout.Split(splitId, dir, r, updatedL1, updatedL2)
+                isSplit <- true
+                Layout.Split(newSplitId, split.direction, 0.5, Layout.Single split.first, Layout.Single split.second)
+            | Layout.Split(splitId, dir, r, i1, i2) ->
+                let next1 = loop i1
+                let next2 = loop i2
+                Layout.Split(splitId, dir, r, next1, next2)
             | _ -> layout
 
+        let nextLayout =
+            loop layout
+
         (newPaneId, nextLayout)
-
-    let getAllowedEdgeSplits (paneIdParam: Leaf) (layout: Layout) =
-        let defaultResponse = {|
-            edges = []
-            isTopAllowed = false
-            isBottomAllowed = false
-            isLeftAllowed = false
-            isRightAllowed = false
-        |}
-
-        match layout with
-        | Layout.Single id when id = paneIdParam ->
-            {|
-                defaultResponse with
-                    edges = [
-                        EdgeDirection.Top
-                        EdgeDirection.Bottom
-                        EdgeDirection.Left
-                        EdgeDirection.Right
-                    ]
-                    isTopAllowed = true
-                    isBottomAllowed = true
-                    isLeftAllowed = true
-                    isRightAllowed = true
-            |}
-        | Layout.Split(_, dir, _, Level1.Single targetId, _)
-        | Layout.Split(_, dir, _, _, Level1.Single targetId) when targetId = paneIdParam ->
-            match dir with
-            | SplitDirection.Horizontal ->
-                {|
-                    defaultResponse with
-                        edges = [
-                            EdgeDirection.Top
-                            EdgeDirection.Bottom
-                        ]
-                        isTopAllowed = true
-                        isBottomAllowed = true
-                |}
-            | SplitDirection.Vertical ->
-                {|
-                    defaultResponse with
-                        edges = [
-                            EdgeDirection.Left
-                            EdgeDirection.Right
-                        ]
-                        isLeftAllowed = true
-                        isRightAllowed = true
-                |}
-        | _ ->
-            defaultResponse
-
-    let ensureEdgeSplitAllowed (paneId: Leaf) (edge: EdgeDirection) (layout: Layout) =
-        let allowedEdges = getAllowedEdgeSplits paneId layout
-        match edge with
-        | EdgeDirection.Top -> allowedEdges.isTopAllowed
-        | EdgeDirection.Bottom -> allowedEdges.isBottomAllowed
-        | EdgeDirection.Left -> allowedEdges.isLeftAllowed
-        | EdgeDirection.Right -> allowedEdges.isRightAllowed
 
     let ensureTabMoveAllowed (tabId: TabId) (model: WorkspaceModel<'T>) =
         let isExistingIsLastTab =
@@ -151,18 +97,12 @@ module private Helper =
             false
 
     let ensureTabEdgeDropAllowed (tabId: TabId) (paneId: Leaf) (edge: EdgeDirection) (model: WorkspaceModel<'T>) =
-        let splitAllowed =
-            model.Layout
-            |> ensureEdgeSplitAllowed paneId edge
         let tabMoveAllowed =
             model
             |> ensureTabMoveAllowed tabId
-        splitAllowed && tabMoveAllowed
+        tabMoveAllowed
 
 open Helper
-
-let ensureEdgeSplitAllowed (paneId: Leaf) (edge: EdgeDirection) (layout: Layout) =
-    Helper.ensureEdgeSplitAllowed paneId edge layout
 
 type WorkspaceModel<'T> with
 
@@ -218,18 +158,17 @@ type WorkspaceModel<'T> with
                 model
                 toBeRemovedPaneIds
 
+    /// This function ensures that the Panes map is in sync with the Layout.
+    /// 
+    /// - If a pane is in the Layout but not in the Panes map, it will be removed from the Layout.
     static member EnsurePaneMapSync(model: WorkspaceModel<'T>) =
-        let paneIdsInLayout =
-            let collectPaneIds (layout: Layout) =
-                match layout with
-                | Layout.Single id -> [ id ]
-                | Layout.Split(_, _, _, l1, l2) ->
-                    let collectInnerIds (lvl1: Level1) =
-                        match lvl1 with
-                        | Level1.Single id -> [ id ]
-                        | Level1.Split(_, _, _, l1, l2) -> [ l1; l2 ]
+        let rec collectPaneIds (layout: Layout) : PaneId list =
+            match layout with
+            | Layout.Single id -> [ id ]
+            | Layout.Split(_, _, _, l1, l2) ->
+                collectPaneIds l1 @ collectPaneIds l2
 
-                    collectInnerIds l1 @ collectInnerIds l2
+        let paneIdsInLayout =
 
             collectPaneIds model.Layout |> Set.ofList<PaneId>
 
@@ -476,19 +415,18 @@ type WorkspaceModel<'T> with
     static member SetSplitRatio (splitId: SplitId) (ratio: float) (model: WorkspaceModel<'T>) =
         let clamped = max 0.15 (min 0.85 ratio)
 
+        let mutable isUpdated = false
+
         let rec updateLayout (layout: Layout) : Layout =
             match layout with
+            // Early exit if we have already updated the ratio
+            | _ when isUpdated -> layout
             | Layout.Split(id, dir, _, l1, l2) when id.Value = splitId.Value ->
+                isUpdated <- true
                 Layout.Split(id, dir, clamped, l1, l2)
             | Layout.Split(id, dir, r, l1, l2) ->
-                Layout.Split(id, dir, r, updateLevel1 l1, updateLevel1 l2)
+                Layout.Split(id, dir, r, updateLayout l1, updateLayout l2)
             | _ -> layout
-
-        and updateLevel1 (lvl: Level1) : Level1 =
-            match lvl with
-            | Level1.Split(id, dir, _, l1, l2) when id.Value = splitId.Value ->
-                Level1.Split(id, dir, clamped, l1, l2)
-            | _ -> lvl
 
         { model with Layout = updateLayout model.Layout }
 

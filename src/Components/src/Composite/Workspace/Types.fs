@@ -74,14 +74,9 @@ type SplitId =
 type Leaf = PaneId
 
 [<RequireQualifiedAccess>]
-type Level1 =
-    | Single of Leaf
-    | Split of SplitId * SplitDirection * ratio: float * Leaf * Leaf
-
-[<RequireQualifiedAccess>]
 type Layout =
     | Single of Leaf
-    | Split of SplitId * SplitDirection * ratio: float * Level1 * Level1
+    | Split of SplitId * SplitDirection * ratio: float * Layout * Layout
 
 type WorkspaceModel<'T> = {
     Layout: Layout
