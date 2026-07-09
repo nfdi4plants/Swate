@@ -582,6 +582,14 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "assigned note folder name keeps the root note date",
+            fun () ->
+                let note = assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
+
+                Vitest.expect(buildAssignedNoteFolderName note).toBe ("2026-06-15_Sampling_protocol")
+        )
+
+        Vitest.test (
             "assignable asset destinations follow the selected target entity folders",
             fun () ->
                 let assayTarget = {
@@ -910,11 +918,11 @@ Vitest.describe (
 
                 Vitest
                     .expect(buildAssignedAssetTargetPath target note asset AssignNoteAssetDestination.Protocol)
-                    .toBe ("assays/AssayA/protocols/Sampling_protocol/assets/nested/diagram.png")
+                    .toBe ("assays/AssayA/protocols/2026-06-15_Sampling_protocol/assets/nested/diagram.png")
 
                 Vitest
                     .expect(buildAssignedAssetTargetPath target note asset AssignNoteAssetDestination.Dataset)
-                    .toBe ("assays/AssayA/dataset/Sampling_protocol/assets/nested/diagram.png")
+                    .toBe ("assays/AssayA/dataset/2026-06-15_Sampling_protocol/assets/nested/diagram.png")
 
                 let studyTarget = {
                     Name = "StudyA"
@@ -923,7 +931,7 @@ Vitest.describe (
 
                 Vitest
                     .expect(buildAssignedAssetTargetPath studyTarget note asset AssignNoteAssetDestination.Resource)
-                    .toBe ("studies/StudyA/resources/Sampling_protocol/assets/nested/diagram.png")
+                    .toBe ("studies/StudyA/resources/2026-06-15_Sampling_protocol/assets/nested/diagram.png")
         )
 
         Vitest.test (
@@ -978,16 +986,20 @@ Vitest.describe (
 
                 Vitest.expect(closed).toBe (true)
                 Vitest.expect(copyRequests.[0].sourceRelativePath).toBe ("notes/2026-06-15/Sampling_protocol")
-                Vitest.expect(copyRequests.[0].targetRelativePath).toBe ("assays/AssayA/protocols/Sampling_protocol")
-                Vitest.expect(copyRequests.[0].overwrite).toBe (true)
+
+                Vitest
+                    .expect(copyRequests.[0].targetRelativePath)
+                    .toBe ("assays/AssayA/protocols/2026-06-15_Sampling_protocol")
+
+                Vitest.expect(copyRequests.[0].overwrite).toBe (false)
 
                 Vitest
                     .expect(moveRequests.[0].sourceRelativePath)
-                    .toBe ("assays/AssayA/protocols/Sampling_protocol/assets/data.csv")
+                    .toBe ("assays/AssayA/protocols/2026-06-15_Sampling_protocol/assets/data.csv")
 
                 Vitest
                     .expect(moveRequests.[0].targetRelativePath)
-                    .toBe ("assays/AssayA/dataset/Sampling_protocol/assets/data.csv")
+                    .toBe ("assays/AssayA/dataset/2026-06-15_Sampling_protocol/assets/data.csv")
 
                 Vitest.expect(moveRequests.[0].overwrite).toBe (true)
                 Vitest.expect(moveRequests.Count).toBe (1)
@@ -995,7 +1007,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "assignNoteToTarget refreshes the assigned note folder before moving selected assets",
+            "assignNoteToTarget uses the dated assigned note folder before moving selected assets",
             fun () -> promise {
                 let target = {
                     Name = "AssayA"
@@ -1042,15 +1054,15 @@ Vitest.describe (
 
                 Vitest.expect(errors.Count).toBe (0)
                 Vitest.expect(closed).toBe (true)
-                Vitest.expect(copyRequests.[0].overwrite).toBe (true)
+                Vitest.expect(copyRequests.[0].overwrite).toBe (false)
 
                 Vitest
                     .expect(moveRequests.[0].sourceRelativePath)
-                    .toBe ("assays/AssayA/protocols/Sampling_protocol/assets/data.csv")
+                    .toBe ("assays/AssayA/protocols/2026-06-15_Sampling_protocol/assets/data.csv")
 
                 Vitest
                     .expect(moveRequests.[0].targetRelativePath)
-                    .toBe ("assays/AssayA/dataset/Sampling_protocol/assets/data.csv")
+                    .toBe ("assays/AssayA/dataset/2026-06-15_Sampling_protocol/assets/data.csv")
 
                 Vitest.expect(moveRequests.[0].overwrite).toBe (true)
             }

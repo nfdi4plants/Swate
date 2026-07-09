@@ -180,6 +180,23 @@ let private targetRootPath (target: ExistingTargetRef) =
     let targetFolder, _ = NoteConversion.existingTargetFolders target.Kind
     combineRelativePaths [| targetFolder; target.Name |]
 
+let private tryGetRootNoteDateFolder (note: AssignableNoteRef) =
+    let normalizedSourcePath =
+        note.SourceFolderPath |> PathHelpers.normalizeCanonicalRelativePath
+
+    match getNonEmptyPathParts normalizedSourcePath with
+    | [| root; dateFolder; noteFolderName |] when
+        PathHelpers.pathsEqual root NoteConversion.notesRootFolder
+        && PathHelpers.pathsEqual noteFolderName note.NoteFolderName
+        ->
+        Some dateFolder
+    | _ -> None
+
+let buildAssignedNoteFolderName (note: AssignableNoteRef) =
+    match tryGetRootNoteDateFolder note with
+    | Some dateFolder -> $"{dateFolder}_{note.NoteFolderName}"
+    | None -> note.NoteFolderName
+
 let buildAssignedNoteFolderPath (target: ExistingTargetRef) (noteFolderName: string) =
     NoteConversion.mkExistingTargetRelativePath target noteFolderName
     |> Option.bind NoteConversion.tryGetNoteFolderRelativePath
@@ -196,20 +213,22 @@ let buildAssignedAssetTargetPath
     (asset: AssignableNoteAssetRef)
     destination
     =
+    let assignedNoteFolderName = buildAssignedNoteFolderName note
+
     let assetFolderPath =
         match destination with
-        | AssignNoteAssetDestination.Protocol -> buildAssignedNoteFolderPath target note.NoteFolderName
+        | AssignNoteAssetDestination.Protocol -> buildAssignedNoteFolderPath target assignedNoteFolderName
         | AssignNoteAssetDestination.Dataset ->
             combineRelativePaths [|
                 targetRootPath target
                 ARCtrl.ArcPathHelper.AssayDatasetFolderName
-                note.NoteFolderName
+                assignedNoteFolderName
             |]
         | AssignNoteAssetDestination.Resource ->
             combineRelativePaths [|
                 targetRootPath target
                 ARCtrl.ArcPathHelper.StudiesResourcesFolderName
-                note.NoteFolderName
+                assignedNoteFolderName
             |]
 
     combineRelativePaths [|
@@ -259,7 +278,8 @@ let assignNoteToTarget
     (assets: AssignableNoteAssetRef list)
     (assetDestinations: Map<string, AssignNoteAssetDestination>)
     : JS.Promise<unit> =
-    let targetFolderPath = buildAssignedNoteFolderPath target note.NoteFolderName
+    let targetFolderPath =
+        note |> buildAssignedNoteFolderName |> buildAssignedNoteFolderPath target
 
     promise {
         if PathHelpers.pathsEqual note.SourceFolderPath targetFolderPath then
@@ -269,7 +289,7 @@ let assignNoteToTarget
                 config.copyFileSystemItem {
                     sourceRelativePath = note.SourceFolderPath
                     targetRelativePath = targetFolderPath
-                    overwrite = true
+                    overwrite = false
                 }
 
             match copyResult with
