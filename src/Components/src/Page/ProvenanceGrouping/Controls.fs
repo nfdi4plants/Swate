@@ -1083,7 +1083,7 @@ type Controls =
         Html.aside [
             prop.ref droppable.setNodeRef
             prop.className [
-                "swt:flex swt:min-w-0 swt:flex-col swt:gap-2 swt:rounded swt:border swt:border-dashed swt:border-base-content/25 swt:border-2 swt:p-3 swt:transition-colors"
+                "swt:flex swt:min-h-[32rem] swt:min-w-0 swt:flex-col swt:gap-2 swt:rounded swt:border swt:border-dashed swt:border-base-content/25 swt:border-2 swt:p-3 swt:transition-colors"
                 if dropState = "rejecting" then
                     "swt:border-warning swt:bg-warning/10 swt:ring-2 swt:ring-warning/30"
                 elif droppable.isOver then
