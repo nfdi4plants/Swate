@@ -440,6 +440,11 @@ type ProvenanceGrouping =
             |]
         )
 
+        // Side hiding consolidates annotations onto the visible rail for the layer
+        // it runs on, so the flag must not carry over to another layer whose hidden
+        // side was never consolidated. Reveal both sides again on every layer switch.
+        React.useEffect ((fun () -> setHiddenSide None), [| box layer.Id |])
+
         // Splitter drags write the grid template straight to the DOM per animation
         // frame and commit the ratios to state once on release; committing per
         // pointermove re-rendered the entire editor for every mouse step.
