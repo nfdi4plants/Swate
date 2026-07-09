@@ -176,6 +176,13 @@ type TutorialOverlay =
                 |> Array.rev
                 |> Array.tryPick (fun step -> step.Checkpoint)
 
+        // The content is rebuilt only when the effective checkpoint or the restart
+        // generation changes - the same signal the KeyedFragment below remounts on.
+        // Without this, `render` runs on every overlay render (spotlight polling,
+        // card drags) and the reconciler discards the fresh subtree it builds.
+        let renderedContent =
+            React.useMemo ((fun () -> render effectiveCheckpoint), [| box generation; box effectiveCheckpoint |])
+
         let markCompleted stepId =
             let next = Set.add stepId latestCompleted.current
             latestCompleted.current <- next
@@ -760,7 +767,7 @@ type TutorialOverlay =
                         // the host rebuilds the state this step starts from.
                         React.KeyedFragment(
                             $"""tutorial-content-{generation}-{defaultArg effectiveCheckpoint "initial"}""",
-                            [ render effectiveCheckpoint ]
+                            [ renderedContent ]
                         )
                         Html.div [
                             prop.className "swt:absolute swt:inset-0 swt:z-40 swt:pointer-events-none"
