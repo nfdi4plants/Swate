@@ -399,7 +399,7 @@ type WorkspaceModel<'T> with
                 |> Option.map (fun targetPane ->
                     let updatedTargetPane = {
                         targetPane with
-                            Tabs = toBeMovedTab :: targetPane.Tabs
+                            Tabs = targetPane.Tabs @ [ toBeMovedTab ]
                             FocusedTab = Some toBeMovedTab.Id
                     }
 

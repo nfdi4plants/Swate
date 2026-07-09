@@ -191,6 +191,12 @@ type Workspace =
 
                     dispatchCtx.dispatch (box (MoveTab(tabIdValue, targetPaneId)))
 
+                | Some (Tab(sourcePaneKey, tabId)), Some (Tab(targetPaneKey, _)) when targetPaneKey <> sourcePaneKey ->
+                    let tabIdValue = TabId tabId
+                    let targetPaneId = PaneId(Guid.Parse(targetPaneKey))
+
+                    dispatchCtx.dispatch (box (MoveTab(tabIdValue, targetPaneId)))
+
                 | Some (Tab(sourcePaneKey, tabId)), Some (Tab(targetPaneKey, targetTabId)) when targetPaneKey = sourcePaneKey ->
                     let tabIdValue = TabId tabId
                     let targetTabIdValue = TabId targetTabId
