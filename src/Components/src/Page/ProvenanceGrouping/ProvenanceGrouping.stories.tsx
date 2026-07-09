@@ -520,7 +520,18 @@ export const ToolbarUsesSinglePropertySortAndOriginButtons: Story = {
 };
 
 export const TopControlsShareOneRowWhenSpaceAllows: Story = {
-  render: () => <Harness />,
+  // The controls row wraps by design (flex-wrap) once it runs out of width, so
+  // this story must guarantee the ample width its name promises. At the default
+  // 1280px browser viewport the row sits right at the edge - it fits under one
+  // platform's font metrics and wraps under another's (Windows passes, Linux CI
+  // wraps by a row), which is what made this test flaky. A fixed wide wrapper
+  // pins the layout well clear of that edge so the single-row assertion is
+  // deterministic regardless of the runner's font rendering.
+  render: () => (
+    <div style={{ width: 1600 }}>
+      <Harness />
+    </div>
+  ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const topControls = canvas.getByTestId('provenance-top-controls');
