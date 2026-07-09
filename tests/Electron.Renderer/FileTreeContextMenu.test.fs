@@ -102,11 +102,11 @@ Vitest.describe (
                 let item = createFolderItem "AssayA" (Some "assays/AssayA")
                 let menuItems = pathActionContextMenuItems (createConfig ()) item
 
-                Vitest.expect(labels menuItems).toEqual ([| "Open Folder"; "Open folder location" |])
+                Vitest.expect(labels menuItems).toEqual ([| "Open Folder"; "Open Folder Location" |])
         )
 
         Vitest.test (
-            "folder open folder location opens the selected folder directly",
+            "folder open folder opens the selected folder directly",
             fun () -> promise {
                 let item = createFolderItem "AssayA" (Some "assays/AssayA")
                 let mutable revealedPath: string option = None
@@ -128,10 +128,10 @@ Vitest.describe (
 
                 let menuItems = pathActionContextMenuItems config item
 
-                let openFolderLocationItem =
+                let openFolderItem =
                     menuItems |> List.find (fun menuItem -> menuItem.Label = "Open Folder")
 
-                openFolderLocationItem.OnClick()
+                openFolderItem.OnClick()
                 do! Promise.sleep 0
 
                 Vitest.expect(revealedPath).toEqual (None)
@@ -163,7 +163,7 @@ Vitest.describe (
                 let menuItems = pathActionContextMenuItems config item
 
                 let openFolderLocationItem =
-                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Open folder location")
+                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Open Folder Location")
 
                 openFolderLocationItem.OnClick()
                 do! Promise.sleep 0

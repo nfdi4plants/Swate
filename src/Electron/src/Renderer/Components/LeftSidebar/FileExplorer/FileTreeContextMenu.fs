@@ -100,17 +100,11 @@ let private pathActionContextMenuItemsForRelativePath
                 "swt:fluent--open-24-regular"
                 (fun () -> runPathAction config "Open file failed" config.openPathWithDefaultApplication relativePath)
 
-        let openFolderLocation =
-            if item.IsDirectory then
-                config.openPathWithDefaultApplication
-            else
-                config.openPathInFileExplorer
-
         if item.IsDirectory then
             ContextMenuItem.create
                 "Open Folder"
                 "swt:fluent--folder-open-24-regular"
-                (fun () -> runPathAction config "Open folder failed" openFolderLocation relativePath)
+                (fun () -> runPathAction config "Open folder failed" config.openPathWithDefaultApplication relativePath)
 
         ContextMenuItem.create
             "Open Folder Location"
