@@ -900,31 +900,13 @@ type CompositeCellEditModal =
     static member RemoveUnit(cell: CompositeCell, header: CompositeHeader, setTerm: OntologyAnnotation -> unit, rmv) =
 
         let value, unit = cell.AsUnitized
-        let keepValueAsTerm, setKeepValueAsTerm = React.useState true
-
-        let term =
-            if keepValueAsTerm then
-                OntologyAnnotation.create value
-            else
-                unit
+        let term = OntologyAnnotation.create value
 
         let annotationFields nameLabel (oa: OntologyAnnotation) = [
             nameLabel, oa.NameText
             "Term source REF", oa.TermSourceREF |> Option.defaultValue ""
             "Term accession number", oa.TermAccessionNumber |> Option.defaultValue ""
         ]
-
-        let choiceButton (label: string, isSelected: bool, onSelect: unit -> unit) =
-            Html.button [
-                prop.type'.button
-                prop.custom ("aria-pressed", isSelected)
-                prop.className [
-                    "swt:btn swt:join-item swt:flex-1"
-                    if isSelected then "swt:btn-primary" else "swt:btn-outline"
-                ]
-                prop.onClick (fun _ -> onSelect ())
-                prop.text label
-            ]
 
         let submit =
             fun () ->
@@ -936,13 +918,6 @@ type CompositeCellEditModal =
             (fun _ -> rmv ()),
             Html.div "Remove Unit",
             React.Fragment [
-                Html.div [
-                    prop.className "swt:join swt:w-full"
-                    prop.children [
-                        choiceButton ("Keep value as term", keepValueAsTerm, fun () -> setKeepValueAsTerm true)
-                        choiceButton ("Keep unit as term", not keepValueAsTerm, fun () -> setKeepValueAsTerm false)
-                    ]
-                ]
                 Html.div [
                     prop.className "swt:grid swt:grid-cols-1 swt:gap-4 swt:md:grid-cols-2"
                     prop.children [

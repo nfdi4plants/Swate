@@ -454,24 +454,15 @@ export const RemoveUnitTransform: Story = {
     expect(modalView.getByText("Result")).toBeInTheDocument();
     expect(modalView.getByText("degree celsius")).toBeInTheDocument();
     expect(modalView.getAllByText("0").length).toBeGreaterThan(0);
-
-    const keepValueButton = modalView.getByRole("button", {
-      name: /Keep value as term/i,
-    });
-    const keepUnitButton = modalView.getByRole("button", {
-      name: /Keep unit as term/i,
-    });
-    expect(keepValueButton).toHaveAttribute("aria-pressed", "true");
-
-    await userEvent.click(keepUnitButton);
-    expect(keepUnitButton).toHaveAttribute("aria-pressed", "true");
+    expect(modalView.queryByText(/Keep value/i)).not.toBeInTheDocument();
+    expect(modalView.queryByText(/Keep unit/i)).not.toBeInTheDocument();
 
     await userEvent.click(modalView.getByRole("button", { name: /^Submit$/i }));
 
     await waitFor(() => {
       const updatedCell = canvas.getByTestId("cell-1-5");
-      expect(updatedCell).toHaveTextContent(/degree celsius/i);
-      expect(updatedCell).not.toHaveTextContent("0");
+      expect(updatedCell).toHaveTextContent("0");
+      expect(updatedCell).not.toHaveTextContent(/degree celsius/i);
     });
   },
 };
