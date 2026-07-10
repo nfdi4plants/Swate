@@ -316,7 +316,7 @@ export const SelfSplitBottomWithMultipleTabs: Story = {
   },
 };
 
-export const MoveTabToAnotherPane: Story = {
+export const ClosePaneViaLastTab: Story = {
   render: () => <SimpleHarness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -328,11 +328,53 @@ export const MoveTabToAnotherPane: Story = {
       expect(canvas.getAllByTestId(/^workspace-pane-/)).toHaveLength(2);
     });
 
+    const newPane = canvas.getAllByTestId(/^workspace-pane-/)[1];
+    expect(within(newPane).getByText('styles.css')).toBeVisible();
+    expect(within(newPane).queryByText('Main.tsx')).not.toBeInTheDocument();
+    expect(within(newPane).queryByText('utils.ts')).not.toBeInTheDocument();
+  },
+};
+
+export const ActiveTabContentAfterSplit: Story = {
+  render: () => <SimpleHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const stylesTab = canvas.getByText('styles.css').closest('[data-workspace-tab-id]')!;
+    await dragToPaneEdge(stylesTab, canvas, 'right');
+
     await waitFor(() => {
       const panes = canvas.getAllByTestId(/^workspace-pane-/);
+      expect(panes).toHaveLength(2);
       expect(panes[0]).toHaveTextContent('Main.tsx');
       expect(panes[0]).toHaveTextContent('utils.ts');
       expect(panes[1]).toHaveTextContent('styles.css');
+    });
+
+    expect(canvas.getByTestId('content-tab-1')).toBeVisible();
+  },
+};
+
+export const ContextMenuCloseOthers: Story = {
+  render: () => <SimpleHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(canvas.getAllByTestId(/^workspace-pane-/)).toHaveLength(1);
+
+    const tabButton = canvas.getByText('Main.tsx').closest('[data-workspace-tab-id]')!;
+    fireEvent.contextMenu(tabButton);
+    await nextFrame();
+
+    const body = within(document.body);
+    await waitFor(() => {
+      expect(body.getByText('Close Others')).toBeVisible();
+    });
+
+    await userEvent.click(body.getByText('Close Others'));
+    await waitFor(() => {
+      expect(canvas.queryByText('utils.ts')).not.toBeInTheDocument();
+      expect(canvas.queryByText('styles.css')).not.toBeInTheDocument();
+      expect(canvas.getByText('Main.tsx')).toBeVisible();
     });
   },
 };
