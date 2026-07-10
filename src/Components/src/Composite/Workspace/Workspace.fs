@@ -46,19 +46,24 @@ type Workspace =
         let objRenderTabContent (tab: obj) = renderTabContent (unbox<Tab<'T>> tab)
 
         let objPanesMap =
-            model.PanesMap
-            |> Map.map (fun _ (p: Pane<'T>) ->
-                {
-                    Id = p.Id
-                    Tabs =
-                        p.Tabs
-                        |> List.map (fun t -> {
-                            Id = t.Id
-                            Label = t.Label
-                            Payload = box t.Payload
-                        })
-                    FocusedTab = p.FocusedTab
-                }
+            React.useMemo (
+                (fun () ->
+                    model.PanesMap
+                    |> Map.map (fun _ (p: Pane<'T>) ->
+                        {
+                            Id = p.Id
+                            Tabs =
+                                p.Tabs
+                                |> List.map (fun t -> {
+                                    Id = t.Id
+                                    Label = t.Label
+                                    Payload = box t.Payload
+                                })
+                            FocusedTab = p.FocusedTab
+                        }
+                    )
+                ),
+                [| box model.PanesMap |]
             )
 
         let dispatchCtx: WorkspaceDispatchContext = {
@@ -163,11 +168,17 @@ type Workspace =
 
                 | _ -> ()
 
-        let dndCtxValue: WorkspaceDndContext = {
-            onDragStart = onDragStart
-            handleDragEnd = handleDragEnd
-            isDragging = activeDrag |> Option.isSome
-        }
+        let dndCtxValue: WorkspaceDndContext =
+            React.useMemo (
+                (fun () ->
+                    {
+                        onDragStart = onDragStart
+                        handleDragEnd = handleDragEnd
+                        isDragging = activeDrag |> Option.isSome
+                    }
+                ),
+                [| box onDragStart; box handleDragEnd; box activeDrag |]
+            )
 
         Html.div [
             prop.ref workspaceElementRef

@@ -17,12 +17,15 @@ type DropOverlay =
     [<ReactComponent>]
     static member DropOverlay(workspaceRef: IRefValue<HTMLElement option>) =
         let dispatchCtx = useWorkspaceDispatchCtx ()
-        let paneStateCtx = useWorkspacePaneStateCtx ()
 
         let isDragging, setIsDragging = React.useState false
         let isDraggingRef = React.useRef false
-        let dragInfo, setDragInfo = React.useState (None: (string * string) option)
+        let dragInfoRef =
+            React.useRef (None: (string * string) option)
+
         let dropTarget, setDropTarget = React.useState (None: DropTarget option)
+        let dropTargetRef =
+            React.useRef (None: DropTarget option)
 
         let targetRect, setTargetRect =
             React.useState (
@@ -32,9 +35,6 @@ type DropOverlay =
                          height: float |} option
             )
 
-        let dropTargetRef =
-            React.useRef (None: DropTarget option)
-
         let targetRectRef =
             React.useRef (
                 None: {| left: float
@@ -43,136 +43,92 @@ type DropOverlay =
                          height: float |} option
             )
 
-        let resolveTarget (x: float) (y: float) =
-            match workspaceRef.current, dragInfo with
+        let computeTargetRect
+            (workspaceEl: HTMLElement)
+            (target: DropTarget)
+            : {| left: float
+                 top: float
+                 width: float
+                 height: float |} option
+            =
+
+            let wr = workspaceEl.getBoundingClientRect()
+
+            match target with
+            | TabBarDrop paneId ->
+                match workspaceEl.querySelector ($"[data-workspace-tabbar=\"{paneId}\"]") with
+                | :? HTMLElement as tabBarEl ->
+                    let r = tabBarEl.getBoundingClientRect()
+
+                    Some {|
+                        left = r.left - wr.left
+                        top = r.top - wr.top
+                        width = r.width
+                        height = r.height
+                    |}
+                | _ -> None
+
+            | EdgeDrop(paneId, dir) ->
+                match workspaceEl.querySelector ($"[data-workspace-pane=\"{paneId}\"]") with
+                | :? HTMLElement as paneEl ->
+                    let r = paneEl.getBoundingClientRect()
+
+                    let tabBarHeight =
+                        match workspaceEl.querySelector ($"[data-workspace-tabbar=\"{paneId}\"]") with
+                        | :? HTMLElement as tb -> tb.getBoundingClientRect().height
+                        | _ -> 0.0
+
+                    let contentTop = r.top + tabBarHeight
+                    let contentHeight = max 0.0 (r.bottom - contentTop)
+                    let relativeLeft = r.left - wr.left
+                    let relativeContentTop = contentTop - wr.top
+
+                    match dir with
+                    | EdgeDirection.Top ->
+                        Some {|
+                            left = relativeLeft
+                            top = relativeContentTop
+                            width = r.width
+                            height = contentHeight * 0.25
+                        |}
+                    | EdgeDirection.Bottom ->
+                        Some {|
+                            left = relativeLeft
+                            top = relativeContentTop + contentHeight * 0.75
+                            width = r.width
+                            height = contentHeight * 0.25
+                        |}
+                    | EdgeDirection.Left ->
+                        Some {|
+                            left = relativeLeft
+                            top = relativeContentTop
+                            width = r.width * 0.25
+                            height = contentHeight
+                        |}
+                    | EdgeDirection.Right ->
+                        Some {|
+                            left = relativeLeft + r.width * 0.75
+                            top = relativeContentTop
+                            width = r.width * 0.25
+                            height = contentHeight
+                        |}
+                | _ -> None
+
+        let resolveAt (x: float) (y: float) =
+            match workspaceRef.current, dragInfoRef.current with
             | Some workspaceEl, Some(sourcePaneId, _) ->
-                let el : HTMLElement option =
-                    let fromPoint = Browser.Dom.document.elementFromPoint (x, y)
-
-                    let foundFrom el : HTMLElement option =
-                        let mutable found : HTMLElement option = None
-                        let mutable current : HTMLElement option = Some el
-
-                        while current.IsSome do
-                            let c = current.Value
-
-                            if obj.ReferenceEquals(c, workspaceEl) then
-                                current <- None
-                            elif not (isNull (c.getAttribute "data-workspace-pane")) then
-                                found <- Some c
-                                current <- None
-                            elif not (isNull (c.getAttribute "data-workspace-tabbar")) then
-                                found <- Some c
-                                current <- None
-                            else
-                                current <- Option.ofObj c.parentElement
-
-                        found
-
-                    match fromPoint with
-                    | :? HTMLElement as e when not (isNull e) ->
-                        match foundFrom e with
-                        | Some _ as result -> result
-                        | None ->
-                            let elements : Element[] = (!!Browser.Dom.document)?elementsFromPoint (x, y)
-
-                            elements
-                            |> Array.tryPick (fun el ->
-                                match el with
-                                | :? HTMLElement as h when workspaceEl.contains (h) -> foundFrom h
-                                | _ -> None
-                            )
-                    | _ -> None
-
-                match el with
-                | Some targetEl ->
-                    let target = resolveDropTarget targetEl x y workspaceEl sourcePaneId
+                match findPaneElement x y workspaceEl with
+                | Some foundEl ->
+                    let target = resolveDropTarget foundEl x y workspaceEl sourcePaneId
+                    let rect = target |> Option.bind (computeTargetRect workspaceEl)
                     setDropTarget target
                     dropTargetRef.current <- target
-
-                    match target with
-                    | Some(TabBarDrop paneId) ->
-                        let found = workspaceEl.querySelector ($"[data-workspace-tabbar=\"{paneId}\"]")
-
-                        match found with
-                        | :? HTMLElement as tabBarEl ->
-                            let r = tabBarEl.getBoundingClientRect()
-                            let wr = workspaceEl.getBoundingClientRect()
-
-                            let rect =
-                                Some {|
-                                    left = r.left - wr.left
-                                    top = r.top - wr.top
-                                    width = r.width
-                                    height = r.height
-                                |}
-
-                            setTargetRect rect
-                            targetRectRef.current <- rect
-                        | _ ->
-                            setTargetRect None
-                            targetRectRef.current <- None
-
-                    | Some(EdgeDrop(paneId, dir)) ->
-                        let found = workspaceEl.querySelector ($"[data-workspace-pane=\"{paneId}\"]")
-
-                        match found with
-                        | :? HTMLElement as paneEl ->
-                            let r = paneEl.getBoundingClientRect()
-                            let wr = workspaceEl.getBoundingClientRect()
-
-                            let tabBarEl =
-                                workspaceEl.querySelector ($"[data-workspace-tabbar=\"{paneId}\"]")
-
-                            let tabBarHeight =
-                                match tabBarEl with
-                                | :? HTMLElement as tb -> tb.getBoundingClientRect().height
-                                | _ -> 0.0
-
-                            let contentTop = r.top + tabBarHeight
-                            let contentHeight = max 0.0 (r.bottom - contentTop)
-                            let relativeLeft = r.left - wr.left
-                            let relativeContentTop = contentTop - wr.top
-
-                            let edgeRect =
-                                match dir with
-                                | EdgeDirection.Top -> {|
-                                    left = relativeLeft
-                                    top = relativeContentTop
-                                    width = r.width
-                                    height = contentHeight * 0.25
-                                  |}
-                                | EdgeDirection.Bottom -> {|
-                                    left = relativeLeft
-                                    top = relativeContentTop + contentHeight * 0.75
-                                    width = r.width
-                                    height = contentHeight * 0.25
-                                  |}
-                                | EdgeDirection.Left -> {|
-                                    left = relativeLeft
-                                    top = relativeContentTop
-                                    width = r.width * 0.25
-                                    height = contentHeight
-                                  |}
-                                | EdgeDirection.Right -> {|
-                                    left = relativeLeft + r.width * 0.75
-                                    top = relativeContentTop
-                                    width = r.width * 0.25
-                                    height = contentHeight
-                                  |}
-
-                            setTargetRect (Some edgeRect)
-                            targetRectRef.current <- Some edgeRect
-                        | _ ->
-                            setTargetRect None
-                            targetRectRef.current <- None
-                    | None ->
-                        setTargetRect None
-                        targetRectRef.current <- None
+                    setTargetRect rect
+                    targetRectRef.current <- rect
                 | None ->
                     setDropTarget None
-                    setTargetRect None
                     dropTargetRef.current <- None
+                    setTargetRect None
                     targetRectRef.current <- None
             | _ -> ()
 
@@ -185,14 +141,14 @@ type DropOverlay =
 
                             match DndId.read activeId with
                             | Some(Tab(sourcePaneId, tabId)) ->
-                                setDragInfo (Some(sourcePaneId, tabId))
+                                dragInfoRef.current <- Some(sourcePaneId, tabId)
                                 setIsDragging true
                                 isDraggingRef.current <- true
                             | _ -> ()
 
                 onDragEnd =
                     fun (_: DndKit.IDndKitEvent) ->
-                        match dragInfo, dropTargetRef.current with
+                        match dragInfoRef.current, dropTargetRef.current with
                         | Some(_, tabId), Some(TabBarDrop targetPaneId) ->
                             dispatchCtx.dispatch (
                                 box (
@@ -212,8 +168,8 @@ type DropOverlay =
                         | _ -> ()
 
                         isDraggingRef.current <- false
+                        dragInfoRef.current <- None
                         setIsDragging false
-                        setDragInfo None
                         setDropTarget None
                         setTargetRect None
                         dropTargetRef.current <- None
@@ -222,8 +178,8 @@ type DropOverlay =
                 onDragCancel =
                     fun (_: DndKit.IDndKitEvent) ->
                         isDraggingRef.current <- false
+                        dragInfoRef.current <- None
                         setIsDragging false
-                        setDragInfo None
                         setDropTarget None
                         setTargetRect None
                         dropTargetRef.current <- None
@@ -240,7 +196,7 @@ type DropOverlay =
 
                     let handler (e: PointerEvent) =
                         if isDraggingRef.current then
-                            resolveTarget e.clientX e.clientY
+                            resolveAt e.clientX e.clientY
 
                     handlerRef <- Some handler
                     Browser.Dom.document.addEventListener ("pointermove", unbox handler)
@@ -251,7 +207,7 @@ type DropOverlay =
                         | None -> ()
                     )
             ),
-            [| box isDragging; box dragInfo |]
+            [| box isDragging |]
         )
 
         match dropTarget, targetRect with

@@ -113,14 +113,18 @@ type TabBar =
             ]
             if paneStateCtx.debug then
                 prop.testId $"workspace-tabbar-{paneIdKey}"
+            prop.style [
+                style.minHeight 45
+            ]
             prop.children [
                 DndKit.SortableContext(
                     items = dragIds,
                     strategy = DndKit.horizontalListSortingStrategy,
                     children =
                         React.Fragment [
-                            for tab in tabs do
-                                let index = tabs |> Array.findIndex (fun t -> t.Id = tab.Id)
+                            for i in 0 .. tabs.Length - 1 do
+                                let tab = tabs.[i]
+                                let index = i
                                 let isActive = paneCtx.focusedTab = Some tab.Id
                                 TabBar.Tab(tab, index, paneIdKey, isActive, key = $"{paneIdKey}:{tab.Id.Value}")
                         ]

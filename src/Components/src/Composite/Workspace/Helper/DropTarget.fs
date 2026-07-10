@@ -1,11 +1,50 @@
 module Swate.Components.Composite.Workspace.Helper.DropTarget
 
 open Browser.Types
+open Fable.Core
+open Fable.Core.JsInterop
 open Swate.Components.Composite.Workspace.Types
 
 type DropTarget =
     | TabBarDrop of paneId: string
     | EdgeDrop of paneId: string * direction: EdgeDirection
+
+let findPaneElement (x: float) (y: float) (workspaceEl: HTMLElement) : HTMLElement option =
+
+    let walkFrom (el: HTMLElement) : HTMLElement option =
+        let mutable current : HTMLElement option = Some el
+        let mutable result : HTMLElement option = None
+
+        while current.IsSome do
+            let c = current.Value
+
+            if obj.ReferenceEquals(c, workspaceEl) then
+                current <- None
+            elif not (isNull (c.getAttribute "data-workspace-pane")) then
+                result <- Some c
+                current <- None
+            elif not (isNull (c.getAttribute "data-workspace-tabbar")) then
+                result <- Some c
+                current <- None
+            else
+                current <- Option.ofObj c.parentElement
+
+        result
+
+    match Browser.Dom.document.elementFromPoint (x, y) with
+    | :? HTMLElement as el when not (isNull el) ->
+        match walkFrom el with
+        | Some _ as result -> result
+        | None ->
+            let elements : Element[] = (!!Browser.Dom.document)?elementsFromPoint (x, y)
+
+            elements
+            |> Array.tryPick (fun e ->
+                match e with
+                | :? HTMLElement as h when workspaceEl.contains (h) -> walkFrom h
+                | _ -> None
+            )
+    | _ -> None
 
 let resolveDropTarget
     (element: HTMLElement)
