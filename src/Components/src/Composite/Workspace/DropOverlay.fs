@@ -15,7 +15,7 @@ open Swate.Components.Composite.Workspace.Helper.DropTarget
 type DropOverlay =
 
     [<ReactComponent>]
-    static member DropOverlay(workspaceRef: IRefValue<HTMLElement option>) =
+    static member DropOverlay(workspaceRef: IRefValue<HTMLElement option>, sortableActiveRef: IRefValue<bool>) =
         let dispatchCtx = useWorkspaceDispatchCtx ()
 
         let isDragging, setIsDragging = React.useState false
@@ -119,13 +119,19 @@ type DropOverlay =
             | Some workspaceEl, Some(sourcePaneId, _) ->
                 match findPaneElement x y workspaceEl with
                 | Some foundEl ->
+                    let isOverTabBar = not (isNull (foundEl.getAttribute "data-workspace-tabbar"))
                     let target = resolveDropTarget foundEl x y workspaceEl sourcePaneId
                     let rect = target |> Option.bind (computeTargetRect workspaceEl)
+
+                    sortableActiveRef.current <- isOverTabBar
+
                     setDropTarget target
                     dropTargetRef.current <- target
                     setTargetRect rect
                     targetRectRef.current <- rect
                 | None ->
+                    sortableActiveRef.current <- false
+
                     setDropTarget None
                     dropTargetRef.current <- None
                     setTargetRect None

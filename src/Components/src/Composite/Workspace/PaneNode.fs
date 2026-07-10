@@ -28,6 +28,7 @@ type PaneNode =
             paneId = paneId
             tabs = pane.Tabs |> Array.ofList
             focusedTab = pane.FocusedTab
+            isFocusedPane = paneStateCtx.focusedPane = paneId
         }
 
         PaneCtx.Provider(
@@ -136,8 +137,8 @@ type PaneNode =
                         prop.className [
                             "swt:shrink-0 swt:select-none swt:transition-colors swt:bg-base-content swt:hover:bg-primary swt:z-10"
                             match dir with
-                            | SplitDirection.Horizontal -> "swt:w-1 swt:cursor-col-resize swt:h-full"
-                            | SplitDirection.Vertical -> "swt:h-1 swt:cursor-row-resize swt:w-full"
+                            | SplitDirection.Horizontal -> "swt:w-0.5 swt:cursor-col-resize swt:h-full"
+                            | SplitDirection.Vertical -> "swt:h-0.5 swt:cursor-row-resize swt:w-full"
                         ]
                     ]
                     Html.div [

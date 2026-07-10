@@ -66,6 +66,7 @@ type PaneContext = {
     paneId: PaneId
     tabs: Tab<obj> array
     focusedTab: TabId option
+    isFocusedPane: bool
 }
 
 let PaneCtx =
@@ -73,3 +74,15 @@ let PaneCtx =
 
 [<Hook>]
 let usePaneCtx () = React.useContext PaneCtx
+
+// -- Sortable active context (controls reorder preview visibility) --
+
+type SortableActiveContext = {
+    isActiveRef: IRefValue<bool>
+}
+
+let SortableActiveCtx =
+    React.createContext<SortableActiveContext>(Unchecked.defaultof<SortableActiveContext>)
+
+[<Hook>]
+let useSortableActiveCtx () = React.useContext SortableActiveCtx

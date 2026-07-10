@@ -211,6 +211,11 @@ type Workspace =
         =
         let layoutCtx = useWorkspaceLayoutCtx ()
         let dndCtx = useWorkspaceDndCtx ()
+        let sortableActiveRef = React.useRef true
+
+        let sortableActiveCtx: SortableActiveContext = {
+            isActiveRef = sortableActiveRef
+        }
 
         DndKit.useDndMonitor (
             {|
@@ -219,24 +224,27 @@ type Workspace =
             |}
         )
 
-        React.Fragment [
-            PaneNode.PaneNode(layoutCtx.layout)
-            TabContextMenu.TabContextMenu(workspaceRef)
-            DndKit.DragOverlay(
-                dropAnimation = {| duration = 0; easing = "linear" |},
-                children =
-                    match activeDrag with
-                    | Some label ->
-                        Html.div [
-                            prop.style [ style.pointerEvents.none ]
-                            prop.className
-                                "swt:tab swt:tab-active swt:shadow-xl swt:ring-2 swt:ring-primary swt:ring-offset-2 swt:ring-offset-base-100 swt:px-3 swt:py-1.5"
-                            prop.children [ Html.span label ]
-                        ]
-                    | None -> Html.none
-            )
-            DropOverlay.DropOverlay(workspaceRef)
-        ]
+        SortableActiveCtx.Provider(
+            sortableActiveCtx,
+            React.Fragment [
+                PaneNode.PaneNode(layoutCtx.layout)
+                TabContextMenu.TabContextMenu(workspaceRef)
+                DndKit.DragOverlay(
+                    dropAnimation = {| duration = 0; easing = "linear" |},
+                    children =
+                        match activeDrag with
+                        | Some label ->
+                            Html.div [
+                                prop.style [ style.pointerEvents.none ]
+                                prop.className
+                                    "swt:tab swt:tab-active swt:shadow-xl swt:ring-2 swt:ring-primary swt:ring-offset-2 swt:ring-offset-base-100 swt:px-3 swt:py-1.5"
+                                prop.children [ Html.span label ]
+                            ]
+                        | None -> Html.none
+                )
+                DropOverlay.DropOverlay(workspaceRef, sortableActiveRef)
+            ]
+        )
 
     [<ReactComponent>]
     static member Entry() =

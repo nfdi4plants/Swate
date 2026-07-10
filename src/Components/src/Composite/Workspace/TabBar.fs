@@ -22,17 +22,19 @@ type TabBar =
 
     [<ReactComponent>]
     static member private Tab
-        (tab: Tab<obj>, index: int, paneIdKey: string, isActive: bool, ?key: string)
+        (tab: Tab<obj>, index: int, paneIdKey: string, isActive: bool, isFocusedPane: bool, ?key: string)
         =
         let dispatchCtx = useWorkspaceDispatchCtx ()
         let paneStateCtx = useWorkspacePaneStateCtx ()
+        let sortableActiveCtx = useSortableActiveCtx ()
         let dragId = DndId.write (DndId.Tab(paneIdKey, tab.Id.Value))
 
         let sortable = DndKit.useSortable ({| id = dragId |})
 
         let style = [
-            style.custom ("transform", DndKit.CSS.Transform.toString sortable.transform)
-            style.custom ("transition", sortable.transition)
+            if sortableActiveCtx.isActiveRef.current then
+                style.custom ("transform", DndKit.CSS.Transform.toString sortable.transform)
+                style.custom ("transition", sortable.transition)
             style.cursor.grab
         ]
 
@@ -47,6 +49,7 @@ type TabBar =
         let tabClass = [
             "swt:tab swt:items-center swt:min-w-fit swt:gap-1 swt:flex-nowrap swt:select-none"
             if isActive then "swt:tab-active"
+            if isActive && isFocusedPane then "swt:ring-1 swt:ring-primary/40 swt:ring-inset"
             if sortable.isDragging then "swt:opacity-30"
         ]
 
@@ -110,6 +113,10 @@ type TabBar =
             prop.custom ("data-workspace-tabbar", paneIdKey)
             prop.className [
                 "swt:tabs swt:tabs-lift swt:w-full swt:overflow-x-auto swt:overflow-y-hidden swt:flex swt:flex-row swt:items-center swt:justify-start swt:pt-1 swt:border-b swt:border-base-content/50 swt:flex-nowrap swt:gap-0"
+                if paneCtx.isFocusedPane then
+                    "swt:bg-primary/10"
+                else
+                    "swt:bg-base-300/50"
             ]
             if paneStateCtx.debug then
                 prop.testId $"workspace-tabbar-{paneIdKey}"
@@ -126,7 +133,7 @@ type TabBar =
                                 let tab = tabs.[i]
                                 let index = i
                                 let isActive = paneCtx.focusedTab = Some tab.Id
-                                TabBar.Tab(tab, index, paneIdKey, isActive, key = $"{paneIdKey}:{tab.Id.Value}")
+                                TabBar.Tab(tab, index, paneIdKey, isActive, paneCtx.isFocusedPane, key = $"{paneIdKey}:{tab.Id.Value}")
                         ]
                 )
             ]
