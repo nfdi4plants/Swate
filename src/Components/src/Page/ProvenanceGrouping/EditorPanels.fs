@@ -35,7 +35,7 @@ module EditorPanels =
             ]
             |> List.distinct
 
-        let headerText = headers |> List.tryHead |> Option.defaultValue "property"
+        let headerText = headers |> List.tryHead |> Option.defaultValue "annotation"
 
         let valueText =
             pending.Batch.Overwrites
@@ -53,7 +53,7 @@ module EditorPanels =
                 $"Apply {headerText} value to {pending.AffectedGroupCount} selected groups?"
             else
                 match headers with
-                | _ :: _ :: _ -> $"Overwrite {overwriteCount} values across {headers.Length} properties?"
+                | _ :: _ :: _ -> $"Overwrite {overwriteCount} values across {headers.Length} annotations?"
                 | _ when overwriteCount > 1 -> $"Overwrite {overwriteCount} {headerText} values?"
                 | _ -> $"Overwrite {headerText} value?"
 
@@ -236,20 +236,7 @@ module EditorPanels =
     let private groupTitle (groups: DisplayGroup list) groupId =
         groups
         |> List.tryFind (fun group -> group.Id = groupId)
-        |> Option.map (fun group ->
-            match group.GroupingValues with
-            | [] ->
-                group.Members
-                |> List.tryHead
-                |> Option.map (fun member' -> member'.Name)
-                |> Option.defaultValue groupId
-            | values ->
-                values
-                |> List.map (fun value ->
-                    $"{value.Key.Header.Category.Name}: {Formatting.formatValue value.Value value.Unit}"
-                )
-                |> String.concat ", "
-        )
+        |> Option.map GroupCardData.title
         |> Option.defaultValue groupId
 
     let connectionDetails

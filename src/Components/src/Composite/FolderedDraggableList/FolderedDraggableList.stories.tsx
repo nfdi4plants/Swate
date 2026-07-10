@@ -4,8 +4,6 @@ import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-
 import { expect, fireEvent, userEvent, waitFor, within } from 'storybook/test';
 import { FolderedDraggableList } from './FolderedDraggableList.fs.js';
 import { ofArray, type FSharpList } from '../../fable_modules/fable-library-ts.5.0.0-alpha.21/List.ts';
-import { ofArray as setOfArray, type FSharpSet } from '../../fable_modules/fable-library-ts.5.0.0-alpha.21/Set.ts';
-import { comparePrimitives } from '../../fable_modules/fable-library-ts.5.0.0-alpha.21/Util.ts';
 
 type PropertyPayload = {
   LayerId: string;
@@ -35,9 +33,9 @@ type StoryFolder = {
 type StoryListProps = {
   folders: FSharpList<StoryFolder>;
   dragId: (folder: StoryFolder, item: StoryItem) => string;
-  expandedFolderIds?: FSharpSet<string>;
-  defaultExpandedFolderIds?: FSharpSet<string>;
-  onExpandedFolderIdsChange?: (expandedFolderIds: FSharpSet<string>) => void;
+  activeFolderId?: string;
+  defaultActiveFolderId?: string;
+  onActiveFolderIdChange?: (activeFolderId: string) => void;
   shelfDropId?: string;
   tryCreateItemFromExternalDrop?: (drop: StoryExternalDrop) => StoryItem | undefined;
   onFoldersChange?: (folders: FSharpList<StoryFolder>) => void;
@@ -73,16 +71,8 @@ type ExternalPropertyDragData = {
 
 const StoryFolderedDraggableList = FolderedDraggableList as React.ComponentType<StoryListProps>;
 
-const stringComparer = {
-  Compare: (x: string, y: string) => comparePrimitives(x, y),
-};
-
 function fsList<T>(items: T[]): FSharpList<T> {
   return ofArray(items);
-}
-
-function fsSet(items: string[]): FSharpSet<string> {
-  return setOfArray(items, stringComparer);
 }
 
 function propertyItem(
@@ -269,6 +259,25 @@ function UpdatingHarness() {
   );
 }
 
+function OverflowToggleHarness() {
+  const [folders, setFolders] = React.useState(() => initialFolders());
+
+  return (
+    <div className="swt:w-72">
+      <button
+        type="button"
+        className="swt:btn swt:btn-xs swt:btn-outline swt:mb-2"
+        onClick={() => setFolders(overflowingFolders())}
+      >
+        Overflow properties
+      </button>
+      <DndContext>
+        <StoryFolderedDraggableList folders={folders} dragId={dragId} debug />
+      </DndContext>
+    </div>
+  );
+}
+
 function FolderColorHarness() {
   const [folders, setFolders] = React.useState(() => initialFolders());
 
@@ -324,7 +333,7 @@ function OutsideDropHarness() {
         <StoryFolderedDraggableList
           folders={folders}
           dragId={dragId}
-          defaultExpandedFolderIds={fsSet(['layer-b'])}
+          defaultActiveFolderId="layer-b"
           shelfDropId="story-foldered-shelf"
           tryCreateItemFromExternalDrop={tryCreateItemFromExternalDrop}
           onFoldersChange={setFolders}
@@ -336,14 +345,8 @@ function OutsideDropHarness() {
   );
 }
 
-function ControlledExpansionHarness() {
-  const [expandedFolderIds, setExpandedFolderIds] = React.useState(() => fsSet(['layer-a']));
-  const [lastExpanded, setLastExpanded] = React.useState('layer-a');
-
-  const handleExpandedChange = (nextExpandedFolderIds: FSharpSet<string>) => {
-    setExpandedFolderIds(nextExpandedFolderIds);
-    setLastExpanded(Array.from(nextExpandedFolderIds).join(',') || 'none');
-  };
+function ControlledActiveTabHarness() {
+  const [activeFolderId, setActiveFolderId] = React.useState('layer-a');
 
   return (
     <div className="swt:flex swt:flex-col swt:gap-3 swt:w-96">
@@ -351,12 +354,12 @@ function ControlledExpansionHarness() {
         <StoryFolderedDraggableList
           folders={initialFolders()}
           dragId={dragId}
-          expandedFolderIds={expandedFolderIds}
-          onExpandedFolderIdsChange={handleExpandedChange}
+          activeFolderId={activeFolderId}
+          onActiveFolderIdChange={setActiveFolderId}
           debug
         />
       </DndContext>
-      <pre data-testid="last-expanded">{lastExpanded}</pre>
+      <pre data-testid="last-active">{activeFolderId}</pre>
     </div>
   );
 }
@@ -386,12 +389,7 @@ function DragHarness() {
   return (
     <div className="swt:flex swt:flex-col swt:gap-3 swt:w-96">
       <DndContext onDragEnd={onDragEnd}>
-        <StoryFolderedDraggableList
-          folders={initialFolders()}
-          dragId={dragId}
-          defaultExpandedFolderIds={fsSet(['layer-a', 'layer-b'])}
-          debug
-        />
+        <StoryFolderedDraggableList folders={initialFolders()} dragId={dragId} debug />
         <DropZone />
       </DndContext>
       <pre data-testid="last-drag">{lastDrag}</pre>
@@ -430,12 +428,7 @@ function ParentRemovalHarness() {
   return (
     <div className="swt:flex swt:flex-col swt:gap-3 swt:w-96">
       <DndContext onDragEnd={onDragEnd}>
-        <StoryFolderedDraggableList
-          folders={folders}
-          dragId={dragId}
-          defaultExpandedFolderIds={fsSet(['layer-a'])}
-          debug
-        />
+        <StoryFolderedDraggableList folders={folders} dragId={dragId} debug />
         <DropZone />
       </DndContext>
       <pre data-testid="last-drop">{lastDrop}</pre>
@@ -523,7 +516,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const TogglesFolders: Story = {
+export const SwitchesTabs: Story = {
   render: () => (
     <DndContext>
       <div className="swt:w-96">
@@ -535,40 +528,34 @@ export const TogglesFolders: Story = {
     const canvas = within(canvasElement);
     const shelf = canvas.getByTestId('foldered-draggable-item-shelf');
 
-    expect(shelf).toBeVisible();
-    expect(within(shelf).queryByRole('button', { name: /Drag/i })).not.toBeInTheDocument();
-
-    await userEvent.click(canvas.getByRole('button', { name: 'Expand Layer A' }));
-
+    // The first tab is active from the start; its items are visible.
+    expect(canvas.getByRole('tab', { name: 'Show Layer A' })).toHaveAttribute('aria-selected', 'true');
     expect(within(shelf).getByTestId('foldered-draggable-item-layer-a-mass')).toBeVisible();
     expect(within(shelf).getByTestId('foldered-draggable-item-layer-a-species')).toBeVisible();
     expect(within(shelf).queryByTestId('foldered-draggable-item-layer-b-instrument')).not.toBeInTheDocument();
-    expect(canvas.getByText('Species')).toBeVisible();
     expect(within(canvas.getByTestId('foldered-draggable-item-layer-a-species')).getByText('2')).toBeVisible();
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Expand Layer B' }));
+    await userEvent.click(canvas.getByRole('tab', { name: 'Show Layer B' }));
 
     await waitFor(() => {
       expect(within(shelf).queryByTestId('foldered-draggable-item-layer-a-mass')).not.toBeInTheDocument();
       expect(within(shelf).getByTestId('foldered-draggable-item-layer-b-instrument')).toBeVisible();
     });
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Collapse Layer B' }));
-
-    await waitFor(() => {
-      expect(within(shelf).queryByRole('button', { name: /Drag/i })).not.toBeInTheDocument();
-    });
+    // Clicking the active tab keeps it open - there is no collapse.
+    await userEvent.click(canvas.getByRole('tab', { name: 'Show Layer B' }));
+    expect(within(shelf).getByTestId('foldered-draggable-item-layer-b-instrument')).toBeVisible();
   },
 };
 
-export const DefaultExpansionOpensInitialFolders: Story = {
+export const DefaultActiveTabShowsItsItems: Story = {
   render: () => (
     <DndContext>
       <div className="swt:w-96">
         <StoryFolderedDraggableList
           folders={initialFolders()}
           dragId={dragId}
-          defaultExpandedFolderIds={fsSet(['layer-a'])}
+          defaultActiveFolderId="layer-b"
           debug
         />
       </div>
@@ -578,13 +565,13 @@ export const DefaultExpansionOpensInitialFolders: Story = {
     const canvas = within(canvasElement);
     const shelf = canvas.getByTestId('foldered-draggable-item-shelf');
 
-    expect(within(shelf).getByTestId('foldered-draggable-item-layer-a-mass')).toBeVisible();
-    expect(within(shelf).queryByTestId('foldered-draggable-item-layer-b-instrument')).not.toBeInTheDocument();
+    expect(within(shelf).getByTestId('foldered-draggable-item-layer-b-instrument')).toBeVisible();
+    expect(within(shelf).queryByTestId('foldered-draggable-item-layer-a-mass')).not.toBeInTheDocument();
   },
 };
 
-export const ControlledExpansionFollowsProps: Story = {
-  render: () => <ControlledExpansionHarness />,
+export const ControlledActiveTabFollowsProps: Story = {
+  render: () => <ControlledActiveTabHarness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const shelf = canvas.getByTestId('foldered-draggable-item-shelf');
@@ -592,13 +579,47 @@ export const ControlledExpansionFollowsProps: Story = {
     expect(within(shelf).getByTestId('foldered-draggable-item-layer-a-mass')).toBeVisible();
     expect(within(shelf).queryByTestId('foldered-draggable-item-layer-b-instrument')).not.toBeInTheDocument();
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Expand Layer B' }));
+    await userEvent.click(canvas.getByRole('tab', { name: 'Show Layer B' }));
 
     await waitFor(() => {
       expect(within(shelf).queryByTestId('foldered-draggable-item-layer-a-mass')).not.toBeInTheDocument();
       expect(within(shelf).getByTestId('foldered-draggable-item-layer-b-instrument')).toBeVisible();
-      expect(canvas.getByTestId('last-expanded')).toHaveTextContent('layer-b');
+      expect(canvas.getByTestId('last-active')).toHaveTextContent('layer-b');
     });
+  },
+};
+
+export const PerTabSearchFiltersOnlyItsCard: Story = {
+  render: () => (
+    <DndContext>
+      <div className="swt:w-96">
+        <StoryFolderedDraggableList folders={initialFolders()} dragId={dragId} debug />
+      </div>
+    </DndContext>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const shelf = canvas.getByTestId('foldered-draggable-item-shelf');
+
+    await userEvent.type(canvas.getByLabelText('Search in Layer A'), 'spec');
+    await waitFor(() => {
+      expect(within(shelf).queryByTestId('foldered-draggable-item-layer-a-mass')).not.toBeInTheDocument();
+      expect(within(shelf).getByTestId('foldered-draggable-item-layer-a-species')).toBeVisible();
+    });
+    expect(canvas.getByText('1 of 2 items')).toBeVisible();
+
+    // A query without matches says so instead of showing an empty shelf.
+    await userEvent.type(canvas.getByLabelText('Search in Layer A'), 'xyz');
+    await waitFor(() => expect(canvas.getByText('No items match "specxyz".')).toBeVisible());
+
+    // The other card keeps its own (empty) search.
+    await userEvent.click(canvas.getByRole('tab', { name: 'Show Layer B' }));
+    expect(canvas.getByLabelText('Search in Layer B')).toHaveValue('');
+    expect(within(shelf).getByTestId('foldered-draggable-item-layer-b-instrument')).toBeVisible();
+
+    // Switching back restores the first card's search untouched.
+    await userEvent.click(canvas.getByRole('tab', { name: 'Show Layer A' }));
+    expect(canvas.getByLabelText('Search in Layer A')).toHaveValue('specxyz');
   },
 };
 
@@ -617,17 +638,38 @@ export const HorizontalRowsScrollWhenOverflowing: Story = {
 
     expect(folderRow).toHaveClass('swt:flex-row');
     expect(folderRow).toHaveClass('swt:flex-nowrap');
-    expect(folderRow).toHaveClass('swt:overflow-x-auto');
+    expect(getComputedStyle(folderRow).overflowX).toBe('auto');
+    expect(getComputedStyle(folderRow).scrollbarGutter).toContain('stable');
     expect(shelf).toBeVisible();
-    expect(canvas.getAllByRole('button', { name: /Wide Layer/i })).toHaveLength(8);
+    expect(canvas.getAllByRole('tab', { name: /Wide Layer/i })).toHaveLength(8);
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Expand Wide Layer 1' }));
+    await userEvent.click(canvas.getByRole('tab', { name: 'Show Wide Layer 1' }));
 
     const itemRow = canvas.getByTestId('foldered-draggable-item-row');
     expect(itemRow).toHaveClass('swt:flex-row');
     expect(itemRow).toHaveClass('swt:flex-nowrap');
-    expect(itemRow).toHaveClass('swt:overflow-x-auto');
+    expect(getComputedStyle(itemRow).overflowX).toBe('auto');
+    expect(getComputedStyle(itemRow).scrollbarGutter).toContain('stable');
+    expect(Math.round(itemRow.getBoundingClientRect().height)).toBeGreaterThanOrEqual(64);
     expect(within(itemRow).getAllByRole('button', { name: /Drag Property/i })).toHaveLength(8);
+  },
+};
+
+export const PropertyRowKeepsHeightWhenScrollbarAppears: Story = {
+  render: () => <OverflowToggleHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const before = Math.round(canvas.getByTestId('foldered-draggable-item-row').getBoundingClientRect().height);
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Overflow properties' }));
+
+    await waitFor(() => {
+      expect(within(canvas.getByTestId('foldered-draggable-item-row')).getAllByRole('button', { name: /Drag Property/i }))
+        .toHaveLength(8);
+    });
+
+    const after = Math.round(canvas.getByTestId('foldered-draggable-item-row').getBoundingClientRect().height);
+    expect(after).toBe(before);
   },
 };
 
@@ -637,7 +679,6 @@ export const UpdatesWhenFoldersPropChanges: Story = {
     const canvas = within(canvasElement);
     const shelf = canvas.getByTestId('foldered-draggable-item-shelf');
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Expand Layer A' }));
     expect(within(shelf).getByTestId('foldered-draggable-item-layer-a-species')).toBeVisible();
 
     await userEvent.click(canvas.getByRole('button', { name: 'Add replicate' }));
@@ -655,7 +696,7 @@ export const UpdatesWhenFoldersPropChanges: Story = {
     expect(within(shelf).getByTestId('foldered-draggable-item-layer-a-mass')).toBeVisible();
 
     await userEvent.click(canvas.getByRole('button', { name: 'Rename and recolor Layer A' }));
-    expect(canvas.getByRole('button', { name: 'Collapse Layer Alpha' })).toBeVisible();
+    expect(canvas.getByRole('tab', { name: 'Show Layer Alpha' })).toBeVisible();
     const folderSwatch = canvas
       .getByTestId('foldered-draggable-folder-layer-a')
       .querySelector<HTMLElement>('[data-foldered-color-swatch="true"]');
@@ -668,19 +709,14 @@ export const SetsFolderColorFromPreview: Story = {
   render: () => <FolderColorHarness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    // The color control lives in the active card's header, so picking a color
+    // never switches or re-focuses tabs.
     const trigger = canvas.getByRole('button', { name: 'Set color for folder Layer A' });
-    const triggerTarget = trigger.parentElement!;
-    const folderCard = canvas.getByTestId('foldered-draggable-folder-layer-a');
-    const folderToggle = canvas.getByRole('button', { name: 'Expand Layer A' });
+    const activeTab = canvas.getByRole('tab', { name: 'Show Layer A' });
 
-    expect(folderCard).not.toHaveAttribute('role', 'button');
-    expect(folderCard).not.toHaveAttribute('tabindex');
-    expect(folderCard).toHaveAttribute('aria-expanded', 'false');
-
-    await userEvent.click(triggerTarget);
-    expect(folderCard).toHaveAttribute('aria-expanded', 'false');
-    expect(folderCard).not.toHaveFocus();
-    expect(folderToggle).not.toHaveFocus();
+    await userEvent.click(trigger.parentElement!);
+    expect(activeTab).toHaveAttribute('aria-selected', 'true');
+    expect(activeTab).not.toHaveFocus();
 
     const body = within(document.body);
     const colorInput = await waitFor(() => body.getByLabelText('Choose color for folder Layer A'));
@@ -697,8 +733,7 @@ export const SetsFolderColorFromPreview: Story = {
       'data-foldered-folder-color',
       '#be185d',
     );
-    expect(canvas.getByTestId('foldered-draggable-folder-layer-a')).not.toHaveFocus();
-    expect(folderToggle).not.toHaveFocus();
+    expect(activeTab).toHaveAttribute('aria-selected', 'true');
   },
 };
 
@@ -875,7 +910,7 @@ export const DisabledItemsDoNotDrag: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Expand Layer B' }));
+    await userEvent.click(canvas.getByRole('tab', { name: 'Show Layer B' }));
 
     const disabledItem = canvas.getByTestId('foldered-draggable-item-layer-b-archived');
     expect(disabledItem).toBeDisabled();

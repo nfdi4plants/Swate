@@ -128,6 +128,8 @@
     <Compile Include="Composite\ThemeSelector\ThemeSelector.fs" />
     <Compile Include="Composite\FolderedDraggableList\Types.fs" />
     <Compile Include="Composite\FolderedDraggableList\FolderedDraggableList.fs" />
+    <Compile Include="Composite\TutorialOverlay\Types.fs" />
+    <Compile Include="Composite\TutorialOverlay\TutorialOverlay.fs" />
     <Compile Include="Composite\TermSearch\Types.fs" />
     <Compile Include="Composite\TermSearch\Context\ActiveKeysContext.fs" />
     <Compile Include="Composite\TermSearch\Context\AllKeysContext.fs" />
@@ -231,6 +233,7 @@
     <Compile Include="Page\ProvenanceGrouping\EditorPropertyShelf.fs" />
     <Compile Include="Page\ProvenanceGrouping\EditorPanels.fs" />
     <Compile Include="Page\ProvenanceGrouping\EditorSurface.fs" />
+    <Compile Include="Page\ProvenanceGrouping\Tutorial.fs" />
     <Compile Include="Page\ProvenanceGrouping\ProvenanceGrouping.fs" />
     <Compile Include="Page\SettingsPage\SettingsPage.fs" />
     <Compile Include="Page\Metadata\FormComponents\Helpers.fs" />

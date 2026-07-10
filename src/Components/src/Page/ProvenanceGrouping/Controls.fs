@@ -199,11 +199,11 @@ type Controls =
                                 step
                                     1
                                     "Group"
-                                    "Click a property in a side rail to merge entities sharing its values into one card."
+                                    "Click an annotation in a side rail to merge entities sharing its values into one card."
                                 step
                                     2
                                     "Annotate"
-                                    "Expand a property's values and drag a value chip onto a card to set it for every member at once."
+                                    "Expand an annotation's values and drag a value chip onto a card to set it for every member at once."
                                 step
                                     3
                                     "Connect"
@@ -226,7 +226,7 @@ type Controls =
                                     (OriginSymbols.upstreamIcon "swt:size-4")
                                     "Value inherited from an upstream table"
                                 legendRow (lineSample false) "Input–output connection"
-                                legendRow (lineSample true) "Where a property or value occurs"
+                                legendRow (lineSample true) "Where an annotation or value occurs"
                             ]
                         ]
                     ]
@@ -234,20 +234,159 @@ type Controls =
         )
 
     [<ReactComponent>]
-    static member LayerTabs
+    static member private LayerPageArrow
         (
-            session: ProvenanceSession,
+            label: string,
+            iconClass: string,
+            target: ProvenanceLayerId option,
             onSelect: ProvenanceLayerId -> unit,
-            onAddLayer: ProvenanceSourceName -> unit,
-            ?debug: bool,
-            ?sourceColors: Map<ProvenanceSourceId, ProvenanceColor>,
-            ?onSetSourceColor: ProvenanceSourceId -> ProvenanceColor option -> unit,
-            ?seedSummary: string
+            testId: string,
+            ?debug: bool
         ) =
+        Html.button [
+            prop.type'.button
+            prop.className [
+                "swt:btn swt:btn-sm swt:btn-outline swt:w-10 swt:px-0"
+                if target.IsNone then
+                    "swt:opacity-40"
+            ]
+            prop.title label
+            prop.ariaLabel label
+            prop.disabled target.IsNone
+            if target.IsSome && defaultArg debug false then
+                prop.testId testId
+            prop.onClick (fun _ -> target |> Option.iter onSelect)
+            prop.children [
+                Html.i [ prop.className $"swt:iconify {iconClass} swt:size-4" ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member private LayerPageButton
+        (
+            layerId: ProvenanceLayerId,
+            name: string,
+            isActive: bool,
+            onSelect: ProvenanceLayerId -> unit,
+            ?sourceColor: ProvenanceColor,
+            ?debug: bool,
+            ?key: string
+        ) =
+        Html.button [
+            match key with
+            | Some key -> prop.key key
+            | None -> ()
+            prop.type'.button
+            prop.title $"View provenance layer {name}"
+            prop.ariaLabel $"View provenance layer {name}"
+            prop.custom ("data-provenance-layer-page", layerId)
+            prop.className [
+                "swt:btn swt:btn-sm swt:min-w-0 swt:px-3"
+                if isActive then
+                    "swt:btn-primary swt:font-semibold"
+                else
+                    "swt:btn-outline swt:opacity-50 swt:hover:opacity-100"
+            ]
+            // Equal-width slots keep the bar from resizing as the window moves;
+            // percent-based so embeds at any width scale with their container
+            // instead of the viewport.
+            prop.style [ style.custom ("width", "clamp(4.5rem, 18%, 7rem)") ]
+            if defaultArg debug false then
+                prop.testId $"provenance-layer-{layerId}"
+                prop.custom ("data-provenance-layer-color", sourceColor |> Option.defaultValue "")
+            prop.onClick (fun _ -> onSelect layerId)
+            prop.children [
+                match sourceColor with
+                | Some color when color <> "" ->
+                    Html.span [
+                        prop.className "swt:size-2 swt:shrink-0 swt:rounded-full"
+                        prop.style [ style.backgroundColor color ]
+                    ]
+                | _ -> Html.none
+                Html.span [
+                    prop.className "swt:min-w-0 swt:truncate"
+                    prop.text name
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member private LayerJumpPopover
+        (session: ProvenanceSession, onSelect: ProvenanceLayerId -> unit, ?debug: bool)
+        =
+        let isOpen, setIsOpen = React.useState false
+
+        // The trigger doubles as the "layer x of n" indicator, so the window
+        // of three page buttons never hides how long the chain actually is.
+        let activeIndex =
+            session.LayerOrder
+            |> List.tryFindIndex (fun layerId -> layerId = session.ActiveLayerId)
+            |> Option.defaultValue 0
+
+        Popover.Popover(
+            isOpen = isOpen,
+            onOpenChange = setIsOpen,
+            ?debug =
+                (if defaultArg debug false then
+                     Some "provenance-layer-jump-popover"
+                 else
+                     None),
+            children =
+                React.Fragment [
+                    Popover.Trigger(
+                        Html.button [
+                            prop.title "Jump to layer"
+                            prop.ariaLabel "Jump to layer"
+                            prop.type'.button
+                            prop.className
+                                "swt:btn swt:btn-sm swt:btn-outline swt:min-w-10 swt:shrink-0 swt:whitespace-nowrap swt:px-2 swt:font-semibold"
+                            if defaultArg debug false then
+                                prop.testId "provenance-layer-jump"
+                            prop.text $"{activeIndex + 1} / {session.LayerOrder.Length}"
+                        ]
+                    )
+                    Popover.Content(
+                        children =
+                            Html.div [
+                                prop.className "swt:flex swt:min-w-48 swt:flex-col swt:gap-2 swt:p-2"
+                                prop.children [
+                                    Html.label [ prop.className "swt:label"; prop.text "Jump to layer" ]
+                                    Html.select [
+                                        prop.className "swt:select swt:select-bordered swt:select-sm swt:w-full"
+                                        prop.ariaLabel "Select layer"
+                                        prop.title "Jump to a layer"
+                                        if defaultArg debug false then
+                                            prop.testId "provenance-layer-select"
+                                        prop.value session.ActiveLayerId
+                                        prop.onChange (fun (layerId: string) ->
+                                            onSelect layerId
+                                            setIsOpen false
+                                        )
+                                        prop.children [
+                                            for layerId in session.LayerOrder do
+                                                let layer = Session.layerById layerId session
+
+                                                Html.option [
+                                                    prop.key layerId
+                                                    prop.value layerId
+                                                    prop.text layer.Model.Source.Name
+                                                ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                    )
+                ]
+        )
+
+    [<ReactComponent>]
+    static member private AddLayerPopover
+        (session: ProvenanceSession, onAddLayer: ProvenanceSourceName -> unit, ?seedSummary: string, ?debug: bool)
+        =
         let defaultNextLayerName (session: ProvenanceSession) =
             $"Layer {session.LayerOrder.Length + 1}"
 
-        let isAddLayerOpen, setIsAddLayerOpen = React.useState false
+        let isOpen, setIsOpen = React.useState false
         let layerName, setLayerName = React.useState (defaultNextLayerName session)
 
         React.useEffect ((fun () -> setLayerName (defaultNextLayerName session)), [| box session.LayerOrder.Length |])
@@ -258,137 +397,161 @@ type Controls =
             if not (String.IsNullOrWhiteSpace trimmed) then
                 onAddLayer trimmed
                 setLayerName (defaultNextLayerName session)
-                setIsAddLayerOpen false
+                setIsOpen false
 
-        let addLayerContent =
-            Html.form [
-                prop.className "swt:flex swt:min-w-56 swt:flex-col swt:gap-2"
-                prop.onSubmit (fun event ->
-                    event.preventDefault ()
-                    submitLayerName ()
-                )
-                prop.children [
-                    // Announces which entities will seed the new layer's inputs, so
-                    // the effect of the current selection (or its absence) is visible
-                    // before the layer is created.
-                    match seedSummary with
-                    | Some summary ->
-                        Html.p [
-                            prop.className "swt:max-w-56 swt:text-xs swt:text-base-content/70"
+        Popover.Popover(
+            isOpen = isOpen,
+            onOpenChange = setIsOpen,
+            ?debug =
+                (if defaultArg debug false then
+                     Some "provenance-add-layer-popover"
+                 else
+                     None),
+            children =
+                React.Fragment [
+                    Popover.Trigger(
+                        Html.button [
+                            prop.title "Add layer"
+                            prop.type'.button
+                            prop.className "swt:btn swt:btn-sm swt:btn-primary"
+                            // Always-on anchor for the interactive tutorial's spotlight.
+                            prop.custom ("data-tutorial", "provenance-add-layer")
                             if defaultArg debug false then
-                                prop.testId "provenance-layer-seed-summary"
-                            prop.text summary
-                        ]
-                    | None -> ()
-                    Html.label [ prop.className "swt:label"; prop.text "Layer name" ]
-                    Html.input [
-                        prop.ariaLabel "Layer name"
-                        prop.className "swt:input swt:input-bordered swt:input-sm"
-                        prop.required true
-                        prop.value layerName
-                        prop.onChange setLayerName
-                    ]
-                    Html.button [
-                        prop.type'.submit
-                        prop.className "swt:btn swt:btn-primary swt:btn-sm"
-                        prop.text "Create layer"
-                    ]
-                ]
-            ]
-
-        Html.div [
-            prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
-            prop.children [
-                for layerId in session.LayerOrder do
-                    let layer = Session.layerById layerId session
-
-                    let sourceColor =
-                        sourceColors
-                        |> Option.bind (fun colors -> colors |> Map.tryFind layer.Model.Source.Id)
-
-                    let layerButtonClasses = [
-                        "swt:btn swt:btn-sm swt:join-item"
-                        if layerId = session.ActiveLayerId then
-                            "swt:btn-primary"
-                        else
-                            "swt:btn-outline"
-                    ]
-
-                    let swatchButtonClass =
-                        [
-                            yield! layerButtonClasses
-                            "swt:min-h-8 swt:w-8 swt:px-0"
-                        ]
-                        |> String.concat " "
-
-                    Html.div [
-                        prop.className "swt:join"
-                        prop.children [
-                            match onSetSourceColor with
-                            | Some setSourceColor ->
-                                Controls.LayerColorButton(
-                                    layer.Model.Source.Id,
-                                    sourceColor,
-                                    setSourceColor layer.Model.Source.Id,
-                                    triggerClassName = swatchButtonClass
-                                )
-                            | None ->
-                                Html.span [
-                                    prop.className [
-                                        yield! layerButtonClasses
-                                        "swt:min-h-8 swt:w-8 swt:px-0"
-                                    ]
-                                    match sourceColor with
-                                    | Some color when color <> "" -> prop.style [ style.backgroundColor color ]
-                                    | _ -> ()
+                                prop.testId "provenance-add-layer"
+                            prop.children [
+                                Html.i [
+                                    prop.className "swt:iconify swt:fluent--add-square-multiple-20-regular swt:size-4"
                                 ]
-                            Html.button [
-                                prop.title $"View provenance layer {layer.Model.Source.Name}"
-                                prop.className layerButtonClasses
-                                prop.ariaLabel $"View provenance layer {layer.Model.Source.Name}"
-                                if defaultArg debug false then
-                                    prop.testId $"provenance-layer-{layerId}"
-                                    prop.custom ("data-provenance-layer-color", sourceColor |> Option.defaultValue "")
-                                prop.onClick (fun _ -> onSelect layerId)
-                                prop.children [ Html.span layer.Model.Source.Name ]
+                                Html.span "Layer"
                             ]
                         ]
-                    ]
-                Popover.Popover(
-                    isOpen = isAddLayerOpen,
-                    onOpenChange = setIsAddLayerOpen,
-                    ?debug =
-                        (if defaultArg debug false then
-                             Some "provenance-add-layer-popover"
-                         else
-                             None),
-                    children =
-                        React.Fragment [
-                            Popover.Trigger(
-                                Html.button [
-                                    prop.title "Add layer"
-                                    prop.type'.button
-                                    prop.className "swt:btn swt:btn-sm swt:btn-primary"
-                                    if defaultArg debug false then
-                                        prop.testId "provenance-add-layer"
-                                    prop.children [
-                                        Html.i [
-                                            prop.className
-                                                "swt:iconify swt:fluent--add-square-multiple-20-regular swt:size-4"
+                    )
+                    Popover.Content(
+                        children =
+                            Html.form [
+                                prop.className "swt:flex swt:min-w-56 swt:flex-col swt:gap-2 swt:p-2"
+                                prop.onSubmit (fun event ->
+                                    event.preventDefault ()
+                                    submitLayerName ()
+                                )
+                                prop.children [
+                                    // Announces which entities will seed the new layer's inputs, so
+                                    // the effect of the current selection (or its absence) is visible
+                                    // before the layer is created.
+                                    match seedSummary with
+                                    | Some summary ->
+                                        Html.p [
+                                            prop.className "swt:max-w-56 swt:text-xs swt:text-base-content/70"
+                                            if defaultArg debug false then
+                                                prop.testId "provenance-layer-seed-summary"
+                                            prop.text summary
                                         ]
-                                        Html.span "Layer"
+                                    | None -> ()
+                                    Html.label [ prop.className "swt:label"; prop.text "Layer name" ]
+                                    Html.input [
+                                        prop.ariaLabel "Layer name"
+                                        prop.className "swt:input swt:input-bordered swt:input-sm"
+                                        prop.required true
+                                        prop.value layerName
+                                        prop.onChange setLayerName
+                                    ]
+                                    Html.button [
+                                        prop.type'.submit
+                                        prop.className "swt:btn swt:btn-primary swt:btn-sm"
+                                        prop.text "Create layer"
                                     ]
                                 ]
+                            ]
+                    )
+                ]
+        )
+
+    [<ReactComponent>]
+    static member LayerPagination
+        (
+            session: ProvenanceSession,
+            onSelect: ProvenanceLayerId -> unit,
+            onAddLayer: ProvenanceSourceName -> unit,
+            ?debug: bool,
+            ?sourceColors: Map<ProvenanceSourceId, ProvenanceColor>,
+            ?onSetSourceColor: ProvenanceSourceId -> ProvenanceColor option -> unit,
+            ?seedSummary: string
+        ) =
+        let activeIndex =
+            session.LayerOrder
+            |> List.tryFindIndex (fun layerId -> layerId = session.ActiveLayerId)
+            |> Option.defaultValue 0
+
+        // The active layer plus one neighbor on each side, clamped to the ends.
+        let visibleLayerIds =
+            let start = max 0 (min (activeIndex - 1) (session.LayerOrder.Length - 3))
+            session.LayerOrder |> List.skip start |> List.truncate 3
+
+        let sourceColorOf (layer: ProvenanceLayer) =
+            sourceColors
+            |> Option.bind (fun colors -> colors |> Map.tryFind layer.Model.Source.Id)
+
+        let activeLayer = Session.layerById session.ActiveLayerId session
+
+        Html.div [
+            prop.className
+                "swt:pointer-events-auto swt:flex swt:max-w-full swt:min-w-0 swt:items-center swt:justify-center swt:gap-2 swt:rounded-box swt:border swt:border-base-content/20 swt:bg-base-100 swt:px-3 swt:py-2 swt:shadow-md swt:ring-1 swt:ring-base-300"
+            // A fixed bar width so the control does not shift as layer names
+            // change; capped by the container, not the viewport, so embedded
+            // editors size the bar to themselves.
+            prop.style [ style.custom ("width", "min(40rem, 100%)") ]
+            prop.custom ("role", "navigation")
+            prop.ariaLabel "Layer pagination"
+            prop.custom ("data-tutorial", "provenance-layer-pagination")
+            if defaultArg debug false then
+                prop.testId "provenance-layer-pagination"
+            prop.children [
+                Html.div [
+                    prop.className "swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:justify-center swt:gap-1"
+                    if defaultArg debug false then
+                        prop.testId "provenance-layer-pages"
+                    prop.children [
+                        Controls.LayerPageArrow(
+                            "Previous layer",
+                            "swt:fluent--chevron-left-20-regular",
+                            session.LayerOrder |> List.tryItem (activeIndex - 1),
+                            onSelect,
+                            "provenance-layer-prev",
+                            ?debug = debug
+                        )
+                        for layerId in visibleLayerIds do
+                            let layer = Session.layerById layerId session
+
+                            Controls.LayerPageButton(
+                                layerId,
+                                layer.Model.Source.Name,
+                                (layerId = session.ActiveLayerId),
+                                onSelect,
+                                ?sourceColor = sourceColorOf layer,
+                                ?debug = debug,
+                                key = layerId
                             )
-                            Popover.Content(
-                                children =
-                                    Html.div [
-                                        prop.className "swt:p-2"
-                                        prop.children [ addLayerContent ]
-                                    ]
-                            )
-                        ]
-                )
+                        Controls.LayerPageArrow(
+                            "Next layer",
+                            "swt:fluent--chevron-right-20-regular",
+                            session.LayerOrder |> List.tryItem (activeIndex + 1),
+                            onSelect,
+                            "provenance-layer-next",
+                            ?debug = debug
+                        )
+                    ]
+                ]
+                Controls.LayerJumpPopover(session, onSelect, ?debug = debug)
+                match onSetSourceColor with
+                | Some setSourceColor ->
+                    Controls.LayerColorButton(
+                        activeLayer.Model.Source.Id,
+                        sourceColorOf activeLayer,
+                        setSourceColor activeLayer.Model.Source.Id,
+                        triggerClassName = "swt:btn swt:btn-sm swt:btn-outline swt:min-h-8 swt:w-8 swt:px-0"
+                    )
+                | None -> Html.none
+                Controls.AddLayerPopover(session, onAddLayer, ?seedSummary = seedSummary, ?debug = debug)
             ]
         ]
 
@@ -557,6 +720,9 @@ type Controls =
 
                 ]
                 prop.custom ("data-provenance-resize-node", "true")
+                // Always-on anchor so the tutorial can target this button
+                // without coupling to its title copy.
+                prop.custom ("data-tutorial-group-by", $"{side}:{header.Category.Name}")
                 if defaultArg debug false then
                     prop.testId $"provenance-property-{side}-{header.Category.Name}"
                 prop.onClick (fun _ -> onToggleSide header)
@@ -642,6 +808,9 @@ type Controls =
                 ]
                 if defaultArg debug false then
                     prop.testId $"provenance-property-expand-{side}-{header.Category.Name}"
+                // Always-on anchor so the tutorial can target the chevron
+                // without coupling to its aria-label copy.
+                prop.custom ("data-tutorial-expand-values", $"{side}:{header.Category.Name}")
                 prop.ariaLabel (
                     if expanded then
                         $"Collapse {header.Category.Name} values"
@@ -790,6 +959,9 @@ type Controls =
                 ]
                 if expanded then
                     Html.div [
+                        // Always-on anchor so the tutorial can ring the expanded
+                        // values without coupling to the debug test id.
+                        prop.custom ("data-tutorial-property-values", $"{side}:{header.Category.Name}")
                         prop.className [
                             // fade-in only: the chips carry connector anchors, so a slide
                             // would put the measured positions off during entry.
@@ -911,7 +1083,7 @@ type Controls =
         Html.aside [
             prop.ref droppable.setNodeRef
             prop.className [
-                "swt:flex swt:min-w-0 swt:flex-col swt:gap-2 swt:rounded swt:border swt:border-dashed swt:border-base-content/25 swt:border-2 swt:p-3 swt:transition-colors"
+                "swt:flex swt:min-h-[32rem] swt:min-w-0 swt:flex-col swt:gap-2 swt:rounded swt:border swt:border-dashed swt:border-base-content/25 swt:border-2 swt:p-3 swt:transition-colors"
                 if dropState = "rejecting" then
                     "swt:border-warning swt:bg-warning/10 swt:ring-2 swt:ring-warning/30"
                 elif droppable.isOver then
@@ -926,6 +1098,8 @@ type Controls =
                     "swt:items-center swt:justify-center"
             ]
             prop.custom ("data-provenance-drop-state", dropState)
+            // Always-on anchor for the interactive tutorial's spotlight.
+            prop.custom ("data-tutorial", $"provenance-rail-{side}")
             if defaultArg debug false then
                 prop.testId $"provenance-property-rail-{side}"
 
@@ -936,13 +1110,13 @@ type Controls =
                 if headers.IsEmpty then
                     Html.p [
                         prop.className "swt:text-sm swt:text-base-content/60 swt:text-center swt:py-8"
-                        prop.text "Drag properties here, then click one to group by it"
+                        prop.text "Drag annotations here, then click one to group by it"
                     ]
 
                     Html.div [
                         prop.className "swt:w-fit"
                         prop.children [
-                            Controls.AddValuePopover(None, onAddValue, label = "Add property", ?debug = debug)
+                            Controls.AddValuePopover(None, onAddValue, label = "Add annotation", ?debug = debug)
                         ]
                     ]
                 else
@@ -952,7 +1126,7 @@ type Controls =
                             if side = ProvenanceSide.Output then
                                 "swt:self-end"
                         ]
-                        prop.title "Click a property to group this side's entities by its values"
+                        prop.title "Click an annotation to group this side's entities by its values"
                         prop.text "Group by"
                     ]
 
@@ -1010,7 +1184,7 @@ type Controls =
                                 "swt:self-end"
                         ]
                         prop.children [
-                            Controls.AddValuePopover(None, onAddValue, label = "Add property", ?debug = debug)
+                            Controls.AddValuePopover(None, onAddValue, label = "Add annotation", ?debug = debug)
                         ]
                     ]
             ]
@@ -1050,7 +1224,7 @@ type Controls =
         let category =
             nextHeader
             |> Option.map (fun next -> next.Category.Name)
-            |> Option.defaultValue "Property"
+            |> Option.defaultValue "Annotation"
 
         let nextValue = ValueDrafts.tryValue kind value term
         let canCreate = nextHeader.IsSome && nextValue.IsSome
@@ -1067,7 +1241,7 @@ type Controls =
                         Html.span [
                             prop.text (
                                 label
-                                |> Option.defaultValue (if header.IsSome then "Add value" else "Add property")
+                                |> Option.defaultValue (if header.IsSome then "Add value" else "Add annotation")
                             )
                         ]
                     ]
@@ -1086,7 +1260,7 @@ type Controls =
                         if header.IsNone then
                             Html.label [
                                 prop.className "swt:label"
-                                prop.text "Property category"
+                                prop.text "Annotation category"
                             ]
 
                             TermSearch.TermSearch(
@@ -1137,7 +1311,7 @@ type Controls =
                             prop.type'.submit
                             prop.disabled (not canCreate)
                             prop.className "swt:btn swt:btn-primary swt:btn-sm"
-                            prop.text (if header.IsSome then "Add value" else "Add property")
+                            prop.text (if header.IsSome then "Add value" else "Add annotation")
                         ]
                     ]
                 ],
@@ -1525,6 +1699,55 @@ type Controls =
                 ]
         )
 
+    /// The overall search over properties, values and groups. Debounced, so
+    /// typing updates the input immediately but filters only settle afterwards.
+    [<ReactComponent>]
+    static member SearchBar(searchText: string, onSearch: string -> unit, ?debug: bool) =
+        let searchDraft, setSearchDraft = React.useState searchText
+        let latestSearchText = React.useRef searchText
+        let latestOnSearch = React.useRef onSearch
+
+        // useLayoutEffect (not a render-phase write) so a discarded render
+        // under concurrent rendering / StrictMode never leaves these pointing
+        // at a searchText/onSearch value that was never actually committed.
+        React.useLayoutEffect (fun () ->
+            latestSearchText.current <- searchText
+            latestOnSearch.current <- onSearch
+        )
+
+        let debouncedSearchDraft = React.useDebounce (searchDraft, 300)
+
+        React.useEffect ((fun () -> setSearchDraft searchText), [| box searchText |])
+
+        React.useEffect (
+            (fun () ->
+                if debouncedSearchDraft <> latestSearchText.current then
+                    latestOnSearch.current debouncedSearchDraft
+            ),
+            [| box debouncedSearchDraft |]
+        )
+
+        Html.div [
+            prop.className "swt:relative swt:flex swt:w-40 swt:shrink-0 swt:items-center"
+            // Always-on anchor for the interactive tutorial's spotlight.
+            prop.custom ("data-tutorial", "provenance-search")
+            if defaultArg debug false then
+                prop.testId "provenance-search"
+            prop.children [
+                Html.i [
+                    prop.className
+                        "swt:iconify swt:fluent--search-20-regular swt:absolute swt:left-2 swt:size-4 swt:text-base-content/50"
+                ]
+                Html.input [
+                    prop.className "swt:input swt:input-bordered swt:input-sm swt:w-full swt:pl-8"
+                    prop.placeholder "Search annotations & values..."
+                    prop.ariaLabel "Search annotations & values"
+                    prop.value searchDraft
+                    prop.onChange setSearchDraft
+                ]
+            ]
+        ]
+
     [<ReactComponent>]
     static member FilterToolbar
         (
@@ -1538,29 +1761,6 @@ type Controls =
         ) =
         let sortOpen, setSortOpen = React.useState false
         let groupSortOpen, setGroupSortOpen = React.useState false
-        let searchDraft, setSearchDraft = React.useState filters.SearchText
-        let latestSearchText = React.useRef filters.SearchText
-        let latestOnSearch = React.useRef onSearch
-
-        // useLayoutEffect (not a render-phase write) so a discarded render
-        // under concurrent rendering / StrictMode never leaves these pointing
-        // at a filters/onSearch value that was never actually committed.
-        React.useLayoutEffect (fun () ->
-            latestSearchText.current <- filters.SearchText
-            latestOnSearch.current <- onSearch
-        )
-
-        let debouncedSearchDraft = React.useDebounce (searchDraft, 300)
-
-        React.useEffect ((fun () -> setSearchDraft filters.SearchText), [| box filters.SearchText |])
-
-        React.useEffect (
-            (fun () ->
-                if debouncedSearchDraft <> latestSearchText.current then
-                    latestOnSearch.current debouncedSearchDraft
-            ),
-            [| box debouncedSearchDraft |]
-        )
 
         let propertySortOption sort label =
             let active = filters.PropertySort = sort
@@ -1618,25 +1818,13 @@ type Controls =
             ]
 
         Html.div [
-            prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2 swt:p-2"
+            prop.className "swt:flex swt:min-w-0 swt:shrink swt:flex-wrap swt:items-center swt:gap-2"
+            // Always-on anchor for the interactive tutorial's spotlight.
+            prop.custom ("data-tutorial", "provenance-filter-toolbar")
             if defaultArg debug false then
                 prop.testId "provenance-filter-toolbar"
             prop.children [
-                Html.div [
-                    prop.className "swt:relative swt:flex swt:items-center"
-                    prop.children [
-                        Html.i [
-                            prop.className
-                                "swt:iconify swt:fluent--search-20-regular swt:absolute swt:left-2 swt:size-4 swt:text-base-content/50"
-                        ]
-                        Html.input [
-                            prop.className "swt:input swt:input-bordered swt:input-sm swt:pl-8"
-                            prop.placeholder "Search properties & values..."
-                            prop.value searchDraft
-                            prop.onChange setSearchDraft
-                        ]
-                    ]
-                ]
+                Controls.SearchBar(filters.SearchText, onSearch, ?debug = debug)
                 Dropdown.Main(
                     sortOpen,
                     setSortOpen,
@@ -1654,7 +1842,7 @@ type Controls =
                         ]
                     ],
                     React.Fragment [
-                        propertySortOption PropertySort.ValueCountDesc "Property Value Count"
+                        propertySortOption PropertySort.ValueCountDesc "Annotation Value Count"
                         propertySortOption PropertySort.NameAsc "Name"
                         propertySortOption PropertySort.ConnectionCountDesc "Connection Count"
                     ],
@@ -1688,8 +1876,8 @@ type Controls =
                         "swt:w-52 swt:max-w-none swt:menu swt:bg-base-200 swt:rounded-box swt:z-99 swt:p-2 swt:shadow-sm swt:top-110%"
                 )
                 Html.select [
-                    prop.className "swt:select swt:select-bordered swt:select-sm"
-                    prop.ariaLabel "Filter by property value count"
+                    prop.className "swt:select swt:select-bordered swt:select-sm swt:w-20 swt:shrink-0"
+                    prop.ariaLabel "Filter by annotation value count"
                     prop.value (
                         match filters.ValueCountFilter with
                         | PropertyValueCountFilter.Any -> "Any"
@@ -1717,15 +1905,15 @@ type Controls =
                     prop.children [
                         originButton
                             PropertyOriginFilter.AnyUpstream
-                            "Show upstream properties"
+                            "Show upstream annotations"
                             (OriginSymbols.upstreamIcon "swt:size-4")
                         originButton
                             PropertyOriginFilter.CurrentOnly
-                            "Show current properties"
+                            "Show current annotations"
                             (OriginSymbols.currentIcon "swt:size-4")
                         originButton
                             PropertyOriginFilter.AnyOrigin
-                            "Show current and upstream properties"
+                            "Show current and upstream annotations"
                             (OriginSymbols.bothIcons "swt:size-4")
                     ]
                 ]
@@ -1753,11 +1941,11 @@ type Controls =
                     match currentColor with
                     | Some c when c <> "" -> prop.style [ style.backgroundColor c ]
                     | _ -> ()
-                    prop.ariaLabel $"Set color for property {header.Category.Name}"
+                    prop.ariaLabel $"Set color for annotation {header.Category.Name}"
                 ],
             content =
                 ColorPicker.content
-                    $"Choose color for property {header.Category.Name}"
+                    $"Choose color for annotation {header.Category.Name}"
                     draftColor
                     setDraftColor
                     onSetColor,

@@ -189,7 +189,7 @@ type ConnectorOverlay =
 
                     ConnectorObserver.observeMatching
                         container
-                        "[data-provenance-group-node],[data-provenance-connection-node],[data-provenance-resize-node]"
+                        "[data-provenance-group-node],[data-provenance-member-node],[data-provenance-connection-node],[data-provenance-resize-node]"
                         observer
 
                 let mutationFrame = ref (None: float option)
@@ -361,16 +361,26 @@ type ConnectorOverlay =
                                         ]
                                     ]
                                 | _ -> ()
-                                // A wide transparent stroke is the actual pointer/keyboard target,
-                                // so selecting a thin curve no longer needs pixel accuracy.
+                                // The pointer/keyboard target: for ribbons the filled band
+                                // itself (transparent fill still hit-tests), for lines a wide
+                                // transparent stroke so selecting a thin curve no longer
+                                // needs pixel accuracy.
                                 match measured.InteractiveConnection with
                                 | Some connection ->
+                                    let hitPath = measured.RibbonPath |> Option.defaultValue measured.Path
+
                                     Svg.path [
-                                        svg.d measured.Path
-                                        svg.custom ("style", ConnectorSvg.pathStyle measured.Path animatePaths)
-                                        svg.fill "none"
-                                        svg.stroke "transparent"
-                                        svg.strokeWidth 14
+                                        svg.d hitPath
+                                        svg.custom ("style", ConnectorSvg.pathStyle hitPath animatePaths)
+
+                                        match measured.RibbonPath with
+                                        | Some _ ->
+                                            svg.fill "transparent"
+                                            svg.stroke "none"
+                                        | None ->
+                                            svg.fill "none"
+                                            svg.stroke "transparent"
+                                            svg.strokeWidth 14
                                         svg.className
                                             "swt:pointer-events-auto swt:cursor-pointer swt:outline-none swt:shadow-none"
                                         svg.custom ("tabIndex", "0")

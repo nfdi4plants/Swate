@@ -487,6 +487,76 @@ module PropertyPlacement =
         }
         |> RailOrder.appendHeader layerId side header
 
+/// Consolidates a hidden side's switchable annotations onto the still-visible rail.
+module SideVisibility =
+
+    /// Real, permanent move (revealing the side does not send them back): every
+    /// annotation on the hidden side that the model lets switch sides is relocated
+    /// to the visible rail, following the cards that stay on screen. A solo grouping
+    /// the header held on the now-hidden side is dropped, since it can no longer be
+    /// seen or managed; group-both assignments are cross-side and left intact.
+    let consolidateToVisible
+        layerId
+        (hiddenSide: ProvenanceSide)
+        (hiddenSideId: ProvenanceLayerSideId)
+        (canSwitch: ProvenancePropertyHeader -> bool)
+        state
+        =
+        let visibleSide =
+            match hiddenSide with
+            | ProvenanceSide.Input -> ProvenanceSide.Output
+            | ProvenanceSide.Output -> ProvenanceSide.Input
+
+        let hiddenScope = scopeForSide hiddenSide
+
+        let placedHeaders =
+            state.PropertyRailPlacements
+            |> Map.toList
+            |> List.choose (fun ((placementLayerId, key), side) ->
+                if placementLayerId = layerId && side = hiddenSide then
+                    Some key.Header
+                else
+                    None
+            )
+
+        let soloGroupedHeaders =
+            (Sides.get hiddenSideId state).GroupingAssignments
+            |> List.filter (fun assignment -> assignment.Scope = hiddenScope)
+            |> List.map (fun assignment -> assignment.Key.Header)
+
+        let headers =
+            [ yield! placedHeaders; yield! soloGroupedHeaders ]
+            |> List.distinct
+            |> List.filter canSwitch
+
+        headers
+        |> List.fold
+            (fun state header ->
+                let key = Keys.groupingKey header
+
+                let withoutSolo =
+                    Sides.update
+                        hiddenSideId
+                        (fun current -> {
+                            current with
+                                GroupingAssignments =
+                                    current.GroupingAssignments
+                                    |> List.filter (fun assignment ->
+                                        not (assignment.Key = key && assignment.Scope = hiddenScope)
+                                    )
+                        })
+                        state
+
+                {
+                    withoutSolo with
+                        PropertyRailPlacements =
+                            withoutSolo.PropertyRailPlacements |> Map.add (layerId, key) visibleSide
+                }
+                |> RailOrder.removeHeader layerId hiddenSide header
+                |> RailOrder.appendHeader layerId visibleSide header
+            )
+            state
+
 /// Tracks expanded property value panels on the side rails.
 module PropertyExpansion =
 
