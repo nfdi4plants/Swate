@@ -81,20 +81,24 @@ async function dragToPaneEdge(source: Element, canvas: ReturnType<typeof within>
   fireEvent.pointerDown(source, {
     clientX: fromX, clientY: fromY, button: 0, buttons: 1, isPrimary: true, pointerId: 1,
   });
+  await new Promise(resolve => setTimeout(resolve, 500));
   await nextFrame();
   fireEvent.pointerMove(paneEl, {
     clientX: activationX, clientY: activationY, button: 0, buttons: 1, isPrimary: true, pointerId: 1,
   });
+  await new Promise(resolve => setTimeout(resolve, 500));
   await nextFrame();
   await nextFrame();
   fireEvent.pointerMove(document, {
     clientX: toX, clientY: toY, button: 0, buttons: 1, isPrimary: true, pointerId: 1,
   });
+  await new Promise(resolve => setTimeout(resolve, 500));
   await nextFrame();
   await nextFrame();
   fireEvent.pointerUp(document, {
     clientX: toX, clientY: toY, button: 0, buttons: 0, isPrimary: true, pointerId: 1,
   });
+  await new Promise(resolve => setTimeout(resolve, 500));
   await nextFrame();
 }
 
