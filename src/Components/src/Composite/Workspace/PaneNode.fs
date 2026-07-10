@@ -74,32 +74,34 @@ type PaneNode =
                 [| box clampedRatio |]
             )
 
-            React.useEffectOnce (fun () ->
+            React.useEffect (
+                (fun () ->
+                    let onMove (e: PointerEvent) =
+                        if dragging.current then
+                            match splitContainerRef.current with
+                            | None
+                            | Some null -> ()
+                            | Some splitContainer ->
+                                let rect = splitContainer.getBoundingClientRect ()
 
-                let onMove (e: PointerEvent) =
-                    if dragging.current then
-                        match splitContainerRef.current with
-                        | None
-                        | Some null -> ()
-                        | Some splitContainer ->
-                            let rect = splitContainer.getBoundingClientRect ()
+                                let directionalPointerPosition =
+                                    match dir with
+                                    | SplitDirection.Horizontal -> (e.clientX - rect.left) / rect.width
+                                    | SplitDirection.Vertical -> (e.clientY - rect.top) / rect.height
 
-                            let directionalPointerPosition =
-                                match dir with
-                                | SplitDirection.Horizontal -> (e.clientX - rect.left) / rect.width
-                                | SplitDirection.Vertical -> (e.clientY - rect.top) / rect.height
+                                setPointerPosition (Some directionalPointerPosition)
 
-                            setPointerPosition (Some directionalPointerPosition)
+                    let stop (_: PointerEvent) = dragging.current <- false
 
-                let stop (_: PointerEvent) = dragging.current <- false
+                    Browser.Dom.document.addEventListener ("pointermove", unbox onMove)
+                    Browser.Dom.document.addEventListener ("pointerup", unbox stop)
 
-                Browser.Dom.document.addEventListener ("pointermove", unbox onMove)
-                Browser.Dom.document.addEventListener ("pointerup", unbox stop)
-
-                FsReact.createDisposable (fun () ->
-                    Browser.Dom.document.removeEventListener ("pointermove", unbox onMove)
-                    Browser.Dom.document.removeEventListener ("pointerup", unbox stop)
-                )
+                    FsReact.createDisposable (fun () ->
+                        Browser.Dom.document.removeEventListener ("pointermove", unbox onMove)
+                        Browser.Dom.document.removeEventListener ("pointerup", unbox stop)
+                    )
+                ),
+                [| box dragging; box splitContainerRef; box dir |]
             )
 
             let flexDir =
