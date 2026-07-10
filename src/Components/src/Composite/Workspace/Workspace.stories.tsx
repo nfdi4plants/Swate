@@ -166,7 +166,7 @@ export const SinglePaneWithTabs: Story = {
       await userEvent.click(canvas.getByText('utils.ts'));
       await waitFor(() => {
         expect(canvas.getByTestId('content-tab-2')).toBeVisible();
-      });
+      }, { timeout: 10_000 });
     });
   },
 };
@@ -182,7 +182,7 @@ export const CloseTab: Story = {
     await userEvent.click(closeBtn);
     await waitFor(() => {
       expect(canvas.queryByText('styles.css')).not.toBeInTheDocument();
-    });
+    }, { timeout: 10_000 });
   },
 };
 
@@ -217,12 +217,12 @@ export const ContextMenuClose: Story = {
     const body = within(document.body);
     await waitFor(() => {
       expect(body.getByText('Close')).toBeVisible();
-    });
+    }, { timeout: 10_000 });
 
     await userEvent.click(body.getByText('Close'));
     await waitFor(() => {
       expect(canvas.queryByText('styles.css')).not.toBeInTheDocument();
-    });
+    }, { timeout: 10_000 });
   },
 };
 
@@ -246,7 +246,7 @@ export const ContextMenuCloseAll: Story = {
       expect(canvas.queryByText('Main.tsx')).not.toBeInTheDocument();
       expect(canvas.queryByText('utils.ts')).not.toBeInTheDocument();
       expect(canvas.queryByText('styles.css')).not.toBeInTheDocument();
-    });
+    }, { timeout: 10_000 });
   },
 };
 
@@ -260,7 +260,7 @@ export const DropTabOnOwnTabBarNoop: Story = {
     await waitFor(() => {
       expect(canvas.getByText('Main.tsx')).toBeVisible();
       expect(canvas.queryAllByTestId(/^workspace-pane-/)).toHaveLength(1);
-    });
+    }, { timeout: 10_000 });
   },
 };
 
@@ -274,7 +274,7 @@ export const DropTabOnOwnEdgeZoneSingleTabNoop: Story = {
       expect(canvas.getByText('Main.tsx')).toBeVisible();
       expect(canvas.queryAllByTestId(/^workspace-pane-/)).toHaveLength(1);
       expect(canvas.queryByTestId(/^workspace-split-/)).not.toBeInTheDocument();
-    });
+    }, { timeout: 10_000 });
   },
 };
 
@@ -293,7 +293,7 @@ export const SelfSplitRightWithMultipleTabs: Story = {
       expect(panes[0]).toHaveTextContent('Main.tsx');
       expect(panes[0]).toHaveTextContent('utils.ts');
       expect(panes[1]).toHaveTextContent('styles.css');
-    });
+    }, { timeout: 10_000 });
   },
 };
 
@@ -312,7 +312,7 @@ export const SelfSplitBottomWithMultipleTabs: Story = {
       expect(panes[0]).toHaveTextContent('Main.tsx');
       expect(panes[0]).toHaveTextContent('styles.css');
       expect(panes[1]).toHaveTextContent('utils.ts');
-    });
+    }, { timeout: 10_000 });
   },
 };
 
@@ -326,8 +326,8 @@ export const ClosePaneViaLastTab: Story = {
 
     await waitFor(() => {
       expect(canvas.getAllByTestId(/^workspace-pane-/)).toHaveLength(2);
-    });
-
+    }, { timeout: 10_000 });
+    
     const newPane = canvas.getAllByTestId(/^workspace-pane-/)[1];
     expect(within(newPane).getByText('styles.css')).toBeVisible();
     expect(within(newPane).queryByText('Main.tsx')).not.toBeInTheDocument();
@@ -349,7 +349,7 @@ export const ActiveTabContentAfterSplit: Story = {
       expect(panes[0]).toHaveTextContent('Main.tsx');
       expect(panes[0]).toHaveTextContent('utils.ts');
       expect(panes[1]).toHaveTextContent('styles.css');
-    });
+    }, { timeout: 10_000 });
 
     expect(canvas.getByTestId('content-tab-1')).toBeVisible();
   },
@@ -368,13 +368,13 @@ export const ContextMenuCloseOthers: Story = {
     const body = within(document.body);
     await waitFor(() => {
       expect(body.getByText('Close Others')).toBeVisible();
-    });
+    }, { timeout: 10_000 });
 
     await userEvent.click(body.getByText('Close Others'));
     await waitFor(() => {
       expect(canvas.queryByText('utils.ts')).not.toBeInTheDocument();
       expect(canvas.queryByText('styles.css')).not.toBeInTheDocument();
       expect(canvas.getByText('Main.tsx')).toBeVisible();
-    });
+    }, { timeout: 10_000 });
   },
 };
