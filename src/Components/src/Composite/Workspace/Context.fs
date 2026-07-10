@@ -14,7 +14,7 @@ type WorkspaceDndContext = {
 }
 
 let WorkspaceDndCtx =
-    React.createContext<WorkspaceDndContext>(Unchecked.defaultof<WorkspaceDndContext>)
+    React.createContext<WorkspaceDndContext> (Unchecked.defaultof<WorkspaceDndContext>)
 
 [<Hook>]
 let useWorkspaceDndCtx () = React.useContext WorkspaceDndCtx
@@ -23,8 +23,7 @@ let useWorkspaceDndCtx () = React.useContext WorkspaceDndCtx
 
 type WorkspaceDispatchContext<'T> = { dispatch: Msg<'T> -> unit }
 
-let WorkspaceDispatchCtx =
-    React.createContext<obj>(null)
+let WorkspaceDispatchCtx = React.createContext<obj> (null)
 
 [<Hook>]
 let useWorkspaceDispatchCtx<'T> () : WorkspaceDispatchContext<'T> =
@@ -35,7 +34,7 @@ let useWorkspaceDispatchCtx<'T> () : WorkspaceDispatchContext<'T> =
 type WorkspaceLayoutContext = { layout: Layout }
 
 let WorkspaceLayoutCtx =
-    React.createContext<WorkspaceLayoutContext>(Unchecked.defaultof<WorkspaceLayoutContext>)
+    React.createContext<WorkspaceLayoutContext> (Unchecked.defaultof<WorkspaceLayoutContext>)
 
 [<Hook>]
 let useWorkspaceLayoutCtx () = React.useContext WorkspaceLayoutCtx
@@ -50,8 +49,7 @@ type WorkspacePaneStateContext<'T> = {
     debug: bool
 }
 
-let WorkspacePaneStateCtx =
-    React.createContext<obj>(null)
+let WorkspacePaneStateCtx = React.createContext<obj> (null)
 
 [<Hook>]
 let useWorkspacePaneStateCtx<'T> () : WorkspacePaneStateContext<'T> =
@@ -66,21 +64,17 @@ type PaneContext<'T> = {
     isFocusedPane: bool
 }
 
-let PaneCtx =
-    React.createContext<obj>(null)
+let PaneCtx = React.createContext<obj> (null)
 
 [<Hook>]
-let usePaneCtx<'T> () : PaneContext<'T> =
-    React.useContext PaneCtx |> unbox
+let usePaneCtx<'T> () : PaneContext<'T> = React.useContext PaneCtx |> unbox
 
 // -- Sortable active context --
 
-type SortableActiveContext = {
-    isActiveRef: IRefValue<bool>
-}
+type SortableActiveContext = { isActiveRef: IRefValue<bool> }
 
 let SortableActiveCtx =
-    React.createContext<SortableActiveContext>(Unchecked.defaultof<SortableActiveContext>)
+    React.createContext<SortableActiveContext> (Unchecked.defaultof<SortableActiveContext>)
 
 [<Hook>]
 let useSortableActiveCtx () = React.useContext SortableActiveCtx

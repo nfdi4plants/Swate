@@ -20,22 +20,25 @@ type DndId with
         if str.StartsWith "tab::" then
             let rest = str.Substring("tab::".Length)
             let idx = rest.LastIndexOf "::"
+
             if idx > 0 then
                 let paneId = rest.Substring(0, idx)
                 let tabId = rest.Substring(idx + 2)
-                Some (Tab(paneId, tabId))
+                Some(Tab(paneId, tabId))
             else
                 None
         elif str.StartsWith "pane-bar::" then
-            Some (TabBar(str.Substring("pane-bar::".Length)))
+            Some(TabBar(str.Substring("pane-bar::".Length)))
         elif str.StartsWith "pane::" && str.Contains "::edge::" then
             let afterPane = str.Substring("pane::".Length)
             let edgeIdx = afterPane.IndexOf "::edge::"
+
             if edgeIdx > 0 then
                 let paneId = afterPane.Substring(0, edgeIdx)
                 let dirStr = afterPane.Substring(edgeIdx + "::edge::".Length)
+
                 match EdgeDirection.fromString dirStr with
-                | Some dir -> Some (EdgeZone(paneId, dir))
+                | Some dir -> Some(EdgeZone(paneId, dir))
                 | None -> None
             else
                 None
@@ -46,6 +49,8 @@ type DndId with
         match this with
         | EdgeZone(_, dir) ->
             match dir with
-            | EdgeDirection.Top | EdgeDirection.Bottom -> Some SplitDirection.Vertical
-            | EdgeDirection.Left | EdgeDirection.Right -> Some SplitDirection.Horizontal
+            | EdgeDirection.Top
+            | EdgeDirection.Bottom -> Some SplitDirection.Vertical
+            | EdgeDirection.Left
+            | EdgeDirection.Right -> Some SplitDirection.Horizontal
         | _ -> None

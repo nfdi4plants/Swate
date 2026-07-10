@@ -155,7 +155,7 @@ module WorkspaceHelper =
                 Layout.Split(split.direction, 0.5, Level1.Single split.first, Level1.Single split.second)
             // Allow inner split only in opposite direction of the target direction.
             // This ensures that we don't create a 3x1 or 1x3 layout, but only a 2x2 layout.
-            | Layout.Split(dir,_, _, _) when dir = targetDirection -> layout
+            | Layout.Split(dir, _, _, _) when dir = targetDirection -> layout
             | Layout.Split(dir, r, l1, l2) ->
                 let updatedL1 = splitLevel1 l1
                 let updatedL2 = splitLevel1 l2
@@ -165,7 +165,7 @@ module WorkspaceHelper =
         (newPaneId, nextLayout)
 
     /// This function checks if a pane can be split in the given direction based on the current layout.
-    /// 
+    ///
     /// ⚠️ It does not check if the split makes sense based on the number of tabs in any given pane.
     let getAllowedEdgeSplits (paneIdParam: Leaf) (layout: Layout) =
         let defaultResponse = {|
@@ -177,51 +177,42 @@ module WorkspaceHelper =
         |}
 
         match layout with
-        | Layout.Single id when id = paneIdParam ->
-            {|
-                defaultResponse with
-                    edges = [
-                        EdgeDirection.Top
-                        EdgeDirection.Bottom
-                        EdgeDirection.Left
-                        EdgeDirection.Right
-                    ]
-                    isTopAllowed = true
-                    isBottomAllowed = true
-                    isLeftAllowed = true
-                    isRightAllowed = true
-            |}
-        | Layout.Split(dir, _, Level1.Single targetId, _) 
+        | Layout.Single id when id = paneIdParam -> {|
+            defaultResponse with
+                edges = [
+                    EdgeDirection.Top
+                    EdgeDirection.Bottom
+                    EdgeDirection.Left
+                    EdgeDirection.Right
+                ]
+                isTopAllowed = true
+                isBottomAllowed = true
+                isLeftAllowed = true
+                isRightAllowed = true
+          |}
+        | Layout.Split(dir, _, Level1.Single targetId, _)
         | Layout.Split(dir, _, _, Level1.Single targetId) when targetId = paneIdParam ->
             match dir with
-            | SplitDirection.Horizontal ->
-                {|
-                    defaultResponse with
-                        edges = [
-                            EdgeDirection.Top
-                            EdgeDirection.Bottom
-                        ]
-                        isTopAllowed = true
-                        isBottomAllowed = true
-                |}
-            | SplitDirection.Vertical ->
-                {|
-                    defaultResponse with
-                        edges = [
-                            EdgeDirection.Left
-                            EdgeDirection.Right
-                        ]
-                        isLeftAllowed = true
-                        isRightAllowed = true
-                |}
-        | _ ->
-            defaultResponse
+            | SplitDirection.Horizontal -> {|
+                defaultResponse with
+                    edges = [ EdgeDirection.Top; EdgeDirection.Bottom ]
+                    isTopAllowed = true
+                    isBottomAllowed = true
+              |}
+            | SplitDirection.Vertical -> {|
+                defaultResponse with
+                    edges = [ EdgeDirection.Left; EdgeDirection.Right ]
+                    isLeftAllowed = true
+                    isRightAllowed = true
+              |}
+        | _ -> defaultResponse
 
     /// This function checks if a pane can be split in the given direction based on the current layout.
-    /// 
+    ///
     /// ⚠️ It does not check if the split makes sense based on the number of tabs in any given pane.
     let ensureEdgeSplitAllowed (paneId: Leaf) (edge: EdgeDirection) (layout: Layout) =
         let allowedEdges = getAllowedEdgeSplits paneId layout
+
         match edge with
         | EdgeDirection.Top -> allowedEdges.isTopAllowed
         | EdgeDirection.Bottom -> allowedEdges.isBottomAllowed
@@ -229,39 +220,34 @@ module WorkspaceHelper =
         | EdgeDirection.Right -> allowedEdges.isRightAllowed
 
     /// This function checks if a tab can be moved to a target pane based on the current layout.
-    /// 
+    ///
     /// - If there is a a ``Layout.Single`` with a single tab, we do not allow moving the tab to another pane, as this would leave the source pane empty.
     let ensureTabMoveAllowed (tabId: TabId) (model: WorkspaceModel<'T>) =
         let isExistingIsLastTab =
             model.PanesMap
             |> Map.tryPick (fun paneId pane ->
                 match pane.Tabs |> List.tryFind (fun t -> t.Id = tabId) with
-                | Some _ -> 
+                | Some _ ->
                     let isLastTab = List.length pane.Tabs = 1
-                    Some (paneId, isLastTab)
-                | None -> 
-                    None
+                    Some(paneId, isLastTab)
+                | None -> None
             )
 
         match isExistingIsLastTab with
-        | Some (sourcePaneId, true) ->
+        | Some(sourcePaneId, true) ->
             match model.Layout with
             | Layout.Single id when id = sourcePaneId -> false
             | _ -> true
-        | Some (_, false) -> true
-        | None -> 
+        | Some(_, false) -> true
+        | None ->
             Browser.Dom.console.warn $"Tab with ID {tabId.Value} not found in any pane."
             // Tab not found in any pane, we cannot move it, so we return
             false
 
     /// This function checks if a pane can be split in the given direction and if a tab can be moved to the new pane based on the current layout.
     let ensureTabEdgeDropAllowed (tabId: TabId) (paneId: Leaf) (edge: EdgeDirection) (model: WorkspaceModel<'T>) =
-        let splitAllowed =
-            model.Layout
-            |> ensureEdgeSplitAllowed paneId edge
-        let tabMoveAllowed =
-            model 
-            |> ensureTabMoveAllowed tabId
+        let splitAllowed = model.Layout |> ensureEdgeSplitAllowed paneId edge
+        let tabMoveAllowed = model |> ensureTabMoveAllowed tabId
         splitAllowed && tabMoveAllowed
 
 open WorkspaceHelper
@@ -329,11 +315,11 @@ type WorkspaceModel<'T> with
             let collectPaneIds (layout: Layout) =
                 match layout with
                 | Layout.Single id -> [ id ]
-                | Layout.Split(_,_, l1, l2) ->
+                | Layout.Split(_, _, l1, l2) ->
                     let collectInnerIds (lvl1: Level1) =
                         match lvl1 with
                         | Level1.Single id -> [ id ]
-                        | Level1.Split(_,_, l1, l2) -> [ l1; l2 ]
+                        | Level1.Split(_, _, l1, l2) -> [ l1; l2 ]
 
                     collectInnerIds l1 @ collectInnerIds l2
 
@@ -413,28 +399,27 @@ type WorkspaceModel<'T> with
 
     static member FocusTab (tabId: TabId) (model: WorkspaceModel<'T>) =
 
-        let pane = 
+        let pane =
             model.PanesMap
             |> Map.tryPick (fun paneId pane ->
                 if pane.Tabs |> List.exists (fun t -> t.Id = tabId) then
-                    Some (paneId, pane)
+                    Some(paneId, pane)
                 else
                     None
             )
 
         match pane with
         | None -> model // Tab not found in any pane, return the model unchanged
-        | Some (paneId, pane) ->
+        | Some(paneId, pane) ->
             let nextPane = { pane with FocusedTab = Some tabId }
+
             {
                 model with
                     FocusedPane = paneId
-                    PanesMap =
-                        model.PanesMap
-                        |> Map.add paneId nextPane
+                    PanesMap = model.PanesMap |> Map.add paneId nextPane
             }
 
-        
+
     /// This function adds a tab to the workspace model.
     ///
     /// - The tab will be added to the currently focused pane.
@@ -488,7 +473,7 @@ type WorkspaceModel<'T> with
             )
 
         match nextSourcePane with
-        | Some (sourcePaneId, _, _) when sourcePaneId = targetPaneId ->
+        | Some(sourcePaneId, _, _) when sourcePaneId = targetPaneId ->
             // Tab is already in the target pane, return the model unchanged
             model
         | Some(sourcePaneId, toBeMovedTab, updatedSourcePane) ->
@@ -529,7 +514,7 @@ type WorkspaceModel<'T> with
             model
 
     /// This function reorders the tabs in a pane based on the provided new order of TabIds.
-    /// 
+    ///
     /// - If the pane does not exist, the model remains unchanged.
     /// - If the new order does not contain all TabIds in the pane, or contains TabIds that do not exist in the pane, an error is thrown.
     static member ReorderTabs (paneId: PaneId) (newOrder: TabId list) (model: WorkspaceModel<'T>) =
@@ -537,14 +522,19 @@ type WorkspaceModel<'T> with
 
         match model.PanesMap |> Map.tryFind paneId with
         | Some pane ->
-            if (Set newOrder <> Set (pane.Tabs |> List.map (fun t -> t.Id))) then
+            if (Set newOrder <> Set(pane.Tabs |> List.map (fun t -> t.Id))) then
                 failwithf "PaneId-%A: New order does not match the set of existing TabIds in the pane." paneId.Value
+
             let reorderedTabs =
                 sanitizedInput
                 |> List.choose (fun tabId -> pane.Tabs |> List.tryFind (fun t -> t.Id = tabId))
-            
+
             let updatedPane = { pane with Tabs = reorderedTabs }
-            { model with PanesMap = model.PanesMap |> Map.add paneId updatedPane }
+
+            {
+                model with
+                    PanesMap = model.PanesMap |> Map.add paneId updatedPane
+            }
         | None ->
             // Pane not found, return the model unchanged
             model
@@ -572,21 +562,29 @@ type WorkspaceModel<'T> with
         }
 
     /// This function removes all tabs from a specified pane, effectively clearing it.
-    /// 
+    ///
     /// - If the pane does not exist, the model remains unchanged.
     /// - After clearing the tabs, the FocusedTab of the pane will be set to None.
     /// - ⚠️ This function does not cleanup empty panes. Use ``CleanupEmptyPanes`` after this if needed.
     static member RemoveAllTabsFromPane (paneId: PaneId) (model: WorkspaceModel<'T>) =
         match model.PanesMap |> Map.tryFind paneId with
         | Some pane ->
-            let updatedPane = { pane with Tabs = []; FocusedTab = None }
-            { model with PanesMap = model.PanesMap |> Map.add paneId updatedPane }
+            let updatedPane = {
+                pane with
+                    Tabs = []
+                    FocusedTab = None
+            }
+
+            {
+                model with
+                    PanesMap = model.PanesMap |> Map.add paneId updatedPane
+            }
         | None ->
             // Pane not found, return the model unchanged
             model
 
 let update (onErroCallback: exn -> unit) (model: WorkspaceModel<'T>) (msg: Msg<'T>) : WorkspaceModel<'T> =
-    try 
+    try
         match msg with
         | AddTab tab -> model |> WorkspaceModel.AddTab tab
 
@@ -596,23 +594,21 @@ let update (onErroCallback: exn -> unit) (model: WorkspaceModel<'T>) (msg: Msg<'
 
         | MoveTab(tabId, targetPaneId) ->
 
-            /// do not allow moving a tab 
+            /// do not allow moving a tab
             let isAllowedTabMove = ensureTabMoveAllowed tabId model
+
             if not isAllowedTabMove then
                 model // If the move is not allowed, we return the model unchanged.
             else
                 model
                 |> WorkspaceModel.MoveTab tabId targetPaneId
                 |> WorkspaceModel.CleanupEmptyPanes
-            
-        | ReorderTabs(paneId, newOrder) ->
-            model
-            |> WorkspaceModel.ReorderTabs paneId newOrder
+
+        | ReorderTabs(paneId, newOrder) -> model |> WorkspaceModel.ReorderTabs paneId newOrder
 
         | SplitPaneByTabMove(tabId, paneId, edge) ->
-            let tabEdgeDropAllowed =
-                ensureTabEdgeDropAllowed tabId paneId edge model
-            
+            let tabEdgeDropAllowed = ensureTabEdgeDropAllowed tabId paneId edge model
+
             if not tabEdgeDropAllowed then
                 model // If the split is not allowed, we return the model unchanged.
             else
@@ -629,18 +625,26 @@ let update (onErroCallback: exn -> unit) (model: WorkspaceModel<'T>) (msg: Msg<'
         // After any message, we ensure that the Panes map is in sync with the Layout and that the focus is valid.
         |> WorkspaceModel.EnsurePaneMapSync
         |> WorkspaceModel.EnsureValidFocus
-    with
-        | exn -> onErroCallback exn; model
+    with exn ->
+        onErroCallback exn
+        model
 
 type CompClass =
     [<ReactComponent>]
     static member MyComponent
-        (renderTabContent: Tab<'A> -> ReactElement, ?renderTab: Tab<'A> -> ReactElement, ?initialTabs: Tab<'A>[], ?initialActiveTabId: string, ?onErrorCallback: exn -> unit)
-        =
+        (
+            renderTabContent: Tab<'A> -> ReactElement,
+            ?renderTab: Tab<'A> -> ReactElement,
+            ?initialTabs: Tab<'A>[],
+            ?initialActiveTabId: string,
+            ?onErrorCallback: exn -> unit
+        ) =
 
-        let onErrorCallback = defaultArg onErrorCallback (fun exn -> Browser.Dom.console.error exn)
+        let onErrorCallback =
+            defaultArg onErrorCallback (fun exn -> Browser.Dom.console.error exn)
 
-        let model, dispatch = React.useReducer (update onErrorCallback, WorkspaceModel.Init())
+        let model, dispatch =
+            React.useReducer (update onErrorCallback, WorkspaceModel.Init())
 
         Html.div [
 

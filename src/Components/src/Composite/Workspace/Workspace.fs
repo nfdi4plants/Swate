@@ -18,21 +18,15 @@ type Workspace =
         (
             renderTabContent: Tab<'T> -> ReactElement,
             ?renderTab: Tab<'T> -> ReactElement,
-            ?initialTabs: Tab<'T> [],
+            ?initialTabs: Tab<'T>[],
             ?children: ReactElement,
             ?debug: bool
-        )
-        =
+        ) =
 
         let debug = defaultArg debug false
 
         let model, dispatch =
-            React.useReducer (
-                update,
-                WorkspaceModel.Init(
-                    ?initialTabs = (initialTabs |> Option.map Array.ofSeq)
-                )
-            )
+            React.useReducer (update, WorkspaceModel.Init(?initialTabs = (initialTabs |> Option.map Array.ofSeq)))
 
         let defaultRenderTab (tab: Tab<'T>) =
             Html.span [ prop.className "swt:text-sm"; prop.text tab.Label ]
@@ -61,18 +55,13 @@ type Workspace =
 
     [<ReactComponent>]
     static member private WorkspaceInner
-        (
-            activeDrag: string option,
-            workspaceRef: IRefValue<Browser.Types.HTMLElement option>
-        )
+        (activeDrag: string option, workspaceRef: IRefValue<Browser.Types.HTMLElement option>)
         =
         let layoutCtx = useWorkspaceLayoutCtx ()
         let dndCtx = useWorkspaceDndCtx ()
         let sortableActiveRef = React.useRef true
 
-        let sortableActiveCtx: SortableActiveContext = {
-            isActiveRef = sortableActiveRef
-        }
+        let sortableActiveCtx: SortableActiveContext = { isActiveRef = sortableActiveRef }
 
         DndKit.useDndMonitor (
             {|
@@ -104,12 +93,7 @@ type Workspace =
         )
 
     [<ReactComponent>]
-    static member Workspace<'T>
-        (
-            ?className: string,
-            ?debug: bool
-        )
-        =
+    static member Workspace<'T>(?className: string, ?debug: bool) =
         let debug = defaultArg debug false
 
         let layoutCtx = useWorkspaceLayoutCtx ()
@@ -122,7 +106,9 @@ type Workspace =
         let pointerSensor =
             DndKit.useSensor (
                 DndKit.PointerSensor,
-                {| activationConstraint = {| distance = 8 |} |}
+                {|
+                    activationConstraint = {| distance = 8 |}
+                |}
             )
 
         let sensors = DndKit.useSensors [| pointerSensor |]
@@ -132,7 +118,7 @@ type Workspace =
                 let activeId = string event.active.id
 
                 match DndId.read activeId with
-                | Some (Tab(paneIdKey, tabId)) ->
+                | Some(Tab(paneIdKey, tabId)) ->
                     let panes = paneStateCtx.panesMap
 
                     let label =
@@ -158,7 +144,9 @@ type Workspace =
 
                 match DndId.read activeId, DndId.read overId with
 
-                | Some (Tab(sourcePaneKey, tabId)), Some (Tab(targetPaneKey, targetTabId)) when targetPaneKey = sourcePaneKey ->
+                | Some(Tab(sourcePaneKey, tabId)), Some(Tab(targetPaneKey, targetTabId)) when
+                    targetPaneKey = sourcePaneKey
+                    ->
                     let tabIdValue = TabId tabId
                     let targetTabIdValue = TabId targetTabId
                     let paneId = PaneId(Guid.Parse(sourcePaneKey))
@@ -167,7 +155,8 @@ type Workspace =
 
                     match panes |> Map.tryFind paneId with
                     | Some pane ->
-                        let fromIndex = pane.Tabs |> List.tryFindIndex (fun (t: Tab<'T>) -> t.Id = tabIdValue)
+                        let fromIndex =
+                            pane.Tabs |> List.tryFindIndex (fun (t: Tab<'T>) -> t.Id = tabIdValue)
 
                         let toIndex =
                             pane.Tabs |> List.tryFindIndex (fun (t: Tab<'T>) -> t.Id = targetTabIdValue)
@@ -182,13 +171,11 @@ type Workspace =
 
         let dndCtxValue: WorkspaceDndContext =
             React.useMemo (
-                (fun () ->
-                    {
-                        onDragStart = onDragStart
-                        handleDragEnd = handleDragEnd
-                        isDragging = activeDrag |> Option.isSome
-                    }
-                ),
+                (fun () -> {
+                    onDragStart = onDragStart
+                    handleDragEnd = handleDragEnd
+                    isDragging = activeDrag |> Option.isSome
+                }),
                 [| box onDragStart; box handleDragEnd; box activeDrag |]
             )
 
@@ -222,13 +209,24 @@ type Workspace =
             $"Payload {short}"
 
         let initialTabs = [|
-            { Id = TabId "tab-1"; Label = "Main.tsx"; Payload = genPayload () }
-            { Id = TabId "tab-2"; Label = "utils.ts"; Payload = genPayload () }
-            { Id = TabId "tab-3"; Label = "styles.css"; Payload = genPayload () }
+            {
+                Id = TabId "tab-1"
+                Label = "Main.tsx"
+                Payload = genPayload ()
+            }
+            {
+                Id = TabId "tab-2"
+                Label = "utils.ts"
+                Payload = genPayload ()
+            }
+            {
+                Id = TabId "tab-3"
+                Label = "styles.css"
+                Payload = genPayload ()
+            }
         |]
 
-        let renderTab (tab: Tab<string>) =
-            Html.span tab.Label
+        let renderTab (tab: Tab<string>) = Html.span tab.Label
 
         let renderTabContent (tab: Tab<string>) =
             Html.div [
@@ -272,11 +270,13 @@ type Workspace =
         let addTab _ =
             let n = tabCounter.current
             tabCounter.current <- n + 1
+
             let tab = {
-                Id = TabId (sprintf "tab-%d" n)
+                Id = TabId(sprintf "tab-%d" n)
                 Label = sprintf "NewFile%d.tsx" n
                 Payload = sprintf "Payload %s" (Guid.NewGuid().ToString("N").Substring(0, 8))
             }
+
             dispatchCtx.dispatch (AddTab tab)
 
         Html.div [
@@ -290,9 +290,7 @@ type Workspace =
                 Html.button [
                     prop.className "swt:btn swt:btn-sm swt:btn-ghost"
                     prop.text "Close All"
-                    prop.onClick (fun _ ->
-                        dispatchCtx.dispatch RemoveAllTabs
-                    )
+                    prop.onClick (fun _ -> dispatchCtx.dispatch RemoveAllTabs)
                 ]
                 Html.span [
                     prop.className "swt:text-xs swt:text-base-content/50 swt:self-center swt:ml-auto"

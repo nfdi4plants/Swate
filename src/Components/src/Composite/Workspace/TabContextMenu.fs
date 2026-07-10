@@ -25,7 +25,8 @@ module private TabContextMenuHelper =
             let paneId = el?dataset?workspacePaneId
 
             match tabId, paneId with
-            | null, _ | _, null -> None
+            | null, _
+            | _, null -> None
             | tabId, paneId ->
                 Some {
                     tabId = string tabId
@@ -42,8 +43,7 @@ type TabContextMenu =
     static member TabContextMenu(containerRef: IRefValue<Browser.Types.HTMLElement option>) =
         let dispatchCtx = useWorkspaceDispatchCtx ()
 
-        let onSpawn (e: MouseEvent) : obj option =
-            tryGetSpawnData e |> Option.map box
+        let onSpawn (e: MouseEvent) : obj option = tryGetSpawnData e |> Option.map box
 
         let childInfo (data: obj) : ContextMenuItem list =
             let spawnData = unbox<ContextMenuSpawnData> data
@@ -52,7 +52,8 @@ type TabContextMenu =
 
             let close _ = dispatchCtx.dispatch (RemoveTab tabId)
 
-            let closeOthers _ = dispatchCtx.dispatch (RemoveOtherTabs tabId)
+            let closeOthers _ =
+                dispatchCtx.dispatch (RemoveOtherTabs tabId)
 
             let closeAll _ = dispatchCtx.dispatch RemoveAllTabs
 
@@ -62,7 +63,9 @@ type TabContextMenu =
                 ContextMenuItem(
                     text = Html.span "Close",
                     icon =
-                        Html.i [ prop.className "swt:iconify swt:fluent--dismiss-12-filled swt:size-4" ],
+                        Html.i [
+                            prop.className "swt:iconify swt:fluent--dismiss-12-filled swt:size-4"
+                        ],
                     onClick = close
                 )
                 ContextMenuItem(
@@ -76,7 +79,9 @@ type TabContextMenu =
                 ContextMenuItem(
                     text = Html.span "Close All",
                     icon =
-                        Html.i [ prop.className "swt:iconify swt:fluent--delete-20-filled swt:size-4" ],
+                        Html.i [
+                            prop.className "swt:iconify swt:fluent--delete-20-filled swt:size-4"
+                        ],
                     onClick = closeAll
                 )
                 ContextMenuItem(isDivider = true)

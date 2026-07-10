@@ -10,9 +10,10 @@ open Swate.Components.Composite.Workspace.Helper.DndId
 
 module private TabBarHelper =
 
-    let dndObjectProps (obj: Swate.Components.JsBindings.IObject) : IReactProperty list =
-        [ for key in Swate.Components.JsBindings.Object.keys obj do
-              prop.custom (key, obj.get key) ]
+    let dndObjectProps (obj: Swate.Components.JsBindings.IObject) : IReactProperty list = [
+        for key in Swate.Components.JsBindings.Object.keys obj do
+            prop.custom (key, obj.get key)
+    ]
 
 open TabBarHelper
 
@@ -38,18 +39,18 @@ type TabBar =
         ]
 
         let dndProps =
-            [
-                prop.ref sortable.setNodeRef
-                prop.style style
-            ]
+            [ prop.ref sortable.setNodeRef; prop.style style ]
             @ dndObjectProps sortable.attributes
             @ dndObjectProps sortable.listeners
 
         let tabClass = [
             "swt:tab swt:items-center swt:min-w-fit swt:gap-1 swt:flex-nowrap swt:select-none"
-            if isActive then "swt:tab-active"
-            if isActive && isFocusedPane then "swt:ring-1 swt:ring-primary/40 swt:ring-inset"
-            if sortable.isDragging then "swt:opacity-30"
+            if isActive then
+                "swt:tab-active"
+            if isActive && isFocusedPane then
+                "swt:ring-1 swt:ring-primary/40 swt:ring-inset"
+            if sortable.isDragging then
+                "swt:opacity-30"
         ]
 
         Html.div [
@@ -62,10 +63,8 @@ type TabBar =
             yield! dndProps
             prop.onMouseUp (fun e ->
                 match e.button with
-                | 0. ->
-                    dispatchCtx.dispatch (FocusTab tab.Id)
-                | 1. ->
-                    dispatchCtx.dispatch (RemoveTab tab.Id)
+                | 0. -> dispatchCtx.dispatch (FocusTab tab.Id)
+                | 1. -> dispatchCtx.dispatch (RemoveTab tab.Id)
                 | _ -> ()
             )
             prop.children [
@@ -118,9 +117,7 @@ type TabBar =
             ]
             if paneStateCtx.debug then
                 prop.testId $"workspace-tabbar-{paneIdKey}"
-            prop.style [
-                style.minHeight 45
-            ]
+            prop.style [ style.minHeight 45 ]
             prop.children [
                 DndKit.SortableContext(
                     items = dragIds,
@@ -131,7 +128,15 @@ type TabBar =
                                 let tab = tabs.[i]
                                 let index = i
                                 let isActive = paneCtx.focusedTab = Some tab.Id
-                                TabBar.Tab(tab, index, paneIdKey, isActive, paneCtx.isFocusedPane, key = $"{paneIdKey}:{tab.Id.Value}")
+
+                                TabBar.Tab(
+                                    tab,
+                                    index,
+                                    paneIdKey,
+                                    isActive,
+                                    paneCtx.isFocusedPane,
+                                    key = $"{paneIdKey}:{tab.Id.Value}"
+                                )
                         ]
                 )
             ]

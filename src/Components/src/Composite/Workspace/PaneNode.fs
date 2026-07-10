@@ -39,10 +39,7 @@ type PaneNode =
                 prop.custom ("data-workspace-pane", paneIdKey)
                 if paneStateCtx.debug then
                     prop.testId $"workspace-pane-{paneIdKey}"
-                prop.children [
-                    TabBar.TabBar(paneId)
-                    ContentArea.ContentArea(paneId)
-                ]
+                prop.children [ TabBar.TabBar(paneId); ContentArea.ContentArea(paneId) ]
             ]
         )
 
@@ -71,8 +68,7 @@ type PaneNode =
             React.useEffect (
                 (fun () ->
                     match clampedRatio with
-                    | Some clamped ->
-                        dispatchCtx.dispatch (SetSplitRatio(splitId, clamped))
+                    | Some clamped -> dispatchCtx.dispatch (SetSplitRatio(splitId, clamped))
                     | None -> ()
                 ),
                 [| box clampedRatio |]

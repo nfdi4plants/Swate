@@ -100,10 +100,7 @@ type Msg<'T> =
     | ClosePane of PaneId
     | SetSplitRatio of splitId: SplitId * ratio: float
 
-type ContextMenuSpawnData = {
-    tabId: string
-    paneId: string
-}
+type ContextMenuSpawnData = { tabId: string; paneId: string }
 
 type IWorkspaceHandle =
     abstract activateTab: string -> unit

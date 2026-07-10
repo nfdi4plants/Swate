@@ -10,9 +10,8 @@ module private Helper =
 
         let rec loop (layout: Layout) : Layout =
             match layout with
-            | Layout.Split(_,_,_, Layout.Single remove, keep)
-            | Layout.Split(_,_,_, keep, Layout.Single remove) when remove = toBeRemoved ->
-                keep
+            | Layout.Split(_, _, _, Layout.Single remove, keep)
+            | Layout.Split(_, _, _, keep, Layout.Single remove) when remove = toBeRemoved -> keep
             | Layout.Split(splitId, dir, r, i1, i2) ->
                 let next1 = loop i1
                 let next2 = loop i2
@@ -22,8 +21,7 @@ module private Helper =
         match layout with
         // If the layout is a single pane, we just return it as is
         | Layout.Single id -> Layout.Single id
-        | Layout.Split(_, _, _, _, _) as split ->
-            loop split
+        | Layout.Split(_, _, _, _, _) as split -> loop split
 
     let splitPane (edge: EdgeDirection) (paneId: PaneId) (layout: Layout) : PaneId * Layout =
         let newPaneId: Leaf = PaneId(Guid.NewGuid())
@@ -58,7 +56,7 @@ module private Helper =
 
         let mutable isSplit = false
 
-        let rec loop (layout: Layout) = 
+        let rec loop (layout: Layout) =
             match layout with
             // Early exit if we have found the pane to split
             | _ when isSplit -> layout
@@ -72,8 +70,7 @@ module private Helper =
                 Layout.Split(splitId, dir, r, next1, next2)
             | _ -> layout
 
-        let nextLayout =
-            loop layout
+        let nextLayout = loop layout
 
         (newPaneId, nextLayout)
 
@@ -87,42 +84,35 @@ module private Helper =
                 match pane.Tabs |> List.tryFind (fun t -> t.Id = tabId) with
                 | Some _ ->
                     let isLastTab = List.length pane.Tabs = 1
-                    Some (paneId, isLastTab)
-                | None ->
-                    None
+                    Some(paneId, isLastTab)
+                | None -> None
             )
 
         match isExistingIsLastTab with
-        | Some (sourcePaneId, true) ->
+        | Some(sourcePaneId, true) ->
             match model.Layout with
             | Layout.Single id when id = sourcePaneId -> false
             | _ -> true
-        | Some (_, false) -> true
+        | Some(_, false) -> true
         | None ->
             Browser.Dom.console.warn $"Tab with ID {tabId.Value} not found in any pane."
             false
 
     let ensureTabEdgeDropAllowed (tabId: TabId) (paneId: Leaf) (edge: EdgeDirection) (model: WorkspaceModel<'T>) =
-        let tabMoveAllowed =
-            model
-            |> ensureTabMoveAllowed tabId
+        let tabMoveAllowed = model |> ensureTabMoveAllowed tabId
         tabMoveAllowed
 
 open Helper
 
 type WorkspaceModel<'T> with
 
-    static member Init(?initialTabs: Tab<'T> [], ?initialActiveTabId: string) =
-        let tabs =
-            initialTabs
-            |> Option.defaultValue [||]
-            |> Array.toList
+    static member Init(?initialTabs: Tab<'T>[], ?initialActiveTabId: string) =
+        let tabs = initialTabs |> Option.defaultValue [||] |> Array.toList
 
         let activeTabId =
             match initialActiveTabId with
             | Some id -> Some(TabId id)
-            | None ->
-                tabs |> List.tryHead |> Option.map (fun t -> t.Id)
+            | None -> tabs |> List.tryHead |> Option.map (fun t -> t.Id)
 
         let id = PaneId(Guid.NewGuid())
 
@@ -170,14 +160,13 @@ type WorkspaceModel<'T> with
                 toBeRemovedPaneIds
 
     /// This function ensures that the Panes map is in sync with the Layout.
-    /// 
+    ///
     /// - If a pane is in the Layout but not in the Panes map, it will be removed from the Layout.
     static member EnsurePaneMapSync(model: WorkspaceModel<'T>) =
         let rec collectPaneIds (layout: Layout) : PaneId list =
             match layout with
             | Layout.Single id -> [ id ]
-            | Layout.Split(_, _, _, l1, l2) ->
-                collectPaneIds l1 @ collectPaneIds l2
+            | Layout.Split(_, _, _, l1, l2) -> collectPaneIds l1 @ collectPaneIds l2
 
         let paneIdsInLayout =
 
@@ -282,13 +271,9 @@ type WorkspaceModel<'T> with
     static member RemoveOtherTabs (keepTabId: TabId) (model: WorkspaceModel<'T>) =
         match WorkspaceModel.GetPaneIdForTab keepTabId model with
         | Some paneId ->
-            let existingPane =
-                model.PanesMap
-                |> Map.find paneId
+            let existingPane = model.PanesMap |> Map.find paneId
 
-            let kept =
-                existingPane.Tabs
-                |> List.filter (fun t -> t.Id = keepTabId)
+            let kept = existingPane.Tabs |> List.filter (fun t -> t.Id = keepTabId)
 
             let updatedPane = {
                 existingPane with
@@ -303,7 +288,7 @@ type WorkspaceModel<'T> with
             }
         | None -> model
 
-    static member RemoveAllTabs (model: WorkspaceModel<'T>) =
+    static member RemoveAllTabs(model: WorkspaceModel<'T>) =
         let id = PaneId(Guid.NewGuid())
 
         let pane = {
@@ -328,8 +313,7 @@ type WorkspaceModel<'T> with
             else
                 pane
 
-        let updatedPanesMap =
-            model.PanesMap |> Map.map updatePane
+        let updatedPanesMap = model.PanesMap |> Map.map updatePane
 
         {
             model with
@@ -379,21 +363,24 @@ type WorkspaceModel<'T> with
                     model.PanesMap
                     |> Map.add sourcePaneId updatedSourcePane
                     |> Map.add targetPaneId updatedTargetPane
-                | None ->
-                    model.PanesMap
+                | None -> model.PanesMap
 
             {
                 model with
                     PanesMap = nextMap
                     FocusedPane = targetPaneId
             }
-        | None ->
-            model
+        | None -> model
 
     static member ReorderTabs (paneId: PaneId) (fromIndex: int) (toIndex: int) (model: WorkspaceModel<'T>) =
         match model.PanesMap |> Map.tryFind paneId with
         | Some pane ->
-            if fromIndex < 0 || toIndex < 0 || fromIndex >= pane.Tabs.Length || toIndex >= pane.Tabs.Length then
+            if
+                fromIndex < 0
+                || toIndex < 0
+                || fromIndex >= pane.Tabs.Length
+                || toIndex >= pane.Tabs.Length
+            then
                 model
             else
                 let tabsArr = pane.Tabs |> List.toArray
@@ -403,7 +390,11 @@ type WorkspaceModel<'T> with
                 let after = withoutElement |> List.skip toIndex
                 let reordered = before @ (element :: after)
                 let updatedPane = { pane with Tabs = reordered }
-                { model with PanesMap = model.PanesMap |> Map.add paneId updatedPane }
+
+                {
+                    model with
+                        PanesMap = model.PanesMap |> Map.add paneId updatedPane
+                }
         | None -> model
 
     /// This function splits a pane into two new panes, based on the specified direction.
@@ -431,13 +422,16 @@ type WorkspaceModel<'T> with
     static member ClosePane (paneId: PaneId) (model: WorkspaceModel<'T>) =
         let clearedPane =
             match model.PanesMap |> Map.tryFind paneId with
-            | Some pane -> { pane with Tabs = []; FocusedTab = None }
-            | None ->
-                {
-                    Id = paneId
+            | Some pane -> {
+                pane with
                     Tabs = []
                     FocusedTab = None
-                }
+              }
+            | None -> {
+                Id = paneId
+                Tabs = []
+                FocusedTab = None
+              }
 
         {
             model with
@@ -456,21 +450,20 @@ type WorkspaceModel<'T> with
             | Layout.Split(id, dir, _, l1, l2) when id.Value = splitId.Value ->
                 isUpdated <- true
                 Layout.Split(id, dir, clamped, l1, l2)
-            | Layout.Split(id, dir, r, l1, l2) ->
-                Layout.Split(id, dir, r, updateLayout l1, updateLayout l2)
+            | Layout.Split(id, dir, r, l1, l2) -> Layout.Split(id, dir, r, updateLayout l1, updateLayout l2)
             | _ -> layout
 
-        { model with Layout = updateLayout model.Layout }
+        {
+            model with
+                Layout = updateLayout model.Layout
+        }
 
 let update (model: WorkspaceModel<'T>) (msg: Msg<'T>) : WorkspaceModel<'T> =
     let next =
         match msg with
         | AddTab tab -> model |> WorkspaceModel.AddTab tab
 
-        | RemoveTab tabId ->
-            model
-            |> WorkspaceModel.RemoveTab tabId
-            |> WorkspaceModel.CleanupEmptyPanes
+        | RemoveTab tabId -> model |> WorkspaceModel.RemoveTab tabId |> WorkspaceModel.CleanupEmptyPanes
 
         | RemoveOtherTabs keepTabId -> model |> WorkspaceModel.RemoveOtherTabs keepTabId
 
@@ -488,13 +481,10 @@ let update (model: WorkspaceModel<'T>) (msg: Msg<'T>) : WorkspaceModel<'T> =
                 |> WorkspaceModel.MoveTab tabId targetPaneId
                 |> WorkspaceModel.CleanupEmptyPanes
 
-        | ReorderTabs(paneId, fromIndex, toIndex) ->
-            model
-            |> WorkspaceModel.ReorderTabs paneId fromIndex toIndex
+        | ReorderTabs(paneId, fromIndex, toIndex) -> model |> WorkspaceModel.ReorderTabs paneId fromIndex toIndex
 
         | SplitPaneByTabMove(tabId, paneId, edge) ->
-            let tabEdgeDropAllowed =
-                ensureTabEdgeDropAllowed tabId paneId edge model
+            let tabEdgeDropAllowed = ensureTabEdgeDropAllowed tabId paneId edge model
 
             if not tabEdgeDropAllowed then
                 model
@@ -507,15 +497,8 @@ let update (model: WorkspaceModel<'T>) (msg: Msg<'T>) : WorkspaceModel<'T> =
                 |> WorkspaceModel.MoveTab tabId newPaneId
                 |> WorkspaceModel.CleanupEmptyPanes
 
-        | ClosePane paneId ->
-            model
-            |> WorkspaceModel.ClosePane paneId
-            |> WorkspaceModel.CleanupEmptyPanes
+        | ClosePane paneId -> model |> WorkspaceModel.ClosePane paneId |> WorkspaceModel.CleanupEmptyPanes
 
-        | SetSplitRatio(splitId, ratio) ->
-            model
-            |> WorkspaceModel.SetSplitRatio splitId ratio
+        | SetSplitRatio(splitId, ratio) -> model |> WorkspaceModel.SetSplitRatio splitId ratio
 
-    next
-    |> WorkspaceModel.EnsurePaneMapSync
-    |> WorkspaceModel.EnsureValidFocus
+    next |> WorkspaceModel.EnsurePaneMapSync |> WorkspaceModel.EnsureValidFocus
