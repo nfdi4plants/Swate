@@ -5,6 +5,21 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Swate.Components.Composite.Workspace.Types
 
+
+/// This is required because fantomas produced some issues with dynamic bindings:
+/// System.Exception: cannot determine if Expr PrefixApp
+///   ExprPrefixAppNode((39,40--39,62)
+///   SingleTextNode((39,40--39,42), "!!") (...) is uppercase or lowercase
+
+module private BrowserTypesExtensions =
+
+    type Document with
+        [<Emit("$0.elementsFromPoint($1, $2)")>]
+        member _.elementsFromPoint(x: float, y: float) : Element[] = jsNative
+
+
+open BrowserTypesExtensions
+
 type DropTarget =
     | TabBarDrop of paneId: string
     | EdgeDrop of paneId: string * direction: EdgeDirection
@@ -12,8 +27,8 @@ type DropTarget =
 let findPaneElement (x: float) (y: float) (workspaceEl: HTMLElement) : HTMLElement option =
 
     let walkFrom (el: HTMLElement) : HTMLElement option =
-        let mutable current : HTMLElement option = Some el
-        let mutable result : HTMLElement option = None
+        let mutable current: HTMLElement option = Some el
+        let mutable result: HTMLElement option = None
 
         while current.IsSome do
             let c = current.Value
@@ -36,7 +51,7 @@ let findPaneElement (x: float) (y: float) (workspaceEl: HTMLElement) : HTMLEleme
         match walkFrom el with
         | Some _ as result -> result
         | None ->
-            let elements : Element[] = (!!Browser.Dom.document)?elementsFromPoint (x, y)
+            let elements: Element[] = Browser.Dom.document.elementsFromPoint (x, y)
 
             elements
             |> Array.tryPick (fun e ->
@@ -52,13 +67,12 @@ let resolveDropTarget
     (pointerY: float)
     (workspaceEl: HTMLElement)
     (sourcePaneId: string)
-    : DropTarget option
-    =
+    : DropTarget option =
 
-    let mutable current : HTMLElement option = Some element
-    let mutable targetPaneId : string option = None
+    let mutable current: HTMLElement option = Some element
+    let mutable targetPaneId: string option = None
     let mutable isTabBar = false
-    let mutable paneElement : HTMLElement option = None
+    let mutable paneElement: HTMLElement option = None
 
     while current.IsSome do
         let el = current.Value
@@ -97,16 +111,17 @@ let resolveDropTarget
 
         match paneEl with
         | Some el ->
-            let rect = el.getBoundingClientRect()
+            let rect = el.getBoundingClientRect ()
 
             let relX = (pointerX - rect.left) / rect.width
             let relY = (pointerY - rect.top) / rect.height
 
-            let distances =
-                [ EdgeDirection.Top, relY
-                  EdgeDirection.Bottom, 1.0 - relY
-                  EdgeDirection.Left, relX
-                  EdgeDirection.Right, 1.0 - relX ]
+            let distances = [
+                EdgeDirection.Top, relY
+                EdgeDirection.Bottom, 1.0 - relY
+                EdgeDirection.Left, relX
+                EdgeDirection.Right, 1.0 - relX
+            ]
 
             let closest = distances |> List.minBy snd
             Some(EdgeDrop(paneId, fst closest))
