@@ -1,7 +1,6 @@
 namespace Swate.Components.Composite.Workspace
 
 open Fable.Core
-open Fable.Core.JsInterop
 open Feliz
 open Swate.Components
 open Swate.Components.JsBindings
@@ -22,7 +21,7 @@ type TabBar =
 
     [<ReactComponent>]
     static member private Tab
-        (tab: Tab<obj>, index: int, paneIdKey: string, isActive: bool, isFocusedPane: bool, ?key: string)
+        (tab: Tab<_>, index: int, paneIdKey: string, isActive: bool, isFocusedPane: bool, ?key: string)
         =
         let dispatchCtx = useWorkspaceDispatchCtx ()
         let paneStateCtx = useWorkspacePaneStateCtx ()
@@ -64,13 +63,13 @@ type TabBar =
             prop.onMouseUp (fun e ->
                 match e.button with
                 | 0. ->
-                    dispatchCtx.dispatch (box (FocusTab tab.Id))
+                    dispatchCtx.dispatch (FocusTab tab.Id)
                 | 1. ->
-                    dispatchCtx.dispatch (box (RemoveTab tab.Id))
+                    dispatchCtx.dispatch (RemoveTab tab.Id)
                 | _ -> ()
             )
             prop.children [
-                paneStateCtx.renderTab (box tab)
+                paneStateCtx.renderTab tab
                 Html.button [
                     prop.type'.button
                     prop.className
@@ -78,7 +77,7 @@ type TabBar =
                     prop.ariaLabel $"Close {tab.Label}"
                     prop.onClick (fun e ->
                         e.stopPropagation ()
-                        dispatchCtx.dispatch (box (RemoveTab tab.Id))
+                        dispatchCtx.dispatch (RemoveTab tab.Id)
                     )
                     prop.onMouseUp (fun e -> e.stopPropagation ())
                     prop.children [
@@ -94,7 +93,6 @@ type TabBar =
     static member TabBar(paneId: PaneId, ?key: string) =
         let paneCtx = usePaneCtx ()
         let paneStateCtx = useWorkspacePaneStateCtx ()
-        let dispatchCtx = useWorkspaceDispatchCtx ()
 
         let tabs = paneCtx.tabs
         let paneIdKey = paneId.Value.ToString("N")

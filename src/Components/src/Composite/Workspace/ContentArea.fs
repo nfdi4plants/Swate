@@ -27,7 +27,7 @@ type ContentArea =
                             if Some tab.Id <> focusedTab then
                                 style.display.none
                         ]
-                        prop.children (paneStateCtx.renderTabContent (box tab))
+                        prop.children (paneStateCtx.renderTabContent tab)
                     ]
                 match focusedTab with
                 | None ->

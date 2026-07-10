@@ -50,7 +50,7 @@ type PaneId =
         let (PaneId id) = this
         id
 
-[<CompiledName("Tab")>]
+[<CompiledName("Tab")>] // Without this, Fable transpiles to ``Tab$1<T>``?
 type Tab<'T> = {
     Id: TabId
     Label: string

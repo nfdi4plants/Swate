@@ -157,18 +157,14 @@ type DropOverlay =
                         match dragInfoRef.current, dropTargetRef.current with
                         | Some(_, tabId), Some(TabBarDrop targetPaneId) ->
                             dispatchCtx.dispatch (
-                                box (
-                                    MoveTab(TabId tabId, PaneId(System.Guid.Parse targetPaneId))
-                                )
+                                MoveTab(TabId tabId, PaneId(System.Guid.Parse targetPaneId))
                             )
                         | Some(_, tabId), Some(EdgeDrop(targetPaneId, dir)) ->
                             dispatchCtx.dispatch (
-                                box (
-                                    SplitPaneByTabMove(
-                                        TabId tabId,
-                                        PaneId(System.Guid.Parse targetPaneId),
-                                        dir
-                                    )
+                                SplitPaneByTabMove(
+                                    TabId tabId,
+                                    PaneId(System.Guid.Parse targetPaneId),
+                                    dir
                                 )
                             )
                         | _ -> ()

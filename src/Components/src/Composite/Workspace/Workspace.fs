@@ -2,7 +2,6 @@ namespace Swate.Components.Composite.Workspace
 
 open System
 open Fable.Core
-open Fable.Core.JsInterop
 open Feliz
 open Swate.Components
 open Swate.Components.JsBindings
@@ -35,172 +34,30 @@ type Workspace =
                 )
             )
 
-        let defaultRenderTab (tab: obj) =
-            let t = unbox<Tab<'T>> tab
-            Html.span [ prop.className "swt:text-sm"; prop.text t.Label ]
+        let defaultRenderTab (tab: Tab<'T>) =
+            Html.span [ prop.className "swt:text-sm"; prop.text tab.Label ]
 
         let renderTabFn = defaultArg renderTab defaultRenderTab
 
-        let objRenderTab (tab: obj) = renderTabFn (unbox<Tab<'T>> tab)
-
-        let objRenderTabContent (tab: obj) = renderTabContent (unbox<Tab<'T>> tab)
-
-        let objPanesMap =
-            React.useMemo (
-                (fun () ->
-                    model.PanesMap
-                    |> Map.map (fun _ (p: Pane<'T>) ->
-                        {
-                            Id = p.Id
-                            Tabs =
-                                p.Tabs
-                                |> List.map (fun t -> {
-                                    Id = t.Id
-                                    Label = t.Label
-                                    Payload = box t.Payload
-                                })
-                            FocusedTab = p.FocusedTab
-                        }
-                    )
-                ),
-                [| box model.PanesMap |]
-            )
-
-        let dispatchCtx: WorkspaceDispatchContext = {
-            dispatch = fun (msg: obj) -> dispatch (unbox<Msg<'T>> msg)
-        }
+        let dispatchCtx: WorkspaceDispatchContext<'T> = { dispatch = dispatch }
 
         let layoutCtx: WorkspaceLayoutContext = { layout = model.Layout }
 
-        let paneStateCtx: WorkspacePaneStateContext = {
-            panesMap = objPanesMap
+        let paneStateCtx: WorkspacePaneStateContext<'T> = {
+            panesMap = model.PanesMap
             focusedPane = model.FocusedPane
-            renderTabContent = objRenderTabContent
-            renderTab = objRenderTab
+            renderTabContent = renderTabContent
+            renderTab = renderTabFn
             debug = debug
         }
 
         WorkspaceDispatchCtx.Provider(
-            dispatchCtx,
+            box dispatchCtx,
             WorkspaceLayoutCtx.Provider(
                 layoutCtx,
-                WorkspacePaneStateCtx.Provider(paneStateCtx, defaultArg children Html.none)
+                WorkspacePaneStateCtx.Provider(box paneStateCtx, defaultArg children Html.none)
             )
         )
-
-    [<ReactComponent>]
-    static member Workspace
-        (
-            ?className: string,
-            ?debug: bool
-        )
-        =
-        let debug = defaultArg debug false
-
-        let layoutCtx = useWorkspaceLayoutCtx ()
-        let paneStateCtx = useWorkspacePaneStateCtx ()
-        let dispatchCtx = useWorkspaceDispatchCtx ()
-
-        let activeDrag, setActiveDrag = React.useState (None: string option)
-        let workspaceElementRef = React.useElementRef ()
-
-        // -- DnD setup --
-
-        let pointerSensor =
-            DndKit.useSensor (
-                DndKit.PointerSensor,
-                {| activationConstraint = {| distance = 8 |} |}
-            )
-
-        let sensors = DndKit.useSensors [| pointerSensor |]
-
-        let onDragStart (event: DndKit.IDndKitEvent) =
-            if not (isNull event.active) then
-                let activeId = string event.active.id
-
-                match DndId.read activeId with
-                | Some (Tab(paneIdKey, tabId)) ->
-                    let panes = paneStateCtx.panesMap
-
-                    let label =
-                        panes
-                        |> Map.tryPick (fun _ pane ->
-                            pane.Tabs
-                            |> List.tryFind (fun (t: Tab<obj>) -> t.Id.Value = tabId)
-                            |> Option.map (fun t -> t.Label)
-                        )
-                        |> Option.defaultValue tabId
-
-                    setActiveDrag (Some label)
-                | _ -> ()
-
-        let handleDragEnd (event: DndKit.IDndKitEvent) =
-            setActiveDrag None
-
-            if isNull event.active || isNull event.over then
-                ()
-            else
-                let activeId = string event.active.id
-                let overId = string event.over.id
-
-                match DndId.read activeId, DndId.read overId with
-
-                | Some (Tab(sourcePaneKey, tabId)), Some (Tab(targetPaneKey, targetTabId)) when targetPaneKey = sourcePaneKey ->
-                    let tabIdValue = TabId tabId
-                    let targetTabIdValue = TabId targetTabId
-                    let paneId = PaneId(Guid.Parse(sourcePaneKey))
-
-                    let panes = paneStateCtx.panesMap
-
-                    match panes |> Map.tryFind paneId with
-                    | Some pane ->
-                        let fromIndex = pane.Tabs |> List.tryFindIndex (fun (t: Tab<obj>) -> t.Id = tabIdValue)
-
-                        let toIndex =
-                            pane.Tabs |> List.tryFindIndex (fun (t: Tab<obj>) -> t.Id = targetTabIdValue)
-
-                        match fromIndex, toIndex with
-                        | Some fromIdx, Some toIdx when fromIdx <> toIdx ->
-
-                            dispatchCtx.dispatch (box (ReorderTabs(paneId, fromIdx, toIdx)))
-                        | _ -> ()
-                    | None -> ()
-
-                | _ -> ()
-
-        let dndCtxValue: WorkspaceDndContext =
-            React.useMemo (
-                (fun () ->
-                    {
-                        onDragStart = onDragStart
-                        handleDragEnd = handleDragEnd
-                        isDragging = activeDrag |> Option.isSome
-                    }
-                ),
-                [| box onDragStart; box handleDragEnd; box activeDrag |]
-            )
-
-        Html.div [
-            prop.ref workspaceElementRef
-            prop.className [
-                "swt:relative swt:flex swt:flex-col swt:size-full swt:overflow-hidden"
-                match className with
-                | Some c -> c
-                | None -> ()
-            ]
-            if debug then
-                prop.testId "workspace-root"
-            prop.children [
-                WorkspaceDndCtx.Provider(
-                    dndCtxValue,
-                    DndKit.DndContext(
-                        sensors = sensors,
-                        collisionDetection = DndKit.closestCenter,
-                        children = Workspace.WorkspaceInner(activeDrag, workspaceElementRef)
-                    )
-                )
-            ]
-        ]
 
     [<ReactComponent>]
     static member private WorkspaceInner
@@ -247,6 +104,117 @@ type Workspace =
         )
 
     [<ReactComponent>]
+    static member Workspace<'T>
+        (
+            ?className: string,
+            ?debug: bool
+        )
+        =
+        let debug = defaultArg debug false
+
+        let layoutCtx = useWorkspaceLayoutCtx ()
+        let paneStateCtx = useWorkspacePaneStateCtx<'T> ()
+        let dispatchCtx = useWorkspaceDispatchCtx<'T> ()
+
+        let activeDrag, setActiveDrag = React.useState (None: string option)
+        let workspaceElementRef = React.useElementRef ()
+
+        let pointerSensor =
+            DndKit.useSensor (
+                DndKit.PointerSensor,
+                {| activationConstraint = {| distance = 8 |} |}
+            )
+
+        let sensors = DndKit.useSensors [| pointerSensor |]
+
+        let onDragStart (event: DndKit.IDndKitEvent) =
+            if not (isNull event.active) then
+                let activeId = string event.active.id
+
+                match DndId.read activeId with
+                | Some (Tab(paneIdKey, tabId)) ->
+                    let panes = paneStateCtx.panesMap
+
+                    let label =
+                        panes
+                        |> Map.tryPick (fun _ pane ->
+                            pane.Tabs
+                            |> List.tryFind (fun (t: Tab<'T>) -> t.Id.Value = tabId)
+                            |> Option.map (fun t -> t.Label)
+                        )
+                        |> Option.defaultValue tabId
+
+                    setActiveDrag (Some label)
+                | _ -> ()
+
+        let handleDragEnd (event: DndKit.IDndKitEvent) =
+            setActiveDrag None
+
+            if isNull event.active || isNull event.over then
+                ()
+            else
+                let activeId = string event.active.id
+                let overId = string event.over.id
+
+                match DndId.read activeId, DndId.read overId with
+
+                | Some (Tab(sourcePaneKey, tabId)), Some (Tab(targetPaneKey, targetTabId)) when targetPaneKey = sourcePaneKey ->
+                    let tabIdValue = TabId tabId
+                    let targetTabIdValue = TabId targetTabId
+                    let paneId = PaneId(Guid.Parse(sourcePaneKey))
+
+                    let panes = paneStateCtx.panesMap
+
+                    match panes |> Map.tryFind paneId with
+                    | Some pane ->
+                        let fromIndex = pane.Tabs |> List.tryFindIndex (fun (t: Tab<'T>) -> t.Id = tabIdValue)
+
+                        let toIndex =
+                            pane.Tabs |> List.tryFindIndex (fun (t: Tab<'T>) -> t.Id = targetTabIdValue)
+
+                        match fromIndex, toIndex with
+                        | Some fromIdx, Some toIdx when fromIdx <> toIdx ->
+                            dispatchCtx.dispatch (ReorderTabs(paneId, fromIdx, toIdx))
+                        | _ -> ()
+                    | None -> ()
+
+                | _ -> ()
+
+        let dndCtxValue: WorkspaceDndContext =
+            React.useMemo (
+                (fun () ->
+                    {
+                        onDragStart = onDragStart
+                        handleDragEnd = handleDragEnd
+                        isDragging = activeDrag |> Option.isSome
+                    }
+                ),
+                [| box onDragStart; box handleDragEnd; box activeDrag |]
+            )
+
+        Html.div [
+            prop.ref workspaceElementRef
+            prop.className [
+                "swt:relative swt:flex swt:flex-col swt:size-full swt:overflow-hidden"
+                match className with
+                | Some c -> c
+                | None -> ()
+            ]
+            if debug then
+                prop.testId "workspace-root"
+            prop.children [
+                WorkspaceDndCtx.Provider(
+                    dndCtxValue,
+                    DndKit.DndContext(
+                        sensors = sensors,
+                        collisionDetection = DndKit.closestCenter,
+                        children = Workspace.WorkspaceInner(activeDrag, workspaceElementRef)
+                    )
+                )
+            ]
+        ]
+
+    [<ReactComponent>]
     static member Entry() =
 
         let genPayload () =
@@ -291,14 +259,14 @@ type Workspace =
                     prop.className "swt:flex swt:flex-col swt:size-full swt:overflow-hidden"
                     prop.children [
                         Workspace.Toolbar()
-                        Workspace.Workspace(className = "swt:flex-1 swt:min-h-0")
+                        Workspace.Workspace<string>(className = "swt:flex-1 swt:min-h-0")
                     ]
                 ]
         )
 
     [<ReactComponent>]
     static member private Toolbar() =
-        let dispatchCtx = useWorkspaceDispatchCtx ()
+        let dispatchCtx = useWorkspaceDispatchCtx<string> ()
         let tabCounter = React.useRef 4
 
         let addTab _ =
@@ -309,7 +277,7 @@ type Workspace =
                 Label = sprintf "NewFile%d.tsx" n
                 Payload = sprintf "Payload %s" (Guid.NewGuid().ToString("N").Substring(0, 8))
             }
-            dispatchCtx.dispatch (box (AddTab tab))
+            dispatchCtx.dispatch (AddTab tab)
 
         Html.div [
             prop.className "swt:flex swt:gap-2 swt:p-2 swt:border-b swt:border-base-content/20 swt:bg-base-200"
@@ -323,7 +291,7 @@ type Workspace =
                     prop.className "swt:btn swt:btn-sm swt:btn-ghost"
                     prop.text "Close All"
                     prop.onClick (fun _ ->
-                        dispatchCtx.dispatch (box RemoveAllTabs)
+                        dispatchCtx.dispatch RemoveAllTabs
                     )
                 ]
                 Html.span [

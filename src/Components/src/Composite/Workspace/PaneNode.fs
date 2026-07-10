@@ -24,7 +24,7 @@ type PaneNode =
                 FocusedTab = None
             }
 
-        let paneCtxValue: PaneContext = {
+        let paneCtxValue: PaneContext<_> = {
             paneId = paneId
             tabs = pane.Tabs |> Array.ofList
             focusedTab = pane.FocusedTab
@@ -32,7 +32,7 @@ type PaneNode =
         }
 
         PaneCtx.Provider(
-            paneCtxValue,
+            box paneCtxValue,
             Html.div [
                 prop.key (defaultArg key paneIdKey)
                 prop.className "swt:flex swt:flex-col swt:min-w-0 swt:min-h-0 swt:flex-1 swt:overflow-hidden"
@@ -72,7 +72,7 @@ type PaneNode =
                 (fun () ->
                     match clampedRatio with
                     | Some clamped ->
-                        dispatchCtx.dispatch (box (SetSplitRatio(splitId, clamped)))
+                        dispatchCtx.dispatch (SetSplitRatio(splitId, clamped))
                     | None -> ()
                 ),
                 [| box clampedRatio |]

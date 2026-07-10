@@ -50,13 +50,13 @@ type TabContextMenu =
             let tabId = TabId spawnData.tabId
             let paneId = PaneId(Guid.Parse(spawnData.paneId))
 
-            let close _ = dispatchCtx.dispatch (box (RemoveTab tabId))
+            let close _ = dispatchCtx.dispatch (RemoveTab tabId)
 
-            let closeOthers _ = dispatchCtx.dispatch (box (RemoveOtherTabs tabId))
+            let closeOthers _ = dispatchCtx.dispatch (RemoveOtherTabs tabId)
 
-            let closeAll _ = dispatchCtx.dispatch (box RemoveAllTabs)
+            let closeAll _ = dispatchCtx.dispatch RemoveAllTabs
 
-            let closeAllInPane _ = dispatchCtx.dispatch (box (ClosePane paneId))
+            let closeAllInPane _ = dispatchCtx.dispatch (ClosePane paneId)
 
             [
                 ContextMenuItem(
