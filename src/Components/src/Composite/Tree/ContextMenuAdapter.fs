@@ -9,7 +9,7 @@ open Swate.Components.Composite.Tree.State
 open Swate.Components.Composite.Tree.Types
 
 let tryGetTarget (lookup: TreeRowLookup<'T>) (event: MouseEvent) =
-    match TreeDom.tryGetNodeId event with
+    match tryGetNodeId event with
     | Some nodeId -> lookup.Nodes |> Map.tryFind nodeId |> Option.map Some
     | None -> Some None
 

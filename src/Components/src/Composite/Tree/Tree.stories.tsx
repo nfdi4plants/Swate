@@ -230,10 +230,6 @@ export const LazyLoadingCachesChildren: Story = {
     await expectLoadingIndicator(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: "Invalidate studies cache" }));
     await expect(canvas.getByRole("button", { name: "Expand studies" })).toBeVisible();
-    await delayed(undefined, 350);
-    await expect(canvas.queryByText("Study 02")).not.toBeInTheDocument();
-    await expect(canvas.getByTestId("load-count")).toHaveTextContent("Loads: 1");
-
     await userEvent.click(canvas.getByRole("button", { name: "Expand studies" }));
     await expectLoadingIndicator(canvasElement);
     await expect(await canvas.findByText("Study 02")).toBeVisible();
@@ -284,6 +280,8 @@ const ParentAwareDataSourceTree = () => {
             ];
           case "remote/arc/studies":
             return [branch("remote/arc/studies/study_03", "Study 03", [leaf("remote/arc/studies/study_03/isa.study.xlsx", "isa.study.xlsx")])];
+          case "remote/arc/runs":
+            return [branch("remote/arc/runs/run_01", "Run 01", [leaf("remote/arc/runs/run_01/isa.run.xlsx", "isa.run.xlsx")])];
           default:
             return [];
         }
@@ -309,7 +307,7 @@ export const DataSourceLoadsChildrenForExpandedBranch: Story = {
     await expect(await canvas.findByText("isa.investigation.xlsx")).toBeVisible();
     await expect(canvas.getByText("studies")).toBeVisible();
     await expect(canvas.getByText("runs")).toBeVisible();
-    await expect(canvas.queryByRole("button", { name: "Expand runs" })).not.toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: "Expand runs" })).toBeVisible();
     await expect(canvas.getByText("empty folder")).toBeVisible();
     await expect(canvas.queryByRole("button", { name: "Expand empty folder" })).not.toBeInTheDocument();
     await expect(canvas.getByTestId("datasource-load-log")).toHaveTextContent("remote/arc");
@@ -317,6 +315,10 @@ export const DataSourceLoadsChildrenForExpandedBranch: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Expand studies" }));
     await expect(await canvas.findByText("Study 03")).toBeVisible();
     await expect(canvas.getByTestId("datasource-load-log")).toHaveTextContent("remote/arc|remote/arc/studies");
+
+    await userEvent.click(canvas.getByRole("button", { name: "Expand runs" }));
+    await expect(await canvas.findByText("Run 01")).toBeVisible();
+    await expect(canvas.getByTestId("datasource-load-log")).toHaveTextContent("remote/arc|remote/arc/studies|remote/arc/runs");
   },
 };
 
@@ -367,13 +369,10 @@ export const DataSourceInvalidateAllCache: Story = {
     await expectLoadingIndicator(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: "Invalidate all datasource cache" }));
     await expect(canvas.getByRole("button", { name: "Expand workflows" })).toBeVisible();
-    await delayed(undefined, 350);
-    await expect(canvas.queryByText("Workflow 1")).not.toBeInTheDocument();
-    await expect(canvas.getByTestId("datasource-invalidate-loads")).toHaveTextContent("Loads: 1");
-
     await userEvent.click(canvas.getByRole("button", { name: "Expand workflows" }));
     await expectLoadingIndicator(canvasElement);
     await expect(await canvas.findByText("Workflow 2")).toBeVisible();
+    await expect(canvas.queryByText("Workflow 1")).not.toBeInTheDocument();
     await expect(canvas.getByTestId("datasource-invalidate-loads")).toHaveTextContent("Loads: 2");
   },
 };

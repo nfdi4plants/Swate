@@ -47,18 +47,18 @@ type Tree =
         let treeRef = React.useElementRef ()
         let scrollRef = React.useElementRef ()
         let loadingNodeIdsRef = React.useRef<ResizeArray<string>> (ResizeArray())
-        let invalidatedNodeIdsRef = React.useRef<ResizeArray<string>> (ResizeArray())
+        let loadRequestIdRef = React.useRef 0
 
         let treeState: TreeState<'T> = useTreeState defaultExpandedIds defaultSelectedIds
 
         let effectiveSelectedIds, setSelection =
             useControlledSelection selectedIds onSelectionChange treeState
 
-        useTreeApi apiRef loadingNodeIdsRef invalidatedNodeIdsRef treeState.SetLoadedChildren treeState.SetExpandedIds
+        useTreeApi apiRef loadingNodeIdsRef treeState.SetLoadedChildren treeState.SetExpandedIds
 
         let lookup =
             React.useMemo (
-                (fun () -> NodeState.flattenVisible dataSource treeState.LoadedChildren treeState.ExpandedIds items),
+                (fun () -> flattenVisible dataSource treeState.LoadedChildren treeState.ExpandedIds items),
                 [|
                     box dataSource
                     box treeState.LoadedChildren
@@ -67,7 +67,7 @@ type Tree =
                 |]
             )
 
-        let focusedId = NodeState.focusedOrFirst treeState.FocusedId lookup.VisibleNodes
+        let focusedId = focusedOrFirst treeState.FocusedId lookup.VisibleNodes
 
         let rows = lookup.VisibleNodes
 
@@ -102,7 +102,7 @@ type Tree =
                 isNodeSelectable
                 enableLazyLoading
                 loadingNodeIdsRef
-                invalidatedNodeIdsRef
+                loadRequestIdRef
                 treeState
                 lookup
                 focusedId
@@ -127,42 +127,44 @@ type Tree =
         }
 
         let renderRow row =
-            let loadState = NodeState.loadStateFor row.Node.id treeState.LoadedChildren
+            let loadState = loadStateFor row.Node.id treeState.LoadedChildren
             let isExpanded = treeState.ExpandedIds.Contains row.Node.id
-            let canExpand = NodeState.canExpand dataSource treeState.LoadedChildren row.Node
+            let canExpandNode = canExpand dataSource treeState.LoadedChildren row.Node
 
-            TreeNode.Row {
-                Row = row
-                IsExpanded = isExpanded
-                IsSelected = effectiveSelectedIds.Contains row.Node.id
-                IsFocused = focusedId = Some row.Node.id
-                IsLoading = loadState.Status = TreeLazyLoadStatus.Loading
-                Error = loadState.Error
-                CanExpand = canExpand
-                CanSelect = not isSelectionDisabled && isNodeSelectable row.Node
-                RenderNode = renderNode
-                Leading = leading
-                Trailing = trailing
-                StyleFn = styleFn
-                OnToggle = fun () -> actions.ExpandNode row.Node
-                OnSelect =
-                    fun event ->
+            TreeNode.Row(
+                row = row,
+                isExpanded = isExpanded,
+                isSelected = effectiveSelectedIds.Contains row.Node.id,
+                isFocused = (focusedId = Some row.Node.id),
+                isLoading = (loadState.Status = TreeLazyLoadStatus.Loading),
+                error = loadState.Error,
+                canExpand = canExpandNode,
+                canSelect = ((not isSelectionDisabled) && isNodeSelectable row.Node),
+                ?renderNode = renderNode,
+                ?leading = leading,
+                ?trailing = trailing,
+                ?styleFn = styleFn,
+                onToggle = (fun () -> actions.ExpandNode row.Node),
+                onSelect =
+                    (fun event ->
                         event.preventDefault ()
                         event.stopPropagation ()
 
-                        if canExpand then
+                        if canExpandNode then
                             actions.ExpandNode row.Node
 
                         let extendSelection = event.shiftKey || event.ctrlKey || event.metaKey
 
                         actions.SelectNode row.Node extendSelection
-                OnFocus =
-                    fun () ->
+                    ),
+                onFocus =
+                    (fun () ->
                         if treeState.FocusedId <> Some row.Node.id then
                             treeState.SetFocusedId(Some row.Node.id)
-                OnKeyDown = actions.OnNodeKeyDown row.Node
-                Debug = debug
-            }
+                    ),
+                onKeyDown = actions.OnNodeKeyDown row.Node,
+                debug = debug
+            )
 
         let treeContent =
             if shouldUseVirtualization then
@@ -216,7 +218,7 @@ type Tree =
                 prop.testId "generic-tree"
             prop.className (TreeHelper.rootClasses styleFn)
             prop.children [
-                TreeCtx.Provider(Some(box contextValue), treeContent)
+                TreeCtx.Provider(unbox<TreeContextValue<obj>> (box contextValue), treeContent)
                 contextMenu
                 if debug then
                     Html.div [

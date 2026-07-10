@@ -8,7 +8,6 @@ open Swate.Components.Composite.Tree.Dom
 open Swate.Components.Composite.Tree.State
 open Swate.Components.Composite.Tree.Types
 
-
 let private toSet (values: string[] option) =
     values |> Option.map Set.ofArray |> Option.defaultValue Set.empty
 
@@ -61,17 +60,9 @@ let useControlledSelection
 let useTreeApi
     (apiRef: IRefValue<TreeApi option> option)
     (loadingNodeIdsRef: IRefValue<ResizeArray<string>>)
-    (invalidatedNodeIdsRef: IRefValue<ResizeArray<string>>)
     setLoadedChildren
     setExpandedIds
     =
-    let markInvalidated nodeId =
-        if
-            loadingNodeIdsRef.current.Contains nodeId
-            && not (invalidatedNodeIdsRef.current.Contains nodeId)
-        then
-            invalidatedNodeIdsRef.current.Add nodeId
-
     React.useEffect (
         (fun () ->
             apiRef
@@ -80,14 +71,12 @@ let useTreeApi
                     Some {
                         InvalidateNode =
                             fun nodeId ->
-                                markInvalidated nodeId
-                                setLoadedChildren (NodeState.invalidateNode nodeId)
+                                loadingNodeIdsRef.current.Remove nodeId |> ignore
+                                setLoadedChildren (invalidateNode nodeId)
                                 setExpandedIds (fun current -> current |> Set.remove nodeId)
                         InvalidateAll =
                             fun () ->
-                                for nodeId in loadingNodeIdsRef.current do
-                                    markInvalidated nodeId
-
+                                loadingNodeIdsRef.current.Clear()
                                 setLoadedChildren (fun _ -> Map.empty)
                                 setExpandedIds (fun _ -> Set.empty)
                     }
@@ -108,7 +97,7 @@ let useTreeNodeActions
     isNodeSelectable
     enableLazyLoading
     (loadingNodeIdsRef: IRefValue<ResizeArray<string>>)
-    (invalidatedNodeIdsRef: IRefValue<ResizeArray<string>>)
+    (loadRequestIdRef: IRefValue<int>)
     (treeState: TreeState<'T>)
     (lookup: TreeRowLookup<'T>)
     focusedId
@@ -116,17 +105,53 @@ let useTreeNodeActions
     setSelection
     onError
     =
-    let focusDom = TreeDom.focusNodeAfterRender treeRef
+    let focusController: TreeFocusController<'T> = {
+        Lookup = lookup
+        SetFocusedId = treeState.SetFocusedId
+        ScrollToIndex = scrollToIndex
+        FocusDom = focusNodeAfterRender treeRef
+    }
 
-    let focusById nodeId =
-        TreeController.tryFocusById lookup treeState.SetFocusedId scrollToIndex focusDom nodeId
+    let loadNode (node: TreeItem<'T>) =
+        TreeController.loadBranchChildren
+            dataSource
+            enableLazyLoading
+            loadingNodeIdsRef
+            loadRequestIdRef
+            treeState.LoadedChildren
+            treeState.SetLoadedChildren
+            treeState.SetExpandedIds
+            onError
+            node
+        |> Promise.start
+
+    React.useEffect (
+        (fun () ->
+            lookup.VisibleNodes
+            |> Array.iter (fun row ->
+                if
+                    treeState.ExpandedIds.Contains row.Node.id
+                    && canExpand dataSource treeState.LoadedChildren row.Node
+                    && (directChildren treeState.LoadedChildren row.Node).IsNone
+                then
+                    loadNode row.Node
+            )
+        ),
+        [|
+            box dataSource
+            box enableLazyLoading
+            box treeState.ExpandedIds
+            box treeState.LoadedChildren
+            box lookup.VisibleNodes
+        |]
+    )
 
     let expandNode (node: TreeItem<'T>) =
         TreeController.expandNode
             dataSource
             enableLazyLoading
             loadingNodeIdsRef
-            invalidatedNodeIdsRef
+            loadRequestIdRef
             treeState.LoadedChildren
             treeState.ExpandedIds
             treeState.SetExpandedIds
@@ -148,41 +173,34 @@ let useTreeNodeActions
         match event.key with
         | kbdEventCode.arrowDown ->
             event.preventDefault ()
-            TreeController.focusByDelta lookup focusedId treeState.SetFocusedId scrollToIndex focusDom 1
+            TreeController.focusByDelta focusController focusedId 1
         | kbdEventCode.arrowUp ->
             event.preventDefault ()
-            TreeController.focusByDelta lookup focusedId treeState.SetFocusedId scrollToIndex focusDom -1
+            TreeController.focusByDelta focusController focusedId -1
         // "Home" and "End" are KeyboardEvent.key values for jumping to the first or last visible node.
         | kbdEventCode.home ->
             event.preventDefault ()
-            TreeController.focusFirst lookup treeState.SetFocusedId scrollToIndex focusDom
+            TreeController.focusFirst focusController
         | kbdEventCode.End ->
             event.preventDefault ()
-            TreeController.focusLast lookup treeState.SetFocusedId scrollToIndex focusDom
+            TreeController.focusLast focusController
         | kbdEventCode.arrowRight ->
             event.preventDefault ()
 
-            if NodeState.canExpand dataSource treeState.LoadedChildren node then
+            if canExpand dataSource treeState.LoadedChildren node then
                 if treeState.ExpandedIds.Contains node.id then
-                    TreeController.focusFirstChild lookup treeState.SetFocusedId scrollToIndex focusDom node.id
+                    TreeController.focusFirstChild focusController node.id
                 else
                     expandNode node
         | kbdEventCode.arrowLeft ->
             event.preventDefault ()
 
-            TreeController.collapseOrFocusParent
-                lookup
-                treeState.ExpandedIds
-                treeState.SetExpandedIds
-                treeState.SetFocusedId
-                scrollToIndex
-                focusDom
-                node.id
+            TreeController.collapseOrFocusParent focusController treeState.ExpandedIds treeState.SetExpandedIds node.id
         | kbdEventCode.enter
         | kbdEventCode.space ->
             event.preventDefault ()
 
-            if NodeState.canExpand dataSource treeState.LoadedChildren node then
+            if canExpand dataSource treeState.LoadedChildren node then
                 expandNode node
 
             selectNode node (event.shiftKey || event.ctrlKey || event.metaKey)
@@ -191,6 +209,5 @@ let useTreeNodeActions
     {
         ExpandNode = expandNode
         SelectNode = selectNode
-        FocusById = focusById
         OnNodeKeyDown = onNodeKeyDown
     }

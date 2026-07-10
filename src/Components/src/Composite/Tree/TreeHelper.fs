@@ -16,22 +16,22 @@ let shouldUseVirtualization enableVirtualization visibleCount =
 
 let selectedIdsArray selectedIds = selectedIds |> Set.toArray
 
-let nodeContainerClasses (props: TreeNodeProps<'T>) =
+let nodeContainerClasses (row: TreeVisibleNode<'T>) canSelect canExpand isSelected isFocused styleFn =
     let baseClasses = [
         "swt:group swt:flex swt:min-h-8 swt:w-full swt:min-w-0 swt:items-center swt:gap-1 swt:rounded-md swt:px-1 swt:py-0.5 swt:text-sm swt:outline-none"
-        if props.CanSelect || props.CanExpand then
+        if canSelect || canExpand then
             "swt:cursor-pointer swt:hover:bg-base-200"
         else
             "swt:cursor-default swt:opacity-80"
-        if props.IsSelected then
+        if isSelected then
             "swt:bg-primary swt:text-primary-content swt:hover:bg-primary"
-        elif props.IsFocused then
+        elif isFocused then
             "swt:bg-base-200"
-        yield! props.Row.Node.className |> Option.map List.singleton |> Option.defaultValue []
+        yield! row.Node.className |> Option.map List.singleton |> Option.defaultValue []
     ]
 
-    props.StyleFn
-    |> Option.map (fun styleFn -> styleFn (Some props.Row.Node.kind) (Some props.Row.Node) baseClasses)
+    styleFn
+    |> Option.map (fun styleFn -> styleFn (Some row.Node.kind) (Some row.Node) baseClasses)
     |> Option.defaultValue baseClasses
 
 let chevronIcon isExpanded =

@@ -1,5 +1,6 @@
 namespace Swate.Components.Composite.Tree
 
+open Browser.Types
 open Fable.Core
 open Feliz
 open Swate.Components.Composite.Tree.Types
@@ -8,29 +9,53 @@ open Swate.Components.Composite.Tree.Types
 type TreeNode =
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
-    static member Row<'T>(props: TreeNodeProps<'T>) =
-        let node = props.Row.Node
+    static member Row<'T>
+        (
+            row: TreeVisibleNode<'T>,
+            isExpanded: bool,
+            isSelected: bool,
+            isFocused: bool,
+            isLoading: bool,
+            error: string option,
+            canExpand: bool,
+            canSelect: bool,
+            ?renderNode: TreeRenderProps<'T> -> ReactElement,
+            ?leading: TreeRenderProps<'T> -> ReactElement,
+            ?trailing: TreeRenderProps<'T> -> ReactElement,
+            ?styleFn: TreeStyleFn<'T>,
+            ?onToggle: unit -> unit,
+            ?onSelect: MouseEvent -> unit,
+            ?onFocus: unit -> unit,
+            ?onKeyDown: KeyboardEvent -> unit,
+            ?debug: bool
+        ) =
+        let node = row.Node
+        let onToggle = defaultArg onToggle ignore
+        let onSelect = defaultArg onSelect ignore
+        let onFocus = defaultArg onFocus ignore
+        let onKeyDown = defaultArg onKeyDown ignore
+        let debug = defaultArg debug false
 
         let renderProps: TreeRenderProps<'T> = {
             Node = node
-            Depth = props.Row.Depth
-            IsExpanded = props.IsExpanded
-            IsSelected = props.IsSelected
-            IsFocused = props.IsFocused
-            IsLoading = props.IsLoading
-            Error = props.Error
-            Toggle = props.OnToggle
-            Select = props.OnSelect
+            Depth = row.Depth
+            IsExpanded = isExpanded
+            IsSelected = isSelected
+            IsFocused = isFocused
+            IsLoading = isLoading
+            Error = error
+            Toggle = onToggle
+            Select = onSelect
         }
 
         let expandButton =
-            if props.CanExpand then
+            if canExpand then
                 Html.button [
                     prop.type'.button
                     prop.className "swt:btn swt:btn-ghost swt:btn-square swt:btn-xs swt:min-h-0 swt:size-6 swt:shrink-0"
                     prop.tabIndex -1
                     prop.ariaLabel (
-                        if props.IsExpanded then
+                        if isExpanded then
                             $"Collapse {node.label}"
                         else
                             $"Expand {node.label}"
@@ -38,16 +63,16 @@ type TreeNode =
                     prop.onClick (fun e ->
                         e.preventDefault ()
                         e.stopPropagation ()
-                        props.OnToggle()
+                        onToggle ()
                     )
                     prop.children [
-                        if props.IsLoading then
+                        if isLoading then
                             Html.span [
                                 prop.className "swt:loading swt:loading-spinner swt:loading-xs"
                             ]
                         else
                             Html.i [
-                                prop.className $"swt:iconify {TreeHelper.chevronIcon props.IsExpanded} swt:size-4"
+                                prop.className $"swt:iconify {TreeHelper.chevronIcon isExpanded} swt:size-4"
                             ]
                     ]
                 ]
@@ -58,7 +83,7 @@ type TreeNode =
                 ]
 
         let leadingContent =
-            match props.Leading with
+            match leading with
             | Some leading -> leading renderProps
             | None ->
                 match node.leading with
@@ -74,7 +99,7 @@ type TreeNode =
                         ]
 
         let nodeContent =
-            match props.RenderNode with
+            match renderNode with
             | Some renderNode ->
                 Html.div [
                     prop.className "swt:min-w-0 swt:flex-1 swt:text-left"
@@ -87,7 +112,7 @@ type TreeNode =
                 ]
 
         let errorContent =
-            match props.Error with
+            match error with
             | Some error ->
                 Html.span [
                     prop.className "swt:badge swt:badge-error swt:badge-sm swt:shrink-0"
@@ -97,7 +122,7 @@ type TreeNode =
             | None -> Html.none
 
         let trailingContent =
-            match props.Trailing with
+            match trailing with
             | Some trailing -> trailing renderProps
             | None ->
                 match node.trailing with
@@ -106,24 +131,23 @@ type TreeNode =
 
         Html.div [
             prop.role "treeitem"
-            prop.tabIndex (if props.IsFocused then 0 else -1)
-            prop.custom ("aria-selected", props.IsSelected)
-            prop.custom ("aria-disabled", not props.CanSelect)
-            prop.custom ("aria-level", props.Row.Depth + 1)
-            if props.CanExpand then
-                prop.custom ("aria-expanded", props.IsExpanded)
+            prop.tabIndex (if isFocused then 0 else -1)
+            prop.custom ("aria-selected", isSelected)
+            if not canSelect && not canExpand then
+                prop.custom ("aria-disabled", true)
+            prop.custom ("aria-level", row.Depth + 1)
+            if canExpand then
+                prop.custom ("aria-expanded", isExpanded)
             prop.custom ("data-tree-node-id", node.id)
             prop.custom ("data-tree-node-kind", string node.kind)
-            if props.Debug then
+            if debug then
                 prop.testId $"tree-node-{node.id}"
-            prop.className (TreeHelper.nodeContainerClasses props)
-            prop.style [
-                style.paddingLeft (length.rem (float props.Row.Depth * 1.25))
-            ]
+            prop.className (TreeHelper.nodeContainerClasses row canSelect canExpand isSelected isFocused styleFn)
+            prop.style [ style.paddingLeft (length.rem (float row.Depth * 1.25)) ]
             prop.title (node.tooltip |> Option.defaultValue node.label)
-            prop.onClick props.OnSelect
-            prop.onFocus (fun _ -> props.OnFocus())
-            prop.onKeyDown props.OnKeyDown
+            prop.onClick onSelect
+            prop.onFocus (fun _ -> onFocus ())
+            prop.onKeyDown onKeyDown
             prop.children [
                 Html.div [
                     prop.className [
