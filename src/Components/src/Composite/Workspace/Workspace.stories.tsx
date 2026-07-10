@@ -5,8 +5,6 @@ import { Workspace, WorkspaceProvider } from './Workspace.fs.js';
 import { Tab } from './Types.fs.js';
 import type { Tab as TabType } from './Types.fs.js';
 
-const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
-
 function createTab(id: string, label: string, payload: string = '{}'): TabType<string> {
   return new Tab<string>(id, label, payload);
 }
@@ -16,6 +14,12 @@ function defaultTabs() {
 }
 
 // --- Drag helpers ---
+
+const nextFrameOrSettle = () =>
+  Promise.all([
+    new Promise((r) => requestAnimationFrame(r)),
+    new Promise((r) => setTimeout(r, 100)),
+  ]).then(() => undefined);
 
 async function dragByPointer(source: Element, target: Element) {
   const from = source.getBoundingClientRect();
@@ -32,19 +36,19 @@ async function dragByPointer(source: Element, target: Element) {
   fireEvent.pointerDown(source, {
     clientX: fromX, clientY: fromY, button: 0, buttons: 1, isPrimary: true, pointerId: 1,
   });
-  await nextFrame();
+  await nextFrameOrSettle();
   fireEvent.pointerMove(target, {
     clientX: activationX, clientY: activationY, button: 0, buttons: 1, isPrimary: true, pointerId: 1,
   });
-  await nextFrame();
+  await nextFrameOrSettle();
   fireEvent.pointerMove(document, {
     clientX: toX, clientY: toY, button: 0, buttons: 1, isPrimary: true, pointerId: 1,
   });
-  await nextFrame();
+  await nextFrameOrSettle();
   fireEvent.pointerUp(target, {
     clientX: toX, clientY: toY, button: 0, buttons: 0, isPrimary: true, pointerId: 1,
   });
-  await nextFrame();
+  await nextFrameOrSettle();
 }
 
 function getPaneContentRect(canvas: ReturnType<typeof within>) {
@@ -81,25 +85,21 @@ async function dragToPaneEdge(source: Element, canvas: ReturnType<typeof within>
   fireEvent.pointerDown(source, {
     clientX: fromX, clientY: fromY, button: 0, buttons: 1, isPrimary: true, pointerId: 1,
   });
-  await new Promise(resolve => setTimeout(resolve, 500));
-  await nextFrame();
+  await nextFrameOrSettle();
   fireEvent.pointerMove(paneEl, {
     clientX: activationX, clientY: activationY, button: 0, buttons: 1, isPrimary: true, pointerId: 1,
   });
-  await new Promise(resolve => setTimeout(resolve, 500));
-  await nextFrame();
-  await nextFrame();
+  await nextFrameOrSettle();
+  await nextFrameOrSettle();
   fireEvent.pointerMove(document, {
     clientX: toX, clientY: toY, button: 0, buttons: 1, isPrimary: true, pointerId: 1,
   });
-  await new Promise(resolve => setTimeout(resolve, 500));
-  await nextFrame();
-  await nextFrame();
+  await nextFrameOrSettle();
+  await nextFrameOrSettle();
   fireEvent.pointerUp(document, {
     clientX: toX, clientY: toY, button: 0, buttons: 0, isPrimary: true, pointerId: 1,
   });
-  await new Promise(resolve => setTimeout(resolve, 500));
-  await nextFrame();
+  await nextFrameOrSettle();
 }
 
 // --- Render helpers ---
@@ -216,7 +216,7 @@ export const ContextMenuClose: Story = {
 
     const tabButton = canvas.getByText('styles.css').closest('[data-workspace-tab-id]')!;
     fireEvent.contextMenu(tabButton);
-    await nextFrame();
+    await nextFrameOrSettle();
 
     const body = within(document.body);
     await waitFor(() => {
@@ -238,7 +238,7 @@ export const ContextMenuCloseAll: Story = {
 
     const tabButton = canvas.getByText('Main.tsx').closest('[data-workspace-tab-id]')!;
     fireEvent.contextMenu(tabButton);
-    await nextFrame();
+    await nextFrameOrSettle();
 
     const body = within(document.body);
     await waitFor(() => {
@@ -367,7 +367,7 @@ export const ContextMenuCloseOthers: Story = {
 
     const tabButton = canvas.getByText('Main.tsx').closest('[data-workspace-tab-id]')!;
     fireEvent.contextMenu(tabButton);
-    await nextFrame();
+    await nextFrameOrSettle();
 
     const body = within(document.body);
     await waitFor(() => {
