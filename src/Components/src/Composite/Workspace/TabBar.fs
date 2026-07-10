@@ -106,14 +106,10 @@ type TabBar =
                 [| box tabs; box paneIdKey |]
             )
 
-        let tabBarDroppable = DndKit.useDroppable ({| id = DndId.write (DndId.TabBar paneIdKey) |})
-
         Html.div [
-            prop.ref tabBarDroppable.setNodeRef
+            prop.custom ("data-workspace-tabbar", paneIdKey)
             prop.className [
                 "swt:tabs swt:tabs-lift swt:w-full swt:overflow-x-auto swt:overflow-y-hidden swt:flex swt:flex-row swt:items-center swt:justify-start swt:pt-1 swt:border-b swt:border-base-content/50 swt:flex-nowrap swt:gap-0"
-                if tabBarDroppable.isOver then
-                    "swt:bg-primary/10"
             ]
             if paneStateCtx.debug then
                 prop.testId $"workspace-tabbar-{paneIdKey}"

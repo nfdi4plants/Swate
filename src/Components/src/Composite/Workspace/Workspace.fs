@@ -140,63 +140,6 @@ type Workspace =
 
                 match DndId.read activeId, DndId.read overId with
 
-                | Some (Tab(_, tabId)), Some (EdgeZone(targetPaneKey, _) as edgeId) ->
-                    let tabIdValue = TabId tabId
-
-                    let panes = paneStateCtx.panesMap
-
-                    let isSingleTabSelfSplit =
-                        let sourcePane =
-                            panes
-                            |> Map.tryPick (fun _ pane ->
-                                if
-                                    pane.Tabs
-                                    |> List.exists (fun (t: Tab<obj>) -> t.Id = tabIdValue)
-                                then
-                                    Some pane
-                                else
-                                    None
-                            )
-
-                        match sourcePane with
-                        | Some p ->
-                            p.Id.Value.ToString("N") = targetPaneKey
-                            && p.Tabs.Length = 1
-                        | None -> false
-
-                    if isSingleTabSelfSplit then
-                        ()
-                    else
-
-                    match edgeId.edgeToSplitDirection () with
-                    | Some _ ->
-                        let targetPaneId = PaneId(Guid.Parse(targetPaneKey))
-
-                        dispatchCtx.dispatch (
-                            box (
-                                SplitPaneByTabMove(
-                                    tabIdValue,
-                                    targetPaneId,
-                                    match edgeId with
-                                    | EdgeZone(_, dir) -> dir
-                                    | _ -> EdgeDirection.Bottom
-                                )
-                            )
-                        )
-                    | None -> ()
-
-                | Some (Tab(sourcePaneKey, tabId)), Some (TabBar targetPaneKey) when targetPaneKey <> sourcePaneKey ->
-                    let tabIdValue = TabId tabId
-                    let targetPaneId = PaneId(Guid.Parse(targetPaneKey))
-
-                    dispatchCtx.dispatch (box (MoveTab(tabIdValue, targetPaneId)))
-
-                | Some (Tab(sourcePaneKey, tabId)), Some (Tab(targetPaneKey, _)) when targetPaneKey <> sourcePaneKey ->
-                    let tabIdValue = TabId tabId
-                    let targetPaneId = PaneId(Guid.Parse(targetPaneKey))
-
-                    dispatchCtx.dispatch (box (MoveTab(tabIdValue, targetPaneId)))
-
                 | Some (Tab(sourcePaneKey, tabId)), Some (Tab(targetPaneKey, targetTabId)) when targetPaneKey = sourcePaneKey ->
                     let tabIdValue = TabId tabId
                     let targetTabIdValue = TabId targetTabId
@@ -229,7 +172,7 @@ type Workspace =
         Html.div [
             prop.ref workspaceElementRef
             prop.className [
-                "swt:flex swt:flex-col swt:size-full swt:overflow-hidden"
+                "swt:relative swt:flex swt:flex-col swt:size-full swt:overflow-hidden"
                 match className with
                 | Some c -> c
                 | None -> ()
@@ -274,12 +217,14 @@ type Workspace =
                     match activeDrag with
                     | Some label ->
                         Html.div [
+                            prop.style [ style.pointerEvents.none ]
                             prop.className
                                 "swt:tab swt:tab-active swt:shadow-xl swt:ring-2 swt:ring-primary swt:ring-offset-2 swt:ring-offset-base-100 swt:px-3 swt:py-1.5"
                             prop.children [ Html.span label ]
                         ]
                     | None -> Html.none
             )
+            DropOverlay.DropOverlay(workspaceRef)
         ]
 
     [<ReactComponent>]

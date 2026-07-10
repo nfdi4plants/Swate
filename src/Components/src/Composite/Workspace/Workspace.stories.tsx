@@ -47,25 +47,54 @@ async function dragByPointer(source: Element, target: Element) {
   await nextFrame();
 }
 
-async function dragToBottomEdge(source: Element, target: Element) {
+function getPaneContentRect(canvas: ReturnType<typeof within>) {
+  const pane = canvas.getByTestId(/^workspace-pane-/);
+  const tabBar = canvas.getByTestId(/^workspace-tabbar-/);
+  const paneRect = pane.getBoundingClientRect();
+  const tabBarRect = tabBar.getBoundingClientRect();
+  const contentLeft = paneRect.left;
+  const contentTop = tabBarRect.bottom;
+  const contentWidth = paneRect.width;
+  const contentHeight = paneRect.bottom - tabBarRect.bottom;
+  return { left: contentLeft, top: contentTop, width: contentWidth, height: contentHeight };
+}
+
+async function dragToPaneEdge(source: Element, canvas: ReturnType<typeof within>, edge: 'right' | 'bottom') {
   const from = source.getBoundingClientRect();
-  const to = target.getBoundingClientRect();
   const fromX = from.left + from.width / 2;
   const fromY = from.top + from.height / 2;
-  const toX = to.left + to.width / 2;
-  const toY = to.top + to.height / 2;
+  const contentRect = getPaneContentRect(canvas);
+  let toX: number, toY: number;
+  if (edge === 'right') {
+    toX = contentRect.left + contentRect.width * 0.875;
+    toY = contentRect.top + contentRect.height / 2;
+  } else {
+    toX = contentRect.left + contentRect.width / 2;
+    toY = contentRect.top + contentRect.height * 0.8;
+  }
   const deltaX = toX - fromX;
   const deltaY = toY - fromY;
   const distance = Math.hypot(deltaX, deltaY) || 1;
   const activationX = fromX + (deltaX / distance) * 8;
   const activationY = fromY + (deltaY / distance) * 8;
-  fireEvent.pointerDown(source, { clientX: fromX, clientY: fromY, button: 0, buttons: 1, isPrimary: true, pointerId: 1 });
+  const paneEl = canvas.getByTestId(/^workspace-pane-/);
+  fireEvent.pointerDown(source, {
+    clientX: fromX, clientY: fromY, button: 0, buttons: 1, isPrimary: true, pointerId: 1,
+  });
   await nextFrame();
-  fireEvent.pointerMove(target, { clientX: activationX, clientY: activationY, button: 0, buttons: 1, isPrimary: true, pointerId: 1 });
+  fireEvent.pointerMove(paneEl, {
+    clientX: activationX, clientY: activationY, button: 0, buttons: 1, isPrimary: true, pointerId: 1,
+  });
   await nextFrame();
-  fireEvent.pointerMove(document, { clientX: toX, clientY: toY, button: 0, buttons: 1, isPrimary: true, pointerId: 1 });
   await nextFrame();
-  fireEvent.pointerUp(target, { clientX: toX, clientY: toY, button: 0, buttons: 0, isPrimary: true, pointerId: 1 });
+  fireEvent.pointerMove(document, {
+    clientX: toX, clientY: toY, button: 0, buttons: 1, isPrimary: true, pointerId: 1,
+  });
+  await nextFrame();
+  await nextFrame();
+  fireEvent.pointerUp(document, {
+    clientX: toX, clientY: toY, button: 0, buttons: 0, isPrimary: true, pointerId: 1,
+  });
   await nextFrame();
 }
 
@@ -240,9 +269,7 @@ export const DropTabOnOwnEdgeZoneSingleTabNoop: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const tab = canvas.getByText('Main.tsx').closest('[data-workspace-tab-id]')!;
-    const paneId = canvas.getByTestId(/^workspace-pane-/).getAttribute('data-testid')!.replace('workspace-pane-', '');
-    const rightEdge = canvas.getByTestId(`workspace-edge-${paneId}-right`);
-    await dragByPointer(tab, rightEdge);
+    await dragToPaneEdge(tab, canvas, 'right');
     await waitFor(() => {
       expect(canvas.getByText('Main.tsx')).toBeVisible();
       expect(canvas.queryAllByTestId(/^workspace-pane-/)).toHaveLength(1);
@@ -256,10 +283,8 @@ export const SelfSplitRightWithMultipleTabs: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const stylesTab = canvas.getByText('styles.css').closest('[data-workspace-tab-id]')!;
-    const paneId = canvas.getByTestId(/^workspace-pane-/).getAttribute('data-testid')!.replace('workspace-pane-', '');
-    const rightEdge = canvas.getByTestId(`workspace-edge-${paneId}-right`);
 
-    await dragByPointer(stylesTab, rightEdge);
+    await dragToPaneEdge(stylesTab, canvas, 'right');
 
     await waitFor(() => {
       expect(canvas.getByTestId(/^workspace-split-/)).toBeInTheDocument();
@@ -277,10 +302,8 @@ export const SelfSplitBottomWithMultipleTabs: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const utilsTab = canvas.getByText('utils.ts').closest('[data-workspace-tab-id]')!;
-    const paneId = canvas.getByTestId(/^workspace-pane-/).getAttribute('data-testid')!.replace('workspace-pane-', '');
-    const bottomEdge = canvas.getByTestId(`workspace-edge-${paneId}-bottom`);
 
-    await dragByPointer(utilsTab, bottomEdge);
+    await dragToPaneEdge(utilsTab, canvas, 'bottom');
 
     await waitFor(() => {
       expect(canvas.getByTestId(/^workspace-split-/)).toBeInTheDocument();
@@ -299,9 +322,7 @@ export const MoveTabToAnotherPane: Story = {
     const canvas = within(canvasElement);
 
     const stylesTab = canvas.getByText('styles.css').closest('[data-workspace-tab-id]')!;
-    const initialPaneId = canvas.getByTestId(/^workspace-pane-/).getAttribute('data-testid')!.replace('workspace-pane-', '');
-    const rightEdge = canvas.getByTestId(`workspace-edge-${initialPaneId}-right`);
-    await dragByPointer(stylesTab, rightEdge);
+    await dragToPaneEdge(stylesTab, canvas, 'right');
 
     await waitFor(() => {
       expect(canvas.getAllByTestId(/^workspace-pane-/)).toHaveLength(2);

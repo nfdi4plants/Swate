@@ -213,11 +213,13 @@
     <Compile Include="Composite\Workspace\Types.fs" />
     <Compile Include="Composite\Workspace\WorkspaceModel.fs" />
     <Compile Include="Composite\Workspace\Helper\DndId.fs" />
+    <Compile Include="Composite\Workspace\Helper\DropTarget.fs" />
     <Compile Include="Composite\Workspace\Context.fs" />
     <Compile Include="Composite\Workspace\ContentArea.fs" />
     <Compile Include="Composite\Workspace\TabBar.fs" />
     <Compile Include="Composite\Workspace\TabContextMenu.fs" />
     <Compile Include="Composite\Workspace\PaneNode.fs" />
+    <Compile Include="Composite\Workspace\DropOverlay.fs" />
     <Compile Include="Composite\Workspace\Workspace.fs" />
     
     <Compile Include="Page\ProvenanceGrouping\Types.fs" />

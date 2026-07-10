@@ -35,6 +35,7 @@ type PaneNode =
             Html.div [
                 prop.key (defaultArg key paneIdKey)
                 prop.className "swt:flex swt:flex-col swt:min-w-0 swt:min-h-0 swt:flex-1 swt:overflow-hidden"
+                prop.custom ("data-workspace-pane", paneIdKey)
                 if paneStateCtx.debug then
                     prop.testId $"workspace-pane-{paneIdKey}"
                 prop.children [
