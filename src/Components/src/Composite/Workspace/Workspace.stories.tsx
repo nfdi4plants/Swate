@@ -329,6 +329,55 @@ export const SelfSplitBottomWithMultipleTabs: Story = {
   },
 };
 
+export const DragBottomDiagnostics: Story = {
+  render: () => <SimpleHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const utilsTab = canvas.getByText('utils.ts').closest('[data-workspace-tab-id]')!;
+
+    const from = utilsTab.getBoundingClientRect();
+    const fromX = from.left + from.width / 2;
+    const fromY = from.top + from.height / 2;
+    const contentRect = getPaneContentRect(canvas);
+    const toX = contentRect.left + contentRect.width / 2;
+    const toY = contentRect.top + contentRect.height * 0.95;
+    const deltaX = toX - fromX;
+    const deltaY = toY - fromY;
+    const distance = Math.hypot(deltaX, deltaY) || 1;
+    const activationX = fromX + (deltaX / distance) * 8;
+    const activationY = fromY + (deltaY / distance) * 8;
+    const paneEl = canvas.getByTestId(/^workspace-pane-/);
+
+    fireEvent.pointerDown(utilsTab, {
+      clientX: fromX, clientY: fromY, button: 0, buttons: 1, isPrimary: true, pointerId: 1,
+    });
+    await nextFrameOrSettle();
+    fireEvent.pointerMove(paneEl, {
+      clientX: activationX, clientY: activationY, button: 0, buttons: 1, isPrimary: true, pointerId: 1,
+    });
+    await nextFrameOrSettle();
+    await nextFrameOrSettle();
+    fireEvent.pointerMove(paneEl, {
+      clientX: toX, clientY: toY, button: 0, buttons: 1, isPrimary: true, pointerId: 1,
+    });
+    await nextFrameOrSettle();
+    await nextFrameOrSettle();
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('drag-debug')).toBeInTheDocument();
+    }, { timeout: 5000 });
+
+    const debugEl = canvas.getByTestId('drag-debug');
+    expect(debugEl.getAttribute('data-drop-target-state')).toBe('edge-bottom');
+    expect(debugEl.getAttribute('data-target-rect-state')).toBe('some');
+
+    fireEvent.pointerUp(paneEl, {
+      clientX: toX, clientY: toY, button: 0, buttons: 0, isPrimary: true, pointerId: 1,
+    });
+    await nextFrameOrSettle();
+  },
+};
+
 export const ClosePaneViaLastTab: Story = {
   render: () => <SimpleHarness />,
   play: async ({ canvasElement }) => {

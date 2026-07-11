@@ -212,59 +212,81 @@ type DropOverlay =
             [| box isDragging |]
         )
 
-        match dropTarget, targetRect with
-        | Some target, Some rect ->
-            let transitionStyle =
-                "top 100ms ease-out, left 100ms ease-out, width 100ms ease-out, height 100ms ease-out"
-
-            let dirStr =
-                match target with
-                | TabBarDrop _ -> "tabbar"
-                | EdgeDrop(_, d) ->
-                    match d with
-                    | EdgeDirection.Top -> "edge-top"
-                    | EdgeDirection.Bottom -> "edge-bottom"
-                    | EdgeDirection.Left -> "edge-left"
-                    | EdgeDirection.Right -> "edge-right"
-
-            let paneStr =
-                match target with
-                | TabBarDrop p -> p
-                | EdgeDrop(p, _) -> p
-
-            match target with
-            | TabBarDrop _ ->
+        React.Fragment [
+            if isDragging then
                 Html.div [
-                    prop.testId "drop-overlay"
-                    prop.custom ("data-overlay-target", dirStr)
-                    prop.custom ("data-overlay-pane", paneStr)
-                    prop.className "swt:absolute swt:bg-primary/10 swt:pointer-events-none swt:z-30 swt:rounded"
-                    prop.style [
-                        style.left (length.px rect.left)
-                        style.top (length.px rect.top)
-                        style.width (length.px rect.width)
-                        style.height (length.px rect.height)
-                        style.custom ("transition", transitionStyle)
-                    ]
+                    prop.testId "drag-debug"
+                    prop.custom ("data-is-dragging", "true")
+                    prop.custom ("data-drop-target-state",
+                        match dropTarget with
+                        | Some(TabBarDrop _) -> "tabbar"
+                        | Some(EdgeDrop(_, d)) ->
+                            match d with
+                            | EdgeDirection.Top -> "edge-top"
+                            | EdgeDirection.Bottom -> "edge-bottom"
+                            | EdgeDirection.Left -> "edge-left"
+                            | EdgeDirection.Right -> "edge-right"
+                        | None -> "none"
+                    )
+                    prop.custom ("data-target-rect-state",
+                        match targetRect with Some _ -> "some" | None -> "none"
+                    )
+                    prop.style [ style.custom ("display", "none") ]
                 ]
-            | EdgeDrop(_, dir) ->
-                Html.div [
-                    prop.testId "drop-overlay"
-                    prop.custom ("data-overlay-target", dirStr)
-                    prop.custom ("data-overlay-pane", paneStr)
-                    prop.className "swt:absolute swt:bg-primary/20 swt:pointer-events-none swt:z-30 swt:rounded"
-                    prop.style [
-                        style.left (length.px rect.left)
-                        style.top (length.px rect.top)
-                        style.width (length.px rect.width)
-                        style.height (length.px rect.height)
-                        match dir with
-                        | EdgeDirection.Top -> style.borderBottomWidth (length.px 4)
-                        | EdgeDirection.Bottom -> style.borderTopWidth (length.px 4)
-                        | EdgeDirection.Left -> style.borderRightWidth (length.px 4)
-                        | EdgeDirection.Right -> style.borderLeftWidth (length.px 4)
-                        style.custom ("borderColor", "oklch(var(--p))")
-                        style.custom ("transition", transitionStyle)
+            match dropTarget, targetRect with
+            | Some target, Some rect ->
+                let transitionStyle =
+                    "top 100ms ease-out, left 100ms ease-out, width 100ms ease-out, height 100ms ease-out"
+
+                let dirStr =
+                    match target with
+                    | TabBarDrop _ -> "tabbar"
+                    | EdgeDrop(_, d) ->
+                        match d with
+                        | EdgeDirection.Top -> "edge-top"
+                        | EdgeDirection.Bottom -> "edge-bottom"
+                        | EdgeDirection.Left -> "edge-left"
+                        | EdgeDirection.Right -> "edge-right"
+
+                let paneStr =
+                    match target with
+                    | TabBarDrop p -> p
+                    | EdgeDrop(p, _) -> p
+
+                match target with
+                | TabBarDrop _ ->
+                    Html.div [
+                        prop.testId "drop-overlay"
+                        prop.custom ("data-overlay-target", dirStr)
+                        prop.custom ("data-overlay-pane", paneStr)
+                        prop.className "swt:absolute swt:bg-primary/10 swt:pointer-events-none swt:z-30 swt:rounded"
+                        prop.style [
+                            style.left (length.px rect.left)
+                            style.top (length.px rect.top)
+                            style.width (length.px rect.width)
+                            style.height (length.px rect.height)
+                            style.custom ("transition", transitionStyle)
+                        ]
                     ]
-                ]
-        | _ -> Html.none
+                | EdgeDrop(_, dir) ->
+                    Html.div [
+                        prop.testId "drop-overlay"
+                        prop.custom ("data-overlay-target", dirStr)
+                        prop.custom ("data-overlay-pane", paneStr)
+                        prop.className "swt:absolute swt:bg-primary/20 swt:pointer-events-none swt:z-30 swt:rounded"
+                        prop.style [
+                            style.left (length.px rect.left)
+                            style.top (length.px rect.top)
+                            style.width (length.px rect.width)
+                            style.height (length.px rect.height)
+                            match dir with
+                            | EdgeDirection.Top -> style.borderBottomWidth (length.px 4)
+                            | EdgeDirection.Bottom -> style.borderTopWidth (length.px 4)
+                            | EdgeDirection.Left -> style.borderRightWidth (length.px 4)
+                            | EdgeDirection.Right -> style.borderLeftWidth (length.px 4)
+                            style.custom ("borderColor", "oklch(var(--p))")
+                            style.custom ("transition", transitionStyle)
+                        ]
+                    ]
+            | _ -> Html.none
+        ]
