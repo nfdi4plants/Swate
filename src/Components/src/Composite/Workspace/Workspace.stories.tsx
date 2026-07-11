@@ -60,7 +60,7 @@ function getPaneContentRect(canvas: ReturnType<typeof within>) {
   const contentTop = tabBarRect.bottom;
   const contentWidth = paneRect.width;
   const contentHeight = paneRect.bottom - tabBarRect.bottom;
-  return { left: contentLeft, top: contentTop, width: contentWidth, height: contentHeight };
+  return { left: contentLeft, top: contentTop, width: contentWidth, height: contentHeight, bottom: paneRect.bottom };
 }
 
 async function dragToPaneEdge(source: Element, canvas: ReturnType<typeof within>, edge: 'right' | 'bottom') {
@@ -74,7 +74,7 @@ async function dragToPaneEdge(source: Element, canvas: ReturnType<typeof within>
     toY = contentRect.top + contentRect.height / 2;
   } else {
     toX = contentRect.left + contentRect.width / 2;
-    toY = contentRect.top + contentRect.height * 0.8;
+    toY = contentRect.top + contentRect.height * 0.95;
   }
   const deltaX = toX - fromX;
   const deltaY = toY - fromY;
@@ -91,12 +91,12 @@ async function dragToPaneEdge(source: Element, canvas: ReturnType<typeof within>
   });
   await nextFrameOrSettle();
   await nextFrameOrSettle();
-  fireEvent.pointerMove(document, {
+  fireEvent.pointerMove(paneEl, {
     clientX: toX, clientY: toY, button: 0, buttons: 1, isPrimary: true, pointerId: 1,
   });
   await nextFrameOrSettle();
   await nextFrameOrSettle();
-  fireEvent.pointerUp(document, {
+  fireEvent.pointerUp(paneEl, {
     clientX: toX, clientY: toY, button: 0, buttons: 0, isPrimary: true, pointerId: 1,
   });
   await nextFrameOrSettle();
