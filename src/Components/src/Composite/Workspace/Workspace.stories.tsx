@@ -96,6 +96,15 @@ async function dragToPaneEdge(source: Element, canvas: ReturnType<typeof within>
   });
   await nextFrameOrSettle();
   await nextFrameOrSettle();
+
+  const expectedTarget = edge === 'right' ? 'edge-right' : 'edge-bottom';
+  await waitFor(() => {
+    expect(canvas.getByTestId('drop-overlay')).toHaveAttribute(
+      'data-overlay-target',
+      expectedTarget,
+    );
+  }, { timeout: 5000 });
+
   fireEvent.pointerUp(paneEl, {
     clientX: toX, clientY: toY, button: 0, buttons: 0, isPrimary: true, pointerId: 1,
   });

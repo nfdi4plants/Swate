@@ -217,9 +217,27 @@ type DropOverlay =
             let transitionStyle =
                 "top 100ms ease-out, left 100ms ease-out, width 100ms ease-out, height 100ms ease-out"
 
+            let dirStr =
+                match target with
+                | TabBarDrop _ -> "tabbar"
+                | EdgeDrop(_, d) ->
+                    match d with
+                    | EdgeDirection.Top -> "edge-top"
+                    | EdgeDirection.Bottom -> "edge-bottom"
+                    | EdgeDirection.Left -> "edge-left"
+                    | EdgeDirection.Right -> "edge-right"
+
+            let paneStr =
+                match target with
+                | TabBarDrop p -> p
+                | EdgeDrop(p, _) -> p
+
             match target with
             | TabBarDrop _ ->
                 Html.div [
+                    prop.testId "drop-overlay"
+                    prop.custom ("data-overlay-target", dirStr)
+                    prop.custom ("data-overlay-pane", paneStr)
                     prop.className "swt:absolute swt:bg-primary/10 swt:pointer-events-none swt:z-30 swt:rounded"
                     prop.style [
                         style.left (length.px rect.left)
@@ -231,6 +249,9 @@ type DropOverlay =
                 ]
             | EdgeDrop(_, dir) ->
                 Html.div [
+                    prop.testId "drop-overlay"
+                    prop.custom ("data-overlay-target", dirStr)
+                    prop.custom ("data-overlay-pane", paneStr)
                     prop.className "swt:absolute swt:bg-primary/20 swt:pointer-events-none swt:z-30 swt:rounded"
                     prop.style [
                         style.left (length.px rect.left)
