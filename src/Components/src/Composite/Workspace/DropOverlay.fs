@@ -47,6 +47,9 @@ type DropOverlay =
                 |} option
             )
 
+        let findPaneResult, setFindPaneResult = React.useState "unknown"
+        let resolveAtCalled, setResolveAtCalled = React.useState false
+
         let computeTargetRect
             (workspaceEl: HTMLElement)
             (target: DropTarget)
@@ -121,10 +124,12 @@ type DropOverlay =
                 | _ -> None
 
         let resolveAt (x: float) (y: float) =
+            setResolveAtCalled true
             match workspaceRef.current, dragInfoRef.current with
             | Some workspaceEl, Some(sourcePaneId, _) ->
                 match findPaneElement x y workspaceEl with
                 | Some foundEl ->
+                    setFindPaneResult "some"
                     let isOverTabBar = not (isNull (foundEl.getAttribute "data-workspace-tabbar"))
                     let target = resolveDropTarget foundEl x y workspaceEl sourcePaneId
                     let rect = target |> Option.bind (computeTargetRect workspaceEl)
@@ -136,6 +141,7 @@ type DropOverlay =
                     setTargetRect rect
                     targetRectRef.current <- rect
                 | None ->
+                    setFindPaneResult "none"
                     sortableActiveRef.current <- false
 
                     setDropTarget None
@@ -154,6 +160,8 @@ type DropOverlay =
                             match DndId.read activeId with
                             | Some(Tab(sourcePaneId, tabId)) ->
                                 dragInfoRef.current <- Some(sourcePaneId, tabId)
+                                setFindPaneResult "unknown"
+                                setResolveAtCalled false
                                 setIsDragging true
                                 isDraggingRef.current <- true
                             | _ -> ()
@@ -171,6 +179,8 @@ type DropOverlay =
 
                         isDraggingRef.current <- false
                         dragInfoRef.current <- None
+                        setFindPaneResult "unknown"
+                        setResolveAtCalled false
                         setIsDragging false
                         setDropTarget None
                         setTargetRect None
@@ -181,6 +191,8 @@ type DropOverlay =
                     fun (_: DndKit.IDndKitEvent) ->
                         isDraggingRef.current <- false
                         dragInfoRef.current <- None
+                        setFindPaneResult "unknown"
+                        setResolveAtCalled false
                         setIsDragging false
                         setDropTarget None
                         setTargetRect None
@@ -231,6 +243,8 @@ type DropOverlay =
                     prop.custom ("data-target-rect-state",
                         match targetRect with Some _ -> "some" | None -> "none"
                     )
+                    prop.custom ("data-find-pane-result", findPaneResult)
+                    prop.custom ("data-resolve-at-called", if resolveAtCalled then "true" else "false")
                     prop.style [ style.custom ("display", "none") ]
                 ]
             match dropTarget, targetRect with

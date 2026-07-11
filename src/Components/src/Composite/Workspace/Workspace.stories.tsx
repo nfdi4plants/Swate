@@ -368,6 +368,8 @@ export const DragBottomDiagnostics: Story = {
     }, { timeout: 5000 });
 
     const debugEl = canvas.getByTestId('drag-debug');
+    expect(debugEl.getAttribute('data-resolve-at-called')).toBe('true');
+    expect(debugEl.getAttribute('data-find-pane-result')).toBe('some');
     expect(debugEl.getAttribute('data-drop-target-state')).toBe('edge-bottom');
     expect(debugEl.getAttribute('data-target-rect-state')).toBe('some');
 
