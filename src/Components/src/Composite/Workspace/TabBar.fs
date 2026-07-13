@@ -8,19 +8,10 @@ open Swate.Components.Composite.Workspace.Types
 open Swate.Components.Composite.Workspace.Context
 open Swate.Components.Composite.Workspace.Helper.DndId
 
-module private TabBarHelper =
-
-    let dndObjectProps (obj: Swate.Components.JsBindings.IObject) : IReactProperty list = [
-        for key in Swate.Components.JsBindings.Object.keys obj do
-            prop.custom (key, obj.get key)
-    ]
-
-open TabBarHelper
-
 [<Erase; Mangle(false)>]
 type TabBar =
 
-    [<ReactComponent>]
+    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private Tab
         (tab: Tab<_>, index: int, paneIdKey: string, isActive: bool, isFocusedPane: bool, ?key: string)
         =
@@ -39,16 +30,21 @@ type TabBar =
         ]
 
         let dndProps =
-            [ prop.ref sortable.setNodeRef; prop.style style ]
-            @ dndObjectProps sortable.attributes
-            @ dndObjectProps sortable.listeners
+            [ 
+                prop.ref sortable.setNodeRef; 
+                prop.style style
+                yield! prop.spread sortable.attributes
+                yield! prop.spread sortable.listeners
+            ]
 
         let tabClass = [
-            "swt:tab swt:items-center swt:min-w-fit swt:gap-1 swt:flex-nowrap swt:select-none"
+            "swt:h-full swt:flex swt:px-2 swt:py-0.5 swt:items-center swt:min-w-fit swt:gap-1 swt:flex-nowrap swt:select-none "
+            "swt:border-r swt:border-r-base-content/50 swt:border-t-2"
             if isActive then
-                "swt:tab-active"
-            if isActive && isFocusedPane then
-                "swt:ring-1 swt:ring-primary/40 swt:ring-inset"
+                "swt:bg-base-100 swt:border-primary"
+            else "swt:border-transparent"
+            // if isActive && isFocusedPane then
+            //     "swt:bg-primary/70"
             if sortable.isDragging then
                 "swt:opacity-30"
         ]
@@ -109,15 +105,15 @@ type TabBar =
         Html.div [
             prop.custom ("data-workspace-tabbar", paneIdKey)
             prop.className [
-                "swt:tabs swt:tabs-lift swt:w-full swt:overflow-x-auto swt:overflow-y-hidden swt:flex swt:flex-row swt:items-center swt:justify-start swt:pt-1 swt:border-b swt:border-base-content/50 swt:flex-nowrap swt:gap-0"
+                "swt:overflow-x-auto swt:flex swt:flex-row swt:items-center swt:justify-start swt:flex-nowrap swt:gap-0 swt:scrollbar-thin swt:w-full"
                 if paneCtx.isFocusedPane then
                     "swt:bg-primary/10"
                 else
-                    "swt:bg-base-300/50"
+                    "swt:bg-base-300"
             ]
             if paneStateCtx.debug then
                 prop.testId $"workspace-tabbar-{paneIdKey}"
-            prop.style [ style.minHeight 45 ]
+            prop.style [ style.minHeight 35 ]
             prop.children [
                 DndKit.SortableContext(
                     items = dragIds,

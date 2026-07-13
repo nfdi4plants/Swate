@@ -221,6 +221,7 @@
     <Compile Include="Composite\Workspace\PaneNode.fs" />
     <Compile Include="Composite\Workspace\DropOverlay.fs" />
     <Compile Include="Composite\Workspace\Workspace.fs" />
+    <Compile Include="Composite\Workspace\Workspace.fixture.fs" />
     
     <Compile Include="Page\ProvenanceGrouping\Types.fs" />
     <Compile Include="Page\ProvenanceGrouping\State.fs" />
