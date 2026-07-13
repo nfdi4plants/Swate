@@ -11,7 +11,7 @@ import {Entry as Select} from '../src/Primitive/Select/Select.fs.ts';
 import {Entry as BaseModal} from '../src/Primitive/BaseModal/BaseModal.fs.ts';
 import { Wizard as LandingWizard } from '../src/Page/Landing/Landing.fs.ts';
 import { Exports_createLandingDraft as createLandingDraft, Exports_createLandingUiState as createLandingUiState } from '../src/Page/Landing/Types.fs.ts';
-import {TIBQueryProvider as TermSearchConfigProvider} from '../src/Composite/TermSearch/ConfigProvider.fs.ts';
+import {DefaultQueryProvider as TermSearchConfigProvider} from '../src/Composite/TermSearch/ConfigProvider.fs.ts';
 import {Entry as TermSearchConfigSetter} from '../src/Composite/TermSearch/ConfigSetter.fs.ts';
 import { Term } from '../../Shared/Database.fs.ts';
 import {Entry as DataMapTable} from '../src/Composite/DataMapTable/DataMapTable.fs.ts';

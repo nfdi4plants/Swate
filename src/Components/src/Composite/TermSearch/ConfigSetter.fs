@@ -25,7 +25,7 @@ type TermSearchConfigSetter =
                 Icons.SearchPlus("swt:size-4")
                 Html.text (
                     if Array.isEmpty activeKeys then
-                        "Select tib queries"
+                        "Select term search sources"
                     else
                         activeKeys |> Array.truncate 3 |> String.concat ", "
                 )
@@ -111,7 +111,7 @@ type TermSearchConfigSetter =
             |}
 
             renderer {|
-                title = "Configure TIB search"
+                title = "Configure terminology search"
                 settingElement =
                     Select.Select<string>(
                         selectItems,
@@ -128,9 +128,9 @@ type TermSearchConfigSetter =
                 description =
                     React.Fragment [
                         Html.p
-                            "Adds support for high performance TIB term search. Choose a collection of terms to search through."
+                            "Adds support for external terminology services. TIB collections and the TS4NFDI OLS gateway can be enabled alongside each other."
                         Html.p [
-                            prop.text "Selecting multiple collections may impact search performance."
+                            prop.text "Selecting multiple sources may impact search performance."
                         ]
                     ]
             |}

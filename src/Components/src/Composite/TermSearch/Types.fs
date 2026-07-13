@@ -200,3 +200,42 @@ module TIBTypesExtensions =
                     t.is_obsolete |> Option.defaultValue false
                 )
             )
+
+[<AutoOpen>]
+module OLSTypesExtensions =
+
+    let private normalizeShortForm (shortForm: string) =
+        let separatorIndex = shortForm.IndexOf "_"
+
+        if separatorIndex > 0 && separatorIndex < shortForm.Length - 1 then
+            shortForm.Substring(0, separatorIndex) + ":" + shortForm.Substring(separatorIndex + 1)
+        else
+            shortForm
+
+    let private termId (term: Api.OLSApi.OLSTypes.Term) =
+        term.obo_id
+        |> Option.orElse (term.short_form |> Option.map normalizeShortForm)
+        |> Option.orElse term.iri
+
+    let private termHref (term: Api.OLSApi.OLSTypes.Term) =
+        term.iri |> Option.orElse term.URI
+
+    type Api.OLSApi.OLSTypes.SearchApi with
+        /// This function is used to transform OLS term type into the Swate compatible Term type.
+        member this.ToMyTerm() =
+            this.response
+            |> Option.bind _.docs
+            |> Option.defaultValue [||]
+            |> Array.map (fun t ->
+                let isObsolete = t.is_obsolete |> Option.orElse t.obsolete
+
+                Term(
+                    ?name = t.label,
+                    ?id = termId t,
+                    ?description = (t.description |> Option.map (String.concat ";")),
+                    ?source = t.ontology_name,
+                    ?href = termHref t,
+                    ?isObsolete = isObsolete,
+                    data = t
+                )
+            )

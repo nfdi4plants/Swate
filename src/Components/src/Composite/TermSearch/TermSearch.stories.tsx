@@ -3,9 +3,11 @@ import { screen, fn, within, expect, userEvent, waitFor, fireEvent } from 'story
 import TermSearch from "./TermSearch.fs.js";
 import * as Provider from "./ConfigProvider.fs.js";
 import { TIBApi } from '../../Api/TIBApi.fs.js';
+import { OLSApi } from '../../Api/OLSApi.fs.js';
 import React from 'react';
 import {
-  Swate_Components_Api_TIBApi_TIBTypes_SearchApi__SearchApi_ToMyTerm as toMyTerm,
+  Swate_Components_Api_TIBApi_TIBTypes_SearchApi__SearchApi_ToMyTerm as toTIBTerms,
+  Swate_Components_Api_OLSApi_OLSTypes_SearchApi__SearchApi_ToMyTerm as toOLSTerms,
   type Term,
 } from './Types.fs.js';
 
@@ -13,7 +15,10 @@ const TERMSEARCH_INPUT_TESTID = 'term-search-input'
 
 const TERMSEARCH_DETAILSMODAL_TESTID = 'modal_termsearch_details_modal'
 
-const toTerms = (searchApi: any): Term[] => (searchApi ? Array.from(toMyTerm(searchApi)) : []);
+const toTerms = (searchApi: any): Term[] => (searchApi ? Array.from(toTIBTerms(searchApi)) : []);
+
+const toOLSResultTerms = (searchApi: any): Term[] =>
+  searchApi ? Array.from(toOLSTerms(searchApi)).slice(0, 10) : [];
 
 const mockInstrumentModelSearch = async (query: string): Promise<Term[]> =>
   query.trim()
@@ -225,6 +230,38 @@ export const TIBSearch: Story = {
   }
 }
 
+export const OLSSearch: Story = {
+  render: renderTermSearch,
+  args: {
+    term: undefined,
+    onTermChange: fn(),
+    disableDefaultSearch: true,
+    disableDefaultParentSearch: true,
+    disableDefaultAllChildrenSearch: true,
+    termSearchQueries: [
+      [
+        "ols_ts4nfdi_search",
+        (query): Promise<Term[]> =>
+          OLSApi.defaultSearch(query, 10).then((searchApi) => toOLSResultTerms(searchApi)),
+      ],
+    ],
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByTestId(TERMSEARCH_INPUT_TESTID);
+    expect(input).toBeInTheDocument();
+
+    await userEvent.type(input, "instrument model", {delay: 50});
+
+    await waitFor(() => {
+      const debugValue = input.getAttribute("data-debugresultcount");
+      expect(debugValue ? parseInt(debugValue, 10) : 0).toBeGreaterThan(0);
+    }, { timeout: 10000 });
+
+    await waitFor(() => expect(args.onTermChange).toHaveBeenCalled());
+  },
+}
+
 export const WithSearchConfigProvider: Story = {
   render: renderTermSearch,
   args: {
@@ -237,9 +274,9 @@ export const WithSearchConfigProvider: Story = {
   },
   decorators: [
     (Story) => (
-      <Provider.TIBQueryProvider>
+      <Provider.DefaultQueryProvider>
         <Story />
-      </Provider.TIBQueryProvider>
+      </Provider.DefaultQueryProvider>
     )
   ],
   play: async ({ args, canvasElement }) => {

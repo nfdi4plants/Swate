@@ -16,6 +16,20 @@ module private TermSearchConfigProviderHelper =
     [<Literal>]
     let TIB_DATAPLANT_COLLECTION_KEY = "DataPLANT"
 
+    [<Literal>]
+    let OLS_PREFIX = "OLS_"
+
+    [<Literal>]
+    let OLS_TS4NFDI_KEY = "TS4NFDI"
+
+    let OLS_DEFAULT_KEY = OLS_PREFIX + OLS_TS4NFDI_KEY
+
+    let private normalizeTerms rows (terms: Term[]) =
+        terms
+        |> Array.distinctBy (fun term -> term.id, term.href, term.name)
+        |> Array.truncate rows
+        |> ResizeArray
+
     let mkTIBQueries (collections: Set<string>) = {|
         TermSearch =
             ResizeArray [
@@ -67,13 +81,34 @@ module private TermSearchConfigProviderHelper =
             ]
     |}
 
+    let mkOLSQueries () = {|
+        TermSearch =
+            ResizeArray [
+                let n = OLS_DEFAULT_KEY
+                let rows = 10
+
+                let query: SearchCall =
+                    fun (q: string) ->
+                        Swate.Components.Api.OLSApi.OLSApi.defaultSearch (q, rows)
+                        |> Promise.map (fun searchApi ->
+                            match searchApi with
+                            | Some api -> api.ToMyTerm() |> normalizeTerms rows
+                            | None -> ResizeArray()
+                        )
+
+                yield (n, query)
+            ]
+        ParentSearch = ResizeArray<string * ParentSearchCall>()
+        AllChildrenSearch = ResizeArray<string * AllChildrenSearchCall>()
+    |}
+
 open TermSearchConfigProviderHelper
 
 [<Erase; Mangle(false)>]
 type TermSearchConfigProvider =
 
     [<ReactComponent>]
-    static member TIBQueryProvider(children: ReactElement) =
+    static member private QueryProvider(children: ReactElement, includeOLS: bool) =
 
         let allTermSearchQueries, setAllTermSearchQueries =
             React.useState<ResizeArray<string * SearchCall>> (fun () -> ResizeArray())
@@ -84,8 +119,29 @@ type TermSearchConfigProvider =
         let allAllChildrenSearchQueries, setAllAllChildrenSearchQueries =
             React.useState<ResizeArray<string * AllChildrenSearchCall>> (fun () -> ResizeArray())
 
+        let applyQueries (tibQueries: {| TermSearch: ResizeArray<string * SearchCall>; ParentSearch: ResizeArray<string * ParentSearchCall>; AllChildrenSearch: ResizeArray<string * AllChildrenSearchCall> |}) =
+            let termSearchQueries = ResizeArray tibQueries.TermSearch
+            let parentSearchQueries = ResizeArray tibQueries.ParentSearch
+            let allChildrenSearchQueries = ResizeArray tibQueries.AllChildrenSearch
+
+            if includeOLS then
+                let olsQueries = TermSearchConfigProviderHelper.mkOLSQueries ()
+                termSearchQueries.AddRange olsQueries.TermSearch
+                parentSearchQueries.AddRange olsQueries.ParentSearch
+                allChildrenSearchQueries.AddRange olsQueries.AllChildrenSearch
+
+            setAllTermSearchQueries termSearchQueries
+            setAllParentSearchQueries parentSearchQueries
+            setAllAllChildrenSearchQueries allChildrenSearchQueries
+
         React.useEffect (
             (fun _ -> // get all currently supported catalogues
+                if includeOLS then
+                    let olsQueries = TermSearchConfigProviderHelper.mkOLSQueries ()
+                    setAllTermSearchQueries (ResizeArray olsQueries.TermSearch)
+                    setAllParentSearchQueries (ResizeArray olsQueries.ParentSearch)
+                    setAllAllChildrenSearchQueries (ResizeArray olsQueries.AllChildrenSearch)
+
                 promise {
                     try
                         let! collections =
@@ -95,15 +151,13 @@ type TermSearchConfigProvider =
                         let collectionSet = Set.ofArray collections.content
 
                         let tibQueries = TermSearchConfigProviderHelper.mkTIBQueries collectionSet
-                        setAllTermSearchQueries (ResizeArray tibQueries.TermSearch)
-                        setAllParentSearchQueries (ResizeArray tibQueries.ParentSearch)
-                        setAllAllChildrenSearchQueries (ResizeArray tibQueries.AllChildrenSearch)
+                        applyQueries tibQueries
                     with ex ->
                         console.error ("Error fetching TIB collections:", ex)
                 }
                 |> Promise.start
             ),
-            [||]
+            [| box includeOLS |]
         )
 
         TermSearchConfigProvider.TermSearchConfigProvider(
@@ -113,6 +167,14 @@ type TermSearchConfigProvider =
             allAllChildrenSearchQueries,
             defaultActive = Set [ TIB_PREFIX + TIB_DATAPLANT_COLLECTION_KEY ]
         )
+
+    [<ReactComponent>]
+    static member TIBQueryProvider(children: ReactElement) =
+        TermSearchConfigProvider.QueryProvider(children, false)
+
+    [<ReactComponent>]
+    static member DefaultQueryProvider(children: ReactElement) =
+        TermSearchConfigProvider.QueryProvider(children, true)
 
 
     [<ReactComponent(true)>]

@@ -20,7 +20,7 @@ let View (model: Model) (dispatch: Msg -> unit) =
 
     // React.strictMode [
     Swate.Components.Composite.ThemeSelector.ThemeProvider.ThemeProvider(
-        Swate.Components.Composite.TermSearch.TermSearchConfigProvider.TIBQueryProvider(
+        Swate.Components.Composite.TermSearch.TermSearchConfigProvider.DefaultQueryProvider(
             Swate.Components.Composite.AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider(
 
                 Html.div [

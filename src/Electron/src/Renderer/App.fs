@@ -198,7 +198,7 @@ let Main () =
             None
 
     Swate.Components.Composite.ThemeSelector.ThemeProvider.ThemeProvider(
-        Swate.Components.Composite.TermSearch.TermSearchConfigProvider.TIBQueryProvider(
+        Swate.Components.Composite.TermSearch.TermSearchConfigProvider.DefaultQueryProvider(
             Context.AppStateContext.AppStateCtx.Provider(
                 model.ArcRootPath,
                 Renderer.Context.FileStateContext.FileStateCtxProvider(
