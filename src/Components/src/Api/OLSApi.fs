@@ -108,34 +108,26 @@ type OLSApi =
         ]
         |> Promise.bind (fun response -> response.json<OLSTypes.TermApi> ())
 
-    static member tryGetIRIFromOboId(oboId: string, ?database: string) =
-        promise {
-            match OLSApiHelper.tryParseOboId oboId with
-            | None -> return None
-            | Some(ontology, iri) ->
-                let! termApi = OLSApi.getTermByIRI (ontology, iri, ?database = database)
+    static member tryGetIRIFromOboId(oboId: string, ?database: string) = promise {
+        match OLSApiHelper.tryParseOboId oboId with
+        | None -> return None
+        | Some(ontology, iri) ->
+            let! termApi = OLSApi.getTermByIRI (ontology, iri, ?database = database)
 
-                return
-                    termApi._embedded
-                    |> Option.bind _.terms
-                    |> Option.bind (
-                        Array.tryFind (fun term ->
-                            term.iri = Some iri
-                            || term.short_form = Some(oboId.Replace(":", "_"))
-                            || term.obo_id = Some oboId
-                        )
+            return
+                termApi._embedded
+                |> Option.bind _.terms
+                |> Option.bind (
+                    Array.tryFind (fun term ->
+                        term.iri = Some iri
+                        || term.short_form = Some(oboId.Replace(":", "_"))
+                        || term.obo_id = Some oboId
                     )
-                    |> Option.bind _.iri
-        }
+                )
+                |> Option.bind _.iri
+    }
 
-    static member search
-        (
-            q: string,
-            ?rows: int,
-            ?ontology: string,
-            ?database: string,
-            ?collectionId: string
-        ) =
+    static member search(q: string, ?rows: int, ?ontology: string, ?database: string, ?collectionId: string) =
         let baseUrl = $"{OLSTypes.BaseAPIUrl}/ols/api/select"
 
         let queryParams: (string * obj) list = [

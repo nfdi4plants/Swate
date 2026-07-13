@@ -208,7 +208,9 @@ module OLSTypesExtensions =
         let separatorIndex = shortForm.IndexOf "_"
 
         if separatorIndex > 0 && separatorIndex < shortForm.Length - 1 then
-            shortForm.Substring(0, separatorIndex) + ":" + shortForm.Substring(separatorIndex + 1)
+            shortForm.Substring(0, separatorIndex)
+            + ":"
+            + shortForm.Substring(separatorIndex + 1)
         else
             shortForm
 
@@ -217,8 +219,7 @@ module OLSTypesExtensions =
         |> Option.orElse (term.short_form |> Option.map normalizeShortForm)
         |> Option.orElse term.iri
 
-    let private termHref (term: Api.OLSApi.OLSTypes.Term) =
-        term.iri |> Option.orElse term.URI
+    let private termHref (term: Api.OLSApi.OLSTypes.Term) = term.iri |> Option.orElse term.URI
 
     type Api.OLSApi.OLSTypes.SearchApi with
         /// This function is used to transform OLS term type into the Swate compatible Term type.

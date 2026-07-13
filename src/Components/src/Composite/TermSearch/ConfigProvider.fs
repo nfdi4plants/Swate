@@ -119,7 +119,14 @@ type TermSearchConfigProvider =
         let allAllChildrenSearchQueries, setAllAllChildrenSearchQueries =
             React.useState<ResizeArray<string * AllChildrenSearchCall>> (fun () -> ResizeArray())
 
-        let applyQueries (tibQueries: {| TermSearch: ResizeArray<string * SearchCall>; ParentSearch: ResizeArray<string * ParentSearchCall>; AllChildrenSearch: ResizeArray<string * AllChildrenSearchCall> |}) =
+        let applyQueries
+            (tibQueries:
+                {|
+                    TermSearch: ResizeArray<string * SearchCall>
+                    ParentSearch: ResizeArray<string * ParentSearchCall>
+                    AllChildrenSearch: ResizeArray<string * AllChildrenSearchCall>
+                |})
+            =
             let termSearchQueries = ResizeArray tibQueries.TermSearch
             let parentSearchQueries = ResizeArray tibQueries.ParentSearch
             let allChildrenSearchQueries = ResizeArray tibQueries.AllChildrenSearch
