@@ -29,20 +29,20 @@ type TabBar =
             style.cursor.grab
         ]
 
-        let dndProps =
-            [ 
-                prop.ref sortable.setNodeRef; 
-                prop.style style
-                yield! prop.spread sortable.attributes
-                yield! prop.spread sortable.listeners
-            ]
+        let dndProps = [
+            prop.ref sortable.setNodeRef
+            prop.style style
+            yield! prop.spread sortable.attributes
+            yield! prop.spread sortable.listeners
+        ]
 
         let tabClass = [
             "swt:h-full swt:flex swt:px-2 swt:py-0.5 swt:items-center swt:min-w-fit swt:gap-1 swt:flex-nowrap swt:select-none "
             "swt:border-r swt:border-r-base-content/50 swt:border-t-2"
             if isActive then
                 "swt:bg-base-100 swt:border-primary"
-            else "swt:border-transparent"
+            else
+                "swt:border-transparent"
             // if isActive && isFocusedPane then
             //     "swt:bg-primary/70"
             if sortable.isDragging then

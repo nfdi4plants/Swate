@@ -4,14 +4,14 @@ namespace Swate.Components.Composite.Workspace
 open System
 open Fable.Core
 open Feliz
-// Workspace 
+// Workspace
 open Types
 open Context
 
 [<Erase; Mangle(false)>]
-type WorkspaceFixture = 
+type WorkspaceFixture =
 
-    
+
     [<ReactComponent>]
     static member private Toolbar() =
         let dispatchCtx = useWorkspaceDispatchCtx<string> ()
@@ -70,8 +70,7 @@ type WorkspaceFixture =
         ]
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
-    static member private RenderTab (tab: Tab<string>) =
-        Html.span tab.Label
+    static member private RenderTab(tab: Tab<string>) = Html.span tab.Label
 
     [<ReactComponent(true)>]
     static member WorkspaceFixture() : ReactElement =
@@ -108,7 +107,9 @@ type WorkspaceFixture =
                     prop.className "swt:flex swt:flex-col swt:size-full swt:overflow-hidden"
                     prop.children [
                         WorkspaceFixture.Toolbar()
-                        Workspace.Workspace<string>(className = "swt:flex-1 swt:min-h-0 swt:border swt:border-base-content/20")
+                        Workspace.Workspace<string>(
+                            className = "swt:flex-1 swt:min-h-0 swt:border swt:border-base-content/20"
+                        )
                     ]
                 ]
         )

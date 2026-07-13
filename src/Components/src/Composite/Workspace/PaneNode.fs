@@ -36,7 +36,8 @@ type PaneNode =
             box paneCtxValue,
             Html.div [
                 prop.key (defaultArg key paneIdKey)
-                prop.className "swt:flex swt:flex-col swt:min-w-0 swt:min-h-0 swt:flex-1 swt:overflow-hidden swt:border-l swt:border-t swt:border-base-content/20"
+                prop.className
+                    "swt:flex swt:flex-col swt:min-w-0 swt:min-h-0 swt:flex-1 swt:overflow-hidden swt:border-l swt:border-t swt:border-base-content/20"
                 prop.custom ("data-workspace-pane", paneIdKey)
                 if paneStateCtx.debug then
                     prop.testId $"workspace-pane-{paneIdKey}"
@@ -50,7 +51,7 @@ type PaneNode =
         let dispatchCtx = useWorkspaceDispatchCtx ()
         let draggingRef = React.useRef false
         let draggingUi, setIsDraggingUi = React.useState false
-        let pointerPosition, setPointerPosition = React.useState(None: Rect option)
+        let pointerPosition, setPointerPosition = React.useState (None: Rect option)
         let throttledPointerPosition = React.useThrottle (pointerPosition, 20)
 
         // Using effect to watch over throttledPointerPosition. This is the only dependency outputting a float, so no chance to enter loops or unexpected behavior.
@@ -89,7 +90,7 @@ type PaneNode =
                     if draggingRef.current then
                         setPointerPosition (Some { X = int e.clientX; Y = int e.clientY })
 
-                let stop (_: PointerEvent) = 
+                let stop (_: PointerEvent) =
                     draggingRef.current <- false
                     setIsDraggingUi false
 
@@ -104,16 +105,16 @@ type PaneNode =
         )
 
         Html.div [
-            prop.onPointerDown (fun _ -> 
+            prop.onPointerDown (fun _ ->
                 draggingRef.current <- true
                 setIsDraggingUi true
             )
-            prop.data("active", 
-                if draggingUi then "true" else "false")
+            prop.data ("active", if draggingUi then "true" else "false")
             prop.className [
                 "swt:shrink-0 swt:select-none swt:transition-colors swt:bg-transparent swt:hover:bg-primary swt:z-10 swt:absolute swt:data-[active=true]:bg-primary"
                 match dir with
-                | SplitDirection.Horizontal -> "swt:w-1.5 swt:cursor-col-resize swt:h-full swt:top-0 swt:bottom-0 swt:-left-1"
+                | SplitDirection.Horizontal ->
+                    "swt:w-1.5 swt:cursor-col-resize swt:h-full swt:top-0 swt:bottom-0 swt:-left-1"
                 | SplitDirection.Vertical -> "swt:h-1.5 swt:cursor-row-resize swt:w-full"
             ]
         ]
@@ -160,10 +161,9 @@ type PaneNode =
                     prop.children [
                         PaneNode.SplitNodeResizer(splitId, splitContainerRef, dir)
                         Html.div [
-                            prop.className "swt:overflow-hidden swt:flex swt:flex-col swt:min-w-0 swt:min-h-0 swt:flex-1 swt:grow"
-                            prop.children [
-                                PaneNode.PaneNode l2 
-                            ]
+                            prop.className
+                                "swt:overflow-hidden swt:flex swt:flex-col swt:min-w-0 swt:min-h-0 swt:flex-1 swt:grow"
+                            prop.children [ PaneNode.PaneNode l2 ]
                         ]
                     ]
                 ]
@@ -176,5 +176,4 @@ type PaneNode =
         match layout with
         | Layout.Single leaf -> PaneNode.LeafNode(leaf, ?key = key)
 
-        | Layout.Split(splitId, dir, ratio, l1, l2) ->
-            PaneNode.SplitNode(splitId, dir, ratio, l1, l2, ?key = key)
+        | Layout.Split(splitId, dir, ratio, l1, l2) -> PaneNode.SplitNode(splitId, dir, ratio, l1, l2, ?key = key)

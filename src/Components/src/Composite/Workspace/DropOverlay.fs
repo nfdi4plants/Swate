@@ -125,6 +125,7 @@ type DropOverlay =
 
         let resolveAt (x: float) (y: float) =
             setResolveAtCalled true
+
             match workspaceRef.current, dragInfoRef.current with
             | Some workspaceEl, Some(sourcePaneId, _) ->
                 match findPaneElement x y workspaceEl with
@@ -229,7 +230,8 @@ type DropOverlay =
                 Html.div [
                     prop.testId "drag-debug"
                     prop.custom ("data-is-dragging", "true")
-                    prop.custom ("data-drop-target-state",
+                    prop.custom (
+                        "data-drop-target-state",
                         match dropTarget with
                         | Some(TabBarDrop _) -> "tabbar"
                         | Some(EdgeDrop(_, d)) ->
@@ -240,8 +242,11 @@ type DropOverlay =
                             | EdgeDirection.Right -> "edge-right"
                         | None -> "none"
                     )
-                    prop.custom ("data-target-rect-state",
-                        match targetRect with Some _ -> "some" | None -> "none"
+                    prop.custom (
+                        "data-target-rect-state",
+                        match targetRect with
+                        | Some _ -> "some"
+                        | None -> "none"
                     )
                     prop.custom ("data-find-pane-result", findPaneResult)
                     prop.custom ("data-resolve-at-called", if resolveAtCalled then "true" else "false")
