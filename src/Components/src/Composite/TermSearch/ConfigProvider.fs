@@ -56,12 +56,7 @@ module private TermSearchConfigProviderHelper =
 
     let private mapSearchResults (convert: 'Api -> Term[]) (request: JS.Promise<'Api option>) =
         request
-        |> Promise.map (fun response ->
-            response
-            |> Option.map convert
-            |> Option.defaultValue [||]
-            |> ResizeArray
-        )
+        |> Promise.map (fun response -> response |> Option.map convert |> Option.defaultValue [||] |> ResizeArray)
 
     let mkTIBQueries (collections: Set<string>) = {
         TermSearch =
@@ -142,7 +137,9 @@ type TermSearchConfigProvider =
             React.useState<ResizeArray<string * SearchCall>> (fun () -> ResizeArray configuredQueries.TermSearch)
 
         let allParentSearchQueries, setAllParentSearchQueries =
-            React.useState<ResizeArray<string * ParentSearchCall>> (fun () -> ResizeArray configuredQueries.ParentSearch)
+            React.useState<ResizeArray<string * ParentSearchCall>> (fun () ->
+                ResizeArray configuredQueries.ParentSearch
+            )
 
         let allAllChildrenSearchQueries, setAllAllChildrenSearchQueries =
             React.useState<ResizeArray<string * AllChildrenSearchCall>> (fun () ->
