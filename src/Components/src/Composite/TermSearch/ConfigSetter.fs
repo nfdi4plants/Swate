@@ -24,10 +24,9 @@ type TermSearchConfigSetter =
 
     [<ReactComponent>]
     static member private SourceTriggerRender(source: TermSearchSource, activeKeys: string[]) =
-        let sourceName = source.ToString()
 
         Html.button [
-            prop.testId $"term-search-config-setter-{sourceName.ToLowerInvariant()}-trigger"
+            prop.testId $"term-search-config-setter-{source}-trigger"
             prop.tabIndex -1
             prop.className [
                 "swt:btn swt:w-fit swt:btn-primary swt:pointer-events-none"
@@ -36,7 +35,7 @@ type TermSearchConfigSetter =
                 Icons.SearchPlus("swt:size-4")
                 Html.text (
                     if Array.isEmpty activeKeys then
-                        $"Select {sourceName} collections"
+                        $"Select {source} collections"
                     else
                         activeKeys |> Array.truncate 3 |> String.concat ", "
                 )
@@ -48,11 +47,9 @@ type TermSearchConfigSetter =
     static member private CollectionSelector
         (source: TermSearchSource, allKeys: Set<string>, activeKeys: string[], setActiveKeys: string[] -> unit)
         =
-        let keys =
-            allKeys |> Seq.filter (TermSearchSourceKey.belongsTo source) |> Array.ofSeq
+        let keys = allKeys |> Seq.filter (belongsTo source) |> Array.ofSeq
 
-        let activeSourceKeys, otherKeys =
-            activeKeys |> Array.partition (TermSearchSourceKey.belongsTo source)
+        let activeSourceKeys, otherKeys = activeKeys |> Array.partition (belongsTo source)
 
         let selectedIndices =
             activeSourceKeys
@@ -115,10 +112,9 @@ type TermSearchConfigSetter =
         let defaultSearchActive = not activeKeysState.disableDefault
 
         let renderCollectionSource source =
-            let sourceName = source.ToString()
 
             renderer {|
-                title = $"Configure {sourceName} search"
+                title = $"Configure {source} search"
                 settingElement =
                     TermSearchConfigSetter.CollectionSelector(source, allKeysCtx, activeKeys, setActiveKeys)
                 description =

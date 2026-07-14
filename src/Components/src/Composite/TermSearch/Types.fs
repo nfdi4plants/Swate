@@ -5,19 +5,19 @@ open Swate.Components.Shared.Extensions
 open Fable.Core
 open Feliz
 
-[<RequireQualifiedAccess; StringEnum>]
+[<RequireQualifiedAccess; StringEnum(CaseRules.None)>]
 type TermSearchSource =
     | TIB
     | OLS
 
-[<RequireQualifiedAccess>]
-module TermSearchSourceKey =
+    member this.DefaultKey =
+        match this with
+        | TIB -> "TIB_DataPLANT"
+        | OLS -> "OLS_DataPLANT Project"
 
-    let private prefix source = source.ToString() + "_"
+let create (source: TermSearchSource) collectionName = $"{source}_{collectionName}"
 
-    let create (source: TermSearchSource) collectionName = prefix source + collectionName
-
-    let belongsTo source (key: string) = key.StartsWith(prefix source)
+let belongsTo (source: TermSearchSource) (key: string) = key.StartsWith $"{source}_"
 
 [<JS.PojoAttribute>]
 type Term

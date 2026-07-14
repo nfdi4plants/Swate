@@ -65,7 +65,7 @@ module private TermSearchConfigProviderHelper =
     let OLS_DATAPLANT_COLLECTION_KEY = "DataPLANT Project"
 
     [<Literal>]
-    let LOCAL_STORAGE_KEY = "swate-termsearchconfig-ctx-v3"
+    let LOCAL_STORAGE_KEY = "swate-termsearchconfig-ctx-v4"
 
     [<Literal>]
     let DEFAULT_SEARCH_ROWS = 10
@@ -88,7 +88,7 @@ module private TermSearchConfigProviderHelper =
         request |> mapSearchResults rows _.ToSwateTerms()
 
     let private createTIBCollection collection = {
-        Key = TermSearchSourceKey.create TermSearchSource.TIB collection
+        Key = create TermSearchSource.TIB collection
         TermSearch =
             fun query ->
                 Api.TIBApi.TIBApi.defaultSearch (query, DEFAULT_SEARCH_ROWS, collection)
@@ -180,7 +180,7 @@ module private TermSearchConfigProviderHelper =
                 | None -> emptyTerms ()
 
             Some {
-                Key = TermSearchSourceKey.create TermSearchSource.OLS collection.label
+                Key = create TermSearchSource.OLS collection.label
                 TermSearch =
                     fun query ->
                         Api.OLSApi.OLSApi.defaultSearch (query, DEFAULT_SEARCH_ROWS, collectionId = collectionId)
@@ -281,9 +281,9 @@ type TermSearchConfigProvider =
         let defaultActive =
             Set [
                 if includeTIB then
-                    TermSearchSourceKey.create TermSearchSource.TIB TIB_DATAPLANT_COLLECTION_KEY
+                    TermSearchSource.TIB.DefaultKey
                 if includeOLS then
-                    TermSearchSourceKey.create TermSearchSource.OLS OLS_DATAPLANT_COLLECTION_KEY
+                    TermSearchSource.OLS.DefaultKey
             ]
 
         TermSearchConfigProvider.TermSearchConfigProvider(

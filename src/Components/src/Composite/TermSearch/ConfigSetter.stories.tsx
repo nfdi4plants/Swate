@@ -5,8 +5,8 @@ import { DefaultQueryProvider as TermSearchConfigProvider } from "./ConfigProvid
 import React from "react";
 
 const SETTER_DEBUG_TESTID = "term-search-config-setter";
-const TIB_TRIGGER_TESTID = "term-search-config-setter-tib-trigger";
-const OLS_TRIGGER_TESTID = "term-search-config-setter-ols-trigger";
+const TIB_TRIGGER_TESTID = "term-search-config-setter-TIB-trigger";
+const OLS_TRIGGER_TESTID = "term-search-config-setter-OLS-trigger";
 const TIB_DEFAULT_KEY = "TIB_DataPLANT";
 const TIB_CHEM_KEY = "TIB_NFDI4CHEM";
 const OLS_DEFAULT_KEY = "OLS_DataPLANT Project";
