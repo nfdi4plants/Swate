@@ -1,5 +1,6 @@
 module internal Swate.Components.Shared.ProvenanceGrouping.ProcessCoreGraph
 
+open System.Globalization
 open System.Text
 open ProcessCore
 open Swate.Components.Shared.ProvenanceGrouping.Types
@@ -190,3 +191,68 @@ let sourceRef (location: ProcessCoreTableLocation) : ProvenanceSourceRef = {
 
 let processId (location: ProcessCoreProcessLocation) : ProvenanceProcessId =
     String.concat "/" (location.DatasetPath @ [ string location.ProcessIndex; location.ExpectedName ])
+
+let tryResolveNode (location: ProcessCoreNodeLocation) (arc: ARC) : IONode option =
+    arc.AllNodes() |> Seq.tryFind (fun node -> node.Key() = location.Key)
+
+let tryResolveAnnotation (location: ProcessCoreAnnotationLocation) (arc: ARC) : Annotation option =
+    let atPosition (position: int) (annotations: Annotation seq) =
+        let list = annotations |> Seq.toList
+
+        if position >= 0 && position < list.Length then
+            Some list.[position]
+        else
+            None
+
+    match location.Owner with
+    | ProcessCoreAnnotationOwner.NodeAdditionalProperty nodeLocation ->
+        tryResolveNode nodeLocation arc
+        |> Option.bind (fun node -> nodeAdditionalProperties node |> atPosition location.Position)
+    | ProcessCoreAnnotationOwner.ProcessParameterValue procLocation ->
+        tryResolveProcess procLocation arc
+        |> Option.bind (fun proc -> proc.ParameterValue :> Annotation seq |> atPosition location.Position)
+    | ProcessCoreAnnotationOwner.RecipeComponent procLocation ->
+        tryResolveProcess procLocation arc
+        |> Option.bind (fun proc -> proc.ExecutesProtocol)
+        |> Option.bind (fun recipe -> recipe.Components :> Annotation seq |> atPosition location.Position)
+
+/// Mutates only `Value`/`ValueTAN`/`Unit`/`UnitTAN`. Category (`Name`/`NameTAN`)
+/// is set once at annotation creation and is never changed by a value update.
+let applyValue (value: ProvenanceValue) (unit: ProvenanceTerm option) (annotation: Annotation) : unit =
+    match value with
+    | ProvenanceValue.Text text ->
+        annotation.Value <- Some text
+        annotation.ValueTAN <- None
+    | ProvenanceValue.Integer intValue ->
+        annotation.Value <- Some(intValue.ToString(CultureInfo.InvariantCulture))
+        annotation.ValueTAN <- None
+    | ProvenanceValue.Float floatValue ->
+        annotation.Value <- Some(floatValue.ToString("R", CultureInfo.InvariantCulture))
+        annotation.ValueTAN <- None
+    | ProvenanceValue.Term term ->
+        annotation.Value <- Some term.Name
+        annotation.ValueTAN <- term.TermAccession
+
+    match unit with
+    | Some unitTerm ->
+        annotation.Unit <- Some unitTerm.Name
+        annotation.UnitTAN <- unitTerm.TermAccession
+    | None ->
+        annotation.Unit <- None
+        annotation.UnitTAN <- None
+
+/// Creates a brand-new annotation for a value/unit created in the editor.
+/// `additionalType` carries the ProcessCore discriminator (e.g.
+/// `CharacteristicValue`, `ParameterValue`, `Component`); `None` leaves it
+/// unset for the generic node-annotation kind.
+let annotationFromValue
+    (additionalType: string option)
+    (header: ProvenancePropertyHeader)
+    (value: ProvenanceValue)
+    (unit: ProvenanceTerm option)
+    : Annotation =
+    let annotation =
+        Annotation(header.Category.Name, ?nameTAN = header.Category.TermAccession, ?additionalType = additionalType)
+
+    applyValue value unit annotation
+    annotation

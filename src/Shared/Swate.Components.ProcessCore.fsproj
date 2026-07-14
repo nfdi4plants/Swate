@@ -16,6 +16,7 @@
     <Compile Include="ProvenanceGrouping\ProcessCoreAdapterTypes.fs" />
     <Compile Include="ProvenanceGrouping\ProcessCoreGraph.fs" />
     <Compile Include="ProvenanceGrouping\ProcessCoreConverter.fs" />
+    <Compile Include="ProvenanceGrouping\ProcessCoreWriteback.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="Swate.Components.Core.fsproj" />
