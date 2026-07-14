@@ -24,7 +24,7 @@ type TermSearchConfigSetter =
 
     [<ReactComponent>]
     static member private SourceTriggerRender(source: TermSearchSource, activeKeys: string[]) =
-        let sourceName = source.ToString()
+        let sourceName = unbox<string> source
 
         Html.button [
             prop.testId $"term-search-config-setter-{sourceName.ToLowerInvariant()}-trigger"

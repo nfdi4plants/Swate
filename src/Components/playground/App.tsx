@@ -218,7 +218,7 @@ function WorkspaceContainer() {
 
 const App = () => {
     return (
-        <WorkspaceContainer />
+        <TermSearchContainer />
     );
 };
 
