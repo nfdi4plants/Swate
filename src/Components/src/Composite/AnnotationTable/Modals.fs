@@ -11,6 +11,7 @@ open Swate.Components.Composite.Table.Types
 open Swate.Components.Composite.AnnotationTable.Types
 open Swate.Components.Shared
 open Swate.Components.Primitive.BaseModal
+open Swate.Components.Primitive.LayoutComponents
 
 // 👀 this file is work in progress
 
@@ -247,11 +248,21 @@ type FooterButtons =
             prop.onClick (fun _ -> rmv ())
         ]
 
-    static member Submit(submitOnClick: unit -> unit) =
+    static member Submit(submitOnClick: unit -> unit, ?disabled: bool) =
+        let disabled = defaultArg disabled false
+
         Html.button [
-            prop.className "swt:btn swt:btn-primary swt:ml-auto"
+            prop.className [
+                "swt:btn swt:btn-primary swt:ml-auto"
+                if disabled then
+                    "swt:btn-disabled"
+            ]
+            prop.disabled disabled
             prop.text "Submit"
-            prop.onClick (fun e -> submitOnClick ())
+            prop.onClick (fun _ ->
+                if not disabled then
+                    submitOnClick ()
+            )
         ]
 
 
@@ -866,83 +877,98 @@ type TransformConfig =
             ]
         ]
 
+module private CompositeCellEditModalHelper =
+
+    let private hasText = Option.exists (System.String.IsNullOrWhiteSpace >> not)
+
+    let private isNumber (input: string) = System.Double.TryParse(input) |> fst
+
+    let isImportableUnitTerm (term: Term) =
+        match term.name with
+        | Some name when (System.String.IsNullOrWhiteSpace name |> not) && (isNumber name |> not) ->
+            hasText term.source && hasText term.id
+        | _ -> false
+
+    let tryGetImportUnitTerm (oa: OntologyAnnotation) =
+        let term = Term.fromOntologyAnnotation oa
+        term |> Option.where isImportableUnitTerm
+
 [<Mangle(false); Erase>]
 type CompositeCellEditModal =
 
     [<ReactComponent>]
-    static member TransformTermUnit
-        (cell: CompositeCell, header: CompositeHeader, setUnitized: OntologyAnnotation -> unit, rmv)
-        =
+    static member RemoveUnit(cell: CompositeCell, header: CompositeHeader, setTerm: OntologyAnnotation -> unit, rmv) =
 
-        let oa = cell.AsTerm
-        let term = Term.fromOntologyAnnotation oa
+        let value, unit = cell.AsUnitized
+        let term = OntologyAnnotation.create value
+
+        let annotationFields nameLabel (oa: OntologyAnnotation) = [
+            nameLabel, oa.NameText
+            "Term source REF", oa.TermSourceREF |> Option.defaultValue ""
+            "Term accession number", oa.TermAccessionNumber |> Option.defaultValue ""
+        ]
 
         let submit =
             fun () ->
-                term |> Term.toOntologyAnnotation |> setUnitized
+                term |> setTerm
                 rmv ()
-
-        let termHeader = header.ToTerm()
-
-        let tHeaders = [|
-            Html.th (header.ToString())
-            Html.th ("Unit")
-            Html.th ($"Term Source REF: {termHeader.TermSourceREF}")
-            Html.th ($"Term Accession Number {termHeader.TermAccessionNumber}")
-        |]
-
-        let tBody = [|
-            Html.td ($"{oa.Name}")
-            Html.td ($"{oa.Name}")
-            Html.td ($"{oa.TermSourceREF}")
-            Html.td ($"{oa.TermAccessionNumber}")
-        |]
 
         BaseModal.Modal(
             true,
             (fun _ -> rmv ()),
-            Html.div "Term to Unit",
+            Html.div "Remove Unit",
             React.Fragment [
-                TransformConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Unitized)
+                Html.div [
+                    prop.className "swt:grid swt:grid-cols-1 swt:gap-4 swt:md:grid-cols-2"
+                    prop.children [
+                        LayoutComponents.KeyValuePanel(
+                            "Current cell",
+                            [ "Value", value; yield! annotationFields "Unit name" unit ]
+                        )
+                        LayoutComponents.KeyValuePanel("Result", annotationFields "Term name" term)
+                    ]
+                ]
             ],
-            footer = React.Fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ]
-        //contentClassInfo = CompositeCellEditModal.BaseModalContentClassOverride
+            footer = React.Fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
+            debug = "Transform_RemoveUnit",
+            className = "swt:w-11/12 swt:max-w-4xl"
         )
 
     [<ReactComponent>]
-    static member UnitToTerm(cell: CompositeCell, header: CompositeHeader, setTerm: OntologyAnnotation -> unit, rmv) =
+    static member AddUnit(cell: CompositeCell, header: CompositeHeader, setUnit: OntologyAnnotation -> unit, rmv) =
 
-        let _, oa = cell.AsUnitized
-        let term = Term.fromOntologyAnnotation oa
+        let initUnit =
+            match cell with
+            | CompositeCell.Term oa
+            | CompositeCell.Unitized(_, oa) -> CompositeCellEditModalHelper.tryGetImportUnitTerm oa
+            | _ -> failwith "AddUnit can only be used with term or unitized cells."
+
+        let unitTerm, setUnitTerm = React.useState initUnit
+
+        let validUnitTerm =
+            unitTerm |> Option.filter CompositeCellEditModalHelper.isImportableUnitTerm
 
         let submit =
             fun () ->
-                term |> Term.toOntologyAnnotation |> setTerm
-                rmv ()
-
-        let termHeader = header.ToTerm()
-
-        let tHeaders = [|
-            Html.th (header.ToString())
-            Html.th ($"Term Source REF: {termHeader.TermSourceREF}")
-            Html.th ($"Term Accession Number {termHeader.TermAccessionNumber}")
-        |]
-
-        let tBody = [|
-            Html.td ($"{oa.Name}")
-            Html.td ($"{oa.TermSourceREF}")
-            Html.td ($"{oa.TermAccessionNumber}")
-        |]
+                validUnitTerm
+                |> Option.iter (fun term ->
+                    term |> Term.toOntologyAnnotation |> setUnit
+                    rmv ()
+                )
 
         BaseModal.Modal(
             true,
             (fun _ -> rmv ()),
-            Html.div "Unit to Term",
+            Html.div "Add Unit",
             React.Fragment [
-                TransformConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Term)
+                InputField.TermCombi(unitTerm, setUnitTerm, "Unit", rmv, submit, autofocus = true)
             ],
-            footer = React.Fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ]
-        //contentClassInfo = CompositeCellEditModal.BaseModalContentClassOverride
+            footer =
+                React.Fragment [
+                    FooterButtons.Cancel(rmv)
+                    FooterButtons.Submit(submit, disabled = validUnitTerm.IsNone)
+                ],
+            debug = "Transform_AddUnit"
         )
 
     [<ReactComponent>]
@@ -1016,18 +1042,18 @@ type CompositeCellEditModal =
         //contentClassInfo = CompositeCellEditModal.BaseModalContentClassOverride
         )
 
-    [<ReactComponent>]
-    static member CompositeCellTransformModal
+    static member private TransformCell
         (compositeCell: CompositeCell, header: CompositeHeader, setCell: CompositeCell -> unit, rmv: unit -> unit)
         =
-
         match compositeCell with
         | CompositeCell.Term _ ->
-            let setUnit = fun term -> setCell (CompositeCell.Unitized("", term))
-            CompositeCellEditModal.TransformTermUnit(compositeCell, header, setUnit, rmv)
+            let setUnit =
+                fun term -> setCell (CompositeCell.Unitized(compositeCell.AsTerm.NameText, term))
+
+            CompositeCellEditModal.AddUnit(compositeCell, header, setUnit, rmv)
         | CompositeCell.Unitized _ ->
             let setTerm = fun unit -> setCell (CompositeCell.Term unit)
-            CompositeCellEditModal.UnitToTerm(compositeCell, header, setTerm, rmv)
+            CompositeCellEditModal.RemoveUnit(compositeCell, header, setTerm, rmv)
         | CompositeCell.Data _ ->
             let setText = fun text -> setCell (CompositeCell.FreeText text)
             CompositeCellEditModal.DataToFreeText(compositeCell, header, setText, rmv)
@@ -1037,6 +1063,12 @@ type CompositeCellEditModal =
                 CompositeCellEditModal.FreeTextToData(compositeCell, header, setData, rmv)
             else
                 Html.none
+
+    [<ReactComponent>]
+    static member CompositeCellTransformModal
+        (compositeCell: CompositeCell, header: CompositeHeader, setCell: CompositeCell -> unit, rmv: unit -> unit)
+        =
+        CompositeCellEditModal.TransformCell(compositeCell, header, setCell, rmv)
 
 
 
