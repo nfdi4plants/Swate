@@ -19,3 +19,10 @@ let makeQueryParamStr (queryParams: (string * obj) list) : string =
     |> (+) "?"
 
 let appendQueryParams (url: string) (queryParams: (string * obj) list) : string = url + makeQueryParamStr queryParams
+
+let getJson<'Response> (url: string) =
+    fetch url [
+        RequestProperties.Method HttpMethod.GET
+        requestHeaders [ HttpRequestHeaders.Accept "application/json" ]
+    ]
+    |> Promise.bind (fun response -> response.json<'Response> ())

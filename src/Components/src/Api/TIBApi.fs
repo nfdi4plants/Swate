@@ -58,20 +58,14 @@ module TIBTypes =
 [<AttachMembers>]
 type TIBApi =
     static member tryGetIRIFromOboId(oboId: string) =
-        fetch (appendQueryParams $"{TIBTypes.BaseAPIUrl}/terms" [ "obo_id", oboId ]) [
-            RequestProperties.Method HttpMethod.GET
-            requestHeaders [ HttpRequestHeaders.Accept "application/json" ]
-        ]
-        |> Promise.bind (fun response ->
-            response.json<TIBTypes.TermApi> ()
-            |> Promise.map (fun termApi ->
-                if termApi._embedded.IsNone then
-                    None
-                else
-                    termApi._embedded.Value.terms
-                    |> Array.tryFind (fun term -> term.obo_id = oboId)
-                    |> Option.map (fun term -> term.iri)
-            )
+        getJson<TIBTypes.TermApi> (appendQueryParams $"{TIBTypes.BaseAPIUrl}/terms" [ "obo_id", oboId ])
+        |> Promise.map (fun termApi ->
+            if termApi._embedded.IsNone then
+                None
+            else
+                termApi._embedded.Value.terms
+                |> Array.tryFind (fun term -> term.obo_id = oboId)
+                |> Option.map (fun term -> term.iri)
         )
 
     // TODO: Maybe we should use allChildrenOf instead of childrenOf?
@@ -114,13 +108,7 @@ type TIBApi =
 
                 let url = appendQueryParams baseUrl queryParams
 
-                return!
-                    fetch url [
-                        RequestProperties.Method HttpMethod.GET
-                        requestHeaders [ HttpRequestHeaders.Accept "application/json" ]
-                    ]
-                    |> Promise.bind (fun response -> response.json<TIBTypes.SearchApi> ())
-                    |> Promise.map Some
+                return! getJson<TIBTypes.SearchApi> url |> Promise.map Some
         }
 
     static member defaultSearch(q: string, ?rows: int, ?collection: string) =
@@ -145,8 +133,4 @@ type TIBApi =
     static member getCollections() =
         let url = $"{TIBTypes.BaseAPIUrl}/ontologies/schemavalues?schema=collection&lang=en"
 
-        fetch url [
-            RequestProperties.Method HttpMethod.GET
-            requestHeaders [ HttpRequestHeaders.Accept "application/json" ]
-        ]
-        |> Promise.bind (fun response -> response.json<TIBTypes.SchemaValuesApi> ())
+        getJson<TIBTypes.SchemaValuesApi> url

@@ -102,11 +102,9 @@ type OLSApi =
                 "database", database.Value
         ]
 
-        fetch (appendQueryParams $"{OLSTypes.BaseAPIUrl}/ols/api/ontologies/{ontology}/terms" queryParams) [
-            RequestProperties.Method HttpMethod.GET
-            requestHeaders [ HttpRequestHeaders.Accept "application/json" ]
-        ]
-        |> Promise.bind (fun response -> response.json<OLSTypes.TermApi> ())
+        getJson<OLSTypes.TermApi> (
+            appendQueryParams $"{OLSTypes.BaseAPIUrl}/ols/api/ontologies/{ontology}/terms" queryParams
+        )
 
     static member tryGetIRIFromOboId(oboId: string, ?database: string) = promise {
         match OLSApiHelper.tryParseOboId oboId with
@@ -144,12 +142,7 @@ type OLSApi =
 
         let url = appendQueryParams baseUrl queryParams
 
-        fetch url [
-            RequestProperties.Method HttpMethod.GET
-            requestHeaders [ HttpRequestHeaders.Accept "application/json" ]
-        ]
-        |> Promise.bind (fun response -> response.json<OLSTypes.SearchApi> ())
-        |> Promise.map Some
+        getJson<OLSTypes.SearchApi> url |> Promise.map Some
 
     static member defaultSearch(q: string, ?rows: int, ?ontology: string, ?database: string, ?collectionId: string) =
         let rows = defaultArg rows 10
@@ -163,8 +156,4 @@ type OLSApi =
                 "collectionId", collectionId.Value
         ]
 
-        fetch (appendQueryParams $"{OLSTypes.BaseAPIUrl}/ols/api/ontologies" queryParams) [
-            RequestProperties.Method HttpMethod.GET
-            requestHeaders [ HttpRequestHeaders.Accept "application/json" ]
-        ]
-        |> Promise.bind (fun response -> response.json<OLSTypes.OntologiesApi> ())
+        getJson<OLSTypes.OntologiesApi> (appendQueryParams $"{OLSTypes.BaseAPIUrl}/ols/api/ontologies" queryParams)
