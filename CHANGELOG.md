@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 2.0.1 - 2026-07-14
+
+### 🐛 Fixed
+
+- Add failsafe for local storage migration from v1.0.7 to v2.0.0 in `ConfigProvider.fs` to prevent errors when the old field `aktiveKeys` is present in local storage key `swate-termsearchconfig-ctx`. This error broke the app on load. (by @Freymaurer)
+
+## 2.0.0 - 2026-07-14
+
 ### ✨ Added
 
 -  Workspace component (by @Freymaurer)

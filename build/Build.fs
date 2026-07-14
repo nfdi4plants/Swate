@@ -6,6 +6,8 @@ open ProjectInfo
 let main args =
     let argv = args |> Array.map (fun x -> x.ToLower()) |> Array.toList
 
+    printfn "all args: %A" argv
+
     match argv with
     | "create-certs" :: _ ->
         Run.createDevCertsForExcelAddIn ()
@@ -23,6 +25,7 @@ let main args =
                 Bundle.Client(true)
                 0
         | _ ->
+            run "dotnet" [ "restore"; "./Swate.sln" ] "."
             Bundle.All()
             0
     | "run" :: a ->
@@ -74,6 +77,9 @@ let main args =
 
         match target with
         | "nuget" ->
+
+            printGreenfn ("Starting Nuget release!")
+
             let key = getEnvironementVariableOrFail "NUGET_KEY"
 
             Release.nuget key isDryRun
@@ -81,21 +87,22 @@ let main args =
             printGreenfn ("Release nuget!")
             0
         | "npm" ->
-            let key = getEnvironementVariableOrFail "NPM_KEY"
 
             printGreenfn ("Starting NPM release!")
 
-            Release.npm key latestVersion isDryRun
+            Release.npm latestVersion isDryRun
 
             printGreenfn "Released npm package version %O" latestVersion.Version
             0
         | "docker" ->
+            printGreenfn ("Starting Docker release!")
+
             let key = getEnvironementVariableOrFail "DOCKER_KEY"
 
             let user =
                 otherArgs
                 |> List.tryFind (fun x -> x.StartsWith "--user=")
-                |> Option.map (fun x -> x.Substring 7)
+                |> Option.map (fun x -> x.Trim().Replace("--user=", ""))
 
             if user.IsNone then
                 printRedfn "No docker user set! Please pass user in the format --user=yourusername"
@@ -112,17 +119,20 @@ let main args =
             printGreenfn ("Release electron-web!")
             0
         | "electron-bin" ->
-            let arch =
-                otherArgs
-                |> List.tryFind (fun x -> x.StartsWith "--arch=")
-                |> Option.map (fun x -> x.Substring 7)
-                |> Option.defaultWith (fun () ->
-                    printRedfn "No --arch provided for electron-bin target!"
-                    exit 1
-                )
 
-            Release.electronBinaries arch
-            printGreenfn "Release electron-bin for arch %s!" arch
+            printfn "otherArgs: %A" otherArgs
+
+            let arch =
+                argv
+                |> List.tryFind (fun x -> x.StartsWith "--arch=")
+                |> Option.map (fun x -> x.Trim().Replace("--arch=", ""))
+
+            if arch.IsNone then
+                printRedfn "No --arch provided for electron-bin target!"
+                exit 1
+
+            Release.electronBinaries arch.Value
+            printGreenfn "Release electron-bin for arch %s!" arch.Value
             0
         | "storybook" ->
             printfn "Starting Storybook release!"
@@ -153,7 +163,6 @@ let main args =
             0
         else
             printGreenfn "The latest version %O from CHANGELOG.md is not yet tagged in git." latestVersion.Version
-            Git.createTagAndPush (nextTag)
 
             match GitHub.tryGetLatestRelease GitHubToken latestVersion with
             | Some _ -> printGreenfn "Release for version %O already exists on GitHub." latestVersion.Version
@@ -179,6 +188,10 @@ let main args =
                     make_latest = Some "true"
             })
         |> ignore
+
+        let nextTag = latestVersion.Version.ToString()
+
+        Git.createTagAndPush (nextTag)
 
         0
     | "upload-release-assets" :: dir :: _ ->

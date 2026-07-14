@@ -11,7 +11,7 @@
 
   <PropertyGroup>
     <PackageId>Swate.Components</PackageId>
-    <PackageVersion>0.0.0</PackageVersion>
+    <PackageVersion>2.0.0</PackageVersion>
     <Authors>Kevin Frey</Authors>
     <Description>Swate react components</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -63,6 +63,7 @@
 
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <None Include="swate-components.css" Pack="true" PackagePath="fable/" />
     <Compile Include="Types\StateContext.fs" />
     <Compile Include="Types\CellCoordinate.fs" />
     <Compile Include="Util\Download.fs" />
