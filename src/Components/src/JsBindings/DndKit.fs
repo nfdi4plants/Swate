@@ -33,6 +33,7 @@ module DndKit =
         abstract member setNodeRef: obj -> unit
         abstract member transform: obj
         abstract member transition: obj
+        abstract member isDragging: bool
 
     type IDroppable =
         abstract member setNodeRef: obj -> unit
