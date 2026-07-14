@@ -23,7 +23,7 @@
     <PackageReference Include="SimpleExec" Version="12.0.0"/>
     <PackageReference Include="Semver" Version="3.0.0"/>
     <PackageReference Include="FsToolkit.ErrorHandling" Version="5.1.0"/>
-    <PackageReference Include="FSharp.Data" Version="5.0.2"/>
+    <PackageReference Include="FSharp.Data" Version="8.1.14"/>
     <PackageReference Update="FSharp.Core" Version="9.0.300"/>
   </ItemGroup>
 </Project>
