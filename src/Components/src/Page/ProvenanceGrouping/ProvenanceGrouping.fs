@@ -19,21 +19,42 @@ type ProvenanceGrouping =
 
     [<ReactComponent(true)>]
     static member Main
-        (session: ProvenanceSession, onChange: ProvenanceEditorChange -> unit, ?height: int, ?debug: bool)
-        =
+        (
+            session: ProvenanceSession,
+            onChange: ProvenanceEditorChange -> unit,
+            ?height: int,
+            ?debug: bool,
+            ?initUiState: ProvenanceSession -> UiState,
+            ?initialOpenRail: ProvenanceSide
+        ) =
         let debug = defaultArg debug false
-        let rawUiState, setUiState = React.useState (fun () -> State.init session)
+
+        // The tutorial sandbox seeds checkpoints through initUiState (e.g.
+        // "Species already sits on the input rail"); regular hosts start fresh.
+        let rawUiState, setUiState =
+            React.useState (fun () ->
+                match initUiState with
+                | Some init -> init session
+                | None -> State.init session
+            )
+
         let activeDrag, setActiveDrag = React.useState<ActiveDrag option> None
         let surfaceRef = React.useElementRef ()
         let splitDrag = React.useRef (None: Splitter.SplitterSide option)
         let rootRef = React.useElementRef ()
         let tier, setTier = React.useState LayoutTier.Wide
-        let openRail, setOpenRail = React.useState<ProvenanceSide option> None
+        let openRail, setOpenRail = React.useState<ProvenanceSide option> initialOpenRail
+
+        // Optical side hiding: the hidden side's rail and cards leave the layout,
+        // but every state rule (placements, grouping, connections) keeps running
+        // on both sides, so revealing the side restores it unchanged.
+        let hiddenSide, setHiddenSide = React.useState<ProvenanceSide option> None
         let density, setDensity = React.useState Density.EditorDensity.Comfortable
         let isPropertyShelfExpanded, setIsPropertyShelfExpanded = React.useState true
+        let isTutorialOpen, setIsTutorialOpen = React.useState false
 
-        let propertyShelfFolderExpansion, setPropertyShelfFolderExpansion =
-            React.useState<(ProvenanceLayerId * Set<string>) option> None
+        let propertyShelfActiveFolder, setPropertyShelfActiveFolder =
+            React.useState<(ProvenanceLayerId * string) option> None
 
         let showPropertyHeaderConnectors, setShowPropertyHeaderConnectors =
             React.useState true
@@ -304,24 +325,15 @@ type ProvenanceGrouping =
                 |]
             )
 
-        let defaultPropertyShelfFolderIds =
-            React.useMemo (
-                (fun () ->
-                    propertyShelfFolders
-                    |> List.tryHead
-                    |> Option.map (fun folder -> Set.singleton folder.Id)
-                    |> Option.defaultValue Set.empty
-                ),
-                [| box propertyShelfFolders |]
-            )
+        // The shelf falls back to its first tab internally, so only a
+        // selection made on the current layer is forwarded.
+        let propertyShelfActiveFolderId =
+            match propertyShelfActiveFolder with
+            | Some(selectedLayerId, folderId) when selectedLayerId = layer.Id -> Some folderId
+            | _ -> None
 
-        let propertyShelfExpandedFolderIds =
-            match propertyShelfFolderExpansion with
-            | Some(expandedLayerId, folderIds) when expandedLayerId = layer.Id -> folderIds
-            | _ -> defaultPropertyShelfFolderIds
-
-        let setPropertyShelfExpandedFolderIds folderIds =
-            setPropertyShelfFolderExpansion (Some(latestLayer.current.Id, folderIds))
+        let setPropertyShelfActiveFolderId folderId =
+            setPropertyShelfActiveFolder (Some(latestLayer.current.Id, folderId))
 
         let setPropertyShelfFolderColor folderId color =
             applyUiState (PropertyShelf.setFolderColor latestSession.current folderId color)
@@ -332,6 +344,8 @@ type ProvenanceGrouping =
                     Html.section [
                         prop.className
                             "swt:flex swt:min-w-0 swt:flex-col swt:gap-3 swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100/80 swt:p-3 swt:shadow-sm"
+                        // Always-on anchor for the interactive tutorial's spotlight.
+                        prop.custom ("data-tutorial", "provenance-property-shelf")
                         if debug then
                             prop.testId "provenance-property-shelf"
                         prop.children [
@@ -342,36 +356,30 @@ type ProvenanceGrouping =
                                         prop.className
                                             "swt:flex swt:min-w-0 swt:items-center swt:gap-2 swt:text-sm swt:font-medium"
                                         prop.children [
-                                            Html.i [
-                                                prop.className [
-                                                    "swt:iconify swt:size-5 swt:shrink-0"
-                                                    if isPropertyShelfExpanded then
-                                                        "swt:fluent--folder-open-24-regular"
-                                                    else
-                                                        "swt:fluent--folder-24-regular"
-                                                ]
-                                            ]
                                             Html.span [
                                                 prop.className "swt:min-w-0 swt:truncate"
-                                                prop.text "Available properties by source"
+                                                prop.text "Annotations"
                                             ]
                                         ]
                                     ]
                                     Html.button [
                                         prop.title (
                                             if isPropertyShelfExpanded then
-                                                "Minimize property folders"
+                                                "Minimize annotation folders"
                                             else
-                                                "Expand property folders"
+                                                "Expand annotation folders"
                                         )
                                         prop.type'.button
                                         prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:size-8 swt:p-0"
                                         prop.custom ("aria-expanded", isPropertyShelfExpanded)
+                                        // Always-on anchor (paired with aria-expanded) so the
+                                        // tutorial can point at the toggle of a minimized shelf.
+                                        prop.custom ("data-tutorial", "provenance-property-shelf-toggle")
                                         prop.ariaLabel (
                                             if isPropertyShelfExpanded then
-                                                "Minimize property folders"
+                                                "Minimize annotation folders"
                                             else
-                                                "Expand property folders"
+                                                "Expand annotation folders"
                                         )
                                         if debug then
                                             prop.testId "provenance-property-shelf-toggle"
@@ -398,8 +406,8 @@ type ProvenanceGrouping =
                                     (fun _ item ->
                                         DragDrop.folderPropertyDragId item.Payload.SourceSide item.Payload.Header
                                     ),
-                                    expandedFolderIds = propertyShelfExpandedFolderIds,
-                                    onExpandedFolderIdsChange = setPropertyShelfExpandedFolderIds,
+                                    ?activeFolderId = propertyShelfActiveFolderId,
+                                    onActiveFolderIdChange = setPropertyShelfActiveFolderId,
                                     onSetFolderColor = setPropertyShelfFolderColor,
                                     className = "swt:min-w-0 swt:motion-pop-in",
                                     debug = debug
@@ -410,7 +418,7 @@ type ProvenanceGrouping =
                 [|
                     box propertyShelfFolders
                     box isPropertyShelfExpanded
-                    box propertyShelfExpandedFolderIds
+                    box propertyShelfActiveFolderId
                 |]
             )
 
@@ -430,6 +438,11 @@ type ProvenanceGrouping =
                 box outputRailProjection.Headers
             |]
         )
+
+        // Side hiding consolidates annotations onto the visible rail for the layer
+        // it runs on, so the flag must not carry over to another layer whose hidden
+        // side was never consolidated. Reveal both sides again on every layer switch.
+        React.useEffect ((fun () -> setHiddenSide None), [| box layer.Id |])
 
         // Splitter drags write the grid template straight to the DOM per animation
         // frame and commit the ratios to state once on release; committing per
@@ -809,8 +822,75 @@ type ProvenanceGrouping =
             | ProvenanceSide.Input -> "input"
             | ProvenanceSide.Output -> "output"
 
+        let visibleSideFor hidden =
+            match hidden with
+            | ProvenanceSide.Input -> ProvenanceSide.Output
+            | ProvenanceSide.Output -> ProvenanceSide.Input
+
         let toggleRail side =
             setOpenRail (if openRail = Some side then None else Some side)
+
+        // Hiding a side removes its rail and cards from the layout, and really
+        // relocates every switchable annotation on it to the visible rail - a
+        // permanent move, so the property stays put once the side is revealed and
+        // any solo grouping it held on the hidden side is dropped (it can no longer
+        // be managed). Non-switchable annotations stay parked until the side is
+        // shown again. Hiding one side always reveals the other.
+        let hideSide (side: ProvenanceSide) =
+            let hiddenSideId =
+                match side with
+                | ProvenanceSide.Input -> layer.InputSideId
+                | ProvenanceSide.Output -> layer.OutputSideId
+
+            applyUiState (
+                State.SideVisibility.consolidateToVisible
+                    layer.Id
+                    side
+                    hiddenSideId
+                    (fun header -> PropertyRails.canSwitchHeader header layer.Model)
+            )
+
+            setHiddenSide (Some side)
+
+        // Icon-only (a left/right panel glyph naming the column it governs) keeps
+        // the pair from wrapping the already-dense toolbar onto a second row.
+        let sideVisibilityToggle (side: ProvenanceSide) =
+            let isVisible = hiddenSide <> Some side
+            let sideText = railSideLabel side
+
+            let label =
+                if isVisible then
+                    $"Hide {sideText}s and their annotations"
+                else
+                    $"Show {sideText}s and their annotations"
+
+            Html.button [
+                prop.type'.button
+                prop.title label
+                prop.className [
+                    "swt:btn swt:btn-xs swt:btn-square"
+                    if isVisible then "swt:btn-primary" else "swt:btn-ghost"
+                ]
+                prop.custom ("aria-pressed", isVisible)
+                prop.ariaLabel label
+                // Always-on anchor for the interactive tutorial's spotlight.
+                prop.custom ("data-tutorial", $"provenance-side-visibility-{side}")
+                if debug then
+                    prop.testId $"provenance-side-visibility-{side}"
+                prop.onClick (fun _ -> if isVisible then hideSide side else setHiddenSide None)
+                prop.children [
+                    Html.i [
+                        prop.className [
+                            "swt:iconify swt:size-4"
+                            match side, isVisible with
+                            | ProvenanceSide.Input, true -> "swt:fluent--panel-left-20-regular"
+                            | ProvenanceSide.Input, false -> "swt:fluent--panel-left-20-filled"
+                            | ProvenanceSide.Output, true -> "swt:fluent--panel-right-20-regular"
+                            | ProvenanceSide.Output, false -> "swt:fluent--panel-right-20-filled"
+                        ]
+                    ]
+                ]
+            ]
 
         let isRejectedPropertyRailDrop targetSide =
             let headerCannotSwitch sourceSide headerId =
@@ -1111,9 +1191,9 @@ type ProvenanceGrouping =
                         Html.button [
                             prop.title (
                                 if side = ProvenanceSide.Input then
-                                    "Hide input properties"
+                                    "Hide input annotations"
                                 else
-                                    "Hide output properties"
+                                    "Hide output annotations"
                             )
                             prop.type'.button
                             prop.className [
@@ -1121,7 +1201,7 @@ type ProvenanceGrouping =
                                 if side = ProvenanceSide.Output then
                                     "swt:self-end"
                             ]
-                            prop.ariaLabel $"Hide {railSideLabel side} properties"
+                            prop.ariaLabel $"Hide {railSideLabel side} annotations"
                             if debug then
                                 prop.testId $"provenance-rail-toggle-{side}"
                             prop.onClick (fun _ -> toggleRail side)
@@ -1145,21 +1225,25 @@ type ProvenanceGrouping =
                 Html.button [
                     prop.title (
                         if side = ProvenanceSide.Input then
-                            "Show input properties"
+                            "Show input annotations"
                         else
-                            "Show output properties"
+                            "Show output annotations"
                     )
                     prop.type'.button
                     prop.className
                         "swt:btn swt:btn-ghost swt:btn-xs swt:h-auto swt:min-h-24 swt:w-fit swt:px-1 swt:py-2"
-                    prop.ariaLabel $"Show {railSideLabel side} properties"
+                    prop.ariaLabel $"Show {railSideLabel side} annotations"
+                    // Stable hook for the interactive tutorial: this collapsed
+                    // strip is the fallback spotlight target when the rail folds,
+                    // so the tour must find it without coupling to aria-label copy.
+                    prop.custom ("data-tutorial", $"provenance-rail-toggle-{side}")
                     if debug then
                         prop.testId $"provenance-rail-toggle-{side}"
                     prop.onClick (fun _ -> toggleRail side)
                     prop.children [
                         Html.span [
                             prop.className "swt:[writing-mode:vertical-rl] swt:text-xs"
-                            prop.text "Properties"
+                            prop.text "Annotations"
                         ]
                     ]
                 ]
@@ -1174,10 +1258,15 @@ type ProvenanceGrouping =
                         prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:w-fit"
                         prop.ariaLabel (
                             if openRail = Some side then
-                                $"Hide {railSideLabel side} properties"
+                                $"Hide {railSideLabel side} annotations"
                             else
-                                $"Show {railSideLabel side} properties"
+                                $"Show {railSideLabel side} annotations"
                         )
+                        // Stable hook for the interactive tutorial's fallback
+                        // spotlight, only while folded - once open, the rail
+                        // panel's own data-tutorial anchor is the target.
+                        if openRail <> Some side then
+                            prop.custom ("data-tutorial", $"provenance-rail-toggle-{side}")
                         if debug then
                             prop.testId $"provenance-rail-toggle-{side}"
                         prop.onClick (fun _ -> toggleRail side)
@@ -1193,8 +1282,8 @@ type ProvenanceGrouping =
                             ]
                             Html.span (
                                 match side with
-                                | ProvenanceSide.Input -> "Input properties"
-                                | ProvenanceSide.Output -> "Output properties"
+                                | ProvenanceSide.Input -> "Input annotations"
+                                | ProvenanceSide.Output -> "Output annotations"
                             )
                         ]
                     ]
@@ -1207,6 +1296,7 @@ type ProvenanceGrouping =
             [
                 string tier
                 string openRail
+                string hiddenSide
                 string density
                 string isPropertyShelfExpanded
                 string panelRatios.Left
@@ -1265,11 +1355,62 @@ type ProvenanceGrouping =
                 |]
             )
 
+        // One side hidden (wide or medium): the visible rail and its cards form a
+        // single cluster centered in the editor instead of stretching across it with
+        // the cards hugging one edge. Two equal `1fr` spacer columns flank the cluster,
+        // so whatever space is left over is split evenly on both sides at any width -
+        // unlike `justify-center`, which only centers space beyond the tracks' max and
+        // so leaves the cluster flush whenever the editor is not much wider than it.
+        // The card column keeps the same generous minimum the two-column middle panel
+        // gives it, and a fixed gutter track carries the rail-to-card connectors. No
+        // splitter: there is only one rail, and the bounded tracks keep it balanced.
+        let soloSurface (visibleSide: ProvenanceSide) =
+            let railTrack = "minmax(10rem, 16rem)"
+            let cardTrack = "minmax(24rem, 44rem)"
+
+            let gutter =
+                match density with
+                | Density.EditorDensity.Compact -> "3rem"
+                | _ -> "4rem"
+
+            let filler () = Html.div [ prop.ariaHidden true ]
+
+            Html.div [
+                prop.key layer.Id
+                prop.ref surfaceRef
+                prop.className "swt:relative swt:mx-4 swt:grid swt:min-w-0 swt:items-start swt:motion-fade-in"
+                prop.style [
+                    style.custom (
+                        "gridTemplateColumns",
+                        match visibleSide with
+                        | ProvenanceSide.Input -> $"minmax(0,1fr) {railTrack} {gutter} {cardTrack} minmax(0,1fr)"
+                        | ProvenanceSide.Output -> $"minmax(0,1fr) {cardTrack} {gutter} {railTrack} minmax(0,1fr)"
+                    )
+                ]
+                if debug then
+                    prop.testId "provenance-surface"
+                prop.children [
+                    connectorOverlay
+                    filler ()
+                    match visibleSide with
+                    | ProvenanceSide.Input ->
+                        railColumn ProvenanceSide.Input
+                        filler ()
+                        groupColumnFor ProvenanceSide.Input
+                    | ProvenanceSide.Output ->
+                        groupColumnFor ProvenanceSide.Output
+                        filler ()
+                        railColumn ProvenanceSide.Output
+                    filler ()
+                ]
+            ]
+
         // Keying the surface by layer remounts it on layer switches, so the change
         // fades in as one deliberate transition instead of flashing in place.
         let surface =
-            match tier with
-            | LayoutTier.Wide ->
+            match tier, hiddenSide with
+            | (LayoutTier.Wide | LayoutTier.Medium), Some hidden -> soloSurface (visibleSideFor hidden)
+            | LayoutTier.Wide, None ->
                 Html.div [
                     prop.key layer.Id
                     prop.ref surfaceRef
@@ -1291,6 +1432,7 @@ type ProvenanceGrouping =
                             (nudgeSplit Splitter.Left)
                             resetSplit
                             debug
+
                         Html.div [
                             // The wide column gap is the gutter the group-to-group
                             // connectors are drawn in.
@@ -1305,6 +1447,7 @@ type ProvenanceGrouping =
                                 groupColumnFor ProvenanceSide.Output
                             ]
                         ]
+
                         Splitter.handle
                             Splitter.Right
                             (activeSplit = Some Splitter.Right)
@@ -1317,7 +1460,7 @@ type ProvenanceGrouping =
                         railColumn ProvenanceSide.Output
                     ]
                 ]
-            | LayoutTier.Medium ->
+            | LayoutTier.Medium, None ->
                 let railTrack side =
                     if openRail = Some side then
                         "minmax(10rem, 16rem)"
@@ -1351,7 +1494,7 @@ type ProvenanceGrouping =
                         mediumRailColumn ProvenanceSide.Output
                     ]
                 ]
-            | LayoutTier.Narrow ->
+            | LayoutTier.Narrow, _ ->
                 // Stacked cards cannot host readable connector curves; connection
                 // badges on the cards carry that information instead.
                 Html.div [
@@ -1362,10 +1505,18 @@ type ProvenanceGrouping =
                     if debug then
                         prop.testId "provenance-surface"
                     prop.children [
-                        narrowRailSection ProvenanceSide.Input
-                        groupColumnFor ProvenanceSide.Input
-                        groupColumnFor ProvenanceSide.Output
-                        narrowRailSection ProvenanceSide.Output
+                        match hiddenSide with
+                        | Some ProvenanceSide.Output ->
+                            narrowRailSection ProvenanceSide.Input
+                            groupColumnFor ProvenanceSide.Input
+                        | Some ProvenanceSide.Input ->
+                            narrowRailSection ProvenanceSide.Output
+                            groupColumnFor ProvenanceSide.Output
+                        | None ->
+                            narrowRailSection ProvenanceSide.Input
+                            groupColumnFor ProvenanceSide.Input
+                            groupColumnFor ProvenanceSide.Output
+                            narrowRailSection ProvenanceSide.Output
                     ]
                 ]
 
@@ -1391,38 +1542,36 @@ type ProvenanceGrouping =
                             "swt:sticky swt:top-0 swt:z-20 swt:flex swt:flex-col swt:gap-4 swt:bg-base-200 swt:p-4"
                         prop.children [
                             Html.div [
-                                prop.className "swt:flex swt:flex-wrap swt:items-center swt:justify-between swt:gap-2"
+                                prop.className "swt:flex swt:min-w-0 swt:flex-wrap swt:items-center swt:gap-2"
+                                if debug then
+                                    prop.testId "provenance-top-controls"
                                 prop.children [
-                                    Controls.LayerTabs(
-                                        session,
-                                        (fun layerId ->
-                                            Session.selectLayer layerId latestSession.current |> publishResult false
-                                        ),
-                                        (fun name ->
-                                            let currentInputGroups, currentOutputGroups = latestGroups.current
-
-                                            EditorActions.addLayer
-                                                latestSession.current
-                                                latestLayer.current.Id
-                                                currentInputGroups
-                                                currentOutputGroups
-                                                latestUiState.current
-                                                name
-                                                publish
-                                        ),
-                                        sourceColors = uiState.PropertyColors.SourceColors,
-                                        onSetSourceColor = setSourceColor,
-                                        seedSummary = layerSeedSummary,
+                                    // Search, sort and filters sit on one line
+                                    // above the property shelf.
+                                    Controls.FilterToolbar(
+                                        uiState.Filters,
+                                        (fun text -> applyUiState (State.Filters.setSearch text)),
+                                        setPropertySort,
+                                        (fun sort -> applyUiState (State.Filters.setGroupSort sort)),
+                                        (fun filter -> applyUiState (State.Filters.setValueCountFilter filter)),
+                                        (fun filter -> applyUiState (State.Filters.setOriginFilter filter)),
                                         debug = debug
                                     )
                                     Html.div [
-                                        prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
+                                        prop.className
+                                            "swt:ml-auto swt:flex swt:shrink-0 swt:flex-wrap swt:items-center swt:gap-2"
+                                        if debug then
+                                            prop.testId "provenance-view-actions"
                                         prop.children [
                                             Html.button [
                                                 prop.type'.button
                                                 prop.className "swt:btn swt:btn-xs swt:btn-ghost"
                                                 prop.title "Undo last change"
                                                 prop.ariaLabel "Undo last change"
+                                                // Always-on anchor for the interactive tutorial;
+                                                // its enabled state doubles as the connect step's
+                                                // "an edit was published" completion signal.
+                                                prop.custom ("data-tutorial", "provenance-undo")
                                                 prop.disabled undoSession.IsNone
                                                 if debug then
                                                     prop.testId "provenance-undo"
@@ -1435,12 +1584,14 @@ type ProvenanceGrouping =
                                                     Html.span "Undo"
                                                 ]
                                             ]
+                                            sideVisibilityToggle ProvenanceSide.Input
+                                            sideVisibilityToggle ProvenanceSide.Output
                                             Html.button [
                                                 prop.title (
                                                     if showPropertyHeaderConnectors then
-                                                        "Hide property header connectors"
+                                                        "Hide annotation header connectors"
                                                     else
-                                                        "Show property header connectors"
+                                                        "Show annotation header connectors"
                                                 )
                                                 prop.type'.button
                                                 prop.className [
@@ -1453,9 +1604,9 @@ type ProvenanceGrouping =
                                                 prop.custom ("aria-pressed", showPropertyHeaderConnectors)
                                                 prop.ariaLabel (
                                                     if showPropertyHeaderConnectors then
-                                                        "Hide property header connectors"
+                                                        "Hide annotation header connectors"
                                                     else
-                                                        "Show property header connectors"
+                                                        "Show annotation header connectors"
                                                 )
                                                 if debug then
                                                     prop.testId "provenance-property-connectors-toggle"
@@ -1472,7 +1623,7 @@ type ProvenanceGrouping =
                                                                 "swt:fluent--eye-hide-20-regular"
                                                         ]
                                                     ]
-                                                    Html.span "Property connectors"
+                                                    Html.span "Annotation connectors"
                                                 ]
                                             ]
                                             Html.button [
@@ -1510,20 +1661,32 @@ type ProvenanceGrouping =
                                                 prop.text "Compact"
                                             ]
                                             Controls.HelpLegend(debug = debug)
+                                            // The tutorial's sandboxed editor (marked by its
+                                            // initUiState seed) must not offer a tutorial of
+                                            // its own - task steps keep the whole surface
+                                            // interactive, so the trigger would nest modals.
+                                            if initUiState.IsNone then
+                                                Html.button [
+                                                    prop.type'.button
+                                                    prop.className "swt:btn swt:btn-ghost swt:btn-xs"
+                                                    prop.title "Open the interactive tutorial"
+                                                    prop.ariaLabel "Open the interactive tutorial"
+                                                    if debug then
+                                                        prop.testId "provenance-tutorial-trigger"
+                                                    prop.onClick (fun _ -> setIsTutorialOpen true)
+                                                    prop.children [
+                                                        Html.i [
+                                                            prop.className
+                                                                "swt:iconify swt:fluent--lightbulb-20-regular swt:size-4"
+                                                        ]
+                                                        Html.span "Tutorial"
+                                                    ]
+                                                ]
                                         ]
                                     ]
                                 ]
                             ]
                             propertyShelf
-                            Controls.FilterToolbar(
-                                uiState.Filters,
-                                (fun text -> applyUiState (State.Filters.setSearch text)),
-                                setPropertySort,
-                                (fun sort -> applyUiState (State.Filters.setGroupSort sort)),
-                                (fun filter -> applyUiState (State.Filters.setValueCountFilter filter)),
-                                (fun filter -> applyUiState (State.Filters.setOriginFilter filter)),
-                                debug = debug
-                            )
                             // The selection bar keeps the otherwise invisible group
                             // selection visible: it drives fan-out drops and layer seeding.
                             if selectedGroupCount > 0 then
@@ -1630,6 +1793,58 @@ type ProvenanceGrouping =
                         connections
                         uiState.Detail
                         removeDisplayConnection
+
+                    // Layer navigation is pinned to the bottom, but only the
+                    // centered pagination control itself is visually boxed.
+                    Html.div [
+                        prop.className
+                            "swt:pointer-events-none swt:sticky swt:bottom-0 swt:z-20 swt:mt-auto swt:flex swt:justify-center swt:px-4 swt:py-2"
+                        prop.children [
+                            Controls.LayerPagination(
+                                session,
+                                (fun layerId ->
+                                    Session.selectLayer layerId latestSession.current |> publishResult false
+                                ),
+                                (fun name ->
+                                    let currentInputGroups, currentOutputGroups = latestGroups.current
+
+                                    EditorActions.addLayer
+                                        latestSession.current
+                                        latestLayer.current.Id
+                                        currentInputGroups
+                                        currentOutputGroups
+                                        latestUiState.current
+                                        name
+                                        publish
+                                ),
+                                sourceColors = uiState.PropertyColors.SourceColors,
+                                onSetSourceColor = setSourceColor,
+                                seedSummary = layerSeedSummary,
+                                debug = debug
+                            )
+                        ]
+                    ]
+
+                    // The tour runs on a sandboxed sample-data editor instance, so
+                    // trying the interactions cannot touch the host's session.
+                    // The overlay rebuilds it from the step's checkpoint seed
+                    // whenever the active step's checkpoint changes.
+                    if isTutorialOpen then
+                        ProvenanceTutorial.Modal(
+                            (fun () -> setIsTutorialOpen false),
+                            (fun checkpoint ->
+                                let seed = ProvenanceTutorialSteps.checkpointSeed checkpoint
+
+                                ProvenanceGrouping.Editor(
+                                    seed.Model(),
+                                    ignore,
+                                    debug = debug,
+                                    initUiState = seed.InitUiState,
+                                    ?initialOpenRail = seed.OpenRail
+                                )
+                            ),
+                            debug = debug
+                        )
                 ]
             ]
 
@@ -1672,12 +1887,25 @@ type ProvenanceGrouping =
 
     [<ReactComponent>]
     static member Editor
-        (initialModel: ProvenanceModel, onChange: ProvenanceEditorChange -> unit, ?height: int, ?debug: bool)
-        =
+        (
+            initialModel: ProvenanceModel,
+            onChange: ProvenanceEditorChange -> unit,
+            ?height: int,
+            ?debug: bool,
+            ?initUiState: ProvenanceSession -> UiState,
+            ?initialOpenRail: ProvenanceSide
+        ) =
         let session, setSession = React.useState (fun () -> Session.init initialModel)
 
         let change (next: ProvenanceEditorChange) =
             setSession next.Session
             onChange next
 
-        ProvenanceGrouping.Main(session, change, ?height = height, ?debug = debug)
+        ProvenanceGrouping.Main(
+            session,
+            change,
+            ?height = height,
+            ?debug = debug,
+            ?initUiState = initUiState,
+            ?initialOpenRail = initialOpenRail
+        )

@@ -40,3 +40,6 @@ artifacts/
 !.idea/.idea.Swate/.idea/workspace.xml
 !.idea/.idea.Swate/.idea/tailwindcss.xml
 opencode.json
+docs/superpowers/
+.opencode/
+.superpowers/
