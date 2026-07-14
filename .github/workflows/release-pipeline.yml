@@ -109,12 +109,12 @@ jobs:
           package-manager-cache: false  # never use caching in release builds
 
       # Verify npm trusted publishing
-      - name: Check npm auth
+      - name: Debug OIDC
+        if: ${{ matrix.target == 'npm' }}
         run: |
-          npm --version
-          npm config get registry
-          npm whoami
-
+          echo "Repository: $GITHUB_REPOSITORY"
+          echo "Workflow: $GITHUB_WORKFLOW"
+          echo "Ref: $GITHUB_REF"
       # Install npm dependencies
       - name: Install root dependencies
         run: npm i
