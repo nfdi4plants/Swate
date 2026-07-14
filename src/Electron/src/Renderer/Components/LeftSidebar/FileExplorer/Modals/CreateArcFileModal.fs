@@ -15,12 +15,10 @@ type CreateArcFileModal =
             isOpen: bool,
             kind: ArcExplorerNodeKind,
             close: unit -> unit,
-            submit: ArcExplorerNodeKind -> string -> unit,
-            ?isCreating: bool
+            submit: ArcExplorerNodeKind -> string -> JS.Promise<unit>
         ) =
 
         let label = ArcExplorerNodeKind.label kind
-        let isCreating = defaultArg isCreating false
 
         Dialog.StringSubmissionDialog(
             isOpen = isOpen,
@@ -39,7 +37,6 @@ type CreateArcFileModal =
                 ),
             submitLabel = $"Create {label}",
             validationMessage = arcCreateIdentifierError,
-            isBusy = isCreating,
             busyLabel = "Creating...",
             debug = "arc-create"
         )

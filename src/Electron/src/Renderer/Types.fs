@@ -1,6 +1,7 @@
 [<AutoOpenAttribute>]
 module Renderer.Types
 
+open Fable.Core
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper

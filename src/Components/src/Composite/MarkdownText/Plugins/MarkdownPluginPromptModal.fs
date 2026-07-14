@@ -1,6 +1,7 @@
 namespace Swate.Components.Composite.MarkdownText.Plugins
 
 open Browser.Types
+open Fable.Core
 open Feliz
 
 open Swate.Components
@@ -10,54 +11,175 @@ open Swate.Components.Primitive.BaseModal
 module MarkdownPluginPromptModal =
 
     type ViewProps = {
-        IsOpen: bool
         SetIsOpen: bool -> unit
-        PromptViewModel: PluginTextInputHelpers.PromptViewModel
-        PromptInput: string
-        PromptError: string option
-        PromptFiles: MarkdownPromptFile list
-        PromptFileDropActive: bool
-        PromptInputRef: IRefValue<option<HTMLInputElement>>
-        PromptFileInputRef: IRefValue<option<HTMLInputElement>>
-        SetPromptFileDropActive: bool -> unit
-        OnPromptInputChange: string -> unit
-        OnPromptFileChange: File list -> unit
-        OnTriggerPromptFileSelection: unit -> unit
-        OnPromptDrop: DragEvent -> unit
-        OnRemovePromptFileAtIndex: int -> unit
-        OnSubmitPromptDialog: unit -> unit
+        Prompt: MarkdownPromptPlugin
+        FilePickerAdapter: MarkdownFilePickerAdapter option
+        OnSubmitTextPrompt: MarkdownPromptPlugin -> string -> JS.Promise<unit>
+        OnSubmitFilePrompt: MarkdownPromptPlugin -> MarkdownPromptFile list -> JS.Promise<unit>
     }
 
     [<ReactComponent>]
     let View (props: ViewProps) =
-        let isOpen = props.IsOpen
-        let setIsOpen = props.SetIsOpen
-        let promptViewModel = props.PromptViewModel
-        let promptInput = props.PromptInput
-        let promptError = props.PromptError
-        let promptFiles = props.PromptFiles
-        let promptFileDropActive = props.PromptFileDropActive
-        let promptInputRef = props.PromptInputRef
-        let promptFileInputRef = props.PromptFileInputRef
-        let setPromptFileDropActive = props.SetPromptFileDropActive
-        let onPromptInputChange = props.OnPromptInputChange
-        let onPromptFileChange = props.OnPromptFileChange
-        let onTriggerPromptFileSelection = props.OnTriggerPromptFileSelection
-        let onPromptDrop = props.OnPromptDrop
-        let onRemovePromptFileAtIndex = props.OnRemovePromptFileAtIndex
-        let onSubmitPromptDialog = props.OnSubmitPromptDialog
+        let activePrompt = Some props.Prompt
+        let filePickerAdapter = props.FilePickerAdapter
+        let promptViewModel = PluginTextInputHelpers.promptViewModel activePrompt
+
+        let promptInput, setPromptInput = React.useState ""
+        let promptError, setPromptError = React.useState (None: string option)
+
+        let promptFiles, setPromptFiles =
+            React.useStateWithUpdater ([]: MarkdownPromptFile list)
+
+        let promptFileDropActive, setPromptFileDropActive = React.useState false
+        let promptInputRef = React.useInputRef ()
+        let promptFileInputRef = React.useInputRef ()
+        let isMountedRef = React.useRef true
+
+        React.useEffectOnce (fun _ ->
+            { new System.IDisposable with
+                member _.Dispose() = isMountedRef.current <- false
+            }
+        )
+
+        let resetPromptState () =
+            setPromptInput ""
+            setPromptError None
+            setPromptFiles (fun _ -> [])
+            setPromptFileDropActive false
+
+        let setIsOpen isOpen =
+            if not isOpen then
+                resetPromptState ()
+
+            props.SetIsOpen isOpen
+
+        let appendPromptFilesAndClearError (files: MarkdownPromptFile list) =
+            if isMountedRef.current then
+                setPromptFiles (fun currentFiles ->
+                    let combined = currentFiles @ files
+                    PluginTextInputHelpers.normalizePromptFiles activePrompt combined
+                )
+
+                if promptError.IsSome then
+                    setPromptError None
+
+        let applyPickedPromptFiles (files: MarkdownPromptFile list) =
+            let accepted, rejected =
+                PluginTextInputHelpers.partitionFilesByAccept activePrompt files
+
+            if not (List.isEmpty accepted) then
+                appendPromptFilesAndClearError accepted
+
+            if not (List.isEmpty rejected) && isMountedRef.current then
+                setPromptError (Some(PluginTextInputHelpers.rejectedFilesMessage activePrompt rejected))
+
+        let removePromptFileAtIndex (indexToRemove: int) =
+            setPromptFiles (fun currentFiles ->
+                currentFiles
+                |> List.indexed
+                |> List.choose (fun (index, file) -> if index = indexToRemove then None else Some file)
+            )
+
+        let promptFilePickerOptions () = {
+            AcceptTypes = PluginTextInputHelpers.activePromptAcceptTypes activePrompt
+            AllowMultiple = Some(PluginTextInputHelpers.activePromptAllowsMultipleFiles activePrompt)
+        }
+
+        let triggerPromptFileSelection () =
+            promise {
+                match filePickerAdapter with
+                | Some adapter ->
+                    let! files = adapter.PickFiles(promptFilePickerOptions ())
+
+                    applyPickedPromptFiles files
+                | None -> promptFileInputRef.current |> Option.iter (fun input -> input.click ())
+            }
+            |> Promise.catch (fun err ->
+                if isMountedRef.current then
+                    setPromptError (Some $"File selection failed: {string err}")
+            )
+            |> Promise.start
+
+        let handlePromptFileChange =
+            fun (files: File list) ->
+                let selected = files |> List.map PluginTextInputHelpers.toPromptFile
+                applyPickedPromptFiles selected
+
+                // Reset the input value so selecting the same file triggers onChange.
+                promptFileInputRef.current |> Option.iter (fun input -> input.value <- "")
+
+        let handlePromptDrop =
+            fun (e: DragEvent) ->
+                e.preventDefault ()
+                e.stopPropagation ()
+                setPromptFileDropActive false
+
+                let files =
+                    if isNull e.dataTransfer || isNull e.dataTransfer.files then
+                        []
+                    else
+                        [
+                            for i in 0 .. int e.dataTransfer.files.length - 1 do
+                                let file = e.dataTransfer.files.item i
+
+                                if not (isNull file) then
+                                    yield PluginTextInputHelpers.toPromptFile file
+                        ]
+
+                if List.isEmpty files then
+                    setPromptError (Some "No files were dropped.")
+                else
+                    applyPickedPromptFiles files
+
+        let handlePromptInputChange =
+            fun (text: string) ->
+                setPromptInput text
+
+                if promptError.IsSome then
+                    setPromptError None
+
+        let submitPrompt submit =
+            promise {
+                try
+                    do! submit
+
+                    if isMountedRef.current then
+                        resetPromptState ()
+                with exn ->
+                    if isMountedRef.current then
+                        setPromptError (Some(string exn))
+            }
+            |> Promise.start
+
+        let submitPromptDialog () =
+            match PluginTextInputHelpers.activePromptInputMode activePrompt with
+            | MarkdownPromptInputMode.Text ->
+                match props.Prompt.Validate promptInput with
+                | Error message -> setPromptError (Some message)
+                | Ok() -> submitPrompt (props.OnSubmitTextPrompt props.Prompt promptInput)
+
+            | MarkdownPromptInputMode.File ->
+                let selectedFiles =
+                    promptFiles |> PluginTextInputHelpers.normalizePromptFiles activePrompt
+
+                if List.isEmpty selectedFiles then
+                    setPromptError (Some "Select at least one file.")
+                else
+                    match props.Prompt.ApplyFiles with
+                    | None -> setPromptError (Some "This plugin does not support file input.")
+                    | Some _ -> submitPrompt (props.OnSubmitFilePrompt props.Prompt selectedFiles)
 
         let isFilePrompt = promptViewModel.InputMode = MarkdownPromptInputMode.File
 
         let promptDescription = promptViewModel.Description |> Option.map Html.text
 
         let promptFileKey (file: MarkdownPromptFile) =
-            let hostPath = file.HostPath |> Option.defaultValue ""
+            let sourceId = file.SourceId |> Option.defaultValue ""
             let mimeType = file.MimeType |> Option.defaultValue ""
-            $"{hostPath}|{file.Name}|{mimeType}"
+            $"{sourceId}|{file.Name}|{mimeType}"
 
         BaseModal.Modal(
-            isOpen = isOpen,
+            isOpen = true,
             setIsOpen = setIsOpen,
             header = Html.text promptViewModel.Title,
             ?description = promptDescription,
@@ -74,7 +196,7 @@ module MarkdownPluginPromptModal =
                                 prop.multiple promptViewModel.AllowMultipleFiles
                                 if promptViewModel.AcceptTypes.IsSome then
                                     prop.accept promptViewModel.AcceptTypes.Value
-                                prop.onChange onPromptFileChange
+                                prop.onChange handlePromptFileChange
                             ]
 
                             let fileDropButtonText = "Drop files here or click to upload"
@@ -89,7 +211,7 @@ module MarkdownPluginPromptModal =
                                     else
                                         "swt:border-base-300"
                                 ]
-                                prop.onClick (fun _ -> onTriggerPromptFileSelection ())
+                                prop.onClick (fun _ -> triggerPromptFileSelection ())
                                 prop.onDragEnter (fun (e: DragEvent) ->
                                     e.preventDefault ()
                                     e.stopPropagation ()
@@ -104,7 +226,7 @@ module MarkdownPluginPromptModal =
                                     e.preventDefault ()
                                     e.stopPropagation ()
                                 )
-                                prop.onDrop onPromptDrop
+                                prop.onDrop handlePromptDrop
                                 prop.text fileDropButtonText
                             ]
 
@@ -132,7 +254,7 @@ module MarkdownPluginPromptModal =
                                                         prop.className "swt:btn swt:btn-xs swt:btn-ghost"
                                                         prop.ariaLabel $"Remove {file.Name}"
                                                         prop.text "x"
-                                                        prop.onClick (fun _ -> onRemovePromptFileAtIndex index)
+                                                        prop.onClick (fun _ -> removePromptFileAtIndex index)
                                                     ]
                                                 ]
                                             ]
@@ -148,11 +270,11 @@ module MarkdownPluginPromptModal =
                                 ]
                                 prop.placeholder promptViewModel.Placeholder
                                 prop.value promptInput
-                                prop.onChange onPromptInputChange
+                                prop.onChange handlePromptInputChange
                                 prop.onKeyDown (fun (e: KeyboardEvent) ->
                                     if e.key = "Enter" then
                                         e.preventDefault ()
-                                        onSubmitPromptDialog ()
+                                        submitPromptDialog ()
                                 )
                             ]
                         if promptError.IsSome then
@@ -172,7 +294,7 @@ module MarkdownPluginPromptModal =
                     Html.button [
                         prop.className "swt:btn swt:btn-primary swt:ml-auto"
                         prop.text promptViewModel.SubmitButtonText
-                        prop.onClick (fun _ -> onSubmitPromptDialog ())
+                        prop.onClick (fun _ -> submitPromptDialog ())
                     ]
                 ],
             initialFocusRef = unbox promptInputRef,

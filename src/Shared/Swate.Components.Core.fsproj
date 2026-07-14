@@ -49,4 +49,8 @@
     <!-- Include the project file itself as well -->
     <Content Include="$(MSBuildThisFileFullPath)" Pack="true" PackagePath="fable/" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="JsBindings\" />
+  </ItemGroup>
 </Project>

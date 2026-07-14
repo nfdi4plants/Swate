@@ -22,6 +22,16 @@ module IPCTypesHelper =
 
 open IPCTypesHelper
 
+[<Literal>]
+let DroppedFilePathsRegisteredChannel = "swate:dropped-file-paths-registered"
+
+[<JS.Pojo>]
+type DroppedFilePathRegistration = { key: string; absolutePath: string }
+
+/// Creates a stable lookup key from browser File metadata; Unit Separator avoids ambiguous joins for normal names.
+let createDroppedFilePathKey (name: string) (size: int) (lastModified: float) (mimeType: string) =
+    String.concat "\u001F" [ name; string size; string lastModified; mimeType ]
+
 type CreateArcRequest = { identifier: string; initGit: bool }
 
 /// Two Way Bridge: Renderer <-> Main
@@ -41,8 +51,6 @@ type IArcVaultsApi = {
 
     pickArcPaths: unit -> JS.Promise<Result<string[], exn>>
     pickDirectory: unit -> JS.Promise<Result<string, exn>>
-    pickAbsolutePaths: unit -> JS.Promise<Result<string[], exn>>
-    pickExternalTextFiles: unit -> JS.Promise<Result<ImportedTextFile[], exn>>
     getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
     pathExists: string -> JS.Promise<Result<bool, exn>>
     openFile: string -> JS.Promise<Result<FileContentDTO, exn>>
@@ -60,11 +68,14 @@ type IArcVaultsApi = {
     addArcFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
     /// Creates a generic file or folder inside a safe ARC directory.
     createFileSystemItem: CreateFileSystemItemRequest -> JS.Promise<Result<string, exn>>
+    /// Copies external files into safe generic ARC paths.
+    copyExternalFilesToArc: CopyExternalFileRequest[] -> JS.Promise<Result<string[], exn>>
     /// Checks if there are unsaved changes in the in-memory ARC scaffold compared to the last saved state on disk. Does not trigger a save or write to disk.
     getHasUnsavedArcChanges: unit -> JS.Promise<Result<bool, exn>>
     deletePath: string -> JS.Promise<Result<unit, exn>>
     renamePath: RenamePathRequest -> JS.Promise<Result<unit, exn>>
     movePath: MovePathRequest -> JS.Promise<Result<unit, exn>>
+    copyFileSystemItem: CopyFileSystemItemRequest -> JS.Promise<Result<unit, exn>>
     renameOpenArcRoot: string -> JS.Promise<Result<string, exn>>
     writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
     runGitLfs: GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
@@ -128,6 +139,12 @@ type IAuthApi = {
     rotatePersonalAccessToken: string -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
     setActiveAccount: string -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
     removeAccount: string -> Fable.Core.JS.Promise<Result<unit, exn>>
+}
+
+/// Two Way Bridge: Renderer <-> Main
+type IFilePickerApi = {
+    pickFilePaths: PickExternalFilePathsRequest -> JS.Promise<Result<string[], exn>>
+    resolveDroppedFilePath: string -> JS.Promise<Result<string, exn>>
 }
 
 /// One Way Bridge: Main -> Renderer

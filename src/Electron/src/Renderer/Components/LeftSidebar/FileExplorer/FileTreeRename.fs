@@ -16,7 +16,6 @@ module FileTreeRenameWorkflow =
         selectedTreePath: string option
         pageState: Renderer.Types.PageState option
         closeRenameModal: unit -> unit
-        setIsRenaming: bool -> unit
         setSelection: ArcSelection -> unit
         refreshGitStatus: unit -> unit
         reloadPreviewByPath: string -> JS.Promise<Result<unit, string>>
@@ -50,20 +49,18 @@ module FileTreeRenameWorkflow =
         | Ok renameDraft -> setPendingRenameDraft (Some renameDraft)
         | Error validationError -> enqueueRenameError enqueueError validationError
 
-    let confirmRenameItem (config: ConfirmRenameConfig) (newName: string) =
+    let confirmRenameItem (config: ConfirmRenameConfig) (newName: string) : JS.Promise<unit> =
         match config.pendingRenameDraft with
-        | None -> config.closeRenameModal ()
+        | None -> promise { config.closeRenameModal () }
         | Some renameDraft ->
             match validateRenameName newName with
-            | Error validationError -> applyRenameError config validationError
+            | Error validationError -> promise { applyRenameError config validationError }
             | Ok normalizedNewName ->
                 let targetPath = buildRenamedSiblingPath renameDraft.SourcePath normalizedNewName
 
                 if PathHelpers.pathsEqual targetPath renameDraft.SourcePath then
-                    config.closeRenameModal ()
+                    promise { config.closeRenameModal () }
                 else
-                    config.setIsRenaming true
-
                     promise {
                         let! renameResult =
                             config.renamePath {
@@ -95,5 +92,3 @@ module FileTreeRenameWorkflow =
                         | Error renameError -> applyRenameError config renameError.Message
                     }
                     |> Promise.catch (fun promiseError -> applyRenameError config promiseError.Message)
-                    |> Promise.map (fun _ -> config.setIsRenaming false)
-                    |> Promise.start

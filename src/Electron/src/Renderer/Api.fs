@@ -4,7 +4,6 @@ open Swate.Components.Shared
 open Swate.Electron.Shared.IPCTypes
 
 open Fable.Core
-open Fable.Core.JsInterop
 open Fable.Remoting.Client
 open Fable.Electron.Remoting.Renderer
 
@@ -15,3 +14,6 @@ let ipcArcVaultApi =
     Remoting.createIpc () |> Remoting.buildProxySender<IArcVaultsApi>
 
 let ipcAuthApi = Remoting.createIpc () |> Remoting.buildProxySender<IAuthApi>
+
+let ipcFilePickerApi =
+    Remoting.createIpc () |> Remoting.buildProxySender<IFilePickerApi>

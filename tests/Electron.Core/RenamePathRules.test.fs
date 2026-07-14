@@ -1,5 +1,6 @@
 module ElectronCore.RenamePathRulesTests
 
+open ARCtrl
 open Swate.Electron.Shared.RenamePathRules
 open Swate.Components.Shared
 open Vitest
@@ -40,6 +41,28 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "native entity child folders follow ARCtrl entity zones",
+            fun () ->
+                Vitest
+                    .expect(ArcEntityPathRules.nativeEntityChildFolderNames ArcEntityPathRules.AddZone.Assays)
+                    .toEqual (
+                        [
+                            ArcPathHelper.AssayDatasetFolderName
+                            ArcPathHelper.AssayProtocolsFolderName
+                        ]
+                    )
+
+                Vitest
+                    .expect(ArcEntityPathRules.nativeEntityChildFolderNames ArcEntityPathRules.AddZone.Studies)
+                    .toEqual (
+                        [
+                            ArcPathHelper.StudiesProtocolsFolderName
+                            ArcPathHelper.StudiesResourcesFolderName
+                        ]
+                    )
+        )
+
+        Vitest.test (
             "ArcEntityPathRules.isRenamePathAllowed allows entity folders and safe generic descendants",
             fun () ->
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay").toBe (true)
@@ -52,6 +75,15 @@ Vitest.describe (
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "notes").toBe (false)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "notes/2026-06-15/foo/foo.md").toBe (true)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "test.fsx").toBe (true)
+        )
+
+        Vitest.test (
+            "root notes folder is protected from rename and delete while descendants are not",
+            fun () ->
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "notes").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "notes").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "notes/2026-06-15/foo/foo.md").toBe (true)
+                Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "notes/2026-06-15/foo/foo.md").toBe (true)
         )
 
         Vitest.test (

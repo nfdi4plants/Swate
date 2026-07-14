@@ -12,6 +12,11 @@ type RmOptions(?recursive: bool, ?force: bool) =
     member val force: bool option = force with get, set
 
 [<JS.PojoAttribute>]
+type CpOptions(?recursive: bool, ?force: bool) =
+    member val recursive: bool option = recursive with get, set
+    member val force: bool option = force with get, set
+
+[<JS.PojoAttribute>]
 type ReaddirOptions(?withFileTypes: bool) =
     member val withFileTypes: bool option = withFileTypes with get, set
 
@@ -29,6 +34,12 @@ type Dirent =
     abstract member isDirectory: unit -> bool
     abstract member isFile: unit -> bool
     abstract member isSymbolicLink: unit -> bool
+
+type FileCopyConstants =
+    abstract member COPYFILE_EXCL: int
+
+[<Import("constants", "fs")>]
+let constants: FileCopyConstants = jsNative
 
 [<Import("mkdirSync", "fs")>]
 let mkdirSync (path: string) (options: MkdirOptions) : unit = jsNative
@@ -62,6 +73,15 @@ let readFileBufferAsync (path: string) : JS.Promise<obj> = jsNative
 
 [<Import("writeFile", "fs/promises")>]
 let writeFileAsync (path: string) (content: string) (encoding: TextEncoding) : JS.Promise<unit> = jsNative
+
+[<Import("cp", "fs/promises")>]
+let cpAsync (sourcePath: string) (targetPath: string) (options: CpOptions) : JS.Promise<unit> = jsNative
+
+[<Import("copyFile", "fs/promises")>]
+let copyFileAsync (sourcePath: string) (targetPath: string) : JS.Promise<unit> = jsNative
+
+[<Import("copyFile", "fs/promises")>]
+let copyFileWithModeAsync (sourcePath: string) (targetPath: string) (mode: int) : JS.Promise<unit> = jsNative
 
 [<Import("rename", "fs/promises")>]
 let renameAsync (oldPath: string) (newPath: string) : JS.Promise<unit> = jsNative

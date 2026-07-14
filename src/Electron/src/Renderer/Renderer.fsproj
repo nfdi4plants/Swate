@@ -30,6 +30,7 @@
     <Compile Include="Components\LeftSidebar\FileExplorer\Helper.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeFileTargetWorkflow.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeRenameHelper.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\AssignNoteHelper.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeContextMenu.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Modals\CreateArcFileModal.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Modals\CreateFileSystemItemModal.fs" />

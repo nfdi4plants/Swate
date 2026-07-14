@@ -15,11 +15,9 @@ type FileTreeRenameModal =
             itemName: string option,
             initialName: string option,
             close: unit -> unit,
-            submit: string -> unit,
-            ?isRenaming: bool
+            submit: string -> JS.Promise<unit>
         ) =
 
-        let isRenaming = defaultArg isRenaming false
         let displayName = itemName |> Option.defaultValue "this item"
 
         Dialog.StringSubmissionDialog(
@@ -33,7 +31,6 @@ type FileTreeRenameModal =
             validate = validateRenameName,
             submitLabel = "Rename",
             validationMessage = "Name is required and must not contain path separators.",
-            isBusy = isRenaming,
             busyLabel = "Renaming...",
             debug = "arc-rename"
         )

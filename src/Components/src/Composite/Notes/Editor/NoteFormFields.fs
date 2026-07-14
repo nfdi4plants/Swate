@@ -5,6 +5,7 @@ open ARCtrl
 open Feliz
 open Swate.Components
 open Swate.Components.Composite.MarkdownText
+open Swate.Components.Composite.MarkdownText.Plugins
 open Swate.Components.Composite.TermSearch
 open Swate.Components.Composite.TermSearch.Types
 open Swate.Components.Primitive.LayoutComponents
@@ -13,7 +14,9 @@ open Swate.Components.Primitive.LayoutComponents
 type NoteFormFields =
 
     [<ReactComponent>]
-    static member Main(draft: NotesDraft, setDraft: NotesDraft -> unit) =
+    static member Main
+        (draft: NotesDraft, setDraft: NotesDraft -> unit, filePickerAdapter: MarkdownFilePickerAdapter option)
+        =
         let dateInputValue =
             draft.DateCreated
             |> Option.map (fun dateValue -> dateValue.ToString("yyyy-MM-dd"))
@@ -185,7 +188,8 @@ type NoteFormFields =
                         (fun value -> setDraft { draft with MainText = value }),
                         height = 360,
                         label = "Main Text",
-                        placeholder = "Write note markdown..."
+                        placeholder = "Write note markdown...",
+                        ?filePickerAdapter = filePickerAdapter
                     )
                 ]
             ]

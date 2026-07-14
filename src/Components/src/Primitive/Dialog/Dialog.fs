@@ -39,23 +39,23 @@ type Dialog =
             fieldLabel: string,
             initialValue: string,
             close: unit -> unit,
-            submit: string -> unit,
+            submit: string -> JS.Promise<unit>,
             validate: string -> Result<string, string>,
             submitLabel: string,
             validationMessage: string,
-            ?isBusy: bool,
             ?busyLabel: string,
             ?debug: string
         ) =
 
         let value, setValue = React.useState initialValue
-        let isBusy = defaultArg isBusy false
+        let isRunning, setIsRunning = React.useState false
         let busyLabel = defaultArg busyLabel submitLabel
+        let isDisabled = isRunning
 
         React.useEffect ((fun () -> setValue initialValue), [| box initialValue; box isOpen; box title |])
 
         let setIsOpen isOpen =
-            if not isOpen then
+            if not isOpen && not isDisabled then
                 close ()
 
         let validationResult = validate value
@@ -63,7 +63,16 @@ type Dialog =
 
         let submitIfValid () =
             match validationResult with
-            | Ok normalizedValue when not isBusy -> submit normalizedValue
+            | Ok normalizedValue when not isRunning ->
+                promise {
+                    setIsRunning true
+
+                    try
+                        do! submit normalizedValue
+                    finally
+                        setIsRunning false
+                }
+                |> Promise.start
             | _ -> ()
 
         let footer =
@@ -72,15 +81,15 @@ type Dialog =
                 prop.children [
                     Html.button [
                         prop.className "swt:btn swt:btn-ghost"
-                        prop.disabled isBusy
+                        prop.disabled isDisabled
                         prop.onClick (fun _ -> close ())
                         prop.text "Cancel"
                     ]
                     Html.button [
                         prop.className "swt:btn swt:btn-primary"
-                        prop.disabled ((not isValid) || isBusy)
+                        prop.disabled ((not isValid) || isDisabled)
                         prop.onClick (fun _ -> submitIfValid ())
-                        prop.text (if isBusy then busyLabel else submitLabel)
+                        prop.text (if isRunning then busyLabel else submitLabel)
                     ]
                 ]
             ]
@@ -98,7 +107,7 @@ type Dialog =
                         prop.children [
                             Html.input [
                                 prop.autoFocus true
-                                prop.disabled isBusy
+                                prop.disabled isDisabled
                                 prop.value value
                                 prop.onChange setValue
                                 prop.onKeyDown (key.enter, fun _ -> submitIfValid ())

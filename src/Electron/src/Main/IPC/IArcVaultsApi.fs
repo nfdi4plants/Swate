@@ -307,7 +307,6 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 |]
 
                 let window = dialogParentFromIpcEvent event
-
                 let! result = dialog.showOpenDialog (?window = window, properties = properties)
 
                 if result.canceled then
@@ -315,62 +314,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 elif result.filePaths.Length <> 1 then
                     return Error(exn "Not exactly one path")
                 else
-                    return Ok(result.filePaths |> Array.exactlyOne)
+                    return Ok(result.filePaths |> Array.exactlyOne |> PathHelpers.normalizePath)
             with e ->
                 return Error(exn $"Could not pick directory: {e.Message}")
-        }
-    pickAbsolutePaths =
-        fun () -> promise {
-            try
-                let properties = [|
-                    Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
-                    Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
-                |]
-
-                let window = dialogParentFromIpcEvent event
-
-                let! result = dialog.showOpenDialog (?window = window, properties = properties)
-
-                if result.canceled then
-                    return Error(exn "Cancelled")
-                else
-                    return Ok result.filePaths
-            with e ->
-                return Error(exn $"Could not pick files: {e.Message}")
-        }
-    pickExternalTextFiles =
-        fun _ -> promise {
-            try
-                let properties = [|
-                    Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
-                    Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
-                |]
-
-                let filters = [|
-                    FileFilter("Delimited text files", [| "csv"; "tsv"; "txt" |])
-                |]
-
-                let window = dialogParentFromIpcEvent event
-
-                let! result = dialog.showOpenDialog (?window = window, properties = properties, filters = filters)
-
-                if result.canceled then
-                    return Error(exn "Cancelled")
-                else
-                    let importedFiles = ResizeArray<ImportedTextFile>()
-
-                    for filePath in result.filePaths do
-                        let absolutePath = resolveAbsolutePath filePath
-                        let! content = ARCtrl.FileSystemHelper.readFileTextAsync absolutePath
-
-                        importedFiles.Add {
-                            Name = path.basename absolutePath
-                            Content = content
-                        }
-
-                    return Ok(importedFiles.ToArray())
-            with e ->
-                return Error(exn $"Could not import external text files: {e.Message}")
         }
     getFileTree =
         fun () -> promise {
@@ -491,6 +437,29 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    // Copies one or more files from the host filesystem into the ARC's filesystem.
+    copyExternalFilesToArc =
+        fun (requests: CopyExternalFileRequest[]) -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault ->
+                            withBusyWriting
+                                vault
+                                (fun () -> promise {
+                                    match!
+                                        ArcFileSystemHelper.copyExternalFilesToArcOnDisk vault.path.Value requests
+                                    with
+                                    | Error error -> return Error error
+                                    | Ok copiedPaths ->
+                                        do! vault.RefreshFileTree()
+                                        return Ok copiedPaths
+                                })
+                        )
+            with e ->
+                return Error e
+        }
     getHasUnsavedArcChanges =
         fun () -> promise {
             try
@@ -608,6 +577,19 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         event
                         (fun vault -> promise {
                             return! ArcFileSystemHelper.moveGenericFileSystemItemOnDisk vault.path.Value request
+                        })
+            with e ->
+                return Error e
+        }
+    // Copies a file or folder from one location to another within the ARC's filesystem.
+    copyFileSystemItem =
+        fun (request: CopyFileSystemItemRequest) -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            return! ArcFileSystemHelper.copyGenericFileSystemItemOnDisk vault.path.Value request
                         })
             with e ->
                 return Error e

@@ -1,5 +1,6 @@
 namespace Swate.Components.Page.FileExplorer
 
+open Swate.Components
 open Swate.Components.Page.FileExplorer.Types
 open Fable.Core
 open Fable.Core.JsInterop
@@ -22,16 +23,6 @@ module private FileExplorerHelper =
                 Some(unbox<Browser.Types.Element> parentElement)
         else
             Some(unbox<Browser.Types.Element> targetObj)
-
-    let private copyPathToClipboard (path: string) =
-        promise {
-            try
-                let windowObj: obj = Browser.Dom.window
-                do! windowObj?navigator?clipboard?writeText (path)
-            with ex ->
-                Browser.Dom.console.warn ($"Could not copy file path: {path}", ex)
-        }
-        |> Promise.start
 
     let private defaultContextMenuItems
         (item: FileItem)
@@ -57,7 +48,17 @@ module private FileExplorerHelper =
                     ContextMenuItem.create
                         "Copy Path"
                         "swt:fluent--copy-24-regular"
-                        (fun () -> copyPathToClipboard path)
+                        (fun () ->
+                            promise {
+                                try
+                                    do!
+                                        Swate.Components.JsBindings.Clipboard.Clipboard.navigator.clipboard.writeText
+                                            path
+                                with ex ->
+                                    Browser.Dom.console.warn ($"Could not copy file path: {path}", ex)
+                            }
+                            |> Promise.start
+                        )
                 | None -> ()
 
                 match getCopyRelativePath item with
@@ -65,7 +66,17 @@ module private FileExplorerHelper =
                     ContextMenuItem.create
                         "Copy Relative Path"
                         "swt:fluent--copy-24-regular"
-                        (fun () -> copyPathToClipboard path)
+                        (fun () ->
+                            promise {
+                                try
+                                    do!
+                                        Swate.Components.JsBindings.Clipboard.Clipboard.navigator.clipboard.writeText
+                                            path
+                                with ex ->
+                                    Browser.Dom.console.warn ($"Could not copy file path: {path}", ex)
+                            }
+                            |> Promise.start
+                        )
                 | None -> ()
             | None -> ()
 
@@ -165,7 +176,10 @@ type FileExplorer =
 
         let scrollContainerClassName =
             if truncateOverflowingItemNames then
-                "swt:w-full swt:min-w-0 swt:overflow-x-hidden"
+                if delegateHorizontalScrollToParent then
+                    "swt:w-full swt:min-w-0 swt:overflow-x-clip"
+                else
+                    "swt:w-full swt:min-w-0 swt:overflow-x-hidden"
             elif delegateHorizontalScrollToParent then
                 "swt:w-max swt:min-w-full"
             else
@@ -267,8 +281,9 @@ type FileExplorer =
             )
 
         let selectedPathIds = model.SelectedPath |> List.map _.Id |> Set.ofList
+        let stickyParentRowHeightPx = 32
 
-        let rec renderItem item =
+        let rec renderItem depth item =
             let isSelected = model.SelectedId = Some item.Id
             let isInSelectedPath = selectedPathIds.Contains item.Id
             let isHighlighted = isSelected || isInSelectedPath
@@ -303,10 +318,16 @@ type FileExplorer =
                             Some(
                                 Html.ul [
                                     prop.className "swt:ml-4"
-                                    prop.children (children |> List.map renderItem)
+                                    prop.children (children |> List.map (renderItem (depth + 1)))
                                 ]
                             )
                         | None -> None
+                    else
+                        None
+
+                let stickyTopOffset =
+                    if delegateHorizontalScrollToParent && childrenTree.IsSome then
+                        Some(depth * stickyParentRowHeightPx)
                     else
                         None
 
@@ -330,6 +351,7 @@ type FileExplorer =
                     ?onDeleteItem = onDeleteItem,
                     canDeleteItem = canDeleteItem,
                     ?statusAction = statusAction,
+                    ?stickyTopOffset = stickyTopOffset,
                     ?children = childrenTree
                 )
             else
@@ -356,7 +378,7 @@ type FileExplorer =
                         Html.ul [
                             prop.testId "file-explorer-container"
                             prop.className listClassName
-                            prop.children (model.Items |> List.map renderItem)
+                            prop.children (model.Items |> List.map (renderItem 0))
                         ]
                     ]
                 ]

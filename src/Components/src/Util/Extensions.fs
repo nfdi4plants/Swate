@@ -76,9 +76,6 @@ module kbdEventCode =
 
     let key (key: string) = key.ToUpper() |> sprintf "Key%s"
 
-open Fable.Core
-open Fable.Core.JsInterop
-
 [<Fable.Core.Global>]
 type console =
     [<Emit("console.log($0)")>]
@@ -89,18 +86,3 @@ type console =
 
     [<Emit("console.error($0)")>]
     static member inline error e = jsNative
-
-[<Erase>]
-type Clipboard =
-    abstract member writeText: string -> JS.Promise<unit>
-    abstract member readText: unit -> JS.Promise<string>
-
-[<Erase>]
-type Navigator =
-    abstract member clipboard: Clipboard
-
-[<AutoOpen>]
-module GlobalBindings =
-
-    [<Emit("navigator")>]
-    let navigator: Navigator = jsNative

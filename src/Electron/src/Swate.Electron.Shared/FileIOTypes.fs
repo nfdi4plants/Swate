@@ -93,6 +93,12 @@ type MovePathRequest = {
     overwrite: bool
 }
 
+type CopyFileSystemItemRequest = {
+    sourceRelativePath: string
+    targetRelativePath: string
+    overwrite: bool
+}
+
 [<RequireQualifiedAccess>]
 type FileSystemItemKind =
     | File
@@ -102,4 +108,15 @@ type CreateFileSystemItemRequest = {
     parentPath: string
     name: string
     kind: FileSystemItemKind
+}
+
+type PickExternalFilePathsRequest = {
+    filterExtensions: string[] option
+    allowMultiple: bool option
+}
+
+type CopyExternalFileRequest = {
+    sourceAbsolutePath: string
+    targetRelativePath: string
+    overwrite: bool
 }

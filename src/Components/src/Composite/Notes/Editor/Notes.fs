@@ -4,6 +4,7 @@ open Fable.Core
 open Feliz
 open Browser.Dom
 open Swate.Components.Shared
+open Swate.Components.Composite.MarkdownText.Plugins
 open Swate.Components.Primitive.BaseModal
 
 
@@ -13,18 +14,23 @@ type Notes =
     [<ReactComponent>]
     static member private ExistingTargetModal
         (
-            isOpen: bool,
             close: unit -> unit,
-            selectedTarget: ExistingTargetRef option,
-            setSelectedTarget: ExistingTargetRef option -> unit,
             availableTargets: ResizeArray<ExistingTargetRef>,
             isSubmitting: bool,
             error: string option,
-            submit: unit -> unit
+            submit: ExistingTargetRef -> unit
         ) =
 
+        let selectedTarget, setSelectedTarget =
+            React.useState<ExistingTargetRef option> None
+
+        let currentSelectedTarget =
+            selectedTarget
+            |> Option.bind (fun target -> availableTargets |> Seq.tryFind ((=) target))
+            |> Option.orElseWith (fun () -> availableTargets |> Seq.tryHead)
+
         let createInExistingText =
-            match selectedTarget |> Option.map _.Kind with
+            match currentSelectedTarget |> Option.map _.Kind with
             | Some NotesTargetKind.Study -> "Create in Study"
             | Some NotesTargetKind.Assay -> "Create in Assay"
             | None -> "Create in Existing Target"
@@ -47,23 +53,23 @@ type Notes =
                         prop.testId "notes-create-existing-button"
                         prop.className [
                             "swt:btn swt:btn-primary"
-                            if isSubmitting || selectedTarget.IsNone then
+                            if isSubmitting || currentSelectedTarget.IsNone then
                                 "swt:btn-disabled"
                         ]
-                        prop.disabled (isSubmitting || selectedTarget.IsNone)
-                        prop.onClick (fun _ -> submit ())
+                        prop.disabled (isSubmitting || currentSelectedTarget.IsNone)
+                        prop.onClick (fun _ -> currentSelectedTarget |> Option.iter submit)
                         prop.text createInExistingText
                     ]
                 ]
             ]
 
         BaseModal.Modal(
-            isOpen = isOpen,
+            isOpen = true,
             setIsOpen = setClose,
             header = Html.text "Existing Target",
             children =
                 React.Fragment [
-                    TargetSelector.Main(selectedTarget, setSelectedTarget, availableTargets, isSubmitting)
+                    TargetSelector.Main(currentSelectedTarget, setSelectedTarget, availableTargets, isSubmitting)
                     match error with
                     | Some message -> Html.span [ prop.className "swt:text-error"; prop.text message ]
                     | None -> Html.none
@@ -80,7 +86,8 @@ type Notes =
             uiState: NotesUiState,
             setUiState: NotesUiState -> unit,
             onSubmit: NotesSubmitPayload -> unit,
-            availableExistingTargets: ResizeArray<ExistingTargetRef>
+            availableExistingTargets: ResizeArray<ExistingTargetRef>,
+            ?filePickerAdapter: MarkdownFilePickerAdapter
         ) =
 
         let setError (value: string option) =
@@ -112,38 +119,23 @@ type Notes =
                     Error = None
             }
 
-        let openExistingTargetSelector () =
-            let selectedTarget =
-                draft.SelectedExistingTarget
-                |> Option.bind (fun targetRef -> availableExistingTargets |> Seq.tryFind ((=) targetRef))
-                |> Option.orElseWith (fun () -> availableExistingTargets |> Seq.tryHead)
+        let openExistingTargetSelector () = setExistingTargetSelector true
 
-            if draft.SelectedExistingTarget <> selectedTarget then
-                setDraft {
-                    draft with
-                        SelectedExistingTarget = selectedTarget
-                }
-
-            setExistingTargetSelector true
-
-        let submitToExisting () =
+        let submitToExisting targetRef =
             if Validation.isRequiredDataValid draft |> not then
                 setError (Some "Please enter a Title and a Date Created value before submitting.")
             else
-                match draft.SelectedExistingTarget with
-                | None -> setError (Some "Select a Study or Assay target first.")
-                | Some targetRef ->
-                    match draft.DateCreated with
-                    | None -> setError (Some "Date Created is required.")
-                    | Some dateCreated ->
-                        match NoteConversion.resolveProtocolName draft with
-                        | None -> setError (Some "Title is invalid for protocol naming. Choose a different title.")
-                        | Some protocolName ->
-                            match NoteConversion.mkExistingTargetRelativePath targetRef protocolName with
-                            | None -> setError (Some "Could not resolve a safe target path.")
-                            | Some relativePath ->
-                                setExistingTargetSelector false
-                                createPayload (NotesTarget.ExistingTarget targetRef) relativePath
+                match draft.DateCreated with
+                | None -> setError (Some "Date Created is required.")
+                | Some _ ->
+                    match NoteConversion.resolveProtocolName draft with
+                    | None -> setError (Some "Title is invalid for protocol naming. Choose a different title.")
+                    | Some protocolName ->
+                        match NoteConversion.mkExistingTargetRelativePath targetRef protocolName with
+                        | None -> setError (Some "Could not resolve a safe target path.")
+                        | Some relativePath ->
+                            setExistingTargetSelector false
+                            createPayload (NotesTarget.ExistingTarget targetRef) relativePath
 
         let submitNewRootNote () =
             if Validation.isRequiredDataValid draft |> not then
@@ -170,23 +162,16 @@ type Notes =
                             prop.className "swt:text-3xl swt:font-bold swt:text-primary"
                             prop.text "Notes"
                         ]
-                        NoteFormFields.Main(draft, setDraft)
+                        NoteFormFields.Main(draft, setDraft, filePickerAdapter)
                         Actions.Main(uiState.IsSubmitting, openExistingTargetSelector, submitNewRootNote, uiState.Error)
-                        Notes.ExistingTargetModal(
-                            uiState.ShowExistingTargetSelector,
-                            (fun () -> setExistingTargetSelector false),
-                            draft.SelectedExistingTarget,
-                            (fun target ->
-                                setDraft {
-                                    draft with
-                                        SelectedExistingTarget = target
-                                }
-                            ),
-                            availableExistingTargets,
-                            uiState.IsSubmitting,
-                            uiState.Error,
-                            submitToExisting
-                        )
+                        if uiState.ShowExistingTargetSelector then
+                            Notes.ExistingTargetModal(
+                                (fun () -> setExistingTargetSelector false),
+                                availableExistingTargets,
+                                uiState.IsSubmitting,
+                                uiState.Error,
+                                submitToExisting
+                            )
                     ]
                 ]
             ]

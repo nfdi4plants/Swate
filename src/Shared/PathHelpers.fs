@@ -155,7 +155,7 @@ module ArcEntityPathRules =
         | OtherPath
 
     let private protectedDeleteTargetNames = [ ".gitattributes"; ".gitkeep"; "readme.md" ]
-    let private protectedRenameRootFolderNames = [ "notes" ]
+    let private protectedRootFolderNames = [ "notes" ]
     let private disallowedGenericPathSegments = [ ".git" ]
 
     let private normalizeRelativePath (path: string) =
@@ -178,7 +178,7 @@ module ArcEntityPathRules =
         | AddZone.Workflows -> ARCtrl.ArcPathHelper.WorkflowFileName
         | AddZone.Runs -> ARCtrl.ArcPathHelper.RunFileName
 
-    let private nativeEntityChildFolderNames =
+    let nativeEntityChildFolderNames =
         function
         | AddZone.Studies -> [
             ARCtrl.ArcPathHelper.StudiesProtocolsFolderName
@@ -274,6 +274,11 @@ module ArcEntityPathRules =
 
         if String.IsNullOrWhiteSpace normalizedRelativePath then
             DeletePathClassification.DisallowedTarget normalizedRelativePath
+        elif
+            segments.Length = 1
+            && PathHelpers.pathMatchesAny protectedRootFolderNames segments.[0]
+        then
+            DeletePathClassification.ProtectedTarget normalizedRelativePath
         elif isProtectedTarget normalizedRelativePath structuralPath then
             DeletePathClassification.ProtectedTarget normalizedRelativePath
         else
@@ -401,7 +406,7 @@ module ArcEntityPathRules =
             else
                 match segments with
                 | [| singleSegment |] ->
-                    if PathHelpers.pathMatchesAny protectedRenameRootFolderNames singleSegment then
+                    if PathHelpers.pathMatchesAny protectedRootFolderNames singleSegment then
                         RenamePathClassification.ProtectedTarget normalizedRelativePath
                     else
                         match tryParseZone singleSegment with
