@@ -99,7 +99,7 @@ let main args =
             let user =
                 otherArgs
                 |> List.tryFind (fun x -> x.StartsWith "--user=")
-                |> Option.map (fun x -> x.Substring 7)
+                |> Option.map (fun x -> x.Trim().Replace("--user=", ""))
 
             if user.IsNone then
                 printRedfn "No docker user set! Please pass user in the format --user=yourusername"
@@ -116,17 +116,20 @@ let main args =
             printGreenfn ("Release electron-web!")
             0
         | "electron-bin" ->
+
+            printfn "args: %A" otherArgs
+
             let arch =
                 otherArgs
                 |> List.tryFind (fun x -> x.StartsWith "--arch=")
-                |> Option.map (fun x -> x.Substring 7)
-                |> Option.defaultWith (fun () ->
-                    printRedfn "No --arch provided for electron-bin target!"
-                    exit 1
-                )
+                |> Option.map (fun x -> x.Trim().Replace("--arch=", ""))
 
-            Release.electronBinaries arch
-            printGreenfn "Release electron-bin for arch %s!" arch
+            if arch.IsNone then
+                printRedfn "No --arch provided for electron-bin target!"
+                exit 1
+
+            Release.electronBinaries arch.Value
+            printGreenfn "Release electron-bin for arch %s!" arch.Value
             0
         | "storybook" ->
             printfn "Starting Storybook release!"

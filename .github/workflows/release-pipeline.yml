@@ -108,6 +108,13 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false  # never use caching in release builds
 
+      # Verify npm trusted publishing
+      - name: Check npm auth
+        run: |
+          npm --version
+          npm config get registry
+          npm whoami
+
       # Install npm dependencies
       - name: Install root dependencies
         run: npm i

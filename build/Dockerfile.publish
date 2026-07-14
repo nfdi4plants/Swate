@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:8.0 as build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 as build
 
 # Install node
 ARG NODE_MAJOR=20
@@ -15,7 +15,7 @@ RUN dotnet tool restore
 RUN dotnet run --project ./build/Build.fsproj bundle
 
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine
 
 COPY --from=build /workspace/deploy /app
 WORKDIR /app
