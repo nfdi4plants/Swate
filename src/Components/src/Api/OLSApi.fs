@@ -43,47 +43,15 @@ module OLSTypes =
         abstract source: string
 
     type Collection =
-        abstract id: string option
+        abstract id: string
         abstract label: string
         abstract isPublic: bool
-        abstract terminologies: Terminology[] option
+        abstract terminologies: Terminology[]
 
-module private OLSApiHelper =
+module private OLSApiTypes =
 
     type HierarchyApi =
         abstract elements: OLSTypes.Term[] option
-
-    type HierarchyResource = {
-        Iri: string
-        Ontology: string
-        Database: string
-    }
-
-    let tryCreateHierarchyResource (parentOboId: string) (collection: OLSTypes.Collection) =
-        match parentOboId.Split ':' with
-        | [| prefix; accession |] when prefix.Length > 0 && accession.Length > 0 ->
-            collection.terminologies
-            |> Option.defaultValue [||]
-            |> Array.tryFind (fun terminology ->
-                System.String.Equals(terminology.uri, prefix, System.StringComparison.OrdinalIgnoreCase)
-                || System.String.Equals(terminology.label, prefix, System.StringComparison.OrdinalIgnoreCase)
-            )
-            |> Option.map (fun terminology ->
-                let shortForm = $"{prefix}_{accession}"
-
-                let iri =
-                    if prefix.Equals("DPBO", System.StringComparison.OrdinalIgnoreCase) then
-                        $"https://purl.org/nfdi4plants/ontology/dpbo/{shortForm}"
-                    else
-                        $"http://purl.obolibrary.org/obo/{shortForm}"
-
-                {
-                    Iri = iri
-                    Ontology = terminology.uri
-                    Database = terminology.source
-                }
-            )
-        | _ -> None
 
 [<AttachMembers>]
 type OLSApi =
@@ -100,27 +68,54 @@ type OLSApi =
         [ 1..encodingCount ]
         |> List.fold (fun encoded _ -> JS.encodeURIComponent encoded) iri
 
-    static member private searchHierarchy(q: string, parentOboId: string, collection: OLSTypes.Collection, ?rows: int) =
-        match OLSApiHelper.tryCreateHierarchyResource parentOboId collection with
-        | None -> Promise.lift None
-        | Some resource ->
+    static member private resolveParent(parentOboId: string, collection: OLSTypes.Collection) =
+        OLSApi.search (parentOboId, 1, collection = collection.id)
+        |> Promise.map (fun response ->
+            response
+            |> Option.bind (fun response ->
+                response
+                |> OLSTypes.searchTerms
+                |> Array.tryFind (fun term -> term.obo_id = Some parentOboId)
+                |> Option.bind (fun term ->
+                    match
+                        term.iri |> Option.orElse term.URI, term.ontology_name |> Option.orElse term.ontologyId
+                    with
+                    | Some iri, Some ontology ->
+                        let sameOntology value =
+                            System.String.Equals(value, ontology, System.StringComparison.OrdinalIgnoreCase)
+
+                        collection.terminologies
+                        |> Array.tryFind (fun terminology ->
+                            sameOntology terminology.uri || sameOntology terminology.label
+                        )
+                        |> Option.map (fun terminology -> iri, terminology)
+                    | _ -> None
+                )
+            )
+        )
+
+    static member private searchHierarchy(q: string, parentOboId: string, collection: OLSTypes.Collection, ?rows: int) = promise {
+        match! OLSApi.resolveParent (parentOboId, collection) with
+        | Some(parentIri, terminology) ->
             let queryParams: (string * obj) list = [
-                "database", resource.Database
+                "database", terminology.source
                 "page", 0
                 "size", (defaultArg rows 10 |> box)
                 if q <> "*" then
                     "search", q
-                if collection.id.IsSome then
-                    "collectionId", collection.id.Value
+                    "collectionId", collection.id
             ]
 
-            let encodedParent = OLSApi.encodeClassPath (resource.Iri, resource.Database)
+            let encodedParent = OLSApi.encodeClassPath (parentIri, terminology.source)
 
-            appendQueryParams
-                $"{OLSTypes.BaseAPIUrl}/ols/api/v2/ontologies/{JS.encodeURIComponent resource.Ontology}/classes/{encodedParent}/children"
-                queryParams
-            |> getJson<OLSApiHelper.HierarchyApi>
-            |> Promise.map (fun response -> response.elements |> Option.defaultValue [||] |> Some)
+            return!
+                appendQueryParams
+                    $"{OLSTypes.BaseAPIUrl}/ols/api/v2/ontologies/{JS.encodeURIComponent terminology.uri}/classes/{encodedParent}/children"
+                    queryParams
+                |> getJson<OLSApiTypes.HierarchyApi>
+                |> Promise.map (fun response -> response.elements |> Option.defaultValue [||] |> Some)
+        | None -> return None
+    }
 
     static member search(q: string, ?rows: int, ?collection: string) =
         let queryParams: (string * obj) list = [

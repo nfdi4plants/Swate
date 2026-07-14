@@ -18,8 +18,18 @@ const TIB_COLLECTIONS = {
 };
 
 const OLS_COLLECTIONS = [
-  { id: "dataplant-id", label: "DataPLANT Project", isPublic: true },
-  { id: "nfdi4plants-id", label: "NFDI4Plants", isPublic: true },
+  {
+    id: "dataplant-id",
+    label: "DataPLANT Project",
+    isPublic: true,
+    terminologies: [{ uri: "dpbo", label: "DPBO", source: "tib" }],
+  },
+  {
+    id: "nfdi4plants-id",
+    label: "NFDI4Plants",
+    isPublic: true,
+    terminologies: [{ uri: "po", label: "PO", source: "tib" }],
+  },
 ];
 
 const meta = {

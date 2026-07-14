@@ -105,28 +105,24 @@ module private TermSearchConfigProviderHelper =
         |> Seq.map createTIBCollection
         |> QueryCollection.create
 
-    let private tryCreateOLSCollection (collection: Api.OLSApi.OLSTypes.Collection) =
-        match collection.id with
-        | Some collectionId when not (System.String.IsNullOrWhiteSpace collection.label) ->
-            Some {
-                Key = create TermSearchSource.OLS collection.label
-                TermSearch =
-                    fun query ->
-                        Api.OLSApi.OLSApi.defaultSearch (query, DEFAULT_SEARCH_ROWS, collectionId)
-                        |> mapOLSSearchResults DEFAULT_SEARCH_ROWS
-                ParentSearch =
-                    fun (parent, query) ->
-                        Api.OLSApi.OLSApi.searchChildrenOf (query, parent, collection, DEFAULT_SEARCH_ROWS)
-                        |> mapOLSHierarchyResults DEFAULT_SEARCH_ROWS
-                AllChildrenSearch =
-                    fun parent ->
-                        Api.OLSApi.OLSApi.searchAllChildrenOf (parent, collection, ALL_CHILDREN_SEARCH_ROWS)
-                        |> mapOLSHierarchyResults ALL_CHILDREN_SEARCH_ROWS
-            }
-        | _ -> None
+    let private createOLSCollection (collection: Api.OLSApi.OLSTypes.Collection) = {
+        Key = create TermSearchSource.OLS collection.label
+        TermSearch =
+            fun query ->
+                Api.OLSApi.OLSApi.defaultSearch (query, DEFAULT_SEARCH_ROWS, collection.id)
+                |> mapOLSSearchResults DEFAULT_SEARCH_ROWS
+        ParentSearch =
+            fun (parent, query) ->
+                Api.OLSApi.OLSApi.searchChildrenOf (query, parent, collection, DEFAULT_SEARCH_ROWS)
+                |> mapOLSHierarchyResults DEFAULT_SEARCH_ROWS
+        AllChildrenSearch =
+            fun parent ->
+                Api.OLSApi.OLSApi.searchAllChildrenOf (parent, collection, ALL_CHILDREN_SEARCH_ROWS)
+                |> mapOLSHierarchyResults ALL_CHILDREN_SEARCH_ROWS
+    }
 
     let mkOLSQueries collections =
-        collections |> Seq.choose tryCreateOLSCollection |> QueryCollection.create
+        collections |> Seq.map createOLSCollection |> QueryCollection.create
 
     [<Hook>]
     let useCollectionQueries enabled source initialQueries request toQueries =
