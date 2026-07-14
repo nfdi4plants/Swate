@@ -256,3 +256,89 @@ let annotationFromValue
 
     applyValue value unit annotation
     annotation
+
+// ── Graph mutation primitives ───────────────────────────────────────────────
+
+/// Builds a fresh `Sample`/`Data` node from a set's final editor name.
+/// ProcessCore canonicalizes by key when the node is later added to a
+/// process via `AddInput`/`AddOutput`, so a freshly constructed node
+/// converges onto any already-registered node with the same key.
+let nodeFromSet (set: ProvenanceSet) : Result<IONode, ProcessCoreWritebackError> =
+    let additionalType =
+        if
+            System.String.IsNullOrWhiteSpace set.Header.Text
+            || set.Header.Text = set.Header.Kind.Label
+        then
+            None
+        else
+            Some set.Header.Text
+
+    if set.Header.Kind.Id = ProcessCoreKinds.sampleEndpoint.Id then
+        Ok(SampleNode(Sample(set.Name, ?additionalType = additionalType)))
+    elif set.Header.Kind.Id = ProcessCoreKinds.dataEndpoint.Id then
+        let path, selector =
+            match set.Name.LastIndexOf '#' with
+            | -1 -> set.Name, None
+            | index -> set.Name.Substring(0, index), Some(set.Name.Substring(index + 1))
+
+        Ok(DataNode(Data(path, ?selector = selector, ?additionalType = additionalType)))
+    else
+        Error(ProcessCoreWritebackError.UnsupportedEndpointKind set.Header.Kind.Id)
+
+/// A distinct container so a connection-targeted component created on one
+/// split row never leaks into sibling rows, while sharing the same
+/// pre-existing component/parameter annotation references keeps updates to
+/// those pre-existing values reaching every cloned occurrence.
+let cloneRecipeShell (recipe: Recipe) : Recipe =
+    let clone =
+        Recipe(
+            ?name = recipe.Name,
+            ?description = recipe.Description,
+            ?version = recipe.Version,
+            ?url = recipe.Url,
+            ?intendedUse = recipe.IntendedUse,
+            ?additionalType = recipe.AdditionalType
+        )
+
+    for formalParameter in recipe.Parameters do
+        clone.AddParameter formalParameter
+
+    for recipeComponent in recipe.Components do
+        clone.AddComponent recipeComponent
+
+    for additionalProperty in recipe.AdditionalProperty do
+        clone.AddAdditionalProperty additionalProperty
+
+    clone
+
+let cloneProcessShell (proc: Process) : Process =
+    let clone = Process(proc.Name, ?additionalType = proc.AdditionalType)
+
+    match proc.ExecutesProtocol with
+    | Some recipe -> clone.ExecutesProtocol <- Some(cloneRecipeShell recipe)
+    | None -> ()
+
+    for parameterValue in proc.ParameterValue do
+        clone.AddParameterValue parameterValue
+
+    clone
+
+/// Never edits the backing input/output arrays directly; the public
+/// `RemoveInput`/`RemoveOutput`/`AddInput`/`AddOutput` APIs maintain
+/// back-edges and canonicalization.
+let replaceProcessIO (inputs: IONode list) (outputs: IONode list) (proc: Process) : unit =
+    for node in proc.Inputs |> Seq.toList do
+        proc.RemoveInput node
+
+    for node in proc.Outputs |> Seq.toList do
+        proc.RemoveOutput node
+
+    for node in inputs do
+        proc.AddInput node
+
+    for node in outputs do
+        proc.AddOutput node
+
+let addProcess (dataset: Dataset) (proc: Process) : unit = dataset.AddProcess proc
+
+let removeProcess (dataset: Dataset) (proc: Process) : unit = dataset.RemoveProcess proc
