@@ -5,10 +5,10 @@ open Swate.Components.Shared.Extensions
 open Fable.Core
 open Feliz
 
-[<RequireQualifiedAccess; StringEnum(CaseRules.None)>]
+[<RequireQualifiedAccess>]
 type TermSearchSource =
-    | TIB
-    | OLS
+    | [<CompiledName("TIB")>] TIB
+    | [<CompiledName("OLS")>] OLS
 
     member this.DefaultKey =
         match this with

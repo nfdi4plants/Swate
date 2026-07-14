@@ -62,9 +62,6 @@ module private TermSearchConfigProviderHelper =
     let TIB_DATAPLANT_COLLECTION_KEY = "DataPLANT"
 
     [<Literal>]
-    let OLS_DATAPLANT_COLLECTION_KEY = "DataPLANT Project"
-
-    [<Literal>]
     let LOCAL_STORAGE_KEY = "swate-termsearchconfig-ctx-v4"
 
     [<Literal>]
