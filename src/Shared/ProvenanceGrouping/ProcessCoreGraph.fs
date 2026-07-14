@@ -94,7 +94,7 @@ let private nodeAdditionalType (node: IONode) =
     | SampleNode sample -> sample.AdditionalType
     | DataNode data -> data.AdditionalType
 
-let private nodeAdditionalProperties (node: IONode) : Annotation seq =
+let nodeAdditionalProperties (node: IONode) : Annotation seq =
     match node with
     | SampleNode sample -> sample.AdditionalProperty :> seq<Annotation>
     | DataNode data -> data.AdditionalProperty :> seq<Annotation>
@@ -159,6 +159,29 @@ let nodeDisplayName (node: IONode) =
     match node with
     | SampleNode sample -> sample.Name
     | DataNode data -> data.Name
+
+/// `ValueTAN` present means the value is ontology-backed. ProcessCore has no
+/// separate ontology-source field, so converted terms always use
+/// `TermSource = None`; writeback stores only the TAN.
+let valueFromAnnotation (annotation: Annotation) : ProvenanceValue =
+    match annotation.ValueTAN with
+    | Some accession ->
+        ProvenanceValue.Term {
+            Name = annotation.ValueText
+            TermSource = None
+            TermAccession = Some accession
+        }
+    | None -> ProvenanceValue.Text annotation.ValueText
+
+let unitFromAnnotation (annotation: Annotation) : ProvenanceTerm option =
+    match annotation.Unit with
+    | Some unitText ->
+        Some {
+            Name = unitText
+            TermSource = None
+            TermAccession = annotation.UnitTAN
+        }
+    | None -> None
 
 let sourceRef (location: ProcessCoreTableLocation) : ProvenanceSourceRef = {
     Id = String.concat "/" (location.DatasetPath @ [ location.TableName ])

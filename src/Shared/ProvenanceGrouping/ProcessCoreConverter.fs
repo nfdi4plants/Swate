@@ -181,6 +181,438 @@ let private partitionBySide
         | None -> false
     )
 
+// ── Annotation normalization ────────────────────────────────────────────────
+
+let private blankAnnotationName (annotation: Annotation) =
+    System.String.IsNullOrWhiteSpace annotation.Name
+
+let private categoryFromAnnotation (annotation: Annotation) : ProvenanceTerm = {
+    Name = annotation.Name
+    TermSource = None
+    TermAccession = annotation.NameTAN
+}
+
+let private kindForNodeAnnotation (annotation: Annotation) =
+    match annotation.AdditionalType |> Option.map (fun value -> value.ToLowerInvariant()) with
+    | Some "characteristicvalue" -> ProcessCoreKinds.characteristic
+    | Some "factorvalue" -> ProcessCoreKinds.factor
+    | Some "parametervalue" -> ProcessCoreKinds.parameter
+    | Some "component" -> ProcessCoreKinds.componentKind
+    | _ -> ProcessCoreKinds.additionalProperty
+
+let private processLocationKey (location: ProcessCoreProcessLocation) =
+    let path = String.concat "/" location.DatasetPath
+    $"{path}:{location.ProcessIndex}"
+
+let private nonBlankSetIds (source: ProvenanceSourceRef) (side: ProvenanceSide) (nodes: IONode seq) =
+    nodes
+    |> Seq.filter (fun node -> not (isBlankEndpoint node))
+    |> Seq.map (fun node -> setId source side (endpointHeader side node) node)
+    |> Seq.distinct
+    |> Seq.toList
+
+/// One not-yet-collapsed converted property occurrence. Exact-duplicate
+/// candidates (same header/value/unit/anchor context/targets) collapse into
+/// one `ProvenancePropertyValue` while every source `Location` is retained
+/// in the writeback index.
+type private PropertyCandidate = {
+    Header: ProvenancePropertyHeader
+    Value: ProvenanceValue
+    Unit: ProvenanceTerm option
+    Anchor: ProvenanceWritebackAnchor
+    TargetInputSetIds: ProvenanceSetId list
+    TargetOutputSetIds: ProvenanceSetId list
+    Location: ProcessCoreAnnotationLocation
+}
+
+let private collectPropertyCandidates
+    (source: ProvenanceSourceRef)
+    (datasetPath: string list)
+    (selected: (int * Process) list)
+    : PropertyCandidate list * ProcessCoreConversionWarning list =
+
+    let mutable candidates: PropertyCandidate list = []
+    let mutable warnings: ProcessCoreConversionWarning list = []
+
+    let addNodeAnnotations
+        (procLocation: ProcessCoreProcessLocation)
+        (side: ProvenanceSide)
+        (node: IONode)
+        (targetSetId: ProvenanceSetId)
+        =
+        let owner = ProcessCoreAnnotationOwner.NodeAdditionalProperty(nodeLocation node)
+
+        node
+        |> nodeAdditionalProperties
+        |> Seq.iteri (fun position annotation ->
+            if blankAnnotationName annotation then
+                warnings <- ProcessCoreConversionWarning.BlankAnnotationName(owner, position) :: warnings
+            else
+                let header = {
+                    Kind = kindForNodeAnnotation annotation
+                    Category = categoryFromAnnotation annotation
+                }
+
+                let anchor = {
+                    Source = source
+                    ProcessId = Some(processId procLocation)
+                    ProcessName = Some procLocation.ExpectedName
+                    Header = header
+                    InputNames =
+                        if side = ProvenanceSide.Input then
+                            [ nodeDisplayName node ]
+                        else
+                            []
+                    OutputNames =
+                        if side = ProvenanceSide.Output then
+                            [ nodeDisplayName node ]
+                        else
+                            []
+                }
+
+                let location = {
+                    Owner = owner
+                    Position = position
+                    Fingerprint = annotationFingerprint annotation
+                }
+
+                candidates <-
+                    {
+                        Header = header
+                        Value = valueFromAnnotation annotation
+                        Unit = unitFromAnnotation annotation
+                        Anchor = anchor
+                        TargetInputSetIds = if side = ProvenanceSide.Input then [ targetSetId ] else []
+                        TargetOutputSetIds = if side = ProvenanceSide.Output then [ targetSetId ] else []
+                        Location = location
+                    }
+                    :: candidates
+        )
+
+    let addProcessLevelAnnotations
+        (owner: ProcessCoreAnnotationOwner)
+        (procLocation: ProcessCoreProcessLocation)
+        (kind: ProvenanceKind)
+        (targetInputSetIds: ProvenanceSetId list)
+        (targetOutputSetIds: ProvenanceSetId list)
+        (annotations: Annotation seq)
+        =
+        annotations
+        |> Seq.iteri (fun position annotation ->
+            if blankAnnotationName annotation then
+                warnings <- ProcessCoreConversionWarning.BlankAnnotationName(owner, position) :: warnings
+            elif targetInputSetIds.IsEmpty && targetOutputSetIds.IsEmpty then
+                warnings <-
+                    ProcessCoreConversionWarning.PropertyWithoutEndpoint(procLocation, annotation.Name)
+                    :: warnings
+            else
+                let header = {
+                    Kind = kind
+                    Category = categoryFromAnnotation annotation
+                }
+
+                let anchor = {
+                    Source = source
+                    ProcessId = Some(processId procLocation)
+                    ProcessName = Some procLocation.ExpectedName
+                    Header = header
+                    InputNames = []
+                    OutputNames = []
+                }
+
+                let location = {
+                    Owner = owner
+                    Position = position
+                    Fingerprint = annotationFingerprint annotation
+                }
+
+                candidates <-
+                    {
+                        Header = header
+                        Value = valueFromAnnotation annotation
+                        Unit = unitFromAnnotation annotation
+                        Anchor = anchor
+                        TargetInputSetIds = targetInputSetIds
+                        TargetOutputSetIds = targetOutputSetIds
+                        Location = location
+                    }
+                    :: candidates
+        )
+
+    for processIndex, proc in selected do
+        let procLocation = processLocation datasetPath processIndex proc
+
+        for position in 0 .. proc.Inputs.Count - 1 do
+            let node = proc.Inputs.[position]
+
+            if not (isBlankEndpoint node) then
+                let id =
+                    setId source ProvenanceSide.Input (endpointHeader ProvenanceSide.Input node) node
+
+                addNodeAnnotations procLocation ProvenanceSide.Input node id
+
+        for position in 0 .. proc.Outputs.Count - 1 do
+            let node = proc.Outputs.[position]
+
+            if not (isBlankEndpoint node) then
+                let id =
+                    setId source ProvenanceSide.Output (endpointHeader ProvenanceSide.Output node) node
+
+                addNodeAnnotations procLocation ProvenanceSide.Output node id
+
+        let targetInputSetIds = nonBlankSetIds source ProvenanceSide.Input proc.Inputs
+        let targetOutputSetIds = nonBlankSetIds source ProvenanceSide.Output proc.Outputs
+
+        addProcessLevelAnnotations
+            (ProcessCoreAnnotationOwner.ProcessParameterValue procLocation)
+            procLocation
+            ProcessCoreKinds.parameter
+            targetInputSetIds
+            targetOutputSetIds
+            proc.ParameterValue
+
+        match proc.ExecutesProtocol with
+        | Some recipe ->
+            addProcessLevelAnnotations
+                (ProcessCoreAnnotationOwner.RecipeComponent procLocation)
+                procLocation
+                ProcessCoreKinds.componentKind
+                targetInputSetIds
+                targetOutputSetIds
+                recipe.Components
+        | None -> ()
+
+    List.rev candidates, List.rev warnings
+
+/// Walks upstream from one selected input node, gathering non-selected
+/// producer processes' parameters/components and their own input nodes'
+/// annotations. All collected values target the originally selected input
+/// set - the boundary node's own annotations are already collected as part
+/// of the loaded input itself and are never revisited here.
+let private walkPreviousContext
+    (source: ProvenanceSourceRef)
+    (datasetEntriesList: DatasetEntry list)
+    (selectedKeys: Set<string>)
+    (inputSetId: ProvenanceSetId)
+    (startNode: IONode)
+    : PropertyCandidate list * ProcessCoreConversionWarning list =
+
+    let mutable candidates: PropertyCandidate list = []
+    let mutable warnings: ProcessCoreConversionWarning list = []
+    let visited = System.Collections.Generic.HashSet<string>()
+
+    let addAnnotations
+        (owner: ProcessCoreAnnotationOwner)
+        (previousSource: ProvenanceSourceRef)
+        (procLocation: ProcessCoreProcessLocation)
+        (producerName: string)
+        (inputNames: string list)
+        (kindSelector: Annotation -> ProvenanceKind)
+        (annotations: Annotation seq)
+        =
+        annotations
+        |> Seq.iteri (fun position annotation ->
+            if blankAnnotationName annotation then
+                warnings <- ProcessCoreConversionWarning.BlankAnnotationName(owner, position) :: warnings
+            else
+                let header = {
+                    Kind = kindSelector annotation
+                    Category = categoryFromAnnotation annotation
+                }
+
+                let anchor = {
+                    Source = previousSource
+                    ProcessId = Some(processId procLocation)
+                    ProcessName = Some producerName
+                    Header = header
+                    InputNames = inputNames
+                    OutputNames = []
+                }
+
+                let location = {
+                    Owner = owner
+                    Position = position
+                    Fingerprint = annotationFingerprint annotation
+                }
+
+                candidates <-
+                    {
+                        Header = header
+                        Value = valueFromAnnotation annotation
+                        Unit = unitFromAnnotation annotation
+                        Anchor = anchor
+                        TargetInputSetIds = [ inputSetId ]
+                        TargetOutputSetIds = []
+                        Location = location
+                    }
+                    :: candidates
+        )
+
+    let rec walk (node: IONode) =
+        for producer in node.GetOutputOf() |> Seq.toList do
+            match producer.ProcessOf with
+            | Some ownerDataset ->
+                match
+                    datasetEntriesList
+                    |> List.tryFind (fun entry -> obj.ReferenceEquals(entry.Dataset, ownerDataset))
+                with
+                | Some entry ->
+                    match
+                        entry.Dataset.Processes
+                        |> Seq.tryFindIndex (fun candidate -> obj.ReferenceEquals(candidate, producer))
+                    with
+                    | Some processIndex ->
+                        let procLocation = processLocation entry.Path processIndex producer
+                        let key = processLocationKey procLocation
+
+                        if visited.Add key then
+                            if not (selectedKeys.Contains key) then
+                                let previousSource =
+                                    sourceRef {
+                                        DatasetPath = procLocation.DatasetPath
+                                        TableName = producer.Name
+                                    }
+
+                                addAnnotations
+                                    (ProcessCoreAnnotationOwner.ProcessParameterValue procLocation)
+                                    previousSource
+                                    procLocation
+                                    producer.Name
+                                    []
+                                    (fun _ -> ProcessCoreKinds.parameter)
+                                    producer.ParameterValue
+
+                                match producer.ExecutesProtocol with
+                                | Some recipe ->
+                                    addAnnotations
+                                        (ProcessCoreAnnotationOwner.RecipeComponent procLocation)
+                                        previousSource
+                                        procLocation
+                                        producer.Name
+                                        []
+                                        (fun _ -> ProcessCoreKinds.componentKind)
+                                        recipe.Components
+                                | None -> ()
+
+                                for upstreamInput in producer.Inputs do
+                                    addAnnotations
+                                        (ProcessCoreAnnotationOwner.NodeAdditionalProperty(nodeLocation upstreamInput))
+                                        previousSource
+                                        procLocation
+                                        producer.Name
+                                        [ nodeDisplayName upstreamInput ]
+                                        kindForNodeAnnotation
+                                        (nodeAdditionalProperties upstreamInput)
+
+                            for upstreamInput in producer.Inputs do
+                                walk upstreamInput
+                    | None -> ()
+                | None -> ()
+            | None -> ()
+
+    walk startNode
+    List.rev candidates, List.rev warnings
+
+let private collectPreviousContextCandidates
+    (arc: ARC)
+    (source: ProvenanceSourceRef)
+    (datasetPath: string list)
+    (selected: (int * Process) list)
+    : PropertyCandidate list * ProcessCoreConversionWarning list =
+
+    let entries = datasetEntries arc
+
+    let selectedKeys =
+        selected
+        |> List.map (fun (index, proc) -> processLocationKey (processLocation datasetPath index proc))
+        |> Set.ofList
+
+    let mutable candidates: PropertyCandidate list = []
+    let mutable warnings: ProcessCoreConversionWarning list = []
+
+    for _, proc in selected do
+        for position in 0 .. proc.Inputs.Count - 1 do
+            let node = proc.Inputs.[position]
+
+            if not (isBlankEndpoint node) then
+                let inputSetId =
+                    setId source ProvenanceSide.Input (endpointHeader ProvenanceSide.Input node) node
+
+                let nodeCandidates, nodeWarnings =
+                    walkPreviousContext source entries selectedKeys inputSetId node
+
+                candidates <- candidates @ nodeCandidates
+                warnings <- warnings @ nodeWarnings
+
+    candidates, warnings
+
+let private dedupKey (candidate: PropertyCandidate) =
+    candidate.Header,
+    candidate.Value,
+    candidate.Unit,
+    candidate.Anchor.Source.Id,
+    candidate.Anchor.ProcessId,
+    candidate.Anchor.ProcessName,
+    List.sort candidate.TargetInputSetIds,
+    List.sort candidate.TargetOutputSetIds
+
+let private buildPropertyValues (source: ProvenanceSourceRef) (candidates: PropertyCandidate list) =
+    let groups = candidates |> List.groupBy dedupKey
+
+    let mutable propertyValues: Map<ProvenancePropertyValueId, ProvenancePropertyValue> =
+        Map.empty
+
+    let mutable inputAttachments: Map<ProvenanceSetId, ProvenancePropertyValueId list> =
+        Map.empty
+
+    let mutable outputAttachments: Map<ProvenanceSetId, ProvenancePropertyValueId list> =
+        Map.empty
+
+    let mutable locations: Map<ProvenancePropertyValueId, ProcessCoreAnnotationLocation list> =
+        Map.empty
+
+    groups
+    |> List.iteri (fun ordinal (_, group) ->
+        let first = List.head group
+        let id = $"{source.Id}::property:{ordinal + 1}"
+
+        let propertyValue = {
+            Id = id
+            Header = first.Header
+            Value = first.Value
+            Unit = first.Unit
+            Origin = ProvenancePropertyOrigin.Real first.Anchor
+        }
+
+        propertyValues <- propertyValues |> Map.add id propertyValue
+
+        locations <-
+            locations
+            |> Map.add id (group |> List.map (fun candidate -> candidate.Location))
+
+        for targetSetId in first.TargetInputSetIds do
+            inputAttachments <-
+                inputAttachments
+                |> Map.add targetSetId (id :: (inputAttachments |> Map.tryFind targetSetId |> Option.defaultValue []))
+
+        for targetSetId in first.TargetOutputSetIds do
+            outputAttachments <-
+                outputAttachments
+                |> Map.add targetSetId (id :: (outputAttachments |> Map.tryFind targetSetId |> Option.defaultValue []))
+    )
+
+    let attach
+        (attachments: Map<ProvenanceSetId, ProvenancePropertyValueId list>)
+        (sets: Map<ProvenanceSetId, ProvenanceSet>)
+        =
+        sets
+        |> Map.map (fun id set -> {
+            set with
+                PropertyValueIds = attachments |> Map.tryFind id |> Option.defaultValue [] |> List.rev
+        })
+
+    propertyValues, locations, attach inputAttachments, attach outputAttachments
+
 let fromArc
     (location: ProcessCoreTableLocation)
     (arc: ARC)
@@ -203,19 +635,31 @@ let fromArc
             else
                 let source = sourceRef location
 
-                let sets, endpointLocations, warnings =
+                let sets, endpointLocations, endpointWarnings =
                     collectEndpoints source location.DatasetPath selected
-
-                let inputSets = partitionBySide sets endpointLocations ProvenanceSide.Input
-                let outputSets = partitionBySide sets endpointLocations ProvenanceSide.Output
 
                 let connections, connectionLocations =
                     collectConnections source location.DatasetPath selected
 
+                let propertyCandidates, propertyWarnings =
+                    collectPropertyCandidates source location.DatasetPath selected
+
+                let previousCandidates, previousWarnings =
+                    collectPreviousContextCandidates arc source location.DatasetPath selected
+
+                let propertyValues, propertyLocations, attachInputs, attachOutputs =
+                    buildPropertyValues source (propertyCandidates @ previousCandidates)
+
+                let inputSets =
+                    partitionBySide sets endpointLocations ProvenanceSide.Input |> attachInputs
+
+                let outputSets =
+                    partitionBySide sets endpointLocations ProvenanceSide.Output |> attachOutputs
+
                 let model =
                     {
                         Source = source
-                        PropertyValues = Map.empty
+                        PropertyValues = propertyValues
                         InputSets = inputSets
                         OutputSets = outputSets
                         Connections = connections
@@ -229,8 +673,8 @@ let fromArc
                         InitialSourceId = source.Id
                         ArcFingerprint = graphFingerprint arc
                         EndpointLocations = endpointLocations
-                        PropertyValueLocations = Map.empty
+                        PropertyValueLocations = propertyLocations
                         ConnectionLocations = connectionLocations
                     }
-                    Warnings = warnings
+                    Warnings = endpointWarnings @ propertyWarnings @ previousWarnings
                 }
