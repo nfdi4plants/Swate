@@ -32,6 +32,16 @@ let private createSet side header name session =
 let private connect inputId outputId session =
     Session.connectSets inputId outputId None session |> expectOk |> fst
 
+let private addLayer name selectedSets session =
+    Session.addLayer
+        {
+            Name = name
+            SelectedSets = selectedSets
+        }
+        session
+    |> expectOk
+    |> fst
+
 let private createProperty target kind category value session =
     Session.createLoadedPropertyValue
         {
@@ -909,4 +919,201 @@ let tests =
                      && annotation.AdditionalType = Some "ParameterValue"
                  ))
                 "A parameter copied to an input set must be stored on that exact node."
+
+        testCase "adds multiple new logical groups to the selected dataset in layer order"
+        <| fun _ ->
+            let fixture = basic ()
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+            let first = Session.init converted.Model |> addLayer "new-stage-one" []
+            let second = first |> addLayer "new-stage-two" []
+
+            let summary = writeBack converted.Index second fixture.Arc |> expectOk
+
+            let addedNames =
+                fixture.Dataset.Processes
+                |> Seq.map (fun proc -> proc.Name)
+                |> Seq.filter (fun name -> name.StartsWith("new-stage-"))
+                |> Seq.toList
+
+            Expect.sequenceEqual
+                addedNames
+                [ "new-stage-one"; "new-stage-two" ]
+                "Layer order must determine process-group order."
+
+            Expect.isGreaterThanOrEqual summary.AddedProcesses 2 "Each new layer must materialize."
+
+        testCase "reuses a reference-linked canonical node"
+        <| fun _ ->
+            let fixture = basic ()
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+            let outputId = converted.Model.OutputSets |> Map.toList |> List.head |> fst
+
+            let session =
+                Session.init converted.Model
+                |> addLayer "new-stage" [ ProvenanceSide.Output, outputId ]
+
+            writeBack converted.Index session fixture.Arc |> expectOk |> ignore
+
+            let created =
+                fixture.Dataset.Processes |> Seq.find (fun proc -> proc.Name = "new-stage")
+
+            Expect.isTrue
+                (obj.ReferenceEquals(created.Inputs.[0].AsSample(), fixture.Process.Outputs.[0].AsSample()))
+                "Reference link must resolve to the same canonical node object."
+
+        testCase "retains an empty new layer as an empty process"
+        <| fun _ ->
+            let fixture = basic ()
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+            let session = Session.init converted.Model |> addLayer "empty-stage" []
+            let emptyLayer = Session.activeLayer session
+
+            let session = {
+                session with
+                    Layers =
+                        session.Layers
+                        |> List.map (fun layer ->
+                            if layer.Id = emptyLayer.Id then
+                                {
+                                    layer with
+                                        Model = {
+                                            layer.Model with
+                                                InputSets = Map.empty
+                                        }
+                                }
+                            else
+                                layer
+                        )
+                    ReferenceLinks = []
+            }
+
+            writeBack converted.Index session fixture.Arc |> expectOk |> ignore
+
+            let created =
+                fixture.Dataset.Processes |> Seq.find (fun proc -> proc.Name = "empty-stage")
+
+            Expect.isEmpty created.Inputs "Empty layer must have no inputs."
+            Expect.isEmpty created.Outputs "Empty layer must have no outputs."
+
+        testCase "materializes an added-then-removed connection only as disconnected endpoints"
+        <| fun _ ->
+            let fixture = basic ()
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+            let withLayer = Session.init converted.Model |> addLayer "unfinished-stage" []
+
+            let projectedInputId =
+                (Session.activeLayer withLayer).Model.InputSets
+                |> Map.toList
+                |> List.head
+                |> fst
+
+            let withOutput =
+                createSet
+                    ProvenanceSide.Output
+                    {
+                        Kind = ProcessCoreKinds.sampleEndpoint
+                        Text = "Sample"
+                    }
+                    "unfinished-output"
+                    withLayer
+
+            let outputId =
+                (Session.activeLayer withOutput).Model.OutputSets
+                |> Map.toList
+                |> List.head
+                |> fst
+
+            let connected = connect projectedInputId outputId withOutput
+
+            let connectionId =
+                (Session.activeLayer connected).Model.Connections
+                |> Map.toList
+                |> List.head
+                |> fst
+
+            let finalSession =
+                Session.removeConnection connectionId connected |> expectOk |> fst
+
+            writeBack converted.Index finalSession fixture.Arc |> expectOk |> ignore
+
+            let rows =
+                fixture.Dataset.Processes
+                |> Seq.filter (fun proc -> proc.Name = "unfinished-stage")
+                |> Seq.toList
+
+            Expect.isTrue
+                (rows
+                 |> List.forall (fun proc -> proc.Inputs.Count = 0 || proc.Outputs.Count = 0))
+                "Removed connection must not reappear."
+
+        testCase "rejects a blank new layer name without mutation"
+        <| fun _ ->
+            let fixture = basic ()
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+            let session = Session.init converted.Model |> addLayer "   " []
+            let layer = Session.activeLayer session
+            let beforeCount = fixture.Dataset.Processes.Count
+            let errors = writeBack converted.Index session fixture.Arc |> expectError
+
+            Expect.contains
+                errors
+                (ProcessCoreWritebackError.BlankLayerName layer.Id)
+                "Blank layer must fail validation."
+
+            Expect.equal fixture.Dataset.Processes.Count beforeCount "Blank-name failure must not add a process."
+
+        testCase "rejects a new layer name that already exists in the dataset"
+        <| fun _ ->
+            let fixture = basic ()
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+            let session = Session.init converted.Model |> addLayer "stage-neutral" []
+            let beforeCount = fixture.Dataset.Processes.Count
+            let errors = writeBack converted.Index session fixture.Arc |> expectError
+
+            Expect.contains
+                errors
+                (ProcessCoreWritebackError.DuplicateLayerName "stage-neutral")
+                "Existing group name must fail validation."
+
+            Expect.equal fixture.Dataset.Processes.Count beforeCount "Duplicate-name failure must not add a process."
+
+        testCase "rejects incompatible reference links without mutation"
+        <| fun _ ->
+            let fixture = basic ()
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+            let initial = Session.init converted.Model
+            let initialLayer = Session.activeLayer initial
+            let inputId = initialLayer.Model.InputSets |> Map.toList |> List.head |> fst
+            let outputId = initialLayer.Model.OutputSets |> Map.toList |> List.head |> fst
+            let withLayer = addLayer "linked-stage" [ ProvenanceSide.Output, outputId ] initial
+            let targetLayer = Session.activeLayer withLayer
+            let targetId = targetLayer.Model.InputSets |> Map.toList |> List.head |> fst
+
+            let incompatible = {
+                Source = {
+                    LayerId = initialLayer.Id
+                    Side = ProvenanceSide.Input
+                    SetId = inputId
+                }
+                Target = {
+                    LayerId = targetLayer.Id
+                    Side = ProvenanceSide.Input
+                    SetId = targetId
+                }
+            }
+
+            let invalidSession = {
+                withLayer with
+                    ReferenceLinks = withLayer.ReferenceLinks @ [ incompatible ]
+            }
+
+            let beforeCount = fixture.Dataset.Processes.Count
+            let errors = writeBack converted.Index invalidSession fixture.Arc |> expectError
+
+            Expect.contains
+                errors
+                (ProcessCoreWritebackError.InvalidReferenceLink incompatible)
+                "Conflicting node keys must fail validation."
+
+            Expect.equal fixture.Dataset.Processes.Count beforeCount "Invalid-link failure must not add a process."
     ]

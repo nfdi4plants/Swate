@@ -48,12 +48,21 @@ type private PropertyMutation = {
     Annotation: Annotation
 }
 
+/// One session-created layer's materialization: every row for its final
+/// sets/connections, plus an empty-process sentinel row (`Input = Output =
+/// None`) when the layer has neither.
+type private NewLayerPlan = {
+    LayerName: string
+    Rows: PlannedRow list
+}
+
 type private Plan = {
     Updates: ExistingAnnotationUpdate list
     Dataset: Dataset option
     LoadedTableName: string
     ReplacedProcesses: (Process * PlannedRow list) list
     NewRows: PlannedRow list
+    NewLayers: NewLayerPlan list
     PropertyMutations: PropertyMutation list
     DeferredPropertyPlacements: PropertyPlacement list
 }
@@ -735,7 +744,7 @@ let private isDeferredPlacement (index: ProcessCoreWritebackIndex) (placement: P
 let private resolveOwnersForPlacement
     (arc: ARC)
     (index: ProcessCoreWritebackIndex)
-    (initialLayer: ProvenanceLayer)
+    (allConnections: Map<ProvenanceConnectionId, ProvenanceConnection>)
     (structuralNodesById: Map<ProvenanceSetId, IONode>)
     (placement: PropertyPlacement)
     : Result<PropertyMutationOwner list, ProcessCoreWritebackError list> =
@@ -768,7 +777,7 @@ let private resolveOwnersForPlacement
         else
             connectionIds
             |> List.collect (fun id ->
-                match initialLayer.Model.Connections.TryFind id with
+                match allConnections.TryFind id with
                 | Some connection -> [ connection.InputSetId; connection.OutputSetId ]
                 | None -> []
             )
@@ -811,7 +820,7 @@ let private narrowerMatch (existing: ProcessCoreAnnotationFingerprint) (requeste
 let private planPropertyMutations
     (arc: ARC)
     (index: ProcessCoreWritebackIndex)
-    (initialLayer: ProvenanceLayer)
+    (allConnections: Map<ProvenanceConnectionId, ProvenanceConnection>)
     (structuralNodesById: Map<ProvenanceSetId, IONode>)
     (placements: PropertyPlacement list)
     : Result<PropertyMutation list, ProcessCoreWritebackError list> =
@@ -823,7 +832,7 @@ let private planPropertyMutations
     let mutations = ResizeArray<PropertyMutation>()
 
     for placement in placements do
-        match resolveOwnersForPlacement arc index initialLayer structuralNodesById placement with
+        match resolveOwnersForPlacement arc index allConnections structuralNodesById placement with
         | Error e -> errors <- errors @ e
         | Ok owners ->
             for owner in owners do
@@ -868,6 +877,223 @@ let private planPropertyMutations
     else
         Ok(mutations |> List.ofSeq)
 
+// ── New editor layers ────────────────────────────────────────────────────
+
+let private validateNewLayerNames
+    (dataset: Dataset option)
+    (initialLayerName: string)
+    (newLayers: ProvenanceLayer list)
+    : ProcessCoreWritebackError list =
+    let existingNames =
+        (match dataset with
+         | Some ds -> ds.Processes |> Seq.map (fun proc -> proc.Name) |> Set.ofSeq
+         | None -> Set.empty)
+        |> Set.add initialLayerName
+
+    let mutable seen: Set<string> = Set.empty
+
+    [
+        for layer in newLayers do
+            let trimmed = layer.Model.Source.Name.Trim()
+
+            if System.String.IsNullOrWhiteSpace trimmed then
+                yield ProcessCoreWritebackError.BlankLayerName layer.Id
+            elif existingNames.Contains trimmed || seen.Contains trimmed then
+                yield ProcessCoreWritebackError.DuplicateLayerName trimmed
+            else
+                seen <- seen.Add trimmed
+    ]
+
+let private validateReferenceLinkShape (session: ProvenanceSession) (link: ProvenanceReferenceLink) =
+    let checkRef (reference: ProvenanceSetReference) =
+        match session.Layers |> List.tryFind (fun layer -> layer.Id = reference.LayerId) with
+        | None -> false
+        | Some layer ->
+            match reference.Side with
+            | ProvenanceSide.Input -> layer.Model.InputSets.ContainsKey reference.SetId
+            | ProvenanceSide.Output -> layer.Model.OutputSets.ContainsKey reference.SetId
+
+    if checkRef link.Source && checkRef link.Target then
+        []
+    else
+        [ ProcessCoreWritebackError.InvalidReferenceLink link ]
+
+/// Resolves the final `IONode` for one new-layer set: zero incoming
+/// reference links means create fresh from the set; one or more means reuse
+/// the already-resolved source node(s), which is valid only when every
+/// linked source resolves to the same canonical node key.
+let private resolveNewLayerSetNode
+    (resolvedNodesBySetId: System.Collections.Generic.Dictionary<ProvenanceSetId, IONode>)
+    (referenceLinksByTarget: Map<ProvenanceSetReference, ProvenanceReferenceLink list>)
+    (target: ProvenanceSetReference)
+    (set: ProvenanceSet)
+    : Result<IONode, ProcessCoreWritebackError list> =
+    match resolvedNodesBySetId.TryGetValue target.SetId with
+    | true, node -> Ok node
+    | false, _ ->
+        match referenceLinksByTarget.TryFind target with
+        | None
+        | Some [] ->
+            match nodeFromSet set with
+            | Ok node ->
+                resolvedNodesBySetId.[target.SetId] <- node
+                Ok node
+            | Error e -> Error [ e ]
+        | Some links ->
+            let sourceResolutions =
+                links
+                |> List.map (fun link ->
+                    match resolvedNodesBySetId.TryGetValue link.Source.SetId with
+                    | true, node -> Ok node
+                    | false, _ -> Error [ ProcessCoreWritebackError.InvalidReferenceLink link ]
+                )
+
+            let errors =
+                sourceResolutions
+                |> List.collect (
+                    function
+                    | Error e -> e
+                    | Ok _ -> []
+                )
+
+            if not errors.IsEmpty then
+                Error(errors |> List.distinct)
+            else
+                let nodes =
+                    sourceResolutions
+                    |> List.choose (
+                        function
+                        | Ok n -> Some n
+                        | Error _ -> None
+                    )
+
+                let distinctKeys = nodes |> List.map (fun node -> node.Key()) |> List.distinct
+
+                if distinctKeys.Length > 1 then
+                    Error(links |> List.map ProcessCoreWritebackError.InvalidReferenceLink)
+                else
+                    resolvedNodesBySetId.[target.SetId] <- nodes.Head
+                    Ok nodes.Head
+
+/// Materializes one new layer from its final model alone - connection
+/// add/remove patch history never controls new-layer structure. One row per
+/// final connection, one one-sided row per disconnected final set, or one
+/// empty-process sentinel row when the layer has neither.
+let private planNewLayer
+    (resolvedNodesBySetId: System.Collections.Generic.Dictionary<ProvenanceSetId, IONode>)
+    (referenceLinksByTarget: Map<ProvenanceSetReference, ProvenanceReferenceLink list>)
+    (layer: ProvenanceLayer)
+    : Result<PlannedRow list, ProcessCoreWritebackError list> =
+
+    let inputResults =
+        layer.Model.InputSets
+        |> Map.toList
+        |> List.map (fun (id, set) ->
+            resolveNewLayerSetNode
+                resolvedNodesBySetId
+                referenceLinksByTarget
+                {
+                    LayerId = layer.Id
+                    Side = ProvenanceSide.Input
+                    SetId = id
+                }
+                set
+            |> Result.map (fun node -> id, { SetId = id; Node = node })
+        )
+
+    let outputResults =
+        layer.Model.OutputSets
+        |> Map.toList
+        |> List.map (fun (id, set) ->
+            resolveNewLayerSetNode
+                resolvedNodesBySetId
+                referenceLinksByTarget
+                {
+                    LayerId = layer.Id
+                    Side = ProvenanceSide.Output
+                    SetId = id
+                }
+                set
+            |> Result.map (fun node -> id, { SetId = id; Node = node })
+        )
+
+    let errors =
+        (inputResults @ outputResults)
+        |> List.collect (
+            function
+            | Error e -> e
+            | Ok _ -> []
+        )
+
+    if not errors.IsEmpty then
+        Error(errors |> List.distinct)
+    else
+        let inputNodes =
+            inputResults
+            |> List.choose (
+                function
+                | Ok pair -> Some pair
+                | Error _ -> None
+            )
+            |> Map.ofList
+
+        let outputNodes =
+            outputResults
+            |> List.choose (
+                function
+                | Ok pair -> Some pair
+                | Error _ -> None
+            )
+            |> Map.ofList
+
+        let isConnected setId =
+            layer.Model.Connections
+            |> Map.exists (fun _ connection -> connection.InputSetId = setId || connection.OutputSetId = setId)
+
+        let connectionRows =
+            layer.Model.Connections
+            |> Map.toList
+            |> List.map (fun (connectionId, connection) -> {
+                Input = inputNodes.TryFind connection.InputSetId
+                Output = outputNodes.TryFind connection.OutputSetId
+                ConnectionId = Some connectionId
+            })
+
+        let oneSidedInputRows =
+            inputNodes
+            |> Map.toList
+            |> List.filter (fun (id, _) -> not (isConnected id))
+            |> List.map (fun (_, node) -> {
+                Input = Some node
+                Output = None
+                ConnectionId = None
+            })
+
+        let oneSidedOutputRows =
+            outputNodes
+            |> Map.toList
+            |> List.filter (fun (id, _) -> not (isConnected id))
+            |> List.map (fun (_, node) -> {
+                Input = None
+                Output = Some node
+                ConnectionId = None
+            })
+
+        let rows = connectionRows @ oneSidedInputRows @ oneSidedOutputRows
+
+        Ok(
+            if rows.IsEmpty then
+                [
+                    {
+                        Input = None
+                        Output = None
+                        ConnectionId = None
+                    }
+                ]
+            else
+                rows
+        )
+
 let private preflight
     (index: ProcessCoreWritebackIndex)
     (session: ProvenanceSession)
@@ -883,6 +1109,17 @@ let private preflight
             |> List.find (fun layer -> layer.Model.Source.Id = index.InitialSourceId)
 
         let tableName = initialLayer.Model.Source.Name
+        let dataset = tryResolveDataset index.LoadedTable.DatasetPath arc
+
+        let newLayers =
+            session.LayerOrder
+            |> List.filter (fun id -> id <> initialLayer.Id)
+            |> List.map (fun id -> session.Layers |> List.find (fun layer -> layer.Id = id))
+
+        let nameErrors = validateNewLayerNames dataset tableName newLayers
+
+        let linkShapeErrors =
+            session.ReferenceLinks |> List.collect (validateReferenceLinkShape session)
 
         let updateResults =
             session.PatchLog
@@ -927,6 +1164,73 @@ let private preflight
                 let allPlannedRows = additionRows @ (replacedProcesses |> List.collect snd)
                 validateNodeIdentity allPlannedRows, Some(additionRows, replacedProcesses)
 
+        // New layers materialize from their final model alone (no patch replay for
+        // structure); resolved nodes are shared globally so reference links can
+        // reuse canonical nodes across the initial layer and any earlier new layer.
+        let newLayersResult =
+            structureValue
+            |> Option.map (fun (additionRows, replacedProcesses) ->
+                let initialStructuralNodesById =
+                    (additionRows @ (replacedProcesses |> List.collect snd))
+                    |> List.collect (fun row -> [ row.Input; row.Output ] |> List.choose id)
+                    |> List.map (fun planned -> planned.SetId, planned.Node)
+                    |> Map.ofList
+
+                let initialRemainingIds =
+                    (initialLayer.Model.InputSets |> Map.toList |> List.map fst)
+                    @ (initialLayer.Model.OutputSets |> Map.toList |> List.map fst)
+                    |> List.filter (fun id -> not (initialStructuralNodesById.ContainsKey id))
+                    |> List.distinct
+
+                initialRemainingIds
+                |> List.map (resolveNodeForSet initialStructuralNodesById arc index)
+                |> collectErrors
+                |> Result.map (fun pairs -> List.zip initialRemainingIds pairs)
+                |> Result.bind (fun originalPairs ->
+                    let resolvedNodesBySetId =
+                        System.Collections.Generic.Dictionary<ProvenanceSetId, IONode>()
+
+                    for KeyValue(id, node) in initialStructuralNodesById do
+                        resolvedNodesBySetId.[id] <- node
+
+                    for id, node in originalPairs do
+                        resolvedNodesBySetId.[id] <- node
+
+                    let referenceLinksByTarget =
+                        session.ReferenceLinks |> List.groupBy (fun link -> link.Target) |> Map.ofList
+
+                    let layerResults =
+                        newLayers
+                        |> List.map (fun layer ->
+                            planNewLayer resolvedNodesBySetId referenceLinksByTarget layer
+                            |> Result.map (fun rows -> {
+                                LayerName = layer.Model.Source.Name
+                                Rows = rows
+                            })
+                        )
+
+                    collectErrors layerResults
+                    |> Result.map (fun plans -> plans, resolvedNodesBySetId)
+                )
+            )
+
+        let newLayerErrors, newLayerValue =
+            match newLayersResult with
+            | None -> [], None
+            | Some(Error errors) -> errors, None
+            | Some(Ok value) -> [], Some value
+
+        let allRowsForIdentity =
+            match structureValue, newLayerValue with
+            | Some(additionRows, replacedProcesses), Some(newLayerPlans, _) ->
+                additionRows
+                @ (replacedProcesses |> List.collect snd)
+                @ (newLayerPlans |> List.collect (fun p -> p.Rows))
+            | Some(additionRows, replacedProcesses), None -> additionRows @ (replacedProcesses |> List.collect snd)
+            | None, _ -> []
+
+        let nodeIdentityErrors = validateNodeIdentity allRowsForIdentity
+
         let addPropertyPatches =
             session.PatchLog
             |> List.choose (
@@ -935,20 +1239,58 @@ let private preflight
                 | _ -> None
             )
 
+        let targetBelongsToLayer (layerModel: ProvenanceModel) target =
+            match target with
+            | ProvenancePropertyTarget.InputSets ids -> ids |> List.forall layerModel.InputSets.ContainsKey
+            | ProvenancePropertyTarget.OutputSets ids -> ids |> List.forall layerModel.OutputSets.ContainsKey
+            | ProvenancePropertyTarget.Connections ids -> ids |> List.forall layerModel.Connections.ContainsKey
+
         let propertyResult =
-            structureValue
-            |> Option.map (fun (additionRows, replacedProcesses) ->
+            newLayerValue
+            |> Option.map (fun (_, resolvedNodesBySetId) ->
                 let structuralNodesById =
-                    (additionRows @ (replacedProcesses |> List.collect snd))
-                    |> List.collect (fun row -> [ row.Input; row.Output ] |> List.choose id)
-                    |> List.map (fun planned -> planned.SetId, planned.Node)
+                    resolvedNodesBySetId |> Seq.map (fun kvp -> kvp.Key, kvp.Value) |> Map.ofSeq
+
+                let allConnections =
+                    session.Layers
+                    |> List.collect (fun layer -> layer.Model.Connections |> Map.toList)
                     |> Map.ofList
 
-                resolveAddPropertyPatches initialLayer addPropertyPatches
+                let allLayerModels =
+                    initialLayer.Model :: (newLayers |> List.map (fun l -> l.Model))
+
+                let placementsPerPatch =
+                    addPropertyPatches
+                    |> List.map (fun (target, header) ->
+                        allLayerModels |> List.tryFind (fun model -> targetBelongsToLayer model target),
+                        target,
+                        header
+                    )
+
+                let placementResults =
+                    allLayerModels
+                    |> List.map (fun model ->
+                        let patchesForModel =
+                            placementsPerPatch
+                            |> List.choose (fun (owner, target, header) ->
+                                match owner with
+                                | Some m when System.Object.ReferenceEquals(m, model) -> Some(target, header)
+                                | _ -> None
+                            )
+
+                        let layer =
+                            (initialLayer :: newLayers)
+                            |> List.find (fun l -> System.Object.ReferenceEquals(l.Model, model))
+
+                        resolveAddPropertyPatches layer patchesForModel
+                    )
+
+                collectErrors placementResults
+                |> Result.map List.concat
                 |> Result.bind (fun placements ->
                     let deferred, immediate = placements |> List.partition (isDeferredPlacement index)
 
-                    planPropertyMutations arc index initialLayer structuralNodesById immediate
+                    planPropertyMutations arc index allConnections structuralNodesById immediate
                     |> Result.map (fun mutations -> mutations, deferred)
                 )
             )
@@ -959,28 +1301,21 @@ let private preflight
             | Some(Error errors) -> errors, None
             | Some(Ok value) -> [], Some value
 
-        let unhandledPatches =
-            session.PatchLog
-            |> List.choose (
-                function
-                | ProvenanceTablePatch.UpdatePropertyValue _
-                | ProvenanceTablePatch.AddLoadedPropertyValue _ -> None
-                | ProvenanceTablePatch.AddLoadedSet(_, patchTableName, _, _)
-                | ProvenanceTablePatch.AddLoadedConnection(patchTableName, _, _, _, _)
-                | ProvenanceTablePatch.RemoveLoadedConnection(patchTableName, _, _, _, _) when
-                    patchTableName = tableName
-                    ->
-                    None
-                | ProvenanceTablePatch.AddLoadedSet _
-                | ProvenanceTablePatch.AddLoadedConnection _
-                | ProvenanceTablePatch.RemoveLoadedConnection _ ->
-                    // Not the initial layer: deferred to a session-created layer's own
-                    // materialization (Task 8), never resolved against these pools.
-                    None
-                | other -> Some(ProcessCoreWritebackError.InvalidPatchTarget(sprintf "%A" other))
-            )
+        // Every ProvenanceTablePatch case is now handled: value updates and property
+        // adds above, and structural patches either against the initial-layer pools
+        // or (for any other table name) by a session-created layer's own
+        // final-model materialization, which needs no patch replay.
+        let unhandledPatches: ProcessCoreWritebackError list = []
 
-        let allErrors = updateErrors @ structureErrors @ propertyErrors @ unhandledPatches
+        let allErrors =
+            nameErrors
+            @ linkShapeErrors
+            @ updateErrors
+            @ structureErrors
+            @ newLayerErrors
+            @ nodeIdentityErrors
+            @ propertyErrors
+            @ unhandledPatches
 
         if not allErrors.IsEmpty then
             Error(allErrors |> List.distinct)
@@ -995,14 +1330,16 @@ let private preflight
                 |> List.distinctBy (fun update -> update.PropertyValueId)
 
             let additionRows, replacedProcesses = structureValue.Value
+            let newLayerPlans, _ = newLayerValue.Value
             let mutations, deferredPlacements = propertyValue.Value
 
             Ok {
                 Updates = updates
-                Dataset = tryResolveDataset index.LoadedTable.DatasetPath arc
+                Dataset = dataset
                 LoadedTableName = tableName
                 ReplacedProcesses = replacedProcesses
                 NewRows = additionRows
+                NewLayers = newLayerPlans
                 PropertyMutations = mutations
                 DeferredPropertyPlacements = deferredPlacements
             }
@@ -1090,6 +1427,17 @@ let private apply (arc: ARC) (plan: Plan) : ProcessCoreWritebackSummary =
             replaceProcessIO inputs outputs proc
             recordConnection row proc
             addedProcesses <- addedProcesses + 1
+
+        // New layers materialize in `LayerOrder`, appended after the loaded table.
+        for newLayer in plan.NewLayers do
+            for row in newLayer.Rows do
+                countNewNodes row
+                let proc = Process(newLayer.LayerName)
+                addProcess dataset proc
+                let inputs, outputs = ioOf row
+                replaceProcessIO inputs outputs proc
+                recordConnection row proc
+                addedProcesses <- addedProcesses + 1
 
     let mutable addedAnnotations = 0
 
