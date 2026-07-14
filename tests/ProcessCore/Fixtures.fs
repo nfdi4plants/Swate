@@ -37,6 +37,32 @@ let basic () =
         Output = output
     }
 
+let processGroup (inputs: IONode list) (outputs: IONode list) =
+    let proc = mkProcess "stage-neutral" inputs outputs
+    let dataset = Dataset("dataset-neutral", processes = [ proc ])
+    ARC("arc-neutral", hasPart = [ dataset ]), dataset, proc
+
+let positional () =
+    processGroup [
+        SampleNode(Sample("input-one"))
+        SampleNode(Sample("input-two"))
+    ] [
+        SampleNode(Sample("output-one"))
+        SampleNode(Sample("output-two"))
+    ]
+
+let allToAll () =
+    processGroup [ SampleNode(Sample("input-one")) ] [
+        SampleNode(Sample("output-one"))
+        SampleNode(Sample("output-two"))
+    ]
+
+let inputOnly () =
+    processGroup [ DataNode(Data("input.dat")) ] []
+
+let outputOnly () =
+    processGroup [] [ DataNode(Data("output.dat", selector = "row=1")) ]
+
 let loadedTable: ProcessCoreTableLocation = {
     DatasetPath = [ "arc-neutral"; "dataset-neutral" ]
     TableName = "stage-neutral"

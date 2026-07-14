@@ -144,6 +144,22 @@ let graphFingerprint (arc: ARC) : string =
 
     sb.ToString()
 
+let nodeLocation (node: IONode) : ProcessCoreNodeLocation =
+    match node with
+    | SampleNode _ -> {
+        Kind = ProcessCoreNodeKind.Sample
+        Key = node.Key()
+      }
+    | DataNode _ -> {
+        Kind = ProcessCoreNodeKind.Data
+        Key = node.Key()
+      }
+
+let nodeDisplayName (node: IONode) =
+    match node with
+    | SampleNode sample -> sample.Name
+    | DataNode data -> data.Name
+
 let sourceRef (location: ProcessCoreTableLocation) : ProvenanceSourceRef = {
     Id = String.concat "/" (location.DatasetPath @ [ location.TableName ])
     Name = location.TableName
