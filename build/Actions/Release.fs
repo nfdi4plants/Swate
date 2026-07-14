@@ -114,7 +114,9 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
                 "login"
                 "--username"
                 username
-                "--password-stdin"
+                // --pasword-stdin requires a completly different setup. this needs to be checked.
+                // https://docs.docker.com/reference/cli/docker/login/#password-stdin
+                "--password" // ⚠️
                 key
                 dockerRegistryTarget
             ]

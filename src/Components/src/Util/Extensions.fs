@@ -23,6 +23,7 @@ module Extensions =
         static member inline data(key: string, value: string) : IReactProperty = unbox ($"data-{key}", value)
         static member inline dataRow(value: int) : IReactProperty = unbox ("data-row", value)
         static member inline dataColumn(value: int) : IReactProperty = unbox ("data-column", value)
+
         static member inline spread(props: obj) : IReactProperty[] =
             props
             |> Fable.Core.JS.Constructors.Object.entries

@@ -56,7 +56,7 @@ jobs:
       #   run: npx playwright install --with-deps chromium
 
       # - name: Run Tests
-      #   run: dotnet run --project ./build/Build.fsproj test
+      #   run: dotnet run --project ./build/Build.fsproj -- test
 
   # --- Job 2: Detect new version ---
   verify_release:
@@ -80,7 +80,7 @@ jobs:
         name: Check for new version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: dotnet run --project ./build/Build.fsproj prerelease
+        run: dotnet run --project ./build/Build.fsproj -- prerelease
 
   release:
     needs: verify_release
@@ -135,7 +135,7 @@ jobs:
         env:
           NUGET_KEY: ${{steps.login.outputs.NUGET_API_KEY}}
           DOCKER_KEY: ${{ secrets.GITHUB_TOKEN }} # or your docker/personal token
-        run: dotnet run --project ./build/Build.fsproj release ${{ matrix.target }} --ci --user=${{ github.actor }}
+        run: dotnet run --project ./build/Build.fsproj -- release ${{ matrix.target }} --ci --user=${{ github.actor }}
 
       - uses: actions/upload-artifact@v4
         if: ${{ matrix.target == 'electron-web' }}
@@ -207,7 +207,7 @@ jobs:
         run: npm i
 
       - name: Build Electron binaries
-        run: dotnet run --project ./build/Build.fsproj release electron-bin --ci --arch=${{ matrix.arch }}
+        run: dotnet run --project ./build/Build.fsproj -- release electron-bin --ci --arch=${{ matrix.arch }}
 
       - uses: actions/upload-artifact@v4
         with:
@@ -244,4 +244,4 @@ jobs:
       - name: Upload assets and finalize release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: dotnet run --project ./build/Build.fsproj postrelease release-assets
+        run: dotnet run --project ./build/Build.fsproj -- postrelease release-assets
