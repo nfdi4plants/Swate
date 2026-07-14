@@ -777,15 +777,46 @@ let private resolveExistingConnectionProcess
                 ]
             )
 
-let private isDeferredPlacement (index: ProcessCoreWritebackIndex) (placement: PropertyPlacement) =
-    match placement.Target with
-    | ProvenancePropertyTarget.Connections connectionIds when
-        placement.Header.Kind.Id = ProcessCoreKinds.parameter.Id
-        || placement.Header.Kind.Id = ProcessCoreKinds.componentKind.Id
-        ->
-        connectionIds
-        |> List.exists (fun id -> not (index.ConnectionLocations.ContainsKey id))
-    | _ -> false
+/// Splits connection-targeted parameter/component placements per connection:
+/// ids whose process already exists are validated and planned immediately,
+/// while ids whose process only materializes during structural apply are
+/// deferred (a brand-new process/recipe can never collide with anything).
+/// Splitting per id keeps a mixed existing+created target from bypassing
+/// validation - and delivery - on its existing-connection part.
+let private splitPlacements
+    (index: ProcessCoreWritebackIndex)
+    (placements: PropertyPlacement list)
+    : PropertyPlacement list * PropertyPlacement list =
+    let mutable immediate: PropertyPlacement list = []
+    let mutable deferred: PropertyPlacement list = []
+
+    for placement in placements do
+        match placement.Target with
+        | ProvenancePropertyTarget.Connections connectionIds when
+            placement.Header.Kind.Id = ProcessCoreKinds.parameter.Id
+            || placement.Header.Kind.Id = ProcessCoreKinds.componentKind.Id
+            ->
+            let existing, created =
+                connectionIds |> List.partition index.ConnectionLocations.ContainsKey
+
+            if not existing.IsEmpty then
+                immediate <-
+                    {
+                        placement with
+                            Target = ProvenancePropertyTarget.Connections existing
+                    }
+                    :: immediate
+
+            if not created.IsEmpty then
+                deferred <-
+                    {
+                        placement with
+                            Target = ProvenancePropertyTarget.Connections created
+                    }
+                    :: deferred
+        | _ -> immediate <- placement :: immediate
+
+    List.rev immediate, List.rev deferred
 
 let private resolveOwnersForPlacement
     (arc: ARC)
@@ -1228,12 +1259,13 @@ let private preflight
                 |> Result.map (fun replacedProcesses -> additionRows, replacedProcesses)
             )
 
+        // Node-identity validation runs once, below, over the combined structure
+        // and new-layer rows; `allRowsForIdentity` covers the structure-only rows
+        // even when new-layer planning fails.
         let structureErrors, structureValue =
             match structureResult with
             | Error errors -> errors, None
-            | Ok(additionRows, replacedProcesses) ->
-                let allPlannedRows = additionRows @ (replacedProcesses |> List.collect snd)
-                validateNodeIdentity allPlannedRows, Some(additionRows, replacedProcesses)
+            | Ok value -> [], Some value
 
         // New layers materialize from their final model alone (no patch replay for
         // structure); resolved nodes are shared globally so reference links can
@@ -1359,7 +1391,7 @@ let private preflight
                 collectErrors placementResults
                 |> Result.map List.concat
                 |> Result.bind (fun placements ->
-                    let deferred, immediate = placements |> List.partition (isDeferredPlacement index)
+                    let immediate, deferred = splitPlacements index placements
 
                     planPropertyMutations arc index allConnections structuralNodesById immediate
                     |> Result.map (fun mutations -> mutations, deferred)
@@ -1550,7 +1582,13 @@ let private apply (arc: ARC) (plan: Plan) : ProcessCoreWritebackSummary =
 
             for connectionId in connectionIds do
                 match connectionProcessMap.TryFind connectionId with
-                | None -> ()
+                | None ->
+                    // splitPlacements defers only editor-created connections, and every
+                    // final editor-created connection materializes exactly one planned
+                    // row that records its process above. Skipping here would silently
+                    // drop a validated placement, so an unmet invariant fails loudly.
+                    failwith
+                        $"Deferred property placement targets connection '{connectionId}' but no planned row materialized a process for it."
                 | Some proc ->
                     let annotation =
                         annotationFromValue additionalType placement.Header placement.Value placement.Unit

@@ -732,6 +732,77 @@ let tests =
                  |> Seq.exists (fun annotation -> annotation.Name = "edge-component"))
                 "The exact connection recipe must receive the component."
 
+        testCase "stores a parameter targeting existing and added connections on both processes"
+        <| fun _ ->
+            let fixture = basic ()
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+
+            let existingConnectionId =
+                converted.Model.Connections |> Map.toList |> List.head |> fst
+
+            let withSets =
+                Session.init converted.Model
+                |> createSet
+                    ProvenanceSide.Input
+                    {
+                        Kind = ProcessCoreKinds.sampleEndpoint
+                        Text = "Sample"
+                    }
+                    "mixed-input"
+                |> createSet
+                    ProvenanceSide.Output
+                    {
+                        Kind = ProcessCoreKinds.sampleEndpoint
+                        Text = "Sample"
+                    }
+                    "mixed-output"
+
+            let layer = Session.activeLayer withSets
+
+            let inputId =
+                layer.Model.InputSets
+                |> Map.toList
+                |> List.find (fun (_, set) -> set.Name = "mixed-input")
+                |> fst
+
+            let outputId =
+                layer.Model.OutputSets
+                |> Map.toList
+                |> List.find (fun (_, set) -> set.Name = "mixed-output")
+                |> fst
+
+            let connected = connect inputId outputId withSets
+
+            let addedConnectionId =
+                (Session.activeLayer connected).Model.Connections
+                |> Map.toList
+                |> List.find (fun (_, connection) -> connection.OutputSetId = outputId)
+                |> fst
+
+            let session =
+                connected
+                |> createProperty
+                    (ProvenancePropertyTarget.Connections [ existingConnectionId; addedConnectionId ])
+                    ProcessCoreKinds.parameter
+                    "mixed-parameter"
+                    "mixed-value"
+
+            writeBack converted.Index session fixture.Arc |> expectOk |> ignore
+
+            Expect.isTrue
+                (fixture.Process.ParameterValue
+                 |> Seq.exists (fun annotation -> annotation.Name = "mixed-parameter"))
+                "The existing connection process must receive the parameter."
+
+            let addedProcess =
+                fixture.Dataset.Processes
+                |> Seq.find (fun proc -> proc.Inputs |> Seq.exists (fun node -> node.Key() = "M:mixed-input"))
+
+            Expect.isTrue
+                (addedProcess.ParameterValue
+                 |> Seq.exists (fun annotation -> annotation.Name = "mixed-parameter"))
+                "The editor-created connection process must receive the parameter."
+
         testCase "writes the final value of a property that was added and then updated"
         <| fun _ ->
             let fixture = basic ()
