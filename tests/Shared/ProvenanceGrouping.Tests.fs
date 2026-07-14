@@ -3066,6 +3066,65 @@ let uiStateTests =
                 Expect.equal setIds [ "input-a"; "input-b" ] "The rejection should identify the assigned targets."
             | other -> failwithf "Expected a multiple-value rejection, got %A" other
 
+        testCase "property value drop plan rejects members whose single values conflict across the group"
+        <| fun _ ->
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+
+            let model =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-input-a-species" species (ProvenanceValue.Text "Arabidopsis") None None
+                        propertyValue "pv-input-b-species" species (ProvenanceValue.Text "Chlamydomonas") None None
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" [ "pv-input-a-species" ]
+                        inputSet "input-b" "assay-table" inputHeader "Input B" [ "pv-input-b-species" ]
+                    ] [] []
+
+            let group: DisplayGroup = {
+                Id = "manual"
+                TableName = "assay-table"
+                Side = ProvenanceSide.Input
+                GroupingValues = []
+                Members = [
+                    {
+                        SetId = "input-a"
+                        Name = "Input A"
+                        PropertyValueIds = [ "pv-input-a-species" ]
+                    }
+                    {
+                        SetId = "input-b"
+                        Name = "Input B"
+                        PropertyValueIds = [ "pv-input-b-species" ]
+                    }
+                ]
+            }
+
+            let source: Types.ValueAssignmentSource = {
+                CopiedFrom = None
+                Property = propertyKeyIn model species
+                Value = ProvenanceValue.Text "A. thaliana"
+                Unit = None
+            }
+
+            // Intentionally stricter than the pre-origin-aware planner: each member
+            // has exactly one value, but no single existing group value can be
+            // replaced safely, so the drop is rejected instead of confirmed.
+            match ValueAssignment.planPropertyValueDrop source group model with
+            | Error(Types.ValueAssignmentError.MultiplePropertyValues(property, setIds)) ->
+                Expect.equal
+                    property
+                    (propertyKeyIn model species)
+                    "The rejection should retain exact property identity."
+
+                Expect.equal
+                    setIds
+                    [ "input-a"; "input-b" ]
+                    "Every member holding a conflicting value should be identified."
+            | other -> failwithf "Expected a cross-member conflict rejection, got %A" other
+
         testCase "property value drop plan overwrites one distinct value represented by several occurrence IDs"
         <| fun _ ->
             let temperature = propertyHeader FixtureKinds.parameterProperty "Temperature"

@@ -128,7 +128,7 @@ module AssignmentErrors =
             $"Cannot assign {property.Header.Category.Name}: every target must either have no value or exactly one value for this annotation."
         | ValueAssignmentError.MultiplePropertyValues(property, setIds) ->
             let targets = setIds |> String.concat ", "
-            $"Cannot overwrite {property.Header.Category.Name}: {targets} already has multiple values for this annotation."
+            $"Cannot overwrite {property.Header.Category.Name}: {targets} hold more than one distinct value for this annotation, so no single value can be replaced."
         | ValueAssignmentError.UpstreamPropertyNotAssigned property ->
             $"Cannot assign {property.Header.Category.Name} to a new entity in this layer. This annotation originated in '{property.OriginSource.Name}' and can only replace an existing assignment."
 
