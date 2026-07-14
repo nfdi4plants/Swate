@@ -100,7 +100,6 @@ let nuget (key: string) (isDryRun: bool) =
     ()
 
 let docker (username: string) (key: string) (version: Changelog.Version) (isDryRun: bool) =
-    // Placeholder for docker release logic
 
     VersionIO.updateVersionFiles version
     VersionIO.updateFSharpProjectVersions version
@@ -115,7 +114,7 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
                 "login"
                 "--username"
                 username
-                "--password"
+                "--password-stdin"
                 key
                 dockerRegistryTarget
             ]
@@ -126,6 +125,8 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
     let imageVersioned = $"{imageName}:{version.Version.ToString()}"
     let imageLatest = $"{imageName}:latest"
     let imageNext = $"{imageName}:next"
+
+    // docker build -t ghcr.io/nfdi4plants/swate:next -t ghcr.io/nfdi4plants/swate:2.0.0 -t ghcr.io/nfdi4plants/swate:latest -f ./build/Dockerfile.publish .
 
     let build =
         run
