@@ -16,7 +16,11 @@ type private ExistingAnnotationUpdate = {
 
 /// One materialized node reference, resolved and validated during preflight
 /// so `apply` only ever touches already-validated `IONode` instances.
-type private PlannedNode = { SetId: ProvenanceSetId; Node: IONode }
+type private PlannedNode = {
+    SetId: ProvenanceSetId
+    Header: ProvenanceIOHeader
+    Node: IONode
+}
 
 /// One internal mutation command for a direct ProcessCore process row.
 /// Structure is never derived from a tabular/scaffold representation.
@@ -75,6 +79,24 @@ let private anchorOfOrigin =
 let private findPropertyValue (session: ProvenanceSession) (propertyValueId: ProvenancePropertyValueId) =
     session.Layers
     |> List.tryPick (fun layer -> layer.Model.PropertyValues.TryFind propertyValueId)
+
+/// Finds the source ID for a table name that belongs to neither the initial
+/// layer nor any session-created layer - i.e. previous/upstream context -
+/// by locating any property value whose real origin anchor names that table.
+let private findPreviousSourceId (session: ProvenanceSession) (tableName: string) : ProvenanceSourceId option =
+    session.Layers
+    |> List.tryPick (fun layer ->
+        layer.Model.PropertyValues
+        |> Map.toList
+        |> List.tryPick (fun (_, value) ->
+            let anchor = anchorOfOrigin value.Origin
+
+            if anchor.Source.Name = tableName then
+                Some anchor.Source.Id
+            else
+                None
+        )
+    )
 
 let private collectErrors
     (results: Result<'a, ProcessCoreWritebackError list> list)
@@ -205,7 +227,16 @@ let private processLocationKey (location: ProcessCoreProcessLocation) =
 let private processLocationKeyOfConnection (index: ProcessCoreWritebackIndex) (connectionId: ProvenanceConnectionId) =
     processLocationKey index.ConnectionLocations.[connectionId].Process
 
+/// Resolves the `IONode` for one set. `nodeFromSet` always constructs a
+/// fresh object; if a node with the same canonical key already exists
+/// anywhere in the ARC, `AddInput`/`AddOutput` silently swaps in that
+/// existing object during apply (ProcessCore's own registry
+/// canonicalization), which would orphan any annotation already written to
+/// the fresh preflight-time reference. Resolving the real existing object
+/// up front keeps the reference in the plan identical to the one that ends
+/// up linked into the graph.
 let private resolvePlannedNode
+    (arc: ARC)
     (sets: Map<ProvenanceSetId, ProvenanceSet>)
     (setId: ProvenanceSetId)
     : Result<PlannedNode, ProcessCoreWritebackError list> =
@@ -213,8 +244,16 @@ let private resolvePlannedNode
     | None -> Error [ ProcessCoreWritebackError.SetNotFound setId ]
     | Some set ->
         match nodeFromSet set with
-        | Ok node -> Ok { SetId = setId; Node = node }
         | Error e -> Error [ e ]
+        | Ok freshNode ->
+            let node =
+                tryResolveNode (nodeLocation freshNode) arc |> Option.defaultValue freshNode
+
+            Ok {
+                SetId = setId
+                Header = set.Header
+                Node = node
+            }
 
 /// AddLoadedSet/AddLoadedConnection patches for the loaded table. Every
 /// final connection materializes exactly one two-sided row; every final
@@ -222,6 +261,7 @@ let private resolvePlannedNode
 /// row. A connection added and later removed is consumed without a row -
 /// its endpoint set(s) fall back to the one-sided rule.
 let private planAdditions
+    (arc: ARC)
     (index: ProcessCoreWritebackIndex)
     (finalInputSets: Map<ProvenanceSetId, ProvenanceSet>)
     (finalOutputSets: Map<ProvenanceSetId, ProvenanceSet>)
@@ -261,8 +301,8 @@ let private planAdditions
                 claimedConnectionIds.Add connectionId |> ignore
 
                 match
-                    resolvePlannedNode finalInputSets connection.InputSetId,
-                    resolvePlannedNode finalOutputSets connection.OutputSetId
+                    resolvePlannedNode arc finalInputSets connection.InputSetId,
+                    resolvePlannedNode arc finalOutputSets connection.OutputSetId
                 with
                 | Ok inputNode, Ok outputNode ->
                     Ok(
@@ -300,7 +340,7 @@ let private planAdditions
                 if isConnectedInFinal id then
                     Ok None
                 else
-                    resolvePlannedNode sets id
+                    resolvePlannedNode arc sets id
                     |> Result.map (fun node ->
                         Some(
                             match side with
@@ -406,8 +446,8 @@ let private planRemovals
                                 let connection = finalConnections.[connectionId]
 
                                 match
-                                    resolvePlannedNode finalInputSets connection.InputSetId,
-                                    resolvePlannedNode finalOutputSets connection.OutputSetId
+                                    resolvePlannedNode arc finalInputSets connection.InputSetId,
+                                    resolvePlannedNode arc finalOutputSets connection.OutputSetId
                                 with
                                 | Ok inputNode, Ok outputNode ->
                                     Ok {
@@ -447,7 +487,7 @@ let private planRemovals
                                     | ProvenanceSide.Input -> finalInputSets
                                     | ProvenanceSide.Output -> finalOutputSets
 
-                                resolvePlannedNode sets setId
+                                resolvePlannedNode arc sets setId
                                 |> Result.map (fun node ->
                                     match side with
                                     | ProvenanceSide.Input -> {
@@ -520,9 +560,15 @@ let private validateNodeIdentity (rows: PlannedRow list) : ProcessCoreWritebackE
     allNodes
     |> List.groupBy (fun planned -> planned.Node.Key())
     |> List.choose (fun (nodeKey, planned) ->
-        let distinctSetIds = planned |> List.map (fun p -> p.SetId) |> List.distinct
+        // Distinct set IDs alone are not a conflict: a reference link legitimately
+        // reuses one canonical node under two different editor set IDs across
+        // layers. Only differing header identity (kind or text) is a genuine
+        // conflict between two distinct editor sets.
+        let distinctHeaders =
+            planned |> List.map (fun p -> p.Header.Kind.Id, p.Header.Text) |> List.distinct
 
-        if distinctSetIds.Length > 1 then
+        if distinctHeaders.Length > 1 then
+            let distinctSetIds = planned |> List.map (fun p -> p.SetId) |> List.distinct
             Some(ProcessCoreWritebackError.ConflictingNodeIdentity(nodeKey, distinctSetIds))
         else
             None
@@ -923,6 +969,7 @@ let private validateReferenceLinkShape (session: ProvenanceSession) (link: Prove
 /// the already-resolved source node(s), which is valid only when every
 /// linked source resolves to the same canonical node key.
 let private resolveNewLayerSetNode
+    (arc: ARC)
     (resolvedNodesBySetId: System.Collections.Generic.Dictionary<ProvenanceSetId, IONode>)
     (referenceLinksByTarget: Map<ProvenanceSetReference, ProvenanceReferenceLink list>)
     (target: ProvenanceSetReference)
@@ -935,7 +982,13 @@ let private resolveNewLayerSetNode
         | None
         | Some [] ->
             match nodeFromSet set with
-            | Ok node ->
+            | Ok freshNode ->
+                // See resolvePlannedNode: reuse the real existing node if this set's
+                // name coincides with one already in the graph, so a directly-added
+                // annotation is not orphaned by ProcessCore's own canonicalization.
+                let node =
+                    tryResolveNode (nodeLocation freshNode) arc |> Option.defaultValue freshNode
+
                 resolvedNodesBySetId.[target.SetId] <- node
                 Ok node
             | Error e -> Error [ e ]
@@ -980,6 +1033,7 @@ let private resolveNewLayerSetNode
 /// final connection, one one-sided row per disconnected final set, or one
 /// empty-process sentinel row when the layer has neither.
 let private planNewLayer
+    (arc: ARC)
     (resolvedNodesBySetId: System.Collections.Generic.Dictionary<ProvenanceSetId, IONode>)
     (referenceLinksByTarget: Map<ProvenanceSetReference, ProvenanceReferenceLink list>)
     (layer: ProvenanceLayer)
@@ -990,6 +1044,7 @@ let private planNewLayer
         |> Map.toList
         |> List.map (fun (id, set) ->
             resolveNewLayerSetNode
+                arc
                 resolvedNodesBySetId
                 referenceLinksByTarget
                 {
@@ -998,7 +1053,14 @@ let private planNewLayer
                     SetId = id
                 }
                 set
-            |> Result.map (fun node -> id, { SetId = id; Node = node })
+            |> Result.map (fun node ->
+                id,
+                {
+                    SetId = id
+                    Header = set.Header
+                    Node = node
+                }
+            )
         )
 
     let outputResults =
@@ -1006,6 +1068,7 @@ let private planNewLayer
         |> Map.toList
         |> List.map (fun (id, set) ->
             resolveNewLayerSetNode
+                arc
                 resolvedNodesBySetId
                 referenceLinksByTarget
                 {
@@ -1014,7 +1077,14 @@ let private planNewLayer
                     SetId = id
                 }
                 set
-            |> Result.map (fun node -> id, { SetId = id; Node = node })
+            |> Result.map (fun node ->
+                id,
+                {
+                    SetId = id
+                    Header = set.Header
+                    Node = node
+                }
+            )
         )
 
     let errors =
@@ -1140,6 +1210,7 @@ let private preflight
 
         let structureResult =
             planAdditions
+                arc
                 index
                 initialLayer.Model.InputSets
                 initialLayer.Model.OutputSets
@@ -1202,7 +1273,7 @@ let private preflight
                     let layerResults =
                         newLayers
                         |> List.map (fun layer ->
-                            planNewLayer resolvedNodesBySetId referenceLinksByTarget layer
+                            planNewLayer arc resolvedNodesBySetId referenceLinksByTarget layer
                             |> Result.map (fun rows -> {
                                 LayerName = layer.Model.Source.Name
                                 Rows = rows
@@ -1301,11 +1372,34 @@ let private preflight
             | Some(Error errors) -> errors, None
             | Some(Ok value) -> [], Some value
 
-        // Every ProvenanceTablePatch case is now handled: value updates and property
-        // adds above, and structural patches either against the initial-layer pools
-        // or (for any other table name) by a session-created layer's own
-        // final-model materialization, which needs no patch replay.
-        let unhandledPatches: ProcessCoreWritebackError list = []
+        // Structural patches are handled against the initial-layer pools above, or
+        // (for a session-created layer's table name) by that layer's own
+        // final-model materialization, which needs no patch replay. A structural
+        // patch naming any other table targets previous/upstream context, where
+        // only value edits are allowed.
+        let knownLayerNames =
+            tableName :: (newLayers |> List.map (fun layer -> layer.Model.Source.Name))
+            |> Set.ofList
+
+        let structuralPatchTableName =
+            function
+            | ProvenanceTablePatch.AddLoadedSet(_, patchTableName, _, _)
+            | ProvenanceTablePatch.AddLoadedConnection(patchTableName, _, _, _, _)
+            | ProvenanceTablePatch.RemoveLoadedConnection(patchTableName, _, _, _, _) -> Some patchTableName
+            | _ -> None
+
+        let unhandledPatches =
+            session.PatchLog
+            |> List.choose (fun patch ->
+                match structuralPatchTableName patch with
+                | Some patchTableName when not (knownLayerNames.Contains patchTableName) ->
+                    let sourceId =
+                        findPreviousSourceId session patchTableName
+                        |> Option.defaultValue patchTableName
+
+                    Some(ProcessCoreWritebackError.StructuralPreviousContextEdit sourceId)
+                | _ -> None
+            )
 
         let allErrors =
             nameErrors

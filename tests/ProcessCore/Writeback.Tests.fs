@@ -1116,4 +1116,309 @@ let tests =
                 "Conflicting node keys must fail validation."
 
             Expect.equal fixture.Dataset.Processes.Count beforeCount "Invalid-link failure must not add a process."
+
+        testCase "rejects a stale source before applying any edit"
+        <| fun _ ->
+            let fixture = basic ()
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+
+            let session =
+                Session.init converted.Model
+                |> createSet
+                    ProvenanceSide.Output
+                    {
+                        Kind = ProcessCoreKinds.sampleEndpoint
+                        Text = "Sample"
+                    }
+                    "must-not-appear"
+
+            fixture.Process.Name <- "changed-concurrently"
+            let beforeCount = fixture.Dataset.Processes.Count
+            let result = writeBack converted.Index session fixture.Arc |> expectError
+
+            Expect.contains
+                result
+                ProcessCoreWritebackError.StaleArc
+                "Concurrent graph change must invalidate the index."
+
+            Expect.equal fixture.Dataset.Processes.Count beforeCount "No process may be added after stale validation."
+
+            Expect.isFalse
+                (fixture.Dataset.AllSamples()
+                 |> Seq.exists (fun sample -> sample.Name = "must-not-appear"))
+                "No planned node may be created after stale validation."
+
+        testCase "collects domain errors before applying valid earlier patches"
+        <| fun _ ->
+            let fixture = basic ()
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+
+            let withValidSet =
+                Session.init converted.Model
+                |> createSet
+                    ProvenanceSide.Output
+                    {
+                        Kind = ProcessCoreKinds.sampleEndpoint
+                        Text = "Sample"
+                    }
+                    "must-not-appear"
+
+            let missingPropertyId = "missing-property-neutral"
+
+            let missingHeader = {
+                Kind = ProcessCoreKinds.parameter
+                Category = {
+                    Name = "missing-category"
+                    TermSource = None
+                    TermAccession = None
+                }
+            }
+
+            let missingAnchor = {
+                Source = converted.Model.Source
+                ProcessId = None
+                ProcessName = Some converted.Model.Source.Name
+                Header = missingHeader
+                InputNames = []
+                OutputNames = []
+            }
+
+            let invalidSession = {
+                withValidSet with
+                    PatchLog =
+                        withValidSet.PatchLog
+                        @ [
+                            ProvenanceTablePatch.UpdatePropertyValue(
+                                missingPropertyId,
+                                missingAnchor,
+                                ProvenanceValue.Text "old",
+                                ProvenanceValue.Text "new",
+                                None
+                            )
+                        ]
+            }
+
+            let beforeCount = fixture.Dataset.Processes.Count
+            let errors = writeBack converted.Index invalidSession fixture.Arc |> expectError
+
+            Expect.contains
+                errors
+                (ProcessCoreWritebackError.PropertyNotFound missingPropertyId)
+                "Missing final property must be reported."
+
+            Expect.equal
+                fixture.Dataset.Processes.Count
+                beforeCount
+                "Valid earlier patches must not apply when a later patch is invalid."
+
+            Expect.isFalse
+                (fixture.Dataset.AllSamples()
+                 |> Seq.exists (fun sample -> sample.Name = "must-not-appear"))
+                "The valid earlier set patch must remain unapplied."
+
+        testCase "rejects structural creation in previous context"
+        <| fun _ ->
+            let arc, _ = withPreviousContext ()
+            let converted = fromArc loadedTable arc |> expectOk
+            let _, previousProperty = propertyByName "previous-parameter" converted.Model
+
+            let previousSource =
+                match previousProperty.Origin with
+                | ProvenancePropertyOrigin.Real anchor -> anchor.Source
+                | other -> failtestf "Expected real previous origin but received %A" other
+
+            let forged = {
+                Session.init converted.Model with
+                    PatchLog = [
+                        ProvenanceTablePatch.AddLoadedSet(
+                            ProvenanceSide.Output,
+                            previousSource.Name,
+                            {
+                                Kind = ProcessCoreKinds.sampleEndpoint
+                                Text = "Sample"
+                            },
+                            "forbidden-previous-set"
+                        )
+                    ]
+            }
+
+            let beforeCount = arc.AllProcesses().Count
+            let errors = writeBack converted.Index forged arc |> expectError
+
+            Expect.contains
+                errors
+                (ProcessCoreWritebackError.StructuralPreviousContextEdit previousSource.Id)
+                "Previous context must allow value updates only, not structural creation."
+
+            Expect.equal (arc.AllProcesses().Count) beforeCount "Rejected previous structure must not mutate the graph."
+
+        testCase "reconverts the complete final session from the mutated ARC"
+        <| fun _ ->
+            let arc, _, _ = annotated ()
+            let dataset = arc.HasPart.[0]
+            let converted = fromArc loadedTable arc |> expectOk
+            let categoryId, _ = propertyByName "category-neutral" converted.Model
+
+            let initialConnectionId =
+                converted.Model.Connections |> Map.toList |> List.head |> fst
+
+            let afterValue =
+                Session.init converted.Model
+                |> update categoryId (ProvenanceValue.Text "roundtrip-value") None
+
+            let afterRemoval =
+                Session.removeConnection initialConnectionId afterValue |> expectOk |> fst
+
+            let afterSet =
+                afterRemoval
+                |> createSet
+                    ProvenanceSide.Output
+                    {
+                        Kind = ProcessCoreKinds.sampleEndpoint
+                        Text = "Sample"
+                    }
+                    "roundtrip-output"
+
+            let initialLayer = Session.activeLayer afterSet
+
+            let inputId =
+                initialLayer.Model.InputSets
+                |> Map.toList
+                |> List.find (fun (_, set) -> set.Name = "input-neutral")
+                |> fst
+
+            let originalOutputId =
+                initialLayer.Model.OutputSets
+                |> Map.toList
+                |> List.find (fun (_, set) -> set.Name = "output-neutral")
+                |> fst
+
+            let addedOutputId =
+                initialLayer.Model.OutputSets
+                |> Map.toList
+                |> List.find (fun (_, set) -> set.Name = "roundtrip-output")
+                |> fst
+
+            let afterConnection = connect inputId addedOutputId afterSet
+
+            let retainedConnectionId =
+                (Session.activeLayer afterConnection).Model.Connections
+                |> Map.toList
+                |> List.find (fun (_, connection) -> connection.OutputSetId = addedOutputId)
+                |> fst
+
+            let afterCharacteristic =
+                afterConnection
+                |> createProperty
+                    (ProvenancePropertyTarget.OutputSets [ originalOutputId ])
+                    ProcessCoreKinds.characteristic
+                    "roundtrip-characteristic"
+                    "roundtrip-characteristic-value"
+
+            let afterParameter =
+                afterCharacteristic
+                |> createProperty
+                    (ProvenancePropertyTarget.Connections [ retainedConnectionId ])
+                    ProcessCoreKinds.parameter
+                    "roundtrip-parameter"
+                    "roundtrip-parameter-value"
+
+            let afterComponent =
+                afterParameter
+                |> createProperty
+                    (ProvenancePropertyTarget.Connections [ retainedConnectionId ])
+                    ProcessCoreKinds.componentKind
+                    "roundtrip-component"
+                    "roundtrip-component-value"
+
+            let withUnfinished =
+                addLayer "roundtrip-unfinished" [ ProvenanceSide.Output, addedOutputId ] afterComponent
+
+            let finalSession = addLayer "roundtrip-empty" [] withUnfinished
+
+            writeBack converted.Index finalSession arc |> expectOk |> ignore
+
+            let loadedAgain = fromArc loadedTable arc |> expectOk
+
+            let pairs =
+                loadedAgain.Model.Connections
+                |> Map.toList
+                |> List.map (fun (_, connection) ->
+                    loadedAgain.Model.InputSets.[connection.InputSetId].Name,
+                    loadedAgain.Model.OutputSets.[connection.OutputSetId].Name
+                )
+
+            Expect.contains pairs ("input-neutral", "roundtrip-output") "Retained added connection must reconvert."
+
+            Expect.isFalse
+                (pairs |> List.contains ("input-neutral", "output-neutral"))
+                "Removed original connection must stay removed."
+
+            let _, category = propertyByName "category-neutral" loadedAgain.Model
+            Expect.equal category.Value (ProvenanceValue.Text "roundtrip-value") "Updated value must reconvert."
+            propertyByName "roundtrip-characteristic" loadedAgain.Model |> ignore
+            propertyByName "roundtrip-parameter" loadedAgain.Model |> ignore
+            propertyByName "roundtrip-component" loadedAgain.Model |> ignore
+
+            let unfinishedLocation = {
+                loadedTable with
+                    TableName = "roundtrip-unfinished"
+            }
+
+            let unfinished = fromArc unfinishedLocation arc |> expectOk
+
+            Expect.sequenceEqual
+                (unfinished.Model.InputSets |> Map.toList |> List.map (fun (_, set) -> set.Name))
+                [ "roundtrip-output" ]
+                "Reference-linked input must reconvert."
+
+            Expect.isEmpty unfinished.Model.OutputSets "Unfinished layer must remain output-free."
+            Expect.isEmpty unfinished.Model.Connections "Unfinished layer must remain disconnected."
+
+            let emptyLocation = {
+                loadedTable with
+                    TableName = "roundtrip-empty"
+            }
+
+            let empty = fromArc emptyLocation arc |> expectOk
+            Expect.isEmpty empty.Model.InputSets "Empty layer must remain input-free."
+            Expect.isEmpty empty.Model.OutputSets "Empty layer must remain output-free."
+            Expect.isEmpty empty.Model.Connections "Empty layer must remain connection-free."
+
+            let newGroupOrder =
+                dataset.Processes
+                |> Seq.map (fun proc -> proc.Name)
+                |> Seq.filter (fun name -> name.StartsWith("roundtrip-"))
+                |> Seq.distinct
+                |> Seq.toList
+
+            Expect.sequenceEqual
+                newGroupOrder
+                [ "roundtrip-unfinished"; "roundtrip-empty" ]
+                "New groups must be appended in session layer order."
+
+        testCase "does not persist through the ARC path"
+        <| fun _ ->
+            let fixture = basic ()
+
+            let isolatedPath =
+                System.IO.Path.Combine(
+                    System.IO.Path.GetTempPath(),
+                    "swate-processcore-" + System.Guid.NewGuid().ToString("N")
+                )
+
+            fixture.Arc.ArcPath <- Some isolatedPath
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+            let outputId = converted.Model.OutputSets |> Map.toList |> List.head |> fst
+
+            let session =
+                Session.init converted.Model
+                |> createProperty
+                    (ProvenancePropertyTarget.OutputSets [ outputId ])
+                    ProcessCoreKinds.factor
+                    "memory-only"
+                    "value-neutral"
+
+            writeBack converted.Index session fixture.Arc |> expectOk |> ignore
+            Expect.isFalse (System.IO.Directory.Exists isolatedPath) "Adapter must not write through ARC.ArcPath."
     ]
