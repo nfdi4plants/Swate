@@ -6,7 +6,6 @@ open Fable.Core.JsInterop
 open Feliz
 open Swate.Components.Composite.TermSearch.Context
 open Swate.Components.Composite.TermSearch.Types
-open System.Collections.Generic
 
 module private TermSearchConfigProviderHelper =
 
@@ -15,12 +14,6 @@ module private TermSearchConfigProviderHelper =
         TermSearch: SearchCall
         ParentSearch: ParentSearchCall
         AllChildrenSearch: AllChildrenSearchCall
-    }
-
-    type OLSHierarchyResource = {
-        Iri: string
-        Ontology: string
-        Database: string
     }
 
     type QueryCollection = {
@@ -84,6 +77,12 @@ module private TermSearchConfigProviderHelper =
     let private mapTIBResults rows (request: JS.Promise<Api.TIBApi.TIBTypes.SearchApi option>) =
         request |> mapSearchResults rows _.ToSwateTerms()
 
+    let private mapOLSSearchResults rows (request: JS.Promise<Api.OLSApi.OLSTypes.SearchApi option>) =
+        request |> mapSearchResults rows _.ToSwateTerms()
+
+    let private mapOLSHierarchyResults rows (request: JS.Promise<Api.OLSApi.OLSTypes.Term[] option>) =
+        request |> mapSearchResults rows OLSTypesExtensions.toSwateTerms
+
     let private createTIBCollection collection = {
         Key = create TermSearchSource.TIB collection
         TermSearch =
@@ -109,108 +108,20 @@ module private TermSearchConfigProviderHelper =
     let private tryCreateOLSCollection (collection: Api.OLSApi.OLSTypes.Collection) =
         match collection.id with
         | Some collectionId when not (System.String.IsNullOrWhiteSpace collection.label) ->
-            let resources = Dictionary<string, OLSHierarchyResource>()
-            let terminologies = collection.terminologies |> Option.defaultValue [||]
-
-            let tryFindDatabase ontology =
-                terminologies
-                |> Array.tryFind (fun terminology ->
-                    System.String.Equals(terminology.uri, ontology, System.StringComparison.OrdinalIgnoreCase)
-                    || System.String.Equals(terminology.label, ontology, System.StringComparison.OrdinalIgnoreCase)
-                )
-                |> Option.map _.source
-
-            let cacheTerms (database: string option) (terms: Api.OLSApi.OLSTypes.Term[]) =
-                for term in terms do
-                    let iri = Api.OLSApi.OLSTypes.TermHelpers.iri term
-                    let ontology = Api.OLSApi.OLSTypes.TermHelpers.ontology term
-                    let termDatabase = ontology |> Option.bind tryFindDatabase |> Option.orElse database
-
-                    match Api.OLSApi.OLSTypes.TermHelpers.id term, iri, ontology, termDatabase with
-                    | Some id, Some iri, Some ontology, Some database when not (resources.ContainsKey id) ->
-                        resources.Add(
-                            id,
-                            {
-                                Iri = iri
-                                Ontology = ontology
-                                Database = database
-                            }
-                        )
-                    | _ -> ()
-
-                OLSTypesExtensions.toSwateTerms terms
-
-            let tryFallbackResource (parent: string) =
-                match parent.Split ':' with
-                | [| prefix; accession |] when prefix.Length > 0 && accession.Length > 0 ->
-                    let shortForm = $"{prefix}_{accession}"
-
-                    tryFindDatabase prefix
-                    |> Option.map (fun database ->
-                        let iri =
-                            if prefix.Equals("DPBO", System.StringComparison.OrdinalIgnoreCase) then
-                                $"https://purl.org/nfdi4plants/ontology/dpbo/{shortForm}"
-                            else
-                                $"http://purl.obolibrary.org/obo/{shortForm}"
-
-                        {
-                            Iri = iri
-                            Ontology = prefix.ToLowerInvariant()
-                            Database = database
-                        }
-                    )
-                | _ -> None
-
-            let tryFindResource parent =
-                match resources.TryGetValue parent with
-                | true, resource -> Some resource
-                | _ -> tryFallbackResource parent
-
-            let emptyTerms () = Promise.lift (ResizeArray<Term>())
-
-            let mapHierarchyResults rows database request =
-                request |> mapResults rows (cacheTerms (Some database))
-
-            let searchHierarchy rows parent search =
-                match tryFindResource parent with
-                | Some resource -> search resource |> mapHierarchyResults rows resource.Database
-                | None -> emptyTerms ()
-
             Some {
                 Key = create TermSearchSource.OLS collection.label
                 TermSearch =
                     fun query ->
-                        Api.OLSApi.OLSApi.defaultSearch (query, DEFAULT_SEARCH_ROWS, collectionId = collectionId)
-                        |> mapSearchResults DEFAULT_SEARCH_ROWS (Api.OLSApi.OLSTypes.searchTerms >> cacheTerms None)
+                        Api.OLSApi.OLSApi.defaultSearch (query, DEFAULT_SEARCH_ROWS, collectionId)
+                        |> mapOLSSearchResults DEFAULT_SEARCH_ROWS
                 ParentSearch =
                     fun (parent, query) ->
-                        searchHierarchy
-                            DEFAULT_SEARCH_ROWS
-                            parent
-                            (fun resource ->
-                                Api.OLSApi.OLSApi.searchChildrenOf (
-                                    query,
-                                    resource.Iri,
-                                    resource.Ontology,
-                                    resource.Database,
-                                    DEFAULT_SEARCH_ROWS,
-                                    collectionId
-                                )
-                            )
+                        Api.OLSApi.OLSApi.searchChildrenOf (query, parent, collection, DEFAULT_SEARCH_ROWS)
+                        |> mapOLSHierarchyResults DEFAULT_SEARCH_ROWS
                 AllChildrenSearch =
                     fun parent ->
-                        searchHierarchy
-                            ALL_CHILDREN_SEARCH_ROWS
-                            parent
-                            (fun resource ->
-                                Api.OLSApi.OLSApi.searchAllChildrenOf (
-                                    resource.Iri,
-                                    resource.Ontology,
-                                    resource.Database,
-                                    ALL_CHILDREN_SEARCH_ROWS,
-                                    collectionId
-                                )
-                            )
+                        Api.OLSApi.OLSApi.searchAllChildrenOf (parent, collection, ALL_CHILDREN_SEARCH_ROWS)
+                        |> mapOLSHierarchyResults ALL_CHILDREN_SEARCH_ROWS
             }
         | _ -> None
 

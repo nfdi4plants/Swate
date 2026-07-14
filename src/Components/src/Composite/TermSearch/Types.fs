@@ -218,16 +218,34 @@ module TIBTypesExtensions =
 [<AutoOpen>]
 module OLSTypesExtensions =
 
+    let private normalizeShortForm (value: string) =
+        let separatorIndex = value.IndexOf "_"
+
+        if separatorIndex > 0 && separatorIndex < value.Length - 1 then
+            value.Substring(0, separatorIndex) + ":" + value.Substring(separatorIndex + 1)
+        else
+            value
+
     let toSwateTerm (term: Api.OLSApi.OLSTypes.Term) =
+        let iri = term.iri |> Option.orElse term.URI
+
+        let id =
+            term.obo_id
+            |> Option.orElse (term.short_form |> Option.orElse term.shortForm |> Option.map normalizeShortForm)
+            |> Option.orElse iri
+
+        let description =
+            term.description
+            |> Option.orElse (term.definition |> Option.bind _.value)
+            |> Option.map (String.concat ";")
+
         Term(
             ?name = term.label,
-            ?id = Api.OLSApi.OLSTypes.TermHelpers.id term,
-            ?description =
-                (Api.OLSApi.OLSTypes.TermHelpers.description term
-                 |> Option.map (String.concat ";")),
-            ?source = Api.OLSApi.OLSTypes.TermHelpers.ontology term,
-            ?href = Api.OLSApi.OLSTypes.TermHelpers.iri term,
-            ?isObsolete = Api.OLSApi.OLSTypes.TermHelpers.isObsolete term,
+            ?id = id,
+            ?description = description,
+            ?source = (term.ontology_name |> Option.orElse term.ontologyId),
+            ?href = iri,
+            ?isObsolete = (term.is_obsolete |> Option.orElse term.isObsolete |> Option.orElse term.obsolete),
             data = term
         )
 

@@ -15,6 +15,7 @@ module OLSTypes =
 
     type Term =
         abstract iri: string option
+        abstract URI: string option
         abstract description: string[] option
         abstract definition: StringValues option
         abstract label: string option
@@ -26,51 +27,8 @@ module OLSTypes =
         abstract short_form: string option
         abstract shortForm: string option
         abstract obo_id: string option
-        abstract hasDirectChildren: bool option
-
-    [<RequireQualifiedAccess>]
-    module TermHelpers =
-
-        let private normalizeShortForm (value: string) =
-            let separatorIndex = value.IndexOf "_"
-
-            if separatorIndex > 0 && separatorIndex < value.Length - 1 then
-                value.Substring(0, separatorIndex) + ":" + value.Substring(separatorIndex + 1)
-            else
-                value
-
-        let iri (term: Term) = term.iri
-
-        let ontology (term: Term) =
-            term.ontology_name |> Option.orElse term.ontologyId
-
-        let description (term: Term) =
-            term.description |> Option.orElse (term.definition |> Option.bind _.value)
-
-        let shortForm (term: Term) =
-            term.short_form |> Option.orElse term.shortForm
-
-        let id (term: Term) =
-            term.obo_id
-            |> Option.orElse (shortForm term |> Option.map normalizeShortForm)
-            |> Option.orElse (iri term)
-
-        let isObsolete (term: Term) =
-            term.is_obsolete |> Option.orElse term.isObsolete |> Option.orElse term.obsolete
-
-        let searchableValues (term: Term) =
-            [|
-                term.label
-                term.obo_id
-                shortForm term
-                iri term
-                yield! description term |> Option.defaultValue [||] |> Array.map Some
-            |]
-            |> Array.choose (fun value -> value)
 
     type SearchResults =
-        abstract numFound: int option
-        abstract start: int option
         abstract docs: Term[] option
 
     type SearchApi =
@@ -78,9 +36,6 @@ module OLSTypes =
 
     let searchTerms (response: SearchApi) =
         response.response |> Option.bind _.docs |> Option.defaultValue [||]
-
-    type HierarchyApi =
-        abstract elements: Term[] option
 
     type Terminology =
         abstract uri: string
@@ -93,20 +48,42 @@ module OLSTypes =
         abstract isPublic: bool
         abstract terminologies: Terminology[] option
 
-module private OLSResponse =
+module private OLSApiHelper =
 
-    // The TS4NFDI gateway currently returns the same identifier as both `iri` and `URI`.
-    // Keep the canonical `iri` field locally until the duplicate is removed upstream.
-    [<Emit("($0.iri = $0.iri ?? $0.URI, delete $0.URI)")>]
-    let private canonicalizeIri (_term: OLSTypes.Term) : unit = jsNative
+    type HierarchyApi =
+        abstract elements: OLSTypes.Term[] option
 
-    let canonicalizeTerms terms =
-        terms |> Array.iter canonicalizeIri
-        terms
+    type HierarchyResource = {
+        Iri: string
+        Ontology: string
+        Database: string
+    }
 
-    let canonicalizeSearch (response: OLSTypes.SearchApi) =
-        response |> OLSTypes.searchTerms |> canonicalizeTerms |> ignore
-        response
+    let tryCreateHierarchyResource (parentOboId: string) (collection: OLSTypes.Collection) =
+        match parentOboId.Split ':' with
+        | [| prefix; accession |] when prefix.Length > 0 && accession.Length > 0 ->
+            collection.terminologies
+            |> Option.defaultValue [||]
+            |> Array.tryFind (fun terminology ->
+                System.String.Equals(terminology.uri, prefix, System.StringComparison.OrdinalIgnoreCase)
+                || System.String.Equals(terminology.label, prefix, System.StringComparison.OrdinalIgnoreCase)
+            )
+            |> Option.map (fun terminology ->
+                let shortForm = $"{prefix}_{accession}"
+
+                let iri =
+                    if prefix.Equals("DPBO", System.StringComparison.OrdinalIgnoreCase) then
+                        $"https://purl.org/nfdi4plants/ontology/dpbo/{shortForm}"
+                    else
+                        $"http://purl.obolibrary.org/obo/{shortForm}"
+
+                {
+                    Iri = iri
+                    Ontology = terminology.uri
+                    Database = terminology.source
+                }
+            )
+        | _ -> None
 
 [<AttachMembers>]
 type OLSApi =
@@ -114,106 +91,58 @@ type OLSApi =
     static member private encodeClassPath(iri: string, database: string) =
         // The gateway double-encodes OLS2 IRIs itself. OLS1 backends expect the
         // already double-encoded value, after Spring has decoded the path once.
-        let encodingCount = if database = "ebi" then 1 else 3
+        let encodingCount =
+            if database.Equals("ebi", System.StringComparison.OrdinalIgnoreCase) then
+                1
+            else
+                3
 
         [ 1..encodingCount ]
         |> List.fold (fun encoded _ -> JS.encodeURIComponent encoded) iri
 
-    static member private getChildren(parentIri: string, ontology: string, database: string, ?collectionId: string) =
-        let encodedParent = OLSApi.encodeClassPath (parentIri, database)
+    static member private searchHierarchy(q: string, parentOboId: string, collection: OLSTypes.Collection, ?rows: int) =
+        match OLSApiHelper.tryCreateHierarchyResource parentOboId collection with
+        | None -> Promise.lift None
+        | Some resource ->
+            let queryParams: (string * obj) list = [
+                "database", resource.Database
+                "page", 0
+                "size", (defaultArg rows 10 |> box)
+                if q <> "*" then
+                    "search", q
+                if collection.id.IsSome then
+                    "collectionId", collection.id.Value
+            ]
 
-        let queryParams: (string * obj) list = [
-            "database", database
-            "page", 0
-            "size", 500
-            if collectionId.IsSome then
-                "collectionId", collectionId.Value
-        ]
+            let encodedParent = OLSApi.encodeClassPath (resource.Iri, resource.Database)
 
-        appendQueryParams
-            $"{OLSTypes.BaseAPIUrl}/ols/api/v2/ontologies/{JS.encodeURIComponent ontology}/classes/{encodedParent}/children"
-            queryParams
-        |> getJson<OLSTypes.HierarchyApi>
-        |> Promise.map (fun response -> response.elements |> Option.defaultValue [||] |> OLSResponse.canonicalizeTerms)
+            appendQueryParams
+                $"{OLSTypes.BaseAPIUrl}/ols/api/v2/ontologies/{JS.encodeURIComponent resource.Ontology}/classes/{encodedParent}/children"
+                queryParams
+            |> getJson<OLSApiHelper.HierarchyApi>
+            |> Promise.map (fun response -> response.elements |> Option.defaultValue [||] |> Some)
 
-    static member private containsQuery(query: string, term: OLSTypes.Term) =
-        if System.String.IsNullOrWhiteSpace query || query = "*" then
-            true
-        else
-            let contains (value: string) =
-                value.IndexOf(query, System.StringComparison.OrdinalIgnoreCase) >= 0
-
-            term |> OLSTypes.TermHelpers.searchableValues |> Array.exists contains
-
-    static member search(q: string, ?rows: int, ?ontology: string, ?database: string, ?collectionId: string) =
+    static member search(q: string, ?rows: int, ?collection: string) =
         let queryParams: (string * obj) list = [
             "q", q
             if rows.IsSome then
                 "rows", rows.Value
-            if ontology.IsSome then
-                "ontology", ontology.Value
-            if database.IsSome then
-                "database", database.Value
-            if collectionId.IsSome then
-                "collectionId", collectionId.Value
+            if collection.IsSome then
+                "collectionId", collection.Value
         ]
 
         appendQueryParams $"{OLSTypes.BaseAPIUrl}/ols/api/select" queryParams
         |> getJson<OLSTypes.SearchApi>
-        |> Promise.map (OLSResponse.canonicalizeSearch >> Some)
+        |> Promise.map Some
 
-    static member defaultSearch(q: string, ?rows: int, ?ontology: string, ?database: string, ?collectionId: string) =
-        OLSApi.search (
-            q,
-            rows = defaultArg rows 10,
-            ?ontology = ontology,
-            ?database = database,
-            ?collectionId = collectionId
-        )
+    static member defaultSearch(q: string, ?rows: int, ?collection: string) =
+        OLSApi.search (q, rows = defaultArg rows 10, ?collection = collection)
 
-    static member searchChildrenOf
-        (q: string, parentIri: string, ontology: string, database: string, ?rows: int, ?collectionId: string)
-        =
-        OLSApi.getChildren (parentIri, ontology, database, ?collectionId = collectionId)
-        |> Promise.map (
-            Array.filter (fun term -> OLSApi.containsQuery (q, term))
-            >> Array.truncate (defaultArg rows 10)
-        )
+    static member searchChildrenOf(q: string, parentOboId: string, collection: OLSTypes.Collection, ?rows: int) =
+        OLSApi.searchHierarchy (q, parentOboId, collection, rows = defaultArg rows 10)
 
-    static member searchAllChildrenOf
-        (parentIri: string, ontology: string, database: string, ?rows: int, ?collectionId: string)
-        =
-        promise {
-            let rows = defaultArg rows 500
-            let visited = System.Collections.Generic.HashSet<string>()
-            let results = ResizeArray<OLSTypes.Term>()
-            let mutable frontier = [| parentIri |]
-            visited.Add parentIri |> ignore
-
-            while frontier.Length > 0 && results.Count < rows do
-                let! childGroups =
-                    frontier
-                    |> Array.map (fun iri -> OLSApi.getChildren (iri, ontology, database, ?collectionId = collectionId))
-                    |> Promise.all
-
-                let nextFrontier = ResizeArray<string>()
-
-                for term in Array.concat childGroups do
-                    if results.Count < rows then
-                        let iri = OLSTypes.TermHelpers.iri term
-
-                        match iri with
-                        | Some value when visited.Add value ->
-                            results.Add term
-
-                            if term.hasDirectChildren |> Option.defaultValue true then
-                                nextFrontier.Add value
-                        | _ -> ()
-
-                frontier <- nextFrontier.ToArray()
-
-            return results.ToArray()
-        }
+    static member searchAllChildrenOf(parentOboId: string, collection: OLSTypes.Collection, ?rows: int) =
+        OLSApi.searchHierarchy ("*", parentOboId, collection, rows = defaultArg rows 500)
 
     static member getCollections() =
         getJson<OLSTypes.Collection[]> $"{OLSTypes.BaseAPIUrl}/collections/"
