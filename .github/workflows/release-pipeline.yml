@@ -105,14 +105,26 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false  # never use caching in release builds
 
       # Install npm dependencies
       - name: Install root dependencies
         run: npm i
 
+        # Get a short-lived NuGet API key
+        # https://learn.microsoft.com/en-gb/nuget/nuget-org/trusted-publishing#github-actions-setup
+      - name: NuGet login (OIDC → temp API key)
+        uses: NuGet/login@v1
+        if: ${{ matrix.target == 'nuget' }}
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+    
+
       - name: Run release for ${{ matrix.target }}
         env:
-          NUGET_KEY: ${{ secrets.NUGET_KEY }}
+          NUGET_KEY: ${{steps.login.outputs.NUGET_API_KEY}}
           NPM_KEY: ${{ secrets.NPM_KEY }}
           DOCKER_KEY: ${{ secrets.GITHUB_TOKEN }} # or your docker/personal token
         run: dotnet run --project ./build/Build.fsproj release ${{ matrix.target }} --ci --user=${{ github.actor }}

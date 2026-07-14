@@ -18,14 +18,13 @@ import {Entry as DataMapTable} from '../src/Composite/DataMapTable/DataMapTable.
 import {Entry as Layout} from '../src/Composite/Layout/Layout.fs.js'
 import {FileExplorerExample_Example} from '../src/Page/FileExplorer/FileExplorer.fs.ts'
 import {Entry as WidgetController} from '../src/Composite/Widgets/Widgets.fs.ts';
-// import {Entry as NoteSearch} from '../src/Composite/Notes/NoteSearch/NoteSearchComponent.fs.ts'
 import {Entry as TextInputWithMarkdown} from '../src/Composite/MarkdownText/TextInputWithMarkdown.fs.ts';
 import {Entry as AuthButton} from '../src/Composite/Authentication/Authentication.fs.ts';
-// import {Entry as DataHubSidebarEntry} from '../src/DataHub/DataHubSidebar.fs.ts';
 import {GitLabEntry as DataHubBrowser} from '../src/Page/DataHubBrowser/DataHubBrowser.fs.ts';
 import {Entry as ARCSelectorEntry} from '../src/Composite/ArcSelector/ArcSelector.fs.ts';
 import {Entry as ArcFileEditor} from '../src/Page/ArcFileEditor/ArcFileEditor.fs.ts';
 import {Entry as SettingsPage} from '../src/Page/SettingsPage/SettingsPage.fs.ts';
+import WorkspaceEntry from '../src/Composite/Workspace/Workspace.fixture.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -34,12 +33,6 @@ function TermSearchContainer() {
   const [counter, setCounter] = React.useState(0)
   return <Fragment>
     <h2 className='swt:text-3xl'>TermSearch</h2>
-    {/* <TermSearch
-      onTermSelect={(term) => setTerm(term as Term | undefined)}
-      term={term}
-      showDetails
-      debug={true}
-    /> */}
     <div className='swt:max-w-2xl swt:flex swt:flex-col swt:gap-4'>
       <div className='swt:flex swt:flex-col'>
         <label className='swt:text-gray-200'>
@@ -94,7 +87,6 @@ function TermSearchContainer() {
 }
 
 function TableContainer() {
-
   return <div className='swt:flex swt:flex-col swt:gap-4'>
     <h2 className='swt:text-3xl'>Table</h2>
     <Table />
@@ -152,8 +144,6 @@ function DataMapTableContainer() {
   </div>
 }
 
-
-
 function FileExplorerContainer() {
   return <div className='swt:flex swt:flex-col swt:gap-4'>
     <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>File Explorer</h2>
@@ -198,13 +188,6 @@ function AuthButtonContainer() {
   </div>
 }
 
-// function DataHubSidebarContainer() {
-//   return <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full'>
-//     <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>DataHub Sidebar</h2>
-//     <DataHubSidebarEntry />
-//   </div>
-// }
-
 function DataHubBrowserContainer() {
   return <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full'>
     <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>DataHub Browser</h2>
@@ -225,16 +208,17 @@ function ArcFileEditorContainer() {
   </div>
 }
 
+function WorkspaceContainer() {
+  return (
+    <div className='swt:flex swt:flex-col swt:h-screen swt:w-screen swt:overflow-hidden'>
+      <WorkspaceEntry />
+    </div>
+  );
+}
+
 const App = () => {
     return (
-        <ArcFileEditorContainer />
-        // <ArcFileEditorContainer />
-        // <AuthButtonContainer />
-        // <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-8 swt:mb-12">
-        //     <NoteSearch />
-        //     <MarkdownTextContainer />
-        //     <LandingContainer />
-        // </div>
+        <WorkspaceContainer />
     );
 };
 
