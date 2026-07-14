@@ -15,6 +15,17 @@ module OntologyAnnotationHelper =
 type OntologyAnnotation with
     static member empty() = OntologyAnnotation.create ()
 
+    member this.hasName = not (System.String.IsNullOrWhiteSpace this.NameText)
+
+    member this.hasTermMetadata =
+        Option.exists (System.String.IsNullOrWhiteSpace >> not) this.TermSourceREF
+        && Option.exists (System.String.IsNullOrWhiteSpace >> not) this.TermAccessionNumber
+
+    member this.NameEquals(other: OntologyAnnotation) =
+        this.hasName
+        && other.hasName
+        && System.String.Equals(this.NameText, other.NameText, System.StringComparison.OrdinalIgnoreCase)
+
     static member from(term: Shared.Database.Term) =
         let comments =
             ResizeArray [
