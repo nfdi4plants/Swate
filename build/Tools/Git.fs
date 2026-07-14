@@ -16,8 +16,6 @@ let createTagAndPush (tag: string) =
         "git"
         [
             "tag"
-            if tag = "1.0.0-rc.9" then
-                "-f"
             tag
         ]
         ""
@@ -27,8 +25,6 @@ let createTagAndPush (tag: string) =
         [
             "push"
             "origin"
-            if tag = "1.0.0-rc.9" then
-                "-f"
             tag
         ]
         ""
