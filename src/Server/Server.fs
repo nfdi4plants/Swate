@@ -23,26 +23,7 @@ open Microsoft.AspNetCore.Http
 
 open Database
 
-let templateApi credentials =
-    let templateUrl =
-        @"https://github.com/nfdi4plants/Swate-templates/releases/download/latest/templates_v2.0.0.json"
-
-    {
-        getTemplates =
-            fun () -> async {
-                let! templates = ARCtrl.Template.Web.getTemplates (None)
-                let templatesJson = ARCtrl.Json.Templates.toJsonString 0 (Array.ofSeq templates)
-                return templatesJson
-            }
-
-        getTemplateById =
-            fun id -> async {
-                let! templates = ARCtrl.Template.Web.getTemplates (None)
-                let template = templates |> Seq.find (fun t -> t.Id = System.Guid(id))
-                let templateJson = Template.toCompressedJsonString 0 template
-                return templateJson
-            }
-    }
+let templateApi = TemplateApi.create TemplateApi.downloadTemplates
 
 let testApi (ctx: HttpContext) : ITestAPI = {
     test =
@@ -82,10 +63,10 @@ let testApi (ctx: HttpContext) : ITestAPI = {
         }
 }
 
-let createITemplateApiv1 credentials =
+let createITemplateApiv1 =
     Remoting.createApi ()
     |> Remoting.withRouteBuilder Route.builder
-    |> Remoting.fromValue (templateApi credentials)
+    |> Remoting.fromValue templateApi
     |> Remoting.withDiagnosticsLogger (printfn "%A")
     |> Remoting.withErrorHandler API.Helper.errorHandler
     |> Remoting.buildHttpHandler
@@ -165,12 +146,7 @@ let topLevelRouter = router {
             API.IOntologyAPI.V3.createIOntologyApi credentials next ctx
         )
 
-    forward
-        @""
-        (fun next ctx ->
-            let credentials = getNeo4JCredentials ctx
-            createITemplateApiv1 credentials next ctx
-        )
+    forward @"" createITemplateApiv1
 
     //
     forward @"" (fun next ctx -> createIServiceAPIv1 next ctx)

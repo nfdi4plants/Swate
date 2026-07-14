@@ -13,6 +13,7 @@
     <Compile Include="Database\TreeSearch.fs"/>
     <Compile Include="Api\Helper.fs"/>
     <Compile Include="Api\IOntologyAPI.fs"/>
+    <Compile Include="TemplateApi.fs"/>
     <Compile Include="Server.fs"/>
   </ItemGroup>
   <ItemGroup>

@@ -1,7 +1,6 @@
 /// https://terminology.services.base4nfdi.de/api-gateway/v3/api-docs
 module Swate.Components.Api.OLSApi
 
-
 open Swate.Components
 open Swate.Components.Shared
 open Fable.Core
@@ -24,7 +23,6 @@ module OLSTypes =
 
     type Term =
         abstract iri: string option
-        abstract URI: string option
         abstract lang: string option
         abstract description: string[] option
         abstract synonym: string[] option
@@ -59,38 +57,20 @@ module OLSTypes =
     type SearchApi =
         abstract response: SearchResults option
 
-    type OntologyConfig =
+    type Collection =
         abstract id: string option
-        abstract title: string option
-        abstract description: string[] option
-        abstract version: string option
-
-    type Ontology =
-        abstract ontologyId: string option
-        abstract ``type``: string option
-        abstract URI: string option
-        abstract config: OntologyConfig option
-
-    type OntologyArray =
-        abstract ontologies: Ontology[] option
-        abstract page: Page option
-
-    type OntologiesApi =
-        abstract _embedded: OntologyArray option
-
+        abstract label: string
+        abstract isPublic: bool
 
 module private OLSApiHelper =
 
-    let tryParseOboId (oboId: string) =
-        let parts = oboId.Split([| ':' |], 2)
+    [<Emit("(($0.iri = $0.iri ?? $0.URI), delete $0.URI)")>]
+    let private canonicalizeTermIdentifier (term: OLSTypes.Term) : unit = jsNative
 
-        if parts.Length = 2 && not (System.String.IsNullOrWhiteSpace parts.[0]) then
-            let ontology = parts.[0].ToLowerInvariant()
-            let iri = $"http://purl.obolibrary.org/obo/{parts.[0]}_{parts.[1]}"
-            Some(ontology, iri)
-        else
-            None
+    let canonicalizeTerms getTerms response =
+        response |> getTerms |> Option.iter (Array.iter canonicalizeTermIdentifier)
 
+        response
 
 [<AttachMembers>]
 type OLSApi =
@@ -105,25 +85,7 @@ type OLSApi =
         getJson<OLSTypes.TermApi> (
             appendQueryParams $"{OLSTypes.BaseAPIUrl}/ols/api/ontologies/{ontology}/terms" queryParams
         )
-
-    static member tryGetIRIFromOboId(oboId: string, ?database: string) = promise {
-        match OLSApiHelper.tryParseOboId oboId with
-        | None -> return None
-        | Some(ontology, iri) ->
-            let! termApi = OLSApi.getTermByIRI (ontology, iri, ?database = database)
-
-            return
-                termApi._embedded
-                |> Option.bind _.terms
-                |> Option.bind (
-                    Array.tryFind (fun term ->
-                        term.iri = Some iri
-                        || term.short_form = Some(oboId.Replace(":", "_"))
-                        || term.obo_id = Some oboId
-                    )
-                )
-                |> Option.bind _.iri
-    }
+        |> Promise.map (OLSApiHelper.canonicalizeTerms (fun response -> response._embedded |> Option.bind _.terms))
 
     static member search(q: string, ?rows: int, ?ontology: string, ?database: string, ?collectionId: string) =
         let baseUrl = $"{OLSTypes.BaseAPIUrl}/ols/api/select"
@@ -142,18 +104,15 @@ type OLSApi =
 
         let url = appendQueryParams baseUrl queryParams
 
-        getJson<OLSTypes.SearchApi> url |> Promise.map Some
+        getJson<OLSTypes.SearchApi> url
+        |> Promise.map (
+            OLSApiHelper.canonicalizeTerms (fun response -> response.response |> Option.bind _.docs)
+            >> Some
+        )
 
     static member defaultSearch(q: string, ?rows: int, ?ontology: string, ?database: string, ?collectionId: string) =
         let rows = defaultArg rows 10
         OLSApi.search (q, rows = rows, ?ontology = ontology, ?database = database, ?collectionId = collectionId)
 
-    static member getOntologies(?database: string, ?collectionId: string) =
-        let queryParams: (string * obj) list = [
-            if database.IsSome then
-                "database", database.Value
-            if collectionId.IsSome then
-                "collectionId", collectionId.Value
-        ]
-
-        getJson<OLSTypes.OntologiesApi> (appendQueryParams $"{OLSTypes.BaseAPIUrl}/ols/api/ontologies" queryParams)
+    static member getCollections() =
+        getJson<OLSTypes.Collection[]> $"{OLSTypes.BaseAPIUrl}/collections/"

@@ -15,3 +15,11 @@ let SwateTemplateApi: ITemplateAPIv1 =
     Remoting.createApi ()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.buildProxy<ITemplateAPIv1>
+
+let loadTemplates () = async {
+    try
+        let! json = SwateTemplateApi.getTemplates ()
+        return Ok(ARCtrl.Json.Templates.fromJsonString json)
+    with error ->
+        return Error($"Error loading templates: {error.Message}")
+}

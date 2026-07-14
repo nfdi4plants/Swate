@@ -18,7 +18,7 @@ type TemplateWidget =
 
     [<ReactComponent(true)>]
     static member TemplateWidget
-        // 👀 If you rename these variables, ensure that the names are forwarded for lazy loading in `src\Components\src\ARCFileEditor\ArcFileEditor.fs` as well!
+        // If you rename these variables, also update the lazy component in ArcFileEditor.fs.
         (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit) =
 
         let templateCacheCtx = TemplateCacheContext.useTemplateCacheCtx ()
@@ -127,7 +127,7 @@ type TemplateWidget =
             ]
         ]
 
-    /// This will be used for tests in Widgets
+    /// This will be used for tests in Widgets.
     [<ReactComponent>]
     static member Entry
         (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit, services: TemplateWidgetServices) =

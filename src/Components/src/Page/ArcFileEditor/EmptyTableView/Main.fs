@@ -86,14 +86,7 @@ type Main =
                     isBuildingBlockOpen,
                     setIsOpen ModalState.BuildingBlock
                 )
-                Modals.Templates(
-                    arcFile,
-                    activeTableIndex,
-                    setArcFile,
-
-                    isTemplatesOpen,
-                    setIsOpen ModalState.Templates
-                )
+                Modals.Templates(arcFile, activeTableIndex, setArcFile, isTemplatesOpen, setIsOpen ModalState.Templates)
                 Modals.PreviousTableSelect(
                     arcFile,
                     activeTableIndex,

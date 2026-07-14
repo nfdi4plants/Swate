@@ -5,6 +5,20 @@ open Swate.Components.Shared.Extensions
 open Fable.Core
 open Feliz
 
+[<RequireQualifiedAccess; StringEnum>]
+type TermSearchSource =
+    | [<CompiledName("TIB")>] TIB
+    | [<CompiledName("OLS")>] OLS
+
+[<RequireQualifiedAccess>]
+module TermSearchSourceKey =
+
+    let private prefix source = (source.ToString()) + "_"
+
+    let create (source: TermSearchSource) collectionName = (prefix source) + collectionName
+
+    let belongsTo source (key: string) = key.StartsWith(prefix source)
+
 [<JS.PojoAttribute>]
 type Term
     (?name: string, ?id: string, ?description: string, ?source: string, ?href: string, ?isObsolete: bool, ?data: obj) =
@@ -219,7 +233,7 @@ module OLSTypesExtensions =
         |> Option.orElse (term.short_form |> Option.map normalizeShortForm)
         |> Option.orElse term.iri
 
-    let private termHref (term: Api.OLSApi.OLSTypes.Term) = term.iri |> Option.orElse term.URI
+    let private termHref (term: Api.OLSApi.OLSTypes.Term) = term.iri
 
     type Api.OLSApi.OLSTypes.SearchApi with
         /// This function is used to transform OLS term type into the Swate compatible Term type.

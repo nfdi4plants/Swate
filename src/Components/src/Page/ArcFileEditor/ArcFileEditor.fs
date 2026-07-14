@@ -8,6 +8,7 @@ open Swate.Components
 open Swate.Components.Primitive
 open Swate.Components.Primitive.Navbar
 open Swate.Components.Composite.Widgets.Context
+open Swate.Components.Composite.Widgets.Types
 open Swate.Components.Composite.DataMapTable
 open Swate.Components.Composite.Widgets.JsonImport.Types
 open Swate.Components.Shared
@@ -282,6 +283,7 @@ type Main =
             arcFile: ArcFiles,
             setArcFile: ArcFiles -> unit,
             pickPaths: unit -> Fable.Core.JS.Promise<string[]>,
+            templateServices: TemplateWidgetServices,
             ?trailingNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?startingActiveView: ActiveView,
             ?onImportJson: JsonImportRequest -> JS.Promise<Result<unit, exn>>,
@@ -446,15 +448,18 @@ type Main =
                 |]
             )
 
-        AnnotationTableContextProvider.AnnotationTableContextProvider(
-            Swate.Components.Page.ArcFileEditor.Widgets.Main.Widgets(
-                content,
-                widgetElements.buildingBlock,
-                widgetElements.template,
-                widgetElements.filePicker,
-                widgetElements.dataAnnotator,
-                widgetElements.jsonImport,
-                widgetElements.jsonExport
+        Swate.Components.Composite.Template.TemplateCacheProvider.TemplateCacheProvider(
+            (fun () -> templateServices.loadTemplates () |> Async.StartAsPromise),
+            AnnotationTableContextProvider.AnnotationTableContextProvider(
+                Swate.Components.Page.ArcFileEditor.Widgets.Main.Widgets(
+                    content,
+                    widgetElements.buildingBlock,
+                    widgetElements.template,
+                    widgetElements.filePicker,
+                    widgetElements.dataAnnotator,
+                    widgetElements.jsonImport,
+                    widgetElements.jsonExport
+                )
             )
         )
 
@@ -496,40 +501,27 @@ type Main =
 
         let (arcFile: ArcFiles), setArcFile = React.useState (ArcFiles.Assay(startAssay))
 
-        let loadTemplates =
-            fun () ->
-                match debug with
-                | Some true -> promise {
-                    let STORY_TEMPLATE_NAME = "Story Import Template"
+        let loadTemplates () = async {
+            match debug with
+            | Some true ->
+                let template = Template.init "Story Import Template"
+                template.Organisation <- Organisation.DataPLANT
+                template.Table.AddColumn(CompositeHeader.Input IOType.Source)
+                template.Table.AddColumn(CompositeHeader.Output IOType.Sample)
 
-                    let createImportTemplate =
-                        let template = Template.init (STORY_TEMPLATE_NAME)
-                        template.Organisation <- Organisation.DataPLANT
-                        template.Table.AddColumn(CompositeHeader.Input(IOType.Source))
-                        template.Table.AddColumn(CompositeHeader.Output(IOType.Sample))
-
-                        template.Table.AddColumn(
-                            CompositeHeader.Component(
-                                OntologyAnnotation("My Awesome component", tsr = "COMASS", tan = "COMASS:12345")
-                            )
-                        )
-
-                        template.Table.AddRowsEmpty(1)
-                        template.Version <- "1.0.0"
-                        template
-
-                    return Ok([| createImportTemplate |])
-                  }
-                | _ ->
-
-                    promise {
-                        let! json = Api.SwateApi.SwateTemplateApi.getTemplates () |> Async.StartAsPromise
-                        return Ok(ARCtrl.Json.Templates.fromJsonString json)
-                    }
-                    |> Promise.catch (fun error ->
-                        // Handle error, e.g., log it or show a notification
-                        Error(sprintf "Error loading templates: %s" error.Message)
+                template.Table.AddColumn(
+                    CompositeHeader.Component(
+                        OntologyAnnotation("My Awesome component", tsr = "COMASS", tan = "COMASS:12345")
                     )
+                )
+
+                template.Table.AddRowsEmpty 1
+                template.Version <- "1.0.0"
+                return Ok [| template |]
+            | _ -> return! Api.SwateApi.loadTemplates ()
+        }
+
+        let templateServices = { loadTemplates = loadTemplates }
 
         let ColumnCountTestDisplay () =
             let firstTableColumnCount =
@@ -551,10 +543,13 @@ type Main =
             |]
         }
 
-        Swate.Components.Composite.Template.TemplateCacheProvider.TemplateCacheProvider(
-            loadTemplates,
-            React.Fragment [
-                ColumnCountTestDisplay()
-                Main.ArcFileEditor(arcFile, setArcFile, pickPathsMockFn, startingActiveView = ActiveView.Table 0)
-            ]
-        )
+        React.Fragment [
+            ColumnCountTestDisplay()
+            Main.ArcFileEditor(
+                arcFile,
+                setArcFile,
+                pickPathsMockFn,
+                templateServices,
+                startingActiveView = ActiveView.Table 0
+            )
+        ]
