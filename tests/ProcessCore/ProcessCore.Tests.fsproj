@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Fixtures.fs" />
     <Compile Include="AdapterContract.Tests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
