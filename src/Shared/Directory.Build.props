@@ -1,0 +1,18 @@
+<Project>
+  <!-- Chain to the repo-root Directory.Build.props: MSBuild only auto-imports
+       the closest Directory.Build.props found walking up from the project, so
+       this file must re-import the root one to keep its settings (shared
+       FSharp.Core reference) applying to Swate.Components.Core.fsproj. -->
+  <Import Project="$(MSBuildThisFileDirectory)..\..\Directory.Build.props" />
+
+  <!-- Swate.Components.ProcessCore.fsproj shares this directory with
+       Swate.Components.Core.fsproj. NuGet restore writes obj\project.assets.json
+       unqualified by project name, so without distinct intermediate/output
+       paths the two projects' restores clobber each other. This must be set
+       via Directory.Build.props (imported before Sdk.props) rather than
+       inline in the .fsproj, where it is evaluated too late. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Swate.Components.ProcessCore'">
+    <BaseIntermediateOutputPath>obj\ProcessCore\</BaseIntermediateOutputPath>
+    <BaseOutputPath>bin\ProcessCore\</BaseOutputPath>
+  </PropertyGroup>
+</Project>

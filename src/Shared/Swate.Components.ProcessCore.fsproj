@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <PackageId>Swate.Components.ProcessCore</PackageId>
+    <PackageVersion>0.0.0</PackageVersion>
+    <Authors>Kevin Frey</Authors>
+    <Description>ProcessCore provenance adapter for Swate.Components</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>F# ProcessCore provenance Swate</PackageTags>
+    <PackageProjectUrl>https://github.com/nfdi4plants/Swate</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/nfdi4plants/Swate</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="ProvenanceGrouping\ProcessCoreAdapterTypes.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="Swate.Components.Core.fsproj" />
+    <PackageReference Include="ProcessCore" />
+    <PackageReference Include="Fable.Core" VersionOverride="5.2.0" />
+    <!-- ProcessCore 0.0.7 -> FsSpreadsheet.Net 7.0.0 requires FSharp.Core >= 10.1.301,
+         above the repo-wide 10.1.203 central pin. Override locally, same as
+         the Fable.Core override above, instead of bumping the global pin. -->
+    <PackageReference Update="FSharp.Core" VersionOverride="10.1.301" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="@(Compile)" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
+    <Content Include="$(MSBuildThisFileFullPath)" Pack="true" PackagePath="fable/" />
+  </ItemGroup>
+</Project>
