@@ -6,6 +6,8 @@ open ProjectInfo
 let main args =
     let argv = args |> Array.map (fun x -> x.ToLower()) |> Array.toList
 
+    printfn "all args: %A" argv
+
     match argv with
     | "create-certs" :: _ ->
         Run.createDevCertsForExcelAddIn ()
@@ -23,6 +25,7 @@ let main args =
                 Bundle.Client(true)
                 0
         | _ ->
+            run "dotnet" [ "restore"; "./Swate.sln" ] "."
             Bundle.All()
             0
     | "run" :: a ->
@@ -117,10 +120,10 @@ let main args =
             0
         | "electron-bin" ->
 
-            printfn "args: %A" otherArgs
+            printfn "otherArgs: %A" otherArgs
 
             let arch =
-                otherArgs
+                argv
                 |> List.tryFind (fun x -> x.StartsWith "--arch=")
                 |> Option.map (fun x -> x.Trim().Replace("--arch=", ""))
 

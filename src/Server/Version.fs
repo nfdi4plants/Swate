@@ -6,8 +6,8 @@ let AssemblyTitle = "Swate"
 
 // AssemblyVersion is updated by the release pipeline via REGEX. do not touch!
 [<Literal>]
-let AssemblyVersion = "0.0.0"
+let AssemblyVersion = "2.0.0"
 
 // AssemblyMetadata_ReleaseDate is updated by the release pipeline via REGEX. do not touch!
 [<Literal>]
-let AssemblyMetadata_ReleaseDate = "10.10.2025"
+let AssemblyMetadata_ReleaseDate = "14.07.2026"

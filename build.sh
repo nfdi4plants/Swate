@@ -1,2 +1,2 @@
 #!/bin/bash
-dotnet run --project ./build/Build.fsproj "$@"
+dotnet run --project ./build/Build.fsproj -- "$@"

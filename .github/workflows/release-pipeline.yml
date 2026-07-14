@@ -41,6 +41,11 @@ jobs:
       #     node-version: 22
       #     cache: "npm"
 
+      # Trusted publishing with npm requires at least npm version 11.5.1, BUT node v22 comes with npm v10.x.
+      # https://docs.npmjs.com/trusted-publishers
+      # - name: Update npm version to at least 11.5.1
+      #   run: npm install -g npm@11.5.1
+
       # # Install npm dependencies
       # - name: Install root npm dependencies
       #   run: npm i
@@ -51,7 +56,7 @@ jobs:
       #   run: npx playwright install --with-deps chromium
 
       # - name: Run Tests
-      #   run: dotnet run --project ./build/Build.fsproj test
+      #   run: dotnet run --project ./build/Build.fsproj -- test
 
   # --- Job 2: Detect new version ---
   verify_release:
@@ -75,7 +80,7 @@ jobs:
         name: Check for new version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: dotnet run --project ./build/Build.fsproj prerelease
+        run: dotnet run --project ./build/Build.fsproj -- prerelease
 
   release:
     needs: verify_release
@@ -108,19 +113,17 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           package-manager-cache: false  # never use caching in release builds
 
-      # Verify npm trusted publishing
-      - name: Debug OIDC
-        if: ${{ matrix.target == 'npm' }}
-        run: |
-          echo "Repository: $GITHUB_REPOSITORY"
-          echo "Workflow: $GITHUB_WORKFLOW"
-          echo "Ref: $GITHUB_REF"
+      # Trusted publishing with npm requires at least npm version 11.5.1, BUT node v22 comes with npm v10.x.
+      # https://docs.npmjs.com/trusted-publishers
+      - name: Update npm version to at least 11.5.1
+        run: npm install -g npm@11.5.1
+
       # Install npm dependencies
       - name: Install root dependencies
         run: npm i
 
-        # Get a short-lived NuGet API key
-        # https://learn.microsoft.com/en-gb/nuget/nuget-org/trusted-publishing#github-actions-setup
+      # Get a short-lived NuGet API key
+      # https://learn.microsoft.com/en-gb/nuget/nuget-org/trusted-publishing#github-actions-setup
       - name: NuGet login (OIDC → temp API key)
         uses: NuGet/login@v1
         if: ${{ matrix.target == 'nuget' }}
@@ -128,12 +131,11 @@ jobs:
         with:
           user: ${{ secrets.NUGET_USER }}
     
-
       - name: Run release for ${{ matrix.target }}
         env:
           NUGET_KEY: ${{steps.login.outputs.NUGET_API_KEY}}
           DOCKER_KEY: ${{ secrets.GITHUB_TOKEN }} # or your docker/personal token
-        run: dotnet run --project ./build/Build.fsproj release ${{ matrix.target }} --ci --user=${{ github.actor }}
+        run: dotnet run --project ./build/Build.fsproj -- release ${{ matrix.target }} --ci --user=${{ github.actor }}
 
       - uses: actions/upload-artifact@v4
         if: ${{ matrix.target == 'electron-web' }}
@@ -194,14 +196,18 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22
-          cache: "npm"
+
+      # Trusted publishing with npm requires at least npm version 11.5.1, BUT node v22 comes with npm v10.x.
+      # https://docs.npmjs.com/trusted-publishers
+      - name: Update npm version to at least 11.5.1
+        run: npm install -g npm@11.5.1
 
       # Install npm dependencies
       - name: Install root dependencies
         run: npm i
 
       - name: Build Electron binaries
-        run: dotnet run --project ./build/Build.fsproj release electron-bin --ci --arch=${{ matrix.arch }}
+        run: dotnet run --project ./build/Build.fsproj -- release electron-bin --ci --arch=${{ matrix.arch }}
 
       - uses: actions/upload-artifact@v4
         with:
@@ -238,4 +244,4 @@ jobs:
       - name: Upload assets and finalize release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: dotnet run --project ./build/Build.fsproj postrelease release-assets
+        run: dotnet run --project ./build/Build.fsproj -- postrelease release-assets
