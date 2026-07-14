@@ -5,7 +5,7 @@ open SimpleExec
 open ProjectInfo
 open System.IO
 
-let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
+let npm (version: Changelog.Version) (isDryRun: bool) =
 
     let isPrerelease = version.Version.IsPrerelease
 
@@ -27,16 +27,6 @@ let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
         let version = VersionIO.updateComponentsPackageJSONVersion version
 
         let build = run "npm" [ "run"; "build" ] ProjectPaths.componentsPath
-
-        let setConfig =
-            run
-                "npm"
-                [
-                    "config"
-                    "set"
-                    $"//registry.npmjs.org/:_authToken={key}"
-                ]
-                ProjectPaths.componentsPath
 
         let cssFilePath =
             Path.Combine(ProjectPaths.componentsPath, "dist", "assets", "swate-components.css")
