@@ -234,21 +234,30 @@ module ProvenanceTutorialSteps =
     let private speciesHeader =
         Fixtures.propertyHeader Fixtures.FixtureKinds.characteristicProperty "Species"
 
+    let private speciesProperty (session: ProvenanceSession) =
+        let layer = Session.activeLayer session
+
+        layer.Model.PropertyValues
+        |> Map.toList
+        |> List.map snd
+        |> List.find (fun propertyValue -> propertyValue.Header = speciesHeader)
+        |> ProvenancePropertyValue.propertyKey
+
     let private withSpeciesOnInputRail (session: ProvenanceSession) (state: UiState) =
         let layer = Session.activeLayer session
-        State.PropertyPlacement.place layer.Id ProvenanceSide.Input speciesHeader state
+        State.PropertyPlacement.place layer.Id ProvenanceSide.Input (speciesProperty session) state
 
     let private withSpeciesGrouped (session: ProvenanceSession) (state: UiState) =
         let layer = Session.activeLayer session
 
         withSpeciesOnInputRail session state
-        |> State.GroupingAssignments.toggleSide layer.InputSideId ProvenanceSide.Input speciesHeader
+        |> State.GroupingAssignments.toggleSide layer.InputSideId ProvenanceSide.Input (speciesProperty session)
 
     let private withSpeciesValuesExpanded (session: ProvenanceSession) (state: UiState) =
         let layer = Session.activeLayer session
 
         withSpeciesGrouped session state
-        |> State.PropertyExpansion.toggle layer.Id ProvenanceSide.Input speciesHeader
+        |> State.PropertyExpansion.toggle layer.Id ProvenanceSide.Input (speciesProperty session)
 
     /// The stock sample plus one input without any annotation values. Every
     /// stock entity already has a species (inputs their own, outputs an

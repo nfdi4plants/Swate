@@ -96,6 +96,13 @@ type ProvenancePropertyHeader = {
     Category: ProvenanceTerm
 }
 
+/// Identity of one logical property throughout the provenance editor.
+/// The overall source is the origin; process and occurrence metadata are not.
+type ProvenancePropertyKey = {
+    Header: ProvenancePropertyHeader
+    OriginSource: ProvenanceSourceRef
+}
+
 /// Source metadata needed to update an existing property value in its source model.
 /// This is a writeback anchor, not a graph edge and not an ARCtrl object reference.
 type ProvenanceWritebackAnchor = {
@@ -118,6 +125,15 @@ type ProvenancePropertyOrigin =
     | Real of ProvenanceWritebackAnchor
     | Virtual of ProvenanceWritebackAnchor
 
+module ProvenancePropertyOrigin =
+
+    let anchor origin =
+        match origin with
+        | ProvenancePropertyOrigin.Real anchor
+        | ProvenancePropertyOrigin.Virtual anchor -> anchor
+
+    let source origin = (anchor origin).Source
+
 /// One concrete editable key/value in the normalized model.
 /// Distinct values must remain distinct; exact duplicate source occurrences may collapse when they are not meaningfully distinguishable in the source-agnostic core model.
 type ProvenancePropertyValue = {
@@ -132,6 +148,17 @@ type ProvenancePropertyValue = {
     /// Required origin and writeback anchor metadata.
     Origin: ProvenancePropertyOrigin
 }
+
+module ProvenancePropertyValue =
+
+    let propertyKey (propertyValue: ProvenancePropertyValue) : ProvenancePropertyKey = {
+        Header = propertyValue.Header
+        OriginSource = ProvenancePropertyOrigin.source propertyValue.Origin
+    }
+
+    let belongsTo (key: ProvenancePropertyKey) (propertyValue: ProvenancePropertyValue) =
+        propertyValue.Header = key.Header
+        && (ProvenancePropertyOrigin.source propertyValue.Origin).Id = key.OriginSource.Id
 
 /// One actual loaded input or output endpoint.
 /// This is the first-class UI item before grouping; it is not a collapsed graph node.

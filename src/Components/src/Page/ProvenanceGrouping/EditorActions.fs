@@ -16,7 +16,7 @@ open Swate.Components.Page.ProvenanceGrouping.Types
 
 type EditorLookups = {
     FindGroup: ProvenanceSide -> string -> DisplayGroup option
-    FindHeader: string -> ProvenancePropertyHeader option
+    FindProperty: string -> ProvenancePropertyKey option
     FindPropertyValue: ProvenancePropertyValueId -> ProvenancePropertyValue option
     SourceForValue: ProvenancePropertyValueId -> ProvenancePropertyValue -> ValueAssignmentSource
 }
@@ -38,7 +38,7 @@ type ActiveDrag = {
 }
 
 type PropertyShelfItemPayload = {
-    Header: ProvenancePropertyHeader
+    Property: ProvenancePropertyKey
     SourceSide: ProvenanceSide
 }
 
@@ -57,18 +57,18 @@ module EditorLookups =
 
         // Built lazily and at most once per lookups instance; drag handlers call
         // FindHeader repeatedly and must not rescan the whole model each time.
-        let knownHeaders =
+        let knownProperties =
             lazy
                 ([
                     yield! PropertyRails.headersForModel layer.Model
-                    yield! State.Palette.headersForSide layer.Id ProvenanceSide.Input uiState
-                    yield! State.Palette.headersForSide layer.Id ProvenanceSide.Output uiState
+                    yield! State.Palette.propertiesForSide layer.Id ProvenanceSide.Input uiState
+                    yield! State.Palette.propertiesForSide layer.Id ProvenanceSide.Output uiState
                  ]
                  |> List.distinct)
 
-        let findHeader headerId =
-            knownHeaders.Value
-            |> List.tryFind (fun header -> DragDrop.propertyHeaderIdentity header = headerId)
+        let findProperty propertyId =
+            knownProperties.Value
+            |> List.tryFind (fun property -> DragDrop.propertyKeyIdentity property = propertyId)
 
         let findPropertyValue propertyValueId =
             layer.Model.PropertyValues.TryFind propertyValueId
@@ -80,14 +80,14 @@ module EditorLookups =
                     Some propertyValueId
                 else
                     None
-            Header = propertyValue.Header
+            Property = ProvenancePropertyValue.propertyKey propertyValue
             Value = propertyValue.Value
             Unit = propertyValue.Unit
         }
 
         {
             FindGroup = findGroup
-            FindHeader = findHeader
+            FindProperty = findProperty
             FindPropertyValue = findPropertyValue
             SourceForValue = sourceForValue
         }
@@ -124,11 +124,13 @@ module AssignmentErrors =
     let text error =
         match error with
         | ValueAssignmentError.EmptyTarget -> "Drop a value onto a group with at least one entity."
-        | ValueAssignmentError.MixedPropertyValueCounts header ->
-            $"Cannot assign {header.Category.Name}: every target must either have no value or exactly one value for this annotation."
-        | ValueAssignmentError.MultiplePropertyValues(header, setIds) ->
+        | ValueAssignmentError.MixedPropertyValueCounts property ->
+            $"Cannot assign {property.Header.Category.Name}: every target must either have no value or exactly one value for this annotation."
+        | ValueAssignmentError.MultiplePropertyValues(property, setIds) ->
             let targets = setIds |> String.concat ", "
-            $"Cannot overwrite {header.Category.Name}: {targets} already has multiple values for this annotation."
+            $"Cannot overwrite {property.Header.Category.Name}: {targets} already has multiple values for this annotation."
+        | ValueAssignmentError.UpstreamPropertyNotAssigned property ->
+            $"Cannot assign {property.Header.Category.Name} to a new entity in this layer. This annotation originated in '{property.OriginSource.Name}' and can only replace an existing assignment."
 
 /// Session-changing actions that publish patches back to the host component.
 module EditorActions =
@@ -343,7 +345,10 @@ module DragHandlers =
                 pulsedCard <- true
 
             let identity =
-                DragDrop.groupingValueIdentity propertyValue.Header propertyValue.Value propertyValue.Unit
+                DragDrop.groupingValueIdentity
+                    (ProvenancePropertyValue.propertyKey propertyValue)
+                    propertyValue.Value
+                    propertyValue.Unit
 
             let sidePrefix = $"provenance-node::{side}::"
 
@@ -554,24 +559,24 @@ module DragHandlers =
         | Some(DragDrop.Payload.PropertyValue propertyValueId), Some(side, groupId), _ ->
             routePropertyValueDrop context side groupId propertyValueId
         | Some(DragDrop.Payload.FolderPropertyHeader(sourceSide, headerId)), _, Some targetSide ->
-            match context.Lookups.FindHeader headerId with
-            | Some header when
+            match context.Lookups.FindProperty headerId with
+            | Some property when
                 sourceSide = targetSide
-                || PropertyRails.canSwitchHeader header context.Layer.Model
+                || PropertyRails.canSwitchHeader property context.Layer.Model
                 ->
                 context.GetUiState()
-                |> State.PropertyPlacement.place context.Layer.Id targetSide header
+                |> State.PropertyPlacement.place context.Layer.Id targetSide property
                 |> context.SetUiState
             | _ -> ()
         | Some(DragDrop.Payload.PropertyHeader(sourceSide, headerId)), _, Some targetSide when sourceSide <> targetSide ->
-            match context.Lookups.FindHeader headerId with
-            | Some header when PropertyRails.canSwitchHeader header context.Layer.Model ->
+            match context.Lookups.FindProperty headerId with
+            | Some property when PropertyRails.canSwitchHeader property context.Layer.Model ->
                 State.GroupingAssignments.move
                     context.Layer.Id
                     (layerIdForSide context.Layer sourceSide)
                     (layerIdForSide context.Layer targetSide)
                     targetSide
-                    header
+                    property
                     (context.GetUiState())
                 |> context.SetUiState
             | _ -> ()

@@ -27,7 +27,7 @@ type ProvenanceDetail =
 
 type ValueAssignmentSource = {
     CopiedFrom: ProvenancePropertyValueId option
-    Header: ProvenancePropertyHeader
+    Property: ProvenancePropertyKey
     Value: ProvenanceValue
     Unit: ProvenanceTerm option
 }
@@ -47,8 +47,9 @@ type ValueAssignmentPlan =
 [<RequireQualifiedAccess>]
 type ValueAssignmentError =
     | EmptyTarget
-    | MixedPropertyValueCounts of ProvenancePropertyHeader
-    | MultiplePropertyValues of ProvenancePropertyHeader * ProvenanceSetId list
+    | MixedPropertyValueCounts of ProvenancePropertyKey
+    | MultiplePropertyValues of ProvenancePropertyKey * ProvenanceSetId list
+    | UpstreamPropertyNotAssigned of ProvenancePropertyKey
 
 type PropertyAssignmentBatch = {
     Adds: CreateLoadedPropertyValueCommand list
@@ -110,7 +111,7 @@ type VisiblePropertyColorContext = {
 
 type VisiblePropertyColorKey = {
     ContextId: ProvenanceColorContextId
-    Header: ProvenancePropertyHeader
+    Property: ProvenancePropertyKey
 }
 
 type PropertyColorSettings = {
@@ -155,7 +156,7 @@ type FilterState = {
 }
 
 type PropertyStats = {
-    Header: ProvenancePropertyHeader
+    Property: ProvenancePropertyKey
     DistinctValueCount: int
     SetsWithValueCount: int
     TotalSetCount: int
@@ -169,7 +170,7 @@ type PropertyCountBadge =
 type UiState = {
     SideStates: Map<ProvenanceLayerSideId, SideViewState>
     PropertyRailPlacements: Map<ProvenanceLayerId * GroupingKey, ProvenanceSide>
-    PropertyRailOrders: Map<ProvenanceLayerId * ProvenanceSide, ProvenancePropertyHeader list>
+    PropertyRailOrders: Map<ProvenanceLayerId * ProvenanceSide, ProvenancePropertyKey list>
     ExpandedProperties: Set<ProvenanceLayerId * ProvenanceSide * GroupingKey>
     PaletteValues: Map<ProvenanceLayerId * ProvenanceSide, ProvenancePropertyValue list>
     PendingAssignmentBatch: PendingAssignmentBatch option
