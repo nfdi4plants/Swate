@@ -4,6 +4,7 @@ open Expecto
 open ProcessCore
 open ProcessCoreProvenanceFixtures
 open Swate.Components.Shared.ProvenanceGrouping.Types
+open Swate.Components.Shared.ProvenanceGrouping.Edit
 open Swate.Components.Shared.ProvenanceGrouping.Session
 open Swate.Components.Shared.ProvenanceGrouping.ProcessCoreAdapterTypes
 open Swate.Components.Shared.ProvenanceGrouping.ProcessCoreConverter
@@ -30,6 +31,26 @@ let private createSet side header name session =
 
 let private connect inputId outputId session =
     Session.connectSets inputId outputId None session |> expectOk |> fst
+
+let private createProperty target kind category value session =
+    Session.createLoadedPropertyValue
+        {
+            Target = target
+            CopiedFrom = None
+            Header = {
+                Kind = kind
+                Category = {
+                    Name = category
+                    TermSource = None
+                    TermAccession = None
+                }
+            }
+            Value = ProvenanceValue.Text value
+            Unit = None
+        }
+        session
+    |> expectOk
+    |> fst
 
 let tests =
     testList "ProcessCore writeback" [
@@ -493,4 +514,399 @@ let tests =
                 (namesForSet disconnectedOutput)
                 "split-component"
                 "Disconnected replacement must retain the component."
+
+        testCase "stores an explicit characteristic on an output node"
+        <| fun _ ->
+            let fixture = basic ()
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+            let outputId = converted.Model.OutputSets |> Map.toList |> List.head |> fst
+
+            let session =
+                Session.init converted.Model
+                |> createProperty
+                    (ProvenancePropertyTarget.OutputSets [ outputId ])
+                    ProcessCoreKinds.characteristic
+                    "unfinished-characteristic"
+                    "value-neutral"
+
+            writeBack converted.Index session fixture.Arc |> expectOk |> ignore
+
+            Expect.isTrue
+                (fixture.Process.Outputs.[0].AsSample().AdditionalProperty
+                 |> Seq.exists (fun annotation ->
+                     annotation.Name = "unfinished-characteristic"
+                     && annotation.AdditionalType = Some "CharacteristicValue"
+                 ))
+                "Explicit output placement must be retained."
+
+        testCase "stores an explicit factor on an input node"
+        <| fun _ ->
+            let fixture = basic ()
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+            let inputId = converted.Model.InputSets |> Map.toList |> List.head |> fst
+
+            let session =
+                Session.init converted.Model
+                |> createProperty
+                    (ProvenancePropertyTarget.InputSets [ inputId ])
+                    ProcessCoreKinds.factor
+                    "unfinished-factor"
+                    "level-neutral"
+
+            writeBack converted.Index session fixture.Arc |> expectOk |> ignore
+
+            Expect.isTrue
+                (fixture.Process.Inputs.[0].AsSample().AdditionalProperty
+                 |> Seq.exists (fun annotation ->
+                     annotation.Name = "unfinished-factor"
+                     && annotation.AdditionalType = Some "FactorValue"
+                 ))
+                "Explicit input placement must be retained."
+
+        testCase "stores a set-targeted parameter only on the exact output node"
+        <| fun _ ->
+            let fixture = basic ()
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+            let inputId = converted.Model.InputSets |> Map.toList |> List.head |> fst
+            let outputId = converted.Model.OutputSets |> Map.toList |> List.head |> fst
+
+            let session =
+                Session.init converted.Model
+                |> createProperty
+                    (ProvenancePropertyTarget.OutputSets [ outputId ])
+                    ProcessCoreKinds.parameter
+                    "set-parameter"
+                    "parameter-value"
+
+            writeBack converted.Index session fixture.Arc |> expectOk |> ignore
+
+            Expect.isTrue
+                (fixture.Process.Outputs.[0].AsSample().AdditionalProperty
+                 |> Seq.exists (fun annotation ->
+                     annotation.Name = "set-parameter"
+                     && annotation.AdditionalType = Some "ParameterValue"
+                 ))
+                "A set-targeted parameter must be stored on the selected node."
+
+            Expect.isFalse
+                (fixture.Process.ParameterValue
+                 |> Seq.exists (fun annotation -> annotation.Name = "set-parameter"))
+                "A set-targeted parameter must not spread through the process."
+
+            let reconverted = fromArc loadedTable fixture.Arc |> expectOk
+            let propertyId, _ = propertyByName "set-parameter" reconverted.Model
+
+            Expect.contains
+                reconverted.Model.OutputSets.[outputId].PropertyValueIds
+                propertyId
+                "The parameter must reconvert on the selected output."
+
+            Expect.isFalse
+                (reconverted.Model.InputSets.[inputId].PropertyValueIds
+                 |> List.contains propertyId)
+                "The parameter must not reconvert on the input."
+
+        testCase "stores a set-targeted component only on the exact input node"
+        <| fun _ ->
+            let fixture = basic ()
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+            let inputId = converted.Model.InputSets |> Map.toList |> List.head |> fst
+            let outputId = converted.Model.OutputSets |> Map.toList |> List.head |> fst
+
+            let session =
+                Session.init converted.Model
+                |> createProperty
+                    (ProvenancePropertyTarget.InputSets [ inputId ])
+                    ProcessCoreKinds.componentKind
+                    "set-component"
+                    "component-value"
+
+            writeBack converted.Index session fixture.Arc |> expectOk |> ignore
+
+            Expect.isTrue
+                (fixture.Process.Inputs.[0].AsSample().AdditionalProperty
+                 |> Seq.exists (fun annotation ->
+                     annotation.Name = "set-component"
+                     && annotation.AdditionalType = Some "Component"
+                 ))
+                "A set-targeted component must be stored on the selected node."
+
+            Expect.isTrue
+                (fixture.Process.ExecutesProtocol.IsNone
+                 || (fixture.Process.ExecutesProtocol.Value.Components
+                     |> Seq.forall (fun annotation -> annotation.Name <> "set-component")))
+                "A set-targeted component must not spread through a recipe."
+
+            let reconverted = fromArc loadedTable fixture.Arc |> expectOk
+            let propertyId, _ = propertyByName "set-component" reconverted.Model
+
+            Expect.contains
+                reconverted.Model.InputSets.[inputId].PropertyValueIds
+                propertyId
+                "The component must reconvert on the selected input."
+
+            Expect.isFalse
+                (reconverted.Model.OutputSets.[outputId].PropertyValueIds
+                 |> List.contains propertyId)
+                "The component must not reconvert on the output."
+
+        testCase "stores connection-targeted node properties on both endpoints"
+        <| fun _ ->
+            let fixture = basic ()
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+            let connectionId = converted.Model.Connections |> Map.toList |> List.head |> fst
+
+            let session =
+                Session.init converted.Model
+                |> createProperty
+                    (ProvenancePropertyTarget.Connections [ connectionId ])
+                    ProcessCoreKinds.additionalProperty
+                    "edge-note"
+                    "note-neutral"
+
+            writeBack converted.Index session fixture.Arc |> expectOk |> ignore
+
+            Expect.isTrue
+                (fixture.Process.Inputs.[0].AsSample().AdditionalProperty
+                 |> Seq.exists (fun a -> a.Name = "edge-note"))
+                "Input node must receive the edge property."
+
+            Expect.isTrue
+                (fixture.Process.Outputs.[0].AsSample().AdditionalProperty
+                 |> Seq.exists (fun a -> a.Name = "edge-note"))
+                "Output node must receive the edge property."
+
+        testCase "stores a connection parameter only on its exact process"
+        <| fun _ ->
+            let fixture = basic ()
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+            let connectionId = converted.Model.Connections |> Map.toList |> List.head |> fst
+
+            let session =
+                Session.init converted.Model
+                |> createProperty
+                    (ProvenancePropertyTarget.Connections [ connectionId ])
+                    ProcessCoreKinds.parameter
+                    "edge-parameter"
+                    "parameter-value"
+
+            writeBack converted.Index session fixture.Arc |> expectOk |> ignore
+
+            Expect.isTrue
+                (fixture.Process.ParameterValue
+                 |> Seq.exists (fun annotation -> annotation.Name = "edge-parameter"))
+                "The exact connection process must receive the parameter."
+
+        testCase "creates a recipe component for an exact connection"
+        <| fun _ ->
+            let fixture = basic ()
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+            let connectionId = converted.Model.Connections |> Map.toList |> List.head |> fst
+
+            let session =
+                Session.init converted.Model
+                |> createProperty
+                    (ProvenancePropertyTarget.Connections [ connectionId ])
+                    ProcessCoreKinds.componentKind
+                    "edge-component"
+                    "component-value"
+
+            writeBack converted.Index session fixture.Arc |> expectOk |> ignore
+
+            Expect.isTrue
+                fixture.Process.ExecutesProtocol.IsSome
+                "A recipe must be created for the connection component."
+
+            Expect.isTrue
+                (fixture.Process.ExecutesProtocol.Value.Components
+                 |> Seq.exists (fun annotation -> annotation.Name = "edge-component"))
+                "The exact connection recipe must receive the component."
+
+        testCase "writes the final value of a property that was added and then updated"
+        <| fun _ ->
+            let fixture = basic ()
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+            let outputId = converted.Model.OutputSets |> Map.toList |> List.head |> fst
+
+            let withProperty =
+                Session.init converted.Model
+                |> createProperty
+                    (ProvenancePropertyTarget.OutputSets [ outputId ])
+                    ProcessCoreKinds.factor
+                    "final-factor"
+                    "initial-value"
+
+            let propertyId, _ =
+                propertyByName "final-factor" (Session.activeLayer withProperty).Model
+
+            let finalSession =
+                update propertyId (ProvenanceValue.Text "final-value") None withProperty
+
+            writeBack converted.Index finalSession fixture.Arc |> expectOk |> ignore
+
+            let written =
+                fixture.Process.Outputs.[0].AsSample().AdditionalProperty
+                |> Seq.find (fun annotation -> annotation.Name = "final-factor")
+
+            Expect.equal written.Value (Some "final-value") "Final session state must override the add-patch payload."
+
+        testCase "replays same-category property IDs in numeric ordinal order"
+        <| fun _ ->
+            let fixture = basic ()
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+            let inputId = converted.Model.InputSets |> Map.toList |> List.head |> fst
+            let values = [ 1..11 ] |> List.map (fun ordinal -> $"value-{ordinal}")
+
+            let session =
+                values
+                |> List.fold
+                    (fun state value ->
+                        createProperty
+                            (ProvenancePropertyTarget.InputSets [ inputId ])
+                            ProcessCoreKinds.characteristic
+                            "duplicate-category"
+                            value
+                            state
+                    )
+                    (Session.init converted.Model)
+
+            writeBack converted.Index session fixture.Arc |> expectOk |> ignore
+
+            let written =
+                fixture.Process.Inputs.[0].AsSample().AdditionalProperty
+                |> Seq.filter (fun annotation -> annotation.Name = "duplicate-category")
+                |> Seq.map (fun annotation -> annotation.Value)
+                |> Seq.toList
+
+            Expect.sequenceEqual
+                written
+                (values |> List.map Some)
+                "Generated ordinals must be parsed numerically; lexical order would place 10 before 2."
+
+        testCase "rejects a recipe-component collision that differs only by value accession"
+        <| fun _ ->
+            let fixture = basic ()
+
+            let existing =
+                Annotation(
+                    "collision-category",
+                    value = "collision-value",
+                    valueTAN = "term:existing",
+                    additionalType = "Component"
+                )
+
+            let recipe = Recipe(name = "collision-recipe", components = [ existing ])
+            fixture.Process.ExecutesProtocol <- Some recipe
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+            let connectionId = converted.Model.Connections |> Map.toList |> List.head |> fst
+
+            let session =
+                Session.createLoadedPropertyValue
+                    {
+                        Target = ProvenancePropertyTarget.Connections [ connectionId ]
+                        CopiedFrom = None
+                        Header = {
+                            Kind = ProcessCoreKinds.componentKind
+                            Category = {
+                                Name = "collision-category"
+                                TermSource = None
+                                TermAccession = None
+                            }
+                        }
+                        Value =
+                            ProvenanceValue.Term {
+                                Name = "collision-value"
+                                TermSource = None
+                                TermAccession = Some "term:requested"
+                            }
+                        Unit = None
+                    }
+                    (Session.init converted.Model)
+                |> expectOk
+                |> fst
+
+            let beforeCount = recipe.Components.Count
+            let errors = writeBack converted.Index session fixture.Arc |> expectError
+
+            Expect.isTrue
+                (errors
+                 |> List.exists (
+                     function
+                     | ProcessCoreWritebackError.ConflictingAnnotationIdentity _ -> true
+                     | _ -> false
+                 ))
+                "A narrower ProcessCore equality collision must fail preflight."
+
+            Expect.equal recipe.Components.Count beforeCount "A collision must not partially add a component."
+
+            Expect.equal
+                existing.ValueTAN
+                (Some "term:existing")
+                "A collision must leave the existing annotation unchanged."
+
+        testCase "rejects a node annotation collision that differs only by discriminator"
+        <| fun _ ->
+            let fixture = basic ()
+            let output = fixture.Process.Outputs.[0].AsSample()
+
+            output.AddAdditionalProperty(
+                Annotation("kind-collision", value = "same-value", additionalType = "CharacteristicValue")
+            )
+
+            let converted = fromArc loadedTable fixture.Arc |> expectOk
+            let outputId = converted.Model.OutputSets |> Map.toList |> List.head |> fst
+
+            let session =
+                Session.init converted.Model
+                |> createProperty
+                    (ProvenancePropertyTarget.OutputSets [ outputId ])
+                    ProcessCoreKinds.factor
+                    "kind-collision"
+                    "same-value"
+
+            let beforeCount = output.AdditionalProperty.Count
+            let errors = writeBack converted.Index session fixture.Arc |> expectError
+
+            Expect.isTrue
+                (errors
+                 |> List.exists (
+                     function
+                     | ProcessCoreWritebackError.ConflictingAnnotationIdentity _ -> true
+                     | _ -> false
+                 ))
+                "Different property kinds must not be silently deduplicated."
+
+            Expect.equal output.AdditionalProperty.Count beforeCount "A discriminator collision must be atomic."
+
+        testCase "copies an upstream property into the current group without changing its original"
+        <| fun _ ->
+            let arc, upstreamAnnotation = withPreviousContext ()
+            let converted = fromArc loadedTable arc |> expectOk
+            let previousId, _ = propertyByName "previous-parameter" converted.Model
+            let inputId = converted.Model.InputSets |> Map.toList |> List.head |> fst
+
+            let session =
+                Session.init converted.Model
+                |> Session.copyPropertyValueToLoadedTarget previousId (ProvenancePropertyTarget.InputSets [ inputId ])
+                |> expectOk
+                |> fst
+
+            writeBack converted.Index session arc |> expectOk |> ignore
+
+            let current =
+                arc.AllProcesses() |> Seq.find (fun proc -> proc.Name = "stage-neutral")
+
+            Expect.equal
+                upstreamAnnotation.Value
+                (Some "previous-value")
+                "Copying must not mutate the upstream annotation."
+
+            Expect.isTrue
+                (current.Inputs.[0].AsSample().AdditionalProperty
+                 |> Seq.exists (fun annotation ->
+                     annotation.Name = "previous-parameter"
+                     && annotation.Value = Some "previous-value"
+                     && annotation.AdditionalType = Some "ParameterValue"
+                 ))
+                "A parameter copied to an input set must be stored on that exact node."
     ]

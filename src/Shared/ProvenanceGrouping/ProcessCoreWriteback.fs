@@ -20,9 +20,32 @@ type private PlannedNode = { SetId: ProvenanceSetId; Node: IONode }
 
 /// One internal mutation command for a direct ProcessCore process row.
 /// Structure is never derived from a tabular/scaffold representation.
+/// `ConnectionId` is set only for rows that represent a final connection, so
+/// property placement can later map a connection target to the exact
+/// process that materializes it.
 type private PlannedRow = {
     Input: PlannedNode option
     Output: PlannedNode option
+    ConnectionId: ProvenanceConnectionId option
+}
+
+/// One property value resolved to its final (post-edit) value/unit and the
+/// exact editor target that must receive it.
+type private PropertyPlacement = {
+    Target: ProvenancePropertyTarget
+    Header: ProvenancePropertyHeader
+    Value: ProvenanceValue
+    Unit: ProvenanceTerm option
+}
+
+type private PropertyMutationOwner =
+    | NodeOwner of IONode
+    | ProcessParameterOwner of Process
+    | RecipeComponentOwner of Process
+
+type private PropertyMutation = {
+    Owner: PropertyMutationOwner
+    Annotation: Annotation
 }
 
 type private Plan = {
@@ -31,6 +54,8 @@ type private Plan = {
     LoadedTableName: string
     ReplacedProcesses: (Process * PlannedRow list) list
     NewRows: PlannedRow list
+    PropertyMutations: PropertyMutation list
+    DeferredPropertyPlacements: PropertyPlacement list
 }
 
 let private anchorOfOrigin =
@@ -41,6 +66,29 @@ let private anchorOfOrigin =
 let private findPropertyValue (session: ProvenanceSession) (propertyValueId: ProvenancePropertyValueId) =
     session.Layers
     |> List.tryPick (fun layer -> layer.Model.PropertyValues.TryFind propertyValueId)
+
+let private collectErrors
+    (results: Result<'a, ProcessCoreWritebackError list> list)
+    : Result<'a list, ProcessCoreWritebackError list> =
+    let errors =
+        results
+        |> List.collect (
+            function
+            | Error e -> e
+            | Ok _ -> []
+        )
+
+    if not errors.IsEmpty then
+        Error(errors |> List.distinct)
+    else
+        Ok(
+            results
+            |> List.choose (
+                function
+                | Ok v -> Some v
+                | Error _ -> None
+            )
+        )
 
 let private validateGraph (index: ProcessCoreWritebackIndex) (arc: ARC) : ProcessCoreWritebackError list =
     if graphFingerprint arc <> index.ArcFingerprint then
@@ -73,8 +121,8 @@ let private validateLayers
 /// Resolves one `UpdatePropertyValue` patch. A property absent from the
 /// conversion index but present in the final session is editor-created
 /// (`Virtual`) in this session; its value update is absorbed here because
-/// its owning `AddLoadedPropertyValue` materialization (Task 7) always
-/// writes the property's final session value, not the add-patch payload.
+/// its owning `AddLoadedPropertyValue` materialization always writes the
+/// property's final session value, not the add-patch payload.
 let private resolveUpdatePatch
     (index: ProcessCoreWritebackIndex)
     (session: ProvenanceSession)
@@ -212,6 +260,7 @@ let private planAdditions
                         Some {
                             Input = Some inputNode
                             Output = Some outputNode
+                            ConnectionId = Some connectionId
                         }
                     )
                 | Error e, _
@@ -246,8 +295,16 @@ let private planAdditions
                     |> Result.map (fun node ->
                         Some(
                             match side with
-                            | ProvenanceSide.Input -> { Input = Some node; Output = None }
-                            | ProvenanceSide.Output -> { Input = None; Output = Some node }
+                            | ProvenanceSide.Input -> {
+                                Input = Some node
+                                Output = None
+                                ConnectionId = None
+                              }
+                            | ProvenanceSide.Output -> {
+                                Input = None
+                                Output = Some node
+                                ConnectionId = None
+                              }
                         )
                     )
             )
@@ -305,10 +362,8 @@ let private planRemovals
     if matchedConnectionIds.IsEmpty then
         Ok []
     else
-        let processKeyOf connectionId =
-            processLocationKeyOfConnection index connectionId
-
-        let byProcess = matchedConnectionIds |> List.groupBy processKeyOf
+        let byProcess =
+            matchedConnectionIds |> List.groupBy (processLocationKeyOfConnection index)
 
         let results =
             byProcess
@@ -349,6 +404,7 @@ let private planRemovals
                                     Ok {
                                         Input = Some inputNode
                                         Output = Some outputNode
+                                        ConnectionId = Some connectionId
                                     }
                                 | Error e, _
                                 | _, Error e -> Error e
@@ -385,8 +441,16 @@ let private planRemovals
                                 resolvePlannedNode sets setId
                                 |> Result.map (fun node ->
                                     match side with
-                                    | ProvenanceSide.Input -> { Input = Some node; Output = None }
-                                    | ProvenanceSide.Output -> { Input = None; Output = Some node }
+                                    | ProvenanceSide.Input -> {
+                                        Input = Some node
+                                        Output = None
+                                        ConnectionId = None
+                                      }
+                                    | ProvenanceSide.Output -> {
+                                        Input = None
+                                        Output = Some node
+                                        ConnectionId = None
+                                      }
                                 )
                             )
 
@@ -486,6 +550,324 @@ let private removeConnectionPatchesFor (tableName: string) (patchLog: Provenance
         | _ -> None
     )
 
+// ── Property placement (AddLoadedPropertyValue) ─────────────────────────────
+
+let private parseOrdinal (prefix: string) (id: string) : Result<int, ProcessCoreWritebackError> =
+    if not (id.StartsWith(prefix, System.StringComparison.Ordinal)) then
+        Error(ProcessCoreWritebackError.GeneratedIdFormatChanged(id, prefix))
+    else
+        let suffix = id.Substring(prefix.Length)
+
+        match
+            System.Int32.TryParse(
+                suffix,
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture
+            )
+        with
+        | true, ordinal when ordinal >= 0 -> Ok ordinal
+        | _ -> Error(ProcessCoreWritebackError.GeneratedIdFormatChanged(id, prefix))
+
+let private resolvedTargetSetIds (layerModel: ProvenanceModel) target =
+    match target with
+    | ProvenancePropertyTarget.InputSets ids -> ids |> List.sort |> List.distinct
+    | ProvenancePropertyTarget.OutputSets ids -> ids |> List.sort |> List.distinct
+    | ProvenancePropertyTarget.Connections connectionIds ->
+        connectionIds
+        |> List.collect (fun id ->
+            match layerModel.Connections.TryFind id with
+            | Some connection -> [ connection.InputSetId; connection.OutputSetId ]
+            | None -> []
+        )
+        |> List.sort
+        |> List.distinct
+
+/// Pairs `AddLoadedPropertyValue` patches to layer-owned `Virtual` final
+/// values by replaying the patch log against candidates grouped by
+/// (header, resolved target), claiming ascending numeric ID ordinals so
+/// duplicate-value adds under one shared header/target never collide.
+let private resolveAddPropertyPatches
+    (initialLayer: ProvenanceLayer)
+    (addPatches: (ProvenancePropertyTarget * ProvenancePropertyHeader) list)
+    : Result<PropertyPlacement list, ProcessCoreWritebackError list> =
+
+    let ownVirtual =
+        initialLayer.Model.PropertyValues
+        |> Map.toList
+        |> List.choose (fun (id, value) ->
+            match value.Origin with
+            | ProvenancePropertyOrigin.Virtual anchor when anchor.Source.Id = initialLayer.Model.Source.Id ->
+                Some(id, value)
+            | _ -> None
+        )
+
+    let attachedSetIds id =
+        let ownIds (sets: Map<ProvenanceSetId, ProvenanceSet>) =
+            sets
+            |> Map.toList
+            |> List.filter (fun (_, set) -> set.PropertyValueIds |> List.contains id)
+            |> List.map fst
+
+        (ownIds initialLayer.Model.InputSets @ ownIds initialLayer.Model.OutputSets)
+        |> List.sort
+        |> List.distinct
+
+    let prefix = $"{initialLayer.Model.Source.Id}::property-value-"
+    let mutable ordinalErrors: ProcessCoreWritebackError list = []
+
+    let candidatesByKey =
+        ownVirtual
+        |> List.choose (fun (id, value) ->
+            match parseOrdinal prefix id with
+            | Ok ordinal -> Some((value.Header, attachedSetIds id), (ordinal, id))
+            | Error e ->
+                ordinalErrors <- e :: ordinalErrors
+                None
+        )
+        |> List.groupBy fst
+        |> List.map (fun (key, items) -> key, items |> List.map snd |> List.sortBy fst |> List.map snd)
+        |> Map.ofList
+
+    if not ordinalErrors.IsEmpty then
+        Error(ordinalErrors |> List.distinct)
+    else
+        let claimed = System.Collections.Generic.HashSet<ProvenancePropertyValueId>()
+
+        let results =
+            addPatches
+            |> List.map (fun (target, header) ->
+                let key = header, resolvedTargetSetIds initialLayer.Model target
+
+                match candidatesByKey.TryFind key with
+                | None ->
+                    Error [
+                        ProcessCoreWritebackError.PropertyNotFound(sprintf "%A" key)
+                    ]
+                | Some candidates ->
+                    let chosen =
+                        candidates
+                        |> List.tryFind (fun id -> not (claimed.Contains id))
+                        |> Option.orElse (List.tryHead candidates)
+
+                    match chosen with
+                    | None ->
+                        Error [
+                            ProcessCoreWritebackError.PropertyNotFound(sprintf "%A" key)
+                        ]
+                    | Some id ->
+                        claimed.Add id |> ignore
+
+                        match initialLayer.Model.PropertyValues.TryFind id with
+                        | Some finalValue ->
+                            Ok {
+                                Target = target
+                                Header = header
+                                Value = finalValue.Value
+                                Unit = finalValue.Unit
+                            }
+                        | None -> Error [ ProcessCoreWritebackError.PropertyNotFound id ]
+            )
+
+        collectErrors results
+
+let private additionalTypeForKind (kind: ProvenanceKind) =
+    if kind.Id = ProcessCoreKinds.characteristic.Id then
+        Some "CharacteristicValue"
+    elif kind.Id = ProcessCoreKinds.factor.Id then
+        Some "FactorValue"
+    elif kind.Id = ProcessCoreKinds.parameter.Id then
+        Some "ParameterValue"
+    elif kind.Id = ProcessCoreKinds.componentKind.Id then
+        Some "Component"
+    else
+        None
+
+let private resolveNodeForSet
+    (structuralNodesById: Map<ProvenanceSetId, IONode>)
+    (arc: ARC)
+    (index: ProcessCoreWritebackIndex)
+    (setId: ProvenanceSetId)
+    : Result<IONode, ProcessCoreWritebackError list> =
+    match structuralNodesById.TryFind setId with
+    | Some node -> Ok node
+    | None ->
+        match index.EndpointLocations.TryFind setId with
+        | Some location ->
+            match location.Occurrences with
+            | occurrence :: _ ->
+                match tryResolveNode occurrence.Node arc with
+                | Some node -> Ok node
+                | None -> Error [ ProcessCoreWritebackError.SetNotFound setId ]
+            | [] -> Error [ ProcessCoreWritebackError.SetNotFound setId ]
+        | None -> Error [ ProcessCoreWritebackError.SetNotFound setId ]
+
+/// `None` when the connection is genuinely new in this session (its process
+/// does not exist until structural apply runs); such placements are
+/// deferred and applied without a collision check, since a brand-new
+/// process/recipe can never collide with anything.
+let private resolveExistingConnectionProcess
+    (arc: ARC)
+    (index: ProcessCoreWritebackIndex)
+    (connectionId: ProvenanceConnectionId)
+    : Result<Process, ProcessCoreWritebackError list> option =
+    match index.ConnectionLocations.TryFind connectionId with
+    | None -> None
+    | Some location ->
+        match tryResolveProcess location.Process arc with
+        | Some proc -> Some(Ok proc)
+        | None ->
+            Some(
+                Error [
+                    ProcessCoreWritebackError.ConnectionNotFound connectionId
+                ]
+            )
+
+let private isDeferredPlacement (index: ProcessCoreWritebackIndex) (placement: PropertyPlacement) =
+    match placement.Target with
+    | ProvenancePropertyTarget.Connections connectionIds when
+        placement.Header.Kind.Id = ProcessCoreKinds.parameter.Id
+        || placement.Header.Kind.Id = ProcessCoreKinds.componentKind.Id
+        ->
+        connectionIds
+        |> List.exists (fun id -> not (index.ConnectionLocations.ContainsKey id))
+    | _ -> false
+
+let private resolveOwnersForPlacement
+    (arc: ARC)
+    (index: ProcessCoreWritebackIndex)
+    (initialLayer: ProvenanceLayer)
+    (structuralNodesById: Map<ProvenanceSetId, IONode>)
+    (placement: PropertyPlacement)
+    : Result<PropertyMutationOwner list, ProcessCoreWritebackError list> =
+
+    let resolveNode = resolveNodeForSet structuralNodesById arc index
+
+    match placement.Target with
+    | ProvenancePropertyTarget.InputSets ids
+    | ProvenancePropertyTarget.OutputSets ids ->
+        ids |> List.map resolveNode |> collectErrors |> Result.map (List.map NodeOwner)
+    | ProvenancePropertyTarget.Connections connectionIds ->
+        if placement.Header.Kind.Id = ProcessCoreKinds.parameter.Id then
+            connectionIds
+            |> List.map (fun id ->
+                match resolveExistingConnectionProcess arc index id with
+                | Some result -> result
+                | None -> Error [ ProcessCoreWritebackError.ConnectionNotFound id ]
+            )
+            |> collectErrors
+            |> Result.map (List.map ProcessParameterOwner)
+        elif placement.Header.Kind.Id = ProcessCoreKinds.componentKind.Id then
+            connectionIds
+            |> List.map (fun id ->
+                match resolveExistingConnectionProcess arc index id with
+                | Some result -> result
+                | None -> Error [ ProcessCoreWritebackError.ConnectionNotFound id ]
+            )
+            |> collectErrors
+            |> Result.map (List.map RecipeComponentOwner)
+        else
+            connectionIds
+            |> List.collect (fun id ->
+                match initialLayer.Model.Connections.TryFind id with
+                | Some connection -> [ connection.InputSetId; connection.OutputSetId ]
+                | None -> []
+            )
+            |> List.distinct
+            |> List.map resolveNode
+            |> collectErrors
+            |> Result.map (List.map NodeOwner)
+
+let private existingAnnotations (owner: PropertyMutationOwner) : Annotation list =
+    match owner with
+    | NodeOwner node -> nodeAdditionalProperties node |> Seq.toList
+    | ProcessParameterOwner proc -> proc.ParameterValue |> Seq.toList
+    | RecipeComponentOwner proc ->
+        proc.ExecutesProtocol
+        |> Option.map (fun recipe -> recipe.Components |> Seq.toList)
+        |> Option.defaultValue []
+
+let private ownerKey (owner: PropertyMutationOwner) =
+    match owner with
+    | NodeOwner node -> "node:" + node.Key()
+    | ProcessParameterOwner proc ->
+        "param:"
+        + string (System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode proc)
+    | RecipeComponentOwner proc ->
+        "component:"
+        + string (System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode proc)
+
+let private narrowerMatch (existing: ProcessCoreAnnotationFingerprint) (requested: ProcessCoreAnnotationFingerprint) =
+    existing.Name = requested.Name
+    && existing.Value = requested.Value
+    && existing.Unit = requested.Unit
+    && existing.NameTAN = requested.NameTAN
+
+/// Validates and plans every immediate (non-deferred) property placement
+/// against a symbolic per-owner snapshot seeded from current annotations,
+/// updated as each placement is planned so later placements in the same
+/// batch see earlier ones. A full-fingerprint match is a genuine no-op; a
+/// narrower ProcessCore-equality match with a different fingerprint is a
+/// conflicting-identity error that leaves the plan (and graph) untouched.
+let private planPropertyMutations
+    (arc: ARC)
+    (index: ProcessCoreWritebackIndex)
+    (initialLayer: ProvenanceLayer)
+    (structuralNodesById: Map<ProvenanceSetId, IONode>)
+    (placements: PropertyPlacement list)
+    : Result<PropertyMutation list, ProcessCoreWritebackError list> =
+
+    let pending =
+        System.Collections.Generic.Dictionary<string, ResizeArray<ProcessCoreAnnotationFingerprint>>()
+
+    let mutable errors: ProcessCoreWritebackError list = []
+    let mutations = ResizeArray<PropertyMutation>()
+
+    for placement in placements do
+        match resolveOwnersForPlacement arc index initialLayer structuralNodesById placement with
+        | Error e -> errors <- errors @ e
+        | Ok owners ->
+            for owner in owners do
+                let key = ownerKey owner
+
+                if not (pending.ContainsKey key) then
+                    pending.[key] <- ResizeArray(existingAnnotations owner |> List.map annotationFingerprint)
+
+                let additionalType =
+                    match owner with
+                    | ProcessParameterOwner _ -> Some "ParameterValue"
+                    | RecipeComponentOwner _ -> Some "Component"
+                    | NodeOwner _ -> additionalTypeForKind placement.Header.Kind
+
+                let annotation =
+                    annotationFromValue additionalType placement.Header placement.Value placement.Unit
+
+                let requested = annotationFingerprint annotation
+                let list = pending.[key]
+
+                if list |> Seq.exists ((=) requested) then
+                    ()
+                else
+                    match owner, list |> Seq.tryFind (fun fp -> narrowerMatch fp requested) with
+                    | ProcessParameterOwner _, _
+                    | _, None ->
+                        list.Add requested
+
+                        mutations.Add {
+                            Owner = owner
+                            Annotation = annotation
+                        }
+                    | (NodeOwner _ | RecipeComponentOwner _), Some existingFp ->
+                        errors <-
+                            errors
+                            @ [
+                                ProcessCoreWritebackError.ConflictingAnnotationIdentity(key, existingFp, requested)
+                            ]
+
+    if not errors.IsEmpty then
+        Error(errors |> List.distinct)
+    else
+        Ok(mutations |> List.ofSeq)
+
 let private preflight
     (index: ProcessCoreWritebackIndex)
     (session: ProvenanceSession)
@@ -545,11 +927,44 @@ let private preflight
                 let allPlannedRows = additionRows @ (replacedProcesses |> List.collect snd)
                 validateNodeIdentity allPlannedRows, Some(additionRows, replacedProcesses)
 
+        let addPropertyPatches =
+            session.PatchLog
+            |> List.choose (
+                function
+                | ProvenanceTablePatch.AddLoadedPropertyValue(target, _, header, _, _) -> Some(target, header)
+                | _ -> None
+            )
+
+        let propertyResult =
+            structureValue
+            |> Option.map (fun (additionRows, replacedProcesses) ->
+                let structuralNodesById =
+                    (additionRows @ (replacedProcesses |> List.collect snd))
+                    |> List.collect (fun row -> [ row.Input; row.Output ] |> List.choose id)
+                    |> List.map (fun planned -> planned.SetId, planned.Node)
+                    |> Map.ofList
+
+                resolveAddPropertyPatches initialLayer addPropertyPatches
+                |> Result.bind (fun placements ->
+                    let deferred, immediate = placements |> List.partition (isDeferredPlacement index)
+
+                    planPropertyMutations arc index initialLayer structuralNodesById immediate
+                    |> Result.map (fun mutations -> mutations, deferred)
+                )
+            )
+
+        let propertyErrors, propertyValue =
+            match propertyResult with
+            | None -> [], None
+            | Some(Error errors) -> errors, None
+            | Some(Ok value) -> [], Some value
+
         let unhandledPatches =
             session.PatchLog
             |> List.choose (
                 function
-                | ProvenanceTablePatch.UpdatePropertyValue _ -> None
+                | ProvenanceTablePatch.UpdatePropertyValue _
+                | ProvenanceTablePatch.AddLoadedPropertyValue _ -> None
                 | ProvenanceTablePatch.AddLoadedSet(_, patchTableName, _, _)
                 | ProvenanceTablePatch.AddLoadedConnection(patchTableName, _, _, _, _)
                 | ProvenanceTablePatch.RemoveLoadedConnection(patchTableName, _, _, _, _) when
@@ -565,7 +980,7 @@ let private preflight
                 | other -> Some(ProcessCoreWritebackError.InvalidPatchTarget(sprintf "%A" other))
             )
 
-        let allErrors = updateErrors @ structureErrors @ unhandledPatches
+        let allErrors = updateErrors @ structureErrors @ propertyErrors @ unhandledPatches
 
         if not allErrors.IsEmpty then
             Error(allErrors |> List.distinct)
@@ -580,6 +995,7 @@ let private preflight
                 |> List.distinctBy (fun update -> update.PropertyValueId)
 
             let additionRows, replacedProcesses = structureValue.Value
+            let mutations, deferredPlacements = propertyValue.Value
 
             Ok {
                 Updates = updates
@@ -587,14 +1003,34 @@ let private preflight
                 LoadedTableName = tableName
                 ReplacedProcesses = replacedProcesses
                 NewRows = additionRows
+                PropertyMutations = mutations
+                DeferredPropertyPlacements = deferredPlacements
             }
-
-let private nodesOf (row: PlannedRow) =
-    [ row.Input; row.Output ] |> List.choose id |> List.map (fun p -> p.Node)
 
 let private ioOf (row: PlannedRow) =
     (row.Input |> Option.map (fun p -> p.Node) |> Option.toList),
     (row.Output |> Option.map (fun p -> p.Node) |> Option.toList)
+
+let private nodesOf (row: PlannedRow) =
+    [ row.Input; row.Output ] |> List.choose id |> List.map (fun p -> p.Node)
+
+let private applyMutation (mutation: PropertyMutation) =
+    match mutation.Owner with
+    | NodeOwner node ->
+        match node with
+        | SampleNode sample -> sample.AddAdditionalProperty mutation.Annotation
+        | DataNode data -> data.AddAdditionalProperty mutation.Annotation
+    | ProcessParameterOwner proc -> proc.AddParameterValue mutation.Annotation
+    | RecipeComponentOwner proc ->
+        let recipe =
+            match proc.ExecutesProtocol with
+            | Some recipe -> recipe
+            | None ->
+                let recipe = Recipe(name = proc.Name)
+                proc.ExecutesProtocol <- Some recipe
+                recipe
+
+        recipe.AddComponent mutation.Annotation
 
 let private apply (arc: ARC) (plan: Plan) : ProcessCoreWritebackSummary =
     let touchedAnnotations =
@@ -608,6 +1044,7 @@ let private apply (arc: ARC) (plan: Plan) : ProcessCoreWritebackSummary =
     let mutable addedProcesses = 0
     let mutable removedProcesses = 0
     let mutable addedNodes = 0
+    let mutable connectionProcessMap: Map<ProvenanceConnectionId, Process> = Map.empty
 
     let existingNodeKeys =
         System.Collections.Generic.HashSet<string>(arc.AllNodes() |> Seq.map (fun node -> node.Key()))
@@ -616,6 +1053,11 @@ let private apply (arc: ARC) (plan: Plan) : ProcessCoreWritebackSummary =
         for node in nodesOf row do
             if existingNodeKeys.Add(node.Key()) then
                 addedNodes <- addedNodes + 1
+
+    let recordConnection (row: PlannedRow) (proc: Process) =
+        match row.ConnectionId with
+        | Some connectionId -> connectionProcessMap <- connectionProcessMap |> Map.add connectionId proc
+        | None -> ()
 
     match plan.Dataset with
     | None -> ()
@@ -629,6 +1071,7 @@ let private apply (arc: ARC) (plan: Plan) : ProcessCoreWritebackSummary =
                 countNewNodes first
                 let inputs, outputs = ioOf first
                 replaceProcessIO inputs outputs original
+                recordConnection first original
 
                 for row in rest do
                     countNewNodes row
@@ -636,6 +1079,7 @@ let private apply (arc: ARC) (plan: Plan) : ProcessCoreWritebackSummary =
                     addProcess dataset clone
                     let inputs, outputs = ioOf row
                     replaceProcessIO inputs outputs clone
+                    recordConnection row clone
                     addedProcesses <- addedProcesses + 1
 
         for row in plan.NewRows do
@@ -644,11 +1088,48 @@ let private apply (arc: ARC) (plan: Plan) : ProcessCoreWritebackSummary =
             addProcess dataset proc
             let inputs, outputs = ioOf row
             replaceProcessIO inputs outputs proc
+            recordConnection row proc
             addedProcesses <- addedProcesses + 1
+
+    let mutable addedAnnotations = 0
+
+    for mutation in plan.PropertyMutations do
+        applyMutation mutation
+        addedAnnotations <- addedAnnotations + 1
+
+    for placement in plan.DeferredPropertyPlacements do
+        match placement.Target with
+        | ProvenancePropertyTarget.Connections connectionIds ->
+            let additionalType, isComponent =
+                if placement.Header.Kind.Id = ProcessCoreKinds.componentKind.Id then
+                    Some "Component", true
+                else
+                    Some "ParameterValue", false
+
+            for connectionId in connectionIds do
+                match connectionProcessMap.TryFind connectionId with
+                | None -> ()
+                | Some proc ->
+                    let annotation =
+                        annotationFromValue additionalType placement.Header placement.Value placement.Unit
+
+                    if isComponent then
+                        applyMutation {
+                            Owner = RecipeComponentOwner proc
+                            Annotation = annotation
+                        }
+                    else
+                        applyMutation {
+                            Owner = ProcessParameterOwner proc
+                            Annotation = annotation
+                        }
+
+                    addedAnnotations <- addedAnnotations + 1
+        | _ -> ()
 
     {
         UpdatedAnnotations = touchedAnnotations.Count
-        AddedAnnotations = 0
+        AddedAnnotations = addedAnnotations
         AddedNodes = addedNodes
         AddedProcesses = addedProcesses
         RemovedProcesses = removedProcesses
