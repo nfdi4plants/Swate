@@ -117,36 +117,6 @@ let private valueSetForKey key propertyValues : GroupingValue list list =
 let private valuesForKey model set key =
     setPropertyValues model set |> valueSetForKey key
 
-let private combineValueSets key valueSets : GroupingValue list list =
-    let values =
-        valueSets
-        |> List.collect id
-        |> List.groupBy (fun (_, value, unit, _) -> value, unit)
-        |> List.map (fun ((value, unit), grouped) ->
-            let propertyValueIds =
-                grouped
-                |> List.collect (fun (_, _, _, propertyValueIds) -> propertyValueIds)
-                |> List.distinct
-                |> List.sort
-
-            key, value, unit, propertyValueIds
-        )
-        |> List.sortBy (fun (_, value, unit, _) -> valueText value unit)
-
-    if values.IsEmpty then [] else [ values ]
-
-let private connectedOutputSets model inputSetId =
-    model.Connections
-    |> mapValues
-    |> List.filter (fun connection -> connection.Source.Id = model.Source.Id && connection.InputSetId = inputSetId)
-    |> List.choose (fun connection -> model.OutputSets.TryFind connection.OutputSetId)
-    |> List.filter (fun set -> set.Source.Id = model.Source.Id)
-
-let private inheritedOutputValuesForKey model inputSetId key =
-    connectedOutputSets model inputSetId
-    |> List.collect (fun outputSet -> valuesForKey model outputSet key)
-    |> combineValueSets key
-
 let private scopeApplies side scope =
     match side, scope with
     | ProvenanceSide.Input, GroupingScope.Input
@@ -173,17 +143,6 @@ let private normalizeAssignments side assignments =
         else
             grouped.Head
     )
-
-let private valuesForAssignment model side set assignment =
-    match side, assignment.Scope with
-    | ProvenanceSide.Input, GroupingScope.Both ->
-        let ownValues = valuesForKey model set assignment.Key
-
-        if ownValues.IsEmpty then
-            inheritedOutputValuesForKey model set.Id assignment.Key
-        else
-            ownValues
-    | _ -> valuesForKey model set assignment.Key
 
 let private combinations values =
     let rec loop collected remaining =
@@ -225,7 +184,7 @@ let displayGroupsForAssignments (model: ProvenanceModel) side assignments =
             for set in sets do
                 let keyValues =
                     activeAssignments
-                    |> List.map (valuesForAssignment model side set)
+                    |> List.map (fun assignment -> valuesForKey model set assignment.Key)
                     |> List.filter (fun values -> values |> List.isEmpty |> not)
 
                 if keyValues.IsEmpty then

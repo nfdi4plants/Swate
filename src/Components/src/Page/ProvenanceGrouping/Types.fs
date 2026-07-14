@@ -194,6 +194,9 @@ module StoryFixtures =
     let createInputOnlySession () = inputOnlyModel () |> Session.init
     let createOutputOnlySession () = outputOnlyModel () |> Session.init
 
+    let createDisconnectedPropertySession () =
+        disconnectedPropertyModel () |> Session.init
+
     let createSwitchablePropertySession () =
         switchablePropertyModel () |> Session.init
 
@@ -264,6 +267,9 @@ module Exports =
 
     let createOutputOnlySession () =
         StoryFixtures.createOutputOnlySession ()
+
+    let createDisconnectedPropertySession () =
+        StoryFixtures.createDisconnectedPropertySession ()
 
     let createSwitchablePropertySession () =
         StoryFixtures.createSwitchablePropertySession ()

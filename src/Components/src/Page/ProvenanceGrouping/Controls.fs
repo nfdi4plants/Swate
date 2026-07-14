@@ -849,7 +849,7 @@ type Controls =
             Html.button [
                 prop.type'.button
                 prop.title
-                    $"Group both sides by {header.Category.Name}. Inputs without their own value use values inherited from connected outputs."
+                    $"Group both sides by {header.Category.Name}. Connected inputs and outputs share their values for grouping."
                 prop.className [
                     "swt:btn swt:btn-xs swt:btn-square swt:z-10"
                     if bothSelected then

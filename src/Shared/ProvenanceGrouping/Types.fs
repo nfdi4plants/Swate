@@ -225,38 +225,112 @@ type ProvenanceModel = {
 
 module ProvenanceModel =
 
-    let refreshInheritedOutputProperties (model: ProvenanceModel) =
-        let inheritedByOutput =
+    /// Recomputes same-layer property inheritance in both directions: a value
+    /// on any endpoint spreads through this model's connections to every
+    /// transitively connected endpoint, regardless of side. Entries stay keyed
+    /// by connection ID so removing a connection retracts them; entries keyed
+    /// by connections of other models (carried in from upstream layers) are
+    /// preserved untouched. A set never inherits its own values back.
+    let refreshInheritedProperties (model: ProvenanceModel) =
+        let localConnections =
             model.Connections
             |> Map.toList
-            |> List.choose (fun (connectionId, connection) ->
-                match
-                    model.InputSets.TryFind connection.InputSetId, model.OutputSets.TryFind connection.OutputSetId
-                with
-                | Some inputSet, Some _ when connection.Source.Id = model.Source.Id ->
-                    let propertyValueIds = ProvenanceSet.effectivePropertyValueIds inputSet
-
-                    if propertyValueIds.IsEmpty then
-                        None
-                    else
-                        Some(connection.OutputSetId, connectionId, propertyValueIds)
-                | _ -> None
+            |> List.filter (fun (_, connection) ->
+                connection.Source.Id = model.Source.Id
+                && model.InputSets.ContainsKey connection.InputSetId
+                && model.OutputSets.ContainsKey connection.OutputSetId
             )
-            |> List.groupBy (fun (outputSetId, _, _) -> outputSetId)
-            |> List.map (fun (outputSetId, inherited) ->
-                outputSetId,
-                inherited
-                |> List.map (fun (_, connectionId, propertyValueIds) -> connectionId, propertyValueIds)
-                |> Map.ofList
-            )
-            |> Map.ofList
 
-        let outputSets =
-            model.OutputSets
-            |> Map.map (fun outputSetId outputSet -> {
-                outputSet with
-                    InheritedPropertyValueIds =
-                        inheritedByOutput |> Map.tryFind outputSetId |> Option.defaultValue Map.empty
-            })
+        // Entries keyed by connections this model does not own were carried in
+        // from an upstream layer; they seed inheritance but are never rebuilt.
+        let carriedEntries (set: ProvenanceSet) =
+            set.InheritedPropertyValueIds
+            |> Map.filter (fun connectionId _ -> not (model.Connections.ContainsKey connectionId))
 
-        { model with OutputSets = outputSets }
+        let seedIds (set: ProvenanceSet) =
+            [
+                yield! set.PropertyValueIds
+                yield! carriedEntries set |> Map.toList |> List.sortBy fst |> List.collect snd
+            ]
+            |> List.distinct
+
+        let inputSeeds = model.InputSets |> Map.map (fun _ set -> seedIds set)
+        let outputSeeds = model.OutputSets |> Map.map (fun _ set -> seedIds set)
+
+        let entriesExcept
+            connectionId
+            setId
+            (entries: Map<ProvenanceSetId, Map<ProvenanceConnectionId, ProvenancePropertyValueId list>>)
+            =
+            entries
+            |> Map.tryFind setId
+            |> Option.defaultValue Map.empty
+            |> Map.toList
+            |> List.filter (fun (entryConnectionId, _) -> entryConnectionId <> connectionId)
+            |> List.sortBy fst
+            |> List.collect snd
+
+        let setEntry connectionId setId propertyValueIds entries =
+            if List.isEmpty propertyValueIds then
+                entries
+            else
+                let current = entries |> Map.tryFind setId |> Option.defaultValue Map.empty
+                entries |> Map.add setId (current |> Map.add connectionId propertyValueIds)
+
+        // One hop of inheritance per pass, repeated to a fixpoint so values
+        // spread through chains (output -> shared input -> sibling output).
+        // Excluding the entry that arrived through the connection itself keeps
+        // a value from echoing straight back to its origin.
+        let step (inputEntries, outputEntries) =
+            localConnections
+            |> List.fold
+                (fun (inputEntries, outputEntries) (connectionId, connection) ->
+                    let inputSeed = inputSeeds.[connection.InputSetId]
+                    let outputSeed = outputSeeds.[connection.OutputSetId]
+
+                    let toOutput =
+                        [
+                            yield! inputSeed
+                            yield! entriesExcept connectionId connection.InputSetId inputEntries
+                        ]
+                        |> List.distinct
+                        |> List.filter (fun id -> not (List.contains id outputSeed))
+
+                    let toInput =
+                        [
+                            yield! outputSeed
+                            yield! entriesExcept connectionId connection.OutputSetId outputEntries
+                        ]
+                        |> List.distinct
+                        |> List.filter (fun id -> not (List.contains id inputSeed))
+
+                    setEntry connectionId connection.InputSetId toInput inputEntries,
+                    setEntry connectionId connection.OutputSetId toOutput outputEntries
+                )
+                (inputEntries, outputEntries)
+
+        let rec fixpoint state =
+            let next = step state
+
+            if next = state then state else fixpoint next
+
+        let inputEntries, outputEntries = fixpoint (Map.empty, Map.empty)
+
+        let withRefreshedEntries localEntries (set: ProvenanceSet) = {
+            set with
+                InheritedPropertyValueIds =
+                    localEntries
+                    |> Map.tryFind set.Id
+                    |> Option.defaultValue Map.empty
+                    |> Map.fold
+                        (fun state connectionId propertyValueIds -> state |> Map.add connectionId propertyValueIds)
+                        (carriedEntries set)
+        }
+
+        {
+            model with
+                InputSets = model.InputSets |> Map.map (fun _ set -> withRefreshedEntries inputEntries set)
+                OutputSets =
+                    model.OutputSets
+                    |> Map.map (fun _ set -> withRefreshedEntries outputEntries set)
+        }

@@ -609,7 +609,7 @@ module internal Dedup =
                 OutputSets = state.OutputSets
                 Connections = state.Connections
              }
-             |> ProvenanceModel.refreshInheritedOutputProperties)
+             |> ProvenanceModel.refreshInheritedProperties)
         Index = {
             LoadedTable = loadedTable
             EndpointLocations = state.EndpointLocations

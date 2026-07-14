@@ -537,6 +537,97 @@ let groupingTests =
                 [ "pv-input-a-species"; "pv-input-b-species" ]
                 "Adding a connection should add that input's properties to the output's effective properties."
 
+        testCase "inputs expose output properties inherited through current loaded connections"
+        <| fun _ ->
+            let analysis = propertyHeader FixtureKinds.parameterProperty "Analysis"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+            let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
+
+            let built =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-output-a-analysis" analysis (ProvenanceValue.Text "LC-MS") None None
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" []
+                    ] [
+                        outputSet "output-a" "assay-table" outputHeader "Output A" [ "pv-output-a-analysis" ]
+                    ] [
+                        connection "connection-a" "assay-table" None "input-a" "output-a"
+                    ]
+
+            Expect.equal
+                (ProvenanceSet.effectivePropertyValueIds built.InputSets.["input-a"])
+                [ "pv-output-a-analysis" ]
+                "An input should expose properties inherited from its directly connected loaded output."
+
+        testCase "same-layer inheritance spreads transitively across connected endpoints"
+        <| fun _ ->
+            let analysis = propertyHeader FixtureKinds.parameterProperty "Analysis"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+            let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
+
+            let built =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-output-b-analysis" analysis (ProvenanceValue.Text "LC-MS") None None
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" []
+                    ] [
+                        outputSet "output-a" "assay-table" outputHeader "Output A" []
+                        outputSet "output-b" "assay-table" outputHeader "Output B" [ "pv-output-b-analysis" ]
+                    ] [
+                        connection "connection-a" "assay-table" None "input-a" "output-a"
+                        connection "connection-b" "assay-table" None "input-a" "output-b"
+                    ]
+
+            Expect.equal
+                (ProvenanceSet.effectivePropertyValueIds built.InputSets.["input-a"])
+                [ "pv-output-b-analysis" ]
+                "A value added to one connected output should reach the shared input."
+
+            Expect.equal
+                (ProvenanceSet.effectivePropertyValueIds built.OutputSets.["output-a"])
+                [ "pv-output-b-analysis" ]
+                "A value added to one connected output should reach sibling outputs through the shared input."
+
+            Expect.isFalse
+                (built.OutputSets.["output-b"].InheritedPropertyValueIds
+                 |> Map.exists (fun _ ids -> ids |> List.contains "pv-output-b-analysis"))
+                "A value must never be inherited back onto the endpoint that owns it."
+
+        testCase "refresh preserves inherited entries carried in from upstream connections"
+        <| fun _ ->
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+            let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
+            let modelSource = Fixture.source "layer-2:next-table" "next-table"
+
+            let carriedInput = {
+                Fixture.inputSet "carried-input" modelSource inputHeader "Carried Input" [] with
+                    InheritedPropertyValueIds = Map.ofList [ "upstream-connection", [ "pv-upstream" ] ]
+            }
+
+            let built =
+                Fixture.model modelSource [] [ carriedInput ] [
+                    Fixture.outputSet "output-a" modelSource outputHeader "Output A" []
+                ] [
+                    Fixture.connection "local-connection" modelSource None "carried-input" "output-a"
+                ]
+
+            Expect.equal
+                (built.InputSets.["carried-input"].InheritedPropertyValueIds
+                 |> Map.tryFind "upstream-connection")
+                (Some [ "pv-upstream" ])
+                "Entries keyed by upstream connections must survive a same-layer refresh."
+
+            Expect.equal
+                (ProvenanceSet.effectivePropertyValueIds built.OutputSets.["output-a"])
+                [ "pv-upstream" ]
+                "Carried upstream values should flow on to connected outputs in the current layer."
+
         testCase "grouping collapses identical equal values for one set into one display member"
         <| fun _ ->
             let replicate = propertyHeader FixtureKinds.parameterProperty "Replicate"
@@ -717,7 +808,7 @@ let groupingTests =
                 [ ProvenanceValue.Text "1"; ProvenanceValue.Text "2" ]
                 "A missing input property should inherit direct connected output values as one combined value-set group."
 
-        testCase "both-side grouping prefers input values over inherited output values"
+        testCase "both-side grouping combines input values with connected output values"
         <| fun _ ->
             let replicate = propertyHeader FixtureKinds.parameterProperty "Replicate"
             let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
@@ -758,18 +849,16 @@ let groupingTests =
 
             let groupedValues =
                 groups
-                |> List.filter (fun group -> group.Members |> List.exists (fun member' -> member'.SetId = "input-a"))
-                |> List.choose (fun group ->
+                |> List.find (fun group -> group.Members |> List.exists (fun member' -> member'.SetId = "input-a"))
+                |> fun group ->
                     group.GroupingValues
-                    |> List.tryExactlyOne
-                    |> Option.map (fun groupingValue -> groupingValue.Value)
-                )
-                |> List.sort
+                    |> List.map (fun groupingValue -> groupingValue.Value)
+                    |> List.sort
 
             Expect.equal
                 groupedValues
-                [ ProvenanceValue.Text "3" ]
-                "An input's own values should be used before direct connected output values are considered."
+                [ ProvenanceValue.Text "1"; ProvenanceValue.Text "3" ]
+                "An input's own values and direct connected output values belong to the same combined group."
 
         testCase "displayGroups works for input-only loaded models"
         <| fun _ ->
@@ -904,6 +993,35 @@ let editTests =
                     (nextModel.InputSets.["input-c"].PropertyValueIds.Length)
                     1
                     "Target input set should point to the new value."
+            | other -> failwithf "Expected one AddLoadedPropertyValue patch, got %A" other
+
+        testCase "createLoadedPropertyValue on an output reaches connected inputs through inheritance"
+        <| fun _ ->
+            let model = validModel ()
+            let treatment = propertyHeader FixtureKinds.characteristicProperty "Treatment"
+
+            let command = {
+                Target = ProvenancePropertyTarget.OutputSets [ "output-a" ]
+                CopiedFrom = None
+                Header = treatment
+                Value = ProvenanceValue.Text "Drought"
+                Unit = None
+            }
+
+            match createLoadedPropertyValue command model with
+            | Ok(nextModel, [ ProvenanceTablePatch.AddLoadedPropertyValue _ ]) ->
+                let addedId =
+                    nextModel.OutputSets.["output-a"].PropertyValueIds
+                    |> List.find (fun id -> not (model.OutputSets.["output-a"].PropertyValueIds |> List.contains id))
+
+                Expect.isTrue
+                    (ProvenanceSet.effectivePropertyValueIds nextModel.InputSets.["input-a"]
+                     |> List.contains addedId)
+                    "A value added to an output should be inherited by its connected inputs."
+
+                Expect.isFalse
+                    (nextModel.InputSets.["input-a"].PropertyValueIds |> List.contains addedId)
+                    "The connected input must inherit the value, not own it."
             | other -> failwithf "Expected one AddLoadedPropertyValue patch, got %A" other
 
         testCase "copyPropertyValueToLoadedTarget copies previous value to existing loaded connection"
@@ -1161,6 +1279,10 @@ let editTests =
                 Expect.isTrue
                     (nextModel.OutputSets.["output-b"].InheritedPropertyValueIds.ContainsKey "connection-b")
                     "Other connections keep their inherited values."
+
+                Expect.isFalse
+                    (nextModel.InputSets.["input-b"].InheritedPropertyValueIds.ContainsKey "connection-c")
+                    "The input side of the removed connection should drop its inherited values too."
             | other -> failwithf "Expected one RemoveLoadedConnection patch, got %A" other
 
         testCase "removeConnection rejects unknown connections"
