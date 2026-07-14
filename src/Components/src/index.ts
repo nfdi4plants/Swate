@@ -93,4 +93,5 @@ export { default as WorkflowMetadata } from './dist/Page/Metadata/WorkflowMetada
 
 export { SwateApi } from './dist/Api/SwateApi.fs';
 export { TIBApi } from './dist/Api/TIBApi.fs';
+export { OLSApi } from './dist/Api/OLSApi.fs';
 export { GitLabApi } from './dist/Api/GitLabApi.fs';

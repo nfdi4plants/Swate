@@ -5,6 +5,20 @@ open Swate.Components.Shared.Extensions
 open Fable.Core
 open Feliz
 
+[<RequireQualifiedAccess; StringEnum>]
+type TermSearchSource =
+    | TIB
+    | OLS
+
+[<RequireQualifiedAccess>]
+module TermSearchSourceKey =
+
+    let private prefix source = source.ToString() + "_"
+
+    let create (source: TermSearchSource) collectionName = prefix source + collectionName
+
+    let belongsTo source (key: string) = key.StartsWith(prefix source)
+
 [<JS.PojoAttribute>]
 type Term
     (?name: string, ?id: string, ?description: string, ?source: string, ?href: string, ?isObsolete: bool, ?data: obj) =
@@ -188,7 +202,7 @@ module TIBTypesExtensions =
 
     type Api.TIBApi.TIBTypes.SearchApi with
         /// This function is used to transform TIB term type into the Swate compatible Term type.
-        member this.ToMyTerm() =
+        member this.ToSwateTerms() =
             this.response.docs
             |> Array.map (fun t ->
                 Term(
@@ -200,3 +214,26 @@ module TIBTypesExtensions =
                     t.is_obsolete |> Option.defaultValue false
                 )
             )
+
+[<AutoOpen>]
+module OLSTypesExtensions =
+
+    let toSwateTerm (term: Api.OLSApi.OLSTypes.Term) =
+        Term(
+            ?name = term.label,
+            ?id = Api.OLSApi.OLSTypes.TermHelpers.id term,
+            ?description =
+                (Api.OLSApi.OLSTypes.TermHelpers.description term
+                 |> Option.map (String.concat ";")),
+            ?source = Api.OLSApi.OLSTypes.TermHelpers.ontology term,
+            ?href = Api.OLSApi.OLSTypes.TermHelpers.iri term,
+            ?isObsolete = Api.OLSApi.OLSTypes.TermHelpers.isObsolete term,
+            data = term
+        )
+
+    let toSwateTerms = Array.map toSwateTerm
+
+    type Api.OLSApi.OLSTypes.SearchApi with
+        /// Transform an OLS gateway search result into Swate-compatible terms.
+        member this.ToSwateTerms() =
+            this |> Api.OLSApi.OLSTypes.searchTerms |> toSwateTerms

@@ -1,13 +1,7 @@
 /// https://api.terminology.tib.eu/swagger-ui/index.html
 module Swate.Components.Api.TIBApi
 
-
-open Swate.Components
-open Swate.Components.Shared
 open Fable.Core
-open Fable.Core.JsInterop
-open Fable.Remoting.Client
-open Fetch
 open Swate.Components.Api.Helper
 
 
@@ -58,19 +52,14 @@ module TIBTypes =
 [<AttachMembers>]
 type TIBApi =
     static member tryGetIRIFromOboId(oboId: string) =
-        fetch (appendQueryParams $"{TIBTypes.BaseAPIUrl}/terms" [ "obo_id", oboId ]) [
-            RequestProperties.Method HttpMethod.GET
-            requestHeaders [ HttpRequestHeaders.Accept "application/json" ]
-        ]
-        |> Promise.bind (fun response ->
-            response.json<TIBTypes.TermApi> ()
-            |> Promise.map (fun termApi ->
-                if termApi._embedded.IsNone then
-                    None
-                else
-                    termApi._embedded.Value.terms
-                    |> Array.tryFind (fun term -> term.obo_id = oboId)
-                    |> Option.map (fun term -> term.iri)
+        appendQueryParams $"{TIBTypes.BaseAPIUrl}/terms" [ "obo_id", oboId ]
+        |> getJson<TIBTypes.TermApi>
+        |> Promise.map (fun termApi ->
+            termApi._embedded
+            |> Option.bind (fun embedded ->
+                embedded.terms
+                |> Array.tryFind (fun term -> term.obo_id = oboId)
+                |> Option.map (fun term -> term.iri)
             )
         )
 
@@ -112,14 +101,9 @@ type TIBApi =
                         "classification", collection.Value
                 ]
 
-                let url = appendQueryParams baseUrl queryParams
-
                 return!
-                    fetch url [
-                        RequestProperties.Method HttpMethod.GET
-                        requestHeaders [ HttpRequestHeaders.Accept "application/json" ]
-                    ]
-                    |> Promise.bind (fun response -> response.json<TIBTypes.SearchApi> ())
+                    appendQueryParams baseUrl queryParams
+                    |> getJson<TIBTypes.SearchApi>
                     |> Promise.map Some
         }
 
@@ -143,10 +127,4 @@ type TIBApi =
         TIBApi.search ("*", rows = rows, childrenOf = parentOboId, ?collection = collection)
 
     static member getCollections() =
-        let url = $"{TIBTypes.BaseAPIUrl}/ontologies/schemavalues?schema=collection&lang=en"
-
-        fetch url [
-            RequestProperties.Method HttpMethod.GET
-            requestHeaders [ HttpRequestHeaders.Accept "application/json" ]
-        ]
-        |> Promise.bind (fun response -> response.json<TIBTypes.SchemaValuesApi> ())
+        getJson<TIBTypes.SchemaValuesApi> $"{TIBTypes.BaseAPIUrl}/ontologies/schemavalues?schema=collection&lang=en"

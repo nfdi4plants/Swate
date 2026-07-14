@@ -5,7 +5,7 @@ import * as Provider from "./ConfigProvider.fs.js";
 import { TIBApi } from '../../Api/TIBApi.fs.js';
 import React from 'react';
 import {
-  Swate_Components_Api_TIBApi_TIBTypes_SearchApi__SearchApi_ToMyTerm as toMyTerm,
+  Swate_Components_Api_TIBApi_TIBTypes_SearchApi__SearchApi_ToSwateTerms as toSwateTerms,
   type Term,
 } from './Types.fs.js';
 
@@ -13,7 +13,7 @@ const TERMSEARCH_INPUT_TESTID = 'term-search-input'
 
 const TERMSEARCH_DETAILSMODAL_TESTID = 'modal_termsearch_details_modal'
 
-const toTerms = (searchApi: any): Term[] => (searchApi ? Array.from(toMyTerm(searchApi)) : []);
+const toTerms = (searchApi: any): Term[] => (searchApi ? Array.from(toSwateTerms(searchApi)) : []);
 
 const mockInstrumentModelSearch = async (query: string): Promise<Term[]> =>
   query.trim()
