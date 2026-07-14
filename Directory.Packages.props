@@ -3,14 +3,14 @@
         <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     </PropertyGroup>
     <ItemGroup>
-        <PackageVersion Include="FSharp.Core" Version="10.0.100"/>
+        <PackageVersion Include="FSharp.Core" Version="10.0.108"/>
         <PackageVersion Include="ARCtrl" Version="3.0.0-beta.12"/>
         <PackageVersion Include="ARCtrl.Javascript" Version="3.0.0-beta.12"/>
         <PackageVersion Include="ARCtrl.Core" Version="3.0.0-beta.12"/>
         <PackageVersion Include="ARCtrl.Spreadsheet" Version="3.0.0-beta.12"/>
         <!-- client -->
         <PackageVersion Include="Fable.Core" Version="5.0.0-beta.4"/>
-        <PackageVersion Include="YAMLicious" Version="1.0.0-alpha.1"/>
+        <PackageVersion Include="YAMLicious" Version="1.0.0"/>
         <PackageVersion Include="Fable.Elmish" Version="4.2.0"/>
         <PackageVersion Include="Fable.Elmish.HMR" Version="7.0.0"/>
         <PackageVersion Include="Fable.Elmish.React" Version="4.0.0"/>
