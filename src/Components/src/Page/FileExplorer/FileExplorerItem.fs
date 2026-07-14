@@ -2,6 +2,7 @@ namespace Swate.Components.Page.FileExplorer
 
 open Fable.Core
 open Feliz
+open Swate.Components.JsBindings
 open Swate.Components.Page.FileExplorer.Types
 
 [<Mangle(false); Erase>]
@@ -275,6 +276,9 @@ type FileExplorerItem =
             ?onDeleteItem: FileItem -> unit,
             ?canDeleteItem: FileItem -> bool,
             ?statusAction: ContextMenuItem,
+            ?stickyDepth: int,
+            ?stickyTopOffset: int,
+            ?onStickyRowHeightChange: string -> int -> unit,
             ?children: ReactElement
         ) =
         let canCreateItem = defaultArg canCreateItem (fun (_: FileItem) -> false)
@@ -285,6 +289,29 @@ type FileExplorerItem =
         let canDeleteFromDirectory = canDeleteItem item && onDeleteItem.IsSome
         let hasStatusControl = Helper.isLfs item || statusAction.IsSome
 
+        let effectiveStickyDepth = if isExpanded then stickyDepth else None
+        let effectiveStickyTopOffset = if isExpanded then stickyTopOffset else None
+        let hasStickyTreatment = effectiveStickyTopOffset.IsSome
+
+        let rowObserverRef = React.useRef<ResizeObserver option> None
+
+        let setRowRef (element: Browser.Types.Element) =
+            rowObserverRef.current |> Option.iter (fun observer -> observer.disconnect ())
+            rowObserverRef.current <- None
+
+            match hasStickyTreatment, isNull element, onStickyRowHeightChange with
+            | true, false, Some onHeightChange ->
+                let row = unbox<Browser.Types.HTMLElement> element
+
+                let reportHeight () =
+                    onHeightChange item.Id (int row.offsetHeight)
+
+                reportHeight ()
+                let observer = ResizeObserver(reportHeight)
+                observer.observe row
+                rowObserverRef.current <- Some observer
+            | _ -> ()
+
         let directoryToggleIconClass =
             if isExpanded then
                 "swt:iconify swt:fluent--caret-down-24-filled swt:size-4 swt:shrink-0"
@@ -293,12 +320,28 @@ type FileExplorerItem =
 
         let rowChildren = [
             Html.div [
+                prop.ref setRowRef
                 prop.custom ("data-file-item-id", item.Id)
                 prop.className [
                     "swt:group swt:w-full swt:px-2 swt:py-1 swt:cursor-default"
+                    if hasStickyTreatment then
+                        "swt:bg-base-100 swt:border-b swt:border-base-content/10 swt:shadow-sm"
+
                     rowHighlightClass
                 ]
-                prop.style [ style.display.flex; style.width (length.percent 100) ]
+                prop.style [
+                    style.display.flex
+                    style.width (length.percent 100)
+                    yield!
+                        effectiveStickyTopOffset
+                        |> Option.map (fun topOffset -> [
+                            style.position.sticky
+                            style.top topOffset
+                            // Parent rows need to layer above nested sticky rows. Very deep trees can exhaust this z-index base.
+                            style.zIndex (100 - defaultArg effectiveStickyDepth 0)
+                        ])
+                        |> Option.defaultValue []
+                ]
 
                 if not directoryChevronToggleOnly then
                     prop.onClick onDirectorySelect
