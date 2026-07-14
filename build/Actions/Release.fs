@@ -26,7 +26,11 @@ let npm (version: Changelog.Version) (isDryRun: bool) =
 
         let version = VersionIO.updateComponentsPackageJSONVersion version
 
+        printGreenfn "Start building npm package"
+
         let build = run "npm" [ "run"; "build" ] ProjectPaths.componentsPath
+
+        printGreenfn "Start updating .css file to use @layer swt-base instead of @layer base"
 
         let cssFilePath =
             Path.Combine(ProjectPaths.componentsPath, "dist", "assets", "swate-components.css")
@@ -38,6 +42,8 @@ let npm (version: Changelog.Version) (isDryRun: bool) =
         let replacedContent = content.Replace("@layer base", "@layer swt-base")
         System.IO.File.WriteAllText(cssFilePath, replacedContent)
 
+        printGreenfn "Start publishing npm package"
+
         let publish =
             run
                 "npm"
@@ -45,6 +51,7 @@ let npm (version: Changelog.Version) (isDryRun: bool) =
                     "publish"
                     "--access"
                     "public"
+                    "--provenance"
                     if isPrerelease then
                         "--tag"
                         "next"
