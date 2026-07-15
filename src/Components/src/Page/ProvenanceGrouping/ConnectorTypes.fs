@@ -84,8 +84,8 @@ module ConnectorOverlayState =
     /// exact cards open.
     let followsExpandedNeighbors state = state.ExpandedGroups.Count = 1
 
-    let isPropertyExpanded layerId side header state =
-        state.ExpandedProperties.Contains(layerId, side, { Header = header })
+    let isPropertyExpanded layerId side property state =
+        state.ExpandedProperties.Contains(layerId, side, property)
 
 type ConnectorMeasureContext = {
     Container: HTMLElement

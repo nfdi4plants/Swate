@@ -97,7 +97,7 @@ let model
             |> List.map (fun connection -> connection.Id, connection)
             |> Map.ofList
     }
-    |> ProvenanceModel.refreshInheritedOutputProperties
+    |> ProvenanceModel.refreshInheritedProperties
 
 let sampleModel () : ProvenanceModel =
     let assaySource = source "fixture:assay-table" "assay-table"
@@ -264,6 +264,40 @@ let outputOnlyModel () : ProvenanceModel =
         ]
         [] [
             outputSet "output-only-a" outputOnlySource outputHeader "Output Only A" [ "pv-output-only-analysis" ]
+        ] []
+
+let disconnectedPropertyModel () : ProvenanceModel =
+    let modelSource =
+        source "fixture:disconnected-property-table" "disconnected-property-table"
+
+    let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+    let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
+    let analysis = propertyHeader FixtureKinds.parameterProperty "Analysis"
+    let replicate = propertyHeader FixtureKinds.parameterProperty "Replicate"
+
+    model
+        modelSource
+        [
+            propertyValue
+                "pv-disconnected-output-analysis"
+                analysis
+                (ProvenanceValue.Text "Mass Spectrometry")
+                None
+                (real modelSource None analysis [] [ "Disconnected Output" ])
+            propertyValue
+                "pv-disconnected-output-replicate"
+                replicate
+                (ProvenanceValue.Text "1")
+                None
+                (real modelSource None replicate [] [ "Disconnected Output" ])
+        ]
+        [
+            inputSet "disconnected-input" modelSource inputHeader "Disconnected Input" []
+        ] [
+            outputSet "disconnected-output" modelSource outputHeader "Disconnected Output" [
+                "pv-disconnected-output-analysis"
+                "pv-disconnected-output-replicate"
+            ]
         ] []
 
 let switchablePropertyModel () : ProvenanceModel =
