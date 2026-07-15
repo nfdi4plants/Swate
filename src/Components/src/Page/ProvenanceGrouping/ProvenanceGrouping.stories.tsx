@@ -7,6 +7,7 @@ import {
   Exports_createSampleSession as createSampleSession,
   Exports_createInputOnlySession as createInputOnlySession,
   Exports_createOutputOnlySession as createOutputOnlySession,
+  Exports_createDisconnectedPropertySession as createDisconnectedPropertySession,
   Exports_createSwitchablePropertySession as createSwitchablePropertySession,
   Exports_createTypedSampleSession as createTypedSampleSession,
   Exports_createDataOutputOnlySession as createDataOutputOnlySession,
@@ -14,7 +15,7 @@ import {
   Exports_patchLog as patchLog,
 } from './Types.fs.js';
 
-type Fixture = 'sample' | 'inputOnly' | 'outputOnly' | 'switchableProperty' | 'typedSample' | 'dataOutputOnly';
+type Fixture = 'sample' | 'inputOnly' | 'outputOnly' | 'disconnectedProperty' | 'switchableProperty' | 'typedSample' | 'dataOutputOnly';
 
 function createSessionForFixture(selected: Fixture) {
   switch (selected) {
@@ -22,6 +23,8 @@ function createSessionForFixture(selected: Fixture) {
       return createInputOnlySession();
     case 'outputOnly':
       return createOutputOnlySession();
+    case 'disconnectedProperty':
+      return createDisconnectedPropertySession();
     case 'switchableProperty':
       return createSwitchablePropertySession();
     case 'typedSample':
@@ -448,7 +451,7 @@ export const RejectedShelfPropertyDropRestoresFolderItem: Story = {
 };
 
 export const SingleSidedShelfPropertiesCannotDropOnOppositeSide: Story = {
-  render: () => <Harness />,
+  render: () => <Harness fixture="disconnectedProperty" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const source = await shelfProperty(canvas, 'Analysis');
@@ -748,7 +751,7 @@ export const RailValueShowsDragIndicatorWhileDragging: Story = {
 };
 
 export const SingleSidedPropertiesCannotSwitchSides: Story = {
-  render: () => <Harness />,
+  render: () => <Harness fixture="disconnectedProperty" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -780,7 +783,8 @@ export const SwitchesPropertyGroupingSideByDrag: Story = {
       expect(canvas.queryByTestId('provenance-group-Output-output:Batch=A')).not.toBeInTheDocument();
       expect(canvas.getByTestId('provenance-group-Output-output:output-a')).toBeInTheDocument();
       expect(canvas.getByTestId('provenance-group-Input-input:Batch=A')).toBeInTheDocument();
-      expect(canvas.getByTestId('provenance-group-Input-input:input-b')).toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Input-input:Batch=B')).toBeInTheDocument();
+      expect(canvas.queryByTestId('provenance-group-Input-input:input-b')).not.toBeInTheDocument();
     });
   },
 };

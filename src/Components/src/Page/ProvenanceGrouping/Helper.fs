@@ -13,29 +13,29 @@ module Exports =
         | "Output" -> ProvenanceSide.Output
         | side -> failwithf "Unknown provenance side '%s'." side
 
-    let private propertyHeaderByName propertyName (model: ProvenanceModel) =
+    let private propertyByName propertyName (model: ProvenanceModel) =
         model.PropertyValues
         |> Map.toList
-        |> List.map (fun (_, value) -> value.Header)
+        |> List.map (snd >> ProvenancePropertyValue.propertyKey)
         |> List.distinct
-        |> List.find (fun header -> header.Category.Name = propertyName)
+        |> List.find (fun property -> property.Header.Category.Name = propertyName)
 
     let sampleDroppedPropertyRailColor sideName propertyName layerColor =
         let session = StoryFixtures.createSampleSession ()
         let layer = Session.activeLayer session
         let side = sideFromName sideName
-        let header = propertyHeaderByName propertyName layer.Model
+        let property = propertyByName propertyName layer.Model
 
         let uiState =
             State.init session
             |> State.Sides.ensure session
-            |> State.PropertyPlacement.place layer.Id side header
+            |> State.PropertyPlacement.place layer.Id side property
             |> State.PropertyColors.setSourceColor layer.Model.Source.Id layerColor
 
         let projection =
             PropertyProjection.railProjectionWithFilters session layer.Id side layer.Model uiState
 
         projection.ColorByHeader
-        |> Map.tryFind header
+        |> Map.tryFind property
         |> Option.bind id
         |> Option.defaultValue ""

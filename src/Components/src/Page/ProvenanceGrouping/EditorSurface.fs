@@ -22,13 +22,13 @@ module EditorSurface =
             [
                 yield!
                     activeAssignments
-                    |> List.map (fun (assignment: GroupingAssignment) -> assignment.Key.Header)
+                    |> List.map (fun (assignment: GroupingAssignment) -> assignment.Key)
                 yield!
                     uiState.PropertyRailPlacements
                     |> Map.toList
                     |> List.choose (fun ((currentLayerId, key), placedSide) ->
                         if currentLayerId = layerId && placedSide = side then
-                            Some key.Header
+                            Some key
                         else
                             None
                     )
@@ -57,7 +57,7 @@ module EditorSurface =
 
     let propertyRail
         side
-        activeSourceId
+        activeSource
         sideId
         (projection: PropertyRails.RailProjection)
         activeAssignments
@@ -80,7 +80,7 @@ module EditorSurface =
         =
         Controls.PropertyRail(
             side,
-            activeSourceId,
+            activeSource,
             projection.Headers,
             activeAssignments,
             (fun header -> projection.ValuesByHeader |> Map.tryFind header |> Option.defaultValue []),
