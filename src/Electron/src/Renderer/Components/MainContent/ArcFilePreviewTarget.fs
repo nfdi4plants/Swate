@@ -6,10 +6,15 @@ open Renderer.Components.MainContent.ArcFilePreviewTargetHelper
 open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Composite.AnnotationTable
 open Swate.Components.Composite.Widgets.JsonImport.Types
+open Swate.Components.Composite.Widgets.Types
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
+
+let private templateServices: TemplateWidgetServices = {
+    loadTemplates = Swate.Components.Api.SwateApi.loadTemplates
+}
 
 [<ReactComponent>]
 let private TableNavbarActions (props: ArcFileEditorHeaderProps, setArcFile: ArcFiles -> unit) =
@@ -118,6 +123,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
         arcFile,
         setArcFile,
         pickFilePaths,
+        templateServices,
         trailingNavbarElements = trailingNavbarElements,
         onImportJson = importJson,
         onError =

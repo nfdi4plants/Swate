@@ -275,6 +275,7 @@ type FileExplorerItem =
             ?onDeleteItem: FileItem -> unit,
             ?canDeleteItem: FileItem -> bool,
             ?statusAction: ContextMenuItem,
+            ?stickyTopOffset: int,
             ?children: ReactElement
         ) =
         let canCreateItem = defaultArg canCreateItem (fun (_: FileItem) -> false)
@@ -284,6 +285,12 @@ type FileExplorerItem =
         let hasItemActions = itemActions |> List.isEmpty |> not
         let canDeleteFromDirectory = canDeleteItem item && onDeleteItem.IsSome
         let hasStatusControl = Helper.isLfs item || statusAction.IsSome
+
+        let stickyRowClasses =
+            if stickyTopOffset.IsSome then
+                "swt:sticky swt:bg-base-100 swt:border-b swt:border-base-content/10 swt:shadow-sm"
+            else
+                ""
 
         let directoryToggleIconClass =
             if isExpanded then
@@ -296,9 +303,21 @@ type FileExplorerItem =
                 prop.custom ("data-file-item-id", item.Id)
                 prop.className [
                     "swt:group swt:w-full swt:px-2 swt:py-1 swt:cursor-default"
+                    stickyRowClasses
                     rowHighlightClass
                 ]
-                prop.style [ style.display.flex; style.width (length.percent 100) ]
+                prop.style [
+                    style.display.flex
+                    style.width (length.percent 100)
+                    yield!
+                        stickyTopOffset
+                        |> Option.map (fun offset -> [
+                            style.position.sticky
+                            style.top offset
+                            style.zIndex (100 - (offset / 32))
+                        ])
+                        |> Option.defaultValue []
+                ]
 
                 if not directoryChevronToggleOnly then
                     prop.onClick onDirectorySelect

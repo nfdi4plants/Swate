@@ -10,62 +10,127 @@ open Swate.Components.Composite.TermSearch.Types
 
 module private TermSearchConfigProviderHelper =
 
-    [<Literal>]
-    let TIB_PREFIX = "TIB_"
+    type SearchCollection = {
+        Key: string
+        TermSearch: SearchCall
+        ParentSearch: ParentSearchCall option
+        AllChildrenSearch: AllChildrenSearchCall option
+    }
+
+    type QueryCollection = {
+        TermSearch: ResizeArray<string * SearchCall>
+        ParentSearch: ResizeArray<string * ParentSearchCall>
+        AllChildrenSearch: ResizeArray<string * AllChildrenSearchCall>
+    }
+
+    module QueryCollection =
+
+        let empty () = {
+            TermSearch = ResizeArray()
+            ParentSearch = ResizeArray()
+            AllChildrenSearch = ResizeArray()
+        }
+
+        let create (collections: seq<SearchCollection>) =
+            let queries = empty ()
+
+            for collection in collections do
+                queries.TermSearch.Add(collection.Key, collection.TermSearch)
+
+                collection.ParentSearch
+                |> Option.iter (fun search -> queries.ParentSearch.Add(collection.Key, search))
+
+                collection.AllChildrenSearch
+                |> Option.iter (fun search -> queries.AllChildrenSearch.Add(collection.Key, search))
+
+            queries
+
+        let private appendItems (first: ResizeArray<'Item>) (second: ResizeArray<'Item>) =
+            let result = ResizeArray first
+            result.AddRange second
+            result
+
+        let append (first: QueryCollection) (second: QueryCollection) = {
+            TermSearch = appendItems first.TermSearch second.TermSearch
+            ParentSearch = appendItems first.ParentSearch second.ParentSearch
+            AllChildrenSearch = appendItems first.AllChildrenSearch second.AllChildrenSearch
+        }
 
     [<Literal>]
     let TIB_DATAPLANT_COLLECTION_KEY = "DataPLANT"
 
-    let mkTIBQueries (collections: Set<string>) = {|
+    [<Literal>]
+    let OLS_DATAPLANT_COLLECTION_KEY = "DataPLANT Project"
+
+    [<Literal>]
+    let LOCAL_STORAGE_KEY = "swate-termsearchconfig-ctx-v3"
+
+    [<Literal>]
+    let DEFAULT_SEARCH_ROWS = 10
+
+    [<Literal>]
+    let ALL_CHILDREN_SEARCH_ROWS = 300
+
+    let private normalizeTerms rows (terms: Term[]) =
+        terms
+        |> Array.distinctBy (fun term -> term.id, term.href, term.name)
+        |> Array.truncate rows
+
+    let private mapSearchResults rows (convert: 'Api -> Term[]) (request: JS.Promise<'Api option>) =
+        request
+        |> Promise.map (fun response ->
+            response
+            |> Option.map convert
+            |> Option.defaultValue [||]
+            |> normalizeTerms rows
+            |> ResizeArray
+        )
+
+    let private createTIBCollection collection = {
+        Key = TermSearchSourceKey.create TermSearchSource.TIB collection
         TermSearch =
-            ResizeArray [
-                for c in collections do
-                    let n = TIB_PREFIX + c
-
-                    let query: SearchCall =
-                        fun (q: string) ->
-                            Swate.Components.Api.TIBApi.TIBApi.defaultSearch (q, 10, c)
-                            |> Promise.map (fun searchApi ->
-                                match searchApi with
-                                | Some api -> api.ToMyTerm() |> ResizeArray
-                                | None -> ResizeArray()
-                            )
-
-                    yield (n, query)
-            ]
+            fun query ->
+                Api.TIBApi.TIBApi.defaultSearch (query, DEFAULT_SEARCH_ROWS, collection)
+                |> mapSearchResults DEFAULT_SEARCH_ROWS _.ToMyTerm()
         ParentSearch =
-            ResizeArray [
-                for c in collections do
-                    let n = TIB_PREFIX + c
-
-                    let query: ParentSearchCall =
-                        fun (parent: string, query: string) ->
-                            Swate.Components.Api.TIBApi.TIBApi.searchChildrenOf (query, parent, 10, c)
-                            |> Promise.map (fun searchApi ->
-                                match searchApi with
-                                | Some api -> api.ToMyTerm() |> ResizeArray
-                                | None -> ResizeArray()
-                            )
-
-                    yield (n, query)
-            ]
+            Some(fun (parent, query) ->
+                Api.TIBApi.TIBApi.searchChildrenOf (query, parent, DEFAULT_SEARCH_ROWS, collection)
+                |> mapSearchResults DEFAULT_SEARCH_ROWS _.ToMyTerm()
+            )
         AllChildrenSearch =
-            ResizeArray [
-                for c in collections do
-                    let n = TIB_PREFIX + c
+            Some(fun parent ->
+                Api.TIBApi.TIBApi.searchAllChildrenOf (parent, ALL_CHILDREN_SEARCH_ROWS, collection = collection)
+                |> mapSearchResults ALL_CHILDREN_SEARCH_ROWS _.ToMyTerm()
+            )
+    }
 
-                    let query: AllChildrenSearchCall =
-                        fun (p: string) ->
-                            Swate.Components.Api.TIBApi.TIBApi.searchAllChildrenOf (p, 300, collection = c)
-                            |> Promise.map (fun searchApi ->
-                                match searchApi with
-                                | Some api -> api.ToMyTerm() |> ResizeArray
-                                | None -> ResizeArray()
-                            )
+    let mkTIBQueries collections =
+        collections |> Seq.map createTIBCollection |> QueryCollection.create
 
-                    yield (n, query)
-            ]
-    |}
+    let private tryCreateOLSCollection (collection: Api.OLSApi.OLSTypes.Collection) =
+        match collection.id with
+        | Some collectionId when not (System.String.IsNullOrWhiteSpace collection.label) ->
+            Some {
+                Key = TermSearchSourceKey.create TermSearchSource.OLS collection.label
+                TermSearch =
+                    fun query ->
+                        Api.OLSApi.OLSApi.defaultSearch (query, DEFAULT_SEARCH_ROWS, collectionId = collectionId)
+                        |> mapSearchResults DEFAULT_SEARCH_ROWS _.ToMyTerm()
+                ParentSearch = None
+                AllChildrenSearch = None
+            }
+        | _ -> None
+
+    let mkOLSQueries collections =
+        collections |> Seq.choose tryCreateOLSCollection |> QueryCollection.create
+
+    let loadCollections source request toQueries setQueries = promise {
+        try
+            let! response = request ()
+            response |> toQueries |> setQueries
+        with ex ->
+            console.error ($"Error fetching {source} collections:", ex)
+    }
 
 open TermSearchConfigProviderHelper
 
@@ -73,46 +138,73 @@ open TermSearchConfigProviderHelper
 type TermSearchConfigProvider =
 
     [<ReactComponent>]
-    static member TIBQueryProvider(children: ReactElement) =
+    static member private QueryProvider(children: ReactElement, includeOLS: bool) =
 
-        let allTermSearchQueries, setAllTermSearchQueries =
-            React.useState<ResizeArray<string * SearchCall>> (fun () -> ResizeArray())
+        let tibQueries, setTIBQueries =
+            React.useState (fun () ->
+                Set.singleton TIB_DATAPLANT_COLLECTION_KEY
+                |> TermSearchConfigProviderHelper.mkTIBQueries
+            )
 
-        let allParentSearchQueries, setAllParentSearchQueries =
-            React.useState<ResizeArray<string * ParentSearchCall>> (fun () -> ResizeArray())
-
-        let allAllChildrenSearchQueries, setAllAllChildrenSearchQueries =
-            React.useState<ResizeArray<string * AllChildrenSearchCall>> (fun () -> ResizeArray())
+        let olsQueries, setOLSQueries = React.useState (fun () -> QueryCollection.empty ())
 
         React.useEffect (
-            (fun _ -> // get all currently supported catalogues
-                promise {
-                    try
-                        let! collections =
-                            Api.TIBApi.TIBApi.getCollections ()
-                            |> Promise.catch (fun ex -> failwithf "Error fetching TIB collections: %s" ex.Message)
-
-                        let collectionSet = Set.ofArray collections.content
-
-                        let tibQueries = TermSearchConfigProviderHelper.mkTIBQueries collectionSet
-                        setAllTermSearchQueries (ResizeArray tibQueries.TermSearch)
-                        setAllParentSearchQueries (ResizeArray tibQueries.ParentSearch)
-                        setAllAllChildrenSearchQueries (ResizeArray tibQueries.AllChildrenSearch)
-                    with ex ->
-                        console.error ("Error fetching TIB collections:", ex)
-                }
+            (fun () ->
+                TermSearchConfigProviderHelper.loadCollections
+                    "TIB"
+                    Api.TIBApi.TIBApi.getCollections
+                    (fun response ->
+                        response.content
+                        |> Set.ofArray
+                        |> Set.add TIB_DATAPLANT_COLLECTION_KEY
+                        |> TermSearchConfigProviderHelper.mkTIBQueries
+                    )
+                    setTIBQueries
                 |> Promise.start
             ),
             [||]
         )
 
+        React.useEffect (
+            (fun () ->
+                if includeOLS then
+                    TermSearchConfigProviderHelper.loadCollections
+                        "OLS"
+                        Api.OLSApi.OLSApi.getCollections
+                        TermSearchConfigProviderHelper.mkOLSQueries
+                        setOLSQueries
+                    |> Promise.start
+                else
+                    setOLSQueries (QueryCollection.empty ())
+            ),
+            [| box includeOLS |]
+        )
+
+        let allQueries =
+            React.useMemo (
+                (fun () -> QueryCollection.append tibQueries olsQueries),
+                [| box tibQueries; box olsQueries |]
+            )
+
         TermSearchConfigProvider.TermSearchConfigProvider(
             children,
-            allTermSearchQueries,
-            allParentSearchQueries,
-            allAllChildrenSearchQueries,
-            defaultActive = Set [ TIB_PREFIX + TIB_DATAPLANT_COLLECTION_KEY ]
+            allQueries.TermSearch,
+            allQueries.ParentSearch,
+            allQueries.AllChildrenSearch,
+            defaultActive =
+                Set [
+                    TermSearchSourceKey.create TermSearchSource.TIB TIB_DATAPLANT_COLLECTION_KEY
+                    TermSearchSourceKey.create TermSearchSource.OLS OLS_DATAPLANT_COLLECTION_KEY
+                ]
         )
+
+    [<ReactComponent>]
+    static member TIBQueryProvider(children: ReactElement) =
+        TermSearchConfigProvider.QueryProvider(children, false)
+
+    [<ReactComponent>]
+    static member DefaultQueryProvider(children: ReactElement) =
+        TermSearchConfigProvider.QueryProvider(children, true)
 
 
     [<ReactComponent(true)>]
@@ -125,7 +217,7 @@ type TermSearchConfigProvider =
             ?defaultActive: Set<string>,
             ?localStorageKey: string
         ) =
-        let localStorageKey = defaultArg localStorageKey "swate-termsearchconfig-ctx"
+        let localStorageKey = defaultArg localStorageKey LOCAL_STORAGE_KEY
         let defaultActive = defaultArg defaultActive Set.empty
 
         let (activeKeys: TermSearchActiveKeysContext), setActiveKeys =
@@ -164,32 +256,19 @@ type TermSearchConfigProvider =
         let queries =
             React.useMemo (
                 (fun () ->
+                    let activeKeySet = Set.ofArray activeKeys.activeKeys
 
-                    let termSearchQueries =
-                        allTermSearchQueries
-                        |> Seq.filter (fun (key, _) ->
-                            let isActive = activeKeys.activeKeys |> Set.ofSeq |> Set.contains key
-
-                            isActive
-                        )
-                        |> ResizeArray
-
-                    let parentSearchQueries =
-                        allParentSearchQueries
-                        |> Seq.filter (fun (key, _) -> activeKeys.activeKeys |> Set.ofSeq |> Set.contains key)
-                        |> ResizeArray
-
-                    let allChildrenSearchQueries =
-                        allAllChildrenSearchQueries
-                        |> Seq.filter (fun (key, _) -> activeKeys.activeKeys |> Set.ofSeq |> Set.contains key)
+                    let activeQueries queries =
+                        queries
+                        |> Seq.filter (fun (key, _) -> Set.contains key activeKeySet)
                         |> ResizeArray
 
                     {
                         hasProvider = true
                         disableDefault = activeKeys.disableDefault
-                        termSearchQueries = termSearchQueries
-                        parentSearchQueries = parentSearchQueries
-                        allChildrenSearchQueries = allChildrenSearchQueries
+                        termSearchQueries = activeQueries allTermSearchQueries
+                        parentSearchQueries = activeQueries allParentSearchQueries
+                        allChildrenSearchQueries = activeQueries allAllChildrenSearchQueries
                     }
                 ),
                 [|

@@ -165,7 +165,10 @@ type FileExplorer =
 
         let scrollContainerClassName =
             if truncateOverflowingItemNames then
-                "swt:w-full swt:min-w-0 swt:overflow-x-hidden"
+                if delegateHorizontalScrollToParent then
+                    "swt:w-full swt:min-w-0 swt:overflow-x-clip"
+                else
+                    "swt:w-full swt:min-w-0 swt:overflow-x-hidden"
             elif delegateHorizontalScrollToParent then
                 "swt:w-max swt:min-w-full"
             else
@@ -267,8 +270,9 @@ type FileExplorer =
             )
 
         let selectedPathIds = model.SelectedPath |> List.map _.Id |> Set.ofList
+        let stickyParentRowHeightPx = 32
 
-        let rec renderItem item =
+        let rec renderItem depth item =
             let isSelected = model.SelectedId = Some item.Id
             let isInSelectedPath = selectedPathIds.Contains item.Id
             let isHighlighted = isSelected || isInSelectedPath
@@ -303,10 +307,16 @@ type FileExplorer =
                             Some(
                                 Html.ul [
                                     prop.className "swt:ml-4"
-                                    prop.children (children |> List.map renderItem)
+                                    prop.children (children |> List.map (renderItem (depth + 1)))
                                 ]
                             )
                         | None -> None
+                    else
+                        None
+
+                let stickyTopOffset =
+                    if delegateHorizontalScrollToParent && childrenTree.IsSome then
+                        Some(depth * stickyParentRowHeightPx)
                     else
                         None
 
@@ -330,6 +340,7 @@ type FileExplorer =
                     ?onDeleteItem = onDeleteItem,
                     canDeleteItem = canDeleteItem,
                     ?statusAction = statusAction,
+                    ?stickyTopOffset = stickyTopOffset,
                     ?children = childrenTree
                 )
             else
@@ -356,7 +367,7 @@ type FileExplorer =
                         Html.ul [
                             prop.testId "file-explorer-container"
                             prop.className listClassName
-                            prop.children (model.Items |> List.map renderItem)
+                            prop.children (model.Items |> List.map (renderItem 0))
                         ]
                     ]
                 ]

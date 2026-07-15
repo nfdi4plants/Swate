@@ -1,22 +1,70 @@
-import type { Meta, StoryObj } from '@storybook/react-vite';
-import { screen, fn, within, expect, userEvent, waitFor, fireEvent } from 'storybook/test';
-import {Entry as TermSearchConfigSetter} from "./ConfigSetter.fs.js";
-import {TIBQueryProvider as TermSearchConfigProvider} from "./ConfigProvider.fs.js"
-import React from 'react';
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
+import { Entry as TermSearchConfigSetter } from "./ConfigSetter.fs.js";
+import { DefaultQueryProvider as TermSearchConfigProvider } from "./ConfigProvider.fs.js";
+import React from "react";
 
-const SETTER_DEBUG_TESTID = "term-search-config-setter"
+const SETTER_DEBUG_TESTID = "term-search-config-setter";
+const TIB_TRIGGER_TESTID = "term-search-config-setter-tib-trigger";
+const OLS_TRIGGER_TESTID = "term-search-config-setter-ols-trigger";
+const TIB_DEFAULT_KEY = "TIB_DataPLANT";
+const TIB_CHEM_KEY = "TIB_NFDI4CHEM";
+const OLS_DEFAULT_KEY = "OLS_DataPLANT Project";
+const OLS_PLANTS_KEY = "OLS_NFDI4Plants";
 
-const SETTER_TRIGGER_TESTID = "term-search-config-setter-tib-trigger"
+const TIB_COLLECTIONS = {
+  content: ["DataPLANT", "NFDI4CHEM"],
+  numberOfElements: 2,
+};
+
+const OLS_COLLECTIONS = [
+  { id: "dataplant-id", label: "DataPLANT Project", isPublic: true },
+  { id: "nfdi4plants-id", label: "NFDI4Plants", isPublic: true },
+];
 
 const meta = {
   title: "Composite Components/TermSearch/TermSearchConfigSetter",
   tags: ["autodocs"],
   parameters: {
-    // Optional parameter to center the component in the Canvas. More info: https://storybook.js.org/docs/configure/story-layout
-    layout: 'centered',
+    layout: "centered",
   },
-  async beforeEach() {
+  async beforeEach(context) {
     localStorage.clear();
+
+    if (context.parameters.legacyTermSearchConfig) {
+      localStorage.setItem(
+        "swate-termsearchconfig-ctx",
+        JSON.stringify(context.parameters.legacyTermSearchConfig),
+      );
+    }
+
+    const originalFetch = globalThis.fetch;
+
+    globalThis.fetch = fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.includes("/ontologies/schemavalues")) {
+        if (context.parameters.tibCollectionRequestFails) {
+          throw new Error("TIB collection discovery unavailable");
+        }
+
+        return Response.json(TIB_COLLECTIONS);
+      }
+
+      if (url.endsWith("/collections/")) {
+        if (context.parameters.olsCollectionRequestPending) {
+          return new Promise<Response>(() => undefined);
+        }
+
+        return Response.json(OLS_COLLECTIONS);
+      }
+
+      throw new Error(`Unexpected request: ${url}`);
+    }) as typeof fetch;
+
+    return () => {
+      globalThis.fetch = originalFetch;
+    };
   },
   component: TermSearchConfigSetter,
   decorators: [
@@ -32,63 +80,151 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {
-  play: async ({ args, canvasElement }) => {
-
-    // const input = within(canvasElement).getByTestId(SETTER_TRIGGER_TESTID);
-    const debug = within(canvasElement).getByTestId(SETTER_DEBUG_TESTID);
-
-
-    // read the attributes (strings!)
-    const activeKeysCount = parseInt(debug.getAttribute('data-activekeyscount') || '0', 10);
-    const disableDefault = debug.getAttribute('data-defaultdisables') === 'true';
-    const activeKeys = debug.getAttribute('data-activekeys') || "";
-
-    // assertions
-    expect(activeKeysCount).toBe(1);
-    expect(disableDefault).toBe(false);
-    expect(activeKeys).toBe("TIB_DataPLANT");
-  }
+async function openCollectionSelector(trigger: HTMLElement) {
+  const selector = trigger.parentElement;
+  expect(selector).not.toBeNull();
+  await userEvent.click(selector!);
+  return screen.findByRole("listbox");
 }
 
+function getOption(listbox: HTMLElement, key: string) {
+  const option = listbox.querySelector(`[data-selectoption="${key}"]`);
 
+  if (!(option instanceof HTMLElement)) {
+    throw new Error(`Expected ${key} option to be rendered.`);
+  }
+
+  return option;
+}
+
+async function waitForOptions(listbox: HTMLElement, ...keys: string[]) {
+  await waitFor(() => {
+    keys.forEach((key) => expect(getOption(listbox, key)).toBeInTheDocument());
+  });
+}
+
+function expectActiveKeys(debug: HTMLElement, ...keys: string[]) {
+  expect(debug).toHaveAttribute("data-activekeys", keys.sort().join("; "));
+}
+
+export const Default: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const debug = canvas.getByTestId(SETTER_DEBUG_TESTID);
+    const tibTrigger = canvas.getByTestId(TIB_TRIGGER_TESTID);
+    const olsTrigger = canvas.getByTestId(OLS_TRIGGER_TESTID);
+
+    expect(debug).toHaveAttribute("data-activekeyscount", "2");
+    expect(debug).toHaveAttribute("data-defaultdisables", "false");
+    expectActiveKeys(debug, OLS_DEFAULT_KEY, TIB_DEFAULT_KEY);
+    expect(tibTrigger).toHaveTextContent(TIB_DEFAULT_KEY);
+    expect(tibTrigger).not.toHaveTextContent("OLS");
+    expect(olsTrigger).toHaveTextContent(OLS_DEFAULT_KEY);
+  },
+};
+
+export const TIBLoadsIndependentlyFromOLS: Story = {
+  parameters: {
+    olsCollectionRequestPending: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByTestId(TIB_TRIGGER_TESTID);
+    const listbox = await openCollectionSelector(trigger);
+
+    await waitForOptions(listbox, TIB_DEFAULT_KEY, TIB_CHEM_KEY);
+  },
+};
+
+export const OLSLoadsIndependentlyFromTIB: Story = {
+  parameters: {
+    tibCollectionRequestFails: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByTestId(OLS_TRIGGER_TESTID);
+    const listbox = await openCollectionSelector(trigger);
+
+    await waitForOptions(listbox, OLS_DEFAULT_KEY, OLS_PLANTS_KEY);
+  },
+};
+
+export const TIBDefaultAvailableWhenCollectionLoadingFails: Story = {
+  parameters: {
+    tibCollectionRequestFails: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const debug = canvas.getByTestId(SETTER_DEBUG_TESTID);
+    const trigger = canvas.getByTestId(TIB_TRIGGER_TESTID);
+    const listbox = await openCollectionSelector(trigger);
+
+    expectActiveKeys(debug, OLS_DEFAULT_KEY, TIB_DEFAULT_KEY);
+    expect(trigger).toHaveTextContent(TIB_DEFAULT_KEY);
+    expect(getOption(listbox, TIB_DEFAULT_KEY)).toBeInTheDocument();
+  },
+};
+
+export const DefaultsReplaceLegacyEmptySelection: Story = {
+  parameters: {
+    tibCollectionRequestFails: true,
+    legacyTermSearchConfig: {
+      disableDefault: false,
+      activeKeys: [],
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const debug = canvas.getByTestId(SETTER_DEBUG_TESTID);
+    const trigger = canvas.getByTestId(TIB_TRIGGER_TESTID);
+
+    await waitFor(() => {
+      expectActiveKeys(debug, OLS_DEFAULT_KEY, TIB_DEFAULT_KEY);
+      expect(trigger).toHaveTextContent(TIB_DEFAULT_KEY);
+    });
+
+    const listbox = await openCollectionSelector(trigger);
+    expect(getOption(listbox, TIB_DEFAULT_KEY)).toBeInTheDocument();
+  },
+};
+
+export const SelectOLSCollection: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const debug = canvas.getByTestId(SETTER_DEBUG_TESTID);
+    const trigger = canvas.getByTestId(OLS_TRIGGER_TESTID);
+    const listbox = await openCollectionSelector(trigger);
+
+    await waitForOptions(listbox, OLS_DEFAULT_KEY, OLS_PLANTS_KEY);
+
+    await userEvent.click(getOption(listbox, OLS_PLANTS_KEY));
+    await userEvent.keyboard("{Escape}");
+
+    await waitFor(() => {
+      expectActiveKeys(debug, OLS_DEFAULT_KEY, OLS_PLANTS_KEY, TIB_DEFAULT_KEY);
+      expect(trigger).toHaveTextContent(
+        `${OLS_DEFAULT_KEY}, ${OLS_PLANTS_KEY}`,
+      );
+    });
+  },
+};
 
 export const SetMultipleTIBQueries: Story = {
-  tags: ['skip-test'],
-  play: async ({ args, canvasElement }) => {
-
+  play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const debug = await canvas.findByTestId(SETTER_DEBUG_TESTID, {}, { timeout: 10000 });
-    const trigger = await canvas.findByTestId(SETTER_TRIGGER_TESTID, {}, { timeout: 10000 });
+    const debug = canvas.getByTestId(SETTER_DEBUG_TESTID);
+    const trigger = canvas.getByTestId(TIB_TRIGGER_TESTID);
+    const listbox = await openCollectionSelector(trigger);
+
+    await waitForOptions(listbox, TIB_CHEM_KEY);
+
+    await userEvent.click(getOption(listbox, TIB_CHEM_KEY));
+    await userEvent.keyboard("{Escape}");
 
     await waitFor(() => {
-      expect(getComputedStyle(trigger).pointerEvents).not.toBe("none");
-    }, { timeout: 10000 });
-
-    await userEvent.click(trigger);
-
-    const box = await screen.findByRole('listbox', {}, { timeout: 10000 });
-    const option = await waitFor(() => {
-      const currentOption = box.querySelector('[data-selectoption="TIB_NFDI4CHEM"]');
-
-      if (!(currentOption instanceof HTMLElement)) {
-        throw new Error("Expected TIB_NFDI4CHEM option to be rendered.");
-      }
-
-      return currentOption;
-    }, { timeout: 10000 });
-
-    await userEvent.click(option);
-    await userEvent.keyboard('{Escape}');
-
-    await waitFor(() => {
-      const activeKeysCount = parseInt(debug.getAttribute('data-activekeyscount') || '0', 10);
-      const disableDefault = debug.getAttribute('data-defaultdisables') === 'true';
-      const activeKeys = debug.getAttribute('data-activekeys') || "";
-
-      expect(activeKeysCount).toBe(2);
-      expect(disableDefault).toBe(false);
-      expect(activeKeys).toBe("TIB_DataPLANT; TIB_NFDI4CHEM");
-    }, { timeout: 10000 });
-  }
-}
+      expect(debug).toHaveAttribute("data-activekeyscount", "3");
+      expect(debug).toHaveAttribute("data-defaultdisables", "false");
+      expectActiveKeys(debug, OLS_DEFAULT_KEY, TIB_DEFAULT_KEY, TIB_CHEM_KEY);
+    });
+  },
+};
