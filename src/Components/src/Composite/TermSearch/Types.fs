@@ -230,8 +230,9 @@ module OLSTypesExtensions =
         let iri = term.iri |> Option.orElse term.URI
 
         let id =
-            term.obo_id
-            |> Option.orElse (term.short_form |> Option.orElse term.shortForm |> Option.map normalizeShortForm)
+            term.short_form
+            |> Option.orElse term.shortForm
+            |> Option.map normalizeShortForm
             |> Option.orElse iri
 
         let description =

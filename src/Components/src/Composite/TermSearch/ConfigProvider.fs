@@ -77,8 +77,8 @@ module private TermSearchConfigProviderHelper =
     let private mapTIBResults rows (request: JS.Promise<Api.TIBApi.TIBTypes.SearchApi option>) =
         request |> mapSearchResults rows _.ToSwateTerms()
 
-    let private mapOLSSearchResults rows (request: JS.Promise<Api.OLSApi.OLSTypes.SearchApi option>) =
-        request |> mapSearchResults rows _.ToSwateTerms()
+    let private mapOLSResults rows (request: JS.Promise<Api.OLSApi.OLSTypes.SearchApi>) =
+        request |> mapResults rows _.ToSwateTerms()
 
     let private mapOLSHierarchyResults rows (request: JS.Promise<Api.OLSApi.OLSTypes.Term[] option>) =
         request |> mapSearchResults rows OLSTypesExtensions.toSwateTerms
@@ -109,8 +109,8 @@ module private TermSearchConfigProviderHelper =
         Key = create TermSearchSource.OLS collection.label
         TermSearch =
             fun query ->
-                Api.OLSApi.OLSApi.defaultSearch (query, DEFAULT_SEARCH_ROWS, collection.id)
-                |> mapOLSSearchResults DEFAULT_SEARCH_ROWS
+                Api.OLSApi.OLSApi.search (query, collection.id)
+                |> mapOLSResults DEFAULT_SEARCH_ROWS
         ParentSearch =
             fun (parent, query) ->
                 Api.OLSApi.OLSApi.searchChildrenOf (query, parent, collection, DEFAULT_SEARCH_ROWS)

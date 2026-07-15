@@ -11,7 +11,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const PARENT_IRI = "https://example.org/custom-ontology/parents/PO_0009011";
+const PARENT_IRI = "http://purl.obolibrary.org/obo/PO_0009011";
 
 const COLLECTION = {
   id: "dataplant-id",
@@ -21,10 +21,13 @@ const COLLECTION = {
 };
 
 const PARENT_RESPONSE = {
-  response: {
-    docs: [
+  _embedded: {
+    terms: [
       {
-        obo_id: "PO:0009011",
+        iri: PARENT_IRI,
+        ontology_name: "agro",
+      },
+      {
         iri: PARENT_IRI,
         ontology_name: "po",
       },
@@ -48,7 +51,7 @@ function installFetchMock(...responseBodies: object[]) {
   };
 }
 
-export const DefaultSearch: Story = {
+export const Search: Story = {
   play: async () => {
     const identifier = "https://purl.org/nfdi4plants/ontology/dpbo/DPBO_0000033";
     const { fetchMock, restore } = installFetchMock({
@@ -58,7 +61,6 @@ export const DefaultSearch: Story = {
         docs: [
           {
             label: "plant age",
-            obo_id: "DPBO:0000033",
             short_form: "DPBO_0000033",
             iri: identifier,
             ontology_name: "dpbo",
@@ -68,16 +70,16 @@ export const DefaultSearch: Story = {
     });
 
     try {
-      const response = await OLSApi.defaultSearch("plant age", 10, "dataplant-id");
+      const response = await OLSApi.search("plant age", "dataplant-id");
       const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
 
-      expect(url.pathname).toBe("/api-gateway/ols/api/select");
-      expect(url.searchParams.get("q")).toBe("plant age");
-      expect(url.searchParams.get("rows")).toBe("10");
+      expect(url.pathname).toBe("/api-gateway/search");
+      expect(url.searchParams.get("query")).toBe("plant age");
+      expect(url.searchParams.get("targetDbSchema")).toBe("ols");
       expect(url.searchParams.get("collectionId")).toBe("dataplant-id");
-      expect(response?.response?.docs?.[0]).toMatchObject({
+      expect(response.response?.docs?.[0]).toMatchObject({
         label: "plant age",
-        obo_id: "DPBO:0000033",
+        short_form: "DPBO_0000033",
         iri: identifier,
       });
     } finally {
@@ -88,43 +90,40 @@ export const DefaultSearch: Story = {
 
 export const SearchChildrenOf: Story = {
   play: async () => {
-    const { fetchMock, restore } = installFetchMock(
-      PARENT_RESPONSE,
-      {
-        elements: [
-          {
-            iri: "http://purl.obolibrary.org/obo/PO_0025034",
-            label: "leaf",
-            shortForm: "PO_0025034",
-            ontologyId: "po",
-            hasDirectChildren: true,
-          },
-        ],
-      },
-    );
+    const { fetchMock, restore } = installFetchMock(PARENT_RESPONSE, {
+      elements: [
+        {
+          iri: "http://purl.obolibrary.org/obo/PO_0009002",
+          label: "plant cell",
+          shortForm: "PO_0009002",
+          ontologyId: "po",
+        },
+        {
+          iri: "http://purl.obolibrary.org/obo/PO_0025034",
+          label: "leaf",
+          shortForm: "PO_0025034",
+          ontologyId: "po",
+          hasDirectChildren: true,
+        },
+      ],
+    });
 
     try {
       const children = await OLSApi.searchChildrenOf("leaf", "PO:0009011", COLLECTION, 10);
-      const parentSearchUrl = new URL(String(fetchMock.mock.calls[0]?.[0]));
-      const url = new URL(String(fetchMock.mock.calls[1]?.[0]));
-      const encodedParent = url.pathname.split("/").at(-2);
+      const parentUrl = new URL(String(fetchMock.mock.calls[0]?.[0]));
+      const childrenUrl = new URL(String(fetchMock.mock.calls[1]?.[0]));
+      const encodedParent = childrenUrl.pathname.split("/").at(-2);
 
-      expect(parentSearchUrl.pathname).toBe("/api-gateway/ols/api/select");
-      expect(parentSearchUrl.searchParams.get("q")).toBe("PO:0009011");
-      expect(fetchMock).toHaveBeenCalledTimes(2);
-      expect(url.pathname).toContain("/ols/api/v2/ontologies/po/classes/");
+      expect(parentUrl.pathname).toBe("/api-gateway/ols/api/terms");
+      expect(parentUrl.searchParams.get("iri")).toBe("PO:0009011");
+      expect(parentUrl.searchParams.get("collectionId")).toBe("dataplant-id");
       expect(decodeURIComponent(decodeURIComponent(decodeURIComponent(encodedParent!)))).toBe(PARENT_IRI);
-      expect(url.searchParams.get("database")).toBe("tib");
-      expect(url.searchParams.get("collectionId")).toBe("dataplant-id");
-      expect(url.searchParams.get("search")).toBe("leaf");
-      expect(url.searchParams.get("size")).toBe("10");
+      expect(childrenUrl.pathname).toContain("/ols/api/v2/ontologies/po/classes/");
+      expect(childrenUrl.searchParams.get("database")).toBe("tib");
+      expect(childrenUrl.searchParams.get("collectionId")).toBe("dataplant-id");
+      expect(childrenUrl.searchParams.get("search")).toBe("leaf");
       expect(children).toHaveLength(1);
-      expect(children?.[0]).toMatchObject({
-        label: "leaf",
-        iri: "http://purl.obolibrary.org/obo/PO_0025034",
-        shortForm: "PO_0025034",
-        ontologyId: "po",
-      });
+      expect(children?.[0]).toMatchObject({ label: "leaf", shortForm: "PO_0025034" });
     } finally {
       restore();
     }
@@ -133,21 +132,35 @@ export const SearchChildrenOf: Story = {
 
 export const SearchAllChildrenOf: Story = {
   play: async () => {
+    const branchIri = "http://purl.obolibrary.org/obo/PO_0025496";
     const { fetchMock, restore } = installFetchMock(
       PARENT_RESPONSE,
       {
         elements: [
           {
-            iri: "http://purl.obolibrary.org/obo/PO_0025496",
+            iri: branchIri,
             label: "multi-tissue plant structure",
             shortForm: "PO_0025496",
             ontologyId: "po",
+            hasDirectChildren: true,
           },
           {
             iri: "http://purl.obolibrary.org/obo/PO_0025034",
             label: "leaf",
             shortForm: "PO_0025034",
             ontologyId: "po",
+            hasDirectChildren: false,
+          },
+        ],
+      },
+      {
+        elements: [
+          {
+            iri: "http://purl.obolibrary.org/obo/PO_0009020",
+            label: "plant structure descendant",
+            shortForm: "PO_0009020",
+            ontologyId: "po",
+            hasDirectChildren: false,
           },
         ],
       },
@@ -155,16 +168,18 @@ export const SearchAllChildrenOf: Story = {
 
     try {
       const children = await OLSApi.searchAllChildrenOf("PO:0009011", COLLECTION, 10);
-      const url = new URL(String(fetchMock.mock.calls[1]?.[0]));
+      const descendantUrl = new URL(String(fetchMock.mock.calls[2]?.[0]));
+      const encodedBranch = descendantUrl.pathname.split("/").at(-2);
 
       expect(children?.map((term) => term.label)).toEqual([
         "multi-tissue plant structure",
         "leaf",
+        "plant structure descendant",
       ]);
-      expect(fetchMock).toHaveBeenCalledTimes(2);
-      expect(url.pathname).toContain("/children");
-      expect(url.searchParams.has("search")).toBe(false);
-      expect(url.searchParams.get("size")).toBe("10");
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(decodeURIComponent(decodeURIComponent(decodeURIComponent(encodedBranch!)))).toBe(branchIri);
+      expect(descendantUrl.searchParams.has("search")).toBe(false);
+      expect(descendantUrl.searchParams.get("size")).toBe("500");
     } finally {
       restore();
     }
