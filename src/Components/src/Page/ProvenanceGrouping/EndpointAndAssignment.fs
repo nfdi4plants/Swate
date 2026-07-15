@@ -45,11 +45,11 @@ module ValueAssignment =
         | ProvenanceSide.Input -> ProvenancePropertyTarget.InputSets ids
         | ProvenanceSide.Output -> ProvenancePropertyTarget.OutputSets ids
 
-    let private memberValuesForHeader header (model: ProvenanceModel) (member': DisplayMember) =
+    let private memberValuesForProperty property (model: ProvenanceModel) (member': DisplayMember) =
         member'.PropertyValueIds
         |> List.distinct
         |> List.choose (fun propertyValueId -> model.PropertyValues.TryFind propertyValueId)
-        |> List.filter (fun propertyValue -> propertyValue.Header = header)
+        |> List.filter (ProvenancePropertyValue.belongsTo property)
 
     let planPropertyValueDrop
         (source: ValueAssignmentSource)
@@ -58,28 +58,35 @@ module ValueAssignment =
         : Result<ValueAssignmentPlan, ValueAssignmentError> =
         let memberValues =
             group.Members
-            |> List.map (fun member' -> member'.SetId, memberValuesForHeader source.Header model member')
+            |> List.map (fun member' -> member'.SetId, memberValuesForProperty source.Property model member')
 
         if memberValues.IsEmpty then
             Error ValueAssignmentError.EmptyTarget
         else
-            let membersWithMultipleValues =
-                memberValues
-                |> List.choose (fun (setId, values) -> if values.Length > 1 then Some setId else None)
+            let allValues = memberValues |> List.collect snd
 
-            if not membersWithMultipleValues.IsEmpty then
-                Error(ValueAssignmentError.MultiplePropertyValues(source.Header, membersWithMultipleValues))
-            elif memberValues |> List.forall (fun (_, values) -> values.IsEmpty) then
-                Ok(
-                    AddCurrent {
-                        Target = targetForGroup group.Side group
-                        CopiedFrom = source.CopiedFrom
-                        Header = source.Header
-                        Value = source.Value
-                        Unit = source.Unit
-                    }
-                )
-            elif memberValues |> List.forall (fun (_, values) -> values.Length = 1) then
+            let distinctAssignedValues =
+                allValues
+                |> List.map (fun propertyValue -> propertyValue.Value, propertyValue.Unit)
+                |> List.distinct
+
+            if memberValues |> List.forall (fun (_, values) -> values.IsEmpty) then
+                if source.Property.OriginSource.Id = model.Source.Id then
+                    Ok(
+                        AddCurrent {
+                            Target = targetForGroup group.Side group
+                            CopiedFrom = source.CopiedFrom
+                            Header = source.Property.Header
+                            Value = source.Value
+                            Unit = source.Unit
+                        }
+                    )
+                else
+                    Error(ValueAssignmentError.UpstreamPropertyNotAssigned source.Property)
+            elif
+                memberValues |> List.forall (fun (_, values) -> not values.IsEmpty)
+                && distinctAssignedValues.Length = 1
+            then
                 Ok(
                     ConfirmOverwrite {
                         Target = targetForGroup group.Side group
@@ -87,13 +94,19 @@ module ValueAssignment =
                             memberValues
                             |> List.collect (fun (_, values) -> values |> List.map (fun value -> value.Id))
                             |> List.distinct
-                        Header = source.Header
+                        Header = source.Property.Header
                         Value = source.Value
                         Unit = source.Unit
                     }
                 )
+            elif memberValues |> List.exists (fun (_, values) -> values.IsEmpty) then
+                Error(ValueAssignmentError.MixedPropertyValueCounts source.Property)
             else
-                Error(ValueAssignmentError.MixedPropertyValueCounts source.Header)
+                let assignedSetIds =
+                    memberValues
+                    |> List.choose (fun (setId, values) -> if values.IsEmpty then None else Some setId)
+
+                Error(ValueAssignmentError.MultiplePropertyValues(source.Property, assignedSetIds))
 
     let private combineGroupsForAssignment (groups: DisplayGroup list) : DisplayGroup option =
         match groups with

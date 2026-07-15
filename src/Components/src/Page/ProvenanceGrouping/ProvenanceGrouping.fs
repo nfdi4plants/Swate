@@ -404,7 +404,7 @@ type ProvenanceGrouping =
                                 FolderedDraggableList.FolderedDraggableList<PropertyShelfItemPayload>(
                                     propertyShelfFolders,
                                     (fun _ item ->
-                                        DragDrop.folderPropertyDragId item.Payload.SourceSide item.Payload.Header
+                                        DragDrop.folderPropertyDragId item.Payload.SourceSide item.Payload.Property
                                     ),
                                     ?activeFolderId = propertyShelfActiveFolderId,
                                     onActiveFolderIdChange = setPropertyShelfActiveFolderId,
@@ -642,9 +642,9 @@ type ProvenanceGrouping =
         let createSet =
             React.useCallback ((fun command -> EditorActions.createSet latestSession.current publish command), [||])
 
-        let addPaletteValue side header value unit =
+        let addPaletteValue side property value unit =
             let layer = latestLayer.current
-            applyUiState (State.Palette.addValue layer.Id layer.Model.Source side header value unit)
+            applyUiState (State.Palette.addValue layer.Id side property value unit)
 
         let toggleSideGrouping sideId side header =
             applyUiState (State.GroupingAssignments.toggleSide sideId side header)
@@ -895,8 +895,8 @@ type ProvenanceGrouping =
         let isRejectedPropertyRailDrop targetSide =
             let headerCannotSwitch sourceSide headerId =
                 sourceSide <> targetSide
-                && (lookups.FindHeader headerId
-                    |> Option.exists (fun header -> PropertyRails.canSwitchHeader header layer.Model |> not))
+                && (lookups.FindProperty headerId
+                    |> Option.exists (fun property -> PropertyRails.canSwitchHeader property layer.Model |> not))
 
             match activeDrag with
             | Some {
@@ -1005,7 +1005,7 @@ type ProvenanceGrouping =
 
             EditorSurface.propertyRail
                 side
-                layer.Model.Source.Id
+                layer.Model.Source
                 sideId
                 (match side with
                  | ProvenanceSide.Input -> activeInputRailProjection
@@ -1028,9 +1028,11 @@ type ProvenanceGrouping =
                 // some entity; the palette copy keeps rendering after a drop, so the
                 // check must look at value identity rather than the chip's own id.
                 (fun propertyValue ->
+                    let property = ProvenancePropertyValue.propertyKey propertyValue
+
                     layer.Model.PropertyValues
                     |> Map.exists (fun _ existing ->
-                        existing.Header = propertyValue.Header
+                        ProvenancePropertyValue.belongsTo property existing
                         && existing.Value = propertyValue.Value
                         && existing.Unit = propertyValue.Unit
                     )
