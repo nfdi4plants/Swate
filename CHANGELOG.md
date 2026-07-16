@@ -16,6 +16,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 2.0.2 - 2026-07-15
+
+### 🔄 Changed
+
+-   Provenance editor: a property's identity is now its header **plus** its source table, so same-named properties from different tables (e.g. "Temperature" from Growth vs. Cultivation) get their own rail row, color, drag identity and connector lines instead of collapsing into one property #1255 (by @Caroott)
+
+### 🐛 Fixed
+
+-   Fix connection annotation inheritance in the provenance editor: values spread bidirectionally through a layer's connections to all transitively connected endpoints, removing a connection retracts exactly the values it carried, and upstream values are left untouched #1255 (by @Caroott)
+-   Group overwrites in the provenance editor now respect the property's origin: only assignments of the exact property are replaced (all writeback occurrences of a value together), upstream-originated properties can't be attached to entities that never had them, and drops on entities without a single shared existing value are rejected with a clear error instead of silently creating or mixing assignments #1255 (by @Caroott)
+
+
+## 2.0.1 - 2026-07-14
+
+### 🐛 Fixed
+
+- Add failsafe for local storage migration from v1.0.7 to v2.0.0 in `ConfigProvider.fs` to prevent errors when the old field `aktiveKeys` is present in local storage key `swate-termsearchconfig-ctx`. This error broke the app on load. (by @Freymaurer)
+
 ## 2.0.0 - 2026-07-14
 
 ### ✨ Added

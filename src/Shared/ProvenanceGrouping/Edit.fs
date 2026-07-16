@@ -371,7 +371,7 @@ let createLoadedPropertyValue (command: CreateLoadedPropertyValueCommand) (model
                         InputSets = model.InputSets |> updateSets propertyValueId inputSetIds
                         OutputSets = model.OutputSets |> updateSets propertyValueId outputSetIds
                 }
-                |> ProvenanceModel.refreshInheritedOutputProperties
+                |> ProvenanceModel.refreshInheritedProperties
 
             if nextModel = model then
                 Ok(model, [])
@@ -406,7 +406,7 @@ let createLoadedPropertyValue (command: CreateLoadedPropertyValueCommand) (model
                         InputSets = model.InputSets |> updateSets propertyValueId inputSetIds
                         OutputSets = model.OutputSets |> updateSets propertyValueId outputSetIds
                 }
-                |> ProvenanceModel.refreshInheritedOutputProperties
+                |> ProvenanceModel.refreshInheritedProperties
 
             Ok(
                 nextModel,
@@ -439,12 +439,21 @@ let removeConnection (connectionId: ProvenanceConnectionId) (model: ProvenanceMo
     match chooseConnection model connectionId with
     | Error error -> Error error
     | Ok connection ->
+        // Strip the removed connection's inherited entries explicitly: once the
+        // connection is gone from the map, the refresh would treat them as
+        // carried-in upstream entries and preserve them.
+        let dropInherited setId sets =
+            sets
+            |> Map.change setId (Option.map (ProvenanceSet.removeInheritedPropertyValueIds connectionId))
+
         let nextModel =
             {
                 model with
                     Connections = model.Connections |> Map.remove connectionId
+                    InputSets = model.InputSets |> dropInherited connection.InputSetId
+                    OutputSets = model.OutputSets |> dropInherited connection.OutputSetId
             }
-            |> ProvenanceModel.refreshInheritedOutputProperties
+            |> ProvenanceModel.refreshInheritedProperties
 
         Ok(
             nextModel,
@@ -492,7 +501,7 @@ let connectSets inputSetId outputSetId processName (model: ProvenanceModel) : Ed
                 model with
                     Connections = model.Connections |> Map.add connectionId connection
             }
-            |> ProvenanceModel.refreshInheritedOutputProperties
+            |> ProvenanceModel.refreshInheritedProperties
 
         Ok(
             nextModel,

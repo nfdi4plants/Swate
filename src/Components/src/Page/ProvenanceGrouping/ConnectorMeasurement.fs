@@ -328,10 +328,10 @@ module ConnectorHandles =
         ParentGroupId = Some groupId
     }
 
-    let propertyHeader side header : ConnectionHandleRef = {
+    let propertyHeader side property : ConnectionHandleRef = {
         Kind = ConnectionHandleKind.PropertyHeader
         Side = side
-        Id = DragDrop.propertyHeaderIdentity header
+        Id = DragDrop.propertyKeyIdentity property
         ParentGroupId = None
     }
 
