@@ -588,12 +588,9 @@ type Controls =
 
     [<ReactComponent>]
     static member private PropertySwapButton
-        (
-            side: ProvenanceSide,
-            header: ProvenancePropertyHeader,
-            onSwitch: ProvenancePropertyHeader -> unit,
-            ?debug: bool
-        ) =
+        (side: ProvenanceSide, property: ProvenancePropertyKey, onSwitch: ProvenancePropertyKey -> unit, ?debug: bool)
+        =
+        let header = property.Header
         let sideName = SideLabels.sideName side
 
         Html.button [
@@ -603,8 +600,8 @@ type Controls =
             prop.ariaLabel $"Move {header.Category.Name} from {sideName}"
             if defaultArg debug false then
                 prop.testId $"provenance-property-drag-{side}-{header.Category.Name}"
-            prop.onPointerUp (fun _ -> onSwitch header)
-            prop.onClick (fun _ -> onSwitch header)
+            prop.onPointerUp (fun _ -> onSwitch property)
+            prop.onClick (fun _ -> onSwitch property)
             prop.children [
                 Html.i [
                     prop.className "swt:iconify swt:fluent--arrow-swap-20-regular swt:size-4"
@@ -617,16 +614,16 @@ type Controls =
         (
             side: ProvenanceSide,
             activeSourceId: ProvenanceSourceId,
-            header: ProvenancePropertyHeader,
+            property: ProvenancePropertyKey,
             propertyValues: ProvenancePropertyValue list,
             active: GroupingAssignment list,
             canSwitch: bool,
             expanded: bool,
-            onToggleSide: ProvenancePropertyHeader -> unit,
-            onToggleBoth: ProvenancePropertyHeader -> unit,
-            onSwitch: ProvenancePropertyHeader -> unit,
-            onToggleExpanded: ProvenancePropertyHeader -> unit,
-            onAddValue: ProvenancePropertyHeader -> ProvenanceValue -> ProvenanceTerm option -> unit,
+            onToggleSide: ProvenancePropertyKey -> unit,
+            onToggleBoth: ProvenancePropertyKey -> unit,
+            onSwitch: ProvenancePropertyKey -> unit,
+            onToggleExpanded: ProvenancePropertyKey -> unit,
+            onAddValue: ProvenancePropertyKey -> ProvenanceValue -> ProvenanceTerm option -> unit,
             setIsValueChipDragging: bool -> unit,
             ?debug: bool,
             ?key: string,
@@ -640,10 +637,12 @@ type Controls =
             ?onApplyValueToSelection: ProvenancePropertyValue -> unit,
             ?applySelectionLabel: string
         ) =
+        let header = property.Header
+
         let draggable =
             DndKit.useDraggable (
                 {|
-                    id = DragDrop.propertyDragId side header
+                    id = DragDrop.propertyDragId side property
                     data = {| label = header.Category.Name |}
                 |}
             )
@@ -658,11 +657,11 @@ type Controls =
 
         let sideSelected =
             active
-            |> List.exists (fun assignment -> assignment.Key.Header = header && assignment.Scope = sideScope)
+            |> List.exists (fun assignment -> assignment.Key = property && assignment.Scope = sideScope)
 
         let bothSelected =
             active
-            |> List.exists (fun assignment -> assignment.Key.Header = header && assignment.Scope = GroupingScope.Both)
+            |> List.exists (fun assignment -> assignment.Key = property && assignment.Scope = GroupingScope.Both)
 
         let sideName = SideLabels.sideName side
 
@@ -675,7 +674,7 @@ type Controls =
                 {
                     Kind = ConnectionHandleKind.PropertyHeader
                     Side = side
-                    Id = DragDrop.propertyHeaderIdentity header
+                    Id = DragDrop.propertyKeyIdentity property
                     ParentGroupId = None
                 },
                 (match side with
@@ -725,7 +724,8 @@ type Controls =
                 prop.custom ("data-tutorial-group-by", $"{side}:{header.Category.Name}")
                 if defaultArg debug false then
                     prop.testId $"provenance-property-{side}-{header.Category.Name}"
-                prop.onClick (fun _ -> onToggleSide header)
+                prop.custom ("data-provenance-property-origin", property.OriginSource.Id)
+                prop.onClick (fun _ -> onToggleSide property)
                 prop.children [
                     propertyAnchor
                     match color with
@@ -817,7 +817,7 @@ type Controls =
                     else
                         $"Expand {header.Category.Name} values"
                 )
-                prop.onClick (fun _ -> onToggleExpanded header)
+                prop.onClick (fun _ -> onToggleExpanded property)
                 prop.children [
                     Html.i [
                         prop.className [
@@ -849,7 +849,7 @@ type Controls =
             Html.button [
                 prop.type'.button
                 prop.title
-                    $"Group both sides by {header.Category.Name}. Inputs without their own value use values inherited from connected outputs."
+                    $"Group both sides by {header.Category.Name}. Connected inputs and outputs share their values for grouping."
                 prop.className [
                     "swt:btn swt:btn-xs swt:btn-square swt:z-10"
                     if bothSelected then
@@ -862,7 +862,7 @@ type Controls =
                 if defaultArg debug false then
                     prop.testId $"provenance-property-both-{side}-{header.Category.Name}"
                 prop.ariaLabel $"Group {header.Category.Name} on both sides"
-                prop.onClick (fun _ -> onToggleBoth header)
+                prop.onClick (fun _ -> onToggleBoth property)
                 prop.children [
                     Html.i [
                         prop.className "swt:iconify swt:fluent--link-multiple-20-regular swt:size-4"
@@ -872,7 +872,7 @@ type Controls =
 
         let swapButton =
             if canSwitch then
-                Controls.PropertySwapButton(side, header, onSwitch, ?debug = debug)
+                Controls.PropertySwapButton(side, property, onSwitch, ?debug = debug)
             else
                 Html.button [
                     prop.type'.button
@@ -999,7 +999,7 @@ type Controls =
                                 )
                             Controls.AddValuePopover(
                                 Some header,
-                                (fun addedHeader value unit -> onAddValue addedHeader value unit),
+                                (fun _ value unit -> onAddValue property value unit),
                                 label = "Add value",
                                 ?debug = debug
                             )
@@ -1016,25 +1016,25 @@ type Controls =
     static member PropertyRail
         (
             side: ProvenanceSide,
-            activeSourceId: ProvenanceSourceId,
-            headers: ProvenancePropertyHeader list,
+            activeSource: ProvenanceSourceRef,
+            headers: ProvenancePropertyKey list,
             active: GroupingAssignment list,
-            valuesForHeader: ProvenancePropertyHeader -> ProvenancePropertyValue list,
-            isExpanded: ProvenancePropertyHeader -> bool,
-            onToggleSide: ProvenancePropertyHeader -> unit,
-            onToggleBoth: ProvenancePropertyHeader -> unit,
-            onSwitch: ProvenancePropertyHeader -> unit,
-            onToggleExpanded: ProvenancePropertyHeader -> unit,
-            onAddValue: ProvenancePropertyHeader -> ProvenanceValue -> ProvenanceTerm option -> unit,
-            canSwitch: ProvenancePropertyHeader -> bool,
+            valuesForHeader: ProvenancePropertyKey -> ProvenancePropertyValue list,
+            isExpanded: ProvenancePropertyKey -> bool,
+            onToggleSide: ProvenancePropertyKey -> unit,
+            onToggleBoth: ProvenancePropertyKey -> unit,
+            onSwitch: ProvenancePropertyKey -> unit,
+            onToggleExpanded: ProvenancePropertyKey -> unit,
+            onAddValue: ProvenancePropertyKey -> ProvenanceValue -> ProvenanceTerm option -> unit,
+            canSwitch: ProvenancePropertyKey -> bool,
             isDropRejected: bool,
             isDropAvailable: bool,
             setIsValueChipDragging: bool -> unit,
-            statsForHeader: ProvenancePropertyHeader -> PropertyStats option,
-            badgeForHeader: ProvenancePropertyHeader -> PropertyCountBadge option,
-            colorForHeader: ProvenancePropertyHeader -> ProvenanceColor option,
-            originsForHeader: ProvenancePropertyHeader -> Set<ProvenancePropertyOrigin> option,
-            onSetColor: ProvenancePropertyHeader -> ProvenanceColor option -> unit,
+            statsForHeader: ProvenancePropertyKey -> PropertyStats option,
+            badgeForHeader: ProvenancePropertyKey -> PropertyCountBadge option,
+            colorForHeader: ProvenancePropertyKey -> ProvenanceColor option,
+            originsForHeader: ProvenancePropertyKey -> Set<ProvenancePropertyOrigin> option,
+            onSetColor: ProvenancePropertyKey -> ProvenanceColor option -> unit,
             sourceInfoForValue: ProvenancePropertyValue -> PropertyValueSourceInfo option,
             ?sideId: ProvenanceLayerSideId,
             ?isUnassignedValue: ProvenancePropertyValue -> bool,
@@ -1056,7 +1056,7 @@ type Controls =
         let collapseThreshold = 6
 
         let isPinned header =
-            active |> List.exists (fun assignment -> assignment.Key.Header = header)
+            active |> List.exists (fun assignment -> assignment.Key = header)
             || isExpanded header
 
         let visibleHeaders =
@@ -1116,7 +1116,20 @@ type Controls =
                     Html.div [
                         prop.className "swt:w-fit"
                         prop.children [
-                            Controls.AddValuePopover(None, onAddValue, label = "Add annotation", ?debug = debug)
+                            Controls.AddValuePopover(
+                                None,
+                                (fun header value unit ->
+                                    onAddValue
+                                        {
+                                            Header = header
+                                            OriginSource = activeSource
+                                        }
+                                        value
+                                        unit
+                                ),
+                                label = "Add annotation",
+                                ?debug = debug
+                            )
                         ]
                     ]
                 else
@@ -1133,7 +1146,7 @@ type Controls =
                     for header in visibleHeaders do
                         Controls.PropertyRailItem(
                             side,
-                            activeSourceId,
+                            activeSource.Id,
                             header,
                             valuesForHeader header,
                             active,
@@ -1155,7 +1168,7 @@ type Controls =
                             ?onApplyValueToSelection = onApplyValueToSelection,
                             ?applySelectionLabel = applySelectionLabel,
                             debug = defaultArg debug false,
-                            key = DragDrop.propertyHeaderIdentity header
+                            key = DragDrop.propertyKeyIdentity header
                         )
 
                     if hiddenHeaderCount > 0 || showAllHeaders && headers.Length > collapseThreshold then
@@ -1184,7 +1197,20 @@ type Controls =
                                 "swt:self-end"
                         ]
                         prop.children [
-                            Controls.AddValuePopover(None, onAddValue, label = "Add annotation", ?debug = debug)
+                            Controls.AddValuePopover(
+                                None,
+                                (fun header value unit ->
+                                    onAddValue
+                                        {
+                                            Header = header
+                                            OriginSource = activeSource
+                                        }
+                                        value
+                                        unit
+                                ),
+                                label = "Add annotation",
+                                ?debug = debug
+                            )
                         ]
                     ]
             ]

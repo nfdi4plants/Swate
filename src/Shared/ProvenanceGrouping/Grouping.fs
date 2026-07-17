@@ -2,7 +2,7 @@ module Swate.Components.Shared.ProvenanceGrouping.Grouping
 
 open Swate.Components.Shared.ProvenanceGrouping.Types
 
-type GroupingKey = { Header: ProvenancePropertyHeader }
+type GroupingKey = ProvenancePropertyKey
 
 [<RequireQualifiedAccess>]
 type GroupingScope =
@@ -57,9 +57,9 @@ let valueText (value: ProvenanceValue) (unit: ProvenanceTerm option) =
     | None -> text
 
 let private groupingKeySortText (key: GroupingKey) =
-    sprintf "%s:%s" key.Header.Kind.Id key.Header.Category.Name
+    sprintf "%s:%s:%s" key.Header.Kind.Id key.Header.Category.Name key.OriginSource.Id
 
-let private groupingValuesText keyValueSeparator keySeparator values =
+let private groupingValuesText duplicateHeaders keyValueSeparator keySeparator values =
     values
     |> List.groupBy (fun value -> value.Key)
     |> List.sortBy (fun (key, _) -> groupingKeySortText key)
@@ -70,7 +70,13 @@ let private groupingValuesText keyValueSeparator keySeparator values =
             |> List.map (fun groupingValue -> valueText groupingValue.Value groupingValue.Unit)
             |> String.concat " | "
 
-        sprintf "%s%s%s" key.Header.Category.Name keyValueSeparator valuesText
+        let keyText =
+            if duplicateHeaders |> Set.contains key.Header then
+                $"{key.Header.Category.Name}@{key.OriginSource.Id}"
+            else
+                key.Header.Category.Name
+
+        sprintf "%s%s%s" keyText keyValueSeparator valuesText
     )
     |> String.concat keySeparator
 
@@ -99,7 +105,7 @@ type private GroupingValue = GroupingKey * ProvenanceValue * ProvenanceTerm opti
 let private valueSetForKey key propertyValues : GroupingValue list list =
     let values =
         propertyValues
-        |> List.filter (fun (propertyValue: ProvenancePropertyValue) -> propertyValue.Header = key.Header)
+        |> List.filter (ProvenancePropertyValue.belongsTo key)
         |> List.groupBy (fun propertyValue -> propertyValue.Value, propertyValue.Unit)
         |> List.map (fun ((value, unit), propertyValues) ->
             key,
@@ -116,36 +122,6 @@ let private valueSetForKey key propertyValues : GroupingValue list list =
 
 let private valuesForKey model set key =
     setPropertyValues model set |> valueSetForKey key
-
-let private combineValueSets key valueSets : GroupingValue list list =
-    let values =
-        valueSets
-        |> List.collect id
-        |> List.groupBy (fun (_, value, unit, _) -> value, unit)
-        |> List.map (fun ((value, unit), grouped) ->
-            let propertyValueIds =
-                grouped
-                |> List.collect (fun (_, _, _, propertyValueIds) -> propertyValueIds)
-                |> List.distinct
-                |> List.sort
-
-            key, value, unit, propertyValueIds
-        )
-        |> List.sortBy (fun (_, value, unit, _) -> valueText value unit)
-
-    if values.IsEmpty then [] else [ values ]
-
-let private connectedOutputSets model inputSetId =
-    model.Connections
-    |> mapValues
-    |> List.filter (fun connection -> connection.Source.Id = model.Source.Id && connection.InputSetId = inputSetId)
-    |> List.choose (fun connection -> model.OutputSets.TryFind connection.OutputSetId)
-    |> List.filter (fun set -> set.Source.Id = model.Source.Id)
-
-let private inheritedOutputValuesForKey model inputSetId key =
-    connectedOutputSets model inputSetId
-    |> List.collect (fun outputSet -> valuesForKey model outputSet key)
-    |> combineValueSets key
 
 let private scopeApplies side scope =
     match side, scope with
@@ -174,17 +150,6 @@ let private normalizeAssignments side assignments =
             grouped.Head
     )
 
-let private valuesForAssignment model side set assignment =
-    match side, assignment.Scope with
-    | ProvenanceSide.Input, GroupingScope.Both ->
-        let ownValues = valuesForKey model set assignment.Key
-
-        if ownValues.IsEmpty then
-            inheritedOutputValuesForKey model set.Id assignment.Key
-        else
-            ownValues
-    | _ -> valuesForKey model set assignment.Key
-
 let private combinations values =
     let rec loop collected remaining =
         match remaining with
@@ -199,20 +164,29 @@ let private displayMember (set: ProvenanceSet) propertyValueIds = {
     PropertyValueIds = propertyValueIds |> List.distinct
 }
 
-let private groupId side (values: DisplayGroupingValue list) fallbackSetId =
+let private groupId duplicateHeaders side (values: DisplayGroupingValue list) fallbackSetId =
     match values with
     | [] -> sprintf "%s:%s" (sideText side) fallbackSetId
-    | _ -> values |> groupingValuesText "=" "|" |> sprintf "%s:%s" (sideText side)
+    | _ ->
+        values
+        |> groupingValuesText duplicateHeaders "=" "|"
+        |> sprintf "%s:%s" (sideText side)
 
 let displayGroupsForAssignments (model: ProvenanceModel) side assignments =
     let sets = loadedSets model side
     let assignments = normalizeAssignments side assignments
 
+    let duplicateHeaders =
+        assignments
+        |> List.countBy (fun assignment -> assignment.Key.Header)
+        |> List.choose (fun (header, count) -> if count > 1 then Some header else None)
+        |> Set.ofList
+
     match assignments with
     | [] ->
         sets
         |> List.map (fun set -> {
-            Id = groupId side [] set.Id
+            Id = groupId duplicateHeaders side [] set.Id
             TableName = set.Source.Name
             Side = side
             GroupingValues = []
@@ -225,12 +199,12 @@ let displayGroupsForAssignments (model: ProvenanceModel) side assignments =
             for set in sets do
                 let keyValues =
                     activeAssignments
-                    |> List.map (valuesForAssignment model side set)
+                    |> List.map (fun assignment -> valuesForKey model set assignment.Key)
                     |> List.filter (fun values -> values |> List.isEmpty |> not)
 
                 if keyValues.IsEmpty then
                     yield
-                        groupId side [] set.Id,
+                        groupId duplicateHeaders side [] set.Id,
                         set.Source.Name,
                         [],
                         displayMember set (ProvenanceSet.effectivePropertyValueIds set)
@@ -246,7 +220,7 @@ let displayGroupsForAssignments (model: ProvenanceModel) side assignments =
                             })
 
                         yield
-                            groupId side groupingValues set.Id,
+                            groupId duplicateHeaders side groupingValues set.Id,
                             set.Source.Name,
                             groupingValues,
                             displayMember set (ProvenanceSet.effectivePropertyValueIds set)
