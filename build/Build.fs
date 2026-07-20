@@ -6,8 +6,6 @@ open ProjectInfo
 let main args =
     let argv = args |> Array.map (fun x -> x.ToLower()) |> Array.toList
 
-    printfn "all args: %A" argv
-
     match argv with
     | "create-certs" :: _ ->
         Run.createDevCertsForExcelAddIn ()
@@ -120,8 +118,6 @@ let main args =
             0
         | "electron-bin" ->
 
-            printfn "otherArgs: %A" otherArgs
-
             let arch =
                 argv
                 |> List.tryFind (fun x -> x.StartsWith "--arch=")
@@ -135,7 +131,7 @@ let main args =
             printGreenfn "Release electron-bin for arch %s!" arch.Value
             0
         | "storybook" ->
-            printfn "Starting Storybook release!"
+            printGreenfn "Starting Storybook release!"
             Release.storybook ()
             0
         | _ ->

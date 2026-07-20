@@ -3,6 +3,7 @@
     {
       "name": "Frey, Kevin",
       "affiliation": "RPTU Kaiserslautern-Landau",
+      "type": "ProjectLeader",
       "orcid": "https://orcid.org/0000-0002-8510-6810"
     },
     {
@@ -22,21 +23,25 @@
     {
       "name": "Mühlhaus, Timo",
       "affiliation": "RPTU Kaiserslautern-Landau",
-      "orcid": "https://orcid.org/0000-0003-3925-6778"
+      "orcid": "https://orcid.org/0000-0003-3925-6778",
+      "type": "Supervisor"
     }
   ],
   "contributors": [
     {
       "name": "Paul, Annika",
+      "type": "ProjectMember",
       "affiliation": "RPTU Kaiserslautern-Landau",
       "orcid": "https://orcid.org/0009-0008-7417-0965"
     },
     {
       "name": "Osah, Peter",
+      "type": "ProjectMember",
       "affiliation": "RPTU Kaiserslautern-Landau"
     },
     {
       "name": "Brilhaus, Dominik",
+      "type": "ContactPerson",
       "affiliation": "CEPLAS, HHU",
       "orcid": "https://orcid.org/0000-0001-9021-3197"
     }
