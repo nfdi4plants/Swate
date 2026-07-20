@@ -15,6 +15,11 @@
       "affiliation": "RPTU Kaiserslautern-Landau"
     },
     {
+      "name": "Schneider, Kevin",
+      "affiliation": "RPTU Kaiserslautern-Landau",
+      "orcid": "https://orcid.org/0000-0002-2198-5262"
+    },
+    {
       "name": "Mühlhaus, Timo",
       "affiliation": "RPTU Kaiserslautern-Landau",
       "orcid": "https://orcid.org/0000-0003-3925-6778"
@@ -37,7 +42,10 @@
     }
   ],
   "keywords": [
-    "RDM", "Research Data management", "ARC", "Annotated Research Context"
+    "RDM",
+    "Research Data management",
+    "ARC",
+    "Annotated Research Context"
   ],
   "license": "mit",
   "upload_type": "software",
