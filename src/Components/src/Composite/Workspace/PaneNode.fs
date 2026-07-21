@@ -109,7 +109,7 @@ type PaneNode =
                 draggingRef.current <- true
                 setIsDraggingUi true
             )
-            prop.data ("active", if draggingUi then "true" else "false")
+            prop.custom ("data-active", if draggingUi then "true" else "false")
             prop.className [
                 "swt:shrink-0 swt:select-none swt:transition-colors swt:bg-transparent swt:hover:bg-primary swt:z-10 swt:absolute swt:data-[active=true]:bg-primary"
                 match dir with
