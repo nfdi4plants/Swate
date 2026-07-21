@@ -1,4 +1,4 @@
-# Swate
+# Swate 
 
 > **Swate** - something or someone that gets you absolutely joyed ([Urban dictionary](https://www.urbandictionary.com/define.php?term=swate))
 
@@ -57,3 +57,9 @@ You can also follow along our tutorial [Violas Journey](https://nfdi4plants.gith
 Any help is welcome, from a typo fix to a new feature. If you are unsure about anything, just ask. We are here to help you help us.
 
 If you want to contribute or just check out Swate on your local machine have a look at the [CONTRIBUTING.md](CONTRIBUTING.md) file.
+
+### Cite us!
+
+Every release is published to Zenodo with a stable DOI.
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21456532.svg)](https://doi.org/10.5281/zenodo.21456532)
