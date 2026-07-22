@@ -5,18 +5,28 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 open Swate.Components.Composite.TermSearch.Context
+open Swate.Components.Composite.TermSearch.Types
 open Swate.Components.Primitive
-open Swate.Components
 open Swate.Components.Primitive.Select
 open Swate.Components.Primitive.Select.Types
+
+module private ConfigSetterTypes =
+
+    let sources = [| TermSearchSource.TIB; TermSearchSource.OLS |]
+
+    let description =
+        function
+        | TermSearchSource.TIB -> "Choose the TIB terminology collections to include in term searches."
+        | TermSearchSource.OLS -> "Choose complete terminology collections from the TS4NFDI OLS gateway."
 
 [<Erase; Mangle(false)>]
 type TermSearchConfigSetter =
 
     [<ReactComponent>]
-    static member private TriggerRender(activeKeys: string[]) =
+    static member private SourceTriggerRender(source: TermSearchSource, activeKeys: string[]) =
+
         Html.button [
-            prop.testId "term-search-config-setter-tib-trigger"
+            prop.testId $"term-search-config-setter-{source}-trigger"
             prop.tabIndex -1
             prop.className [
                 "swt:btn swt:w-fit swt:btn-primary swt:pointer-events-none"
@@ -25,7 +35,7 @@ type TermSearchConfigSetter =
                 Icons.SearchPlus("swt:size-4")
                 Html.text (
                     if Array.isEmpty activeKeys then
-                        "Select tib queries"
+                        $"Select {source} collections"
                     else
                         activeKeys |> Array.truncate 3 |> String.concat ", "
                 )
@@ -33,6 +43,43 @@ type TermSearchConfigSetter =
             ]
         ]
 
+    [<ReactComponent>]
+    static member private CollectionSelector
+        (source: TermSearchSource, allKeys: Set<string>, activeKeys: string[], setActiveKeys: string[] -> unit)
+        =
+        let keys = allKeys |> Seq.filter (belongsTo source) |> Array.ofSeq
+
+        let activeSourceKeys, otherKeys = activeKeys |> Array.partition (belongsTo source)
+
+        let selectedIndices =
+            activeSourceKeys
+            |> Array.choose (fun key -> keys |> Array.tryFindIndex ((=) key))
+            |> Set
+
+        let selectItems: SelectItem<string>[] =
+            keys |> Array.map (fun key -> {| label = key; item = key |})
+
+        let setSelectedIndices selectedIndices =
+            let selectedKeys =
+                selectedIndices |> Seq.map (fun index -> keys.[index]) |> Array.ofSeq
+
+            setActiveKeys (Array.append otherKeys selectedKeys)
+
+        let TriggerRender =
+            fun _ -> TermSearchConfigSetter.SourceTriggerRender(source, activeSourceKeys)
+
+        Select.Select<string>(
+            selectItems,
+            selectedIndices,
+            setSelectedIndices,
+            triggerRenderFn = TriggerRender,
+            middleware = [|
+                FloatingUI.Middleware.flip ()
+                FloatingUI.Middleware.shift ()
+                FloatingUI.Middleware.offset (4)
+            |],
+            dropdownPlacement = FloatingUI.Placement.BottomEnd
+        )
 
     [<ReactComponentAttribute(true)>]
     static member TermSearchConfigSetter
@@ -56,30 +103,28 @@ type TermSearchConfigSetter =
         let activeKeys =
             activeKeysState.activeKeys |> Option.ofObj |> Option.defaultValue [||]
 
-        let selectedIndices =
-            activeKeys
-            |> Array.choose (fun key -> allKeysCtx |> Seq.tryFindIndex (fun activeKey -> activeKey = key))
-            |> Set
-
-        let selectItems: SelectItem<string>[] =
-            allKeysCtx |> Seq.map (fun key -> {| label = key; item = key |}) |> Array.ofSeq
-
-        let setSelectedIndices =
-            fun selectedIndices ->
-                let nextActiveKeys = selectedIndices |> Seq.map (fun i -> allKeysCtx |> Seq.item i)
-
-                activeKeysCtx.setState {|
-                    activeKeysState with
-                        activeKeys = Array.ofSeq nextActiveKeys
-                |}
+        let setActiveKeys nextActiveKeys =
+            activeKeysCtx.setState {|
+                activeKeysState with
+                    activeKeys = nextActiveKeys
+            |}
 
         let defaultSearchActive = not activeKeysState.disableDefault
 
-        let TriggerRender = fun _ -> TermSearchConfigSetter.TriggerRender(activeKeys)
+        let renderCollectionSource source =
+
+            renderer {|
+                title = $"Configure {source} search"
+                settingElement =
+                    TermSearchConfigSetter.CollectionSelector(source, allKeysCtx, activeKeys, setActiveKeys)
+                description =
+                    React.Fragment [
+                        Html.p (ConfigSetterTypes.description source)
+                        Html.p "Selecting multiple collections may impact search performance."
+                    ]
+            |}
 
         React.Fragment [
-
-            //Debugging component, storing data for storybook tests
             Html.div [
                 prop.className "swt:hidden"
                 prop.ariaHidden true
@@ -100,45 +145,21 @@ type TermSearchConfigSetter =
                         ]
                         prop.type'.checkbox
                         prop.isChecked defaultSearchActive
-                        prop.onChange (fun (b: bool) ->
+                        prop.onChange (fun (isActive: bool) ->
                             activeKeysCtx.setState {|
                                 activeKeysState with
-                                    disableDefault = not b
+                                    disableDefault = not isActive
                             |}
                         )
                     ]
                 description = Html.p "When you deactivate this, the default search will not be used."
             |}
 
-            renderer {|
-                title = "Configure TIB search"
-                settingElement =
-                    Select.Select<string>(
-                        selectItems,
-                        selectedIndices,
-                        setSelectedIndices,
-                        triggerRenderFn = TriggerRender,
-                        middleware = [|
-                            FloatingUI.Middleware.flip ()
-                            FloatingUI.Middleware.shift ()
-                            FloatingUI.Middleware.offset (4)
-                        |],
-                        dropdownPlacement = FloatingUI.Placement.BottomEnd
-                    )
-                description =
-                    React.Fragment [
-                        Html.p
-                            "Adds support for high performance TIB term search. Choose a collection of terms to search through."
-                        Html.p [
-                            prop.text "Selecting multiple collections may impact search performance."
-                        ]
-                    ]
-            |}
+            yield! ConfigSetterTypes.sources |> Array.map renderCollectionSource
         ]
 
     [<ReactComponent>]
     static member Entry() =
-
         let renderer =
             fun
                 (props:
