@@ -8,13 +8,11 @@ let rootClasses styleFn =
     ]
 
     styleFn
-    |> Option.map (fun fn -> fn None None baseClasses)
+    |> Option.map (fun fn -> fn None baseClasses)
     |> Option.defaultValue baseClasses
 
 let shouldUseVirtualization enableVirtualization visibleCount =
     enableVirtualization && visibleCount > 0
-
-let selectedIdsArray selectedIds = selectedIds |> Set.toArray
 
 let nodeContainerClasses (row: TreeVisibleNode<'T>) canSelect canExpand isSelected isFocused styleFn =
     let baseClasses = [
@@ -31,7 +29,7 @@ let nodeContainerClasses (row: TreeVisibleNode<'T>) canSelect canExpand isSelect
     ]
 
     styleFn
-    |> Option.map (fun styleFn -> styleFn (Some row.Node.kind) (Some row.Node) baseClasses)
+    |> Option.map (fun styleFn -> styleFn (Some row.Node) baseClasses)
     |> Option.defaultValue baseClasses
 
 let chevronIcon isExpanded =

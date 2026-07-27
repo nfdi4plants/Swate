@@ -7,14 +7,23 @@ let TreeCtx =
     React.createContext<TreeContextValue<obj>> {
         DataSource = None
         SelectionMode = TreeSelectionMode.Single
+        SelectedIds = None
+        DefaultSelectedIds = None
+        DefaultExpandedIds = None
+        OnSelectionChange = None
         SelectionDisabled = false
         IsNodeSelectable = fun _ -> true
+        EnableLazyLoading = false
+        EnableVirtualization = false
+        EstimateNodeHeight = 34
+        OnContextMenu = None
         RenderNode = None
         Leading = None
         Trailing = None
         StyleFn = None
-        ContextMenuItems = None
         OnError = ignore
+        ApiRef = None
+        AriaLabel = "Tree"
         Debug = false
     }
 

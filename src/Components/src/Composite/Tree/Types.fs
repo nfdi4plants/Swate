@@ -3,7 +3,6 @@ module Swate.Components.Composite.Tree.Types
 open Browser.Types
 open Fable.Core
 open Feliz
-open Swate.Components.Primitive.ContextMenu.Types
 
 /// Distinguishes expandable branch nodes from terminal leaf nodes.
 [<StringEnum(CaseRules.LowerFirst)>]
@@ -34,7 +33,6 @@ type TreeItem<'T>
         kind: TreeNodeKind,
         ?data: 'T,
         ?children: TreeItem<'T>[],
-        ?childrenCount: int,
         ?icon: ReactElement,
         ?tooltip: string,
         ?leading: ReactElement,
@@ -46,7 +44,6 @@ type TreeItem<'T>
     member val kind = kind with get, set
     member val data: 'T option = data with get, set
     member val children: TreeItem<'T>[] option = children with get, set
-    member val childrenCount: int option = childrenCount with get, set
     member val icon: ReactElement option = icon with get, set
     member val tooltip: string option = tooltip with get, set
     member val leading: ReactElement option = leading with get, set
@@ -101,23 +98,32 @@ type TreeApi = {
 }
 
 /// Allows consumers to extend or replace the generated CSS class list for tree rows.
-type TreeStyleFn<'T> = TreeNodeKind option -> TreeItem<'T> option -> string list -> string list
+type TreeStyleFn<'T> = TreeItem<'T> option -> string list -> string list
 
-/// Creates context menu items for a node target or for the tree root when no node is targeted.
-type TreeContextMenuFn<'T> = TreeItem<'T> option -> ContextMenuItem[]
+/// Exposes the browser context-menu event together with its node target, or None for the tree root.
+type TreeContextMenuEvent<'T> = delegate of MouseEvent * TreeItem<'T> option -> unit
 
 /// Context value shared by tree subcomponents that need access to tree-level configuration.
 type TreeContextValue<'T> = {
     DataSource: TreeDataSource<'T> option
     SelectionMode: TreeSelectionMode
+    SelectedIds: string[] option
+    DefaultSelectedIds: string[] option
+    DefaultExpandedIds: string[] option
+    OnSelectionChange: (string[] -> unit) option
     SelectionDisabled: bool
     IsNodeSelectable: TreeItem<'T> -> bool
+    EnableLazyLoading: bool
+    EnableVirtualization: bool
+    EstimateNodeHeight: int
+    OnContextMenu: TreeContextMenuEvent<'T> option
     RenderNode: (TreeRenderProps<'T> -> ReactElement) option
     Leading: (TreeRenderProps<'T> -> ReactElement) option
     Trailing: (TreeRenderProps<'T> -> ReactElement) option
     StyleFn: TreeStyleFn<'T> option
-    ContextMenuItems: TreeContextMenuFn<'T> option
     OnError: exn -> unit
+    ApiRef: IRefValue<TreeApi option> option
+    AriaLabel: string
     Debug: bool
 }
 

@@ -57,19 +57,19 @@ let directChildren (loadedChildren: Map<string, TreeLoadState<'T>>) (node: TreeI
 
 let canExpand
     (dataSource: TreeDataSource<'T> option)
+    enableLazyLoading
     (loadedChildren: Map<string, TreeLoadState<'T>>)
     (node: TreeItem<'T>)
     =
     if node.kind <> TreeNodeKind.Branch then
         false
     else
-        match directChildren loadedChildren node, node.childrenCount, dataSource with
-        | Some children, _, _ -> children.Length > 0
-        | None, Some count, _ -> count <> 0
-        | None, None, Some source -> source.GetChildrenCount(Some node) <> 0
-        | None, None, None -> false
+        match directChildren loadedChildren node, dataSource with
+        | Some children, _ -> children.Length > 0
+        | None, Some source when enableLazyLoading -> source.GetChildrenCount(Some node) <> 0
+        | None, _ -> false
 
-let flattenVisible dataSource loadedChildren expandedIds items =
+let flattenVisible loadedChildren expandedIds items =
     let nodes = ResizeArray<TreeVisibleNode<'T>>()
     let nodeMap = ResizeArray<string * TreeItem<'T>>()
     let parentMap = ResizeArray<string * string>()
@@ -89,9 +89,7 @@ let flattenVisible dataSource loadedChildren expandedIds items =
                 if expandedIds |> Set.contains item.id then
                     match directChildren loadedChildren item with
                     | Some children -> loop (ancestors |> Set.add item.id) (Some item.id) (depth + 1) children
-                    | None ->
-                        if canExpand dataSource loadedChildren item then
-                            ()
+                    | None -> ()
 
     loop Set.empty None 0 items
 

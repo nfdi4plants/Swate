@@ -3,6 +3,7 @@ namespace Swate.Components.Composite.Tree
 open Browser.Types
 open Fable.Core
 open Feliz
+open Swate.Components.Composite.Tree.Context
 open Swate.Components.Composite.Tree.Types
 
 [<Erase; Mangle(false)>]
@@ -18,23 +19,18 @@ type TreeNode =
             isLoading: bool,
             error: string option,
             canExpand: bool,
-            canSelect: bool,
-            ?renderNode: TreeRenderProps<'T> -> ReactElement,
-            ?leading: TreeRenderProps<'T> -> ReactElement,
-            ?trailing: TreeRenderProps<'T> -> ReactElement,
-            ?styleFn: TreeStyleFn<'T>,
             ?onToggle: unit -> unit,
             ?onSelect: MouseEvent -> unit,
             ?onFocus: unit -> unit,
-            ?onKeyDown: KeyboardEvent -> unit,
-            ?debug: bool
+            ?onKeyDown: KeyboardEvent -> unit
         ) =
+        let config = useTreeCtx<'T> ()
         let node = row.Node
+        let canSelect = not config.SelectionDisabled && config.IsNodeSelectable node
         let onToggle = defaultArg onToggle ignore
         let onSelect = defaultArg onSelect ignore
         let onFocus = defaultArg onFocus ignore
         let onKeyDown = defaultArg onKeyDown ignore
-        let debug = defaultArg debug false
 
         let renderProps: TreeRenderProps<'T> = {
             Node = node
@@ -83,7 +79,7 @@ type TreeNode =
                 ]
 
         let leadingContent =
-            match leading with
+            match config.Leading with
             | Some leading -> leading renderProps
             | None ->
                 match node.leading with
@@ -99,7 +95,7 @@ type TreeNode =
                         ]
 
         let nodeContent =
-            match renderNode with
+            match config.RenderNode with
             | Some renderNode ->
                 Html.div [
                     prop.className "swt:min-w-0 swt:flex-1 swt:text-left"
@@ -122,7 +118,7 @@ type TreeNode =
             | None -> Html.none
 
         let trailingContent =
-            match trailing with
+            match config.Trailing with
             | Some trailing -> trailing renderProps
             | None ->
                 match node.trailing with
@@ -140,9 +136,9 @@ type TreeNode =
                 prop.custom ("aria-expanded", isExpanded)
             prop.custom ("data-tree-node-id", node.id)
             prop.custom ("data-tree-node-kind", string node.kind)
-            if debug then
+            if config.Debug then
                 prop.testId $"tree-node-{node.id}"
-            prop.className (TreeHelper.nodeContainerClasses row canSelect canExpand isSelected isFocused styleFn)
+            prop.className (TreeHelper.nodeContainerClasses row canSelect canExpand isSelected isFocused config.StyleFn)
             prop.style [ style.paddingLeft (length.rem (float row.Depth * 1.25)) ]
             prop.title (node.tooltip |> Option.defaultValue node.label)
             prop.onClick onSelect

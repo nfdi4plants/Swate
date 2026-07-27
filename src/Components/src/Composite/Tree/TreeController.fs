@@ -95,7 +95,7 @@ let expandNode
     (onError: exn -> unit)
     (node: TreeItem<'T>)
     =
-    if canExpand dataSource loadedChildren node then
+    if canExpand dataSource enableLazyLoading loadedChildren node then
         setExpandedIds (toggleExpanded node.id)
 
         if not (expandedIds |> Set.contains node.id) then

@@ -4,6 +4,7 @@ open Browser.Types
 open Fable.Core
 open Feliz
 open Swate.Components
+open Swate.Components.Composite.Tree.Context
 open Swate.Components.Composite.Tree.Dom
 open Swate.Components.Composite.Tree.State
 open Swate.Components.Composite.Tree.Types
@@ -91,11 +92,6 @@ let useTreeApi
 let useTreeNodeActions
     (treeRef: IRefValue<HTMLElement option>)
     scrollToIndex
-    (dataSource: TreeDataSource<'T> option)
-    selectionMode
-    isSelectionDisabled
-    isNodeSelectable
-    enableLazyLoading
     (loadingNodeIdsRef: IRefValue<ResizeArray<string>>)
     (loadRequestIdRef: IRefValue<int>)
     (treeState: TreeState<'T>)
@@ -103,8 +99,9 @@ let useTreeNodeActions
     focusedId
     effectiveSelectedIds
     setSelection
-    onError
     =
+    let config = useTreeCtx<'T> ()
+
     let focusController: TreeFocusController<'T> = {
         Lookup = lookup
         SetFocusedId = treeState.SetFocusedId
@@ -114,14 +111,14 @@ let useTreeNodeActions
 
     let loadNode (node: TreeItem<'T>) =
         TreeController.loadBranchChildren
-            dataSource
-            enableLazyLoading
+            config.DataSource
+            config.EnableLazyLoading
             loadingNodeIdsRef
             loadRequestIdRef
             treeState.LoadedChildren
             treeState.SetLoadedChildren
             treeState.SetExpandedIds
-            onError
+            config.OnError
             node
         |> Promise.start
 
@@ -131,15 +128,15 @@ let useTreeNodeActions
             |> Array.iter (fun row ->
                 if
                     treeState.ExpandedIds.Contains row.Node.id
-                    && canExpand dataSource treeState.LoadedChildren row.Node
+                    && canExpand config.DataSource config.EnableLazyLoading treeState.LoadedChildren row.Node
                     && (directChildren treeState.LoadedChildren row.Node).IsNone
                 then
                     loadNode row.Node
             )
         ),
         [|
-            box dataSource
-            box enableLazyLoading
+            box config.DataSource
+            box config.EnableLazyLoading
             box treeState.ExpandedIds
             box treeState.LoadedChildren
             box lookup.VisibleNodes
@@ -148,22 +145,22 @@ let useTreeNodeActions
 
     let expandNode (node: TreeItem<'T>) =
         TreeController.expandNode
-            dataSource
-            enableLazyLoading
+            config.DataSource
+            config.EnableLazyLoading
             loadingNodeIdsRef
             loadRequestIdRef
             treeState.LoadedChildren
             treeState.ExpandedIds
             treeState.SetExpandedIds
             treeState.SetLoadedChildren
-            onError
+            config.OnError
             node
 
     let selectNode (node: TreeItem<'T>) extendSelection =
         TreeController.selectNode
-            selectionMode
-            isSelectionDisabled
-            isNodeSelectable
+            config.SelectionMode
+            config.SelectionDisabled
+            config.IsNodeSelectable
             effectiveSelectedIds
             setSelection
             node
@@ -187,7 +184,7 @@ let useTreeNodeActions
         | kbdEventCode.arrowRight ->
             event.preventDefault ()
 
-            if canExpand dataSource treeState.LoadedChildren node then
+            if canExpand config.DataSource config.EnableLazyLoading treeState.LoadedChildren node then
                 if treeState.ExpandedIds.Contains node.id then
                     TreeController.focusFirstChild focusController node.id
                 else
@@ -200,7 +197,7 @@ let useTreeNodeActions
         | kbdEventCode.space ->
             event.preventDefault ()
 
-            if canExpand dataSource treeState.LoadedChildren node then
+            if canExpand config.DataSource config.EnableLazyLoading treeState.LoadedChildren node then
                 expandNode node
 
             selectNode node (event.shiftKey || event.ctrlKey || event.metaKey)

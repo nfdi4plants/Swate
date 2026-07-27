@@ -1,6 +1,6 @@
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fireEvent, screen, userEvent, waitFor, within } from "storybook/test";
+import { expect, fireEvent, userEvent, waitFor, within } from "storybook/test";
 import { Tree } from "./Tree.fs.js";
 import type { TreeApi, TreeItem } from "./Types.fs.js";
 
@@ -15,7 +15,7 @@ const branch = (id: string, label: string, children?: DemoNode[], payload?: Demo
     id,
     label,
     kind: "branch",
-    ...(children ? { children, childrenCount: children.length } : {}),
+    ...(children ? { children } : {}),
     data: payload,
   }) as DemoNode;
 
@@ -50,13 +50,6 @@ const baseItems = [
     leaf("arc/isa.investigation.xlsx", "isa.investigation.xlsx"),
   ]),
 ] as DemoNode[];
-
-const menuItem = (label: string, onClick: () => void) =>
-  ({
-    text: <span>{label}</span>,
-    icon: <i className="swt:iconify swt:fluent--document-24-regular swt:size-4" />,
-    onClick,
-  }) as any;
 
 const meta = {
   title: "Composite Components/Tree",
@@ -245,6 +238,41 @@ export const LazyLoadingCachesChildren: Story = {
     await expectLoadingIndicator(canvasElement);
     await expect(await canvas.findByText("Study 02")).toBeVisible();
     await expect(canvas.getByTestId("load-count")).toHaveTextContent("Loads: 3");
+  },
+};
+
+const LazyLoadingDisabledTree = () => {
+  const [loadCount, setLoadCount] = React.useState(0);
+  const items = React.useMemo(() => [branch("arc/lazy-disabled", "lazy disabled", undefined)], []);
+
+  const dataSource = React.useMemo(
+    () => ({
+      GetChildrenCount: () => 1,
+      GetTreeItems: async () => {
+        setLoadCount((count) => count + 1);
+        return [leaf("arc/lazy-disabled/hidden.txt", "hidden.txt")];
+      },
+    }),
+    [],
+  );
+
+  return (
+    <div className="swt:w-96">
+      <Tree items={items} dataSource={dataSource as any} enableLazyLoading={false} debug />
+      <div data-testid="disabled-lazy-load-count">Loads: {loadCount}</div>
+    </div>
+  );
+};
+
+export const DisabledLazyLoadingIsNotExpandable: Story = {
+  render: () => <LazyLoadingDisabledTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.queryByRole("button", { name: "Expand lazy disabled" })).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByText("lazy disabled"));
+    await expect(canvas.getByTestId("disabled-lazy-load-count")).toHaveTextContent("Loads: 0");
+    await expect(canvas.queryByText("hidden.txt")).not.toBeInTheDocument();
   },
 };
 
@@ -488,9 +516,10 @@ const ContextMenuTree = () => {
       <Tree
         items={baseItems}
         defaultExpandedIds={["arc", "arc/studies", "arc/studies/study_01"]}
-        contextMenuItems={(node) => [
-          menuItem(node ? `Inspect ${node.label}` : "Inspect ARC root", () => setLastAction(node?.id ?? "root")),
-        ]}
+        onContextMenu={(event, node) => {
+          event.preventDefault();
+          setLastAction(node?.id ?? "root");
+        }}
         debug
       />
       <div data-testid="last-action">Last action: {lastAction}</div>
@@ -503,18 +532,14 @@ export const NodeAndRootContextMenu: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await waitFor(() => {
-      fireEvent.contextMenu(canvas.getByTestId("tree-node-arc/studies/study_01/isa.study.xlsx"), { clientX: 20, clientY: 20, bubbles: true });
-      expect(screen.getByRole("button", { name: /inspect isa.study.xlsx/i })).toBeInTheDocument();
+    fireEvent.contextMenu(canvas.getByTestId("tree-node-arc/studies/study_01/isa.study.xlsx"), {
+      clientX: 20,
+      clientY: 20,
+      bubbles: true,
     });
-    await userEvent.click(screen.getByRole("button", { name: /inspect isa.study.xlsx/i }));
     await expect(canvas.getByTestId("last-action")).toHaveTextContent("arc/studies/study_01/isa.study.xlsx");
 
-    await waitFor(() => {
-      fireEvent.contextMenu(canvas.getByRole("tree"), { clientX: 20, clientY: 20, bubbles: true });
-      expect(screen.getByRole("button", { name: /inspect arc root/i })).toBeInTheDocument();
-    });
-    await userEvent.click(screen.getByRole("button", { name: /inspect arc root/i }));
+    fireEvent.contextMenu(canvas.getByRole("tree"), { clientX: 20, clientY: 20, bubbles: true });
     await expect(canvas.getByTestId("last-action")).toHaveTextContent("root");
   },
 };
@@ -557,8 +582,8 @@ const CustomTree = () => {
             ) : null}
           </span>
         )}
-        styleFn={(kind, node, classes) => {
-          if (!kind) return [...classes, "swt:border", "swt:border-info"];
+        styleFn={(node, classes) => {
+          if (!node) return [...classes, "swt:border", "swt:border-info"];
           if (node?.id === "arc/studies/study_04") return [...classes, "swt:text-primary"];
           if (node?.id === "arc/studies/study_04/isa.study.xlsx") return [...classes, "swt:text-accent"];
           return classes;

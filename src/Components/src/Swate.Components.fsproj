@@ -118,7 +118,6 @@
     <Compile Include="Composite\Tree\Context.fs" />
     <Compile Include="Composite\Tree\TreeController.fs" />
     <Compile Include="Composite\Tree\Hooks.fs" />
-    <Compile Include="Composite\Tree\ContextMenuAdapter.fs" />
     <Compile Include="Composite\Tree\TreeNode.fs" />
     <Compile Include="Composite\Tree\Tree.fs" />
     <Compile Include="Primitive\Actionbar\Types.fs" />

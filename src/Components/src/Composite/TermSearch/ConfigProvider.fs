@@ -133,8 +133,7 @@ type TermSearchConfigProvider =
 
         // From v1.0.7 to v2.0.0 the field was renamed from `aktiveKeys` to `activeKeys`. This migration code ensures that users who have the old field in their local storage will have it removed and replaced with the new field.
         match activeKeys.activeKeys with
-        | null -> 
-            Browser.Dom.window.localStorage.removeItem(localStorageKey)
+        | null -> Browser.Dom.window.localStorage.removeItem (localStorageKey)
         | _ -> ()
 
         let allKeys =
