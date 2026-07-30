@@ -3,7 +3,7 @@ import { expect, screen, userEvent, waitFor, within } from 'storybook/test';
 import { Entry as BOAT } from './BOAT.fs.js';
 
 const meta: Meta<typeof BOAT> = {
-  title: "Composite Components/BOAT",
+  title: "Page Components/BOAT",
   component: BOAT,
   parameters: {
     layout: "fullscreen",

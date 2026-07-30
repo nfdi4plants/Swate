@@ -28,7 +28,6 @@ type Builder =
             setState: Annotation list -> unit,
             isLocalStorageClear: string -> unit -> bool,
             elementID,
-            modalState,
             fileName: string,
             setFileName,
             setLocalFileName
@@ -44,13 +43,9 @@ type Builder =
 
         let (numPages: int option), setNumPages = React.useState (None)
 
-        let initialModal = { isActive = false; location = (0, 0) }
-
-        let modalContext = React.useContext (Contexts.ModalContext.createModalContext)
-
         let del =
             fun () ->
-                let setLocalFile (id: string) (nextFile: UploadedFile) = // I copied this from FileUploader. This is not DRY.
+                let setLocalFile (id: string) (nextFile: UploadedFile) =
                     let JSONString = Json.stringify nextFile
                     Browser.WebStorage.localStorage.setItem (id, JSONString)
 
@@ -63,8 +58,6 @@ type Builder =
                 setFileName ""
                 setLocalFileName "fileName" ""
 
-        let turnOffContext (event: Browser.Types.Event) = modalContext.setter initialModal
-
         let (highlight: Highlight), setHighlight =
             React.useState (
                 {
@@ -74,14 +67,7 @@ type Builder =
                 }
             )
 
-        React.useEffectOnce (fun () ->
-            Browser.Dom.window.addEventListener ("resize", turnOffContext)
-
-            { new IDisposable with
-                member this.Dispose() =
-                    window.removeEventListener ("resize", turnOffContext)
-            }
-        )
+        let contextMenuRef = React.useElementRef ()
 
         let placeholder =
             Html.div [
@@ -89,9 +75,9 @@ type Builder =
                 prop.children [
                     Html.div [
                         prop.className
-                            "swt:p-2 swt:md:p-5 swt:lg:p-10 swt:flex swt:justify-center swt:items-center swt:flex-col swt:bg-base-200/80 swt:shadow-lg swt:rounded-lg swt:max-w-2xl"
+                            "swt:p-2 swt:md:p-5 swt:lg:p-10 swt:flex swt:justify-center swt:items-center swt:flex-col swt:bg-base-200/80 swt:shadow-lg swt:rounded-lg swt:max-w-2xl swt:border swt:border-primary"
                         prop.children [
-                            Html.h1 [ prop.className "swt:my-2"; prop.text "Select file here:" ]
+                            Html.h1 [ prop.className "swt:my-2"; prop.text "Select file here for process annotations:" ]
 
                             Html.div [
                                 FileUpload.UploadDisplay(filehtml, setFilehtml, setState, setFileName, setLocalFileName)
@@ -101,61 +87,124 @@ type Builder =
                 ]
             ]
 
-        let paper (width: string) (display: ReactElement) =
+        let paper (display: ReactElement) =
             Html.div [
                 prop.className "swt:overflow-y-hidden swt:h-full swt:flex swt:flex-row swt:gap-2 swt:w-full swt:relative swt:p-2"
                 prop.children [
-                    match modalState.isActive with
-                    | true ->
-                        Contextmenu.onContextMenu (
-                            modalContext,
-                            annoState,
-                            setState,
-                            elementID,
-                            highlight,
-                            setHighlight
-                        )
-                    | false -> Html.none
                     Html.div [
-                        prop.className [ width ]
-                        prop.onContextMenu (fun e ->
-                            // https://stackoverflow.com/a/2614472/12858021
-                            let Selection = window.getSelection ()
-                            let term = Selection.ToString().Trim()
-                            let rect = Selection.getRangeAt(0).getBoundingClientRect ()
-                            let relativeParent = document.getElementById(elementID).getBoundingClientRect ()
-
-                            if term.Length <> 0 then
-                                modalContext.setter {
-                                    isActive = true
-                                    location =
-                                        rect.right - relativeParent.left, rect.bottom - relativeParent.top + 12.0
-                                }
-
-                                e.stopPropagation ()
-                                e.preventDefault ()
-                            else
-                                ()
-                        )
-                        prop.children [
-                            Html.div [ prop.text fileName; prop.className "swt:p-2" ]
-                            display
-                        ]
-                    ]
-                    Html.div [
-                        prop.className "swt:w-1/3"
+                        prop.className "swt:w-full"
+                        prop.ref contextMenuRef
                         prop.children [
                             Html.div [
-                                prop.text "Annotations"
-                                prop.className "swt:p-2"
-                                prop.style [ style.width.inheritFromParent ]
+                                prop.className "swt:badge swt:badge-primary swt:m-2"
+                                prop.text fileName
                             ]
-                        // for a in 0 .. annoState.Length - 1 do
-                        //     App.Components.AnnoBlockwithSwate(annoState, setState, a, highlight, setHighlight)
+                            display
                         ]
                     ]
                 ]
             ]
+
+        let contextMenu =
+            Swate.Components.Primitive.ContextMenu.ContextMenu.ContextMenu(
+                childInfo =
+                    (fun _ -> [
+                        Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(
+                            text =
+                                Html.div [
+                                    prop.className "swt:text-gray-500 swt:text-sm swt:p-1"
+                                    prop.text "Add new annotation as .."
+                                ]
+                        )
+                        Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(
+                            text = Html.span "Key",
+                            onClick =
+                                fun _ ->
+                                    FunctionsContextmenu.addAnnotationKeyNew(
+                                        annoState,
+                                        setState,
+                                        elementID,
+                                        highlight,
+                                        setHighlight
+                                    ) ()
+                        )
+                        Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(
+                            text = Html.span "Term",
+                            onClick =
+                                fun _ ->
+                                    FunctionsContextmenu.addAnnotationBodyNew(
+                                        annoState,
+                                        setState,
+                                        elementID,
+                                        highlight,
+                                        setHighlight
+                                    ) ()
+                        )
+                        Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(
+                            text = Html.span "Value",
+                            onClick =
+                                fun _ ->
+                                    FunctionsContextmenu.addAnnotationValueNew(
+                                        annoState,
+                                        setState,
+                                        elementID,
+                                        highlight,
+                                        setHighlight
+                                    ) ()
+                        )
+                        Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(isDivider = true)
+                        Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(
+                            text =
+                                Html.div [
+                                    prop.className "swt:text-gray-500 swt:text-sm swt:p-1"
+                                    prop.text "Add to last annotation as .."
+                                ]
+                        )
+                        Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(
+                            text = Html.span "Key",
+                            onClick =
+                                fun _ ->
+                                    FunctionsContextmenu.addToLastAnnoAsKey(
+                                        annoState,
+                                        setState,
+                                        highlight,
+                                        setHighlight
+                                    ) ()
+                        )
+                        Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(
+                            text = Html.span "Term",
+                            onClick =
+                                fun _ ->
+                                    FunctionsContextmenu.addToLastAnnoAsBody(
+                                        annoState,
+                                        setState,
+                                        highlight,
+                                        setHighlight
+                                    ) ()
+                        )
+                        Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(
+                            text = Html.span "Value",
+                            onClick =
+                                fun _ ->
+                                    FunctionsContextmenu.addToLastAnnoAsValue(
+                                        annoState,
+                                        setState,
+                                        highlight,
+                                        setHighlight
+                                    ) ()
+                        )
+                    ]),
+                ref = contextMenuRef,
+                onSpawn =
+                    (fun e ->
+                        let term = window.getSelection().ToString().Trim()
+
+                        if term.Length <> 0 then
+                            Some(box term)
+                        else
+                            None
+                    )
+            )
 
         React.Fragment [
             match filehtml with
@@ -164,18 +213,17 @@ type Builder =
             Html.div [
                 prop.className "swt:flex swt:flex-row swt:p-2"
                 prop.id "main-parent"
-                prop.onClick (fun e -> modalContext.setter initialModal)
                 prop.children [
-
                     match filehtml with
                     | Unset -> placeholder
                     | Docx fileString ->
-                        paper "w-2/3" (FileUpload.DisplayHtml(fileString, highlight, elementID, isLocalStorageClear))
+                        paper (FileUpload.DisplayHtml(fileString, highlight, elementID, isLocalStorageClear))
                     | PDF fileString ->
-                        paper "" (FileUpload.DisplayPDF fileString setNumPages numPages elementID highlight)
+                        paper (FileUpload.DisplayPDF fileString setNumPages numPages elementID highlight)
                     | Txt fileString ->
-                        paper "w-2/3" (FileUpload.DisplayHtml(fileString, highlight, elementID, isLocalStorageClear))
+                        paper (FileUpload.DisplayHtml(fileString, highlight, elementID, isLocalStorageClear))
 
                 ]
             ]
+            contextMenu
         ]

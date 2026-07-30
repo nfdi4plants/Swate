@@ -13,6 +13,7 @@ open Renderer.Components.MainContent.GitUnsupportedTarget
 open Renderer.Components.MainContent.LandingDraftTarget
 open Renderer.Components.MainContent.NotesDraftTarget
 open Renderer.Components.MainContent.NotesSearchTarget
+open Renderer.Components.MainContent.BOATTarget
 open Renderer.Components.MainContent.ProvenanceGroupingTarget
 open Renderer.Components.MainContent.TextPreviewTarget
 open Renderer.Components.MainContent.UnknownPreviewTarget
@@ -100,6 +101,7 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                     // | Some _, Some PageState.LandingDraftPage -> LandingDraftTarget()
                     | Some _, Some PageState.NotesDraftPage -> NotesDraftTarget()
                     | Some _, Some PageState.NotesSearchPage -> NotesSearchTarget()
+                    | Some _, Some PageState.BOATPage -> BOATTarget()
                     | Some _, Some PageState.ProvenanceGroupingPage ->
                         React.Suspense(
                             [ LazyComponents.ProvenanceGroupingTarget() ],

@@ -65,7 +65,7 @@
     "mermaid": "^11.12.3",
     "rehype-rewrite": "^4.0.4",
     "rehype-sanitize": "^6.0.0",
-    "pdfjs-dist": "^5.4.449",
+    "pdfjs-dist": "4.8.69",
     "react-highlight-words": "^0.20.0",
     "react-pdf": "^9.2.1",
     "rehype-raw": "^7.0.0",

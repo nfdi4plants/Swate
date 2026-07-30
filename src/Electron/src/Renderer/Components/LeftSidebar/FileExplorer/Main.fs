@@ -154,6 +154,11 @@ type Main =
                                         "Note Search",
                                         fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesSearchPage)
                                     )
+                                    ButtonInfo.create (
+                                        "swt:fluent--document-arrow-right-20-regular swt:size-5",
+                                        "Annotation from freetext",
+                                        fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.BOATPage)
+                                    )
                                 // Placeholder for provenance grouping page, which is not ready yet. We want to have this in the action bar for easy access since it's a key feature, but we don't want it to be visible until it's ready, hence the commented out button for now. Once the page is ready, we can uncomment this and remove the fallback in the main content area.
                                 // ButtonInfo.create (
                                 //     "swt:fluent--text-paragraph-24-regular swt:size-5",

@@ -105,17 +105,6 @@ type Highlight =
     Values: Map<float,string>
     }
 
-type ModalInfo = {
-    isActive: bool
-    location: float * float
-}
-
-type DropdownModal = {
-    modalState: ModalInfo
-    setter: ModalInfo -> unit 
-}
-
-
 [<RequireQualifiedAccess>]
 
 type Page =

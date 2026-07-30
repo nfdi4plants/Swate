@@ -17,10 +17,7 @@ module PDFjs =
   importSideEffects "react-pdf/dist/Page/AnnotationLayer.css"
   emitJsStatement () """import { pdfjs } from 'react-pdf';
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString();"""
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;"""
 
 module RemarkImport =
 
@@ -60,7 +57,7 @@ module RemarkImport =
 
 type ReactElements =
   [<ReactComponent(import="Document", from="react-pdf")>]
-  static member Document (file: string, onLoadSuccess: {|numPages: int|} -> unit, children: ReactElement list, ?externalLinkTarget: string) = React.Imported()
+  static member Document (file: string, onLoadSuccess: {|numPages: int|} -> unit, children: ReactElement list, ?externalLinkTarget: string, ?onLoadError: exn -> unit) = React.Imported()
 
   [<ReactComponent(import="Page", from="react-pdf")>]
   static member Page (pageNumber: int, width: int, customTextRenderer:'c -> string, ?key: string) = React.Imported()
@@ -180,7 +177,7 @@ module Lists =
 type FileUpload =
     static member DisplayHtml(htmlString: string, highList: Highlight, elementID: string, isLocalStorageClear) = 
       Html.div [
-        prop.className "swt:flex swt:justify-end"
+        prop.className "swt:flex swt:w-full swt:justify-center"
         prop.children [
           PaperWithMarker.Main(htmlString, Lists.keyList highList, Lists.termList highList, Lists.valueList highList, elementID, isLocalStorageClear)
         ]
@@ -211,7 +208,7 @@ type FileUpload =
         )
 
       Html.div [
-        // prop.className "mt-5"
+        prop.className "swt:flex swt:w-full swt:justify-center"
         prop.id elementID
         prop.children [
           ReactElements.Document(
@@ -225,9 +222,10 @@ type FileUpload =
                   i, 
                   750,
                   textRender,
-                  "1")
+                  $"page-{i}")
             ],
-            externalLinkTarget = "_blank"
+            externalLinkTarget = "_blank",
+            onLoadError = (fun e -> Browser.Dom.console.error ("Error loading PDF:", e))
           ) 
           Html.p [
               prop.text (
@@ -265,59 +263,21 @@ type FileUpload =
         )
       ]
 
-    static member private RemoveUploadedFileButton (setFilehtml, setLocalFile, setState, setFileName, setLocalFileName) =
-      Html.button [
-        prop.className "swt:btn swt:btn-error swt:btn-block"
-        prop.onClick (fun e -> 
-          setFilehtml Unset
-          setLocalFile "file" Unset
-
-          setState []
-
-          setFileName ""
-          setLocalFileName "fileName" ""
-        )
-        prop.children [
-          Html.span [
-            Html.i [
-              prop.className "swt:fa-solid swt:fa-trash-can"
-            ]
-          ]
-        ]
-      ]
-
-    /// <summary>
-    /// A stateful React component that maintains a counter
-    /// </summary>
     [<ReactComponent>]
     static member UploadDisplay(filehtml, setFilehtml, setState, setFileName, setLocalFileName) =
-    
-        // let uploadFileType, setUploadFileType = React.useState(UploadFileType.PDF)
 
         let setLocalFile (id: string) (nextFile: UploadedFile) =
             let JSONString = Json.stringify nextFile 
             Browser.WebStorage.localStorage.setItem(id, JSONString)
 
         Html.div [
-          prop.className "swt:flex swt:flex-col swt:gap-2"
-          prop.children [
-            Html.div [
-              
-              prop.children [
-                // FileUpload.FileTypeSelect setUploadFileType
+            prop.className "swt:flex swt:flex-col swt:gap-2"
+            prop.children [
                 FileUpload.FileInput setState setFilehtml setLocalFile setFileName setLocalFileName
                 Html.h1 [
-                  prop.className "swt:mt-2 swt:text-gray-600"
-                  prop.text "compatible filetypes: .pdf | .docx | .md | .txt"
+                    prop.className "swt:mt-2 swt:text-gray-600"
+                    prop.text "compatible filetypes: .pdf | .docx | .md | .txt"
                 ]
-              ]
             ]
-            match filehtml with
-            | Unset -> Html.div []
-            | _ ->
-              FileUpload.RemoveUploadedFileButton(
-                setFilehtml, setLocalFile, setState, setFileName, setLocalFileName
-              )
-          ]
         ]
 

@@ -1,5 +1,7 @@
 namespace App
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Feliz
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -14,18 +16,11 @@ open Fable.SimpleJson
 open ARCtrl.Json
 open Thoth.Json.Core
 
-<<<<<<< HEAD
-<<<<<<< HEAD
+[<Erase; Mangle(false)>]
+type BOAT =
 
-=======
-        
->>>>>>> 60142a8c (add BOAT files)
-=======
-
->>>>>>> c29bb7aa (add files)
-type View =
-    [<ReactComponent>]
-    static member Main() =
+    [<ReactComponent(true)>]
+    static member Entry() =
 
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -76,22 +71,18 @@ type View =
             Browser.WebStorage.localStorage.setItem (id, JSONstring)
 
         let initialFileName (id: string) =
-            if isLocalStorageClear id () = true then
+            try
+                if isLocalStorageClear id () = true then
+                    ""
+                else
+                    Json.parseAs<string> (Browser.WebStorage.localStorage.getItem id)
+            with e ->
+                Browser.Dom.console.warn (sprintf "Error parsing JSON from localStorage for key '%s': %s" id e.Message)
                 ""
-            else
-                Json.parseAs<string> (Browser.WebStorage.localStorage.getItem id)
 
         let fileName, setFileName = React.useState (initialFileName "fileName")
 
         let fileNamewithoutType = fileName.Split('.').[0] //splits the file name and takes the first part before the dot
-
-
-        let (modalState: ModalInfo, setModal) = React.useState (Contextmenu.initialModal)
-
-        let myModalContext = { //makes setter and state in one record type
-            modalState = modalState
-            setter = setModal
-        }
 
         let elementID = "Paper"
 
@@ -108,7 +99,7 @@ type View =
                             // Components.Navbar.Main(setpage, currentpage, AnnotationState, setState, fileNamewithoutType)
                             Html.div [
                                 prop.testId "contentView"
-                                prop.className "swt:grow swt:w-full"
+                                prop.className "swt:grow"
                                 prop.children [
                                     // match currentpage with
                                     // | Types.Page.Builder ->
@@ -122,17 +113,14 @@ type View =
                                         setFileName,
                                         setLocalFileName
 
-                                        )
-                                    // | Types.Page.Contact -> Components.Contact.Main()
-                                    // | Types.Page.Help -> Components.Help.Main()
-                                ]
-                            ]
-                            // Components.Footer.Main
+                                )
+                            // | Types.Page.Contact -> Components.Contact.Main()
+                            // | Types.Page.Help -> Components.Help.Main()
                         ]
                     ]
+                    // Components.Footer.Main
                 ]
-            )
-
+            ]
         ]
 =======
             try 
@@ -221,29 +209,25 @@ type View =
 =======
 >>>>>>> cdfd054d (remove errors and add swt styling)
         React.StrictMode [
-            Contexts.ModalContext.createModalContext.Provider(
-                myModalContext,
-                React.Fragment [
+            Html.div [
+                prop.id "mainView"
+                prop.className "swt:flex swt:min-h-screen swt:flex-col swt:text-accent-content"
+                prop.children [
+                    // Components.Navbar.Main(setpage, currentpage, AnnotationState, setState, fileNamewithoutType)
                     Html.div [
-                        prop.id "mainView"
-                        prop.className "swt:flex swt:min-h-screen swt:flex-col swt:bg-accent swt:text-accent-content"
+                        prop.testId "contentView"
+                        prop.className "swt:grow"
                         prop.children [
-                            // Components.Navbar.Main(setpage, currentpage, AnnotationState, setState, fileNamewithoutType)
-                            Html.div [
-                                prop.testId "contentView"
-                                prop.className "swt:grow"
-                                prop.children [
-                                    // match currentpage with
-                                    // | Types.Page.Builder ->
-                                    Builder.Main(
-                                        AnnotationState,
-                                        setState,
-                                        isLocalStorageClear,
-                                        elementID,
-                                        modalState,
-                                        fileName,
-                                        setFileName,
-                                        setLocalFileName
+                            // match currentpage with
+                            // | Types.Page.Builder ->
+                            Builder.Main(
+                                AnnotationState,
+                                setState,
+                                isLocalStorageClear,
+                                elementID,
+                                fileName,
+                                setFileName,
+                                setLocalFileName
 
                                         )
                                     // | Types.Page.Contact -> Components.Contact.Main()
