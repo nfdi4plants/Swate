@@ -8,6 +8,8 @@ open ARCtrl
 open Fable.Core.JsInterop
 open Browser.Dom
 open Fable.Core
+open Swate.Components.Primitive
+open Swate.Components.Primitive.LoadingSpinner
 
 open System.Threading.Tasks
 
@@ -57,7 +59,7 @@ module RemarkImport =
 
 type ReactElements =
   [<ReactComponent(import="Document", from="react-pdf")>]
-  static member Document (file: string, onLoadSuccess: {|numPages: int|} -> unit, children: ReactElement list, ?externalLinkTarget: string, ?onLoadError: exn -> unit) = React.Imported()
+  static member Document (file: string, onLoadSuccess: {|numPages: int|} -> unit, children: ReactElement list, ?externalLinkTarget: string, ?onLoadError: exn -> unit, ?loading: ReactElement) = React.Imported()
 
   [<ReactComponent(import="Page", from="react-pdf")>]
   static member Page (pageNumber: int, width: int, customTextRenderer:'c -> string, ?key: string) = React.Imported()
@@ -225,15 +227,9 @@ type FileUpload =
                   $"page-{i}")
             ],
             externalLinkTarget = "_blank",
-            onLoadError = (fun e -> Browser.Dom.console.error ("Error loading PDF:", e))
-          ) 
-          Html.p [
-              prop.text (
-                  match numPages with
-                  | Some np -> ""
-                  | None -> "Loading..."
-              )
-          ]
+            onLoadError = (fun e -> Browser.Dom.console.error ("Error loading PDF:", e)),
+            loading = LoadingSpinner.LoadingSpinner("Loading PDF", size = DaisyuiSize.XL)
+          )
         ]
       ]
 

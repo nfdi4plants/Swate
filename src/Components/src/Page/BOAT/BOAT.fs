@@ -71,12 +71,12 @@ type BOAT =
         React.StrictMode [
             Html.div [
                 prop.id "mainView"
-                prop.className "swt:flex swt:min-h-screen swt:flex-col swt:text-accent-content"
+                prop.className "swt:flex swt:w-full swt:min-h-screen swt:flex-col swt:text-accent-content"
                 prop.children [
                     // Components.Navbar.Main(setpage, currentpage, AnnotationState, setState, fileNamewithoutType)
                     Html.div [
                         prop.testId "contentView"
-                        prop.className "swt:grow"
+                        prop.className "swt:grow swt:w-full swt:overflow-y-hidden swt:min-h-0"
                         prop.children [
                             // match currentpage with
                             // | Types.Page.Builder ->

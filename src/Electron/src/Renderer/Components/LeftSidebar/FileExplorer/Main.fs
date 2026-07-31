@@ -155,7 +155,7 @@ type Main =
                                         fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesSearchPage)
                                     )
                                     ButtonInfo.create (
-                                        "swt:fluent--document-arrow-right-20-regular swt:size-5",
+                                        "swt:fluent:comment-note-24-regular swt:size-5",
                                         "Annotation from freetext",
                                         fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.BOATPage)
                                     )

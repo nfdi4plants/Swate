@@ -414,3 +414,13 @@ body[data-theme='light'] .wmde-markdown,
 [data-theme='light'] .wmde-markdown {
     color-scheme: light;
 }
+
+::highlight(keyColor) {
+    background-color: #ffe699;
+}
+::highlight(termColor) {
+    background-color: #4fb3d9;
+}
+::highlight(valueColor) {
+    background-color: #4fd984;
+}

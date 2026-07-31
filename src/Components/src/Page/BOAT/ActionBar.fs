@@ -152,13 +152,13 @@ type ActionBar =
                                     Html.li [
                                         Html.a [
                                             prop.text "as .xlsx"
-                                            prop.onClick (fun _ -> ())
+                                            prop.onClick (fun _ -> DownloadParser.downloadXlsxProm(fileName,annoState) |> Promise.start)
                                         ]
                                     ]
                                     Html.li [
                                         Html.a [
                                             prop.text "as .json"
-                                            prop.onClick (fun _ -> ())
+                                            prop.onClick (fun _ -> DownloadParser.downloadJsonProm(fileName,annoState) |> Promise.start)
                                         ]
                                     ]
                                 ]

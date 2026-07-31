@@ -89,7 +89,7 @@ type Builder =
 
         let paper (display: ReactElement) =
             Html.div [
-                prop.className "swt:overflow-y-hidden swt:h-full swt:flex swt:flex-row swt:gap-2 swt:w-full swt:relative swt:p-2"
+                prop.className "swt:overflow-y-auto swt:h-full swt:flex swt:flex-row swt:gap-2 swt:w-full swt:relative swt:p-2"
                 prop.children [
                     Html.div [
                         prop.className "swt:w-full"
@@ -211,7 +211,7 @@ type Builder =
             | Unset -> ()
             | _ -> ActionBar.Main(annoState, setState, del, fileName, highlight, setHighlight)
             Html.div [
-                prop.className "swt:flex swt:flex-row swt:p-2"
+                prop.className "swt:flex swt:flex-row swt:p-2 swt:overflow-y-auto swt:h-full"
                 prop.id "main-parent"
                 prop.children [
                     match filehtml with

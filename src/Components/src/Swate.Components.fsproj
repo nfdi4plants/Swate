@@ -323,6 +323,7 @@
     <Compile Include="Page\BOAT\Highlight.fs"/>
     <Compile Include="Page\BOAT\FileUploader.fs"/>
     <Compile Include="Page\BOAT\PreviewTable.fs"/>
+    <Compile Include="Page\BOAT\DownloadParser.fs"/>
     <Compile Include="Page\BOAT\ActionBar.fs"/>
     <Compile Include="Page\BOAT\Builder.fs"/>
     <Compile Include="Page\BOAT\BOAT.fs" />
