@@ -105,6 +105,11 @@ module ArcVaultExtensions =
                         "Unable to reload ARC after file watcher event: %s"
                         (PathHelpers.formatContractErrors loadError)
                 | Ok reloadedArc ->
+                    // The file watcher is our source of truth for changes made on disk. Establish the reloaded
+                    // ARC as a clean hash baseline before merging it; without this, unchanged entities have
+                    // missing/stale hashes and the next save can unnecessarily overwrite multiple XLSX files.
+                    baselineArcStaticHashes reloadedArc
+
                     let! mergeResult = promise {
                         try
                             return Ok(ARC.merge arcLocal reloadedArc events)
@@ -116,6 +121,10 @@ module ArcVaultExtensions =
                     | Error mergeError ->
                         swatelogfn this.window.id "Unable to merge ARC after file watcher event: %s" mergeError.Message
                     | Ok mergedArc ->
+                        // ARC.merge may copy or reconstruct entities without retaining the hashes established
+                        // above, so transfer the disk baseline to the merged ARC. Watcher-applied values then
+                        // stay clean, while values that still differ because of local edits remain unsaved.
+                        syncArcStaticHashes reloadedArc mergedArc
                         this.SetArc mergedArc
                         this.RefreshHasUnsavedArcChangesFlag()
             | Some _, None -> do! this.LoadArc()
