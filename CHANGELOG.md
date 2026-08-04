@@ -16,6 +16,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🐛 Fixed
+
+-   Preserve ARC static hash baselines during file watcher merges so saving metadata no longer overwrites unchanged XLSX files.
+-   Support Ctrl/Cmd+C, Ctrl/Cmd+X, and Ctrl/Cmd+V for single and multi-cell DataMap selections, preserve selectors after `#`, omit trailing whitespace when copying, and grow rows when pasting.
+-   Preserve pasted and edited DataMap Label values when rerendering the ARC file.
+-   Add table-consistent Copy, Cut, Paste, Clear, Fill Column, Clear Column, and Delete Selected Rows actions to the DataMap context menu.
+-   Rerender DataMap cells immediately after clearing them with the Delete key.
+-   Enable Add Rows and File Picker insertion in DataMap views.
+-   Store File Picker and Data Annotator references relative to the ARC root for assay, study, run, and workflow DataMaps, and rerender immediately after insertion.
+-   Migrate the outdated `isa_datamap` file to `isa.datamap.xlsx` during ARC loading, while preserving an existing canonical workbook.
+
 ## 2.0.4 - 2026-07-20
 
 ### 🐛 Fixed

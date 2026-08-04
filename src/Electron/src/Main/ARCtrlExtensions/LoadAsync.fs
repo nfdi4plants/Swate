@@ -43,6 +43,41 @@ module ArcLoadExtensions =
 
         collectFiles arcPath ""
 
+    let migrateLegacyDataMapPathsAsync (arcPath: string) (paths: string[]) = promise {
+        let migratedPaths = ResizeArray<string>()
+
+        for relativePath in paths do
+            if isLegacyDataMapPath relativePath then
+                let parentPath = dirname relativePath
+
+                let canonicalRelativePath =
+                    if parentPath = "." then
+                        ArcPathHelper.DataMapFileName
+                    else
+                        join [| parentPath; ArcPathHelper.DataMapFileName |]
+                    |> PathHelpers.normalizePath
+
+                let legacyAbsolutePath = join [| arcPath; relativePath |]
+                let canonicalAbsolutePath = join [| arcPath; canonicalRelativePath |]
+
+                if existsSync canonicalAbsolutePath then
+                    Browser.Dom.console.warn (
+                        $"Outdated DataMap file '{relativePath}' was ignored because '{canonicalRelativePath}' already exists."
+                    )
+                else
+                    do! renameAsync legacyAbsolutePath canonicalAbsolutePath
+
+                    Browser.Dom.console.warn (
+                        $"Outdated DataMap file '{relativePath}' was migrated to '{canonicalRelativePath}'."
+                    )
+
+                    migratedPaths.Add canonicalRelativePath
+            else
+                migratedPaths.Add relativePath
+
+        return migratedPaths.ToArray()
+    }
+
     type private CanonicalArcFileRepairSpec = {
         CollectionFolder: string
         FileName: string
@@ -143,7 +178,8 @@ module ArcLoadExtensions =
         /// Hotfix for #619, not fixed in the consumed ARCtrl 3.0.0-beta.12.
         /// Mirrors ARC.tryLoadAsync, changing only filesystem traversal so `.git` directories are never enumerated.
         static member LoadAsyncSwate(arcPath: string) = promise {
-            let! paths = getAllArcFilePathsAsync arcPath
+            let! discoveredPaths = getAllArcFilePathsAsync arcPath
+            let! paths = migrateLegacyDataMapPathsAsync arcPath discoveredPaths
             let arc = ARC.fromFilePaths paths
             let contracts = arc.GetReadContracts()
 

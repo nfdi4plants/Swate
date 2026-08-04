@@ -18,7 +18,9 @@ let private shouldIgnoreDirName (name: string) = name = ".git"
 let private shouldIgnorePath (path: string) =
     let normalizedPath = PathHelpers.normalizeSeparators path
     let tempXlsxPattern = """\.~\$.*\.xlsx$"""
+
     System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
+    || isLegacyDataMapPath normalizedPath
 
 /// Enriches a single file entry with Git LFS metadata from `git lfs ls-files -j`.
 let private withFileEntryLfsMetadata

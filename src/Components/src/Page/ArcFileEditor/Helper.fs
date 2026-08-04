@@ -28,16 +28,36 @@ let applyDataAnnotatorInputToArcFile
     (destination: AnnotationDestination, arcFile: ArcFiles, setArcFile: ArcFiles -> unit)
     =
     (fun annotationInput ->
+        // Apply changes to a copy so React can compare it with the unchanged current ARC.
+        let nextArcFile = ArcFiles.refreshRef arcFile
+
         let result =
             match destination with
             | AnnotationDestination.Table table ->
-                Swate.Components.Composite.Widgets.DataAnnotator.Helper.applyToTable table annotationInput
-            | AnnotationDestination.DataMap dataMap ->
-                Swate.Components.Composite.Widgets.DataAnnotator.Helper.applyToDataMap dataMap annotationInput
+                let tableIndex =
+                    arcFile.Tables()
+                    |> Seq.tryFindIndex (fun candidate -> System.Object.ReferenceEquals(candidate, table))
+
+                match tableIndex with
+                | Some index when index < nextArcFile.Tables().Count ->
+                    let nextTable = nextArcFile.Tables().[index]
+
+                    Swate.Components.Composite.Widgets.DataAnnotator.Helper.applyToTable nextTable annotationInput
+                | _ -> Error "The Data Annotator target table is no longer available."
+            | AnnotationDestination.DataMap _ ->
+                let rootRelativeInput = {
+                    annotationInput with
+                        FileName = toArcRootRelativeFilePath arcFile annotationInput.FileName
+                }
+
+                match nextArcFile.TryGetDataMap() with
+                | Some dataMap ->
+                    Swate.Components.Composite.Widgets.DataAnnotator.Helper.applyToDataMap dataMap rootRelativeInput
+                | None -> Error "The Data Annotator target DataMap is no longer available."
 
         match result with
         | Ok _ ->
-            setArcFile (ArcFiles.refreshRef arcFile)
+            setArcFile nextArcFile
             result
         | Error _ -> result
     )
