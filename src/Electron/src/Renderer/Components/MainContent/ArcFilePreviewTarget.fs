@@ -10,6 +10,7 @@ open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
+open Swate.Components.Page.ArcFileEditor.Types
 
 [<ReactComponent>]
 let private TableNavbarActions (props: ArcFileEditorHeaderProps, setArcFile: ArcFiles -> unit) =
@@ -54,12 +55,15 @@ let private TableNavbarActions (props: ArcFileEditorHeaderProps, setArcFile: Arc
     | _ -> Html.none
 
 [<ReactComponent>]
-let ArcFilePreviewTarget (arcFile: ArcFiles) =
+let ArcFilePreviewTarget (arcFile: ArcFiles, startingActiveView: ActiveView option) =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let errorModal = useErrorModalCtx ()
 
     let setArcFilePageState (nextArcFile: ArcFiles) =
-        let page = Renderer.Types.PageState.ArcFilePage nextArcFile
+        let page =
+            match startingActiveView with
+            | Some activeView -> Renderer.Types.PageState.ArcFilePageWithStartingView(nextArcFile, activeView)
+            | None -> Renderer.Types.PageState.ArcFilePage nextArcFile
 
         pageStateCtx.setState (Some page)
 
@@ -119,6 +123,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
         setArcFile,
         pickFilePaths,
         trailingNavbarElements = trailingNavbarElements,
+        startingActiveView = (startingActiveView |> Option.defaultValue ActiveView.Metadata),
         onImportJson = importJson,
         onError =
             (fun message ->

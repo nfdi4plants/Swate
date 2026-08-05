@@ -14,76 +14,36 @@ open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Renderer.Types
 
-module NavbarHelper =
-
-    module Selector =
-
-        /// Unified open: main process decides current window / new window / focus existing.
-        let openARC (onError: string -> unit) () =
-            Renderer.Components.Helper.ArcVaultHelper.openArc onError |> Promise.start
-
-        /// Click on a recent ARC: main process decides open-or-focus.
-        let openArcByPath (onError: string -> unit) (clickedARC: ARCPointer) =
-            Renderer.Components.Helper.ArcVaultHelper.openArcByPath onError clickedARC.path
-            |> Promise.start
-
-        let rmvRecentArc (onError: string -> unit) (pointer: ARCPointer) =
-            promise {
-                match! Api.ipcArcVaultApi.removeRecentARC pointer with
-                | Ok _ -> ()
-                | Error exn -> onError exn.Message
-            }
-            |> Promise.start
-
 type private Selector =
 
-    static member CreateArcActionBtn(onClick: Browser.Types.MouseEvent -> unit) =
-        ButtonInfo.create ("swt:fluent--document-add-24-regular swt:size-5", "Create a new ARC", onClick)
-
-    static member OpenArcActionBtn(onClick: Browser.Types.MouseEvent -> unit) =
-        ButtonInfo.create ("swt:fluent--folder-open-24-regular swt:size-5", "Open an existing ARC", onClick)
-
-    static member DownloadArcActionBtn(onClick: Browser.Types.MouseEvent -> unit) =
-        ButtonInfo.create ("swt:fluent--cloud-beaker-24-regular swt:size-5", "Download ARC from DataHub", onClick)
-
     [<ReactComponent>]
-    static member private Actionbar
-        (setNewArcModalIsOpen: bool -> unit, toggleSelector: unit -> unit, onArcError: string -> unit)
-        =
+    static member Actionbar(setNewArcModalIsOpen: bool -> unit, onArcError: string -> unit) =
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
 
-        let onCreateARC =
-            fun _ ->
-                setNewArcModalIsOpen true
-                toggleSelector ()
-
-        let onOpenARC =
-            fun _ ->
-                NavbarHelper.Selector.openARC onArcError ()
-                toggleSelector ()
-
-        let openDataHubBrowser =
-            fun _ ->
-                pageStateCtx.setState (Some Renderer.Types.PageState.DataHubBrowser)
-                toggleSelector ()
 
         Actionbar.Main(
             [|
-                Selector.CreateArcActionBtn(onCreateARC)
-                Selector.OpenArcActionBtn(onOpenARC)
-                Selector.DownloadArcActionBtn(openDataHubBrowser)
+                ButtonInfo.create (
+                    "swt:fluent--folder-add-24-regular swt:size-5",
+                    "Create a new ARC",
+                    fun _ -> setNewArcModalIsOpen true
+                )
+                ButtonInfo.create (
+                    "swt:fluent--folder-open-24-regular swt:size-5",
+                    "Open an existing ARC",
+                    fun _ -> openArc onArcError |> Promise.start
+                )
+                ButtonInfo.create (
+                    "swt:fluent--cloud-beaker-24-regular swt:size-5",
+                    "Download ARC from DataHub",
+                    fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.DataHubBrowser)
+                )
             |],
             4
         )
 
     [<ReactComponent>]
-    static member Main() =
-        let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
-        let newArcModalIsOpen, setNewArcModalIsOpen = React.useState false
-        let errorCtx = useErrorModalCtx ()
-
-        let onArcError =
-            createErrorModalCallback errorCtx.enqueue "ARC action failed" appStateCtx
+    static member Main(onArcError: string -> unit, setNewArcModalIsOpen: bool -> unit) =
 
         let recentArcs =
             Renderer.MainSyncedState.useMainSyncedState {
@@ -105,23 +65,24 @@ type private Selector =
                 if isOpen then
                     recentArcs.refresh ()
 
-        React.Fragment [
-            BaseModal.BaseModal(
-                newArcModalIsOpen,
-                setNewArcModalIsOpen,
-                Renderer.Components.InitState.CreateNewArcModalContent(fun () -> setNewArcModalIsOpen false)
-            )
-            Swate.Components.Composite.ArcSelector.ArcSelector.Main(
-                recentArcs.state,
-                NavbarHelper.Selector.openArcByPath onArcError,
-                rmvRecentArc = NavbarHelper.Selector.rmvRecentArc onArcError,
-                onOpenChange = onOpen,
-                actionbar = Selector.Actionbar(setNewArcModalIsOpen, selectorControlRef.current.toggle, onArcError),
-                isLoading = recentArcs.isLoading,
-                controlRef = selectorControlRef,
-                ?currentlyOpenArcPath = appStateCtx
-            )
-        ]
+        let removeRecentArc pointer =
+            promise {
+                match! Api.ipcArcVaultApi.removeRecentARC pointer with
+                | Ok _ -> ()
+                | Error exn -> onArcError exn.Message
+            }
+            |> Promise.start
+
+        Swate.Components.Composite.ArcSelector.ArcSelector.Main(
+            recentArcs.state,
+            (fun clickedARC -> openArcByPath onArcError clickedARC.path |> Promise.start),
+            rmvRecentArc = removeRecentArc,
+            actionbar = Selector.Actionbar(setNewArcModalIsOpen, onArcError),
+            onOpenChange = onOpen,
+            isLoading = recentArcs.isLoading,
+            controlRef = selectorControlRef,
+            ?currentlyOpenArcPath = Renderer.Context.AppStateContext.useAppStateCtx ()
+        )
 
 module private Authentication =
 
@@ -313,13 +274,18 @@ type Navbar =
     static member Main() =
 
         let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
+        let newArcModalIsOpen, setNewArcModalIsOpen = React.useState false
+        let errorCtx = useErrorModalCtx ()
+
+        let onArcError =
+            createErrorModalCallback errorCtx.enqueue "ARC action failed" appStateCtx
 
         let left =
             Html.div [
                 prop.className "swt:flex swt:items-center swt:gap-2"
                 prop.children [
                     Navbar.SettingsButton()
-                    Selector.Main()
+                    Selector.Main(onArcError, setNewArcModalIsOpen)
                     Navbar.SaveArcButton()
                 ]
             ]
@@ -335,4 +301,11 @@ type Navbar =
                 ]
             ]
 
-        Swate.Components.Primitive.Navbar.Navbar.Main(left = left, right = right)
+        React.Fragment [
+            BaseModal.BaseModal(
+                newArcModalIsOpen,
+                setNewArcModalIsOpen,
+                Renderer.Components.InitState.CreateNewArcModalContent(fun () -> setNewArcModalIsOpen false)
+            )
+            Swate.Components.Primitive.Navbar.Navbar.Main(left = left, right = right)
+        ]

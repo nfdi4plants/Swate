@@ -296,6 +296,18 @@ type Main =
         let activeView, setActiveView =
             React.useState (startingActiveView |> Option.defaultValue ActiveView.Metadata)
 
+        let arcFileNavigationKey =
+            arcFile.TryGetRelativePath()
+            |> Option.defaultValue (string arcFile.RelatedArcFilesDiscriminate)
+
+        let startingActiveViewKey =
+            startingActiveView |> Option.map _.ViewIndex |> Option.defaultValue -3
+
+        React.useEffect (
+            (fun () -> setActiveView (startingActiveView |> Option.defaultValue ActiveView.Metadata)),
+            [| box arcFileNavigationKey; box startingActiveViewKey |]
+        )
+
         React.useEffect (
             (fun () ->
                 let nextActiveView = ActiveView.Forward(arcFile, activeView)
