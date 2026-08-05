@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Enable Add Rows and File Picker insertion in DataMap views.
 -   Store File Picker and Data Annotator references relative to the ARC root for assay, study, run, and workflow DataMaps, and rerender immediately after insertion.
 -   Migrate the outdated `isa_datamap` file to `isa.datamap.xlsx` during ARC loading, while preserving an existing canonical workbook.
+-   Fix the DataMap delete-row regression test to use the strongly typed `CellCoordinate` API.
 
 ## 2.0.4 - 2026-07-20
 
