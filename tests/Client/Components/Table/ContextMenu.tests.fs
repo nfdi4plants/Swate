@@ -290,7 +290,7 @@ type TestCases =
         Expect.equal dataMap.DataContexts.[0].FilePath None "Clear Column should clear the first row."
         Expect.equal dataMap.DataContexts.[1].FilePath None "Clear Column should clear the second row."
 
-        [ {| x = 1; y = 1 |} ]
+        ([ {| x = 1; y = 1 |} ]: CellCoordinate list)
         |> Swate.Components.Composite.Table.Helper.selectedRowIndices dataMap.RowCount
         |> Array.iter dataMap.DataContexts.RemoveAt
 
