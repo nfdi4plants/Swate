@@ -132,7 +132,7 @@ type Actionbar =
             let event = Actionbar.createMouseEvent "contextmenu" options
             element.dispatchEvent (event) |> ignore
 
-        if buttons.Length > 0 && buttons.Length <= maxNumber + 1 then
+        if buttons.Length > 0 && buttons.Length <= maxNumber then
             Html.none
         else
             let buttonInfo =
@@ -185,7 +185,7 @@ type Actionbar =
         let selectedElements =
             React.useMemo (
                 (fun _ ->
-                    if buttons.Length > 0 && buttons.Length > maxNumber + 1 then
+                    if buttons.Length > 0 && buttons.Length > maxNumber then
                         Array.take maxNumber buttons
                     else
                         buttons

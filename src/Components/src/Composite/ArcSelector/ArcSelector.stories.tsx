@@ -91,7 +91,7 @@ export const ClickingActionbarButtonClosesDropdown: Story = {
 
 export const RestButtonShowsOptionsAndOptionsClickable: Story = {
   args: {
-    maxNumberActionbar: 3,
+    maxNumberActionbar: 1,
     debug: true
   },
   play: async ({ canvasElement }) => {
