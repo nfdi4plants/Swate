@@ -221,6 +221,19 @@ type TestCases =
             "DatamapTesting.txt"
             "Copied DataMap data should not include trailing tabs for empty metadata."
 
+    static member TableCopyIncludesSelector() =
+        let dataCell = CompositeCell.createDataFromString "DatamapTesting.txt#row=2"
+
+        Expect.equal
+            (dataCell.ToClipboardStr())
+            "DatamapTesting.txt#row=2"
+            "Copied table data should include its selector in the displayed clipboard cell."
+
+        Expect.equal
+            (CompositeCell.ToClipboardTableTxt [| [| dataCell; CompositeCell.FreeText "label" |] |])
+            "DatamapTesting.txt#row=2\tlabel"
+            "A table data cell and its selector must occupy one clipboard cell."
+
     static member DataMapCellPastePreservesSelector() =
         let dataMap = DataMap(ResizeArray [ DataContext() ])
 
@@ -410,6 +423,8 @@ let Main =
         testList "Regression" [
             testCase "DataMap cell copy includes the selector behind #"
             <| fun _ -> TestCases.DataMapCopyIncludesSelector()
+            testCase "Table cell copy includes the selector behind #"
+            <| fun _ -> TestCases.TableCopyIncludesSelector()
             testCase "DataMap cell paste includes the selector behind #"
             <| fun _ -> TestCases.DataMapCellPastePreservesSelector()
             testCase "DataMap labels survive ARC file refreshes"

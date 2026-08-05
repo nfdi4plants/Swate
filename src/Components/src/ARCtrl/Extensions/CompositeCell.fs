@@ -87,6 +87,13 @@ type CompositeCell with
     member this.ToTabStr() =
         this.GetContentSwate() |> String.concat "\t"
 
+    /// Serialize one displayed grid cell for the clipboard. Data cells keep their
+    /// selector in the compact `path#selector` representation used by the table UI.
+    member this.ToClipboardStr() =
+        match this with
+        | CompositeCell.Data data -> data.Name |> Option.defaultValue ""
+        | _ -> this.ToTabStr()
+
     static member fromTabStr(str: string, header: CompositeHeader) =
         let content = str.Split('\t') |> Array.map _.Trim()
         CompositeCell.fromContentValid (content, header)
@@ -120,6 +127,11 @@ type CompositeCell with
             |> Array.map (fun row -> row |> Array.map (fun cell -> cell.ToTabStr()) |> String.concat "\t")
 
         rows |> String.concat (System.Environment.NewLine)
+
+    static member ToClipboardTableTxt(cells: CompositeCell[][]) =
+        cells
+        |> Array.map (Array.map (fun cell -> CompositeCell.FreeText(cell.ToClipboardStr())))
+        |> CompositeCell.ToTableTxt
 
     static member fromTabTxt (tabTxt: string) (header: CompositeHeader) =
         let lines =

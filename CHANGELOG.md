@@ -20,11 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -   Add Download ARC from the ARC selector into the sidebar below Git.
 -   Update FileTree ARC entity navigation: selecting an entity name opens Metadata, expansion and collapse are controlled only by the arrow, and table/DataMap files open their corresponding tabs.
+-   Store File Picker and Data Annotator references with an explicit `./` ARC-root-relative path in both table and DataMap views.
 
 ### 🐛 Fixed
 
 -   Load templates through ARCtrl's JavaScript web API in Electron's main process, avoiding incompatible .NET/Fable server bindings and browser CORS restrictions.
 -   Show Actionbar overflow options whenever the button count exceeds the configured visible-button limit.
+-   Use consistent clipboard formatting across normal table and DataMap views, preserving data selectors after `#` when copying single or multiple cells.
 - Ensure switching between FileTree ARC files refreshes the selected editor tab instead of retaining the previous entity's tab.
 
 ## 2.0.5 - 2026-08-05
