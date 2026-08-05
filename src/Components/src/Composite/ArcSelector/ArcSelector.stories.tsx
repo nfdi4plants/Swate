@@ -106,7 +106,7 @@ export const RestButtonShowsOptionsAndOptionsClickable: Story = {
     const menu = await screen.findByTestId('context_menu');
     expect(menu).toBeVisible();
 
-    const menuItem = within(menu).getByText('Create a new ARC');
+    const menuItem = within(menu).getByText('Open an existing ARC');
     await userEvent.click(menuItem);
 
     await waitFor(() => {

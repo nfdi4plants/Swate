@@ -60,7 +60,10 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, startingActiveView: ActiveView opti
     let errorModal = useErrorModalCtx ()
 
     let setArcFilePageState (nextArcFile: ArcFiles) =
-        let page = Renderer.Types.PageState.ArcFilePage nextArcFile
+        let page =
+            match startingActiveView with
+            | Some activeView -> Renderer.Types.PageState.ArcFilePageWithStartingView(nextArcFile, activeView)
+            | None -> Renderer.Types.PageState.ArcFilePage nextArcFile
 
         pageStateCtx.setState (Some page)
 
