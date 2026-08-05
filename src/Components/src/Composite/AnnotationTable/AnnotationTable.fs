@@ -16,21 +16,6 @@ open ARCtrl
 open Types.AnnotationTableContextMenu
 open Types.AnnotationTable
 
-module AnnotationTableHelper =
-
-    let (|KbdShortcutTrigger|_|)
-        (keyOptions: {| keyCode: string; isCtrl: bool |}[])
-        (e: Browser.Types.KeyboardEvent, selectedCells: GridSelect.GridSelectHandle, activeCell: CellCoordinate option)
-        =
-        match
-            activeCell.IsNone
-            && selectedCells.count > 0
-            && keyOptions
-               |> Array.exists (fun ko -> e.code = ko.keyCode && (if ko.isCtrl then e.ctrlKey || e.metaKey else true))
-        with
-        | true -> Some()
-        | false -> None
-
 module AnnotationTableMemo =
 
     [<Erase>]
@@ -629,53 +614,14 @@ type AnnotationTable =
                     onKeydown =
                         (fun (e, selectedCells, activeCell) ->
 
-                            let kbd_f2_CtrlEnter = [|
-                                {|
-                                    keyCode = kbdEventCode.f2
-                                    isCtrl = false
-                                |}
-                                {|
-                                    keyCode = kbdEventCode.enter
-                                    isCtrl = true
-                                |}
-                            |]
-
-                            let kbd_delete = [|
-                                {|
-                                    keyCode = kbdEventCode.delete
-                                    isCtrl = false
-                                |}
-                            |]
-
-                            let kbd_CtrlV = [|
-                                {|
-                                    keyCode = kbdEventCode.key ("v")
-                                    isCtrl = true
-                                |}
-                            |]
-
-                            let kbd_CtrlC = [|
-                                {|
-                                    keyCode = kbdEventCode.key ("c")
-                                    isCtrl = true
-                                |}
-                            |]
-
-                            let kbd_CtrlX = [|
-                                {|
-                                    keyCode = kbdEventCode.key ("x")
-                                    isCtrl = true
-                                |}
-                            |]
-
-                            match (e, selectedCells, activeCell) with
-                            | AnnotationTableHelper.KbdShortcutTrigger kbd_f2_CtrlEnter ->
+                            match GridSelect.tryGetKeyboardShortcut e selectedCells activeCell with
+                            | Some GridSelect.KeyboardShortcut.Details ->
                                 let cell = selectedCells.selectedCellsReducedSet.MinimumElement
                                 setModal (Some(ModalTypes.Details cell))
-                            | AnnotationTableHelper.KbdShortcutTrigger kbd_delete ->
+                            | Some GridSelect.KeyboardShortcut.Delete ->
                                 arcTable.ClearSelectedCells(tableRef.current.SelectHandle)
                                 arcTable.Copy() |> setArcTable
-                            | AnnotationTableHelper.KbdShortcutTrigger kbd_CtrlV ->
+                            | Some GridSelect.KeyboardShortcut.Paste ->
                                 AnnotationTableContextMenuUtil.tryPasteCopiedCells (
                                     selectedCells.selectedCellsReducedSet.MinimumElement,
                                     arcTable,
@@ -684,14 +630,14 @@ type AnnotationTable =
                                     setArcTable
                                 )
                                 |> Promise.start
-                            | AnnotationTableHelper.KbdShortcutTrigger kbd_CtrlC ->
+                            | Some GridSelect.KeyboardShortcut.Copy ->
                                 AnnotationTableContextMenuUtil.copy (
                                     selectedCells.selectedCellsReducedSet.MinimumElement,
                                     arcTable,
                                     tableRef.current.SelectHandle
                                 )
                                 |> Promise.start
-                            | AnnotationTableHelper.KbdShortcutTrigger kbd_CtrlX ->
+                            | Some GridSelect.KeyboardShortcut.Cut ->
                                 AnnotationTableContextMenuUtil.cut (
                                     selectedCells.selectedCellsReducedSet.MinimumElement,
                                     arcTable,

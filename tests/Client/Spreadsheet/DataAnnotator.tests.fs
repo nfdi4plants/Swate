@@ -5,6 +5,8 @@ open ARCtrl
 open Swate.Components.Shared
 open global.Spreadsheet
 
+module ComponentDataAnnotatorTypes = Swate.Components.Composite.Widgets.DataAnnotator.Types
+
 let private createTableState rowCount =
     let table = ArcTable.init "TestTable"
 
@@ -93,4 +95,65 @@ let Main =
 
             Expect.equal secondCell.FilePath (Some "test.csv") "Created rows should store the selected file path."
             Expect.equal secondCell.Selector (Some "row=2") "Created rows should store selectors in order."
+
+        testCase "stores assay DataMap uploads relative to the ARC root"
+        <| fun _ ->
+            let assay = ArcAssay.init "MyAssay"
+            let dataMap = DataMap.init ()
+            assay.DataMap <- Some dataMap
+            let arcFile = ArcFiles.Assay assay
+            let mutable nextArcFile = None
+
+            Swate.Components.Page.ArcFileEditor.Helper.applyDataAnnotatorInputToArcFile
+                (ComponentDataAnnotatorTypes.AnnotationDestination.DataMap dataMap,
+                 arcFile,
+                 (fun value -> nextArcFile <- Some value))
+                {
+                    Selectors = [| "row=2" |]
+                    FileName = "test.csv"
+                    FileType = "text/csv"
+                    Target =
+                        ComponentDataAnnotatorTypes.AnnotationTarget.DataMap
+                            ComponentDataAnnotatorTypes.WriteMode.Replace
+                }
+            |> Result.defaultWith failwith
+            |> ignore
+
+            let nextDataMap = nextArcFile.Value.TryGetDataMap().Value
+
+            Expect.equal
+                nextDataMap.DataContexts.[0].FilePath
+                (Some "assays/MyAssay/dataset/test.csv")
+                "DataMap file paths must be relative to the ARC root."
+
+            Expect.equal
+                dataMap.DataContexts.Count
+                0
+                "Submitting must not mutate the DataMap currently rendered by React."
+
+        testCase "creates ARC-root-relative paths for every DataMap parent"
+        <| fun _ ->
+            let cases = [|
+                ArcFiles.Assay(ArcAssay.init "MyAssay"), "assays/MyAssay/dataset/test.csv"
+                ArcFiles.Study(ArcStudy.init "MyStudy", []), "studies/MyStudy/resources/test.csv"
+                ArcFiles.Run(ArcRun.init "MyRun"), "runs/MyRun/test.csv"
+                ArcFiles.Workflow(ArcWorkflow.init "MyWorkflow"), "workflows/MyWorkflow/test.csv"
+                ArcFiles.DataMap(Some(DatamapParentInfo.create "MyStudy" DataMapParent.Study), DataMap.init ()),
+                "studies/MyStudy/resources/test.csv"
+            |]
+
+            for arcFile, expected in cases do
+                Expect.equal
+                    (toArcRootRelativeFilePath arcFile "test.csv")
+                    expected
+                    "Bare filenames must be rooted below their owning ARC entity."
+
+        testCase "preserves an existing ARC-root-relative DataMap path"
+        <| fun _ ->
+            let arcFile = ArcFiles.Assay(ArcAssay.init "MyAssay")
+            let rootRelativePath = "assays/MyAssay/dataset/test.csv"
+
+            let actual = toArcRootRelativeFilePath arcFile rootRelativePath
+
+            Expect.equal actual rootRelativePath "Existing ARC-root-relative paths must not be prefixed again."
     ]

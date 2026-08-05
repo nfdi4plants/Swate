@@ -15,13 +15,16 @@ open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Composite.AnnotationTable
 open Swate.Components.Composite.Widgets.DataAnnotator.Types
 
-type private AddRowsFooterViewProps = {
-    rowsToAdd: int
-    minRowsToAdd: int
-    onRowsToAddChange: int -> unit
-    onAddRows: unit -> unit
-    onAddRowsAndReset: unit -> unit
-}
+module private ArcFileEditorTypes =
+    type AddRowsFooterViewProps = {
+        rowsToAdd: int
+        minRowsToAdd: int
+        onRowsToAddChange: int -> unit
+        onAddRows: unit -> unit
+        onAddRowsAndReset: unit -> unit
+    }
+
+open ArcFileEditorTypes
 
 type private LazyComponents =
 
@@ -240,12 +243,11 @@ type Main =
         let tryGetAddRowsTarget () =
             Helper.tryGetAddRowsTarget (activeView, arcFileState)
 
-        let hasColumns =
-            activeView.TryGetActiveTable(arcFileState)
-            |> Option.map (fun t -> t.ColumnCount > 0)
-            |> Option.defaultValue false
-
-        let canAddRows = tryGetAddRowsTarget () |> Option.isSome && hasColumns
+        let canAddRows =
+            match tryGetAddRowsTarget () with
+            | Some(AddRowsTarget.Table table) -> table.ColumnCount > 0
+            | Some(AddRowsTarget.DataMap dataMap) -> dataMap.ColumnCount > 0
+            | None -> false
 
         let addRowsWithCount rowCount =
             match tryGetAddRowsTarget () with

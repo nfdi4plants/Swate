@@ -8,6 +8,14 @@ open ARCtrl
 [<AutoOpen>]
 module ARCtrlHelper =
 
+    /// WORKAROUND: ARCtrl's DataContext.Copy() omits DataContext.Label.
+    /// Remove this function after upgrading to an ARCtrl version that preserves labels.
+    let preserveDataMapLabelsWorkaround (source: DataMap) (target: DataMap) =
+        Seq.iter2
+            (fun (source: DataContext) (target: DataContext) -> target.Label <- source.Label)
+            source.DataContexts
+            target.DataContexts
+
     [<RequireQualifiedAccess; StringEnum>]
     type ArcFilesDiscriminate =
         | [<CompiledName("investigation")>] Investigation
@@ -76,7 +84,7 @@ module ARCtrlHelper =
             | [| RunsFolderName; anyRunName; DatamapFileName |] -> create anyRunName DataMapParent.Run |> Some
             | _ -> None
 
-        let toPath (dmpi: DatamapParentInfo) =
+        let toFolderPath (dmpi: DatamapParentInfo) =
             let folderName =
                 match dmpi.Parent with
                 | DataMapParent.Assay -> AssaysFolderName
@@ -84,7 +92,10 @@ module ARCtrlHelper =
                 | DataMapParent.Run -> RunsFolderName
                 | DataMapParent.Workflow -> WorkflowsFolderName
 
-            combineMany [| folderName; dmpi.ParentId; DatamapFileName |]
+            combineMany [| folderName; dmpi.ParentId |]
+
+        let toPath (dmpi: DatamapParentInfo) =
+            combineMany [| toFolderPath dmpi; DatamapFileName |]
 
     let createNewTableName (tables: seq<ArcTable>) =
         let existingNames = tables |> Seq.map _.Name |> Set.ofSeq
@@ -187,14 +198,51 @@ module ARCtrlHelper =
 
         /// React only refreshes if the reference changes, but when we update the ArcFile, we usually mutate the existing object. This function creates a new reference with the same content, which can be used to force React to re-render.
         static member refreshRef(arcFile: ArcFiles) : ArcFiles =
+            let copy =
+                match arcFile with
+                | ArcFiles.Investigation investigation -> ArcFiles.Investigation <| investigation.Copy()
+                | ArcFiles.Study(study, _) -> ArcFiles.Study(study.Copy(), [])
+                | ArcFiles.Assay assay -> ArcFiles.Assay <| assay.Copy()
+                | ArcFiles.Run run -> ArcFiles.Run <| run.Copy()
+                | ArcFiles.Workflow workflow -> ArcFiles.Workflow <| workflow.Copy()
+                | ArcFiles.DataMap(parent, dataMap) -> ArcFiles.DataMap(parent, dataMap.Copy())
+                | ArcFiles.Template template -> ArcFiles.Template <| template.Copy()
+
+            match arcFile.TryGetDataMap(), copy.TryGetDataMap() with
+            | Some source, Some target -> preserveDataMapLabelsWorkaround source target
+            | _ -> ()
+
+            copy
+
+    /// Single source of truth for file paths stored relative to the ARC root.
+    let toArcRootRelativeFilePath (arcFile: ArcFiles) (filePath: string) =
+        let parentInfo =
             match arcFile with
-            | ArcFiles.Investigation investigation -> ArcFiles.Investigation <| investigation.Copy()
-            | ArcFiles.Study(study, _) -> ArcFiles.Study(study.Copy(), [])
-            | ArcFiles.Assay assay -> ArcFiles.Assay <| assay.Copy()
-            | ArcFiles.Run run -> ArcFiles.Run <| run.Copy()
-            | ArcFiles.Workflow workflow -> ArcFiles.Workflow <| workflow.Copy()
-            | ArcFiles.DataMap(parent, dataMap) -> ArcFiles.DataMap(parent, dataMap.Copy())
-            | ArcFiles.Template template -> ArcFiles.Template <| template.Copy()
+            | ArcFiles.Assay assay -> Some(DatamapParentInfo.create assay.Identifier DataMapParent.Assay)
+            | ArcFiles.Study(study, _) -> Some(DatamapParentInfo.create study.Identifier DataMapParent.Study)
+            | ArcFiles.Run run -> Some(DatamapParentInfo.create run.Identifier DataMapParent.Run)
+            | ArcFiles.Workflow workflow -> Some(DatamapParentInfo.create workflow.Identifier DataMapParent.Workflow)
+            | ArcFiles.DataMap(Some parentInfo, _) -> Some parentInfo
+            | _ -> None
+
+        match parentInfo, ARCtrl.ArcPathHelper.split filePath with
+        // Browser uploads expose only the bare file name, while stored references are ARC-root-relative.
+        | Some parentInfo, [| _ |] ->
+            let childFolder =
+                match parentInfo.Parent with
+                | DataMapParent.Assay -> Some ARCtrl.ArcPathHelper.AssayDatasetFolderName
+                | DataMapParent.Study -> Some ARCtrl.ArcPathHelper.StudiesResourcesFolderName
+                | DataMapParent.Run
+                | DataMapParent.Workflow -> None
+
+            [|
+                Some(DatamapParentInfo.toFolderPath parentInfo)
+                childFolder
+                Some filePath
+            |]
+            |> Array.choose id
+            |> ARCtrl.ArcPathHelper.combineMany
+        | _ -> filePath
 
     [<RequireQualifiedAccess>]
     module ArcFileDefaults =

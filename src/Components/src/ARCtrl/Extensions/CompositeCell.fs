@@ -168,7 +168,9 @@ type CompositeCell with
         | CompositeCell.Unitized(_, oa) -> CompositeCell.Unitized(s, oa)
         | CompositeCell.FreeText _ -> CompositeCell.FreeText s
         | CompositeCell.Data d ->
-            d.FilePath <- Some s
+            // Data.Name parses the `path#selector` representation used by DataMaps. Assigning
+            // FilePath directly would incorrectly treat the selector as part of the path.
+            d.Name <- Some s
             CompositeCell.Data d
 
     /// <summary>
