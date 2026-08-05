@@ -25,11 +25,17 @@ module private MainHelper =
     let loadTemplates =
         fun () ->
             promise {
-                let! json =
-                    Swate.Components.Api.SwateApi.SwateTemplateApi.getTemplates ()
-                    |> Async.StartAsPromise
+                // let! json =
+                //     Swate.Components.Api.SwateApi.SwateTemplateApi.getTemplates ()
+                //     |> Async.StartAsPromise
+                // return Ok(ARCtrl.Json.Templates.fromJsonString json)
 
-                return Ok(ARCtrl.Json.Templates.fromJsonString json)
+                let! result = Api.ipcTemplateApi.getTemplates ()
+
+                return
+                    result
+                    |> Result.map ARCtrl.Json.Templates.fromJsonString
+                    |> Result.mapError (fun error -> error.Message)
             }
             |> Promise.catch (fun error ->
                 // Handle error, e.g., log it or show a notification
