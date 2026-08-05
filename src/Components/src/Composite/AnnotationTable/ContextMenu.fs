@@ -139,7 +139,7 @@ type AnnotationTableContextMenuUtil =
                     |> Array.map (fun row -> row |> String.concat "\t")
                     |> String.concat System.Environment.NewLine
                 else
-                    CompositeCell.ToTableTxt(cells)
+                    CompositeCell.ToClipboardTableTxt(cells)
             else if cellIndex.y - 1 < 0 then
                 let column = table.GetColumn(cellIndex.x - 1)
                 let table = ArcTable.init ("placeholder")
@@ -150,7 +150,7 @@ type AnnotationTableContextMenuUtil =
                 |> String.concat System.Environment.NewLine
             else
                 let cell = table.GetCellAt((cellIndex.x - 1, cellIndex.y - 1))
-                cell.ToTabStr()
+                cell.ToClipboardStr()
 
         navigator.clipboard.writeText result
 

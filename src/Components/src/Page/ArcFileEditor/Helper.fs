@@ -32,6 +32,11 @@ let applyDataAnnotatorInputToArcFile
         let nextArcFile = ArcFiles.refreshRef arcFile
 
         let result =
+            let rootRelativeInput = {
+                annotationInput with
+                    FileName = toArcRootRelativeFilePath arcFile annotationInput.FileName
+            }
+
             match destination with
             | AnnotationDestination.Table table ->
                 let tableIndex =
@@ -42,14 +47,9 @@ let applyDataAnnotatorInputToArcFile
                 | Some index when index < nextArcFile.Tables().Count ->
                     let nextTable = nextArcFile.Tables().[index]
 
-                    Swate.Components.Composite.Widgets.DataAnnotator.Helper.applyToTable nextTable annotationInput
+                    Swate.Components.Composite.Widgets.DataAnnotator.Helper.applyToTable nextTable rootRelativeInput
                 | _ -> Error "The Data Annotator target table is no longer available."
             | AnnotationDestination.DataMap _ ->
-                let rootRelativeInput = {
-                    annotationInput with
-                        FileName = toArcRootRelativeFilePath arcFile annotationInput.FileName
-                }
-
                 match nextArcFile.TryGetDataMap() with
                 | Some dataMap ->
                     Swate.Components.Composite.Widgets.DataAnnotator.Helper.applyToDataMap dataMap rootRelativeInput

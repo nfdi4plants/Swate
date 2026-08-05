@@ -123,7 +123,7 @@ let Main =
 
             Expect.equal
                 nextDataMap.DataContexts.[0].FilePath
-                (Some "assays/MyAssay/dataset/test.csv")
+                (Some "./assays/MyAssay/dataset/test.csv")
                 "DataMap file paths must be relative to the ARC root."
 
             Expect.equal
@@ -134,12 +134,12 @@ let Main =
         testCase "creates ARC-root-relative paths for every DataMap parent"
         <| fun _ ->
             let cases = [|
-                ArcFiles.Assay(ArcAssay.init "MyAssay"), "assays/MyAssay/dataset/test.csv"
-                ArcFiles.Study(ArcStudy.init "MyStudy", []), "studies/MyStudy/resources/test.csv"
-                ArcFiles.Run(ArcRun.init "MyRun"), "runs/MyRun/test.csv"
-                ArcFiles.Workflow(ArcWorkflow.init "MyWorkflow"), "workflows/MyWorkflow/test.csv"
+                ArcFiles.Assay(ArcAssay.init "MyAssay"), "./assays/MyAssay/dataset/test.csv"
+                ArcFiles.Study(ArcStudy.init "MyStudy", []), "./studies/MyStudy/resources/test.csv"
+                ArcFiles.Run(ArcRun.init "MyRun"), "./runs/MyRun/test.csv"
+                ArcFiles.Workflow(ArcWorkflow.init "MyWorkflow"), "./workflows/MyWorkflow/test.csv"
                 ArcFiles.DataMap(Some(DatamapParentInfo.create "MyStudy" DataMapParent.Study), DataMap.init ()),
-                "studies/MyStudy/resources/test.csv"
+                "./studies/MyStudy/resources/test.csv"
             |]
 
             for arcFile, expected in cases do
@@ -155,5 +155,37 @@ let Main =
 
             let actual = toArcRootRelativeFilePath arcFile rootRelativePath
 
-            Expect.equal actual rootRelativePath "Existing ARC-root-relative paths must not be prefixed again."
+            Expect.equal actual $"./{rootRelativePath}" "Existing ARC-root-relative paths must use an explicit relative prefix."
+
+        testCase "stores table-view uploads relative to the ARC root"
+        <| fun _ ->
+            let table = ArcTable.init "MyTable"
+            table.AddColumn(CompositeHeader.FreeText "Source", ResizeArray [ CompositeCell.FreeText "sample" ])
+            let assay = ArcAssay.init "MyAssay"
+            assay.AddTable table
+            let arcFile = ArcFiles.Assay assay
+            let mutable nextArcFile = None
+
+            Swate.Components.Page.ArcFileEditor.Helper.applyDataAnnotatorInputToArcFile
+                (ComponentDataAnnotatorTypes.AnnotationDestination.Table table,
+                 arcFile,
+                 (fun value -> nextArcFile <- Some value))
+                {
+                    Selectors = [| "row=2" |]
+                    FileName = "test.csv"
+                    FileType = "text/csv"
+                    Target =
+                        ComponentDataAnnotatorTypes.AnnotationTarget.Table
+                            (ComponentDataAnnotatorTypes.TargetColumn.Autodetect,
+                             ComponentDataAnnotatorTypes.WriteMode.Replace)
+                }
+            |> Result.defaultWith failwith
+            |> ignore
+
+            let outputColumn = nextArcFile.Value.Tables().[0].GetOutputColumn()
+
+            Expect.equal
+                outputColumn.Cells.[0].AsData.FilePath
+                (Some "./assays/MyAssay/dataset/test.csv")
+                "Table-view Data Annotator paths must be relative to the ARC root."
     ]

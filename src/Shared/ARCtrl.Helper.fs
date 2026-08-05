@@ -225,6 +225,10 @@ module ARCtrlHelper =
             | ArcFiles.DataMap(Some parentInfo, _) -> Some parentInfo
             | _ -> None
 
+        let withExplicitRelativePrefix (path: string) =
+            let normalizedPath = path.Replace('\\', '/')
+            if normalizedPath.StartsWith("./") then normalizedPath else $"./{normalizedPath}"
+
         match parentInfo, ARCtrl.ArcPathHelper.split filePath with
         // Browser uploads expose only the bare file name, while stored references are ARC-root-relative.
         | Some parentInfo, [| _ |] ->
@@ -242,6 +246,8 @@ module ARCtrlHelper =
             |]
             |> Array.choose id
             |> ARCtrl.ArcPathHelper.combineMany
+            |> withExplicitRelativePrefix
+        | _, segments when segments.Length > 1 -> withExplicitRelativePrefix filePath
         | _ -> filePath
 
     [<RequireQualifiedAccess>]

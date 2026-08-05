@@ -24,13 +24,11 @@ module ARCtrlExtensions =
             |> Seq.map (fun (_, row) ->
                 row
                 |> Seq.sortBy _.x
-                // Copy the value displayed by the DataMap grid as one clipboard cell. ToTabStr
-                // expands composite metadata into multiple columns and adds trailing tabs for
-                // empty fields, while ToString keeps `path#selector` compact and complete.
-                |> Seq.map (fun coordinate -> this.GetCell(coordinate.x - 1, coordinate.y - 1).ToString())
-                |> String.concat "\t"
+                |> Seq.map (fun coordinate -> this.GetCell(coordinate.x - 1, coordinate.y - 1))
+                |> Seq.toArray
             )
-            |> String.concat System.Environment.NewLine
+            |> Seq.toArray
+            |> CompositeCell.ToClipboardTableTxt
 
         member this.PasteTabText(startCoordinate: CellCoordinate, clipboardText: string) =
             let rows =
