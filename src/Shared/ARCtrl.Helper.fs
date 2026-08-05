@@ -227,7 +227,11 @@ module ARCtrlHelper =
 
         let withExplicitRelativePrefix (path: string) =
             let normalizedPath = path.Replace('\\', '/')
-            if normalizedPath.StartsWith("./") then normalizedPath else $"./{normalizedPath}"
+
+            if normalizedPath.StartsWith("./") then
+                normalizedPath
+            else
+                $"./{normalizedPath}"
 
         match parentInfo, ARCtrl.ArcPathHelper.split filePath with
         // Browser uploads expose only the bare file name, while stored references are ARC-root-relative.

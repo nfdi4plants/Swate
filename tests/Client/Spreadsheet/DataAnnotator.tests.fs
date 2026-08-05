@@ -155,7 +155,10 @@ let Main =
 
             let actual = toArcRootRelativeFilePath arcFile rootRelativePath
 
-            Expect.equal actual $"./{rootRelativePath}" "Existing ARC-root-relative paths must use an explicit relative prefix."
+            Expect.equal
+                actual
+                $"./{rootRelativePath}"
+                "Existing ARC-root-relative paths must use an explicit relative prefix."
 
         testCase "stores table-view uploads relative to the ARC root"
         <| fun _ ->
@@ -175,9 +178,10 @@ let Main =
                     FileName = "test.csv"
                     FileType = "text/csv"
                     Target =
-                        ComponentDataAnnotatorTypes.AnnotationTarget.Table
-                            (ComponentDataAnnotatorTypes.TargetColumn.Autodetect,
-                             ComponentDataAnnotatorTypes.WriteMode.Replace)
+                        ComponentDataAnnotatorTypes.AnnotationTarget.Table(
+                            ComponentDataAnnotatorTypes.TargetColumn.Autodetect,
+                            ComponentDataAnnotatorTypes.WriteMode.Replace
+                        )
                 }
             |> Result.defaultWith failwith
             |> ignore
