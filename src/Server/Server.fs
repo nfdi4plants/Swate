@@ -25,7 +25,7 @@ open Database
 
 let templateApi credentials =
     let templateUrl =
-        @"https://github.com/nfdi4plants/Swate-templates/releases/download/latest/templates_v2.0.0.json"
+        @"https://github.com/nfdi4plants/swate-template-registry/releases/download/latest/templates_v2.0.0.json"
 
     {
         getTemplates =
