@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 2.0.41 - 2026-08-05
+
 ### 🐛 Fixed
 
 -   Preserve ARC static hash baselines during file watcher merges so saving metadata no longer overwrites unchanged XLSX files.
