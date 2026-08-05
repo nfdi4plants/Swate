@@ -5,6 +5,7 @@ open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.GitTypes
+open Swate.Components.Page.ArcFileEditor.Types
 
 [<RequireQualifiedAccess>]
 type LeftSidebarPage =
@@ -16,6 +17,7 @@ type GitUnsupportedPageData = GitUnsupportedContentDto
 [<RequireQualifiedAccess>]
 type PageState =
     | ArcFilePage of ArcFiles
+    | ArcFilePageWithStartingView of ArcFiles * ActiveView
     | MarkdownPage of string
     | TextPage of string
     | UnknownPage
@@ -38,7 +40,26 @@ type PageState =
             let arcfile = FileContentDTO.toArcFile dto
 
             match arcfile with
-            | Some arcFile -> PageState.ArcFilePage arcFile
+            | Some arcFile ->
+                let normalizedPath = PathHelpers.normalizePath dto.path
+
+                if
+                    normalizedPath.EndsWith(
+                        ARCtrl.ArcPathHelper.DataMapFileName,
+                        System.StringComparison.OrdinalIgnoreCase
+                    )
+                then
+                    PageState.ArcFilePageWithStartingView(arcFile, ActiveView.DataMap)
+                elif normalizedPath.EndsWith(".xlsx", System.StringComparison.OrdinalIgnoreCase) then
+                    let startingView =
+                        if arcFile.Tables().Count > 0 then
+                            ActiveView.Table 0
+                        else
+                            ActiveView.Metadata
+
+                    PageState.ArcFilePageWithStartingView(arcFile, startingView)
+                else
+                    PageState.ArcFilePage arcFile
             | None ->
                 PageState.ErrorPage
                     $"Failed to parse ARC file: {dto.path} - {dto.fileType} - unsupported format or corrupted content."

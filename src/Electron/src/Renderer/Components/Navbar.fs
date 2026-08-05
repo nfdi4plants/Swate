@@ -16,37 +16,34 @@ open Renderer.Types
 
 type private Selector =
 
-    static member CreateArcActionBtn(onClick: Browser.Types.MouseEvent -> unit) =
-        ButtonInfo.create ("swt:fluent--folder-add-24-regular swt:size-5", "Create a new ARC", onClick)
-
-    static member OpenArcActionBtn(onClick: Browser.Types.MouseEvent -> unit) =
-        ButtonInfo.create ("swt:fluent--folder-open-24-regular swt:size-5", "Open an existing ARC", onClick)
-
-    static member DownloadArcActionBtn(onClick: Browser.Types.MouseEvent -> unit) =
-        ButtonInfo.create ("swt:fluent--cloud-beaker-24-regular swt:size-5", "Download ARC from DataHub", onClick)
-
     [<ReactComponent>]
     static member Actionbar(setNewArcModalIsOpen: bool -> unit, onArcError: string -> unit) =
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
 
-        let onCreateARC = fun _ -> setNewArcModalIsOpen true
-
-        let onOpenARC = fun _ -> openArc onArcError |> Promise.start
-
-        let openDataHubBrowser =
-            fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.DataHubBrowser)
 
         Actionbar.Main(
             [|
-                Selector.CreateArcActionBtn(onCreateARC)
-                Selector.OpenArcActionBtn(onOpenARC)
-                Selector.DownloadArcActionBtn(openDataHubBrowser)
+                ButtonInfo.create (
+                    "swt:fluent--folder-add-24-regular swt:size-5",
+                    "Create a new ARC",
+                    fun _ -> setNewArcModalIsOpen true
+                )
+                ButtonInfo.create (
+                    "swt:fluent--folder-open-24-regular swt:size-5",
+                    "Open an existing ARC",
+                    fun _ -> openArc onArcError |> Promise.start
+                )
+                ButtonInfo.create (
+                    "swt:fluent--cloud-beaker-24-regular swt:size-5",
+                    "Download ARC from DataHub",
+                    fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.DataHubBrowser)
+                )
             |],
             4
         )
 
     [<ReactComponent>]
-    static member Main(onArcError: string -> unit) =
+    static member Main(onArcError: string -> unit, setNewArcModalIsOpen: bool -> unit) =
 
         let recentArcs =
             Renderer.MainSyncedState.useMainSyncedState {
@@ -80,6 +77,7 @@ type private Selector =
             recentArcs.state,
             (fun clickedARC -> openArcByPath onArcError clickedARC.path |> Promise.start),
             rmvRecentArc = removeRecentArc,
+            actionbar = Selector.Actionbar(setNewArcModalIsOpen, onArcError),
             onOpenChange = onOpen,
             isLoading = recentArcs.isLoading,
             controlRef = selectorControlRef,
@@ -287,9 +285,8 @@ type Navbar =
                 prop.className "swt:flex swt:items-center swt:gap-2"
                 prop.children [
                     Navbar.SettingsButton()
-                    Selector.Main(onArcError)
+                    Selector.Main(onArcError, setNewArcModalIsOpen)
                     Navbar.SaveArcButton()
-                    Selector.Actionbar(setNewArcModalIsOpen, onArcError)
                 ]
             ]
 

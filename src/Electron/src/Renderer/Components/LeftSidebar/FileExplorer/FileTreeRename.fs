@@ -39,6 +39,9 @@ module FileTreeRenameWorkflow =
         | Some(Renderer.Types.PageState.ArcFilePage arcFile) ->
             arcFile.TryGetRelativePath()
             |> Option.bind (fun arcFilePath -> tryRemapSelectionPath sourcePath targetPath (Some arcFilePath))
+        | Some(Renderer.Types.PageState.ArcFilePageWithStartingView(arcFile, _)) ->
+            arcFile.TryGetRelativePath()
+            |> Option.bind (fun arcFilePath -> tryRemapSelectionPath sourcePath targetPath (Some arcFilePath))
         | _ -> None
 
     let requestRenameItem

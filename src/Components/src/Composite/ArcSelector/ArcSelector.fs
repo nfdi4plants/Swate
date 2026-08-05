@@ -264,19 +264,6 @@ type ArcSelector =
                 "Open an existing ARC",
                 closeDropdown
             )
-
-            ButtonInfo.create (
-                "swt:fluent--cloud-arrow-down-24-regular swt:size-5",
-                "Download an existing ARC",
-                closeDropdown
-            )
-
-            ButtonInfo.create ("swt:fluent--document-add-24-regular swt:size-5", "Create a new ARC", closeDropdown)
-            ButtonInfo.create (
-                "swt:fluent--folder-arrow-up-24-regular swt:size-5",
-                "Open an existing ARC",
-                closeDropdown
-            )
         |]
 
         let actionbar = Actionbar.Main(actionbarButtons, maxNumberActionbar, ?debug = debug)

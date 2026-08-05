@@ -297,6 +297,11 @@ type Main =
             React.useState (startingActiveView |> Option.defaultValue ActiveView.Metadata)
 
         React.useEffect (
+            (fun () -> setActiveView (startingActiveView |> Option.defaultValue ActiveView.Metadata)),
+            [| box arcFile; box startingActiveView |]
+        )
+
+        React.useEffect (
             (fun () ->
                 let nextActiveView = ActiveView.Forward(arcFile, activeView)
 

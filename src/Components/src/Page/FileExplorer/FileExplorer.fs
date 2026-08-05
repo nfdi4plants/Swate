@@ -122,6 +122,7 @@ type FileExplorer =
             ?onDirectoryArrowToggle: FileItem -> bool -> unit,
             ?directoryInteractionMode: DirectoryInteractionMode,
             ?directoryChevronToggleOnly: bool,
+            ?directoryChevronToggleOnlyForItem: FileItem -> bool,
             ?delegateHorizontalScrollToParent: bool,
             ?truncateOverflowingItemNames: bool,
             ?getItemIconClass: FileItem -> string option,
@@ -137,6 +138,9 @@ type FileExplorer =
             defaultArg directoryInteractionMode DirectoryInteractionMode.SingleClickToggle
 
         let directoryChevronToggleOnly = defaultArg directoryChevronToggleOnly false
+
+        let directoryChevronToggleOnlyForItem =
+            defaultArg directoryChevronToggleOnlyForItem (fun _ -> directoryChevronToggleOnly)
 
         let delegateHorizontalScrollToParent =
             defaultArg delegateHorizontalScrollToParent false
@@ -212,6 +216,7 @@ type FileExplorer =
             if
                 directoryInteractionMode = DirectoryInteractionMode.SingleClickToggle
                 && canExpand
+                && not (directoryChevronToggleOnlyForItem item)
             then
                 setExpanded item (not (model.ExpandedIds.Contains item.Id))
 
@@ -315,7 +320,7 @@ type FileExplorer =
                     rowHighlightClass,
                     selectedNameClass,
                     isExpanded,
-                    directoryChevronToggleOnly,
+                    directoryChevronToggleOnlyForItem item,
                     canExpand,
                     getItemIconClass,
                     handleDirectorySelection item canExpand,
