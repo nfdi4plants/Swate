@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🔄 Changed
+
+-   Move Electron ARC open, create, and download actions from the selector dropdown into the navbar beside Save, using a folder-plus icon for Create ARC.
+
 ### 🐛 Fixed
 
 -   Load templates through ARCtrl's JavaScript web API in Electron's main process, avoiding incompatible .NET/Fable server bindings and browser CORS restrictions.
