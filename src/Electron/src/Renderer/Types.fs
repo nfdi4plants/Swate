@@ -16,8 +16,7 @@ type GitUnsupportedPageData = GitUnsupportedContentDto
 
 [<RequireQualifiedAccess>]
 type PageState =
-    | ArcFilePage of ArcFiles
-    | ArcFilePageWithStartingView of ArcFiles * ActiveView
+    | ArcFilePage of arcFile: ArcFiles * startingView: ActiveView option
     | MarkdownPage of string
     | TextPage of string
     | UnknownPage
@@ -49,7 +48,7 @@ type PageState =
                         System.StringComparison.OrdinalIgnoreCase
                     )
                 then
-                    PageState.ArcFilePageWithStartingView(arcFile, ActiveView.DataMap)
+                    PageState.ArcFilePage(arcFile, Some ActiveView.DataMap)
                 elif normalizedPath.EndsWith(".xlsx", System.StringComparison.OrdinalIgnoreCase) then
                     let startingView =
                         if arcFile.Tables().Count > 0 then
@@ -57,9 +56,9 @@ type PageState =
                         else
                             ActiveView.Metadata
 
-                    PageState.ArcFilePageWithStartingView(arcFile, startingView)
+                    PageState.ArcFilePage(arcFile, Some startingView)
                 else
-                    PageState.ArcFilePage arcFile
+                    PageState.ArcFilePage(arcFile, None)
             | None ->
                 PageState.ErrorPage
                     $"Failed to parse ARC file: {dto.path} - {dto.fileType} - unsupported format or corrupted content."

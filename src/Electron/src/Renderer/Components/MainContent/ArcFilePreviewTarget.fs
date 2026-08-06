@@ -55,53 +55,12 @@ let private TableNavbarActions (props: ArcFileEditorHeaderProps, setArcFile: Arc
     | _ -> Html.none
 
 [<ReactComponent>]
-let private CreateDataMapNavbarAction (props: ArcFileEditorHeaderProps, saveArcFile: ArcFiles -> unit) =
-    let supportsDataMap, canAddDataMap =
-        match props.arcFile with
-        | ArcFiles.Assay assay -> true, assay.DataMap.IsNone
-        | ArcFiles.Study(study, _) -> true, study.DataMap.IsNone
-        | ArcFiles.Run run -> true, run.DataMap.IsNone
-        | ArcFiles.Workflow workflow -> true, workflow.DataMap.IsNone
-        | _ -> false, false
-
-    let addDataMap _ =
-        if canAddDataMap then
-            let dataMap = Some(ARCtrl.DataMap.init ())
-
-            match props.arcFile with
-            | ArcFiles.Assay assay -> assay.DataMap <- dataMap
-            | ArcFiles.Study(study, _) -> study.DataMap <- dataMap
-            | ArcFiles.Run run -> run.DataMap <- dataMap
-            | ArcFiles.Workflow workflow -> workflow.DataMap <- dataMap
-            | _ -> ()
-
-            saveArcFile (ArcFiles.refreshRef props.arcFile)
-            props.setActiveView ActiveView.DataMap
-
-    if supportsDataMap then
-        Swate.Components.Primitive.Buttons.Buttons.QuickAccessButton(
-            Html.i [
-                prop.className "swt:iconify swt:fluent--database-arrow-up-20-regular swt:size-5"
-            ],
-            "Add DataMap",
-            addDataMap,
-            isDisabled = not canAddDataMap
-        )
-    else
-        Html.none
-
-[<ReactComponent>]
 let ArcFilePreviewTarget (arcFile: ArcFiles, startingActiveView: ActiveView option) =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let errorModal = useErrorModalCtx ()
 
     let setArcFilePageState (nextArcFile: ArcFiles) =
-        let page =
-            match startingActiveView with
-            | Some activeView -> Renderer.Types.PageState.ArcFilePageWithStartingView(nextArcFile, activeView)
-            | None -> Renderer.Types.PageState.ArcFilePage nextArcFile
-
-        pageStateCtx.setState (Some page)
+        pageStateCtx.setState (Some(Renderer.Types.PageState.ArcFilePage(nextArcFile, startingActiveView)))
 
     let updateArcFileInMemory (nextArcFile: ArcFiles) = Helper.setArcFileInMemory nextArcFile
 
@@ -118,16 +77,6 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, startingActiveView: ActiveView opti
         fun (nextArcFile: ArcFiles) ->
             setArcFilePageState nextArcFile
             setArcFileInMemoryWithErrorModal nextArcFile
-
-    let saveArcFileImmediately (nextArcFile: ArcFiles) =
-        setArcFilePageState nextArcFile
-
-        promise {
-            match! Helper.saveArcFile nextArcFile with
-            | Ok() -> ()
-            | Error exn -> errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not save DataMap"))
-        }
-        |> Promise.start
 
     let onSaveArcFile =
         fun _ ->
@@ -165,21 +114,63 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, startingActiveView: ActiveView opti
         React.useCallback ((fun props -> TableNavbarActions(props, setArcFile)), [| box setArcFile |])
 
     let widgetNavbarElements =
-        React.useCallback (
-            (fun props -> CreateDataMapNavbarAction(props, saveArcFileImmediately)),
-            [| box saveArcFileImmediately |]
-        )
+        fun props ->
+            let button (dataMap: ARCtrl.DataMap option) setDataMap =
+                Swate.Components.Primitive.Buttons.Buttons.QuickAccessButton(
+                    Html.i [
+                        prop.className "swt:iconify swt:fluent--database-arrow-up-20-regular swt:size-5"
+                    ],
+                    "Add DataMap",
+                    (fun _ ->
+                        if dataMap.IsNone then
+                            setDataMap (Some(ARCtrl.DataMap.init ()))
+                            let nextArcFile = ArcFiles.refreshRef props.arcFile
+                            setArcFilePageState nextArcFile
+                            props.setActiveView ActiveView.DataMap
 
-    Swate.Components.Page.ArcFileEditor.Main.ArcFileEditor(
-        arcFile,
-        setArcFile,
-        pickFilePaths,
-        widgetNavbarElements = widgetNavbarElements,
-        trailingNavbarElements = trailingNavbarElements,
-        startingActiveView = (startingActiveView |> Option.defaultValue ActiveView.Metadata),
-        onImportJson = importJson,
-        onError =
-            (fun message ->
-                errorModal.enqueue (ErrorModalRequest.create (message, title = "Could not update ARC file editor"))
+                            promise {
+                                match! Helper.saveArcFile nextArcFile with
+                                | Ok() -> ()
+                                | Error exn ->
+                                    errorModal.enqueue (
+                                        ErrorModalRequest.create (exn.Message, title = "Could not save DataMap")
+                                    )
+                            }
+                            |> Promise.start
+                    ),
+                    isDisabled = dataMap.IsSome
+                )
+
+            match props.arcFile with
+            | ArcFiles.Assay assay -> button assay.DataMap (fun value -> assay.DataMap <- value)
+            | ArcFiles.Study(study, _) -> button study.DataMap (fun value -> study.DataMap <- value)
+            | ArcFiles.Run run -> button run.DataMap (fun value -> run.DataMap <- value)
+            | ArcFiles.Workflow workflow -> button workflow.DataMap (fun value -> workflow.DataMap <- value)
+            | _ -> Html.none
+
+    let editorKey =
+        arcFile.TryGetRelativePath()
+        |> Option.defaultValue (string arcFile.RelatedArcFilesDiscriminate),
+        startingActiveView |> Option.map _.ViewIndex
+
+    Html.div [
+        prop.key (string editorKey)
+        prop.className "swt:contents"
+        prop.children [
+            Swate.Components.Page.ArcFileEditor.Main.ArcFileEditor(
+                arcFile,
+                setArcFile,
+                pickFilePaths,
+                widgetNavbarElements = widgetNavbarElements,
+                trailingNavbarElements = trailingNavbarElements,
+                startingActiveView = (startingActiveView |> Option.defaultValue ActiveView.Metadata),
+                onImportJson = importJson,
+                onError =
+                    (fun message ->
+                        errorModal.enqueue (
+                            ErrorModalRequest.create (message, title = "Could not update ARC file editor")
+                        )
+                    )
             )
-    )
+        ]
+    ]

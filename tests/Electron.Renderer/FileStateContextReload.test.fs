@@ -152,7 +152,7 @@ Vitest.describe (
                 Vitest
                     .expect(
                         FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
-                            Some(PageState.ArcFilePage workflowArcFile)
+                            Some(PageState.ArcFilePage(workflowArcFile, None))
                         )
                     )
                     .toBe (true)

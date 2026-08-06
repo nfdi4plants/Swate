@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   🐛 `Fixed` for any bug fixes.
 -   🔒 `Security` in case of vulnerabilities.
 
+## [Unreleased]
+
+### Changed
+
+-   Simplify Electron FileTree navigation so ARC editors initialize the requested Metadata, table, or DataMap view directly, and show the DataHub download action only in the sidebar.
+-   Consolidate Electron ARC editor page state, safely resolve canonical entity workbooks, and reuse shared path normalization for ARC-root-relative references.
+
 ## 2.0.7 - 2026-08-06
 
 ### Added

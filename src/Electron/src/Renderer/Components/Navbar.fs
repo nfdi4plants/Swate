@@ -18,9 +18,6 @@ type private Selector =
 
     [<ReactComponent>]
     static member Actionbar(setNewArcModalIsOpen: bool -> unit, onArcError: string -> unit) =
-        let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
-
-
         Actionbar.Main(
             [|
                 ButtonInfo.create (
@@ -33,13 +30,8 @@ type private Selector =
                     "Open an existing ARC",
                     fun _ -> openArc onArcError |> Promise.start
                 )
-                ButtonInfo.create (
-                    "swt:fluent--cloud-beaker-24-regular swt:size-5",
-                    "Download ARC from DataHub",
-                    fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.DataHubBrowser)
-                )
             |],
-            4
+            2
         )
 
     [<ReactComponent>]
