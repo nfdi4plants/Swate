@@ -14,33 +14,10 @@ open Swate.Components.Composite.AnnotationTable.Types
 open Swate.Components.Composite.Table
 open Swate.Components.Composite.Table.Types
 
-
-/// AnnotationTableContextMenu Components
-type ATCMC =
-    static member Icon(className: string) = Html.i [ prop.className className ]
-
-    static member KbdHint(text: string, ?label: string) =
-        let label = defaultArg label text
-
-        {|
-            element =
-                Html.kbd [
-                    prop.className "swt:ml-auto swt:kbd swt:kbd-sm"
-                    prop.text text
-                ]
-            label = label
-        |}
+module TableHelper = Swate.Components.Composite.Table.Helper
+open Swate.Components.Composite.Table.Helper
 
 type AnnotationTableContextMenuUtil =
-
-    static member fillColumn(index: CellCoordinate, table: ArcTable) : ArcTable =
-        let cell = table.GetCellAt(index.x - 1, index.y - 1)
-        let nextTable = table.Copy()
-
-        for y in 0 .. table.RowCount - 1 do
-            nextTable.SetCellAt(index.x - 1, y, cell.Copy())
-
-        nextTable
 
     static member clear(cellIndex: CellCoordinate, table: ArcTable, selectHandle: SelectHandle) : ArcTable =
         let nextTable = table.Copy()
@@ -61,9 +38,7 @@ type AnnotationTableContextMenuUtil =
         if selectHandle.contains tableIndex then
             let rowCoordinates =
                 selectHandle.getSelectedCells ()
-                |> Array.ofSeq
-                |> Array.distinctBy (fun coordinate -> coordinate.y)
-                |> Array.map (fun coordinate -> coordinate.y - 1)
+                |> TableHelper.selectedRowIndices table.RowCount
 
             table.RemoveRows(rowCoordinates)
         else
@@ -164,7 +139,7 @@ type AnnotationTableContextMenuUtil =
                     |> Array.map (fun row -> row |> String.concat "\t")
                     |> String.concat System.Environment.NewLine
                 else
-                    CompositeCell.ToTableTxt(cells)
+                    CompositeCell.ToClipboardTableTxt(cells)
             else if cellIndex.y - 1 < 0 then
                 let column = table.GetColumn(cellIndex.x - 1)
                 let table = ArcTable.init ("placeholder")
@@ -175,7 +150,7 @@ type AnnotationTableContextMenuUtil =
                 |> String.concat System.Environment.NewLine
             else
                 let cell = table.GetCellAt((cellIndex.x - 1, cellIndex.y - 1))
-                cell.ToTabStr()
+                cell.ToClipboardStr()
 
         navigator.clipboard.writeText result
 
@@ -636,7 +611,18 @@ type AnnotationTableContextMenu =
                 Html.div "Fill Column",
                 icon = Icons.Pen(),
                 kbdbutton = ATCMC.KbdHint("F"),
-                onClick = fun _ -> AnnotationTableContextMenuUtil.fillColumn (cellIndex, arcTable) |> setArcTable
+                onClick =
+                    fun _ ->
+                        let nextTable = arcTable.Copy()
+
+                        TableHelper.fillColumn
+                            arcTable.RowCount
+                            cellIndex
+                            (fun coordinate -> arcTable.GetCellAt(coordinate.x - 1, coordinate.y - 1))
+                            _.Copy()
+                            (fun coordinate cell -> nextTable.SetCellAt(coordinate.x - 1, coordinate.y - 1, cell))
+
+                        setArcTable nextTable
             )
             if not (String.IsNullOrWhiteSpace(transformName)) then
                 ContextMenuItem(

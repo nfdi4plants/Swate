@@ -10,6 +10,8 @@ open Swate.Components.Primitive
 open Swate.Components.Primitive.Buttons
 open Swate.Components.Primitive.LoadingSpinner
 open Swate.Components.Composite.AnnotationTable.Context
+open Swate.Components.Composite.DataMapTable
+open Swate.Components.Composite.DataMapTable.Types
 
 /// This context is designed to be used only internally in this file.
 module private FilePickerWidgetContext =
@@ -43,6 +45,14 @@ module private FilePickerWidgetContext =
             toggle = toggle
         |}
 
+module private FilePickerWidgetTypes =
+    [<RequireQualifiedAccess>]
+    type InsertTarget =
+        | Table of index: int * selection: CellCoordinateRange
+        | DataMap of selection: CellCoordinateRange
+
+open FilePickerWidgetTypes
+
 module private FilePickerWidgetHelper =
     let appendPickedPaths (setPaths: (string[] -> string[]) -> unit) =
         fun (paths: string[]) ->
@@ -71,21 +81,19 @@ module private FilePickerWidgetHelper =
                 | _ -> current
             )
 
-    let insertPathsIntoSelectedTableCells
-        (arcFile: ArcFiles)
-        setArcFile
-        (activeTableIndex: int option)
-        (paths: string[])
-        (selectedCells: option<CellCoordinateRange>)
-        =
-        match arcFile.TryGetActiveTable(activeTableIndex), selectedCells with
-        | Some(_, table), Some selection ->
+    let insertPathsIntoSelectedCells (arcFile: ArcFiles) setArcFile (paths: string[]) (target: InsertTarget option) =
+        let paths = paths |> Array.map (toArcRootRelativeFilePath arcFile)
+        let nextArcFile = ArcFiles.refreshRef arcFile
+
+        match target with
+        | Some(InsertTarget.Table(tableIndex, selection)) ->
+            let nextTable = nextArcFile.TryGetActiveTable(Some tableIndex).Value |> snd
             let columnIndex = selection.xStart
             let mutable rowIndex = selection.yStart
 
             let cellsToInsert = [|
                 for path in paths do
-                    match table.TryGetCellAt(columnIndex, rowIndex) with
+                    match nextTable.TryGetCellAt(columnIndex, rowIndex) with
                     | Some cell ->
                         let nextCell = cell.UpdateMainField path
                         let coordinate: CellCoordinate = {| x = columnIndex; y = rowIndex |}
@@ -97,9 +105,22 @@ module private FilePickerWidgetHelper =
             if cellsToInsert.Length = 0 then
                 failwith "No valid cells to insert paths into. Please check the selected range and try again."
             else
-                table.SetCellsAt cellsToInsert
-                setArcFile (ArcFiles.refreshRef arcFile)
-        | _ -> ()
+                nextTable.SetCellsAt cellsToInsert
+                setArcFile nextArcFile
+        | Some(InsertTarget.DataMap selection) ->
+            match nextArcFile.TryGetDataMap() with
+            | Some dataMap ->
+                dataMap.PasteTabText(
+                    {|
+                        x = selection.xStart
+                        y = selection.yStart
+                    |},
+                    String.concat System.Environment.NewLine paths
+                )
+
+                setArcFile nextArcFile
+            | None -> ()
+        | None -> ()
 
 
 [<Erase; Mangle(false)>]
@@ -337,8 +358,7 @@ type FilePickerWidget =
                         prop.className "swt:btn swt:btn-primary swt:ml-auto"
                         prop.disabled (not canInsert)
                         prop.text "Insert file names"
-                        prop.title
-                            "Insert file paths into the currently selected table cells. Requires an active table view and selected cells."
+                        prop.title "Insert file paths into the currently selected table or DataMap cells."
                         prop.onClick (fun _ -> insertPaths false)
                     ]
                 | _ ->
@@ -359,8 +379,7 @@ type FilePickerWidget =
                     Html.button [
                         prop.className "swt:btn swt:btn-primary swt:ml-auto"
                         prop.disabled (not canInsert)
-                        prop.title
-                            "Insert selected file paths into the currently selected table cells. Requires an active table view and selected cells."
+                        prop.title "Insert selected file paths into the currently selected table or DataMap cells."
                         prop.text "Insert selected"
                         prop.onClick (fun _ -> insertPaths true)
                     ]
@@ -394,11 +413,11 @@ type FilePickerWidget =
         let isLoading, setIsLoading = React.useState false
 
         let annotationCtx = useAnnotationTableStateCtx ()
+        let activeTable = arcFile.TryGetActiveTable(activeTableIndex)
 
-        let selectedCells =
-
-            match arcFile.TryGetActiveTable(activeTableIndex) with
-            | Some(_, table) ->
+        let insertionTarget: InsertTarget option =
+            match activeTable with
+            | Some(tableIndex, table) ->
                 annotationCtx.state
                 |> Map.tryFind table.Name
                 |> Option.bind (fun tableCtx -> tableCtx.SelectedCells)
@@ -409,9 +428,13 @@ type FilePickerWidget =
                     yEnd = selectedRange.yEnd - 1
                 |})
                 |> unbox<CellCoordinateRange option>
-            | None -> None
-
-        let hasActiveTableView = arcFile.TryGetActiveTable(activeTableIndex).IsSome
+                |> Option.map (fun selection -> InsertTarget.Table(tableIndex, selection))
+            | None ->
+                annotationCtx.state
+                |> Map.tryFind DataMapTable.SelectionContextKey
+                |> Option.bind _.SelectedCells
+                |> unbox<CellCoordinateRange option>
+                |> Option.map InsertTarget.DataMap
 
         let hasPaths = paths.Length > 0
 
@@ -435,12 +458,7 @@ type FilePickerWidget =
                     else
                         paths
 
-                FilePickerWidgetHelper.insertPathsIntoSelectedTableCells
-                    arcFile
-                    setArcFile
-                    activeTableIndex
-                    paths
-                    selectedCells
+                FilePickerWidgetHelper.insertPathsIntoSelectedCells arcFile setArcFile paths insertionTarget
 
         let selectContextState =
             React.useMemo (
@@ -457,7 +475,7 @@ type FilePickerWidget =
                 if isLoading then
                     LoadingSpinner.LoadingSpinner("Loading Paths...", DaisyuiSize.LG)
                 else if hasPaths then
-                    let canInsert = hasActiveTableView && selectedCells.IsSome && hasPaths
+                    let canInsert = hasPaths && insertionTarget.IsSome
 
                     FilePickerWidgetContext.SelectedPathsCtx.Provider(
                         selectContextState,

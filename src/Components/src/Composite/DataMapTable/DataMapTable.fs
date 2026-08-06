@@ -16,13 +16,7 @@ open Swate.Components.Composite.Table.Types
 open Swate.Components.Composite.DataMapTable.Types
 open Swate.Components.Composite.AnnotationTable
 open Swate.Components.Composite.AnnotationTable.Context
-
-
-module private DataMapTableHelper =
-    [<RequireQualifiedAccess>]
-    type Modal = Details of CellCoordinate
-
-open DataMapTableHelper
+open Swate.Components.Composite.DataMapTable.Helper
 
 module private DatamapMemoComponents =
 
@@ -254,67 +248,6 @@ type DataMapTable =
 
         BaseModal.BaseModal(isOpen, setIsOpen, children = Content)
 
-    [<ReactComponent>]
-    static member private ContextMenu
-        (
-            datamap: DataMap,
-            setDatamap: DataMap -> unit,
-            setModal: Modal option -> unit,
-            tableRef: IRefValue<TableHandle>,
-            containerRef,
-            ?debug: bool
-        ) =
-        let deleteRow =
-            fun (index: CellCoordinate) ->
-                let isSelected = tableRef.current.SelectHandle.contains index
-                let start = index.y - 1
-
-                if not isSelected then
-                    datamap.DataContexts.RemoveAt(start)
-                else
-                    let range = tableRef.current.SelectHandle.getSelectedCellRange().Value
-                    let count = range.yEnd - range.yStart + 1
-                    datamap.DataContexts.RemoveRange(start, count)
-
-                setDatamap datamap
-
-        ContextMenu.ContextMenu(
-            (fun data ->
-                let index = data |> unbox<CellCoordinate>
-
-                [
-                    ContextMenuItem(
-                        text = Html.div "Details",
-                        icon = Icons.MagnifyingGlassPlus(),
-                        kbdbutton = ATCMC.KbdHint("D"),
-                        onClick = (fun _ -> setModal (Some(Modal.Details index)))
-                    )
-                    ContextMenuItem(isDivider = true)
-                    ContextMenuItem(
-                        text = Html.div "Delete Row",
-                        icon = Icons.DeleteLeft(),
-                        kbdbutton = ATCMC.KbdHint("DelR"),
-                        onClick = (fun x -> deleteRow index)
-                    )
-                ]
-            ),
-            ref = containerRef,
-            onSpawn =
-                (fun e ->
-                    let target = e.target :?> Browser.Types.HTMLElement
-
-                    match target.closest ("[data-row][data-column]"), containerRef.current with
-                    | Some cell, Some container when container.contains (cell) ->
-                        let cell = cell :?> Browser.Types.HTMLElement
-                        let row = int cell?dataset?row
-                        let col = int cell?dataset?column
-                        let indices: CellCoordinate = {| y = row; x = col |}
-                        if col > 0 && row > 0 then Some indices else None // disable context menu on index column
-                    | _ -> None
-                ),
-            ?debug = debug
-        )
-
     [<ReactComponent(true)>]
     static member DataMapTable
         // 👀 If you rename these variables, ensure that the names are forwarded for lazy loading in `src\Components\src\ARCFileEditor\ArcFileEditor.fs` as well!
@@ -355,17 +288,17 @@ type DataMapTable =
                 | _ when index.x > 0 && index.y > 0 ->
                     let cell = datamap.GetCell(index.x - 1, index.y - 1)
 
-                    let setCell =
-                        fun newValue ->
-                            datamap.SetCell(index.x - 1, index.y - 1, newValue)
-                            setDatamap datamap
+                    let setCell newValue =
+                        updateDataMap
+                            datamap
+                            setDatamap
+                            (fun nextDataMap -> nextDataMap.SetCell(index.x - 1, index.y - 1, newValue))
 
                     DatamapMemoComponents.ActiveCompositeCell(index, cell, setCell)
 
                 | _ when index.x > 0 && index.y = 0 -> Html.div "when index.x > 0 && index.y = 0"
                 | _ -> Html.div "unknown table pattern"
             )
-
 
         React.Fragment [
             DataMapTable.Modals(modal, setModal, datamap, setDatamap)
@@ -378,7 +311,14 @@ type DataMapTable =
                 prop.ref containerRef
 
                 prop.children [
-                    DataMapTable.ContextMenu(datamap, setDatamap, setModal, tableRef, containerRef, ?debug = debug)
+                    DataMapContextMenu.ContextMenu(
+                        datamap,
+                        setDatamap,
+                        setModal,
+                        tableRef,
+                        containerRef,
+                        ?debug = debug
+                    )
                     Table.Table(
                         datamap.RowCount + 1,
                         datamap.ColumnCount + 1,
@@ -389,18 +329,37 @@ type DataMapTable =
                         onSelect = onSelect,
                         onKeydown =
                             (fun (e, selectedCells, activeCell) ->
-                                if
-                                    e.code = kbdEventCode.f2
-                                    || ((e.ctrlKey || e.metaKey)
-                                        && e.code = kbdEventCode.enter
-                                        && activeCell.IsNone
-                                        && selectedCells.count > 0)
-                                then
+                                match GridSelect.tryGetKeyboardShortcut e selectedCells activeCell with
+                                | Some GridSelect.KeyboardShortcut.Details ->
                                     let cell = selectedCells.selectedCellsReducedSet.MinimumElement
                                     setModal (Some(Modal.Details cell))
-                                elif e.code = kbdEventCode.delete && selectedCells.count > 0 then
-                                    datamap.ClearSelectedCells(tableRef.current.SelectHandle)
-                                    datamap.Copy() |> setDatamap
+                                | Some GridSelect.KeyboardShortcut.Delete ->
+                                    updateDataMap
+                                        datamap
+                                        setDatamap
+                                        _.ClearSelectedCells(tableRef.current.SelectHandle)
+                                | Some GridSelect.KeyboardShortcut.Copy ->
+                                    e.preventDefault ()
+
+                                    tableRef.current.SelectHandle.getSelectedCells ()
+                                    |> copyCells datamap
+                                    |> Promise.start
+                                | Some GridSelect.KeyboardShortcut.Paste ->
+                                    e.preventDefault ()
+
+                                    pasteCells datamap selectedCells.selectedCellsReducedSet.MinimumElement setDatamap
+                                    |> Promise.start
+                                | Some GridSelect.KeyboardShortcut.Cut ->
+                                    e.preventDefault ()
+                                    let coordinates = tableRef.current.SelectHandle.getSelectedCells () |> Seq.toArray
+
+                                    promise {
+                                        do! copyCells datamap coordinates
+
+                                        updateDataMap datamap setDatamap _.ClearCells(coordinates)
+                                    }
+                                    |> Promise.start
+                                | None -> ()
                             )
                     )
                 ]

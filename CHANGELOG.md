@@ -14,7 +14,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   🐛 `Fixed` for any bug fixes.
 -   🔒 `Security` in case of vulnerabilities.
 
-## [Unreleased]
+## 2.0.7 - 2026-08-06
+
+### Added
+
+-   Add an Electron ARC file editor navbar action for creating and immediately saving DataMaps on assays, studies, runs, and workflows. The action remains visible and is disabled when a DataMap already exists.
+
+## 2.0.6 - 2026-08-05
+
+### 🔄 Changed
+
+-   Add Download ARC from the ARC selector into the sidebar below Git.
+-   Update FileTree ARC entity navigation: selecting an entity name opens Metadata, expansion and collapse are controlled only by the arrow, and table/DataMap files open their corresponding tabs.
+-   Store File Picker and Data Annotator references with an explicit `./` ARC-root-relative path in both table and DataMap views.
+
+### 🐛 Fixed
+
+-   Load templates through ARCtrl's JavaScript web API in Electron's main process, avoiding incompatible .NET/Fable server bindings and browser CORS restrictions.
+-   Show Actionbar overflow options whenever the button count exceeds the configured visible-button limit.
+-   Use consistent clipboard formatting across normal table and DataMap views, preserving data selectors after `#` when copying single or multiple cells.
+- Ensure switching between FileTree ARC files refreshes the selected editor tab instead of retaining the previous entity's tab.
+
+## 2.0.5 - 2026-08-05
+
+### 🐛 Fixed
+
+-   Preserve ARC static hash baselines during file watcher merges so saving metadata no longer overwrites unchanged XLSX files.
+-   Support Ctrl/Cmd+C, Ctrl/Cmd+X, and Ctrl/Cmd+V for single and multi-cell DataMap selections, preserve selectors after `#`, omit trailing whitespace when copying, and grow rows when pasting.
+-   Preserve pasted and edited DataMap Label values when rerendering the ARC file.
+-   Add table-consistent Copy, Cut, Paste, Clear, Fill Column, Clear Column, and Delete Selected Rows actions to the DataMap context menu.
+-   Rerender DataMap cells immediately after clearing them with the Delete key.
+-   Enable Add Rows and File Picker insertion in DataMap views.
+-   Store File Picker and Data Annotator references relative to the ARC root for assay, study, run, and workflow DataMaps, and rerender immediately after insertion.
+-   Migrate the outdated `isa_datamap` file to `isa.datamap.xlsx` during ARC loading, while preserving an existing canonical workbook.
+-   Fix the DataMap delete-row regression test to use the strongly typed `CellCoordinate` API.
 
 ## 2.0.4 - 2026-07-20
 

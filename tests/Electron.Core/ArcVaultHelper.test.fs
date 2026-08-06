@@ -8,6 +8,7 @@ open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Main.Notes.NoteConstants
 open Swate.Components.Shared
+open Swate.Electron.Shared.FileIOHelper
 open Vitest
 
 let private mkdirRecursiveAsync (directoryPath: string) = promise {
@@ -61,6 +62,73 @@ Vitest.describe (
                 Vitest.expect(isGitMetadataPath ".gitignore").toBe (false)
                 Vitest.expect(isGitMetadataPath ".gitattributes").toBe (false)
                 Vitest.expect(isGitMetadataPath "notes/my.git/file.txt").toBe (false)
+        )
+
+        Vitest.test (
+            "legacy isa_datamap paths are ignored in favor of the canonical workbook",
+            fun () ->
+                Vitest.expect(isLegacyDataMapPath "assays/assay_1/isa_datamap").toBe (true)
+                Vitest.expect(isLegacyDataMapPath "assays/assay_1/ISA_DATAMAP").toBe (true)
+                Vitest.expect(isLegacyDataMapPath "assays/assay_1/isa.datamap.xlsx").toBe (false)
+                Vitest.expect(isLegacyDataMapPath "assays/isa_datamap/data.txt").toBe (false)
+        )
+
+        Vitest.test (
+            "legacy isa_datamap file is migrated to the canonical workbook path",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-legacy-datamap-"
+
+                try
+                    let assayFolder = join [| rootPath; "assays"; "assay_1" |]
+                    let legacyPath = join [| assayFolder; "isa_datamap" |]
+                    let canonicalPath = join [| assayFolder; "isa.datamap.xlsx" |]
+                    do! mkdirRecursiveAsync assayFolder
+                    do! writeTextFileAsync legacyPath "legacy-content"
+
+                    let! migratedPaths = migrateLegacyDataMapPathsAsync rootPath [| "assays/assay_1/isa_datamap" |]
+
+                    Vitest.expect(migratedPaths).toEqual ([| "assays/assay_1/isa.datamap.xlsx" |])
+                    Vitest.expect(existsSync legacyPath).toBe (false)
+                    Vitest.expect(existsSync canonicalPath).toBe (true)
+
+                    let! migratedContent = readFileAsync canonicalPath TextEncoding.Utf8
+                    Vitest.expect(migratedContent).toBe ("legacy-content")
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "canonical DataMap workbook wins over a legacy isa_datamap file",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-canonical-datamap-"
+
+                try
+                    let assayFolder = join [| rootPath; "assays"; "assay_1" |]
+                    let legacyPath = join [| assayFolder; "isa_datamap" |]
+                    let canonicalPath = join [| assayFolder; "isa.datamap.xlsx" |]
+                    do! mkdirRecursiveAsync assayFolder
+                    do! writeTextFileAsync legacyPath "legacy-content"
+                    do! writeTextFileAsync canonicalPath "canonical-content"
+
+                    let! migratedPaths =
+                        migrateLegacyDataMapPathsAsync rootPath [|
+                            "assays/assay_1/isa_datamap"
+                            "assays/assay_1/isa.datamap.xlsx"
+                        |]
+
+                    Vitest.expect(migratedPaths).toEqual ([| "assays/assay_1/isa.datamap.xlsx" |])
+                    Vitest.expect(existsSync legacyPath).toBe (true)
+
+                    let! canonicalContent = readFileAsync canonicalPath TextEncoding.Utf8
+                    Vitest.expect(canonicalContent).toBe ("canonical-content")
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
         )
 
         Vitest.test (

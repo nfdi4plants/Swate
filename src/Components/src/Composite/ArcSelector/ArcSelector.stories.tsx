@@ -91,7 +91,7 @@ export const ClickingActionbarButtonClosesDropdown: Story = {
 
 export const RestButtonShowsOptionsAndOptionsClickable: Story = {
   args: {
-    maxNumberActionbar: 3,
+    maxNumberActionbar: 1,
     debug: true
   },
   play: async ({ canvasElement }) => {
@@ -106,7 +106,7 @@ export const RestButtonShowsOptionsAndOptionsClickable: Story = {
     const menu = await screen.findByTestId('context_menu');
     expect(menu).toBeVisible();
 
-    const menuItem = within(menu).getByText('Create a new ARC');
+    const menuItem = within(menu).getByText('Open an existing ARC');
     await userEvent.click(menuItem);
 
     await waitFor(() => {

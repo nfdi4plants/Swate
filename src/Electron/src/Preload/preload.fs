@@ -8,6 +8,7 @@ Remoting.createIpc () |> Remoting.buildTwoWayBridge<IArcVaultsApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IGitApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IGitLabApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IAuthApi>
+Remoting.createIpc () |> Remoting.buildTwoWayBridge<ITemplateApi>
 
 Remoting.createIpc () |> Remoting.buildBridge<IPathChangeRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IRecentArcsRendererApi>

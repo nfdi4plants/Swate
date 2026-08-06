@@ -15,13 +15,16 @@ open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Composite.AnnotationTable
 open Swate.Components.Composite.Widgets.DataAnnotator.Types
 
-type private AddRowsFooterViewProps = {
-    rowsToAdd: int
-    minRowsToAdd: int
-    onRowsToAddChange: int -> unit
-    onAddRows: unit -> unit
-    onAddRowsAndReset: unit -> unit
-}
+module private ArcFileEditorTypes =
+    type AddRowsFooterViewProps = {
+        rowsToAdd: int
+        minRowsToAdd: int
+        onRowsToAddChange: int -> unit
+        onAddRows: unit -> unit
+        onAddRowsAndReset: unit -> unit
+    }
+
+open ArcFileEditorTypes
 
 type private LazyComponents =
 
@@ -240,12 +243,11 @@ type Main =
         let tryGetAddRowsTarget () =
             Helper.tryGetAddRowsTarget (activeView, arcFileState)
 
-        let hasColumns =
-            activeView.TryGetActiveTable(arcFileState)
-            |> Option.map (fun t -> t.ColumnCount > 0)
-            |> Option.defaultValue false
-
-        let canAddRows = tryGetAddRowsTarget () |> Option.isSome && hasColumns
+        let canAddRows =
+            match tryGetAddRowsTarget () with
+            | Some(AddRowsTarget.Table table) -> table.ColumnCount > 0
+            | Some(AddRowsTarget.DataMap dataMap) -> dataMap.ColumnCount > 0
+            | None -> false
 
         let addRowsWithCount rowCount =
             match tryGetAddRowsTarget () with
@@ -282,6 +284,7 @@ type Main =
             arcFile: ArcFiles,
             setArcFile: ArcFiles -> unit,
             pickPaths: unit -> Fable.Core.JS.Promise<string[]>,
+            ?widgetNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?trailingNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?startingActiveView: ActiveView,
             ?onImportJson: JsonImportRequest -> JS.Promise<Result<unit, exn>>,
@@ -293,6 +296,18 @@ type Main =
 
         let activeView, setActiveView =
             React.useState (startingActiveView |> Option.defaultValue ActiveView.Metadata)
+
+        let arcFileNavigationKey =
+            arcFile.TryGetRelativePath()
+            |> Option.defaultValue (string arcFile.RelatedArcFilesDiscriminate)
+
+        let startingActiveViewKey =
+            startingActiveView |> Option.map _.ViewIndex |> Option.defaultValue -3
+
+        React.useEffect (
+            (fun () -> setActiveView (startingActiveView |> Option.defaultValue ActiveView.Metadata)),
+            [| box arcFileNavigationKey; box startingActiveViewKey |]
+        )
 
         React.useEffect (
             (fun () ->
@@ -329,6 +344,16 @@ type Main =
                 [| box trailingNavbarElements; box headerProps |]
             )
 
+        let widgetNavbarElement =
+            React.useMemo (
+                (fun () ->
+                    match widgetNavbarElements with
+                    | Some renderWidgetNavbarElements -> renderWidgetNavbarElements headerProps
+                    | None -> Html.none
+                ),
+                [| box widgetNavbarElements; box headerProps |]
+            )
+
         let navbar =
             React.useMemo (
                 (fun () ->
@@ -336,13 +361,20 @@ type Main =
                         prop.className "swt:shrink-0 swt:border-b swt:border-base-300"
                         prop.children [
                             Navbar.Main(
-                                left = Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns(),
+                                left =
+                                    Html.div [
+                                        prop.className "swt:flex swt:items-center swt:gap-2"
+                                        prop.children [
+                                            Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns()
+                                            widgetNavbarElement
+                                        ]
+                                    ],
                                 right = trailingNavbarElement
                             )
                         ]
                     ]
                 ),
-                [| box trailingNavbarElement |]
+                [| box widgetNavbarElement; box trailingNavbarElement |]
             )
 
         let widgetElements =
