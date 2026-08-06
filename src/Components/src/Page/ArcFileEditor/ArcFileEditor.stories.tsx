@@ -125,3 +125,25 @@ export const AddTemplateWidget: Story = {
     });
   },
 };
+
+export const AppendTemplateToEmptyTable: Story = {
+  parameters: { isolated: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const portal = within(canvasElement.ownerDocument.body);
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Table 1' }));
+    expect(canvas.getByText('Start with template!')).toBeInTheDocument();
+
+    await userEvent.click(getWidgetButton(canvas, 'Open Add Template'));
+    await userEvent.click(await canvas.findByText(STORY_TEMPLATE_NAME));
+    await userEvent.click(canvas.getByRole('button', { name: /^Import$/i }));
+
+    const importDialog = await portal.findByRole('dialog', { name: /Import templates/i });
+    await userEvent.click(within(importDialog).getByRole('button', { name: /^Import$/i }));
+
+    await waitFor(() => {
+      expect(canvas.queryByText('Start with template!')).not.toBeInTheDocument();
+    });
+  },
+};

@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 -   Prevent deleted ARC table tabs from reappearing when adding a new table by using current immutable editor state and stable tab identities.
+-   Append imported templates to a fresh table model when the active table is empty.
 
 ## 2.0.7 - 2026-08-06
 
