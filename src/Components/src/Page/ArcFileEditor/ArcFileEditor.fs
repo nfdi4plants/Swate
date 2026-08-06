@@ -284,6 +284,7 @@ type Main =
             arcFile: ArcFiles,
             setArcFile: ArcFiles -> unit,
             pickPaths: unit -> Fable.Core.JS.Promise<string[]>,
+            ?widgetNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?trailingNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?startingActiveView: ActiveView,
             ?onImportJson: JsonImportRequest -> JS.Promise<Result<unit, exn>>,
@@ -343,6 +344,16 @@ type Main =
                 [| box trailingNavbarElements; box headerProps |]
             )
 
+        let widgetNavbarElement =
+            React.useMemo (
+                (fun () ->
+                    match widgetNavbarElements with
+                    | Some renderWidgetNavbarElements -> renderWidgetNavbarElements headerProps
+                    | None -> Html.none
+                ),
+                [| box widgetNavbarElements; box headerProps |]
+            )
+
         let navbar =
             React.useMemo (
                 (fun () ->
@@ -350,13 +361,20 @@ type Main =
                         prop.className "swt:shrink-0 swt:border-b swt:border-base-300"
                         prop.children [
                             Navbar.Main(
-                                left = Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns(),
+                                left =
+                                    Html.div [
+                                        prop.className "swt:flex swt:items-center swt:gap-2"
+                                        prop.children [
+                                        Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns()
+                                        widgetNavbarElement
+                                        ]
+                                    ],
                                 right = trailingNavbarElement
                             )
                         ]
                     ]
                 ),
-                [| box trailingNavbarElement |]
+                [| box widgetNavbarElement; box trailingNavbarElement |]
             )
 
         let widgetElements =
