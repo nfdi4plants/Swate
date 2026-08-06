@@ -10,6 +10,7 @@ open Renderer.Context.FileStateContext
 open Renderer.Types
 open ARCtrl
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Components.Shared
 open Vitest
 
 let private bridgeName typeName = $"FABLE_REMOTING_{typeName}"
@@ -220,6 +221,51 @@ Vitest.describe (
                 match pageState with
                 | PageState.MarkdownPage markdownContent -> Vitest.expect(markdownContent).toBe ("# My Note")
                 | _ -> failwith "Expected MarkdownPage for markdown file content DTO."
+        )
+
+        Vitest.test (
+            "fromFileContentDTO opens an ARC workbook without tables on Metadata",
+            fun () ->
+                let dto =
+                    Swate.Electron.Shared.FileIOHelper.FileContentDTO.fromArcFile (
+                        ArcFiles.Assay(ArcAssay.init "assay")
+                    )
+                    |> Option.defaultWith (fun () -> failwith "Expected an assay DTO.")
+
+                match PageState.fromFileContentDTO dto with
+                | PageState.ArcFilePage(_, Some ActiveView.Metadata) -> ()
+                | _ -> failwith "Expected the Metadata starting view."
+        )
+
+        Vitest.test (
+            "fromFileContentDTO opens an ARC workbook with tables on its first table",
+            fun () ->
+                let assay = ArcAssay.init "assay"
+                assay.AddTable(ArcTable.init "table")
+
+                let dto =
+                    Swate.Electron.Shared.FileIOHelper.FileContentDTO.fromArcFile (ArcFiles.Assay assay)
+                    |> Option.defaultWith (fun () -> failwith "Expected an assay DTO.")
+
+                match PageState.fromFileContentDTO dto with
+                | PageState.ArcFilePage(_, Some(ActiveView.Table 0)) -> ()
+                | _ -> failwith "Expected the first table starting view."
+        )
+
+        Vitest.test (
+            "fromFileContentDTO opens a DataMap workbook on DataMap",
+            fun () ->
+                let parent = DatamapParentInfo.create "assay" DataMapParent.Assay
+
+                let dto =
+                    Swate.Electron.Shared.FileIOHelper.FileContentDTO.fromArcFile (
+                        ArcFiles.DataMap(Some parent, DataMap.init ())
+                    )
+                    |> Option.defaultWith (fun () -> failwith "Expected a DataMap DTO.")
+
+                match PageState.fromFileContentDTO dto with
+                | PageState.ArcFilePage(_, Some ActiveView.DataMap) -> ()
+                | _ -> failwith "Expected the DataMap starting view."
         )
 
 )

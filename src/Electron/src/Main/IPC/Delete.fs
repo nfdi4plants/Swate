@@ -57,8 +57,10 @@ module ArcDeleteHelper =
         | Some arcFile when arcFileMatchesEntity fileType identifier arcFile -> Ok()
         | _ -> Error(exn $"ARC does not contain {entityKindForFileType fileType} with identifier '{identifier}'.")
 
-    let canonicalEntityFilePath zone identifier =
-        ArcEntityPathRules.buildCanonicalEntityPaths zone identifier |> List.head
+    let tryCanonicalEntityFilePath zone identifier =
+        match ArcEntityPathRules.buildCanonicalEntityPaths zone identifier |> List.tryHead with
+        | Some path -> Ok path
+        | None -> Error(exn $"Could not determine the canonical ARC entity file for '{identifier}'.")
 
     let private mergeDeletedEntityFromDisk arcPath canonicalFilePath (arcLocal: ARC) = promise {
         match! ARC.LoadAsyncSwate arcPath with
@@ -86,7 +88,10 @@ module ArcDeleteHelper =
     let private tryGetEntityDeleteTarget relativePath =
         match ArcEntityPathRules.classifyDeleteTarget relativePath with
         | ArcEntityPathRules.DeletePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath) ->
-            Ok(arcFileTypeForZone zone, identifier, normalizedRelativePath, canonicalEntityFilePath zone identifier)
+            tryCanonicalEntityFilePath zone identifier
+            |> Result.map (fun canonicalFilePath ->
+                arcFileTypeForZone zone, identifier, normalizedRelativePath, canonicalFilePath
+            )
         | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.EntityFile(zone,
                                                                                                                                identifier),
                                                                           normalizedRelativePath) ->
