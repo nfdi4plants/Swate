@@ -11,7 +11,10 @@ open Renderer.Types
 open ARCtrl
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Components.Shared
+open Swate.Components.Page.ArcFileEditor.Types
 open Vitest
+
+type private RendererPageState = Renderer.Types.PageState
 
 let private bridgeName typeName = $"FABLE_REMOTING_{typeName}"
 
@@ -153,7 +156,7 @@ Vitest.describe (
                 Vitest
                     .expect(
                         FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
-                            Some(PageState.ArcFilePage(workflowArcFile, None))
+                            Some(RendererPageState.ArcFilePage(workflowArcFile, None))
                         )
                     )
                     .toBe (true)
@@ -161,7 +164,7 @@ Vitest.describe (
                 Vitest
                     .expect(
                         FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
-                            Some(PageState.MarkdownPage "# md")
+                            Some(RendererPageState.MarkdownPage "# md")
                         )
                     )
                     .toBe (true)
@@ -169,21 +172,7 @@ Vitest.describe (
                 Vitest
                     .expect(
                         FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
-                            Some(PageState.TextPage "txt")
-                        )
-                    )
-                    .toBe (true)
-
-                Vitest
-                    .expect(
-                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (Some PageState.UnknownPage)
-                    )
-                    .toBe (true)
-
-                Vitest
-                    .expect(
-                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
-                            Some(PageState.ErrorPage "err")
+                            Some(RendererPageState.TextPage "txt")
                         )
                     )
                     .toBe (true)
@@ -191,7 +180,23 @@ Vitest.describe (
                 Vitest
                     .expect(
                         FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
-                            Some PageState.NotesDraftPage
+                            Some RendererPageState.UnknownPage
+                        )
+                    )
+                    .toBe (true)
+
+                Vitest
+                    .expect(
+                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
+                            Some(RendererPageState.ErrorPage "err")
+                        )
+                    )
+                    .toBe (true)
+
+                Vitest
+                    .expect(
+                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
+                            Some RendererPageState.NotesDraftPage
                         )
                     )
                     .toBe (false)
@@ -199,7 +204,7 @@ Vitest.describe (
                 Vitest
                     .expect(
                         FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
-                            Some PageState.ProvenanceGroupingPage
+                            Some RendererPageState.ProvenanceGroupingPage
                         )
                     )
                     .toBe (false)
@@ -216,10 +221,11 @@ Vitest.describe (
                     path = "notes/my-note.md"
                 |}
 
-                let pageState = PageState.fromFileContentDTO dto
+                let pageState = RendererPageState.fromFileContentDTO dto
 
                 match pageState with
-                | PageState.MarkdownPage markdownContent -> Vitest.expect(markdownContent).toBe ("# My Note")
+                | RendererPageState.MarkdownPage markdownContent ->
+                    Vitest.expect(markdownContent).toBe ("# My Note")
                 | _ -> failwith "Expected MarkdownPage for markdown file content DTO."
         )
 
@@ -232,8 +238,8 @@ Vitest.describe (
                     )
                     |> Option.defaultWith (fun () -> failwith "Expected an assay DTO.")
 
-                match PageState.fromFileContentDTO dto with
-                | PageState.ArcFilePage(_, Some ActiveView.Metadata) -> ()
+                match RendererPageState.fromFileContentDTO dto with
+                | RendererPageState.ArcFilePage(_, Some ActiveView.Metadata) -> ()
                 | _ -> failwith "Expected the Metadata starting view."
         )
 
@@ -247,8 +253,8 @@ Vitest.describe (
                     Swate.Electron.Shared.FileIOHelper.FileContentDTO.fromArcFile (ArcFiles.Assay assay)
                     |> Option.defaultWith (fun () -> failwith "Expected an assay DTO.")
 
-                match PageState.fromFileContentDTO dto with
-                | PageState.ArcFilePage(_, Some(ActiveView.Table 0)) -> ()
+                match RendererPageState.fromFileContentDTO dto with
+                | RendererPageState.ArcFilePage(_, Some(ActiveView.Table 0)) -> ()
                 | _ -> failwith "Expected the first table starting view."
         )
 
@@ -263,8 +269,8 @@ Vitest.describe (
                     )
                     |> Option.defaultWith (fun () -> failwith "Expected a DataMap DTO.")
 
-                match PageState.fromFileContentDTO dto with
-                | PageState.ArcFilePage(_, Some ActiveView.DataMap) -> ()
+                match RendererPageState.fromFileContentDTO dto with
+                | RendererPageState.ArcFilePage(_, Some ActiveView.DataMap) -> ()
                 | _ -> failwith "Expected the DataMap starting view."
         )
 
