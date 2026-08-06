@@ -125,8 +125,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, startingActiveView: ActiveView opti
         promise {
             match! Helper.saveArcFile nextArcFile with
             | Ok() -> ()
-            | Error exn ->
-                errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not save DataMap"))
+            | Error exn -> errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not save DataMap"))
         }
         |> Promise.start
 

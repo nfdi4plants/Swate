@@ -365,8 +365,8 @@ type Main =
                                     Html.div [
                                         prop.className "swt:flex swt:items-center swt:gap-2"
                                         prop.children [
-                                        Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns()
-                                        widgetNavbarElement
+                                            Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns()
+                                            widgetNavbarElement
                                         ]
                                     ],
                                 right = trailingNavbarElement
