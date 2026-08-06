@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 -   Add an Electron ARC file editor navbar action for creating and immediately saving DataMaps on assays, studies, runs, and workflows. The action remains visible and is disabled when a DataMap already exists.
+## 2.0.6 - 2026-08-05
 
 ### 🔄 Changed
 
