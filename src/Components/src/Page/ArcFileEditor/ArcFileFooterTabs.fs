@@ -119,7 +119,9 @@ type ArcFileFooterTabs =
         ]
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
-    static member private TableTab(index: int, tableName: string, onClick, isActive: bool, ?onDoubleClick, ?key: int) =
+    static member private TableTab
+        (index: int, tableName: string, onClick, isActive: bool, ?onDoubleClick, ?key: string)
+        =
 
         let sortable = DndKit.useSortable ({| id = mkTableDragId index |})
 
@@ -220,7 +222,12 @@ type ArcFileFooterTabs =
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private PlusBtn(onClick) =
 
-        ArcFileFooterTabs.BaseTab(Html.none, onClick, "swt:iconify swt:fluent--add-12-filled")
+        ArcFileFooterTabs.BaseTab(
+            Html.none,
+            onClick,
+            "swt:iconify swt:fluent--add-12-filled",
+            extraProps = [ prop.ariaLabel "Add new table" ]
+        )
 
     [<ReactComponent>]
     static member private ContextMenu
@@ -293,7 +300,7 @@ type ArcFileFooterTabs =
                 )
         )
 
-    [<ReactComponent(true)>]
+    [<ReactComponent>]
     static member Main
         (arcFile: ArcFiles, activeView: ActiveView, setActiveView: ActiveView -> unit, setArcFile: ArcFiles -> unit)
         =
@@ -301,11 +308,18 @@ type ArcFileFooterTabs =
         let canAddTable = arcFile.CanCreateTables()
         let canRenderDataMap = arcFile.CanRenderDataMapView()
         let tabsRef = React.useElementRef ()
+        let arcFileRef = React.useRef arcFile
+        arcFileRef.current <- arcFile
+
+        let updateArcFile update =
+            let nextArcFile = ArcFiles.refreshRef arcFileRef.current
+            let result = update nextArcFile
+            arcFileRef.current <- nextArcFile
+            setArcFile nextArcFile
+            result
 
         let isEditorModeTableTab, setIsEditorModeTableTab =
             React.useState (None: int option)
-
-        let arcFileHash = arcFile.GetHashCode()
 
         let metadataTabLabel =
             React.useMemo (
@@ -319,7 +333,7 @@ type ArcFileFooterTabs =
                     | ArcFiles.Template _ -> "Template"
                     | ArcFiles.DataMap _ -> "Datamap"
                 ),
-                [| box arcFileHash |]
+                [| box arcFile |]
             )
 
         let setEditorMode =
@@ -357,32 +371,31 @@ type ArcFileFooterTabs =
                 closeEditorMode ()
 
                 if canAddTable then
-                    let nextName = createNewTableName tables.Tables
-                    let nextTable = ArcTable.init nextName
+                    let nextTableIndex =
+                        updateArcFile (fun nextArcFile ->
+                            let nextTables = nextArcFile.ArcTables()
+                            let nextName = createNewTableName nextTables.Tables
+                            nextTables.AddTable(ArcTable.init nextName)
+                            nextTables.TableCount - 1
+                        )
 
-                    arcFile.ArcTables().AddTable nextTable
-
-                    setArcFile (ArcFiles.refreshRef arcFile)
-                    setActiveView (ActiveView.Table(tables.TableCount - 1))
+                    setActiveView (ActiveView.Table nextTableIndex)
 
         let deleteTable (tableIndex: int) =
             closeEditorMode ()
-            arcFile.ArcTables().RemoveTableAt tableIndex
+            updateArcFile (fun nextArcFile -> nextArcFile.ArcTables().RemoveTableAt tableIndex)
 
             match activeView with
             | ActiveView.Table i when i = tableIndex -> setActiveView ActiveView.Metadata
             | ActiveView.Table i when i > tableIndex -> setActiveView (ActiveView.Table(i - 1))
             | _ -> ()
 
-            setArcFile (ArcFiles.refreshRef arcFile)
-
         let updateTableOrder (oldIndex: int, newIndex: int) =
             closeEditorMode ()
-            arcFile.ArcTables().MoveTable(oldIndex, newIndex)
-            let lastIndex = tables.TableCount - 1
-            let nextActiveIndex = max 0 (min newIndex lastIndex)
+            updateArcFile (fun nextArcFile -> nextArcFile.ArcTables().MoveTable(oldIndex, newIndex))
+
+            let nextActiveIndex = max 0 (min newIndex (tables.TableCount - 1))
             setActiveView (ActiveView.Table nextActiveIndex)
-            setArcFile (ArcFiles.refreshRef arcFile)
 
         let handleDragEnd =
             React.useCallback (
@@ -431,11 +444,16 @@ type ArcFileFooterTabs =
         let renameTable =
             React.useCallback (
                 (fun (tableIndex: int) (newName: string) ->
-                    match System.String.IsNullOrWhiteSpace newName || newName = tables.[tableIndex].Name with
+                    let currentArcFile = arcFileRef.current
+                    let currentTables = currentArcFile.ArcTables()
+
+                    match
+                        System.String.IsNullOrWhiteSpace newName
+                        || newName = currentTables.[tableIndex].Name
+                    with
                     | true -> ()
                     | false ->
-                        arcFile.ArcTables().RenameTableAt(tableIndex, newName)
-                        setArcFile (ArcFiles.refreshRef arcFile)
+                        updateArcFile (fun nextArcFile -> nextArcFile.ArcTables().RenameTableAt(tableIndex, newName))
                         closeEditorMode ()
                 ),
                 [|
@@ -500,7 +518,7 @@ type ArcFileFooterTabs =
                                                     (fun _ -> activateTableView tableModel.index),
                                                     isActive = tableModel.isActive,
                                                     onDoubleClick = (fun _ -> openTableNameEditor tableModel.index),
-                                                    key = tableModel.index
+                                                    key = tableModel.tableName
                                                 )
 
                                     ]

@@ -421,20 +421,16 @@ type Main =
                 |]
             )
 
-        /// ArcFiles type is too complex for react. Therefore we check hashcode instead and compare that.
-        let arcFileHashCode = arcFile.GetHashCode()
-        let activeViewHash = activeView.GetHashCode()
-
         let ArcFileContentViewMemo =
             React.useMemo (
                 (fun () -> Main.ArcFileContentView(activeView, arcFile, setArcFile)),
-                [| box activeViewHash; box arcFileHashCode |]
+                [| box activeView; box arcFile |]
             )
 
         let AddRowsFooterMemo =
             React.useMemo (
                 (fun () -> Main.AddRowsFooter(activeView, arcFile, setArcFile)),
-                [| box activeViewHash; box arcFileHashCode |]
+                [| box activeView; box arcFile |]
             )
 
         let content =
@@ -455,8 +451,8 @@ type Main =
                 ),
                 [|
                     box navbar
-                    box activeViewHash
-                    box arcFileHashCode
+                    box activeView
+                    box arcFile
                     box setArcFile
                     box setActiveView
                 |]

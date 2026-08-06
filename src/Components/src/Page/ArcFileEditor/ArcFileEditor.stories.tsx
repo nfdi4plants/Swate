@@ -69,6 +69,30 @@ export const NavbarWidgetToggle: Story = {
   },
 };
 
+export const DeleteThenAddTable: Story = {
+  parameters: { isolated: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const portal = within(canvasElement.ownerDocument.body);
+
+    const deletedTable = canvas.getByRole('button', { name: 'Table 2' });
+    await userEvent.click(deletedTable);
+    await userEvent.pointer({ keys: '[MouseRight]', target: deletedTable });
+    await userEvent.click(await portal.findByText('Delete Table'));
+
+    await waitFor(() => {
+      expect(canvas.queryByRole('button', { name: 'Table 2' })).not.toBeInTheDocument();
+    });
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Add new table' }));
+
+    await waitFor(() => {
+      expect(canvas.queryByRole('button', { name: 'Table 2' })).not.toBeInTheDocument();
+      expect(canvas.getByRole('button', { name: 'New Table 0' })).toBeInTheDocument();
+    });
+  },
+};
+
 export const AddTemplateWidget: Story = {
   parameters: { isolated: true },
   play: async ({ canvasElement }) => {
