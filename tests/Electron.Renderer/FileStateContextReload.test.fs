@@ -224,8 +224,7 @@ Vitest.describe (
                 let pageState = RendererPageState.fromFileContentDTO dto
 
                 match pageState with
-                | RendererPageState.MarkdownPage markdownContent ->
-                    Vitest.expect(markdownContent).toBe ("# My Note")
+                | RendererPageState.MarkdownPage markdownContent -> Vitest.expect(markdownContent).toBe ("# My Note")
                 | _ -> failwith "Expected MarkdownPage for markdown file content DTO."
         )
 
