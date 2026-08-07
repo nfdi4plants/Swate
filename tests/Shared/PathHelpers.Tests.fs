@@ -135,6 +135,20 @@ let tests =
                                                                              _) -> ()
             | _ -> failwith "Expected study entity folder classification."
 
+        testCase "classifyDeleteTarget treats hidden files in add-zone roots as generic descendants"
+        <| fun _ ->
+            let classification = ArcEntityPathRules.classifyDeleteTarget "assays/.DS_Store"
+
+            match classification with
+            | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget(ArcEntityPathRules.AddZone.Assays,
+                                                                                  normalizedPath) ->
+                Expect.equal normalizedPath "assays/.DS_Store" "The hidden file path should remain unchanged."
+            | _ -> failwith "Expected a generic assay-zone descendant classification."
+
+            Expect.isTrue
+                (ArcEntityPathRules.isDeletePathAllowed "assays/.DS_Store")
+                "Safe hidden files in add-zone roots should be deletable."
+
         testCase "isDeletePathAllowed keeps broad add-zone descendants"
         <| fun _ ->
             Expect.isTrue
