@@ -45,7 +45,7 @@ let Main () =
         if remoteActionsEnabled then
             None
         else
-            Some "Sign in to a DataHub account to use fetch, pull, push, update, and remote bootstrap."
+            Some "Sign in to a DataHUB account to use fetch, pull, push, update, and remote bootstrap."
 
     let openArc =
         fun _ ->

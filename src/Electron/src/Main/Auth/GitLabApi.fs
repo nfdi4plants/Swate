@@ -23,11 +23,11 @@ let private mapGitLabError (error: ComponentsGitLabApi.GitLabError) : GitLabAuth
       }
     | ComponentsGitLabApi.GitLabError.NotFound -> {
         Kind = AuthFailureKind.EndpointInvalid
-        Message = "GitLab API endpoint not found. Check the DataHub URL."
+        Message = "GitLab API endpoint not found. Check the DataHUB URL."
       }
     | ComponentsGitLabApi.GitLabError.NetworkError _ -> {
         Kind = AuthFailureKind.Network
-        Message = "Network error contacting the DataHub. Check your connection."
+        Message = "Network error contacting the DataHUB. Check your connection."
       }
     | ComponentsGitLabApi.GitLabError.DecodeError ex -> {
         Kind = AuthFailureKind.Unknown

@@ -333,7 +333,7 @@ type DataHubBrowser =
                         prop.children [
                             Html.option [
                                 prop.value ""
-                                prop.text "Select organisation"
+                                prop.text "Select group"
                                 prop.disabled true
                             ]
                             for g in groups do
@@ -354,7 +354,7 @@ type DataHubBrowser =
                     ExploreTab.All, "All", "All"
                     ExploreTab.YourRepos, "Your Repos", "YourRepos"
                     ExploreTab.MostStarred, "Most Starred", "MostStarred"
-                    ExploreTab.YourOrganisations, "Your Organisations", "YourOrganisations"
+                    ExploreTab.YourOrganisations, "Your Groups", "YourOrganisations"
                 ]
 
                 for mode, label, tid in tabs do
@@ -592,7 +592,7 @@ type DataHubBrowser =
                 Html.div [
                     prop.className "swt:flex swt:items-center swt:gap-2"
                     prop.children [
-                        DataHubBrowser.SectionHeading("GitLab Explore")
+                        DataHubBrowser.SectionHeading("Download ARC from DataHUB")
                         match onClose with
                         | Some closeFn ->
                             Html.div [

@@ -32,7 +32,7 @@ module RemoteProvisioning =
     let defaultProvider: Provider = {
         CreateProject =
             fun _ -> promise {
-                return Error "No usable DataHub account is signed in. Sign in before publishing this local repository."
+                return Error "No usable DataHUB account is signed in. Sign in before publishing this local repository."
             }
     }
 

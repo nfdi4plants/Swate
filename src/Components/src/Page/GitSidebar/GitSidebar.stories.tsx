@@ -298,9 +298,11 @@ export const AdvancedActions: Story = {
     await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
     await expect(canvas.getByTestId("GitSidebarAdvancedActionsButton")).toHaveClass("swt:btn-primary");
     await expect(canvas.getByTestId("GitSidebarAdvancedActionsDivider")).toBeInTheDocument();
-    await expect(canvas.getByTestId("GitSidebarUpdateArcButton")).toHaveTextContent("Update ARC from Online");
+    await expect(canvas.getByTestId("GitSidebarUpdateArcButton")).toHaveTextContent(
+      "Pull (and integrate) changes from DataHUB",
+    );
     await expect(canvas.queryByTestId("GitSidebarSyncButton")).toBeNull();
-    await expect(canvas.queryByTestId("GitSidebarLocalCommitButton")).toBeNull();
+    await expect(canvas.getByTestId("GitSidebarLocalCommitButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarFetchButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarPullButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarPushButton")).toBeInTheDocument();
@@ -334,7 +336,7 @@ export const ActionTooltipsAndResponsiveLabels: Story = {
 
     await expect(canvas.getByTestId("GitSidebarUpdateArcButton")).toHaveAttribute(
       "title",
-      "Update ARC from Online:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git pull origin",
+      "Pull (and integrate) changes from DataHUB:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git pull origin",
     );
     await expect(canvas.getByTestId("GitSidebarUpdateArcButtonLabel")).toHaveClass("swt:truncate");
     await expect(canvas.getByTestId("GitSidebarUpdateArcButtonLabel")).toHaveClass(
@@ -593,7 +595,7 @@ export const BusyProgressState: Story = {
     await expect(outputConsole).toHaveClass("swt:bg-base-content");
     await expect(outputConsole).toHaveClass("swt:text-base-100");
 
-    const sourceControlTitle = canvas.getByText("Source Control");
+    const sourceControlTitle = canvas.getByText("Git");
     const trackingInfo = canvas.getByText("Tracking origin/feature/git-sidebar");
     expect(
       sourceControlTitle.compareDocumentPosition(canvas.getByTestId("GitSidebarProgressNotice")) &
@@ -737,40 +739,32 @@ export const CommitComposer: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const modal = within(document.body);
     const legacyCard = canvas.getByTestId("GitSidebarCommitSection").firstElementChild as HTMLElement;
     await expect(legacyCard).not.toHaveClass("swt:rounded-box");
     await expect(legacyCard).not.toHaveClass("swt:border");
     await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
-    await expect(canvas.getByTestId("GitSidebarPrimarySaveButton")).toHaveTextContent("Save Selected Changes");
-    await userEvent.click(canvas.getByTestId("GitSidebarSaveOptionsButton"));
-    await expect(canvas.getByTestId("GitSidebarLocalCommitButton")).toHaveTextContent(
-      "Add and commit selected Changes",
+    await expect(canvas.getByTestId("GitSidebarPrimarySaveButton")).toHaveTextContent(
+      "Commit and push selected changes to the DataHUB",
     );
-    const sidebarBounds = canvas.getByTestId("GitSidebar").getBoundingClientRect();
-    const menuBounds = canvas.getByTestId("GitSidebarSaveOptionsMenu").getBoundingClientRect();
-    expect(menuBounds.left).toBeGreaterThanOrEqual(sidebarBounds.left);
-    expect(menuBounds.right).toBeLessThanOrEqual(sidebarBounds.right);
+    await expect(canvas.getByTestId("GitSidebarLocalCommitButton")).toHaveTextContent(
+      "Commit selected changes locally",
+    );
+    await expect(canvas.queryByTestId("GitSidebarSaveOptionsButton")).toBeNull();
+    await expect(canvas.queryByTestId("GitSidebarSaveOptionsMenu")).toBeNull();
     await expect(canvas.queryByTestId("GitSidebarCommitSelectionButton")).toBeNull();
     await expect(canvas.queryByTestId("GitSidebarCommitSelectionCheckbox-README.md")).toBeNull();
-    // Ctrl+click to deselect – button text should switch back to "Save All Changes"
+    // Ctrl+click to deselect; button text should switch back to the all-changes action.
     fireEvent.mouseDown(canvas.getByTestId("GitSidebarChangeRow-0"), { ctrlKey: true });
     fireEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"), { ctrlKey: true });
     await waitFor(() =>
-      expect(canvas.getByTestId("GitSidebarPrimarySaveButton")).toHaveTextContent("Save All Changes"),
-    );
-    await userEvent.click(canvas.getByTestId("GitSidebarSaveOptionsButton"));
-    await waitFor(() =>
-      expect(canvas.getByTestId("GitSidebarLocalCommitButton")).toHaveTextContent(
-        "Add and commit all Changes",
+      expect(canvas.getByTestId("GitSidebarPrimarySaveButton")).toHaveTextContent(
+        "Commit and push all changes to the DataHUB",
       ),
     );
-    await userEvent.click(canvas.getByTestId("GitSidebarSaveOptionsHelpButton"));
-    await expect(await modal.findByTestId("popover_content_GitSidebarSaveOptionsHelp")).toHaveTextContent(
-      "Save changes commits locally",
-    );
-    await expect(modal.getByTestId("popover_content_GitSidebarSaveOptionsHelp")).toHaveTextContent(
-      "Add and commit changes only writes the local Git commit",
+    await waitFor(() =>
+      expect(canvas.getByTestId("GitSidebarLocalCommitButton")).toHaveTextContent(
+        "Commit all changes locally",
+      ),
     );
   },
 };
@@ -785,7 +779,7 @@ export const RemoteActionsDisabled: Story = {
     lfsAutoTrackThresholdMb: 1,
     remoteActionsEnabled: false,
     remoteActionsWarning:
-      "Sign in to a DataHub account to use fetch, pull, push, or update.",
+      "Sign in to a DataHUB account to use fetch, pull, push, or update.",
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -794,7 +788,7 @@ export const RemoteActionsDisabled: Story = {
     await expect(
       canvas.getByTestId("GitSidebarRemoteAuthWarning"),
     ).toHaveTextContent(
-      "Sign in to a DataHub account to use fetch, pull, push, or update.",
+      "Sign in to a DataHUB account to use fetch, pull, push, or update.",
     );
   },
 };

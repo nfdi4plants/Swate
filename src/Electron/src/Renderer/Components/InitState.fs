@@ -137,7 +137,7 @@ let InitState () =
                         prop.className "swt:iconify swt:fluent--cloud-beaker-24-filled swt:size-5"
                     ],
                     "Download ARC",
-                    "Download an existing ARC from DataHub!",
+                    "Download an existing ARC from DataHUB!",
                     (fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.DataHubBrowser))
                 )
             ],

@@ -107,11 +107,11 @@ const RepositorySetupExample = () => {
               className="swt:text-xs swt:font-medium swt:text-base-content/70"
               htmlFor="repository-name-input"
             >
-              DataHub repository name
+              DataHUB repository name
             </label>
             <input
               id="repository-name-input"
-              aria-label="DataHub repository name"
+              aria-label="DataHUB repository name"
               className="swt:input swt:input-bordered swt:w-full"
               placeholder="my-arc"
               value={projectName}

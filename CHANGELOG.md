@@ -18,7 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
--   Simplify Electron FileTree navigation so ARC editors initialize the requested Metadata, table, or DataMap view directly, and show the DataHub download action only in the sidebar.
+-   Clarify the Electron Git sidebar workflow with consistent Git terminology, a DataHUB pull action, and separate always-visible actions for local commits and commits pushed to the DataHUB. #1283
+-   Standardize user-facing DataHUB capitalization, rename DataHUB organisations to groups, and label the repository browser as "Download ARC from DataHUB". #1286
+-   Simplify Electron FileTree navigation so ARC editors initialize the requested Metadata, table, or DataMap view directly, and show the DataHUB download action only in the sidebar.
 -   Consolidate Electron ARC editor page state, safely resolve canonical entity workbooks, and reuse shared path normalization for ARC-root-relative references.
 -   Harden canonical entity path resolution for Electron rename and delete operations, and document the behavior of the shared path-normalization helpers.
 

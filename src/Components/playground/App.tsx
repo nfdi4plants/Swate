@@ -190,7 +190,7 @@ function AuthButtonContainer() {
 
 function DataHubBrowserContainer() {
   return <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full'>
-    <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>DataHub Browser</h2>
+    <h2 className='swt:text-5xl swt:font-bold swt:mb-4'>DataHUB Browser</h2>
     <DataHubBrowser />
   </div>
 }

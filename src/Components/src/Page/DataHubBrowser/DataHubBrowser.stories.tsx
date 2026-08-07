@@ -38,6 +38,11 @@ const expectMockSignedIn = async (canvas: ReturnType<typeof within>, isSignedIn:
 
 export const Default: Story = {
   name: "Default",
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(await canvas.findByText("Download ARC from DataHUB")).toBeInTheDocument();
+    expect(await canvas.findByTestId("GitLabExploreTab-YourOrganisations")).toHaveTextContent("Your Groups");
+  },
 };
 
 export const TabSwitchFlow: Story = {
@@ -90,7 +95,7 @@ export const SearchCombinedWithTabFilter: Story = {
 };
 
 export const OrganisationFilteringFlow: Story = {
-  name: "Organisation tab restricted when logged out",
+  name: "Group tab restricted when logged out",
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -230,6 +235,7 @@ export const LoginLogoutToggleFlow: Story = {
 
     await waitFor(async () => {
       expect((await canvas.findByTestId("GitLabExploreTab-YourOrganisations")).className).toMatch(/tab-active/);
+      expect(await canvas.findByTestId("GitLabExploreOrganisationSelect")).toHaveTextContent("Select group");
     });
 
     await userEvent.click(await canvas.findByTestId("GitLabExploreMockLogoutButton"));

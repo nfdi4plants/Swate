@@ -703,7 +703,7 @@ let private classifyWriteResult (busyOperation: GitBusyOperation) (result: Resul
         Ok(
             WriteOperationRemoteProjectAlreadyExists(
                 operationResult.Message
-                |> Option.defaultValue "A DataHub repository with this name already exists."
+                |> Option.defaultValue "A DataHUB repository with this name already exists."
             )
         )
     | Ok operationResult when not operationResult.Success ->

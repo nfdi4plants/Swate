@@ -1198,7 +1198,7 @@ let private tryGetPublishRepositoryName (arcPath: string) =
 
     match projectName with
     | Some name -> Ok name
-    | None -> Error(exn "Cannot derive a DataHub repository name from the ARC path.")
+    | None -> Error(exn "Cannot derive a DataHUB repository name from the ARC path.")
 
 let private createPublishFailure (projectName: string) (message: string) =
     let details =
@@ -1206,11 +1206,11 @@ let private createPublishFailure (projectName: string) (message: string) =
         |> Option.ofObj
         |> Option.map _.Trim()
         |> Option.filter (String.IsNullOrWhiteSpace >> not)
-        |> Option.defaultValue "DataHub project creation failed without details."
+        |> Option.defaultValue "DataHUB project creation failed without details."
 
     {
         Kind = classifyFailureKind details
-        Message = $"Could not publish local repository '{projectName}' to the active DataHub account: {details}"
+        Message = $"Could not publish local repository '{projectName}' to the active DataHUB account: {details}"
     }
 
 let private configurePublishedOriginRemote
@@ -1257,7 +1257,7 @@ let private publishOriginRemoteIfMissing
                         return
                             errorResult (
                                 exn
-                                    $"DataHub created repository '{projectName}', but returned an unusable Git remote URL: {remoteUrlError.Message}"
+                                    $"DataHUB created repository '{projectName}', but returned an unusable Git remote URL: {remoteUrlError.Message}"
                             )
                     | Ok safeRemoteUrl -> return! configurePublishedOriginRemote arcPath remoteState safeRemoteUrl
     }

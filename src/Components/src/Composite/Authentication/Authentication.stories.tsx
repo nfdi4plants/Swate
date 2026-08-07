@@ -87,7 +87,7 @@ export const SignInRequiresPatFlow: Story = {
 };
 
 export const SwitchToSupportedDataHubFlow: Story = {
-  name: 'Switch to supported DataHub',
+  name: 'Switch to supported DataHUB',
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -114,7 +114,7 @@ export const SwitchToSupportedDataHubFlow: Story = {
 };
 
 export const SwitchToCustomDataHubFlow: Story = {
-  name: 'Switch to custom DataHub',
+  name: 'Switch to custom DataHUB',
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const selectedDataHub = 'https://gitlab.example.org/';

@@ -100,7 +100,7 @@ type Authentication =
             prop.children [
                 Html.legend [
                     prop.className "swt:fieldset-legend"
-                    prop.text "Select DataHub"
+                    prop.text "Select DataHUB"
                 ]
                 Html.div [
                     prop.className
@@ -169,11 +169,11 @@ type Authentication =
             prop.className "swt:flex swt:flex-col swt:p-4 swt:w-md swt:gap-2"
             prop.children [
                 Html.h1 [
-                    prop.text "DataHub Authentication"
+                    prop.text "DataHUB Authentication"
                     prop.className "swt:text-center swt:text-3xl swt:font-bold swt:mb-2"
                 ]
                 Html.p [
-                    prop.text "Sign in to your DataHub account to access your ARCs."
+                    prop.text "Sign in to your DataHUB account to access your ARCs."
                     prop.className "swt:text-center swt:text-sm swt:text-base-content/80"
                 ]
                 Html.fieldSet [
@@ -220,7 +220,7 @@ type Authentication =
                 ]
                 Html.p [
                     prop.className "swt:text-sm swt:text-center swt:text-base-content/80"
-                    prop.text "Don't have an account? Sign up on your DataHub instance to create one."
+                    prop.text "Don't have an account? Sign up on your DataHUB instance to create one."
                 ]
             ]
         ]

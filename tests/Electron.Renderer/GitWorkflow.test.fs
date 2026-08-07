@@ -66,7 +66,7 @@ let private duplicateRemoteProjectResult attemptedName = {
         Success = false
         Message =
             Some
-                $"Could not publish local repository '{attemptedName}' to the active DataHub account: GitLab request failed with HTTP 400: name has already been taken."
+                $"Could not publish local repository '{attemptedName}' to the active DataHUB account: GitLab request failed with HTTP 400: name has already been taken."
         FailureKind = Some GitFailureKind.RemoteProjectAlreadyExists
 }
 
@@ -2506,7 +2506,7 @@ Vitest.describe (
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
                             remoteActionsEnabled = false,
-                            remoteActionsWarning = "Sign in to a DataHub account to use fetch, pull, push, or update."
+                            remoteActionsWarning = "Sign in to a DataHUB account to use fetch, pull, push, or update."
                         )
                     )
 
@@ -2514,7 +2514,7 @@ Vitest.describe (
                     container.querySelector ("[data-testid='GitSidebarUpdateArcButton']") :?> HTMLButtonElement
 
                 Vitest.expect(updateButton.disabled).toBe (true)
-                Vitest.expect(container.textContent.Contains("Sign in to a DataHub account")).toBe (true)
+                Vitest.expect(container.textContent.Contains("Sign in to a DataHUB account")).toBe (true)
 
                 cleanup ()
             }

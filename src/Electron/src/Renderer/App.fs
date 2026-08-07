@@ -154,7 +154,7 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage) setLeftSideba
         )
         Layout.LayoutBtn(
             iconClassName = "swt:fluent--cloud-beaker-24-regular",
-            tooltip = "Download ARC from DataHub",
+            tooltip = "Download ARC from DataHUB",
             isActive = false,
             onClick = fun () -> pageStateCtx.setState (Some PageState.DataHubBrowser)
         )

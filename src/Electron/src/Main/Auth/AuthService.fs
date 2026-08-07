@@ -92,7 +92,7 @@ let private normalizeBaseUrl (baseUrl: string) : Result<string, AuthFailure> =
     if String.IsNullOrWhiteSpace trimmed then
         Error {
             Kind = AuthFailureKind.EndpointInvalid
-            Message = "DataHub URL is empty."
+            Message = "DataHUB URL is empty."
         }
     else
         let mutable uri = Unchecked.defaultof<Uri>
@@ -102,7 +102,7 @@ let private normalizeBaseUrl (baseUrl: string) : Result<string, AuthFailure> =
         else
             Error {
                 Kind = AuthFailureKind.EndpointInvalid
-                Message = "DataHub URL must be a valid HTTPS URL."
+                Message = "DataHUB URL must be a valid HTTPS URL."
             }
 
 
@@ -217,9 +217,9 @@ let private refreshTokenProvider () =
                 with
                 | None ->
                     return
-                        Error "No usable DataHub account is signed in. Sign in before publishing this local repository."
+                        Error "No usable DataHUB account is signed in. Sign in before publishing this local repository."
                 | Some(user, token) when String.IsNullOrWhiteSpace user.TargetDataHub ->
-                    return Error "The active DataHub account has no DataHub endpoint configured."
+                    return Error "The active DataHUB account has no DataHUB endpoint configured."
                 | Some(user, token) ->
                     let! projectResult =
                         Swate.Components.Api.GitLabApi.GitLabApi.CreateProject(user.TargetDataHub, token, projectName)
