@@ -139,35 +139,16 @@ type FileTree =
 
         let withStartingView activeView =
             function
-            | Renderer.Types.PageState.ArcFilePage arcFile
-            | Renderer.Types.PageState.ArcFilePageWithStartingView(arcFile, _) ->
-                Renderer.Types.PageState.ArcFilePageWithStartingView(arcFile, activeView)
+            | Renderer.Types.PageState.ArcFilePage(arcFile, _) ->
+                Renderer.Types.PageState.ArcFilePage(arcFile, Some activeView)
             | pageState -> pageState
-
-        let openSelectedPreview (itemName: string) (selectedPath: string) = promise {
-            let! openedResult = openView selectedPath
-
-            let result =
-                if
-                    selectedPath.EndsWith(
-                        ARCtrl.ArcPathHelper.DataMapFileName,
-                        System.StringComparison.OrdinalIgnoreCase
-                    )
-                then
-                    openedResult
-                    |> Result.map (withStartingView Swate.Components.Page.ArcFileEditor.Types.ActiveView.DataMap)
-                else
-                    openedResult
-
-            applyPreviewResult itemName result
-        }
 
         let tryGetArcEntityWorkbookName (path: string) =
             ArcEntityPathRules.tryGetRenameEntityFolderTarget (PathHelpers.normalizePath path)
-            |> Option.map (fun (zone, identifier) ->
+            |> Option.bind (fun (zone, identifier) ->
                 ArcEntityPathRules.buildCanonicalEntityPaths zone identifier
-                |> List.head
-                |> PathHelpers.getFileName
+                |> List.tryHead
+                |> Option.map PathHelpers.getFileName
             )
 
         let isArcEntityDirectory (item: FileItem) =
@@ -205,7 +186,8 @@ type FileTree =
                     if Swate.Components.Page.FileExplorer.Helper.needsLfsDownload item then
                         pageStateCtx.setState None
                     else
-                        do! openSelectedPreview item.Name selectedPath
+                        let! result = openView selectedPath
+                        applyPreviewResult item.Name result
             }
             |> Promise.start
 

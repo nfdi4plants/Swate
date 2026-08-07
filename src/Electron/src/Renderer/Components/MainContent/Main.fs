@@ -22,25 +22,24 @@ module private MainHelper =
 
     open Fable.Core
 
-    let loadTemplates =
-        fun () ->
-            promise {
-                // let! json =
-                //     Swate.Components.Api.SwateApi.SwateTemplateApi.getTemplates ()
-                //     |> Async.StartAsPromise
-                // return Ok(ARCtrl.Json.Templates.fromJsonString json)
+    let loadTemplates () =
+        promise {
+            // let! json =
+            //     Swate.Components.Api.SwateApi.SwateTemplateApi.getTemplates ()
+            //     |> Async.StartAsPromise
+            // return Ok(ARCtrl.Json.Templates.fromJsonString json)
 
-                let! result = Api.ipcTemplateApi.getTemplates ()
+            let! result = Api.ipcTemplateApi.getTemplates ()
 
-                return
-                    result
-                    |> Result.map ARCtrl.Json.Templates.fromJsonString
-                    |> Result.mapError (fun error -> error.Message)
-            }
-            |> Promise.catch (fun error ->
-                // Handle error, e.g., log it or show a notification
-                Error(sprintf "Error loading templates: %s" error.Message)
-            )
+            return
+                result
+                |> Result.map ARCtrl.Json.Templates.fromJsonString
+                |> Result.mapError (fun error -> error.Message)
+        }
+        |> Promise.catch (fun error ->
+            // Handle error, e.g., log it or show a notification
+            Error(sprintf "Error loading templates: %s" error.Message)
+        )
 
 
 module private LazyComponents =
@@ -94,9 +93,8 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                                 "swt:flex-1 swt:min-w-0 swt:min-h-0 swt:flex swt:justify-center swt:items-center"
                             prop.children [ Renderer.Components.InitState.InitState() ]
                         ]
-                    | Some _, Some(PageState.ArcFilePage arcFile) -> ArcFilePreviewTarget(arcFile, None)
-                    | Some _, Some(PageState.ArcFilePageWithStartingView(arcFile, startingActiveView)) ->
-                        ArcFilePreviewTarget(arcFile, Some startingActiveView)
+                    | Some _, Some(PageState.ArcFilePage(arcFile, startingView)) ->
+                        ArcFilePreviewTarget(arcFile, startingView)
                     | Some _, Some(PageState.MarkdownPage content) ->
                         React.Suspense(
                             [ LazyComponents.LazyMarkdownEditorTarget(content) ],
