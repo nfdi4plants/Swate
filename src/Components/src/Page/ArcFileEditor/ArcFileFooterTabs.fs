@@ -22,15 +22,11 @@ module private ArcFileFooterTabsHelper =
 
     let tryParseTableDragId (i: string) =
         if i.StartsWith TableDragIdPrefix then
-            let indexStr = i.Substring(TableDragIdPrefix.Length)
-
-            match System.Int32.TryParse indexStr with
+            match System.Int32.TryParse(i.Substring(TableDragIdPrefix.Length)) with
             | true, index -> Some index
             | _ -> None
         else
             None
-
-    let resolveDropTargetTableIndex (targetId: string) = tryParseTableDragId targetId
 
     let tryGetDndEventId (eventNode: obj) =
         if isNull eventNode then
@@ -57,10 +53,7 @@ module private ArcFileFooterTabsHelper =
         match i with
         | "metadata" -> Some ActiveView.Metadata
         | "datamap" -> Some ActiveView.DataMap
-        | _ ->
-            match tryParseTableDragId i with
-            | Some index -> Some(ActiveView.Table index)
-            | None -> None
+        | _ -> tryParseTableDragId i |> Option.map ActiveView.Table
 
     module ContextMenu =
 
@@ -322,19 +315,14 @@ type ArcFileFooterTabs =
             React.useState (None: int option)
 
         let metadataTabLabel =
-            React.useMemo (
-                (fun () ->
-                    match arcFile with
-                    | ArcFiles.Assay _ -> "Assay"
-                    | ArcFiles.Study _ -> "Study"
-                    | ArcFiles.Investigation _ -> "Investigation"
-                    | ArcFiles.Run _ -> "Run"
-                    | ArcFiles.Workflow _ -> "Workflow"
-                    | ArcFiles.Template _ -> "Template"
-                    | ArcFiles.DataMap _ -> "Datamap"
-                ),
-                [| box arcFile |]
-            )
+            match arcFile with
+            | ArcFiles.Assay _ -> "Assay"
+            | ArcFiles.Study _ -> "Study"
+            | ArcFiles.Investigation _ -> "Investigation"
+            | ArcFiles.Run _ -> "Run"
+            | ArcFiles.Workflow _ -> "Workflow"
+            | ArcFiles.Template _ -> "Template"
+            | ArcFiles.DataMap _ -> "Datamap"
 
         let setEditorMode =
             React.useCallback (
@@ -383,6 +371,7 @@ type ArcFileFooterTabs =
 
         let deleteTable (tableIndex: int) =
             closeEditorMode ()
+
             updateArcFile (fun nextArcFile -> nextArcFile.ArcTables().RemoveTableAt tableIndex)
 
             match activeView with
@@ -392,6 +381,7 @@ type ArcFileFooterTabs =
 
         let updateTableOrder (oldIndex: int, newIndex: int) =
             closeEditorMode ()
+
             updateArcFile (fun nextArcFile -> nextArcFile.ArcTables().MoveTable(oldIndex, newIndex))
 
             let nextActiveIndex = max 0 (min newIndex (tables.TableCount - 1))
@@ -406,7 +396,7 @@ type ArcFileFooterTabs =
                     else
                         match tryGetDndEventId (box event.active), tryGetDndEventId (box event.over) with
                         | Some activeId, Some overId when activeId <> overId ->
-                            match tryParseTableDragId activeId, resolveDropTargetTableIndex overId with
+                            match tryParseTableDragId activeId, tryParseTableDragId overId with
                             | Some oldIndex, Some newIndex when oldIndex <> newIndex ->
                                 updateTableOrder (oldIndex, newIndex)
                             | _ -> ()
@@ -417,10 +407,7 @@ type ArcFileFooterTabs =
 
 
         let tableIds =
-            React.useMemo (
-                (fun () -> tables |> Seq.mapi (fun index _ -> mkTableDragId index) |> ResizeArray),
-                [| box tables.TableCount; box tableNamesKey |]
-            )
+            tables |> Seq.mapi (fun index _ -> mkTableDragId index) |> ResizeArray
 
         let tableTabModels: TableTabViewModel[] =
             React.useMemo (
@@ -450,6 +437,9 @@ type ArcFileFooterTabs =
                     match
                         System.String.IsNullOrWhiteSpace newName
                         || newName = currentTables.[tableIndex].Name
+                        || (currentTables
+                            |> Seq.mapi (fun index table -> index, table.Name)
+                            |> Seq.exists (fun (index, tableName) -> index <> tableIndex && tableName = newName))
                     with
                     | true -> ()
                     | false ->
