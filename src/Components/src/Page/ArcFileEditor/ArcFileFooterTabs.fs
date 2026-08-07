@@ -314,15 +314,10 @@ type ArcFileFooterTabs =
         let isEditorModeTableTab, setIsEditorModeTableTab =
             React.useState (None: int option)
 
+        let fileType = arcFile.RelatedArcFilesDiscriminate |> unbox<string>
+
         let metadataTabLabel =
-            match arcFile with
-            | ArcFiles.Assay _ -> "Assay"
-            | ArcFiles.Study _ -> "Study"
-            | ArcFiles.Investigation _ -> "Investigation"
-            | ArcFiles.Run _ -> "Run"
-            | ArcFiles.Workflow _ -> "Workflow"
-            | ArcFiles.Template _ -> "Template"
-            | ArcFiles.DataMap _ -> "Datamap"
+            fileType.Substring(0, 1).ToUpperInvariant() + fileType.Substring(1)
 
         let setEditorMode =
             React.useCallback (
@@ -431,8 +426,8 @@ type ArcFileFooterTabs =
         let renameTable =
             React.useCallback (
                 (fun (tableIndex: int) (newName: string) ->
-                    let currentArcFile = arcFileRef.current
-                    let currentTables = currentArcFile.ArcTables()
+
+                    let currentTables = arcFileRef.current.ArcTables()
 
                     match
                         System.String.IsNullOrWhiteSpace newName
