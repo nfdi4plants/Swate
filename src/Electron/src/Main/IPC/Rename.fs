@@ -186,31 +186,31 @@ module ArcRenameHelper =
             | Ok(sourceZone, sourceIdentifier, sourcePath) ->
                 let sourceFileType = ArcDeleteHelper.arcFileTypeForZone sourceZone
 
-                let canonicalSourcePath =
-                    ArcDeleteHelper.canonicalEntityFilePath sourceZone sourceIdentifier
+                match ArcDeleteHelper.tryCanonicalEntityFilePath sourceZone sourceIdentifier with
+                | Error canonicalPathError -> return Error canonicalPathError
+                | Ok canonicalSourcePath ->
+                    match
+                        ArcDeleteHelper.tryEnsureArcEntityResolved
+                            sourceFileType
+                            sourceIdentifier
+                            canonicalSourcePath
+                            arcLocal
+                    with
+                    | Error resolutionError -> return Error resolutionError
+                    | Ok() ->
+                        match tryBuildRenameTargetPath sourcePath request.newName with
+                        | Error targetPathError -> return Error(exn targetPathError)
+                        | Ok targetPath ->
+                            let targetIdentifier = PathHelpers.getNameFromPath targetPath
 
-                match
-                    ArcDeleteHelper.tryEnsureArcEntityResolved
-                        sourceFileType
-                        sourceIdentifier
-                        canonicalSourcePath
-                        arcLocal
-                with
-                | Error resolutionError -> return Error resolutionError
-                | Ok() ->
-                    match tryBuildRenameTargetPath sourcePath request.newName with
-                    | Error targetPathError -> return Error(exn targetPathError)
-                    | Ok targetPath ->
-                        let targetIdentifier = PathHelpers.getNameFromPath targetPath
-
-                        return!
-                            renameResolvedArcEntityAsync
-                                arcPath
-                                sourcePath
-                                targetPath
-                                canonicalSourcePath
-                                sourceFileType
-                                sourceIdentifier
-                                targetIdentifier
-                                arcLocal
+                            return!
+                                renameResolvedArcEntityAsync
+                                    arcPath
+                                    sourcePath
+                                    targetPath
+                                    canonicalSourcePath
+                                    sourceFileType
+                                    sourceIdentifier
+                                    targetIdentifier
+                                    arcLocal
         }

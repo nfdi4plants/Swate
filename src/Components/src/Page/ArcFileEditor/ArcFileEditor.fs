@@ -297,18 +297,6 @@ type Main =
         let activeView, setActiveView =
             React.useState (startingActiveView |> Option.defaultValue ActiveView.Metadata)
 
-        let arcFileNavigationKey =
-            arcFile.TryGetRelativePath()
-            |> Option.defaultValue (string arcFile.RelatedArcFilesDiscriminate)
-
-        let startingActiveViewKey =
-            startingActiveView |> Option.map _.ViewIndex |> Option.defaultValue -3
-
-        React.useEffect (
-            (fun () -> setActiveView (startingActiveView |> Option.defaultValue ActiveView.Metadata)),
-            [| box arcFileNavigationKey; box startingActiveViewKey |]
-        )
-
         React.useEffect (
             (fun () ->
                 let nextActiveView = ActiveView.Forward(arcFile, activeView)
@@ -344,16 +332,6 @@ type Main =
                 [| box trailingNavbarElements; box headerProps |]
             )
 
-        let widgetNavbarElement =
-            React.useMemo (
-                (fun () ->
-                    match widgetNavbarElements with
-                    | Some renderWidgetNavbarElements -> renderWidgetNavbarElements headerProps
-                    | None -> Html.none
-                ),
-                [| box widgetNavbarElements; box headerProps |]
-            )
-
         let navbar =
             React.useMemo (
                 (fun () ->
@@ -366,7 +344,9 @@ type Main =
                                         prop.className "swt:flex swt:items-center swt:gap-2"
                                         prop.children [
                                             Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns()
-                                            widgetNavbarElement
+                                            match widgetNavbarElements with
+                                            | Some renderWidgetNavbarElements -> renderWidgetNavbarElements headerProps
+                                            | None -> ()
                                         ]
                                     ],
                                 right = trailingNavbarElement
@@ -374,7 +354,11 @@ type Main =
                         ]
                     ]
                 ),
-                [| box widgetNavbarElement; box trailingNavbarElement |]
+                [|
+                    box widgetNavbarElements
+                    box headerProps
+                    box trailingNavbarElement
+                |]
             )
 
         let widgetElements =

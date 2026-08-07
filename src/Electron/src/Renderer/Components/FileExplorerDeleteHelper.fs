@@ -21,7 +21,6 @@ module FileExplorerDeleteHelper =
     let private resetsWhenSelectionIsRemoved =
         function
         | PageState.ArcFilePage _
-        | PageState.ArcFilePageWithStartingView _
         | PageState.MarkdownPage _
         | PageState.TextPage _
         | PageState.UnknownPage

@@ -226,7 +226,7 @@ module ARCtrlHelper =
             | _ -> None
 
         let withExplicitRelativePrefix (path: string) =
-            let normalizedPath = path.Replace('\\', '/')
+            let normalizedPath = PathHelpers.normalizeSeparators path
 
             if normalizedPath.StartsWith("./") then
                 normalizedPath
