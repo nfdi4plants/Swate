@@ -35,30 +35,6 @@ type Story = StoryObj<typeof meta>;
 const getWidgetButton = (canvas: ReturnType<typeof within>, label: string) =>
   canvas.getByRole('button', { name: new RegExp(label, 'i') });
 
-type StoryCanvas = ReturnType<typeof within>;
-
-const renameTable = async (canvas: StoryCanvas, currentName: string, nextName: string) => {
-  await userEvent.dblClick(canvas.getByRole('button', { name: currentName }));
-  const nameInput = canvas.getByRole('textbox');
-  await userEvent.clear(nameInput);
-  await userEvent.type(nameInput, `${nextName}{enter}`);
-};
-
-const deleteTable = async (canvas: StoryCanvas, portal: StoryCanvas, tableName: string) => {
-  const table = canvas.getByRole('button', { name: tableName });
-  await userEvent.pointer({ keys: '[MouseRight]', target: table });
-  await userEvent.click(await portal.findByText('Delete Table'));
-};
-
-const importStoryTemplate = async (canvas: StoryCanvas, portal: StoryCanvas) => {
-  await userEvent.click(getWidgetButton(canvas, 'Open Add Template'));
-  await userEvent.click(await canvas.findByText(STORY_TEMPLATE_NAME));
-  await userEvent.click(canvas.getByRole('button', { name: /^Import$/i }));
-
-  const importDialog = await portal.findByRole('dialog', { name: /Import templates/i });
-  await userEvent.click(within(importDialog).getByRole('button', { name: /^Import$/i }));
-};
-
 export const IntegratedNavbar: Story = {
   parameters: { isolated: true },
   play: async ({ canvasElement }) => {
@@ -101,7 +77,8 @@ export const DeleteThenAddTable: Story = {
 
     const deletedTable = canvas.getByRole('button', { name: 'Table 2' });
     await userEvent.click(deletedTable);
-    await deleteTable(canvas, portal, 'Table 2');
+    await userEvent.pointer({ keys: '[MouseRight]', target: deletedTable });
+    await userEvent.click(await portal.findByText('Delete Table'));
 
     await waitFor(() => {
       expect(canvas.queryByRole('button', { name: 'Table 2' })).not.toBeInTheDocument();
@@ -158,7 +135,12 @@ export const AppendTemplateToEmptyTable: Story = {
     await userEvent.click(canvas.getByRole('button', { name: 'Table 1' }));
     expect(canvas.getByText('Start with template!')).toBeInTheDocument();
 
-    await importStoryTemplate(canvas, portal);
+    await userEvent.click(getWidgetButton(canvas, 'Open Add Template'));
+    await userEvent.click(await canvas.findByText(STORY_TEMPLATE_NAME));
+    await userEvent.click(canvas.getByRole('button', { name: /^Import$/i }));
+
+    const importDialog = await portal.findByRole('dialog', { name: /Import templates/i });
+    await userEvent.click(within(importDialog).getByRole('button', { name: /^Import$/i }));
 
     await waitFor(() => {
       expect(canvas.queryByText('Start with template!')).not.toBeInTheDocument();
@@ -175,9 +157,14 @@ export const RenameThenDeleteAndAddTable: Story = {
     const canvas = within(canvasElement);
     const portal = within(canvasElement.ownerDocument.body);
 
-    await renameTable(canvas, 'Table 2', 'Renamed Table');
-    await canvas.findByRole('button', { name: 'Renamed Table' });
-    await deleteTable(canvas, portal, 'Renamed Table');
+    await userEvent.dblClick(canvas.getByRole('button', { name: 'Table 2' }));
+    const nameInput = canvas.getByRole('textbox');
+    await userEvent.clear(nameInput);
+    await userEvent.type(nameInput, 'Renamed Table{enter}');
+
+    const renamedTable = await canvas.findByRole('button', { name: 'Renamed Table' });
+    await userEvent.pointer({ keys: '[MouseRight]', target: renamedTable });
+    await userEvent.click(await portal.findByText('Delete Table'));
     await userEvent.click(canvas.getByRole('button', { name: 'Add new table' }));
 
     await waitFor(() => {
@@ -192,9 +179,11 @@ export const RejectDuplicateTableName: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await renameTable(canvas, 'Table 2', 'Table 1');
-
+    await userEvent.dblClick(canvas.getByRole('button', { name: 'Table 2' }));
     const nameInput = canvas.getByRole('textbox');
+    await userEvent.clear(nameInput);
+    await userEvent.type(nameInput, 'Table 1{enter}');
+
     expect(nameInput).toHaveValue('Table 1');
     await userEvent.keyboard('{Escape}');
     expect(canvas.getAllByRole('button', { name: 'Table 1' })).toHaveLength(1);
