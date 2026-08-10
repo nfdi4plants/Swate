@@ -77,10 +77,11 @@ type Annotation = {
     IsOpen: bool
     Search: SearchComponent
     Height: float
+    XCoordinate: float
 } with
 
 
-    static member init(key, body, ?keyType, ?isOpen, ?search, ?height) =
+    static member init(key, body, ?keyType, ?isOpen, ?search, ?height, ?xCoordinate) =
         let isOpen = defaultArg isOpen true
         let keyType = defaultArg keyType CompositeHeaderDiscriminate.Parameter
 
@@ -92,11 +93,12 @@ type Annotation = {
             }
 
         let height = defaultArg height 0.0
-
+        let xCoordinate = defaultArg xCoordinate 0.0
         {
             IsOpen = isOpen
             Search = search
             Height = height
+            XCoordinate = xCoordinate
         }
 
     member this.ToggleOpen() = { this with IsOpen = not this.IsOpen }

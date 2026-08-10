@@ -58,7 +58,7 @@ module PreviewTable =
                                                     prop.className "swt:flex swt:justify-center swt:items-center"
                                                     prop.children [
                                                         Html.button [
-                                                            prop.className "swt:cursor-pointer"
+                                                            prop.className "swt:cursor-pointer swt:hover:text-error swt:transition-colors swt:p-1"
                                                             prop.onClick (fun _ ->
                                                                 let newAnnoList: Annotation list =
                                                                     annoState

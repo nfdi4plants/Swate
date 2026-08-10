@@ -26,6 +26,8 @@ module Jsonkeys =
     [<Literal>]
     let Height = "height"
 
+    [<Literal>]
+    let XCoordinate = "xCoordinate"
 
 
 let encoderAnno (anno: Annotation) = //encodes annotation to json
@@ -52,7 +54,7 @@ let encoderAnno (anno: Annotation) = //encodes annotation to json
             )
         Encode.tryInclude Jsonkeys.Body CompositeCell.encoder (Some anno.Search.Body)
         Encode.tryInclude Jsonkeys.IsOpen Encode.bool (Some anno.IsOpen)
-        Encode.tryInclude Jsonkeys.Height Encode.float (Some anno.Height)
+        Encode.tryInclude Jsonkeys.XCoordinate Encode.float (Some anno.XCoordinate)
     ]
     |> Encode.choose
     |> Encode.object
@@ -78,6 +80,7 @@ let decoderAnno: Decoder<Annotation list> = //decodes json to annotation
                 Body = get.Required.Field Jsonkeys.Body CompositeCell.decoder
             }
             Height = get.Required.Field Jsonkeys.Height Decode.float
+            XCoordinate = get.Required.Field Jsonkeys.XCoordinate Decode.float
         })
     )
 

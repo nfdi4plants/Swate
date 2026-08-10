@@ -30,6 +30,15 @@ module FunctionsContextmenu =
                 rect.bottom - relativeParent.top + 12.0
             | _ -> 0.0
 
+        let xCoordinateOfSelection =
+            match window.getSelection () with
+            | (selection: Selection) when selection.rangeCount > 0 ->
+                let range = selection.getRangeAt (0)
+                let rect = range.getBoundingClientRect ()
+                let relativeParent = document.getElementById(elementID).getBoundingClientRect ()
+                rect.right - relativeParent.left + 850.0
+            | _ -> 0.0
+
         if term.Length <> 0 then
             let closedList = state |> List.map (fun a -> { a with IsOpen = false })
 
@@ -37,7 +46,8 @@ module FunctionsContextmenu =
                 Annotation.init (
                     OntologyAnnotation(term),
                     body = CompositeCell.Term(OntologyAnnotation("")),
-                    height = yCoordinateOfSelection
+                    height = yCoordinateOfSelection,
+                    xCoordinate = xCoordinateOfSelection
                 )
             ]
 
@@ -74,7 +84,15 @@ module FunctionsContextmenu =
                 let rect = range.getBoundingClientRect ()
                 let relativeParent = document.getElementById(elementID).getBoundingClientRect ()
                 rect.bottom - relativeParent.top + 12.0
+            | _ -> 0.0
 
+        let xCoordinateOfSelection =
+            match window.getSelection () with
+            | (selection: Selection) when selection.rangeCount > 0 ->
+                let range = selection.getRangeAt (0)
+                let rect = range.getBoundingClientRect ()
+                let relativeParent = document.getElementById(elementID).getBoundingClientRect ()
+                rect.left - relativeParent.right
             | _ -> 0.0
 
         if term.Length <> 0 then
@@ -84,7 +102,8 @@ module FunctionsContextmenu =
                 Annotation.init (
                     OntologyAnnotation(""),
                     body = CompositeCell.Term(OntologyAnnotation(term)),
-                    height = yCoordinateOfSelection
+                    height = yCoordinateOfSelection,
+                    xCoordinate = xCoordinateOfSelection
                 )
             ]
 
@@ -124,6 +143,15 @@ module FunctionsContextmenu =
 
             | _ -> 0.0
 
+        let xCoordinateOfSelection =
+            match window.getSelection () with
+            | (selection: Selection) when selection.rangeCount > 0 ->
+                let range = selection.getRangeAt (0)
+                let rect = range.getBoundingClientRect ()
+                let relativeParent = document.getElementById(elementID).getBoundingClientRect ()
+                rect.left - relativeParent.right
+            | _ -> 0.0
+
         if term.Length <> 0 then
             let closedList = state |> List.map (fun a -> { a with IsOpen = false })
 
@@ -131,7 +159,8 @@ module FunctionsContextmenu =
                 Annotation.init (
                     OntologyAnnotation(""),
                     body = CompositeCell.Unitized(term, OntologyAnnotation("")),
-                    height = yCoordinateOfSelection
+                    height = yCoordinateOfSelection,
+                    xCoordinate = xCoordinateOfSelection
                 )
             ]
 

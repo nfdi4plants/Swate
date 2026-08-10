@@ -68,6 +68,41 @@ type Builder =
             )
 
         let contextMenuRef = React.useElementRef ()
+        let spacerHeight, setSpacerHeight = React.useState (0.)
+
+        React.useEffect (
+            (fun () ->
+                let groupedAnnos =
+                    annoState |> List.groupBy (fun a -> floor a.Height)
+
+                let maxAnnotationBottom =
+                    groupedAnnos
+                    |> List.fold
+                        (fun maxBot (height, annos) ->
+                            let hasOpenAnno = annos |> List.exists (fun a -> a.IsOpen)
+
+                            if hasOpenAnno then
+                                let noteHeight =
+                                    if annos.Length = 1 then 300.0
+                                    else 80.0 + (float annos.Length) * 250.0
+
+                                max maxBot (height + noteHeight)
+                            else
+                                max maxBot (height + 30.0)
+                        )
+                        0.0
+
+                let docHeight =
+                    match contextMenuRef.current with
+                    | Some el -> el.scrollHeight |> float
+                    | None -> 0.0
+
+                let extra = max 0.0 (maxAnnotationBottom - docHeight)
+
+                setSpacerHeight extra
+            ),
+            [| box annoState |]
+        )
 
         let placeholder =
             Html.div [
@@ -105,6 +140,12 @@ type Builder =
                             display
                         ]
                     ]
+                    for a in 0 .. annoState.Length - 1 do
+                        App.Components.AnnoBlockwithSwate(annoState, setState, a, highlight, setHighlight)
+                    Html.div [
+                        prop.style [ style.height (int spacerHeight) ]
+                    ]
+
                 ]
             ]
 

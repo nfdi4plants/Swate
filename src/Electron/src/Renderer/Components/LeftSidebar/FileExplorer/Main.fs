@@ -150,7 +150,7 @@ type Main =
                                         fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesDraftPage)
                                     )
                                     ButtonInfo.create (
-                                        "swt:fluent--document-search-24-regular swt:size-5",
+                                        "swt:document-search-24-regular swt:size-5",
                                         "Note Search",
                                         fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesSearchPage)
                                     )

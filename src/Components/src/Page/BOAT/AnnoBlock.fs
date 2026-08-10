@@ -34,7 +34,7 @@ module Searchblock =
                     Html.button [
                         prop.className (
                             if isTermActive then
-                                "swt:flex-1 swt:rounded-md swt:border swt:border-info swt:bg-info swt:px-3 swt:py-1 swt:text-white"
+                                "swt:flex-1 swt:rounded-md swt:border swt:border-info swt:bg-info swt:px-3 swt:py-1"
                             else
                                 "swt:flex-1 swt:rounded-md swt:border swt:border-gray-300 swt:bg-white swt:px-3 swt:py-1 swt:text-gray-700"
                         )
@@ -65,7 +65,7 @@ module Searchblock =
                     Html.button [
                         prop.className (
                             if isUnitizedActive then
-                                "swt:flex-1 swt:rounded-md swt:border swt:border-info swt:bg-info swt:px-3 swt:py-1 swt:text-white"
+                                "swt:flex-1 swt:rounded-md swt:border swt:border-info swt:bg-info swt:px-3 swt:py-1"
                             else
                                 "swt:flex-1 swt:rounded-md swt:border swt:border-gray-300 swt:bg-white swt:px-3 swt:py-1 swt:text-gray-700"
                         )
@@ -98,7 +98,7 @@ module Searchblock =
             prop.className "swt:relative"
             prop.children [
                 Html.div [
-                    prop.className "swt:flex swt:w-full swt:flex-wrap swt:gap-2 swt:z-20 swt:text-white"
+                    prop.className "swt:flex swt:w-full swt:flex-wrap swt:gap-2 swt:z-20"
                     prop.children [
                         let setKeyType (cHDOpt: CompositeHeaderDiscriminate option) =
                             let cHD = cHDOpt |> Option.defaultValue CompositeHeaderDiscriminate.Parameter
@@ -150,7 +150,7 @@ module Searchblock =
                                             ]
                                         ]
                                 ],
-                            dropdownClassName = "swt:dropdown-end"
+                            dropdownClassName = "swt:dropdown-start"
                         )
 
                         let setter (termOpt: Term option) =
@@ -188,7 +188,7 @@ module Searchblock =
             prop.className "swt:relative"
             prop.children [
                 Html.div [
-                    prop.className "swt:flex swt:w-full swt:flex-wrap swt:gap-2 swt:z-1! swt:text-white"
+                    prop.className "swt:flex swt:w-full swt:flex-wrap swt:gap-2 swt:z-1! "
                     prop.children [
                         TermOrUnitizedSwitch(a, annoState, setAnnoState)
                         let setter (termOpt: Term option) =
@@ -235,10 +235,6 @@ type Components =
         ) =
 
         let a = annoState.[index]
-
-        let mapOfSameHeight =
-
-            annoState |> List.groupBy (fun a -> floor a.Height) |> Map.ofList
 
         let deleteButton (specIndex: int) =
             Html.span [
@@ -314,7 +310,7 @@ type Components =
 
         let annotationNote (specIndex: int) (hasChevron: bool) =
             Html.div [
-                prop.className "swt:bg-[#ffe699] swt:p-3 swt:text-black swt:w-fit"
+                prop.className "swt:bg-amber-300 swt:p-3 swt:w-fit swt:rounded-md swt:shadow-lg swt:border-2 swt:border-secondary swt:z-10!"
                 prop.children [
                     Html.div [
                         prop.className "swt:flex swt:flex-row"
@@ -339,110 +335,52 @@ type Components =
                 ]
             ]
 
+        let closedAnnotationNote =
+            Html.button [
+                prop.className "swt:cursor-pointer"
+                prop.children [
+                    Html.i [
+                        prop.className "swt:iconify swt:fluent--comment-24-filled swt:size-6 swt:text-amber-300 swt:border-2 swt:border-secondary"
+                        prop.onClick (fun e ->
+                            Helperfuncs.updateAnnotation (
+                                (fun e -> e.ToggleOpen()),
+                                index,
+                                annoState,
+                                setState
+                            )
+
+                            let updatedAnnos =
+                                annoState
+                                |> List.mapi (fun i anno ->
+                                    if i = index then
+                                        anno.ToggleOpen()
+                                    else
+                                        { anno with IsOpen = false }
+                                )
+
+                            setState updatedAnnos
+                        )
+                    ]
+                ]
+            ]
+
 
         Html.div [
-            prop.style [ style.position.absolute; style.top (int a.Height) ]
+            prop.style [ style.position.absolute; style.top (int a.Height); style.left (int a.XCoordinate) ]
             prop.children [
-                if mapOfSameHeight[floor a.Height].Length = 1 && a.IsOpen = false then
+                if a.IsOpen = false then
                     Html.div [
                         prop.className "swt:z-0!"
                         prop.children [
-                            Html.button [
-                                prop.className "swt:cursor-pointer"
-                                prop.children [
-                                    Html.i [
-                                        prop.className "swt:iconify swt:fluent--comment-24-regular swt:size-4"
-                                        prop.style [ style.color "#ffe699" ]
-                                        prop.onClick (fun e ->
-                                            Helperfuncs.updateAnnotation (
-                                                (fun e -> e.ToggleOpen()),
-                                                index,
-                                                annoState,
-                                                setState
-                                            )
-
-                                            let updatedAnnos =
-                                                annoState
-                                                |> List.mapi (fun i anno ->
-                                                    if i = index then
-                                                        anno.ToggleOpen()
-                                                    else
-                                                        { anno with IsOpen = false }
-                                                )
-
-                                            setState updatedAnnos
-                                        )
-                                    ]
-                                ]
-                            ]
+                            closedAnnotationNote
                         ]
                     ]
 
-                elif mapOfSameHeight[floor a.Height].Length = 1 && a.IsOpen = true then
+                else 
                     Html.div [
                         prop.className "swt:z-1! swt:relative"
                         prop.children [ annotationNote index true ]
                     ]
 
-                elif
-                    mapOfSameHeight[floor a.Height].Length > 1
-                    && not (mapOfSameHeight[floor a.Height] |> List.exists (fun anno -> anno.IsOpen))
-                then
-                    Html.div [
-                        prop.className "swt:z-0! swt:relative"
-                        prop.children [
-                            Html.div [
-                                prop.className "swt:flex swt:items-center swt:gap-2"
-                                prop.children [
-                                    Html.span [
-                                        prop.className
-                                            "swt:inline-flex swt:h-6 swt:w-6 swt:items-center swt:justify-center swt:rounded-full swt:bg-secondary swt:px-2 swt:py-0.5 swt:text-xs swt:font-semibold swt:text-white"
-                                        prop.text (string mapOfSameHeight[floor a.Height].Length)
-                                    ]
-                                    Html.button [
-                                        prop.className "swt:cursor-pointer"
-                                        prop.children [
-                                            Html.i [
-                                                prop.className "swt:iconify swt:fluent--comment-24-regular swt:size-4"
-                                                prop.style [ style.color "#ffe699" ]
-                                                prop.onClick (fun e ->
-                                                    let updatedAnnos =
-                                                        annoState
-                                                        |> List.mapi (fun i anno ->
-                                                            if i = index then
-                                                                anno.ToggleOpen()
-                                                            else
-                                                                { anno with IsOpen = false }
-                                                        )
-
-                                                    setState updatedAnnos
-                                                )
-                                            ]
-                                        ]
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-
-                elif mapOfSameHeight[floor a.Height].Length > 1 && a.IsOpen = true then //
-                    Html.div [
-                        prop.className "swt:z-1! swt:relative"
-                        prop.children [
-                            Html.div [
-                                prop.className
-                                    "swt:flex swt:flex-col swt:gap-2 swt:border-3 swt:border-secondary swt:p-2 swt:bg-white"
-                                prop.children [
-                                    closeButton index
-                                    for i in 0 .. mapOfSameHeight[floor a.Height].Length - 1 do
-                                        let newIndex =
-                                            annoState
-                                            |> List.findIndex (fun anno -> anno = mapOfSameHeight[floor a.Height][i])
-
-                                        annotationNote newIndex false
-                                ]
-                            ]
-                        ]
-                    ]
             ]
         ]
