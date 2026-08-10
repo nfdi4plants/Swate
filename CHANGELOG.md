@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Prevent deleted ARC table tabs from reappearing when adding a new table by applying tab operations to the current immutable editor state.
 -   Keep table-tab keys unambiguous by rejecting duplicate table names.
 -   Append imported templates to a fresh table model when the active table is empty.
+-   Allow hidden filesystem files such as `.DS_Store` to be deleted from ARC add-zone roots without treating them as ARC entities.
 
 ## 2.0.7 - 2026-08-06
 
