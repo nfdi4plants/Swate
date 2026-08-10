@@ -203,9 +203,28 @@ let tryGetTokenForHost (host: string) : string option =
                 None
         )
 
+/// Commit identity of the active account (used by GitIdentityProvider).
+/// The GitLab username is preferred over the display name so commits link to the account;
+/// accounts stored before usernames were persisted fall back to the display name.
+let tryGetCommitIdentity () : Main.Git.GitTokenProvider.GitCommitIdentity option =
+    getActiveAccountState ()
+    |> Option.map _.Summary.User
+    |> Option.map (fun user -> {
+        Name =
+            if String.IsNullOrWhiteSpace user.Username then
+                user.Name
+            else
+                user.Username
+        Email = user.Email
+    })
+
 let private refreshTokenProvider () =
     Main.Git.GitTokenProvider.setTokenProvider {
         TryGetAccessToken = fun host -> promise { return tryGetTokenForHost host }
+    }
+
+    Main.Git.GitTokenProvider.setIdentityProvider {
+        TryGetCommitIdentity = fun () -> promise { return tryGetCommitIdentity () }
     }
 
     Main.Git.GitTokenProvider.RemoteProvisioning.setProvider {

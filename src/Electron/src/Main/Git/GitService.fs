@@ -102,6 +102,17 @@ let private lfsInstallRequiredTokens = [|
     "clean filter 'lfs' failed"
 |]
 
+// Emitted by git when neither Swate nor the user's git config supplies a commit identity.
+let private identityMissingTokens = [|
+    "please tell me who you are"
+    "unable to auto-detect email address"
+    "author identity unknown"
+    "committer identity unknown"
+    "empty ident name"
+    "no name was given"
+    "no email was given"
+|]
+
 /// Classifies git/simple-git/LFS error text into the shared failure taxonomy used over IPC.
 let classifyFailureKind (message: string) =
     let normalizedMessage =
@@ -115,6 +126,8 @@ let classifyFailureKind (message: string) =
 
     if containsAny lfsInstallRequiredTokens then
         GitFailureKind.LfsInstallRequired
+    elif containsAny identityMissingTokens then
+        GitFailureKind.IdentityMissing
     elif
         containsAny [|
             "has already been taken"
@@ -169,9 +182,17 @@ let private buildLfsInstallPromptMessage (thresholdMb: int option) (details: str
     | Some value when not (String.IsNullOrWhiteSpace value) -> $"{prompt}\n\n{redactToken value}"
     | _ -> prompt
 
+// GitService owns this prompt because a missing identity is only actionable in Swate's own terms.
+let private identityMissingPromptMessage =
+    "Git does not know who you are, so it cannot record who made this commit. Sign in to your DataHub account in Swate, or set an identity yourself with 'git config --global user.name \"Your Name\"' and 'git config --global user.email \"you@example.com\"'."
+
 // GitService shapes the final failure because LFS install-required errors need workflow-specific wording.
 let private createFailure kind (message: string) : GitFailure =
     match kind with
+    | GitFailureKind.IdentityMissing -> {
+        Kind = kind
+        Message = $"{identityMissingPromptMessage}\n\n{message.Trim()}"
+      }
     | GitFailureKind.LfsInstallRequired ->
         let finalMessage =
             if message.IndexOf("Install Git LFS now?", StringComparison.OrdinalIgnoreCase) >= 0 then
@@ -1012,6 +1033,29 @@ let private createPullHydrationFailure (failure: GitFailure) = {
         Message = $"Git pull completed, but Git LFS download failed: {failure.Message}"
 }
 
+/// Config entries pinning the commit author to the signed-in DataHub account.
+/// Empty when no account is active, which leaves the identity to the user's own git config.
+/// Tests call this directly because the entries decide whether a commit can be linked to an account.
+let commitIdentityConfigEntries (identity: GitCommitIdentity option) =
+    match identity with
+    | Some account when
+        not (String.IsNullOrWhiteSpace account.Name)
+        && not (String.IsNullOrWhiteSpace account.Email)
+          ->
+          [|
+              $"user.name={account.Name.Trim()}"
+              $"user.email={account.Email.Trim()}"
+          |]
+    | _ -> [||]
+
+/// Resolves the commit identity of the signed-in account into git config entries.
+/// Shared by every session that can produce a commit, so the identity is never applied by hand.
+/// Tests call this directly because the pull path cannot be exercised against a local test remote.
+let resolveCommitIdentityConfigEntries () : JS.Promise<string[]> = promise {
+    let! identity = tryGetCommitIdentity ()
+    return commitIdentityConfigEntries identity
+}
+
 type private AuthenticatedGitSession = {
     Git: ISimpleGit
     CommandAuth: GitAuthAdapter.GitCommandAuthentication
@@ -1028,6 +1072,9 @@ let private createLocalGitSession arcPath progressCallback =
         }
     }
 
+/// Authenticated session for remote operations.
+/// The account identity travels with the token because remote operations can create commits too:
+/// a pull over divergent history writes a merge commit, which needs an author just like `commit` does.
 let private createAuthenticatedGitSession
     (arcPath: string)
     (remoteName: string)
@@ -1058,8 +1105,12 @@ let private createAuthenticatedGitSession
 
                     match tokenOption with
                     | Some token when not (String.IsNullOrWhiteSpace token) ->
+                        let! commitIdentityEntries = resolveCommitIdentityConfigEntries ()
+
                         try
-                            let operationOptions = createOptions arcPath syncTimeout progressCallback
+                            let operationOptions =
+                                createOptions arcPath syncTimeout progressCallback
+                                |> withConfigEntries commitIdentityEntries
 
                             let git =
                                 applyAuth
@@ -1152,6 +1203,24 @@ let private withLocalGitAndProgress
 
 let private withLocalGit (arcPath: string) (operation: ISimpleGit -> JS.Promise<'T>) : JS.Promise<GitResult<'T>> =
     withLocalGitAndProgress arcPath None operation
+
+/// Local git session for commit-producing operations.
+/// Commits must carry the signed-in account identity, otherwise git falls back to an OS-derived
+/// author that GitLab cannot link to the account.
+let private withCommitGit (arcPath: string) (operation: ISimpleGit -> JS.Promise<'T>) : JS.Promise<GitResult<'T>> = promise {
+    let! commitIdentityEntries = resolveCommitIdentityConfigEntries ()
+
+    let git =
+        createOptions arcPath standardTimeout None
+        |> withConfigEntries commitIdentityEntries
+        |> createGit
+
+    let! repoCheckResult = ensureRepo git
+
+    match repoCheckResult with
+    | Error repoError -> return errorResult repoError
+    | Ok() -> return! runSimpleGit operation git
+}
 
 type private RemoteUrlState =
     | RemoteMissing
@@ -2314,7 +2383,7 @@ let commit (arcPath: string) (message: string) : JS.Promise<GitResult<string>> =
         return errorResult (exn "Commit message must not be empty.")
     else
         return!
-            withLocalGit
+            withCommitGit
                 arcPath
                 (fun git -> promise {
                     let! lfsResult = validateCommitLfsPolicy git
@@ -2349,7 +2418,7 @@ let confirmMergeResolution
                 return unsupportedGitContentResult safeRequestedPath
             else
                 return!
-                    withLocalGit
+                    withCommitGit
                         arcPath
                         (fun git -> promise {
                             let! statusBeforeWrite = git.status ()

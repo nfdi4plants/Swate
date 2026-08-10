@@ -23,6 +23,30 @@ let setTokenProvider (provider: GitTokenProvider) = activeTokenProvider <- provi
 let tryGetAccessToken (host: string) : JS.Promise<string option> =
     activeTokenProvider.TryGetAccessToken host
 
+/// Author identity written into commits created by Swate.
+type GitCommitIdentity = { Name: string; Email: string }
+
+/// Main-process hook used by Git services to resolve the commit identity of the signed-in account.
+/// Without it git falls back to its OS-derived identity, which never links commits to a DataHub account.
+type GitIdentityProvider = {
+    TryGetCommitIdentity: unit -> JS.Promise<GitCommitIdentity option>
+}
+
+/// Provider used when no account is active. Returning None leaves the commit identity to the user's git config.
+let defaultIdentityProvider: GitIdentityProvider = {
+    TryGetCommitIdentity = fun () -> promise { return None }
+}
+
+let mutable private activeIdentityProvider: GitIdentityProvider =
+    defaultIdentityProvider
+
+/// Replaces the process-wide commit identity source used by subsequent Git operations.
+let setIdentityProvider (provider: GitIdentityProvider) = activeIdentityProvider <- provider
+
+/// Resolves the commit identity of the signed-in account, if any.
+let tryGetCommitIdentity () : JS.Promise<GitCommitIdentity option> =
+    activeIdentityProvider.TryGetCommitIdentity()
+
 module RemoteProvisioning =
 
     type Provider = {
