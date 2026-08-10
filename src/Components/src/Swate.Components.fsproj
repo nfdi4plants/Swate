@@ -64,6 +64,7 @@
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="swate-components.css" Pack="true" PackagePath="fable/" />
+    <Compile Include="..\..\Client\Model.fs" Link="Client\Model.fs" />
     <Compile Include="Types\StateContext.fs" />
     <Compile Include="Types\CellCoordinate.fs" />
     <Compile Include="Util\Download.fs" />
@@ -320,11 +321,12 @@
     <Compile Include="Page\BOAT\Extensions.fs"/>
     <Compile Include="Page\BOAT\Mammoth.fs"/>
     <Compile Include="Page\BOAT\ContextmenuFunctions.fs"/>
-    <Compile Include="Page\BOAT\Highlight.fs"/>
+    <Compile Include="Page\BOAT\DisplayHTML.fs"/>
     <Compile Include="Page\BOAT\FileUploader.fs"/>
     <Compile Include="Page\BOAT\PreviewTable.fs"/>
     <Compile Include="Page\BOAT\DownloadParser.fs"/>
     <Compile Include="Page\BOAT\ActionBar.fs"/>
+    <Compile Include="Page\BOAT\AnnoBlock.fs"/>
     <Compile Include="Page\BOAT\Builder.fs"/>
     <Compile Include="Page\BOAT\BOAT.fs" />
     <Compile Include="Style.fs" />

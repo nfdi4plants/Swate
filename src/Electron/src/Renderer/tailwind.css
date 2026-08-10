@@ -234,6 +234,16 @@
     }
 }
 
+::highlight(keyColor) {
+    background-color: #ffe699;
+}
+::highlight(termColor) {
+    background-color: #4fb3d9;
+}
+::highlight(valueColor) {
+    background-color: #4fd984;
+}
+
 /* ProvenanceGrouping connector motion. Kept in sync with src/Components/tailwind.css
    (like scrollbar-fade below): the Renderer builds its own Tailwind bundle, so custom
    utilities from the components package must be repeated here. */

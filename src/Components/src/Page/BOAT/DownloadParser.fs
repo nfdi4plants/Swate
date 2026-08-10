@@ -3,6 +3,8 @@ namespace Components
 open ARCtrl
 open Fable.Remoting.Client
 open Types
+open FsSpreadsheet.Js
+open ARCtrl.Json
 
 module Templates =
     let userTablewithColumns (annoState: Annotation list, fileName: string) =
@@ -29,10 +31,6 @@ module Templates =
             lastUpdated = System.DateTime.UtcNow
             
         )
-
-open FsSpreadsheet.Js
-open ARCtrl.Json
-
 
 module DownloadParser =
 

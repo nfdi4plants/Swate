@@ -89,7 +89,7 @@ type Builder =
 
         let paper (display: ReactElement) =
             Html.div [
-                prop.className "swt:overflow-y-auto swt:h-full swt:flex swt:flex-row swt:gap-2 swt:w-full swt:relative swt:p-2"
+                prop.className "swt:overflow-y-auto swt:h-full swt:flex swt:flex-row swt:w-full swt:relative swt:px-8"
                 prop.children [
                     Html.div [
                         prop.className "swt:w-full"
