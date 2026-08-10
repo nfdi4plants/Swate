@@ -11,12 +11,30 @@ open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
 
 [<ReactComponent>]
-let ArcFilePreviewTarget (arcFile: ArcFiles, startingActiveView: ActiveView option) =
+let ArcFilePreviewTarget (arcFile: ArcFiles, currentActiveView: ActiveView option) =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let errorModal = useErrorModalCtx ()
 
+    let activeView =
+        currentActiveView
+        |> Option.defaultValue ActiveView.Metadata
+        |> fun requestedView -> ActiveView.Forward(arcFile, requestedView)
+
+    let editorStateRef = React.useRef (arcFile, activeView)
+
+    React.useEffect ((fun () -> editorStateRef.current <- arcFile, activeView), [| box arcFile; box activeView |])
+
+    let publishEditorState (nextArcFile, nextActiveView) =
+        editorStateRef.current <- nextArcFile, nextActiveView
+        pageStateCtx.setState (Some(Renderer.Types.PageState.ArcFilePage(nextArcFile, Some nextActiveView)))
+
     let setArcFilePageState (nextArcFile: ArcFiles) =
-        pageStateCtx.setState (Some(Renderer.Types.PageState.ArcFilePage(nextArcFile, startingActiveView)))
+        let _, currentActiveView = editorStateRef.current
+        publishEditorState (nextArcFile, currentActiveView)
+
+    let setActiveView (nextActiveView: ActiveView) =
+        let currentArcFile, _ = editorStateRef.current
+        publishEditorState (currentArcFile, nextActiveView)
 
     let updateArcFileInMemory (nextArcFile: ArcFiles) = Helper.setArcFileInMemory nextArcFile
 
@@ -112,8 +130,9 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, startingActiveView: ActiveView opti
         arcFile,
         setArcFile,
         pickFilePaths,
+        activeView,
+        setActiveView,
         widgetNavbarElements = widgetNavbarElements,
-        startingActiveView = (startingActiveView |> Option.defaultValue ActiveView.Metadata),
         onImportJson = importJson,
         onError =
             (fun message ->

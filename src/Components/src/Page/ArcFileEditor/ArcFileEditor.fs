@@ -284,50 +284,16 @@ type Main =
             arcFile: ArcFiles,
             setArcFile: ArcFiles -> unit,
             pickPaths: unit -> Fable.Core.JS.Promise<string[]>,
+            activeView: ActiveView,
+            setActiveView: ActiveView -> unit,
             ?widgetNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?trailingNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
-            ?startingActiveView: ActiveView,
             ?onImportJson: JsonImportRequest -> JS.Promise<Result<unit, exn>>,
             ?onError: string -> unit
         ) =
 
         let onError =
             defaultArg onError (fun errorMsg -> console.error ("Error in ArcFileEditor: " + errorMsg))
-
-        let activeView, setActiveView =
-            React.useState (startingActiveView |> Option.defaultValue ActiveView.Metadata)
-
-        let arcFileNavigationKey =
-            arcFile.TryGetRelativePath()
-            |> Option.defaultValue (string arcFile.RelatedArcFilesDiscriminate)
-
-        let startingActiveViewKey =
-            startingActiveView |> Option.map _.ViewIndex |> Option.defaultValue -3
-
-        let navigationRequest = arcFileNavigationKey, startingActiveViewKey
-        let previousNavigationRequest = React.useRef navigationRequest
-
-        React.useEffect (
-            (fun () ->
-                let requestedActiveView =
-                    if previousNavigationRequest.current <> navigationRequest then
-                        previousNavigationRequest.current <- navigationRequest
-                        startingActiveView |> Option.defaultValue ActiveView.Metadata
-                    else
-                        activeView
-
-                let nextActiveView = ActiveView.Forward(arcFile, requestedActiveView)
-
-                setActiveView nextActiveView
-            ),
-            [|
-                box arcFileNavigationKey
-                box startingActiveViewKey
-                box (arcFile.Tables().Count)
-                box (arcFile.CanRenderDataMapView())
-                box (arcFile.HasMetadata())
-            |]
-        )
 
         let headerProps = {
             arcFile = arcFile
@@ -474,6 +440,8 @@ type Main =
             )
 
         let (arcFile: ArcFiles), setArcFile = React.useState (ArcFiles.Assay(startAssay))
+        let requestedActiveView, setActiveView = React.useState (ActiveView.Table 0)
+        let activeView = ActiveView.Forward(arcFile, requestedActiveView)
 
         let loadTemplates =
             fun () ->
@@ -534,6 +502,6 @@ type Main =
             loadTemplates,
             React.Fragment [
                 ColumnCountTestDisplay()
-                Main.ArcFileEditor(arcFile, setArcFile, pickPathsMockFn, startingActiveView = ActiveView.Table 0)
+                Main.ArcFileEditor(arcFile, setArcFile, pickPathsMockFn, activeView, setActiveView)
             ]
         )
