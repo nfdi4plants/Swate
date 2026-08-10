@@ -696,6 +696,7 @@ type DataHubBrowser =
                 Username = "storybook-user"
                 Name = "storybook-user"
                 Email = "Storybook User"
+                CommitEmail = None
                 AvatarUrl = ""
                 TargetDataHub = ""
             }
@@ -1065,6 +1066,7 @@ type DataHubBrowser =
                             Name = user.name
                             AvatarUrl = user.avatar_url |> Option.defaultValue ""
                             Email = user.email
+                            CommitEmail = user.commit_email
                             TargetDataHub = baseUrl
                         }
                         DateAdded = "2026-01-01T00:00:00.0000000Z"

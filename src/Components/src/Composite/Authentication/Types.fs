@@ -66,6 +66,8 @@ type AuthUserDto = {
     Username: string
     Name: string
     Email: string
+    /// GitLab commit email; a noreply address when the account keeps its email private in commits.
+    CommitEmail: string option
     AvatarUrl: string
     TargetDataHub: string
 } with
@@ -76,6 +78,7 @@ type AuthUserDto = {
         Username = gitLabUser.username
         Name = gitLabUser.name
         Email = gitLabUser.email
+        CommitEmail = Some gitLabUser.commit_email
         AvatarUrl = gitLabUser.avatar_url
         TargetDataHub = targetDataHub
     }

@@ -421,6 +421,7 @@ type Authentication =
         Username = "john-doe"
         Name = "John Doe"
         Email = "john-doe@mail.com"
+        CommitEmail = None
         AvatarUrl = "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y"
         TargetDataHub = Helper.Default_DataHub_Url
     }
@@ -485,6 +486,7 @@ type Authentication =
                                     Username = "max-mustermann"
                                     Name = "Max Mustermann"
                                     Email = "max@example.org"
+                                    CommitEmail = None
                                     AvatarUrl =
                                         "https://www.gravatar.com/avatar/22222222222222222222222222222222?d=mp&f=y"
                                     TargetDataHub = "https://datahub.rz.rptu.de/"
@@ -500,6 +502,7 @@ type Authentication =
                                     Username = "mr-lazy"
                                     Name = "Mr Lazy"
                                     Email = "lazy@example.org"
+                                    CommitEmail = None
                                     AvatarUrl =
                                         "https://www.gravatar.com/avatar/33333333333333333333333333333333?d=mp&f=y"
                                     TargetDataHub = "https://git.nfdi4plants.org/"

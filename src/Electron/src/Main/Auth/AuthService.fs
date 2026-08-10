@@ -146,6 +146,7 @@ let private toMetadata (localSwateAccountId: string) (summary: AccountSummary) :
     Username = summary.User.Username
     Name = summary.User.Name
     Email = summary.User.Email
+    CommitEmail = summary.User.CommitEmail
     AvatarUrl = summary.User.AvatarUrl
     TargetDataHub = summary.User.TargetDataHub
     DateAdded = summary.DateAdded
@@ -203,20 +204,27 @@ let tryGetTokenForHost (host: string) : string option =
                 None
         )
 
-/// Commit identity of the active account (used by GitIdentityProvider).
+/// Commit identity of an account user.
 /// The GitLab username is preferred over the display name so commits link to the account;
 /// accounts stored before usernames were persisted fall back to the display name.
+/// The commit email is preferred over the primary email so GitLab's
+/// "use a private email in commits" setting is respected; GitLab links noreply addresses too.
+/// Tests call this directly because it decides which identity ends up in a commit.
+let commitIdentityOfUser (user: AuthUserDto) : Main.Git.GitTokenProvider.GitCommitIdentity = {
+    Name =
+        if String.IsNullOrWhiteSpace user.Username then
+            user.Name
+        else
+            user.Username
+    Email =
+        match user.CommitEmail with
+        | Some commitEmail when not (String.IsNullOrWhiteSpace commitEmail) -> commitEmail
+        | _ -> user.Email
+}
+
+/// Commit identity of the active account (used by GitIdentityProvider).
 let tryGetCommitIdentity () : Main.Git.GitTokenProvider.GitCommitIdentity option =
-    getActiveAccountState ()
-    |> Option.map _.Summary.User
-    |> Option.map (fun user -> {
-        Name =
-            if String.IsNullOrWhiteSpace user.Username then
-                user.Name
-            else
-                user.Username
-        Email = user.Email
-    })
+    getActiveAccountState () |> Option.map _.Summary.User |> Option.map commitIdentityOfUser
 
 let private refreshTokenProvider () =
     Main.Git.GitTokenProvider.setTokenProvider {
@@ -598,6 +606,7 @@ let tryRestoreFromStorage () : unit =
             Username = credential.Metadata.Username
             Name = credential.Metadata.Name
             Email = credential.Metadata.Email
+            CommitEmail = credential.Metadata.CommitEmail
             AvatarUrl = credential.Metadata.AvatarUrl
             TargetDataHub = credential.Metadata.TargetDataHub
         }

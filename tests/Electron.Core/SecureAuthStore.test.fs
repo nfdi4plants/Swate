@@ -121,6 +121,7 @@ Vitest.describe (
                             Username = "current-user"
                             Name = "Current User"
                             Email = "current@example.org"
+                            CommitEmail = Some "42-current-user@users.noreply.datahub.example.org"
                             AvatarUrl = "https://example.org/avatar.png"
                             TargetDataHub = "https://datahub.example.org"
                             DateAdded = "2026-06-09T07:00:00.000Z"
