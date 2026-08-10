@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Consolidate Electron ARC editor page state, safely resolve canonical entity workbooks, and reuse shared path normalization for ARC-root-relative references.
 -   Harden canonical entity path resolution for Electron rename and delete operations, and document the behavior of the shared path-normalization helpers.
 
+### Fixed
+
+-   Prevent deleted ARC table tabs from reappearing when adding a new table by applying tab operations to the current immutable editor state.
+-   Keep table-tab keys unambiguous by rejecting duplicate table names.
+-   Append imported templates to a fresh table model when the active table is empty.
+
 ## 2.0.7 - 2026-08-06
 
 ### Added
