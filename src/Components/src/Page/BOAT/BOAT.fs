@@ -89,9 +89,9 @@ type BOAT =
                                 setFileName,
                                 setLocalFileName
 
-                                )
-                            // | Types.Page.Contact -> Components.Contact.Main()
-                            // | Types.Page.Help -> Components.Help.Main()
+                            )
+                        // | Types.Page.Contact -> Components.Contact.Main()
+                        // | Types.Page.Help -> Components.Help.Main()
                         ]
                     ]
                 ]

@@ -77,7 +77,10 @@ type Builder =
                         prop.className
                             "swt:p-2 swt:md:p-5 swt:lg:p-10 swt:flex swt:justify-center swt:items-center swt:flex-col swt:bg-base-200/80 swt:shadow-lg swt:rounded-lg swt:max-w-2xl swt:border swt:border-primary"
                         prop.children [
-                            Html.h1 [ prop.className "swt:my-2"; prop.text "Select file here for process annotations:" ]
+                            Html.h1 [
+                                prop.className "swt:my-2"
+                                prop.text "Select file here for process annotations:"
+                            ]
 
                             Html.div [
                                 FileUpload.UploadDisplay(filehtml, setFilehtml, setState, setFileName, setLocalFileName)
@@ -120,37 +123,25 @@ type Builder =
                             text = Html.span "Key",
                             onClick =
                                 fun _ ->
-                                    FunctionsContextmenu.addAnnotationKeyNew(
-                                        annoState,
-                                        setState,
-                                        elementID,
-                                        highlight,
-                                        setHighlight
-                                    ) ()
+                                    FunctionsContextmenu.addAnnotationKeyNew
+                                        (annoState, setState, elementID, highlight, setHighlight)
+                                        ()
                         )
                         Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(
                             text = Html.span "Term",
                             onClick =
                                 fun _ ->
-                                    FunctionsContextmenu.addAnnotationBodyNew(
-                                        annoState,
-                                        setState,
-                                        elementID,
-                                        highlight,
-                                        setHighlight
-                                    ) ()
+                                    FunctionsContextmenu.addAnnotationBodyNew
+                                        (annoState, setState, elementID, highlight, setHighlight)
+                                        ()
                         )
                         Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(
                             text = Html.span "Value",
                             onClick =
                                 fun _ ->
-                                    FunctionsContextmenu.addAnnotationValueNew(
-                                        annoState,
-                                        setState,
-                                        elementID,
-                                        highlight,
-                                        setHighlight
-                                    ) ()
+                                    FunctionsContextmenu.addAnnotationValueNew
+                                        (annoState, setState, elementID, highlight, setHighlight)
+                                        ()
                         )
                         Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(isDivider = true)
                         Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(
@@ -164,34 +155,25 @@ type Builder =
                             text = Html.span "Key",
                             onClick =
                                 fun _ ->
-                                    FunctionsContextmenu.addToLastAnnoAsKey(
-                                        annoState,
-                                        setState,
-                                        highlight,
-                                        setHighlight
-                                    ) ()
+                                    FunctionsContextmenu.addToLastAnnoAsKey
+                                        (annoState, setState, highlight, setHighlight)
+                                        ()
                         )
                         Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(
                             text = Html.span "Term",
                             onClick =
                                 fun _ ->
-                                    FunctionsContextmenu.addToLastAnnoAsBody(
-                                        annoState,
-                                        setState,
-                                        highlight,
-                                        setHighlight
-                                    ) ()
+                                    FunctionsContextmenu.addToLastAnnoAsBody
+                                        (annoState, setState, highlight, setHighlight)
+                                        ()
                         )
                         Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(
                             text = Html.span "Value",
                             onClick =
                                 fun _ ->
-                                    FunctionsContextmenu.addToLastAnnoAsValue(
-                                        annoState,
-                                        setState,
-                                        highlight,
-                                        setHighlight
-                                    ) ()
+                                    FunctionsContextmenu.addToLastAnnoAsValue
+                                        (annoState, setState, highlight, setHighlight)
+                                        ()
                         )
                     ]),
                 ref = contextMenuRef,
@@ -199,10 +181,7 @@ type Builder =
                     (fun e ->
                         let term = window.getSelection().ToString().Trim()
 
-                        if term.Length <> 0 then
-                            Some(box term)
-                        else
-                            None
+                        if term.Length <> 0 then Some(box term) else None
                     )
             )
 

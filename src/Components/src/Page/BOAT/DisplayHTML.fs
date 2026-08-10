@@ -37,7 +37,7 @@ type PaperWithMarker =
         let ref = React.useElementRef ()
         let markedNodes, setMarkedNodes = React.useState (ResizeArray())
 
-        React.useEffect(
+        React.useEffect (
             (fun () ->
                 if ref.current.IsSome then
                     // https://developer.mozilla.org/en-US/docs/Web/API/Document/createTreeWalker
@@ -158,4 +158,3 @@ type PaperWithMarker =
             prop.id elementID
             prop.ref ref
         ]
-

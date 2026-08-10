@@ -15,38 +15,41 @@ open System.Threading.Tasks
 
 module PDFjs =
 
-  importSideEffects "react-pdf/dist/Page/TextLayer.css"
-  importSideEffects "react-pdf/dist/Page/AnnotationLayer.css"
-  emitJsStatement () """import { pdfjs } from 'react-pdf';
+    importSideEffects "react-pdf/dist/Page/TextLayer.css"
+    importSideEffects "react-pdf/dist/Page/AnnotationLayer.css"
+
+    emitJsStatement
+        ()
+        """import { pdfjs } from 'react-pdf';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;"""
 
 module RemarkImport =
 
-  [<Import("default", "rehype-raw")>]
-  let rehypeRaw: obj = jsNative
-  
-  [<Import("default", "rehype-stringify")>]
-  let rehypeStringify: obj = jsNative
+    [<Import("default", "rehype-raw")>]
+    let rehypeRaw: obj = jsNative
 
-  [<Import("default", "remark-gfm")>]
-  let remarkGfm: obj = jsNative
-  
-  [<Import("default", "remark-parse")>]
-  let remarkParse: obj = jsNative
+    [<Import("default", "rehype-stringify")>]
+    let rehypeStringify: obj = jsNative
 
-  [<Import("default", "remark-rehype")>]
-  let remarkRehype: obj = jsNative
+    [<Import("default", "remark-gfm")>]
+    let remarkGfm: obj = jsNative
 
-  [<Import("unified", "unified")>]
-  let unified: unit -> obj  = jsNative
+    [<Import("default", "remark-parse")>]
+    let remarkParse: obj = jsNative
+
+    [<Import("default", "remark-rehype")>]
+    let remarkRehype: obj = jsNative
+
+    [<Import("unified", "unified")>]
+    let unified: unit -> obj = jsNative
 
 
-  // let rehypeStringify: obj = importDefault "rehype-stringify"
-  // let remarkGfm: obj = importDefault "remark-gfm"
-  // let remarkParse: obj = importDefault "remark-parse"
-  // let remarkRehype: obj = importDefault "remark-rehype"
-  // let unified: obj -> unit = importMember "unified"
+// let rehypeStringify: obj = importDefault "rehype-stringify"
+// let remarkGfm: obj = importDefault "remark-gfm"
+// let remarkParse: obj = importDefault "remark-parse"
+// let remarkRehype: obj = importDefault "remark-rehype"
+// let unified: obj -> unit = importMember "unified"
 
 // type Remark =
 
@@ -58,213 +61,233 @@ module RemarkImport =
 //   static member unified: unit -> unit = jsNative
 
 type ReactElements =
-  [<ReactComponent(import="Document", from="react-pdf")>]
-  static member Document (file: string, onLoadSuccess: {|numPages: int|} -> unit, children: ReactElement list, ?externalLinkTarget: string, ?onLoadError: exn -> unit, ?loading: ReactElement) = React.Imported()
+    [<ReactComponent(import = "Document", from = "react-pdf")>]
+    static member Document
+        (
+            file: string,
+            onLoadSuccess: {| numPages: int |} -> unit,
+            children: ReactElement list,
+            ?externalLinkTarget: string,
+            ?onLoadError: exn -> unit,
+            ?loading: ReactElement
+        ) =
+        React.Imported()
 
-  [<ReactComponent(import="Page", from="react-pdf")>]
-  static member Page (pageNumber: int, width: int, customTextRenderer:'c -> string, ?key: string) = React.Imported()
+    [<ReactComponent(import = "Page", from = "react-pdf")>]
+    static member Page(pageNumber: int, width: int, customTextRenderer: 'c -> string, ?key: string) = React.Imported()
 
 module private FileReaderHelper =
-  open Fable.Core
-  open Fable.Core.JsInterop
+    open Fable.Core
+    open Fable.Core.JsInterop
 
-  [<Emit("new FileReader()")>]
-  let newFileReader(): Browser.Types.FileReader = jsNative
+    [<Emit("new FileReader()")>]
+    let newFileReader () : Browser.Types.FileReader = jsNative
 
-  let readDocx (file: Browser.Types.File) setState setLocalFile = 
-    let reader = newFileReader()
-    reader.onload <- fun e ->
-      let arrayBuffer = e.target?result
-      promise {
-        let! r = Mammoth.mammoth.convertToHtml({|arrayBuffer = arrayBuffer|})
-        (Docx r.value)
-        |> fun t ->
-          t |> setState
-          t |> setLocalFile "file"
-      }
-      |> Promise.start
+    let readDocx (file: Browser.Types.File) setState setLocalFile =
+        let reader = newFileReader ()
 
-    reader.onerror <- fun e ->
-      Browser.Dom.console.error ("Error reading file", e)
-    reader.readAsArrayBuffer(file)
- 
+        reader.onload <-
+            fun e ->
+                let arrayBuffer = e.target?result
 
-  let inline usePlugin (plugin: obj) (instance: obj): obj = instance?``use``(plugin)
-  let inline usePluginWithOpts (plugin: obj) (opts: obj) (instance: obj): obj = instance?``use``(plugin, opts)
+                promise {
+                    let! r = Mammoth.mammoth.convertToHtml ({| arrayBuffer = arrayBuffer |})
 
-  // Bind `process` properly via Emit
-  [<Emit("$0.process($1)")>]
-  let processUnified (processor: obj) (markdown: string) : JS.Promise<obj> = jsNative
+                    (Docx r.value)
+                    |> fun t ->
+                        t |> setState
+                        t |> setLocalFile "file"
+                }
+                |> Promise.start
 
-  let processMarkdown (markdown: string): JS.Promise<obj> =
-      let processor =
-          RemarkImport.unified()
-          |> usePlugin RemarkImport.remarkParse
-          |> usePlugin RemarkImport.remarkGfm
-          |> usePluginWithOpts RemarkImport.remarkRehype {| allowDangerousHtml = true |}
-          |> usePlugin RemarkImport.rehypeRaw
-          |> usePlugin RemarkImport.rehypeStringify
+        reader.onerror <- fun e -> Browser.Dom.console.error ("Error reading file", e)
+        reader.readAsArrayBuffer (file)
 
-      promise {
-          let! result = processUnified processor markdown
-          return result 
-      }
 
-  let readTxt (file: Browser.Types.File) setState setLocalFile = 
-    let reader = newFileReader()
-    reader.onload <- fun e ->
-      let text = reader.result |> unbox<string>
-      let fileEnding = file.name.Split('.').[1]
-      if fileEnding = "md" then 
-        let prom = processMarkdown text
-        prom.``then``(fun result ->
-          let markdownString = result?value
-          setState (Txt markdownString)
-          setLocalFile "file" (Txt markdownString) 
-        ) |> Promise.start
-      else 
-        setState (Txt (text.ToString()))
-        setLocalFile "file" (Txt (text.ToString()))
+    let inline usePlugin (plugin: obj) (instance: obj) : obj = instance?``use`` (plugin)
+    let inline usePluginWithOpts (plugin: obj) (opts: obj) (instance: obj) : obj = instance?``use`` (plugin, opts)
 
-    reader.onerror <- fun e ->
-      Browser.Dom.console.error ("Error reading file", e)
-    reader.readAsText(file)
+    // Bind `process` properly via Emit
+    [<Emit("$0.process($1)")>]
+    let processUnified (processor: obj) (markdown: string) : JS.Promise<obj> = jsNative
 
-  let readPdf (file: Browser.Types.File) setState setLocalFile = //put pdf to html string converter
-    let reader = newFileReader()
-    reader.onload <- fun e ->
-      let base64 = reader.result
-      setState (PDF (base64.ToString()))
-      setLocalFile "file" (PDF (base64.ToString()))
+    let processMarkdown (markdown: string) : JS.Promise<obj> =
+        let processor =
+            RemarkImport.unified ()
+            |> usePlugin RemarkImport.remarkParse
+            |> usePlugin RemarkImport.remarkGfm
+            |> usePluginWithOpts RemarkImport.remarkRehype {| allowDangerousHtml = true |}
+            |> usePlugin RemarkImport.rehypeRaw
+            |> usePlugin RemarkImport.rehypeStringify
 
-    reader.readAsDataURL(file); // Converts to base64
+        promise {
+            let! result = processUnified processor markdown
+            return result
+        }
 
-  let readFromFile (file: Browser.Types.File) setState (fileType: UploadFileType) setLocalFile =
-    match fileType with
-    | UploadFileType.Docx -> readDocx file setState setLocalFile
-    | UploadFileType.PDF -> readPdf file setState setLocalFile
-    | UploadFileType.Txt -> readTxt file setState setLocalFile
+    let readTxt (file: Browser.Types.File) setState setLocalFile =
+        let reader = newFileReader ()
+
+        reader.onload <-
+            fun e ->
+                let text = reader.result |> unbox<string>
+                let fileEnding = file.name.Split('.').[1]
+
+                if fileEnding = "md" then
+                    let prom = processMarkdown text
+
+                    prom.``then`` (fun result ->
+                        let markdownString = result?value
+                        setState (Txt markdownString)
+                        setLocalFile "file" (Txt markdownString)
+                    )
+                    |> Promise.start
+                else
+                    setState (Txt(text.ToString()))
+                    setLocalFile "file" (Txt(text.ToString()))
+
+        reader.onerror <- fun e -> Browser.Dom.console.error ("Error reading file", e)
+        reader.readAsText (file)
+
+    let readPdf (file: Browser.Types.File) setState setLocalFile = //put pdf to html string converter
+        let reader = newFileReader ()
+
+        reader.onload <-
+            fun e ->
+                let base64 = reader.result
+                setState (PDF(base64.ToString()))
+                setLocalFile "file" (PDF(base64.ToString()))
+
+        reader.readAsDataURL (file) // Converts to base64
+
+    let readFromFile (file: Browser.Types.File) setState (fileType: UploadFileType) setLocalFile =
+        match fileType with
+        | UploadFileType.Docx -> readDocx file setState setLocalFile
+        | UploadFileType.PDF -> readPdf file setState setLocalFile
+        | UploadFileType.Txt -> readTxt file setState setLocalFile
 
 module Lists =
 
-  let keyList (highlight: Highlight)= 
-    highlight.Keys
-    |> Map.toArray
-    |> Array.map snd
+    let keyList (highlight: Highlight) =
+        highlight.Keys |> Map.toArray |> Array.map snd
 
-  let termList (highlight: Highlight)= 
-    highlight.Terms
-    |> Map.toArray
-    |> Array.map snd
+    let termList (highlight: Highlight) =
+        highlight.Terms |> Map.toArray |> Array.map snd
 
-  let valueList (highlight: Highlight)= 
-    highlight.Values
-    |> Map.toArray
-    |> Array.map snd
+    let valueList (highlight: Highlight) =
+        highlight.Values |> Map.toArray |> Array.map snd
 
-  // let termlist (annoList: Annotation list) = 
-  //   annoList
-  //   |> List.collect (fun a -> a.Highlight.Terms |> Map.toList |> List.map snd)
-  //   |> List.toArray
-  //   |> Array.filter (fun term -> term <> "")
+// let termlist (annoList: Annotation list) =
+//   annoList
+//   |> List.collect (fun a -> a.Highlight.Terms |> Map.toList |> List.map snd)
+//   |> List.toArray
+//   |> Array.filter (fun term -> term <> "")
 
-    
 
-  // let valuelist (annoList: Annotation list) =
-  //   annoList
-  //   |> List.map (fun a -> a.HighlightValues)
-  //   |> List.toArray
-  //   |> Array.filter (fun a -> a <> "")
+
+// let valuelist (annoList: Annotation list) =
+//   annoList
+//   |> List.map (fun a -> a.HighlightValues)
+//   |> List.toArray
+//   |> Array.filter (fun a -> a <> "")
 
 type FileUpload =
-    static member DisplayHtml(htmlString: string, highList: Highlight, elementID: string, isLocalStorageClear) = 
-      Html.div [
-        prop.className "swt:flex swt:w-full swt:justify-center"
-        prop.children [
-          PaperWithMarker.Main(htmlString, Lists.keyList highList, Lists.termList highList, Lists.valueList highList, elementID, isLocalStorageClear)
+    static member DisplayHtml(htmlString: string, highList: Highlight, elementID: string, isLocalStorageClear) =
+        Html.div [
+            prop.className "swt:flex swt:w-full swt:justify-center"
+            prop.children [
+                PaperWithMarker.Main(
+                    htmlString,
+                    Lists.keyList highList,
+                    Lists.termList highList,
+                    Lists.valueList highList,
+                    elementID,
+                    isLocalStorageClear
+                )
+            ]
         ]
-      ]
 
     [<ReactComponent>]
-  //  https://stackoverflow.com/a/60539836/12858021
-    static member DisplayPDF filehtml setNumPages (numPages: int option) (elementID: string) (highList: Highlight)  =
+    //  https://stackoverflow.com/a/60539836/12858021
+    static member DisplayPDF filehtml setNumPages (numPages: int option) (elementID: string) (highList: Highlight) =
 
-      let highlightPattern(text: string, anno: string, colorcode) = 
-        text.Replace(anno, sprintf "<mark style='background-color: %s'>%s</mark>" colorcode anno)
-      // #ffe699
-      // #4fb3d9
+        let highlightPattern (text: string, anno: string, colorcode) =
+            text.Replace(anno, sprintf "<mark style='background-color: %s'>%s</mark>" colorcode anno)
+        // #ffe699
+        // #4fb3d9
 
-      let textRender =
-        React.useCallback(
-          (fun text -> 
-            let mutable txt = text?str
-            for a in Lists.keyList highList do
-              txt <- highlightPattern(txt, a, "#ffe699")
-            for a in Lists.termList highList do
-              txt <- highlightPattern(txt, a, "#4fb3d9")
-            for a in Lists.valueList highList do
-              txt <- highlightPattern(txt, a, "#4fd984")
-            txt
-          ),
-          [|box highList|]
-        )
+        let textRender =
+            React.useCallback (
+                (fun text ->
+                    let mutable txt = text?str
 
-      Html.div [
-        prop.className "swt:flex swt:w-full swt:justify-center"
-        prop.id elementID
-        prop.children [
-          ReactElements.Document(
-            filehtml, 
-            (fun (props: {|numPages: int|}) -> 
-              setNumPages (Some props.numPages)), 
-            //virtualize this list
-            [
-              for i in 1 .. numPages |> Option.defaultValue 1 do
-                ReactElements.Page(
-                  i, 
-                  750,
-                  textRender,
-                  $"page-{i}")
-            ],
-            externalLinkTarget = "_blank",
-            onLoadError = (fun e -> Browser.Dom.console.error ("Error loading PDF:", e)),
-            loading = LoadingSpinner.LoadingSpinner("Loading PDF", size = DaisyuiSize.XL)
-          )
+                    for a in Lists.keyList highList do
+                        txt <- highlightPattern (txt, a, "#ffe699")
+
+                    for a in Lists.termList highList do
+                        txt <- highlightPattern (txt, a, "#4fb3d9")
+
+                    for a in Lists.valueList highList do
+                        txt <- highlightPattern (txt, a, "#4fd984")
+
+                    txt
+                ),
+                [| box highList |]
+            )
+
+        Html.div [
+            prop.className "swt:flex swt:w-full swt:justify-center"
+            prop.id elementID
+            prop.children [
+                ReactElements.Document(
+                    filehtml,
+                    (fun (props: {| numPages: int |}) -> setNumPages (Some props.numPages)),
+                    //virtualize this list
+                    [
+                        for i in 1 .. numPages |> Option.defaultValue 1 do
+                            ReactElements.Page(i, 750, textRender, $"page-{i}")
+                    ],
+                    externalLinkTarget = "_blank",
+                    onLoadError = (fun e -> Browser.Dom.console.error ("Error loading PDF:", e)),
+                    loading = LoadingSpinner.LoadingSpinner("Loading PDF", size = DaisyuiSize.XL)
+                )
+            ]
         ]
-      ]
 
     [<ReactComponent>]
-    static member private FileInput setState setFilehtml setLocalFile setFileName setLocalFileName=
-      let ref = React.useInputRef()
-      Html.input [
-        prop.className "swt:file-input swt:join-item"
-        prop.ref ref
-        prop.type'.file
-        prop.accept ".docx, .pdf, .txt, .md"
-        prop.onChange (fun (f: Browser.Types.File) -> 
-          let fileType =
-            match f.``type`` with
-            |"application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> UploadFileType.Docx
-            |"application/pdf" -> UploadFileType.PDF
-            | _-> UploadFileType.Txt
+    static member private FileInput setState setFilehtml setLocalFile setFileName setLocalFileName =
+        let ref = React.useInputRef ()
 
-          log fileType
-          FileReaderHelper.readFromFile f setFilehtml fileType setLocalFile
-          if ref.current.IsSome then
-            ref.current.Value.value <- null
+        Html.input [
+            prop.className "swt:file-input swt:join-item"
+            prop.ref ref
+            prop.type'.file
+            prop.accept ".docx, .pdf, .txt, .md"
+            prop.onChange (fun (f: Browser.Types.File) ->
+                let fileType =
+                    match f.``type`` with
+                    | "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> UploadFileType.Docx
+                    | "application/pdf" -> UploadFileType.PDF
+                    | _ -> UploadFileType.Txt
 
-          setFileName f.name
-          setLocalFileName "fileName" f.name
-          setState []
-        )
-      ]
+                log fileType
+                FileReaderHelper.readFromFile f setFilehtml fileType setLocalFile
+
+                if ref.current.IsSome then
+                    ref.current.Value.value <- null
+
+                setFileName f.name
+                setLocalFileName "fileName" f.name
+                setState []
+            )
+        ]
 
     [<ReactComponent>]
     static member UploadDisplay(filehtml, setFilehtml, setState, setFileName, setLocalFileName) =
 
         let setLocalFile (id: string) (nextFile: UploadedFile) =
-            let JSONString = Json.stringify nextFile 
-            Browser.WebStorage.localStorage.setItem(id, JSONString)
+            let JSONString = Json.stringify nextFile
+            Browser.WebStorage.localStorage.setItem (id, JSONString)
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:gap-2"
@@ -276,4 +299,3 @@ type FileUpload =
                 ]
             ]
         ]
-

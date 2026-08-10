@@ -4,22 +4,22 @@ open ARCtrl
 
 [<RequireQualifiedAccess>]
 type CompositeHeaderDiscriminate =
-| Component
-| Characteristic
-| Factor
-| Parameter
-| ProtocolType
-| ProtocolDescription
-| ProtocolUri
-| ProtocolVersion
-| ProtocolREF
-| Performer
-| Date
-| Input
-| Output
-| Comment
-| Freetext
-with
+    | Component
+    | Characteristic
+    | Factor
+    | Parameter
+    | ProtocolType
+    | ProtocolDescription
+    | ProtocolUri
+    | ProtocolVersion
+    | ProtocolREF
+    | Performer
+    | Date
+    | Input
+    | Output
+    | Comment
+    | Freetext
+
     /// <summary>
     /// Returns true if the Building Block is a term column
     /// </summary>
@@ -33,6 +33,7 @@ with
         | Output
         | ProtocolType -> true
         | _ -> false
+
     member this.HasOA() =
         match this with
         | Component
@@ -49,76 +50,78 @@ with
 
     static member fromString(str: string) =
         match str with
-        | "Component"           -> Component
-        | "Characteristic"      -> Characteristic
-        | "Factor"              -> Factor
-        | "Parameter"           -> Parameter
-        | "ProtocolType"        -> ProtocolType
+        | "Component" -> Component
+        | "Characteristic" -> Characteristic
+        | "Factor" -> Factor
+        | "Parameter" -> Parameter
+        | "ProtocolType" -> ProtocolType
         | "ProtocolDescription" -> ProtocolDescription
-        | "ProtocolUri"         -> ProtocolUri
-        | "ProtocolVersion"     -> ProtocolVersion
-        | "ProtocolREF"         -> ProtocolREF
-        | "Performer"           -> Performer
-        | "Date"                -> Date
-        | "Input"               -> Input
-        | "Output"              -> Output
-        | "Comment"             -> Comment
+        | "ProtocolUri" -> ProtocolUri
+        | "ProtocolVersion" -> ProtocolVersion
+        | "ProtocolREF" -> ProtocolREF
+        | "Performer" -> Performer
+        | "Date" -> Date
+        | "Input" -> Input
+        | "Output" -> Output
+        | "Comment" -> Comment
         | anyElse -> failwithf "BuildingBlock.HeaderCellType.fromString: '%s' is not a valid HeaderCellType" anyElse
 
-type SearchComponent = 
-    {
-    Key: OntologyAnnotation 
-    KeyType: CompositeHeaderDiscriminate 
-    Body: CompositeCell 
-    
-    }
+type SearchComponent = {
+    Key: OntologyAnnotation
+    KeyType: CompositeHeaderDiscriminate
+    Body: CompositeCell
 
-type Annotation = 
-    {
+}
+
+type Annotation = {
     IsOpen: bool
     Search: SearchComponent
     Height: float
-    }
+} with
 
 
-    static member init (key, body, ?keyType, ?isOpen,  ?search, ?height ) = 
+    static member init(key, body, ?keyType, ?isOpen, ?search, ?height) =
         let isOpen = defaultArg isOpen true
         let keyType = defaultArg keyType CompositeHeaderDiscriminate.Parameter
-        let search = defaultArg search {
-            Key= key
-            KeyType= keyType
-            Body= body
+
+        let search =
+            defaultArg search {
+                Key = key
+                KeyType = keyType
+                Body = body
             }
+
         let height = defaultArg height 0.0
+
         {
-            IsOpen= isOpen
+            IsOpen = isOpen
             Search = search
-            Height= height
+            Height = height
         }
-    member this.ToggleOpen () = {this with IsOpen = not this.IsOpen}
+
+    member this.ToggleOpen() = { this with IsOpen = not this.IsOpen }
 
 
-type Highlight =
-    {
-    Keys: Map<float,string>
-    Terms: Map<float,string>
-    Values: Map<float,string>
-    }
+type Highlight = {
+    Keys: Map<float, string>
+    Terms: Map<float, string>
+    Values: Map<float, string>
+}
 
 [<RequireQualifiedAccess>]
 
 type Page =
-    |Builder
-    |Contact
-    |Help
+    | Builder
+    | Contact
+    | Help
 
 type UploadFileType =
-  | Docx
-  | PDF
-  | Txt
+    | Docx
+    | PDF
+    | Txt
 
 type UploadedFile =
-  | PDF of string
-  | Docx of string
-  | Txt of string
-  | Unset
+    | PDF of string
+    | Docx of string
+    | Txt of string
+    | Unset

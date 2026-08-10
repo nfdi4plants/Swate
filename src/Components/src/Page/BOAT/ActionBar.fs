@@ -46,7 +46,7 @@ type ActionBar =
                             prop.children [
                                 match annoState = [] && isActive = true with
                                 | true -> Html.h1 [ prop.text "No annotations to display." ]
-                                | false -> PreviewTable.table(annoState, setAnnoState, highlight, setHighlight)
+                                | false -> PreviewTable.table (annoState, setAnnoState, highlight, setHighlight)
                             ]
                         ]
                     ]
@@ -115,7 +115,9 @@ type ActionBar =
                 prop.id "action-bar"
                 prop.children [
                     ActionBar.Btn(
-                        Html.i [ prop.className "swt:iconify swt:fluent--table-24-regular swt:size-4" ],
+                        Html.i [
+                            prop.className "swt:iconify swt:fluent--table-24-regular swt:size-4"
+                        ],
                         (fun _ -> setShowAnnotationModal true),
                         "Show Summary",
                         tooltipClassNames = "swt:tooltip-right"
@@ -152,13 +154,17 @@ type ActionBar =
                                     Html.li [
                                         Html.a [
                                             prop.text "as .xlsx"
-                                            prop.onClick (fun _ -> DownloadParser.downloadXlsxProm(fileName,annoState) |> Promise.start)
+                                            prop.onClick (fun _ ->
+                                                DownloadParser.downloadXlsxProm (fileName, annoState) |> Promise.start
+                                            )
                                         ]
                                     ]
                                     Html.li [
                                         Html.a [
                                             prop.text "as .json"
-                                            prop.onClick (fun _ -> DownloadParser.downloadJsonProm(fileName,annoState) |> Promise.start)
+                                            prop.onClick (fun _ ->
+                                                DownloadParser.downloadJsonProm (fileName, annoState) |> Promise.start
+                                            )
                                         ]
                                     ]
                                 ]
@@ -169,52 +175,53 @@ type ActionBar =
                         prop.children [
                             Swate.Components.Primitive.Dropdown.Dropdown.Main(
                                 isOpen = deleteDropdownOpen,
-                            setIsOpen = setDeleteDropdownOpen,
-                            toggle =
-                                Html.div [
-                                    prop.className "swt:tooltip swt:tooltip-left"
-                                    prop.dataTip "Delete"
-                                    prop.children [
-                                        Html.button [
-                                            prop.className [ "swt:btn swt:btn-sm swt:btn-square"; "swt:btn-error" ]
-                                            prop.onClick (fun _ -> setDeleteDropdownOpen (not deleteDropdownOpen))
-                                            prop.children [
-                                                Html.i [
-                                                    prop.className
-                                                        "swt:iconify swt:fluent--delete-24-regular swt:size-4"
+                                setIsOpen = setDeleteDropdownOpen,
+                                toggle =
+                                    Html.div [
+                                        prop.className "swt:tooltip swt:tooltip-left"
+                                        prop.dataTip "Delete"
+                                        prop.children [
+                                            Html.button [
+                                                prop.className [ "swt:btn swt:btn-sm swt:btn-square"; "swt:btn-error" ]
+                                                prop.onClick (fun _ -> setDeleteDropdownOpen (not deleteDropdownOpen))
+                                                prop.children [
+                                                    Html.i [
+                                                        prop.className
+                                                            "swt:iconify swt:fluent--delete-24-regular swt:size-4"
+                                                    ]
                                                 ]
                                             ]
                                         ]
-                                    ]
-                                ],
-                            children =
-                                React.Fragment [
-                                    Html.li [
-                                        Html.a [
-                                            prop.text "delete all annotations"
-                                            prop.onClick (fun _ ->
-                                                setAnnoState []
-                                                setHighlight {
-                                                    Keys = Map.empty
-                                                    Terms = Map.empty
-                                                    Values = Map.empty
-                                                }
-                                            )
-                                            if annoState = [] then
-                                                prop.className "swt:cursor-not-allowed"
+                                    ],
+                                children =
+                                    React.Fragment [
+                                        Html.li [
+                                            Html.a [
+                                                prop.text "delete all annotations"
+                                                prop.onClick (fun _ ->
+                                                    setAnnoState []
+
+                                                    setHighlight {
+                                                        Keys = Map.empty
+                                                        Terms = Map.empty
+                                                        Values = Map.empty
+                                                    }
+                                                )
+                                                if annoState = [] then
+                                                    prop.className "swt:cursor-not-allowed"
+                                            ]
                                         ]
-                                    ]
-                                    Html.li [
-                                        Html.a [
-                                            prop.text "delete document"
-                                            prop.onClick (fun _ -> del ())
+                                        Html.li [
+                                            Html.a [
+                                                prop.text "delete document"
+                                                prop.onClick (fun _ -> del ())
+                                            ]
                                         ]
-                                    ]
-                                ],
-                            dropdownClassName = "swt:dropdown-end"
-                        )
+                                    ],
+                                dropdownClassName = "swt:dropdown-end"
+                            )
+                        ]
                     ]
                 ]
             ]
         ]
-    ]
