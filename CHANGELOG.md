@@ -21,10 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Simplify Electron FileTree navigation so ARC editors initialize the requested Metadata, table, or DataMap view directly, and show the DataHub download action only in the sidebar.
 -   Consolidate Electron ARC editor page state, safely resolve canonical entity workbooks, and reuse shared path normalization for ARC-root-relative references.
 -   Harden canonical entity path resolution for Electron rename and delete operations, and document the behavior of the shared path-normalization helpers.
+-   Keep table deletion in the existing footer-tab context menu instead of exposing a second, inconsistent navbar action.
 
 ### Fixed
 
--   Prevent deleted ARC table tabs from reappearing when adding a new table by applying tab operations to the current immutable editor state.
+-   Prevent deleted ARC table tabs from reappearing by keeping the add-table handler current and applying table operations to a copied editor state.
+-   Apply requested ARC editor starting-view changes without remounting the editor or resetting the selected tab during ordinary ARC updates.
+-   Preserve stable table identifiers across rerenders so drag-and-drop state is not invalidated while dragging.
+-   Create DataMaps from a copied ARC value instead of mutating the value held in React state.
 -   Keep table-tab keys unambiguous by rejecting duplicate table names.
 -   Append imported templates to a fresh table model when the active table is empty.
 -   Allow hidden filesystem files such as `.DS_Store` to be deleted from ARC add-zone roots without treating them as ARC entities.

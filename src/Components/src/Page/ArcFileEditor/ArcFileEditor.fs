@@ -297,166 +297,133 @@ type Main =
         let activeView, setActiveView =
             React.useState (startingActiveView |> Option.defaultValue ActiveView.Metadata)
 
+        let arcFileNavigationKey =
+            arcFile.TryGetRelativePath()
+            |> Option.defaultValue (string arcFile.RelatedArcFilesDiscriminate)
+
+        let startingActiveViewKey =
+            startingActiveView |> Option.map _.ViewIndex |> Option.defaultValue -3
+
+        let navigationRequest = arcFileNavigationKey, startingActiveViewKey
+        let previousNavigationRequest = React.useRef navigationRequest
+
         React.useEffect (
             (fun () ->
-                let nextActiveView = ActiveView.Forward(arcFile, activeView)
+                let requestedActiveView =
+                    if previousNavigationRequest.current <> navigationRequest then
+                        previousNavigationRequest.current <- navigationRequest
+                        startingActiveView |> Option.defaultValue ActiveView.Metadata
+                    else
+                        activeView
+
+                let nextActiveView = ActiveView.Forward(arcFile, requestedActiveView)
 
                 setActiveView nextActiveView
             ),
             [|
+                box arcFileNavigationKey
+                box startingActiveViewKey
                 box (arcFile.Tables().Count)
                 box (arcFile.CanRenderDataMapView())
                 box (arcFile.HasMetadata())
             |]
         )
 
-        let headerProps =
-            React.useMemo (
-                (fun () -> {
-                    arcFile = arcFile
-                    activeView = activeView
-                    setActiveView = setActiveView
-                }),
-                [| box arcFile; box activeView; box setActiveView |]
-            )
+        let headerProps = {
+            arcFile = arcFile
+            activeView = activeView
+            setActiveView = setActiveView
+        }
 
         let activeTableIndex = activeView.TryTableIndex
 
         let trailingNavbarElement =
-            React.useMemo (
-                (fun () ->
-                    match trailingNavbarElements with
-                    | Some renderTrailingNavbarElements -> renderTrailingNavbarElements headerProps
-                    | None -> Html.none
-                ),
-                [| box trailingNavbarElements; box headerProps |]
-            )
+            match trailingNavbarElements with
+            | Some renderTrailingNavbarElements -> renderTrailingNavbarElements headerProps
+            | None -> Html.none
 
         let navbar =
-            React.useMemo (
-                (fun () ->
-                    Html.div [
-                        prop.className "swt:shrink-0 swt:border-b swt:border-base-300"
-                        prop.children [
-                            Navbar.Main(
-                                left =
-                                    Html.div [
-                                        prop.className "swt:flex swt:items-center swt:gap-2"
-                                        prop.children [
-                                            Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns()
-                                            match widgetNavbarElements with
-                                            | Some renderWidgetNavbarElements -> renderWidgetNavbarElements headerProps
-                                            | None -> ()
-                                        ]
-                                    ],
-                                right = trailingNavbarElement
-                            )
-                        ]
-                    ]
-                ),
-                [|
-                    box widgetNavbarElements
-                    box headerProps
-                    box trailingNavbarElement
-                |]
-            )
-
-        let widgetElements =
-            React.useMemo (
-                (fun () -> {|
-                    buildingBlock =
-                        Main.LazyLoaderWithMessage(
-                            LazyComponents.LazyBuildingBlockWidget(arcFile, activeTableIndex, setArcFile),
-                            "Loading Building Block Widget..."
-                        )
-                    template =
-                        Main.LazyLoaderWithMessage(
-                            LazyComponents.LazyTemplateWidget(arcFile, activeTableIndex, setArcFile),
-                            "Loading Template Widget..."
-                        )
-                    filePicker =
-                        Main.LazyLoaderWithMessage(
-                            LazyComponents.LazyFilePickerWidget(arcFile, activeTableIndex, setArcFile, pickPaths),
-                            "Loading File Picker Widget..."
-                        )
-                    dataAnnotator =
-                        match Helper.tryGetDataAnnotatorDestination (activeView, arcFile) with
-                        | Ok destination ->
-                            Main.LazyLoaderWithMessage(
-                                LazyComponents.LazyDataAnnotator(
-                                    destination,
-                                    Helper.applyDataAnnotatorInputToArcFile (destination, arcFile, setArcFile),
-                                    onError = onError
-                                ),
-                                "Loading Data Annotator Widget..."
-                            )
-                        | Error message ->
+            Html.div [
+                prop.className "swt:shrink-0 swt:border-b swt:border-base-300"
+                prop.children [
+                    Navbar.Main(
+                        left =
                             Html.div [
-                                prop.className "swt:p-3 swt:text-sm swt:opacity-70"
-                                prop.text message
-                            ]
-                    jsonImport =
-                        Main.LazyLoaderWithMessage(
-                            LazyComponents.LazyJsonImportWidget(
-                                arcFile,
-                                setArcFile,
-                                onImportJson,
-                                (fun exn -> onError exn.Message)
-                            ),
-                            "Loading JSON Import Widget..."
-                        )
-                    jsonExport =
-                        Main.LazyLoaderWithMessage(
-                            LazyComponents.LazyJsonExportWidget(arcFile, (fun exn -> onError exn.Message)),
-                            "Loading JSON Export Widget..."
-                        )
-                |}),
-                [|
-                    box arcFile
-                    box activeView
-                    box activeTableIndex
-                    box setArcFile
-                    box onImportJson
-                    pickPaths
-                |]
-            )
+                                prop.className "swt:flex swt:items-center swt:gap-2"
+                                prop.children [
+                                    Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns()
+                                    match widgetNavbarElements with
+                                    | Some renderWidgetNavbarElements -> renderWidgetNavbarElements headerProps
+                                    | None -> ()
+                                ]
+                            ],
+                        right = trailingNavbarElement
+                    )
+                ]
+            ]
 
-        let ArcFileContentViewMemo =
-            React.useMemo (
-                (fun () -> Main.ArcFileContentView(activeView, arcFile, setArcFile)),
-                [| box activeView; box arcFile |]
-            )
-
-        let AddRowsFooterMemo =
-            React.useMemo (
-                (fun () -> Main.AddRowsFooter(activeView, arcFile, setArcFile)),
-                [| box activeView; box arcFile |]
-            )
+        let widgetElements = {|
+            buildingBlock =
+                Main.LazyLoaderWithMessage(
+                    LazyComponents.LazyBuildingBlockWidget(arcFile, activeTableIndex, setArcFile),
+                    "Loading Building Block Widget..."
+                )
+            template =
+                Main.LazyLoaderWithMessage(
+                    LazyComponents.LazyTemplateWidget(arcFile, activeTableIndex, setArcFile),
+                    "Loading Template Widget..."
+                )
+            filePicker =
+                Main.LazyLoaderWithMessage(
+                    LazyComponents.LazyFilePickerWidget(arcFile, activeTableIndex, setArcFile, pickPaths),
+                    "Loading File Picker Widget..."
+                )
+            dataAnnotator =
+                match Helper.tryGetDataAnnotatorDestination (activeView, arcFile) with
+                | Ok destination ->
+                    Main.LazyLoaderWithMessage(
+                        LazyComponents.LazyDataAnnotator(
+                            destination,
+                            Helper.applyDataAnnotatorInputToArcFile (destination, arcFile, setArcFile),
+                            onError = onError
+                        ),
+                        "Loading Data Annotator Widget..."
+                    )
+                | Error message ->
+                    Html.div [
+                        prop.className "swt:p-3 swt:text-sm swt:opacity-70"
+                        prop.text message
+                    ]
+            jsonImport =
+                Main.LazyLoaderWithMessage(
+                    LazyComponents.LazyJsonImportWidget(
+                        arcFile,
+                        setArcFile,
+                        onImportJson,
+                        (fun exn -> onError exn.Message)
+                    ),
+                    "Loading JSON Import Widget..."
+                )
+            jsonExport =
+                Main.LazyLoaderWithMessage(
+                    LazyComponents.LazyJsonExportWidget(arcFile, (fun exn -> onError exn.Message)),
+                    "Loading JSON Export Widget..."
+                )
+        |}
 
         let content =
-            React.useMemo (
-                (fun () ->
+            Html.div [
+                prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
+                prop.children [
+                    navbar
                     Html.div [
                         prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
-                        prop.children [
-                            navbar
-                            Html.div [
-                                prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
-                                prop.children [ ArcFileContentViewMemo ]
-                            ]
-                            AddRowsFooterMemo
-                            ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFile)
-                        ]
+                        prop.children [ Main.ArcFileContentView(activeView, arcFile, setArcFile) ]
                     ]
-                ),
-                [|
-                    box navbar
-                    box activeView
-                    box arcFile
-                    box setArcFile
-                    box setActiveView
-                |]
-            )
+                    Main.AddRowsFooter(activeView, arcFile, setArcFile)
+                    ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFile)
+                ]
+            ]
 
         AnnotationTableContextProvider.AnnotationTableContextProvider(
             Swate.Components.Page.ArcFileEditor.Widgets.Main.Widgets(

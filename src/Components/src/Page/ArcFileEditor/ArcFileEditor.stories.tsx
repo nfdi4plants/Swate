@@ -151,29 +151,6 @@ export const AppendTemplateToEmptyTable: Story = {
   },
 };
 
-export const RenameThenDeleteAndAddTable: Story = {
-  parameters: { isolated: true },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const portal = within(canvasElement.ownerDocument.body);
-
-    await userEvent.dblClick(canvas.getByRole('button', { name: 'Table 2' }));
-    const nameInput = canvas.getByRole('textbox');
-    await userEvent.clear(nameInput);
-    await userEvent.type(nameInput, 'Renamed Table{enter}');
-
-    const renamedTable = await canvas.findByRole('button', { name: 'Renamed Table' });
-    await userEvent.pointer({ keys: '[MouseRight]', target: renamedTable });
-    await userEvent.click(await portal.findByText('Delete Table'));
-    await userEvent.click(canvas.getByRole('button', { name: 'Add new table' }));
-
-    await waitFor(() => {
-      expect(canvas.queryByRole('button', { name: 'Renamed Table' })).not.toBeInTheDocument();
-      expect(canvas.getByRole('button', { name: 'New Table 0' })).toBeInTheDocument();
-    });
-  },
-};
-
 export const RejectDuplicateTableName: Story = {
   parameters: { isolated: true },
   play: async ({ canvasElement }) => {

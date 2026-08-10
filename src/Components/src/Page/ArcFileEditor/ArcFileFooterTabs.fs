@@ -212,16 +212,6 @@ type ArcFileFooterTabs =
             key = "DataMapTab"
         )
 
-    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
-    static member private PlusBtn(onClick) =
-
-        ArcFileFooterTabs.BaseTab(
-            Html.none,
-            onClick,
-            "swt:iconify swt:fluent--add-12-filled",
-            extraProps = [ prop.ariaLabel "Add new table" ]
-        )
-
     [<ReactComponent>]
     static member private ContextMenu
         (
@@ -301,23 +291,25 @@ type ArcFileFooterTabs =
         let canAddTable = arcFile.CanCreateTables()
         let canRenderDataMap = arcFile.CanRenderDataMapView()
         let tabsRef = React.useElementRef ()
-        let arcFileRef = React.useRef arcFile
-        arcFileRef.current <- arcFile
 
         let updateArcFile update =
-            let nextArcFile = ArcFiles.refreshRef arcFileRef.current
+            let nextArcFile = ArcFiles.refreshRef arcFile
             let result = update nextArcFile
-            arcFileRef.current <- nextArcFile
             setArcFile nextArcFile
             result
 
         let isEditorModeTableTab, setIsEditorModeTableTab =
             React.useState (None: int option)
 
-        let fileType = arcFile.RelatedArcFilesDiscriminate |> unbox<string>
-
         let metadataTabLabel =
-            fileType.Substring(0, 1).ToUpperInvariant() + fileType.Substring(1)
+            match arcFile with
+            | ArcFiles.Assay _ -> "Assay"
+            | ArcFiles.Study _ -> "Study"
+            | ArcFiles.Investigation _ -> "Investigation"
+            | ArcFiles.Run _ -> "Run"
+            | ArcFiles.Workflow _ -> "Workflow"
+            | ArcFiles.Template _ -> "Template"
+            | ArcFiles.DataMap _ -> "Datamap"
 
         let setEditorMode =
             React.useCallback (
@@ -402,7 +394,10 @@ type ArcFileFooterTabs =
 
 
         let tableIds =
-            tables |> Seq.mapi (fun index _ -> mkTableDragId index) |> ResizeArray
+            React.useMemo (
+                (fun () -> tables |> Seq.mapi (fun index _ -> mkTableDragId index) |> ResizeArray),
+                [| box tables.TableCount |]
+            )
 
         let tableTabModels: TableTabViewModel[] =
             React.useMemo (
@@ -427,7 +422,7 @@ type ArcFileFooterTabs =
             React.useCallback (
                 (fun (tableIndex: int) (newName: string) ->
 
-                    let currentTables = arcFileRef.current.ArcTables()
+                    let currentTables = arcFile.ArcTables()
 
                     match
                         System.String.IsNullOrWhiteSpace newName
@@ -511,7 +506,12 @@ type ArcFileFooterTabs =
 
 
                             if canAddTable then
-                                ArcFileFooterTabs.PlusBtn addNewTable
+                                ArcFileFooterTabs.BaseTab(
+                                    Html.none,
+                                    addNewTable,
+                                    "swt:iconify swt:fluent--add-12-filled",
+                                    extraProps = [ prop.ariaLabel "Add new table" ]
+                                )
 
                             Html.div [ // This element is a spacer to create some whitespace between the tabs and the right edge of the container.
                                 prop.className "swt:tab swt:max-w-min swt:px-2!"

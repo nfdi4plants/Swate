@@ -2,7 +2,6 @@ module Renderer.Components.MainContent.ArcFilePreviewTargetHelper
 
 open Fable.Core
 open Swate.Components.Composite.Widgets.JsonImport.Types
-open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Shared
 
 let importJsonRequestIntoCurrentTarget
@@ -18,14 +17,3 @@ let importJsonRequestIntoCurrentTarget
             setArcFilePageState nextArcFile
             return! setArcFileInMemory nextArcFile
     }
-
-let deleteSelectedTable
-    (arcFile: ArcFiles)
-    (tableIndex: int)
-    (setArcFile: ArcFiles -> unit)
-    (setActiveView: ActiveView -> unit)
-    =
-    arcFile.ArcTables().RemoveTableAt tableIndex
-
-    arcFile |> ArcFiles.refreshRef |> setArcFile
-    setActiveView ActiveView.Metadata
