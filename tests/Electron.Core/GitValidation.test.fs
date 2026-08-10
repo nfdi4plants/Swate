@@ -378,6 +378,7 @@ Vitest.describe (
                     User = {
                         Id = 1
                         LocalSwateAccountId = "acc-1"
+                        Username = "invalid-user"
                         Name = "Invalid User"
                         Email = "invalid@example.org"
                         AvatarUrl = "https://example.org/avatar.png"

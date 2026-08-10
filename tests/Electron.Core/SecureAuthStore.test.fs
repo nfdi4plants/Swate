@@ -118,6 +118,7 @@ Vitest.describe (
                         Metadata = {
                             LocalSwateAccountId = "current-key"
                             Id = 42
+                            Username = "current-user"
                             Name = "Current User"
                             Email = "current@example.org"
                             AvatarUrl = "https://example.org/avatar.png"

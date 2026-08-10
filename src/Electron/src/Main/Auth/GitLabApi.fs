@@ -53,6 +53,7 @@ let private toAuthUserDto (baseUrl: string) (user: ComponentsGitLabApi.CurrentUs
     {
         Id = user.id
         LocalSwateAccountId = localSwateAccountId
+        Username = user.username
         Name = user.name
         Email = user.email
         AvatarUrl = user.avatar_url |> Option.defaultValue ""

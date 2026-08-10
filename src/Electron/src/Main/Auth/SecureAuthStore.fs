@@ -15,6 +15,7 @@ let private activeAccountFileName = "active-account.json"
 type AuthMetadata = {
     LocalSwateAccountId: string
     Id: int
+    Username: string
     Name: string
     Email: string
     AvatarUrl: string
@@ -106,6 +107,8 @@ let private authMetadataDecoder (localSwateAccountId: string) : Decoder<AuthMeta
         {
             LocalSwateAccountId = localSwateAccountId
             Id = get.Required.Field "id" Decode.int
+            // Optional: metadata written before commit identities were stored has no username.
+            Username = get.Optional.Field "username" Decode.string |> Option.defaultValue ""
             Name = get.Required.Field "name" Decode.string
             Email = get.Required.Field "email" Decode.string
             AvatarUrl = get.Required.Field "avatarUrl" Decode.string
@@ -189,6 +192,7 @@ let store (credential: StoredCredential) : Result<unit, string> =
                 JS.JSON.stringify {|
                     localSwateAccountId = credential.Metadata.LocalSwateAccountId
                     id = credential.Metadata.Id
+                    username = credential.Metadata.Username
                     name = credential.Metadata.Name
                     email = credential.Metadata.Email
                     avatarUrl = credential.Metadata.AvatarUrl

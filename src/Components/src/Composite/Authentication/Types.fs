@@ -62,6 +62,8 @@ type GitLabUser = {
 type AuthUserDto = {
     Id: int
     LocalSwateAccountId: string
+    /// GitLab account shorthand. Used as the git commit author name so commits link to the account.
+    Username: string
     Name: string
     Email: string
     AvatarUrl: string
@@ -71,6 +73,7 @@ type AuthUserDto = {
     static member FromGitLabUser (gitLabUser: GitLabUser) (targetDataHub: string) : AuthUserDto = {
         Id = gitLabUser.id
         LocalSwateAccountId = string gitLabUser.id
+        Username = gitLabUser.username
         Name = gitLabUser.name
         Email = gitLabUser.email
         AvatarUrl = gitLabUser.avatar_url

@@ -418,6 +418,7 @@ type Authentication =
     static member ExmpUserInformation = {
         Id = 1
         LocalSwateAccountId = "acc-1"
+        Username = "john-doe"
         Name = "John Doe"
         Email = "john-doe@mail.com"
         AvatarUrl = "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y"
@@ -465,28 +466,14 @@ type Authentication =
                     setAccounts {
                         ActiveAccount =
                             Some {
-                                User = {
-                                    Id = activeUser.Id
-                                    LocalSwateAccountId = activeUser.LocalSwateAccountId
-                                    Name = activeUser.Name
-                                    Email = activeUser.Email
-                                    AvatarUrl = activeUser.AvatarUrl
-                                    TargetDataHub = activeUser.TargetDataHub
-                                }
+                                User = activeUser
                                 DateAdded = "2026-01-01T00:00:00.0000000Z"
                                 TokenStatus = TokenStatus.Ok
                                 TokenExpiresOn = Some "2026-02-01"
                             }
                         StoredAccounts = [|
                             {
-                                User = {
-                                    Id = activeUser.Id
-                                    LocalSwateAccountId = activeUser.LocalSwateAccountId
-                                    Name = activeUser.Name
-                                    Email = activeUser.Email
-                                    AvatarUrl = activeUser.AvatarUrl
-                                    TargetDataHub = activeUser.TargetDataHub
-                                }
+                                User = activeUser
                                 DateAdded = "2026-01-01T00:00:00.0000000Z"
                                 TokenStatus = TokenStatus.Ok
                                 TokenExpiresOn = Some "2026-02-01"
@@ -495,6 +482,7 @@ type Authentication =
                                 User = {
                                     Id = 2
                                     LocalSwateAccountId = "acc-2"
+                                    Username = "max-mustermann"
                                     Name = "Max Mustermann"
                                     Email = "max@example.org"
                                     AvatarUrl =
@@ -509,6 +497,7 @@ type Authentication =
                                 User = {
                                     Id = 3
                                     LocalSwateAccountId = "acc-3"
+                                    Username = "mr-lazy"
                                     Name = "Mr Lazy"
                                     Email = "lazy@example.org"
                                     AvatarUrl =
