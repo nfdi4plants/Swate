@@ -212,7 +212,11 @@ module ArcEntityPathRules =
     let private classifyStructuralArcPath =
         function
         | [| zoneSegment |] when isAddZoneSegment zoneSegment -> StructuralArcPath.AddZoneRoot
-        | [| zoneSegment; _ |] when isAddZoneSegment zoneSegment -> StructuralArcPath.EntityFolder
+        | [| zoneSegment; name |] when
+            isAddZoneSegment zoneSegment
+            && not (name.StartsWith(".", StringComparison.Ordinal))
+            ->
+            StructuralArcPath.EntityFolder
         | [| zoneSegment; _; childFolderName |] ->
             match tryParseZone zoneSegment with
             | Some zone when PathHelpers.pathMatchesAny (nativeEntityChildFolderNames zone) childFolderName ->
@@ -293,6 +297,8 @@ module ArcEntityPathRules =
                 | None -> DeletePathClassification.GenericTarget normalizedRelativePath
             | [| zoneSegment; identifier |] ->
                 match tryParseZone zoneSegment with
+                | Some zone when identifier.StartsWith(".", StringComparison.Ordinal) ->
+                    DeletePathClassification.AddZoneDescendantTarget(zone, normalizedRelativePath)
                 | Some zone -> DeletePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath)
                 | None -> DeletePathClassification.GenericTarget normalizedRelativePath
             | [| zoneSegment; identifier; fileName |] ->
@@ -415,6 +421,8 @@ module ArcEntityPathRules =
                         | None -> RenamePathClassification.GenericTarget normalizedRelativePath
                 | [| zoneSegment; identifier |] ->
                     match tryParseZone zoneSegment with
+                    | Some _ when identifier.StartsWith(".", StringComparison.Ordinal) ->
+                        RenamePathClassification.GenericTarget normalizedRelativePath
                     | Some zone -> RenamePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath)
                     | None -> RenamePathClassification.GenericTarget normalizedRelativePath
                 | [| zoneSegment; identifier; fileName |] ->
