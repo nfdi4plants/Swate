@@ -69,18 +69,20 @@ let useTreeApi
             apiRef
             |> Option.iter (fun ref ->
                 ref.current <-
-                    Some {
-                        InvalidateNode =
-                            fun nodeId ->
+                    Some(
+                        TreeApi(
+                            (fun nodeId ->
                                 loadingNodeIdsRef.current.Remove nodeId |> ignore
                                 setLoadedChildren (invalidateNode nodeId)
                                 setExpandedIds (fun current -> current |> Set.remove nodeId)
-                        InvalidateAll =
-                            fun () ->
+                            ),
+                            (fun () ->
                                 loadingNodeIdsRef.current.Clear()
                                 setLoadedChildren (fun _ -> Map.empty)
                                 setExpandedIds (fun _ -> Set.empty)
-                    }
+                            )
+                        )
+                    )
             )
 
             fun () -> apiRef |> Option.iter (fun ref -> ref.current <- None)
@@ -127,11 +129,11 @@ let useTreeNodeActions
             lookup.VisibleNodes
             |> Array.iter (fun row ->
                 if
-                    treeState.ExpandedIds.Contains row.Node.id
-                    && canExpand config.DataSource config.EnableLazyLoading treeState.LoadedChildren row.Node
-                    && (directChildren treeState.LoadedChildren row.Node).IsNone
+                    treeState.ExpandedIds.Contains row.node.id
+                    && canExpand config.DataSource config.EnableLazyLoading treeState.LoadedChildren row.node
+                    && (directChildren treeState.LoadedChildren row.node).IsNone
                 then
-                    loadNode row.Node
+                    loadNode row.node
             )
         ),
         [|

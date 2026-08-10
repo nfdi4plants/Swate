@@ -88,6 +88,12 @@ export const BasicExpansionAndSelection: Story = {
 
     await expect(canvas.getByRole("tree")).toBeVisible();
     await expect(canvas.getByText("isa.study.xlsx")).toBeVisible();
+    await expect(canvas.getByTestId("tree-node-arc")).toHaveAttribute("aria-posinset", "1");
+    await expect(canvas.getByTestId("tree-node-arc")).toHaveAttribute("aria-setsize", "1");
+    await expect(canvas.getByTestId("tree-node-arc/studies")).toHaveAttribute("aria-posinset", "1");
+    await expect(canvas.getByTestId("tree-node-arc/studies")).toHaveAttribute("aria-setsize", "3");
+    await expect(canvas.getByTestId("tree-node-arc/assays")).toHaveAttribute("aria-posinset", "2");
+    await expect(canvas.getByTestId("tree-node-arc/isa.investigation.xlsx")).toHaveAttribute("aria-posinset", "3");
 
     await userEvent.click(canvas.getByText("studies"));
     await waitFor(() => expect(canvas.queryByText("isa.study.xlsx")).not.toBeInTheDocument());
@@ -133,6 +139,8 @@ export const MultiSelectionWithoutCheckboxes: Story = {
     const canvas = within(canvasElement);
 
     await expect(canvas.queryByRole("checkbox")).not.toBeInTheDocument();
+    await expect(canvas.getByTestId("tree-node-arc/studies")).not.toHaveAttribute("aria-selected");
+    await expect(canvas.getByTestId("tree-node-arc/studies/study_01/isa.study.xlsx")).toHaveAttribute("aria-selected", "false");
     expect(canvas.getByTestId("tree-node-arc/studies").className).toContain("swt:cursor-pointer");
     expect(canvas.getByTestId("tree-node-arc/studies").className).toContain("swt:hover:bg-base-200");
     await userEvent.click(canvas.getByText("studies"));
@@ -190,8 +198,8 @@ const LazyTree = () => {
 
   const dataSource = React.useMemo(
     () => ({
-      GetChildrenCount: (item: DemoNode | null | undefined) => (item?.id === "arc/lazy-studies" ? 1 : 0),
-      GetTreeItems: async (item: DemoNode | null | undefined) => {
+      getChildrenCount: (item: DemoNode | null | undefined) => (item?.id === "arc/lazy-studies" ? 1 : 0),
+      getTreeItems: async (item: DemoNode | null | undefined) => {
         setLoadCount((count) => count + 1);
         return delayed(
           item?.id === "arc/lazy-studies"
@@ -206,7 +214,7 @@ const LazyTree = () => {
   return (
     <div className="swt:w-96 swt:space-y-2">
       <Tree items={items} dataSource={dataSource as any} apiRef={apiRef as any} debug />
-      <button type="button" className="swt:btn swt:btn-sm" onClick={() => apiRef.current?.InvalidateNode("arc/lazy-studies")}>
+      <button type="button" className="swt:btn swt:btn-sm" onClick={() => apiRef.current?.invalidateNode("arc/lazy-studies")}>
         Invalidate studies cache
       </button>
       <div data-testid="load-count">Loads: {loadCount}</div>
@@ -247,8 +255,8 @@ const LazyLoadingDisabledTree = () => {
 
   const dataSource = React.useMemo(
     () => ({
-      GetChildrenCount: () => 1,
-      GetTreeItems: async () => {
+      getChildrenCount: () => 1,
+      getTreeItems: async () => {
         setLoadCount((count) => count + 1);
         return [leaf("arc/lazy-disabled/hidden.txt", "hidden.txt")];
       },
@@ -282,7 +290,7 @@ const ParentAwareDataSourceTree = () => {
 
   const dataSource = React.useMemo(
     () => ({
-      GetChildrenCount: (item: DemoNode | null | undefined) => {
+      getChildrenCount: (item: DemoNode | null | undefined) => {
         switch (item?.id) {
           case "remote/arc":
             return 4;
@@ -294,7 +302,7 @@ const ParentAwareDataSourceTree = () => {
             return 0;
         }
       },
-      GetTreeItems: async (item: DemoNode | null | undefined) => {
+      getTreeItems: async (item: DemoNode | null | undefined) => {
         const parentId = item?.id ?? "root";
         setLoadLog((current) => [...current, parentId]);
 
@@ -358,8 +366,8 @@ const DataSourceInvalidateAllTree = () => {
 
   const dataSource = React.useMemo(
     () => ({
-      GetChildrenCount: (item: DemoNode | null | undefined) => (item?.id === "arc/workflows" ? 1 : 0),
-      GetTreeItems: async (item: DemoNode | null | undefined) => {
+      getChildrenCount: (item: DemoNode | null | undefined) => (item?.id === "arc/workflows" ? 1 : 0),
+      getTreeItems: async (item: DemoNode | null | undefined) => {
         const version = versionRef.current;
         setLoadCount((count) => count + 1);
         return delayed(
@@ -374,7 +382,7 @@ const DataSourceInvalidateAllTree = () => {
 
   const invalidateAll = React.useCallback(() => {
     versionRef.current += 1;
-    apiRef.current?.InvalidateAll();
+    apiRef.current?.invalidateAll();
   }, []);
 
   return (
@@ -411,8 +419,8 @@ const LazyErrorTree = () => {
 
   const dataSource = React.useMemo(
     () => ({
-      GetChildrenCount: (item: DemoNode | null | undefined) => (item?.id === "arc/runs" ? 1 : 0),
-      GetTreeItems: async (item: DemoNode | null | undefined) => {
+      getChildrenCount: (item: DemoNode | null | undefined) => (item?.id === "arc/runs" ? 1 : 0),
+      getTreeItems: async (item: DemoNode | null | undefined) => {
         if (item?.id !== "arc/runs") return [];
         throw new Error("Run metadata could not be loaded");
       },
@@ -544,6 +552,37 @@ export const NodeAndRootContextMenu: Story = {
   },
 };
 
+const AppearanceTree = () => {
+  const items = React.useMemo(
+    () => [
+      {
+        id: "arc/featured.xlsx",
+        label: "featured.xlsx",
+        kind: "leaf",
+        icon: <i data-testid="custom-tree-icon" className="swt:iconify swt:fluent--document-star-24-filled swt:size-4" />,
+        tooltip: "Featured ARC spreadsheet",
+      } as DemoNode,
+    ],
+    [],
+  );
+
+  return (
+    <div className="swt:w-96">
+      <Tree items={items} debug />
+    </div>
+  );
+};
+
+export const CustomIconAndTooltip: Story = {
+  render: () => <AppearanceTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByTestId("custom-tree-icon")).toBeVisible();
+    await expect(canvas.getByTestId("tree-node-arc/featured.xlsx")).toHaveAttribute("title", "Featured ARC spreadsheet");
+  },
+};
+
 const CustomTree = () => {
   const items = [branch("arc/studies/study_04", "Study 04", [leaf("arc/studies/study_04/isa.study.xlsx", "isa.study.xlsx", { badge: "ISA" })])];
 
@@ -554,30 +593,30 @@ const CustomTree = () => {
         defaultExpandedIds={["arc/studies/study_04"]}
         leading={(props) => (
           <span className="swt:badge swt:badge-xs">
-            {props.Node.kind === "branch" ? (props.IsExpanded ? "open" : "closed") : `depth-${props.Depth}`}
+            {props.node.kind === "branch" ? (props.isExpanded ? "open" : "closed") : `depth-${props.depth}`}
           </span>
         )}
         trailing={(props) =>
-          props.Node.data?.badge ? (
-            <button type="button" className="swt:badge swt:badge-primary swt:badge-sm" onClick={(event) => props.Select(event as any)}>
-              {props.IsSelected ? "Selected" : props.Node.data.badge}
+          props.node.data?.badge ? (
+            <button type="button" className="swt:badge swt:badge-primary swt:badge-sm" onClick={(event) => props.select(event as any)}>
+              {props.isSelected ? "Selected" : props.node.data.badge}
             </button>
           ) : null
         }
         renderNode={(props) => (
           <span className="swt:flex swt:items-center swt:gap-2">
-            <strong>{props.IsFocused ? `${props.Node.label} focused` : props.Node.label}</strong>
-            {props.Node.kind === "branch" ? (
+            <strong>{props.isFocused ? `${props.node.label} focused` : props.node.label}</strong>
+            {props.node.kind === "branch" ? (
               <button
                 type="button"
                 className="swt:btn swt:btn-ghost swt:btn-xs"
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
-                  props.Toggle();
+                  props.toggle();
                 }}
               >
-                Custom toggle {props.Node.label}
+                Custom toggle {props.node.label}
               </button>
             ) : null}
           </span>
@@ -681,6 +720,120 @@ export const RenameUpdatesVisibleNodeLabel: Story = {
 
     await userEvent.click(canvas.getByText("datamap-updated.tsv"));
     await expect(canvas.getByTestId("rename-selected")).toHaveTextContent("arc/assays/assay_05/datamap.tsv");
+  },
+};
+
+type RenderCountNodeProps = {
+  node: DemoNode;
+  reportRender: (nodeId: string) => void;
+};
+
+const RenderCountNode = ({ node, reportRender }: RenderCountNodeProps) => {
+  React.useEffect(() => reportRender(node.id));
+  return <span>{node.label}</span>;
+};
+
+const SelectiveRenderingTree = () => {
+  const [items, setItems] = React.useState<DemoNode[]>(() => [
+    branch("workspace", "Workspace", [leaf("workspace/alpha.txt", "alpha.txt"), leaf("workspace/beta.txt", "beta.txt")]),
+    leaf("stable-one.txt", "stable-one.txt"),
+    leaf("stable-two.txt", "stable-two.txt"),
+  ]);
+  const [renderCounts, setRenderCounts] = React.useState<Record<string, number>>({});
+  const expandedIds = React.useMemo(() => ["workspace"], []);
+
+  const reportRender = React.useCallback((nodeId: string) => {
+    setRenderCounts((current) => ({ ...current, [nodeId]: (current[nodeId] ?? 0) + 1 }));
+  }, []);
+
+  const renderNode = React.useCallback(
+    (props: { node: DemoNode }) => <RenderCountNode node={props.node} reportRender={reportRender} />,
+    [reportRender],
+  );
+
+  const renameBeta = React.useCallback(() => {
+    setItems((current) =>
+      current.map((node) =>
+        node.id === "workspace"
+          ? ({
+              ...node,
+              children: node.children?.map((child) =>
+                child.id === "workspace/beta.txt" ? ({ ...child, label: "beta-renamed.txt" } as DemoNode) : child,
+              ),
+            } as DemoNode)
+          : node,
+      ),
+    );
+  }, []);
+
+  const addGamma = React.useCallback(() => {
+    setItems((current) =>
+      current.map((node) =>
+        node.id === "workspace"
+          ? ({
+              ...node,
+              children: [...(node.children ?? []), leaf("workspace/gamma.txt", "gamma.txt")],
+            } as DemoNode)
+          : node,
+      ),
+    );
+  }, []);
+
+  const trackedNodeIds = ["workspace", "workspace/alpha.txt", "workspace/beta.txt", "workspace/gamma.txt", "stable-one.txt", "stable-two.txt"];
+
+  return (
+    <div className="swt:w-96 swt:space-y-2">
+      <Tree items={items} defaultExpandedIds={expandedIds} renderNode={renderNode as any} debug />
+      <div className="swt:flex swt:gap-2">
+        <button type="button" className="swt:btn swt:btn-sm" onClick={renameBeta}>
+          Rename beta
+        </button>
+        <button type="button" className="swt:btn swt:btn-sm" onClick={addGamma}>
+          Add gamma
+        </button>
+      </div>
+      {trackedNodeIds.map((nodeId) => (
+        <output key={nodeId} data-testid={`render-count-${nodeId}`}>
+          {renderCounts[nodeId] ?? 0}
+        </output>
+      ))}
+    </div>
+  );
+};
+
+export const OnlyAffectedNodesRerender: Story = {
+  render: () => <SelectiveRenderingTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const renderCount = (nodeId: string) => Number(canvas.getByTestId(`render-count-${nodeId}`).textContent);
+
+    await waitFor(() => expect(renderCount("workspace/beta.txt")).toBeGreaterThan(0));
+    const beforeRename = {
+      workspace: renderCount("workspace"),
+      alpha: renderCount("workspace/alpha.txt"),
+      beta: renderCount("workspace/beta.txt"),
+      stableOne: renderCount("stable-one.txt"),
+      stableTwo: renderCount("stable-two.txt"),
+    };
+
+    await userEvent.click(canvas.getByRole("button", { name: "Rename beta" }));
+    await waitFor(() => expect(renderCount("workspace/beta.txt")).toBeGreaterThan(beforeRename.beta));
+    await expect(canvas.getByText("beta-renamed.txt")).toBeVisible();
+    expect(renderCount("workspace")).toBeGreaterThan(beforeRename.workspace);
+    expect(renderCount("workspace/alpha.txt")).toBe(beforeRename.alpha);
+    expect(renderCount("stable-one.txt")).toBe(beforeRename.stableOne);
+    expect(renderCount("stable-two.txt")).toBe(beforeRename.stableTwo);
+
+    const beforeAdd = {
+      stableOne: renderCount("stable-one.txt"),
+      stableTwo: renderCount("stable-two.txt"),
+    };
+
+    await userEvent.click(canvas.getByRole("button", { name: "Add gamma" }));
+    await waitFor(() => expect(renderCount("workspace/gamma.txt")).toBeGreaterThan(0));
+    await expect(canvas.getByText("gamma.txt")).toBeVisible();
+    expect(renderCount("stable-one.txt")).toBe(beforeAdd.stableOne);
+    expect(renderCount("stable-two.txt")).toBe(beforeAdd.stableTwo);
   },
 };
 

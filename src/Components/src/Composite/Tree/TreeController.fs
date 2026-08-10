@@ -60,7 +60,7 @@ let loadBranchChildren
 
             try
                 try
-                    let! children = source.GetTreeItems(Some node)
+                    let! children = source.getTreeItems (Some node)
 
                     setLoadedChildren (fun current ->
                         if isLoadStillPending node.id requestId current then
@@ -133,7 +133,7 @@ let focusNode (focusController: TreeFocusController<'T>) index nodeId =
 
 let tryFocusById (focusController: TreeFocusController<'T>) nodeId =
     focusController.Lookup.VisibleNodes
-    |> Array.tryFindIndex (fun row -> row.Node.id = nodeId)
+    |> Array.tryFindIndex (fun row -> row.node.id = nodeId)
     |> Option.iter (fun index -> focusNode focusController index nodeId)
 
 let focusByDelta focusController focusedId delta =
@@ -143,17 +143,17 @@ let focusByDelta focusController focusedId delta =
 let focusFirst focusController =
     focusController.Lookup.VisibleNodes
     |> Array.tryHead
-    |> Option.iter (fun row -> tryFocusById focusController row.Node.id)
+    |> Option.iter (fun row -> tryFocusById focusController row.node.id)
 
 let focusLast focusController =
     focusController.Lookup.VisibleNodes
     |> Array.tryLast
-    |> Option.iter (fun row -> tryFocusById focusController row.Node.id)
+    |> Option.iter (fun row -> tryFocusById focusController row.node.id)
 
 let focusFirstChild focusController nodeId =
     focusController.Lookup.VisibleNodes
-    |> Array.tryFind (fun row -> row.ParentId = Some nodeId)
-    |> Option.iter (fun row -> tryFocusById focusController row.Node.id)
+    |> Array.tryFind (fun row -> row.parentId = Some nodeId)
+    |> Option.iter (fun row -> tryFocusById focusController row.node.id)
 
 let collapseOrFocusParent focusController expandedIds setExpandedIds nodeId =
     if expandedIds |> Set.contains nodeId then

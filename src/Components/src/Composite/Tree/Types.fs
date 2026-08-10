@@ -17,6 +17,7 @@ type TreeSelectionMode =
     | Multiple
 
 /// Describes the lifecycle state for children loaded through a TreeDataSource.
+/// StringEnum emits this value as a native JavaScript string rather than an object.
 [<StringEnum(CaseRules.LowerFirst)>]
 type TreeLazyLoadStatus =
     | Idle
@@ -51,23 +52,36 @@ type TreeItem<'T>
     member val className: string option = className with get, set
 
 /// Runtime state passed to custom node renderers for content, leading, and trailing slots.
-type TreeRenderProps<'T> = {
-    Node: TreeItem<'T>
-    Depth: int
-    IsExpanded: bool
-    IsSelected: bool
-    IsFocused: bool
-    IsLoading: bool
-    Error: string option
-    Toggle: unit -> unit
-    Select: MouseEvent -> unit
-}
+[<JS.Pojo>]
+type TreeRenderProps<'T>
+    (
+        node: TreeItem<'T>,
+        depth: int,
+        isExpanded: bool,
+        isSelected: bool,
+        isFocused: bool,
+        isLoading: bool,
+        error: string option,
+        toggle: unit -> unit,
+        select: MouseEvent -> unit
+    ) =
+    member val node = node with get, set
+    member val depth = depth with get, set
+    member val isExpanded = isExpanded with get, set
+    member val isSelected = isSelected with get, set
+    member val isFocused = isFocused with get, set
+    member val isLoading = isLoading with get, set
+    member val error = error with get, set
+    member val toggle = toggle with get, set
+    member val select = select with get, set
 
 /// A flattened tree row with depth and parent metadata for rendering and navigation.
 type TreeVisibleNode<'T> = {
-    Node: TreeItem<'T>
-    Depth: int
-    ParentId: string option
+    node: TreeItem<'T>
+    depth: int
+    parentId: string option
+    posInSet: int
+    setSize: int
 }
 
 /// Cached load result for a node whose children are provided asynchronously.
@@ -86,19 +100,20 @@ type TreeRowLookup<'T> = {
 }
 
 /// Datasource adapter for lazy trees; unknown child counts are represented by negative values.
-type TreeDataSource<'T> = {
-    GetChildrenCount: TreeItem<'T> option -> int
-    GetTreeItems: TreeItem<'T> option -> JS.Promise<TreeItem<'T>[]>
-}
+[<JS.Pojo>]
+type TreeDataSource<'T>
+    (getChildrenCount: TreeItem<'T> option -> int, getTreeItems: TreeItem<'T> option -> JS.Promise<TreeItem<'T>[]>) =
+    member val getChildrenCount = getChildrenCount with get, set
+    member val getTreeItems = getTreeItems with get, set
 
 /// Imperative cache invalidation API exposed to consumers through apiRef.
-type TreeApi = {
-    InvalidateNode: string -> unit
-    InvalidateAll: unit -> unit
-}
+[<JS.Pojo>]
+type TreeApi(invalidateNode: string -> unit, invalidateAll: unit -> unit) =
+    member val invalidateNode = invalidateNode with get, set
+    member val invalidateAll = invalidateAll with get, set
 
 /// Allows consumers to extend or replace the generated CSS class list for tree rows.
-type TreeStyleFn<'T> = TreeItem<'T> option -> string list -> string list
+type TreeStyleFn<'T> = TreeItem<'T> option -> string[] -> string[]
 
 /// Exposes the browser context-menu event together with its node target, or None for the tree root.
 type TreeContextMenuEvent<'T> = delegate of MouseEvent * TreeItem<'T> option -> unit

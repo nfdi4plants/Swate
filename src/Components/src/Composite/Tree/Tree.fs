@@ -75,39 +75,39 @@ type Tree =
                 setSelection
 
         let renderRow row =
-            let loadState = loadStateFor row.Node.id treeState.LoadedChildren
-            let isExpanded = treeState.ExpandedIds.Contains row.Node.id
+            let loadState = loadStateFor row.node.id treeState.LoadedChildren
+            let isExpanded = treeState.ExpandedIds.Contains row.node.id
 
             let canExpandNode =
-                canExpand config.DataSource config.EnableLazyLoading treeState.LoadedChildren row.Node
+                canExpand config.DataSource config.EnableLazyLoading treeState.LoadedChildren row.node
 
             TreeNode.Row(
                 row = row,
                 isExpanded = isExpanded,
-                isSelected = effectiveSelectedIds.Contains row.Node.id,
-                isFocused = (focusedId = Some row.Node.id),
+                isSelected = effectiveSelectedIds.Contains row.node.id,
+                isFocused = (focusedId = Some row.node.id),
                 isLoading = (loadState.Status = TreeLazyLoadStatus.Loading),
                 error = loadState.Error,
                 canExpand = canExpandNode,
-                onToggle = (fun () -> actions.ExpandNode row.Node),
+                onToggle = (fun () -> actions.ExpandNode row.node),
                 onSelect =
                     (fun event ->
                         event.preventDefault ()
                         event.stopPropagation ()
 
                         if canExpandNode then
-                            actions.ExpandNode row.Node
+                            actions.ExpandNode row.node
 
                         let extendSelection = event.shiftKey || event.ctrlKey || event.metaKey
 
-                        actions.SelectNode row.Node extendSelection
+                        actions.SelectNode row.node extendSelection
                     ),
                 onFocus =
                     (fun () ->
-                        if treeState.FocusedId <> Some row.Node.id then
-                            treeState.SetFocusedId(Some row.Node.id)
+                        if treeState.FocusedId <> Some row.node.id then
+                            treeState.SetFocusedId(Some row.node.id)
                     ),
-                onKeyDown = actions.OnNodeKeyDown row.Node
+                onKeyDown = actions.OnNodeKeyDown row.node
             )
 
         let treeContent =
@@ -127,7 +127,7 @@ type Tree =
                                     let row = rows.[virtualRow.index]
 
                                     Html.div [
-                                        prop.key row.Node.id
+                                        prop.key row.node.id
                                         prop.ref (fun element -> virtualizer.measureElement (Option.ofObj element))
                                         prop.custom ("data-index", virtualRow.index)
                                         prop.style [
@@ -148,7 +148,7 @@ type Tree =
                     prop.custom ("data-tree-virtualized", "false")
                     prop.children [
                         for row in rows do
-                            Html.div [ prop.key row.Node.id; prop.children [ renderRow row ] ]
+                            Html.div [ prop.key row.node.id; prop.children [ renderRow row ] ]
                     ]
                 ]
 
@@ -209,27 +209,70 @@ type Tree =
             ?ariaLabel: string,
             ?debug: bool
         ) =
-        let contextValue: TreeContextValue<'T> = {
-            DataSource = dataSource
-            SelectionMode = defaultArg selectionMode TreeSelectionMode.Single
-            SelectedIds = selectedIds
-            DefaultSelectedIds = defaultSelectedIds
-            DefaultExpandedIds = defaultExpandedIds
-            OnSelectionChange = onSelectionChange
-            SelectionDisabled = defaultArg isSelectionDisabled false
-            IsNodeSelectable = defaultArg isNodeSelectable (fun _ -> true)
-            EnableLazyLoading = defaultArg enableLazyLoading dataSource.IsSome
-            EnableVirtualization = defaultArg enableVirtualization false
-            EstimateNodeHeight = defaultArg estimateNodeHeight 34
-            OnContextMenu = onContextMenu
-            RenderNode = renderNode
-            Leading = leading
-            Trailing = trailing
-            StyleFn = styleFn
-            OnError = defaultArg onError ignore
-            ApiRef = apiRef
-            AriaLabel = defaultArg ariaLabel "Tree"
-            Debug = defaultArg debug false
-        }
+        let selectionMode = defaultArg selectionMode TreeSelectionMode.Single
+        let isSelectionDisabled = defaultArg isSelectionDisabled false
+
+        let isNodeSelectable =
+            React.useMemo ((fun () -> defaultArg isNodeSelectable (fun _ -> true)), [| box isNodeSelectable |])
+
+        let enableLazyLoading = defaultArg enableLazyLoading dataSource.IsSome
+        let enableVirtualization = defaultArg enableVirtualization false
+        let estimateNodeHeight = defaultArg estimateNodeHeight 34
+
+        let styleFn = React.useMemo ((fun () -> styleFn), [| box styleFn |])
+
+        let onError =
+            React.useMemo ((fun () -> defaultArg onError ignore), [| box onError |])
+
+        let ariaLabel = defaultArg ariaLabel "Tree"
+        let debug = defaultArg debug false
+
+        let contextValue: TreeContextValue<'T> =
+            React.useMemo (
+                (fun () -> {
+                    DataSource = dataSource
+                    SelectionMode = selectionMode
+                    SelectedIds = selectedIds
+                    DefaultSelectedIds = defaultSelectedIds
+                    DefaultExpandedIds = defaultExpandedIds
+                    OnSelectionChange = onSelectionChange
+                    SelectionDisabled = isSelectionDisabled
+                    IsNodeSelectable = isNodeSelectable
+                    EnableLazyLoading = enableLazyLoading
+                    EnableVirtualization = enableVirtualization
+                    EstimateNodeHeight = estimateNodeHeight
+                    OnContextMenu = onContextMenu
+                    RenderNode = renderNode
+                    Leading = leading
+                    Trailing = trailing
+                    StyleFn = styleFn
+                    OnError = onError
+                    ApiRef = apiRef
+                    AriaLabel = ariaLabel
+                    Debug = debug
+                }),
+                [|
+                    box dataSource
+                    box selectionMode
+                    box selectedIds
+                    box defaultSelectedIds
+                    box defaultExpandedIds
+                    box onSelectionChange
+                    box isSelectionDisabled
+                    box isNodeSelectable
+                    box enableLazyLoading
+                    box enableVirtualization
+                    box estimateNodeHeight
+                    box onContextMenu
+                    box renderNode
+                    box leading
+                    box trailing
+                    box styleFn
+                    box onError
+                    box apiRef
+                    box ariaLabel
+                    box debug
+                |]
+            )
 
         TreeCtx.Provider(unbox<TreeContextValue<obj>> (box contextValue), Tree.Root(items))

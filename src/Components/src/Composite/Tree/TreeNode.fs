@@ -25,24 +25,15 @@ type TreeNode =
             ?onKeyDown: KeyboardEvent -> unit
         ) =
         let config = useTreeCtx<'T> ()
-        let node = row.Node
+        let node = row.node
         let canSelect = not config.SelectionDisabled && config.IsNodeSelectable node
         let onToggle = defaultArg onToggle ignore
         let onSelect = defaultArg onSelect ignore
         let onFocus = defaultArg onFocus ignore
         let onKeyDown = defaultArg onKeyDown ignore
 
-        let renderProps: TreeRenderProps<'T> = {
-            Node = node
-            Depth = row.Depth
-            IsExpanded = isExpanded
-            IsSelected = isSelected
-            IsFocused = isFocused
-            IsLoading = isLoading
-            Error = error
-            Toggle = onToggle
-            Select = onSelect
-        }
+        let renderProps =
+            TreeRenderProps(node, row.depth, isExpanded, isSelected, isFocused, isLoading, error, onToggle, onSelect)
 
         let expandButton =
             if canExpand then
@@ -128,10 +119,13 @@ type TreeNode =
         Html.div [
             prop.role "treeitem"
             prop.tabIndex (if isFocused then 0 else -1)
-            prop.custom ("aria-selected", isSelected)
+            if canSelect then
+                prop.custom ("aria-selected", isSelected)
             if not canSelect && not canExpand then
                 prop.custom ("aria-disabled", true)
-            prop.custom ("aria-level", row.Depth + 1)
+            prop.custom ("aria-level", row.depth + 1)
+            prop.custom ("aria-posinset", row.posInSet)
+            prop.custom ("aria-setsize", row.setSize)
             if canExpand then
                 prop.custom ("aria-expanded", isExpanded)
             prop.custom ("data-tree-node-id", node.id)
@@ -139,7 +133,7 @@ type TreeNode =
             if config.Debug then
                 prop.testId $"tree-node-{node.id}"
             prop.className (TreeHelper.nodeContainerClasses row canSelect canExpand isSelected isFocused config.StyleFn)
-            prop.style [ style.paddingLeft (length.rem (float row.Depth * 1.25)) ]
+            prop.style [ style.paddingLeft (length.rem (float row.depth * 1.25)) ]
             prop.title (node.tooltip |> Option.defaultValue node.label)
             prop.onClick onSelect
             prop.onFocus (fun _ -> onFocus ())

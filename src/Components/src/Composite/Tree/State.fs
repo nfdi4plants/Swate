@@ -66,7 +66,7 @@ let canExpand
     else
         match directChildren loadedChildren node, dataSource with
         | Some children, _ -> children.Length > 0
-        | None, Some source when enableLazyLoading -> source.GetChildrenCount(Some node) <> 0
+        | None, Some source when enableLazyLoading -> source.getChildrenCount (Some node) <> 0
         | None, _ -> false
 
 let flattenVisible loadedChildren expandedIds items =
@@ -75,12 +75,16 @@ let flattenVisible loadedChildren expandedIds items =
     let parentMap = ResizeArray<string * string>()
 
     let rec loop ancestors parentId depth (items: TreeItem<'T>[]) =
-        for item in items do
+        for index = 0 to items.Length - 1 do
+            let item = items.[index]
+
             if not (ancestors |> Set.contains item.id) then
                 nodes.Add {
-                    Node = item
-                    Depth = depth
-                    ParentId = parentId
+                    node = item
+                    depth = depth
+                    parentId = parentId
+                    posInSet = index + 1
+                    setSize = items.Length
                 }
 
                 nodeMap.Add(item.id, item)
@@ -134,8 +138,8 @@ let nextSelection mode extendSelection nodeId selectedIds =
 
 let focusedOrFirst focusedId visibleNodes =
     focusedId
-    |> Option.filter (fun id -> visibleNodes |> Array.exists (fun row -> row.Node.id = id))
-    |> Option.orElse (visibleNodes |> Array.tryHead |> Option.map _.Node.id)
+    |> Option.filter (fun id -> visibleNodes |> Array.exists (fun row -> row.node.id = id))
+    |> Option.orElse (visibleNodes |> Array.tryHead |> Option.map _.node.id)
 
 let moveFocus delta focusedId visibleNodes =
     if visibleNodes |> Array.isEmpty then
@@ -143,9 +147,9 @@ let moveFocus delta focusedId visibleNodes =
     else
         let currentIndex =
             focusedId
-            |> Option.bind (fun id -> visibleNodes |> Array.tryFindIndex (fun row -> row.Node.id = id))
+            |> Option.bind (fun id -> visibleNodes |> Array.tryFindIndex (fun row -> row.node.id = id))
             |> Option.defaultValue 0
 
         let nextIndex = currentIndex + delta |> max 0 |> min (visibleNodes.Length - 1)
 
-        Some visibleNodes.[nextIndex].Node.id
+        Some visibleNodes.[nextIndex].node.id
