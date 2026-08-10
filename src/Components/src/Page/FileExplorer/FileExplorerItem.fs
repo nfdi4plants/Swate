@@ -3,6 +3,7 @@ namespace Swate.Components.Page.FileExplorer
 open Fable.Core
 open Feliz
 open Swate.Components.Page.FileExplorer.Types
+open Swate.Components.Primitive.ContextMenu.Types
 
 [<Mangle(false); Erase>]
 type FileExplorerItem =
@@ -46,44 +47,46 @@ type FileExplorerItem =
 
     [<ReactComponent>]
     static member private ItemActionButton(item: FileItem, action: ContextMenuItem) =
-        let label = $"{action.Label} {item.Name}"
+        let actionLabel = action.label |> Option.defaultValue "Action"
+        let label = $"{actionLabel} {item.Name}"
 
         FileExplorerItem.RowActionButton(
             label,
-            action.Icon,
+            action.iconClass |> Option.defaultValue "swt:fluent--more-horizontal-24-regular",
             action.OnClick,
-            ?className = action.ClassName,
-            ?disabled = action.Disabled,
-            buttonKey = $"{item.Id}-{action.Label}"
+            ?className = action.className,
+            disabled = action.disabled,
+            buttonKey = $"{item.Id}-{actionLabel}"
         )
 
     [<ReactComponent>]
     static member private StatusActionButton(item: FileItem, action: ContextMenuItem) =
-        let label = $"{action.Label} {item.Name}"
+        let actionLabel = action.label |> Option.defaultValue "Action"
+        let label = $"{actionLabel} {item.Name}"
 
         Html.button [
             prop.type'.button
             prop.className [
                 "swt:badge swt:badge-sm swt:gap-1 swt:border swt:border-base-300 swt:bg-base-100 swt:text-base-content swt:transition-colors"
 
-                match action.Disabled with
-                | Some true -> "swt:cursor-not-allowed swt:opacity-70"
-                | _ ->
+                if action.disabled then
+                    "swt:cursor-not-allowed swt:opacity-70"
+                else
                     "swt:cursor-pointer swt:hover:border-primary swt:focus-visible:outline swt:focus-visible:outline-2 swt:focus-visible:outline-offset-2 swt:focus-visible:outline-primary"
             ]
-            prop.disabled (defaultArg action.Disabled false)
+            prop.disabled action.disabled
             prop.ariaLabel label
             prop.title label
             prop.onClick (fun ev ->
                 ev.preventDefault ()
                 ev.stopPropagation ()
 
-                if action.Disabled <> Some true then
+                if not action.disabled then
                     action.OnClick()
             )
             prop.children [
-                Html.i [ prop.className $"swt:iconify {action.Icon} swt:size-3" ]
-                Html.span [ prop.text action.Label ]
+                action.icon |> Option.defaultValue Html.none
+                action.text |> Option.defaultValue Html.none
             ]
         ]
 
@@ -129,14 +132,13 @@ type FileExplorerItem =
             |> Option.map (fun size -> $"{statusText} - {size}")
             |> Option.defaultValue statusText
 
-        let isActionDisabled =
-            statusAction
-            |> Option.bind (fun action -> action.Disabled)
-            |> Option.defaultValue false
+        let isActionDisabled = statusAction |> Option.exists _.disabled
 
         let pillAccessibilityText =
             match statusAction with
-            | Some action -> $"{action.Label} {item.Name}. {statusAccessibilityText}"
+            | Some action ->
+                let actionLabel = action.label |> Option.defaultValue "Action"
+                $"{actionLabel} {item.Name}. {statusAccessibilityText}"
             | None -> statusAccessibilityText
 
         let statusClassNames =

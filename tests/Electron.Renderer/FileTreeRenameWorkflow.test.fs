@@ -7,6 +7,7 @@ open ARCtrl
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameHelper
 open Renderer.Components.LeftSidebar.FileExplorer.Types
 open Swate.Components.Page.FileExplorer.Types
+open Swate.Components.Primitive.ContextMenu.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Vitest

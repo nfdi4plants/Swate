@@ -3,6 +3,7 @@ module ElectronRenderer.FileTreeContextMenuTests
 open Renderer.Components.LeftSidebar.FileExplorer.Helper
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeContextMenu
 open Swate.Components.Page.FileExplorer.Types
+open Swate.Components.Primitive.ContextMenu.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Vitest
@@ -47,10 +48,10 @@ let private createFolderItem (name: string) (path: string option) = {
         Id = defaultArg path name
 }
 
-let private labels items =
+let private labels (items: ContextMenuItem list) =
     items |> List.map _.Label |> List.toArray
 
-let private groupedLabels items =
+let private groupedLabels (items: ContextMenuItem list) =
     items
     |> List.map (fun item ->
         if defaultArg item.IsDivider false then

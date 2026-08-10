@@ -232,7 +232,7 @@ type ContextMenu =
 
                                             let triggerEvent =
                                                 fun (e: Browser.Types.MouseEvent) ->
-                                                    if not functionIsCalled.current then
+                                                    if not child.disabled && not functionIsCalled.current then
                                                         functionIsCalled.current <- true
 
                                                         let d = {|
@@ -266,12 +266,17 @@ type ContextMenu =
                                             else
                                                 Html.button [
                                                     prop.key index
-                                                    prop.className
+                                                    prop.className [
                                                         "swt:col-span-3 swt:grid swt:grid-cols-subgrid swt:gap-x-2 swt:text-sm /
                                                         swt:text-base-content swt:px-2 swt:py-1 /
                                                         swt:w-full swt:text-left /
                                                         swt:hover:bg-base-100 /
                                                         swt:focus:bg-base-100 swt:focus:outline-hidden swt:focus:ring-2 swt:focus:ring-primary"
+                                                        if child.disabled then
+                                                            "swt:opacity-50 swt:cursor-not-allowed"
+                                                        yield! child.className |> Option.toList
+                                                    ]
+                                                    prop.disabled child.disabled
                                                     prop.children [
                                                         if child.icon.IsSome then
                                                             Html.div [

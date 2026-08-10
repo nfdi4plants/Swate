@@ -2,6 +2,7 @@ module Renderer.Components.LeftSidebar.FileExplorer.Helper
 
 open System
 open Swate.Components.Page.FileExplorer.Types
+open Swate.Components.Primitive.ContextMenu.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
@@ -143,7 +144,7 @@ let rootFolderContextMenuItems
         item.IsDirectory
         && (tryGetItemRelativePath item |> Option.exists (isRootFolderPath rootFolderName))
 
-    ContextMenuItem.whenItem isMatchingRootFolder label icon (fun _ -> onClick ()) item
+    Swate.Components.Primitive.ContextMenu.Helper.whenItem isMatchingRootFolder label icon (fun _ -> onClick ()) item
 
 let fileSystemCreateKinds = [ FileSystemItemKind.File; FileSystemItemKind.Folder ]
 

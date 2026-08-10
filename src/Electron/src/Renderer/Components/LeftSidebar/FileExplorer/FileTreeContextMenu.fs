@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Swate.Components.Page.FileExplorer.Types
+open Swate.Components.Primitive.ContextMenu.Types
 open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
@@ -37,7 +38,7 @@ let private withDividers (groups: ContextMenuItem list list) =
         if index = 0 then
             group
         else
-            ContextMenuItem.divider :: group
+            Swate.Components.Primitive.ContextMenu.Helper.divider :: group
     )
     |> List.collect id
 
@@ -95,12 +96,12 @@ let private pathActionContextMenuItemsForRelativePath
     =
     [
         if not item.IsDirectory then
-            ContextMenuItem.create
+            Swate.Components.Primitive.ContextMenu.Helper.create
                 "Open with Default Application"
                 "swt:fluent--open-24-regular"
                 (fun () -> runPathAction config "Open file failed" config.openPathWithDefaultApplication relativePath)
 
-        ContextMenuItem.create
+        Swate.Components.Primitive.ContextMenu.Helper.create
             "Open Folder Location"
             "swt:fluent--folder-open-24-regular"
             (fun () -> runPathAction config "Open folder location failed" config.openPathInFileExplorer relativePath)
@@ -115,7 +116,7 @@ let openContextMenuItems (config: ContextMenuConfig) (item: FileItem) =
     match tryGetRelativeItemPath item with
     | None -> []
     | Some relativePath -> [
-        ContextMenuItem.create "Open" "swt:fluent--open-24-regular" (fun () -> config.openItem item)
+        Swate.Components.Primitive.ContextMenu.Helper.create "Open" "swt:fluent--open-24-regular" (fun () -> config.openItem item)
 
         yield! pathActionContextMenuItemsForRelativePath config.pathActionConfig item relativePath
       ]
@@ -123,12 +124,12 @@ let openContextMenuItems (config: ContextMenuConfig) (item: FileItem) =
 let copyPathContextMenuItems (arcRootPath: string option) (item: FileItem) = [
     match tryGetRelativeItemPath item with
     | Some relativePath ->
-        ContextMenuItem.create "Copy Path" "swt:fluent--copy-24-regular" (fun () -> copyTextToClipboard relativePath)
+        Swate.Components.Primitive.ContextMenu.Helper.create "Copy Path" "swt:fluent--copy-24-regular" (fun () -> copyTextToClipboard relativePath)
     | None -> ()
 
     match tryGetAbsoluteItemPath arcRootPath item with
     | Some fullPath ->
-        ContextMenuItem.create "Copy Full Path" "swt:fluent--copy-24-regular" (fun () -> copyTextToClipboard fullPath)
+        Swate.Components.Primitive.ContextMenu.Helper.create "Copy Full Path" "swt:fluent--copy-24-regular" (fun () -> copyTextToClipboard fullPath)
     | None -> ()
 ]
 
@@ -139,13 +140,13 @@ let arcCreateContextMenuItems (openCreateModal: ArcExplorerNodeKind -> unit) (it
                 arcCreateKinds
                 |> List.sortBy arcCreateKindSortOrder
                 |> List.map (fun kind ->
-                    ContextMenuItem.create
+                    Swate.Components.Primitive.ContextMenu.Helper.create
                         $"Add {ArcExplorerNodeKind.label kind}"
                         (arcCreateKindIcon kind)
                         (fun () -> openCreateModal kind)
                 )
 
-            ContextMenuItem.create
+            Swate.Components.Primitive.ContextMenu.Helper.create
                 "Add Note"
                 "swt:fluent--note-add-24-regular"
                 (fun () -> openCreateModal ArcExplorerNodeKind.Note)
@@ -160,7 +161,7 @@ let fileSystemCreateContextMenuItems
     if canCreateFileSystemItemIn item then
         fileSystemCreateKinds
         |> List.map (fun kind ->
-            ContextMenuItem.create
+            Swate.Components.Primitive.ContextMenu.Helper.create
                 $"New {fileSystemCreateKindLabel kind}"
                 (fileSystemCreateKindIcon kind)
                 (fun () -> openFileSystemCreateModal kind item)
@@ -177,7 +178,7 @@ let rootContextMenuItems (config: ContextMenuConfig) (rootItem: FileItem) =
 let renameContextMenuItems (requestRenameItem: FileItem -> unit) (item: FileItem) =
     if canRenameItem item then
         [
-            ContextMenuItem.create "Rename" "swt:fluent--edit-24-regular" (fun () -> requestRenameItem item)
+            Swate.Components.Primitive.ContextMenu.Helper.create "Rename" "swt:fluent--edit-24-regular" (fun () -> requestRenameItem item)
         ]
     else
         []
@@ -185,7 +186,7 @@ let renameContextMenuItems (requestRenameItem: FileItem -> unit) (item: FileItem
 let deleteContextMenuItems (requestDeleteItem: FileItem -> unit) (item: FileItem) =
     if canDeleteItem item then
         [
-            ContextMenuItem.styled
+            Swate.Components.Primitive.ContextMenu.Helper.styled
                 "Delete"
                 "swt:fluent--delete-24-regular"
                 "swt:text-error"

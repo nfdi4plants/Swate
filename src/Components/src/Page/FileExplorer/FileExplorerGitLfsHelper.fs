@@ -2,6 +2,7 @@ module Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper
 
 open Fable.Core
 open Swate.Components.Page.FileExplorer.Types
+open Swate.Components.Primitive.ContextMenu.Types
 
 module FileItemHelper = Swate.Components.Page.FileExplorer.Helper
 
@@ -81,15 +82,15 @@ let private lfsAction label icon item enabled action =
     action
     |> Option.map (fun handler ->
         if enabled then
-            ContextMenuItem.forItem label icon handler item
+            Swate.Components.Primitive.ContextMenu.Helper.forItem label icon handler item
         else
-            ContextMenuItem.disabled label icon
+            Swate.Components.Primitive.ContextMenu.Helper.disabled label icon
     )
 
 let lfsPillAction (item: FileItem) onDownloadLfsFile onFreeLocalLfsCopy =
     let withFallback label icon enabled action =
         lfsAction label icon item enabled action
-        |> Option.defaultValue (ContextMenuItem.disabled label icon)
+        |> Option.defaultValue (Swate.Components.Primitive.ContextMenu.Helper.disabled label icon)
 
     if item.IsDirectory || not (FileItemHelper.isLfs item) then
         None
@@ -98,7 +99,7 @@ let lfsPillAction (item: FileItem) onDownloadLfsFile onFreeLocalLfsCopy =
     elif FileItemHelper.hasLocalLfsCopy item then
         withFallback freeCopyLabel freeCopyIcon true onFreeLocalLfsCopy |> Some
     else
-        ContextMenuItem.disabled downloadLabel downloadIcon |> Some
+        Swate.Components.Primitive.ContextMenu.Helper.disabled downloadLabel downloadIcon |> Some
 
 let contextMenuItems
     (item: FileItem)
@@ -114,7 +115,7 @@ let contextMenuItems
         let hasLocalCopy = FileItemHelper.hasLocalLfsCopy item
 
         [
-            ContextMenuItem.create
+            Swate.Components.Primitive.ContextMenu.Helper.create
                 (if isMarked then "Unmark Git LFS" else "Mark Git LFS")
                 (if isMarked then
                      "swt:fluent--document-dismiss-24-regular"
@@ -131,7 +132,7 @@ let contextMenuItems
                     lfsAction freeCopyLabel freeCopyIcon item hasLocalCopy onFreeLocalLfsCopy
                     |> Option.toList
 
-            ContextMenuItem.disabled
+            Swate.Components.Primitive.ContextMenu.Helper.disabled
                 (if isMarked then
                      "Git LFS: marked"
                  else

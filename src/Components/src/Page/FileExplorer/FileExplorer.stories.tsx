@@ -7,13 +7,13 @@ import {
   lfsPillAction as fileExplorerGitLfsPillAction,
 } from "./FileExplorerGitLfsHelper.fs.js";
 import {
-  ContextMenuItem,
   type FileItem,
   FileItemIcon_Document$,
   FileItemIcon_Folder,
   FileTree_createFile,
   FileTree_createFolder,
 } from "./Types.fs.js";
+import { create as createContextMenuItem } from "../../Primitive/ContextMenu/Helper.fs.js";
 import { ofArray } from "../../fable_modules/fable-library-ts.5.0.0-alpha.21/List.ts";
 
 const arcCreateItems = [
@@ -45,11 +45,10 @@ const InMemoryCreateFileExplorer = () => {
           ofArray(
             arcCreateItems.map(
               (item) =>
-                new ContextMenuItem(
+                createContextMenuItem(
                   item.label,
                   "swt:fluent--document-add-24-regular",
                   () => setPendingPath(item.path),
-                  undefined,
                 ),
             ),
           )
@@ -189,7 +188,7 @@ const DeleteActionFileExplorer = () => {
         canDeleteItem={() => true}
         onDeleteItem={(item) => setLastDeleted(item.Name)}
         getItemActions={(item) =>
-          ofArray([new ContextMenuItem("Mark", "swt:fluent--star-24-regular", () => setLastAction(item.Name), undefined)])
+          ofArray([createContextMenuItem("Mark", "swt:fluent--star-24-regular", () => setLastAction(item.Name))])
         }
       />
       <div data-testid="last-deleted">Last deleted: {lastDeleted}</div>
@@ -208,11 +207,10 @@ const DestructiveContextMenuFileExplorer = () => {
         initialItems={items}
         onContextMenu={() =>
           ofArray([
-            new ContextMenuItem(
+            createContextMenuItem(
               "Delete Item",
               "swt:fluent--delete-24-regular",
               () => setClickCount((count) => count + 1),
-              undefined,
             ),
           ])
         }
@@ -321,13 +319,12 @@ const TruncatedOverflowFileExplorer = () => {
   const rowAction = React.useCallback(
     (item: FileItem) =>
       ofArray([
-        new ContextMenuItem(
+        createContextMenuItem(
           "Mark",
           "swt:fluent--star-24-regular",
           () => {
             void item;
           },
-          undefined,
         ),
       ]),
     [],
@@ -335,13 +332,12 @@ const TruncatedOverflowFileExplorer = () => {
 
   const statusAction = React.useCallback(
     (item: FileItem) =>
-      new ContextMenuItem(
+      createContextMenuItem(
         "Status",
         "swt:fluent--info-24-regular",
         () => {
           void item;
         },
-        undefined,
       ),
     [],
   );

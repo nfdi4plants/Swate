@@ -436,10 +436,7 @@ type FileTree =
             }
 
             Swate.Components.Primitive.ContextMenu.ContextMenu.ContextMenu(
-                (fun _ ->
-                    FileTreeContextMenu.rootContextMenuItems contextMenuConfig rootMenuItem
-                    |> List.map (fun item -> item.ToPrimitiveContextMenuItem())
-                ),
+                (fun _ -> FileTreeContextMenu.rootContextMenuItems contextMenuConfig rootMenuItem),
                 ref = rootContextMenuRef,
                 onSpawn = (fun _ -> Some(box ()))
             )
