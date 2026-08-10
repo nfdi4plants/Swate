@@ -11,14 +11,11 @@ open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
 
 [<ReactComponent>]
-let ArcFilePreviewTarget (arcFile: ArcFiles, currentActiveView: ActiveView option) =
+let ArcFilePreviewTarget (arcFile: ArcFiles, activeView: ActiveView option) =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let errorModal = useErrorModalCtx ()
 
-    let activeView =
-        currentActiveView
-        |> Option.defaultValue ActiveView.Metadata
-        |> fun requestedView -> ActiveView.Forward(arcFile, requestedView)
+    let activeView = activeView |> Option.defaultValue ActiveView.Metadata
 
     let editorStateRef = React.useRef (arcFile, activeView)
 
@@ -36,11 +33,9 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, currentActiveView: ActiveView optio
         let currentArcFile, _ = editorStateRef.current
         publishEditorState (currentArcFile, nextActiveView)
 
-    let updateArcFileInMemory (nextArcFile: ArcFiles) = Helper.setArcFileInMemory nextArcFile
-
     let setArcFileInMemoryWithErrorModal (nextArcFile: ArcFiles) =
         promise {
-            match! updateArcFileInMemory nextArcFile with
+            match! Helper.setArcFileInMemory nextArcFile with
             | Ok() -> ()
             | Error exn ->
                 errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not update ARC in memory"))
@@ -79,7 +74,8 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, currentActiveView: ActiveView optio
     let importJson =
         React.useCallback (
             (fun (request: JsonImportRequest) -> promise {
-                return! importJsonRequestIntoCurrentTarget arcFile request setArcFilePageState updateArcFileInMemory
+                return!
+                    importJsonRequestIntoCurrentTarget arcFile request setArcFilePageState Helper.setArcFileInMemory
             }),
             [| box arcFile; box pageStateCtx |]
         )

@@ -440,8 +440,7 @@ type Main =
             )
 
         let (arcFile: ArcFiles), setArcFile = React.useState (ArcFiles.Assay(startAssay))
-        let requestedActiveView, setActiveView = React.useState (ActiveView.Table 0)
-        let activeView = ActiveView.Forward(arcFile, requestedActiveView)
+        let activeView, setActiveView = React.useState (ActiveView.Table 0)
 
         let loadTemplates =
             fun () ->
