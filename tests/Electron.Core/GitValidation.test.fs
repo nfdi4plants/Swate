@@ -424,7 +424,8 @@ Vitest.describe (
                         {
                             Name = "jdoe"
                             Email = "1-jdoe@users.noreply.example.org"
-                        }: GitTokenProvider.GitCommitIdentity
+                        }
+                        : GitTokenProvider.GitCommitIdentity
                     )
         )
 
@@ -443,16 +444,23 @@ Vitest.describe (
                         {
                             Name = "John Doe"
                             Email = "john@example.org"
-                        }: GitTokenProvider.GitCommitIdentity
+                        }
+                        : GitTokenProvider.GitCommitIdentity
                     )
 
                 Vitest
-                    .expect(AuthService.commitIdentityOfUser { accountUser with CommitEmail = Some "  " })
+                    .expect(
+                        AuthService.commitIdentityOfUser {
+                            accountUser with
+                                CommitEmail = Some "  "
+                        }
+                    )
                     .toEqual (
                         {
                             Name = "jdoe"
                             Email = "john@example.org"
-                        }: GitTokenProvider.GitCommitIdentity
+                        }
+                        : GitTokenProvider.GitCommitIdentity
                     )
         )
 )

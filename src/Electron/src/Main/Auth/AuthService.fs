@@ -224,7 +224,9 @@ let commitIdentityOfUser (user: AuthUserDto) : Main.Git.GitTokenProvider.GitComm
 
 /// Commit identity of the active account (used by GitIdentityProvider).
 let tryGetCommitIdentity () : Main.Git.GitTokenProvider.GitCommitIdentity option =
-    getActiveAccountState () |> Option.map _.Summary.User |> Option.map commitIdentityOfUser
+    getActiveAccountState ()
+    |> Option.map _.Summary.User
+    |> Option.map commitIdentityOfUser
 
 let private refreshTokenProvider () =
     Main.Git.GitTokenProvider.setTokenProvider {
