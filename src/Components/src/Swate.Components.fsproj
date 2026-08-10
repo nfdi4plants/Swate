@@ -64,7 +64,6 @@
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="swate-components.css" Pack="true" PackagePath="fable/" />
-    <Compile Include="..\..\Client\Model.fs" Link="Client\Model.fs" />
     <Compile Include="Types\StateContext.fs" />
     <Compile Include="Types\CellCoordinate.fs" />
     <Compile Include="Util\Download.fs" />

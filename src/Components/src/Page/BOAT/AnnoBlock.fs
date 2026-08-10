@@ -6,7 +6,6 @@ open Types
 open Fable.Core
 open Swate.Components.Composite.TermSearch.Types
 open Swate.Components.Primitive.Dropdown
-open Model.BuildingBlock
 
 module private Helperfuncs =
     let updateAnnotation
@@ -90,7 +89,7 @@ module Searchblock =
         ]
 
     [<ReactComponent>]
-    let SearchElementKey (ui, setUi, annoState: Annotation list, setAnnoState, a) =
+    let SearchElementKey (annoState: Annotation list, setAnnoState, a) =
         let element = React.useElementRef ()
         let keyTypeDropdownOpen, setKeyTypeDropdownOpen = React.useState false
 
@@ -235,8 +234,6 @@ type Components =
             setHighlight: Highlight -> unit
         ) =
 
-        let (ui: BuildingBlockUIState, setUi) = React.useState (BuildingBlockUIState.init)
-
         let a = annoState.[index]
 
         let mapOfSameHeight =
@@ -331,7 +328,7 @@ type Components =
                                         prop.className "swt:flex swt:flex-row swt:justify-end"
                                         prop.children [ deleteButton specIndex ]
                                     ]
-                                    Searchblock.SearchElementKey(ui, setUi, annoState, setState, specIndex)
+                                    Searchblock.SearchElementKey(annoState, setState, specIndex)
                                     if annoState[specIndex].Search.KeyType.IsTermColumn() then
                                         Searchblock.SearchElementBody(specIndex, annoState, setState)
                                         valueInput specIndex
