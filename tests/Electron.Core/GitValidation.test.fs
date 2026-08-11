@@ -379,8 +379,10 @@ Vitest.describe (
                     User = {
                         Id = 1
                         LocalSwateAccountId = "acc-1"
+                        Username = "invalid-user"
                         Name = "Invalid User"
                         Email = "invalid@example.org"
+                        CommitEmail = None
                         AvatarUrl = "https://example.org/avatar.png"
                         TargetDataHub = "https://git.nfdi4plants.org/"
                     }
@@ -396,6 +398,71 @@ Vitest.describe (
 
                 Vitest.expect(authState.ActiveUser().IsSome).toBe (true)
                 Vitest.expect(authState.UsableActiveUser()).toEqual (None)
+        )
+)
+
+Vitest.describe (
+    "AuthService.commitIdentityOfUser",
+    fun () ->
+        let accountUser: AuthUserDto = {
+            Id = 1
+            LocalSwateAccountId = "acc-1"
+            Username = "jdoe"
+            Name = "John Doe"
+            Email = "john@example.org"
+            CommitEmail = Some "1-jdoe@users.noreply.example.org"
+            AvatarUrl = ""
+            TargetDataHub = "https://git.nfdi4plants.org/"
+        }
+
+        // GitLab's "use a private email in commits" setting must carry into Swate commits.
+        Vitest.test (
+            "prefers the GitLab username and commit email",
+            fun () ->
+                Vitest
+                    .expect(AuthService.commitIdentityOfUser accountUser)
+                    .toEqual (
+                        {
+                            Name = "jdoe"
+                            Email = "1-jdoe@users.noreply.example.org"
+                        }
+                        : GitTokenProvider.GitCommitIdentity
+                    )
+        )
+
+        Vitest.test (
+            "falls back to display name and primary email for accounts stored before these fields existed",
+            fun () ->
+                let legacyUser = {
+                    accountUser with
+                        Username = ""
+                        CommitEmail = None
+                }
+
+                Vitest
+                    .expect(AuthService.commitIdentityOfUser legacyUser)
+                    .toEqual (
+                        {
+                            Name = "John Doe"
+                            Email = "john@example.org"
+                        }
+                        : GitTokenProvider.GitCommitIdentity
+                    )
+
+                Vitest
+                    .expect(
+                        AuthService.commitIdentityOfUser {
+                            accountUser with
+                                CommitEmail = Some "  "
+                        }
+                    )
+                    .toEqual (
+                        {
+                            Name = "jdoe"
+                            Email = "john@example.org"
+                        }
+                        : GitTokenProvider.GitCommitIdentity
+                    )
         )
 )
 
