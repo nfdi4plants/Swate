@@ -189,10 +189,19 @@ let private identityMissingPromptMessage =
 // GitService shapes the final failure because LFS install-required errors need workflow-specific wording.
 let private createFailure kind (message: string) : GitFailure =
     match kind with
-    | GitFailureKind.IdentityMissing -> {
-        Kind = kind
-        Message = $"{identityMissingPromptMessage}\n\n{message.Trim()}"
-      }
+    | GitFailureKind.IdentityMissing ->
+        // Guard against double-wrapping when an already-shaped failure is rethrown and reclassified,
+        // e.g. the auto-commit inside confirmMergeResolution.
+        let finalMessage =
+            if
+                message.IndexOf("Git does not know who you are", StringComparison.OrdinalIgnoreCase)
+                >= 0
+            then
+                message
+            else
+                $"{identityMissingPromptMessage}\n\n{message.Trim()}"
+
+        { Kind = kind; Message = finalMessage }
     | GitFailureKind.LfsInstallRequired ->
         let finalMessage =
             if message.IndexOf("Install Git LFS now?", StringComparison.OrdinalIgnoreCase) >= 0 then
@@ -1058,17 +1067,34 @@ let resolveCommitIdentityConfigEntries (host: string option) : JS.Promise<string
     return commitIdentityConfigEntries identity
 }
 
+// scp-style SSH remotes (git@host:path). The shared remote URL policy rejects them for auth,
+// but they still name the hub a commit will be pushed to, so identity selection parses them.
+// The single-character host guard keeps Windows drive paths (C:\arc) from reading as hosts.
+let private scpStyleRemoteHostPattern = Regex(@"^(?:[^@:/\\]+@)?([^@:/\\]+):")
+
+let private tryExtractScpStyleHost (remoteUrl: string) : string option =
+    if remoteUrl.Contains "://" then
+        None
+    else
+        let patternMatch = scpStyleRemoteHostPattern.Match remoteUrl
+
+        if patternMatch.Success && patternMatch.Groups.[1].Value.Length > 1 then
+            Some(patternMatch.Groups.[1].Value.Trim().ToLowerInvariant())
+        else
+            None
+
 /// Best-effort host of the origin remote, used to pick the matching account identity for local commits.
-/// Missing or non-https/ssh remotes resolve to None, which falls back to the active account.
+/// Missing or unparsable remotes resolve to None, which falls back to the active account.
 let private tryGetOriginHost (arcPath: string) : JS.Promise<string option> = promise {
     try
         let probeGit = createOptions arcPath standardTimeout None |> createGit
         let! remoteUrl = probeGit.raw [| "config"; "--get"; "remote.origin.url" |]
+        let trimmedRemoteUrl = remoteUrl.Trim()
 
         return
-            match tryExtractHostFromRemoteUrl (remoteUrl.Trim()) with
+            match tryExtractHostFromRemoteUrl trimmedRemoteUrl with
             | Ok host -> Some host
-            | Error _ -> None
+            | Error _ -> tryExtractScpStyleHost trimmedRemoteUrl
     with _ ->
         return None
 }

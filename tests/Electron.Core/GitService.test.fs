@@ -796,6 +796,32 @@ Vitest.describe (
 
                             Vitest.expect(requestedHost).toEqual (Some(Some testRemoteHost))
                         })
+
+                    // scp-style SSH remotes are rejected by the auth URL policy but still name the
+                    // hub, so identity selection must resolve their host too.
+                    requestedHost <- None
+
+                    do!
+                        withTempRepository (fun context -> promise {
+                            let! _ =
+                                context.Git.raw [|
+                                    "remote"
+                                    "add"
+                                    "origin"
+                                    $"git@{testRemoteHost}:group/arc.git"
+                                |]
+
+                            let filePath = join [| context.RepoPath; "tracked.txt" |]
+                            do! writeUtf8FileAsync filePath "first\n"
+
+                            let! stageResult = GitService.stagePaths context.RepoPath [| "tracked.txt" |]
+                            expectOk "stage tracked file" stageResult |> ignore
+
+                            let! commitResult = GitService.commit context.RepoPath "test: scp host-aware commit"
+                            expectOk "commit tracked file" commitResult |> ignore
+
+                            Vitest.expect(requestedHost).toEqual (Some(Some testRemoteHost))
+                        })
                 finally
                     GitTokenProvider.setIdentityProvider GitTokenProvider.defaultIdentityProvider
             }

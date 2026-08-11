@@ -224,31 +224,33 @@ let commitIdentityOfUser (user: AuthUserDto) : Main.Git.GitTokenProvider.GitComm
 
 /// Commit identity for a commit that will be pushed to the given host (used by GitIdentityProvider).
 /// Policy: the account matching the host, preferring the active one, so the author links on the hub
-/// being pushed to. Falls back to the active account when no host is known or none matches — any of
-/// the user's real identities beats git's OS-derived author. Unlike token lookup, token validity is
-/// ignored: an expired token cannot authenticate, but its account's email still links commits.
-/// The GitLab username is preferred over the display name so commits link to the account;
+/// being pushed to. With no host known (no remote yet) the active account is used, since publishing
+/// targets its hub. A known host that matches no stored account yields None — the injected `-c`
+/// entries outrank every git config level, so stamping an unrelated account would silently override
+/// an identity the user may have configured for that hub themselves. Unlike token lookup, token
+/// validity is ignored: an expired token cannot authenticate, but its account's email still links
+/// commits. The GitLab username is preferred over the display name so commits link to the account;
 /// accounts stored before usernames were persisted fall back to the display name.
 let tryGetCommitIdentity (host: string option) : Main.Git.GitTokenProvider.GitCommitIdentity option =
-    let matchesHost (accountState: AccountState) =
-        host
-        |> Option.exists (fun host ->
-            String.Equals(
-                SecureAuthStore.extractHost accountState.Summary.User.TargetDataHub,
-                host,
-                StringComparison.OrdinalIgnoreCase
+    let selectedAccountState =
+        match host with
+        | None -> getActiveAccountState ()
+        | Some host ->
+            let matchesHost (accountState: AccountState) =
+                String.Equals(
+                    SecureAuthStore.extractHost accountState.Summary.User.TargetDataHub,
+                    host,
+                    StringComparison.OrdinalIgnoreCase
+                )
+
+            getActiveAccountState ()
+            |> Option.filter matchesHost
+            |> Option.orElseWith (fun () ->
+                accounts
+                |> Map.tryPick (fun _ accountState -> if matchesHost accountState then Some accountState else None)
             )
-        )
 
-    let activeAccountState = getActiveAccountState ()
-
-    activeAccountState
-    |> Option.filter matchesHost
-    |> Option.orElseWith (fun () ->
-        accounts
-        |> Map.tryPick (fun _ accountState -> if matchesHost accountState then Some accountState else None)
-    )
-    |> Option.orElse activeAccountState
+    selectedAccountState
     |> Option.map _.Summary.User
     |> Option.map commitIdentityOfUser
 
