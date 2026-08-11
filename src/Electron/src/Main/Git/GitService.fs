@@ -835,6 +835,8 @@ let private getOversizedWorkingTreePaths
             | None ->
                 match tryResolveArcRelativePath arcPath selectedPath with
                 | Error validationError -> failure <- Some(toFailure validationError)
+                // isa.*.xlsx metadata files must never be tracked with Git LFS, regardless of size.
+                | Ok(relativePath, _) when Swate.Components.Shared.GitLfsRules.isIsaMetadataFile relativePath -> ()
                 | Ok(_, absolutePath) ->
                     let! fileSizeOption = tryGetFileSizeInBytes absolutePath
 
@@ -968,6 +970,8 @@ let private validateCommitLfsPolicy (git: ISimpleGit) : JS.Promise<GitResult<uni
             valueOrEmptyArray status.files
             |> Array.filter (fun fileStatus -> GitStatusCode.isStagedIndexStatus fileStatus.index)
             |> Array.map _.path
+            // isa.*.xlsx metadata files must never be tracked with Git LFS, so they are exempt from the size policy.
+            |> Array.filter (Swate.Components.Shared.GitLfsRules.isIsaMetadataFile >> not)
             |> Array.distinct
 
         let oversizedPaths = ResizeArray<string>()

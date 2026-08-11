@@ -17,6 +17,7 @@ open Swate.Electron.Shared.IPCTypes
 open Vitest
 
 module GitService = Main.Git.GitService
+module GitLfsService = Main.Git.GitLfsService
 module GitProvisioningService = Main.Git.GitProvisioningService
 module GitAuthAdapter = Main.Git.GitAuthAdapter
 module GitCommandResolver = Main.Git.GitCommandResolver
@@ -492,6 +493,60 @@ Vitest.describe (
                             "remote.origin.lfsurl=https://oauth2:abc123@git.nfdi4plants.org/caroott/TestARCGit.git/info/lfs"
                     )
                     .toBe (true)
+        )
+)
+
+Vitest.describe (
+    "GitLfsService.validateTrackingRulesetRequest",
+    fun () ->
+        let expectBlocked (result: Result<unit, string>) =
+            match result with
+            | Ok() -> failwith "Expected the request to be blocked."
+            | Error _ -> ()
+
+        let expectAllowed (result: Result<unit, string>) =
+            match result with
+            | Ok() -> ()
+            | Error reason -> failwith $"Expected the request to be allowed but got: {reason}"
+
+        Vitest.test (
+            "blocks tracking isa metadata files",
+            fun () ->
+                GitLfsService.validateTrackingRulesetRequest Track (Some "studies/study_01/isa.study.xlsx")
+                |> expectBlocked
+        )
+
+        Vitest.test (
+            "blocks tracking the root investigation file",
+            fun () ->
+                GitLfsService.validateTrackingRulesetRequest Track (Some "isa.investigation.xlsx")
+                |> expectBlocked
+        )
+
+        Vitest.test (
+            "allows tracking ordinary files",
+            fun () ->
+                GitLfsService.validateTrackingRulesetRequest Track (Some "assays/assay_01/dataset/raw.bin")
+                |> expectAllowed
+        )
+
+        Vitest.test (
+            "blocks untracking files below a dataset folder",
+            fun () ->
+                GitLfsService.validateTrackingRulesetRequest Untrack (Some "assays/assay_01/dataset/raw.bin")
+                |> expectBlocked
+        )
+
+        Vitest.test (
+            "allows untracking ordinary files",
+            fun () ->
+                GitLfsService.validateTrackingRulesetRequest Untrack (Some "docs/large-report.pdf")
+                |> expectAllowed
+        )
+
+        Vitest.test (
+            "allows commands without a file path",
+            fun () -> GitLfsService.validateTrackingRulesetRequest Pull None |> expectAllowed
         )
 )
 
