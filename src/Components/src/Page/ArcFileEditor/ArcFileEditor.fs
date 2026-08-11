@@ -278,6 +278,11 @@ type Main =
         else
             Html.none
 
+    /// <summary>Renders an editor for an ARC file.</summary>
+    /// <param name="startingActiveView">
+    /// The initial active view. This value is read only when the component mounts; to apply a later value,
+    /// the caller must remount the editor by changing the React key.
+    /// </param>
     [<ReactComponent>]
     static member ArcFileEditor
         (

@@ -5,14 +5,24 @@ open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Composite.Widgets.JsonImport.Types
 open Swate.Components.Shared
 
-let editorKey (arcFile: ArcFiles) (activeView: ActiveView option) =
+let editorKey (arcFile: ArcFiles) (requestedView: ActiveView option) =
     arcFile.TryGetRelativePath()
     |> Option.defaultValue (string arcFile.RelatedArcFilesDiscriminate),
-    activeView |> Option.map _.ViewIndex
+    requestedView |> Option.map _.ViewIndex
+
+let private publishAndPersistArcFile
+    (nextArcFile: ArcFiles)
+    (publishArcFile: ArcFiles -> unit)
+    (persistArcFile: ArcFiles -> JS.Promise<Result<unit, exn>>)
+    =
+    promise {
+        publishArcFile nextArcFile
+        return! persistArcFile nextArcFile
+    }
 
 let createDataMapInCurrentTarget
     (currentArcFile: ArcFiles)
-    (setArcFilePageState: ArcFiles -> unit)
+    (publishArcFile: ActiveView option -> ArcFiles -> unit)
     (saveArcFile: ArcFiles -> JS.Promise<Result<unit, exn>>)
     =
     promise {
@@ -25,8 +35,7 @@ let createDataMapInCurrentTarget
         | ArcFiles.Workflow workflow -> workflow.DataMap <- Some(ARCtrl.DataMap.init ())
         | _ -> ()
 
-        setArcFilePageState nextArcFile
-        return! saveArcFile nextArcFile
+        return! publishAndPersistArcFile nextArcFile (publishArcFile (Some ActiveView.DataMap)) saveArcFile
     }
 
 let importJsonRequestIntoCurrentTarget
@@ -38,7 +47,5 @@ let importJsonRequestIntoCurrentTarget
     promise {
         match Json.Import.applyToCurrentArcFile (currentArcFile, request.ImportedFile) with
         | Error exn -> return Error exn
-        | Ok nextArcFile ->
-            setArcFilePageState nextArcFile
-            return! setArcFileInMemory nextArcFile
+        | Ok nextArcFile -> return! publishAndPersistArcFile nextArcFile setArcFilePageState setArcFileInMemory
     }

@@ -48,16 +48,16 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "creates a DataMap from a copy and publishes the same value that is persisted",
+            "creates a DataMap from a copy and publishes it with the DataMap remount request",
             fun () -> promise {
                 let arcFile, originalAssay = createAssayArcFile [| "Table" |]
-                let publishedArcFiles = ResizeArray<ArcFiles>()
+                let publishedPageStates = ResizeArray<ActiveView option * ArcFiles>()
                 let persistedArcFiles = ResizeArray<ArcFiles>()
 
                 let! result =
                     createDataMapInCurrentTarget
                         arcFile
-                        publishedArcFiles.Add
+                        (fun requestedView nextArcFile -> publishedPageStates.Add(requestedView, nextArcFile))
                         (fun nextArcFile -> promise {
                             persistedArcFiles.Add nextArcFile
                             return Ok()
@@ -68,11 +68,13 @@ Vitest.describe (
                 | Ok() -> ()
 
                 Vitest.expect(originalAssay.DataMap.IsNone).toBe (true)
-                Vitest.expect(publishedArcFiles.Count).toBe (1)
+                Vitest.expect(publishedPageStates.Count).toBe (1)
                 Vitest.expect(persistedArcFiles.Count).toBe (1)
-                Vitest.expect(obj.ReferenceEquals(publishedArcFiles.[0], persistedArcFiles.[0])).toBe (true)
+                let publishedView, publishedArcFile = publishedPageStates.[0]
+                Vitest.expect(publishedView).toEqual (Some ActiveView.DataMap)
+                Vitest.expect(obj.ReferenceEquals(publishedArcFile, persistedArcFiles.[0])).toBe (true)
 
-                match publishedArcFiles.[0] with
+                match publishedArcFile with
                 | ArcFiles.Assay assay -> Vitest.expect(assay.DataMap.IsSome).toBe (true)
                 | _ -> failwith "Expected the published ARC file to remain an Assay."
             }

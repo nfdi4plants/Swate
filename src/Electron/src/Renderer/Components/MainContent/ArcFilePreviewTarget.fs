@@ -11,12 +11,12 @@ open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
 
 [<ReactComponent>]
-let ArcFilePreviewTarget (arcFile: ArcFiles, activeView: ActiveView option) =
+let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let errorModal = useErrorModalCtx ()
 
-    let setArcFilePageState (nextArcFile: ArcFiles) =
-        pageStateCtx.setState (Some(Renderer.Types.PageState.ArcFilePage(nextArcFile, activeView)))
+    let setArcFilePageState nextRequestedView (nextArcFile: ArcFiles) =
+        pageStateCtx.setState (Some(Renderer.Types.PageState.ArcFilePage(nextArcFile, nextRequestedView)))
 
     let setArcFileInMemoryWithErrorModal (nextArcFile: ArcFiles) =
         promise {
@@ -28,7 +28,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, activeView: ActiveView option) =
         |> Promise.start
 
     let setArcFile nextArcFile =
-        setArcFilePageState nextArcFile
+        setArcFilePageState requestedView nextArcFile
         setArcFileInMemoryWithErrorModal nextArcFile
 
     let onSaveArcFile =
@@ -59,7 +59,11 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, activeView: ActiveView option) =
         React.useCallback (
             (fun (request: JsonImportRequest) -> promise {
                 return!
-                    importJsonRequestIntoCurrentTarget arcFile request setArcFilePageState Helper.setArcFileInMemory
+                    importJsonRequestIntoCurrentTarget
+                        arcFile
+                        request
+                        (setArcFilePageState requestedView)
+                        Helper.setArcFileInMemory
             }),
             [| box arcFile; box pageStateCtx |]
         )
@@ -74,8 +78,6 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, activeView: ActiveView option) =
                     "Add DataMap",
                     (fun _ ->
                         if dataMap.IsNone then
-                            props.setActiveView ActiveView.DataMap
-
                             promise {
                                 match!
                                     createDataMapInCurrentTarget props.arcFile setArcFilePageState Helper.saveArcFile
@@ -99,7 +101,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, activeView: ActiveView option) =
             | _ -> Html.none
 
     Html.div [
-        prop.key (string (editorKey arcFile activeView))
+        prop.key (string (editorKey arcFile requestedView))
         prop.className "swt:contents"
         prop.children [
             Swate.Components.Page.ArcFileEditor.Main.ArcFileEditor(
@@ -107,7 +109,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, activeView: ActiveView option) =
                 setArcFile,
                 pickFilePaths,
                 widgetNavbarElements = widgetNavbarElements,
-                startingActiveView = (activeView |> Option.defaultValue ActiveView.Metadata),
+                startingActiveView = (requestedView |> Option.defaultValue ActiveView.Metadata),
                 onImportJson = importJson,
                 onError =
                     (fun message ->

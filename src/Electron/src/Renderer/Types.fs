@@ -16,7 +16,7 @@ type GitUnsupportedPageData = GitUnsupportedContentDto
 
 [<RequireQualifiedAccess>]
 type PageState =
-    | ArcFilePage of arcFile: ArcFiles * activeView: ActiveView option
+    | ArcFilePage of arcFile: ArcFiles * requestedView: ActiveView option
     | MarkdownPage of string
     | TextPage of string
     | UnknownPage
