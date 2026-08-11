@@ -693,8 +693,10 @@ type DataHubBrowser =
             User = {
                 Id = 1
                 LocalSwateAccountId = "1"
+                Username = "storybook-user"
                 Name = "storybook-user"
                 Email = "Storybook User"
+                CommitEmail = None
                 AvatarUrl = ""
                 TargetDataHub = ""
             }
@@ -1060,9 +1062,11 @@ type DataHubBrowser =
                         User = {
                             Id = user.id
                             LocalSwateAccountId = string user.id
+                            Username = user.username
                             Name = user.name
                             AvatarUrl = user.avatar_url |> Option.defaultValue ""
                             Email = user.email
+                            CommitEmail = user.commit_email
                             TargetDataHub = baseUrl
                         }
                         DateAdded = "2026-01-01T00:00:00.0000000Z"

@@ -39,6 +39,7 @@ type GitFailureKind =
     | Canceled
     | LfsInstallRequired
     | RemoteProjectAlreadyExists
+    | IdentityMissing
     | Unknown
 
 [<StringEnum(CaseRules.None)>]
