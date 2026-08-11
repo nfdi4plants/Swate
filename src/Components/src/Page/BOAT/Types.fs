@@ -103,19 +103,7 @@ type Annotation = {
 
     member this.ToggleOpen() = { this with IsOpen = not this.IsOpen }
 
-
-type Highlight = {
-    Keys: Map<float, string>
-    Terms: Map<float, string>
-    Values: Map<float, string>
-}
-
 [<RequireQualifiedAccess>]
-
-type Page =
-    | Builder
-    | Contact
-    | Help
 
 type UploadFileType =
     | Docx

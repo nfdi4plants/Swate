@@ -66,8 +66,6 @@ type BOAT =
 
         let elementID = "Paper"
 
-        let currentpage, setpage = React.useState (Types.Page.Builder)
-
         React.StrictMode [
             Html.div [
                 prop.id "mainView"

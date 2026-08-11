@@ -8,7 +8,7 @@ open Components.FunctionsContextmenu
 
 module PreviewTable =
 
-    let table (annoState: Annotation list, setState: Annotation list -> unit, highlight, setHighlight) =
+    let table (annoState: Annotation list, setState: Annotation list -> unit) =
 
         let cellClass = "swt:border swt:border-black swt:px-3 swt:py-2 swt:min-w-32"
 
@@ -65,20 +65,6 @@ module PreviewTable =
                                                                     |> List.filter (fun x -> x = annoState[a] |> not)
 
                                                                 setState newAnnoList
-
-                                                                let newHighlight = {
-                                                                    Keys =
-                                                                        highlight.Keys
-                                                                        |> Map.remove annoState[a].Height
-                                                                    Terms =
-                                                                        highlight.Terms
-                                                                        |> Map.remove annoState[a].Height
-                                                                    Values =
-                                                                        highlight.Values
-                                                                        |> Map.remove annoState[a].Height
-                                                                }
-
-                                                                setHighlight newHighlight
                                                             )
                                                             prop.children [
                                                                 Html.i [

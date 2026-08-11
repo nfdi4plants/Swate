@@ -58,15 +58,6 @@ type Builder =
                 setFileName ""
                 setLocalFileName "fileName" ""
 
-        let (highlight: Highlight), setHighlight =
-            React.useState (
-                {
-                    Keys = Map.empty
-                    Terms = Map.empty
-                    Values = Map.empty
-                }
-            )
-
         let contextMenuRef = React.useElementRef ()
         let spacerHeight, setSpacerHeight = React.useState (0.)
 
@@ -83,10 +74,10 @@ type Builder =
 
                             if hasOpenAnno then
                                 let noteHeight =
-                                    if annos.Length = 1 then 300.0
-                                    else 80.0 + (float annos.Length) * 250.0
+                                    if annos.Length = 1 then 600.0
+                                    else 100.0 + (float annos.Length) * 350.0
 
-                                max maxBot (height + noteHeight)
+                                max maxBot (height + noteHeight + 100.0)
                             else
                                 max maxBot (height + 30.0)
                         )
@@ -127,7 +118,7 @@ type Builder =
 
         let paper (display: ReactElement) =
             Html.div [
-                prop.className "swt:overflow-y-auto swt:h-full swt:flex swt:flex-row swt:w-full swt:relative swt:px-8"
+                prop.className "swt:overflow-y-auto swt:overflow-x-auto swt:h-full swt:flex swt:flex-row swt:w-full swt:relative swt:px-8"
                 prop.children [
                     Html.div [
                         prop.className "swt:w-full"
@@ -141,7 +132,7 @@ type Builder =
                         ]
                     ]
                     for a in 0 .. annoState.Length - 1 do
-                        App.Components.AnnoBlockwithSwate(annoState, setState, a, highlight, setHighlight)
+                        App.Components.AnnoBlockwithSwate(annoState, setState, a)
                     Html.div [
                         prop.style [ style.height (int spacerHeight) ]
                     ]
@@ -164,24 +155,25 @@ type Builder =
                             text = Html.span "Key",
                             onClick =
                                 fun _ ->
-                                    FunctionsContextmenu.addAnnotationKeyNew
-                                        (annoState, setState, elementID, highlight, setHighlight)
+                                    FunctionsContextmenu.addAnnotationNew
+                                        (annoState, setState, elementID,"key")
+                                        
                                         ()
                         )
                         Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(
                             text = Html.span "Term",
                             onClick =
                                 fun _ ->
-                                    FunctionsContextmenu.addAnnotationBodyNew
-                                        (annoState, setState, elementID, highlight, setHighlight)
+                                    FunctionsContextmenu.addAnnotationNew
+                                        (annoState, setState, elementID,"term")
                                         ()
                         )
                         Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(
                             text = Html.span "Value",
                             onClick =
                                 fun _ ->
-                                    FunctionsContextmenu.addAnnotationValueNew
-                                        (annoState, setState, elementID, highlight, setHighlight)
+                                    FunctionsContextmenu.addAnnotationNew
+                                        (annoState, setState, elementID,"value")
                                         ()
                         )
                         Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(isDivider = true)
@@ -196,24 +188,24 @@ type Builder =
                             text = Html.span "Key",
                             onClick =
                                 fun _ ->
-                                    FunctionsContextmenu.addToLastAnnoAsKey
-                                        (annoState, setState, highlight, setHighlight)
+                                    FunctionsContextmenu.addToLastAnno
+                                        (annoState, setState, "key")
                                         ()
                         )
                         Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(
                             text = Html.span "Term",
                             onClick =
                                 fun _ ->
-                                    FunctionsContextmenu.addToLastAnnoAsBody
-                                        (annoState, setState, highlight, setHighlight)
+                                    FunctionsContextmenu.addToLastAnno
+                                        (annoState, setState, "term")
                                         ()
                         )
                         Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(
                             text = Html.span "Value",
                             onClick =
                                 fun _ ->
-                                    FunctionsContextmenu.addToLastAnnoAsValue
-                                        (annoState, setState, highlight, setHighlight)
+                                    FunctionsContextmenu.addToLastAnno
+                                        (annoState, setState, "value")
                                         ()
                         )
                     ]),
@@ -229,7 +221,7 @@ type Builder =
         React.Fragment [
             match filehtml with
             | Unset -> ()
-            | _ -> ActionBar.Main(annoState, setState, del, fileName, highlight, setHighlight)
+            | _ -> ActionBar.Main(annoState, setState, del, fileName)
             Html.div [
                 prop.className "swt:flex swt:flex-row swt:p-2 swt:overflow-y-auto swt:h-full"
                 prop.id "main-parent"
@@ -237,11 +229,11 @@ type Builder =
                     match filehtml with
                     | Unset -> placeholder
                     | Docx fileString ->
-                        paper (FileUpload.DisplayHtml(fileString, highlight, elementID, isLocalStorageClear))
+                        paper (FileDisplay.DisplayHtml(fileString, elementID, isLocalStorageClear))
                     | PDF fileString ->
-                        paper (FileUpload.DisplayPDF fileString setNumPages numPages elementID highlight)
+                        paper (FileDisplay.DisplayPDF fileString setNumPages numPages elementID)
                     | Txt fileString ->
-                        paper (FileUpload.DisplayHtml(fileString, highlight, elementID, isLocalStorageClear))
+                        paper (FileDisplay.DisplayHtml(fileString, elementID, isLocalStorageClear))
 
                 ]
             ]

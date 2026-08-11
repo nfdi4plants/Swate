@@ -229,9 +229,7 @@ type Components =
         (
             annoState: Annotation list,
             setState: Annotation list -> unit,
-            index: int,
-            highlight: Highlight,
-            setHighlight: Highlight -> unit
+            index: int
         ) =
 
         let a = annoState.[index]
@@ -241,14 +239,6 @@ type Components =
                 prop.className "swt:mt-0 swt:cursor-pointer swt:hover:text-error swt:transition-colors"
                 prop.onClick (fun _ ->
                     annoState |> List.filter ((<>) annoState[specIndex]) |> setState
-
-                    let newHighlight = {
-                        Keys = highlight.Keys |> Map.remove annoState[specIndex].Height
-                        Terms = highlight.Terms |> Map.remove annoState[specIndex].Height
-                        Values = highlight.Values |> Map.remove annoState[specIndex].Height
-                    }
-
-                    setHighlight newHighlight
                 )
                 prop.children [
                     Html.span [
@@ -340,7 +330,7 @@ type Components =
                 prop.className "swt:cursor-pointer"
                 prop.children [
                     Html.i [
-                        prop.className "swt:iconify swt:fluent--comment-24-filled swt:size-6 swt:text-amber-300 swt:border-2 swt:border-secondary"
+                        prop.className "swt:iconify swt:fluent--comment-24-filled swt:size-6 swt:text-amber-300 swt:z-10!"
                         prop.onClick (fun e ->
                             Helperfuncs.updateAnnotation (
                                 (fun e -> e.ToggleOpen()),
@@ -369,13 +359,7 @@ type Components =
             prop.style [ style.position.absolute; style.top (int a.Height); style.left (int a.XCoordinate) ]
             prop.children [
                 if a.IsOpen = false then
-                    Html.div [
-                        prop.className "swt:z-0!"
-                        prop.children [
-                            closedAnnotationNote
-                        ]
-                    ]
-
+                    closedAnnotationNote
                 else 
                     Html.div [
                         prop.className "swt:z-1! swt:relative"

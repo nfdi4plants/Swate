@@ -16,7 +16,7 @@ type ActionBar =
 
     [<ReactComponent>]
     static member AnnotationModal
-        (isActive: bool, toggleActive: bool -> unit, annoState, setAnnoState, highlight, setHighlight)
+        (isActive: bool, toggleActive: bool -> unit, annoState, setAnnoState)
         =
         // Modal for displaying annotations
 
@@ -46,7 +46,7 @@ type ActionBar =
                             prop.children [
                                 match annoState = [] && isActive = true with
                                 | true -> Html.h1 [ prop.text "No annotations to display." ]
-                                | false -> PreviewTable.table (annoState, setAnnoState, highlight, setHighlight)
+                                | false -> PreviewTable.table (annoState, setAnnoState)
                             ]
                         ]
                     ]
@@ -90,7 +90,7 @@ type ActionBar =
         ]
 
     [<ReactComponent>]
-    static member Main(annoState, setAnnoState, del: unit -> unit, fileName, highlight, setHighlight) =
+    static member Main(annoState, setAnnoState, del: unit -> unit, fileName) =
         let showAnnotationModal, setShowAnnotationModal = React.useState (false)
         let resultsIsEmpty = List.isEmpty annoState
 
@@ -103,9 +103,7 @@ type ActionBar =
                     showAnnotationModal,
                     setShowAnnotationModal,
                     annoState,
-                    setAnnoState,
-                    highlight,
-                    setHighlight
+                    setAnnoState
                 ),
                 Browser.Dom.document.body
             )
@@ -200,12 +198,6 @@ type ActionBar =
                                                 prop.text "delete all annotations"
                                                 prop.onClick (fun _ ->
                                                     setAnnoState []
-
-                                                    setHighlight {
-                                                        Keys = Map.empty
-                                                        Terms = Map.empty
-                                                        Values = Map.empty
-                                                    }
                                                 )
                                                 if annoState = [] then
                                                     prop.className "swt:cursor-not-allowed"

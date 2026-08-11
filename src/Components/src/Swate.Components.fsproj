@@ -320,8 +320,8 @@
     <Compile Include="Page\BOAT\Extensions.fs"/>
     <Compile Include="Page\BOAT\Mammoth.fs"/>
     <Compile Include="Page\BOAT\ContextmenuFunctions.fs"/>
-    <Compile Include="Page\BOAT\DisplayHTML.fs"/>
     <Compile Include="Page\BOAT\FileUploader.fs"/>
+    <Compile Include="Page\BOAT\FileDisplay.fs"/>
     <Compile Include="Page\BOAT\PreviewTable.fs"/>
     <Compile Include="Page\BOAT\DownloadParser.fs"/>
     <Compile Include="Page\BOAT\ActionBar.fs"/>

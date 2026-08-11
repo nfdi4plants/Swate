@@ -166,93 +166,9 @@ module private FileReaderHelper =
         | UploadFileType.PDF -> readPdf file setState setLocalFile
         | UploadFileType.Txt -> readTxt file setState setLocalFile
 
-module Lists =
-
-    let keyList (highlight: Highlight) =
-        highlight.Keys |> Map.toArray |> Array.map snd
-
-    let termList (highlight: Highlight) =
-        highlight.Terms |> Map.toArray |> Array.map snd
-
-    let valueList (highlight: Highlight) =
-        highlight.Values |> Map.toArray |> Array.map snd
-
-// let termlist (annoList: Annotation list) =
-//   annoList
-//   |> List.collect (fun a -> a.Highlight.Terms |> Map.toList |> List.map snd)
-//   |> List.toArray
-//   |> Array.filter (fun term -> term <> "")
-
-
-
-// let valuelist (annoList: Annotation list) =
-//   annoList
-//   |> List.map (fun a -> a.HighlightValues)
-//   |> List.toArray
-//   |> Array.filter (fun a -> a <> "")
 
 type FileUpload =
-    static member DisplayHtml(htmlString: string, highList: Highlight, elementID: string, isLocalStorageClear) =
-        Html.div [
-            prop.className "swt:flex swt:w-full swt:justify-center"
-            prop.children [
-                PaperWithMarker.Main(
-                    htmlString,
-                    Lists.keyList highList,
-                    Lists.termList highList,
-                    Lists.valueList highList,
-                    elementID,
-                    isLocalStorageClear
-                )
-            ]
-        ]
 
-    [<ReactComponent>]
-    //  https://stackoverflow.com/a/60539836/12858021
-    static member DisplayPDF filehtml setNumPages (numPages: int option) (elementID: string) (highList: Highlight) =
-
-        let highlightPattern (text: string, anno: string, colorcode) =
-            text.Replace(anno, sprintf "<mark style='background-color: %s'>%s</mark>" colorcode anno)
-        // #ffe699
-        // #4fb3d9
-
-        let textRender =
-            React.useCallback (
-                (fun text ->
-                    let mutable txt = text?str
-
-                    for a in Lists.keyList highList do
-                        txt <- highlightPattern (txt, a, "#ffe699")
-
-                    for a in Lists.termList highList do
-                        txt <- highlightPattern (txt, a, "#4fb3d9")
-
-                    for a in Lists.valueList highList do
-                        txt <- highlightPattern (txt, a, "#4fd984")
-
-                    txt
-                ),
-                [| box highList |]
-            )
-
-        Html.div [
-            prop.className "swt:flex swt:w-full swt:justify-center"
-            prop.id elementID
-            prop.children [
-                ReactElements.Document(
-                    filehtml,
-                    (fun (props: {| numPages: int |}) -> setNumPages (Some props.numPages)),
-                    //virtualize this list
-                    [
-                        for i in 1 .. numPages |> Option.defaultValue 1 do
-                            ReactElements.Page(i, 750, textRender, $"page-{i}")
-                    ],
-                    externalLinkTarget = "_blank",
-                    onLoadError = (fun e -> Browser.Dom.console.error ("Error loading PDF:", e)),
-                    loading = LoadingSpinner.LoadingSpinner("Loading PDF", size = DaisyuiSize.XL)
-                )
-            ]
-        ]
 
     [<ReactComponent>]
     static member private FileInput setState setFilehtml setLocalFile setFileName setLocalFileName =
