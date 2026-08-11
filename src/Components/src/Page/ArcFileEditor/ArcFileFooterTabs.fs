@@ -291,13 +291,10 @@ type ArcFileFooterTabs =
         let canAddTable = arcFile.CanCreateTables()
         let canRenderDataMap = arcFile.CanRenderDataMapView()
         let tabsRef = React.useElementRef ()
-        let arcFileRef = React.useRef arcFile
-        arcFileRef.current <- arcFile
 
         let updateArcFile update =
-            let nextArcFile = ArcFiles.refreshRef arcFileRef.current
+            let nextArcFile = ArcFiles.refreshRef arcFile
             let result = update nextArcFile
-            arcFileRef.current <- nextArcFile
             setArcFile nextArcFile
             result
 
@@ -422,7 +419,7 @@ type ArcFileFooterTabs =
             React.useCallback (
                 (fun (tableIndex: int) (newName: string) ->
 
-                    let currentTables = arcFileRef.current.ArcTables()
+                    let currentTables = arcFile.ArcTables()
 
                     match
                         System.String.IsNullOrWhiteSpace newName
