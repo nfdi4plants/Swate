@@ -281,7 +281,8 @@ Vitest.describe (
 
                 let pageState =
                     RendererPageState.ArcFilePage(ArcFiles.Assay assay, Some(ActiveView.Table 0))
-                    |> Renderer.Components.Helper.ArcViewHelper.applyRequestedPathView "assays/assay/isa.datamap.xlsx"
+                    |> Renderer.Components.Helper.ArcViewSelection.applyRequestedPathView
+                        "assays/assay/isa.datamap.xlsx"
 
                 match pageState with
                 | RendererPageState.ArcFilePage(_, Some ActiveView.DataMap) -> ()

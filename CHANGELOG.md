@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Consolidate Electron ARC editor page state, safely resolve canonical entity workbooks, and reuse shared path normalization for ARC-root-relative references.
 -   Harden canonical entity path resolution for Electron rename and delete operations, and document the behavior of the shared path-normalization helpers.
 -   Keep table deletion in the existing footer-tab context menu instead of exposing a second, inconsistent navbar action.
+-   Isolate requested ARC view selection from eager Electron IPC proxy initialization as a temporary testability workaround; a follow-up should inject the file-opening dependency and keep `openView` as a thin Electron adapter.
 
 ### Fixed
 
