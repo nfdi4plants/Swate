@@ -222,9 +222,33 @@ let commitIdentityOfUser (user: AuthUserDto) : Main.Git.GitTokenProvider.GitComm
         | _ -> user.Email
 }
 
-/// Commit identity of the active account (used by GitIdentityProvider).
-let tryGetCommitIdentity () : Main.Git.GitTokenProvider.GitCommitIdentity option =
-    getActiveAccountState ()
+/// Commit identity for a commit that will be pushed to the given host (used by GitIdentityProvider).
+/// Policy: the account matching the host, preferring the active one, so the author links on the hub
+/// being pushed to. Falls back to the active account when no host is known or none matches — any of
+/// the user's real identities beats git's OS-derived author. Unlike token lookup, token validity is
+/// ignored: an expired token cannot authenticate, but its account's email still links commits.
+/// The GitLab username is preferred over the display name so commits link to the account;
+/// accounts stored before usernames were persisted fall back to the display name.
+let tryGetCommitIdentity (host: string option) : Main.Git.GitTokenProvider.GitCommitIdentity option =
+    let matchesHost (accountState: AccountState) =
+        host
+        |> Option.exists (fun host ->
+            String.Equals(
+                SecureAuthStore.extractHost accountState.Summary.User.TargetDataHub,
+                host,
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+
+    let activeAccountState = getActiveAccountState ()
+
+    activeAccountState
+    |> Option.filter matchesHost
+    |> Option.orElseWith (fun () ->
+        accounts
+        |> Map.tryPick (fun _ accountState -> if matchesHost accountState then Some accountState else None)
+    )
+    |> Option.orElse activeAccountState
     |> Option.map _.Summary.User
     |> Option.map commitIdentityOfUser
 
@@ -234,7 +258,7 @@ let private refreshTokenProvider () =
     }
 
     Main.Git.GitTokenProvider.setIdentityProvider {
-        TryGetCommitIdentity = fun () -> promise { return tryGetCommitIdentity () }
+        TryGetCommitIdentity = fun host -> promise { return tryGetCommitIdentity host }
     }
 
     Main.Git.GitTokenProvider.RemoteProvisioning.setProvider {

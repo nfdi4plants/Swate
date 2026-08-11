@@ -475,7 +475,7 @@ let private withTestIdentityProvider
     =
     promise {
         GitTokenProvider.setIdentityProvider {
-            TryGetCommitIdentity = fun () -> promise { return identity }
+            TryGetCommitIdentity = fun _ -> promise { return identity }
         }
 
         try
@@ -764,6 +764,43 @@ Vitest.describe (
             }
         )
 
+        // Regression for the multi-account case: commit and token lookup must resolve against the
+        // same remote host, so the commit path asks the identity provider for the origin host
+        // instead of blindly taking the active account.
+        Vitest.test (
+            "commit resolves the identity for the origin remote host",
+            fun () -> promise {
+                let mutable requestedHost: string option option = None
+
+                GitTokenProvider.setIdentityProvider {
+                    TryGetCommitIdentity =
+                        fun host -> promise {
+                            requestedHost <- Some host
+                            return Some testAccountIdentity
+                        }
+                }
+
+                try
+                    do!
+                        withTempRepository (fun context -> promise {
+                            let! _ = context.Git.raw [| "remote"; "add"; "origin"; testRemoteUrl |]
+
+                            let filePath = join [| context.RepoPath; "tracked.txt" |]
+                            do! writeUtf8FileAsync filePath "first\n"
+
+                            let! stageResult = GitService.stagePaths context.RepoPath [| "tracked.txt" |]
+                            expectOk "stage tracked file" stageResult |> ignore
+
+                            let! commitResult = GitService.commit context.RepoPath "test: host-aware commit"
+                            expectOk "commit tracked file" commitResult |> ignore
+
+                            Vitest.expect(requestedHost).toEqual (Some(Some testRemoteHost))
+                        })
+                finally
+                    GitTokenProvider.setIdentityProvider GitTokenProvider.defaultIdentityProvider
+            }
+        )
+
         // A pull over divergent history writes a merge commit, so the authenticated remote session
         // resolves the same identity as the local commit session. Pull itself only accepts https/ssh
         // remotes, which a local test remote cannot provide, so the shared resolver is asserted instead.
@@ -774,7 +811,7 @@ Vitest.describe (
                     withTestIdentityProvider
                         (Some testAccountIdentity)
                         (fun () -> promise {
-                            let! entries = GitService.resolveCommitIdentityConfigEntries ()
+                            let! entries = GitService.resolveCommitIdentityConfigEntries (Some testRemoteHost)
 
                             Vitest
                                 .expect(entries)
@@ -790,7 +827,7 @@ Vitest.describe (
                     withTestIdentityProvider
                         None
                         (fun () -> promise {
-                            let! entries = GitService.resolveCommitIdentityConfigEntries ()
+                            let! entries = GitService.resolveCommitIdentityConfigEntries None
                             Vitest.expect(entries).toEqual ([||]: string[])
                         })
             }

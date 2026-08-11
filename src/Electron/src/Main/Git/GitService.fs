@@ -1049,11 +1049,28 @@ let commitIdentityConfigEntries (identity: GitCommitIdentity option) =
     | _ -> [||]
 
 /// Resolves the commit identity of the signed-in account into git config entries.
+/// The host is the remote host the commit will be pushed to, so token and identity resolve
+/// against the same hub instead of the identity silently coming from an unrelated active account.
 /// Shared by every session that can produce a commit, so the identity is never applied by hand.
 /// Tests call this directly because the pull path cannot be exercised against a local test remote.
-let resolveCommitIdentityConfigEntries () : JS.Promise<string[]> = promise {
-    let! identity = tryGetCommitIdentity ()
+let resolveCommitIdentityConfigEntries (host: string option) : JS.Promise<string[]> = promise {
+    let! identity = tryGetCommitIdentity host
     return commitIdentityConfigEntries identity
+}
+
+/// Best-effort host of the origin remote, used to pick the matching account identity for local commits.
+/// Missing or non-https/ssh remotes resolve to None, which falls back to the active account.
+let private tryGetOriginHost (arcPath: string) : JS.Promise<string option> = promise {
+    try
+        let probeGit = createOptions arcPath standardTimeout None |> createGit
+        let! remoteUrl = probeGit.raw [| "config"; "--get"; "remote.origin.url" |]
+
+        return
+            match tryExtractHostFromRemoteUrl (remoteUrl.Trim()) with
+            | Ok host -> Some host
+            | Error _ -> None
+    with _ ->
+        return None
 }
 
 type private AuthenticatedGitSession = {
@@ -1105,7 +1122,7 @@ let private createAuthenticatedGitSession
 
                     match tokenOption with
                     | Some token when not (String.IsNullOrWhiteSpace token) ->
-                        let! commitIdentityEntries = resolveCommitIdentityConfigEntries ()
+                        let! commitIdentityEntries = resolveCommitIdentityConfigEntries (Some host)
 
                         try
                             let operationOptions =
@@ -1208,7 +1225,8 @@ let private withLocalGit (arcPath: string) (operation: ISimpleGit -> JS.Promise<
 /// Commits must carry the signed-in account identity, otherwise git falls back to an OS-derived
 /// author that GitLab cannot link to the account.
 let private withCommitGit (arcPath: string) (operation: ISimpleGit -> JS.Promise<'T>) : JS.Promise<GitResult<'T>> = promise {
-    let! commitIdentityEntries = resolveCommitIdentityConfigEntries ()
+    let! originHost = tryGetOriginHost arcPath
+    let! commitIdentityEntries = resolveCommitIdentityConfigEntries originHost
 
     let git =
         createOptions arcPath standardTimeout None

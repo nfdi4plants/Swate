@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Keep table-tab keys unambiguous by rejecting duplicate table names.
 -   Append imported templates to a fresh table model when the active table is empty.
 -   Allow hidden filesystem files such as `.DS_Store` to be deleted from ARC add-zone roots without treating them as ARC entities.
--   Sign commits created in Swate with the signed-in DataHub account instead of git's OS-derived fallback identity, so commits link to the account #1304.
+-   Sign commits created in Swate with the stored DataHub account matching the ARC's remote host (falling back to the active account) instead of git's OS-derived fallback identity, so commits link to the account on the hub they are pushed to #1304.
 -   Report a missing git identity as its own failure with setup guidance instead of passing git's raw "Please tell me who you are" output to the user #1305.
 -   Respect GitLab's "use a private email in commits" setting by signing commits with the account's commit email instead of its primary email.
 
