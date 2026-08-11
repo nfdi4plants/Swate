@@ -172,6 +172,15 @@ let createCommandAuthentication
         Environment = createNonInteractiveEnv ()
     }
 
+/// Merges `key=value` config entries into simple-git options so they stay scoped to the in-memory instance.
+let withConfigEntries (entries: string[]) (baseOptions: SimpleGitOptions) : SimpleGitOptions =
+    if Array.isEmpty entries then
+        baseOptions
+    else
+        let mergedConfig = [| yield! baseConfigEntries baseOptions; yield! entries |]
+
+        emitJsExpr (baseOptions, mergedConfig) "{ ...$0, config: $1 }"
+
 /// Returns a simple-git instance with authentication config merged into the supplied base options.
 /// Use this instead of writing credentials to `.git/config`.
 let applyAuth
@@ -184,16 +193,7 @@ let applyAuth
     : ISimpleGit =
     let commandAuth = createCommandAuthentication host token remoteName remoteUrl
     let authConfig = toConfigEntries commandAuth.ConfigArgs
-
-    let mergedConfig = [|
-        yield! baseConfigEntries baseOptions
-        yield! authConfig
-    |]
-
-    let scopedOptions: SimpleGitOptions =
-        emitJsExpr (baseOptions, mergedConfig) "{ ...$0, config: $1 }"
-
-    gitFactory scopedOptions
+    gitFactory (withConfigEntries authConfig baseOptions)
 
 /// Redacts bearer/basic headers and credential URLs before errors or diagnostics leave Main.
 let redactToken (text: string) : string =

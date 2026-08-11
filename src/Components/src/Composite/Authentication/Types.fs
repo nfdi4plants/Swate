@@ -62,8 +62,12 @@ type GitLabUser = {
 type AuthUserDto = {
     Id: int
     LocalSwateAccountId: string
+    /// GitLab account shorthand. Used as the git commit author name so commits link to the account.
+    Username: string
     Name: string
     Email: string
+    /// GitLab commit email; a noreply address when the account keeps its email private in commits.
+    CommitEmail: string option
     AvatarUrl: string
     TargetDataHub: string
 } with
@@ -71,8 +75,10 @@ type AuthUserDto = {
     static member FromGitLabUser (gitLabUser: GitLabUser) (targetDataHub: string) : AuthUserDto = {
         Id = gitLabUser.id
         LocalSwateAccountId = string gitLabUser.id
+        Username = gitLabUser.username
         Name = gitLabUser.name
         Email = gitLabUser.email
+        CommitEmail = Some gitLabUser.commit_email
         AvatarUrl = gitLabUser.avatar_url
         TargetDataHub = targetDataHub
     }
