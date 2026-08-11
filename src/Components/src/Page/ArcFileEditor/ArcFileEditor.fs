@@ -284,16 +284,35 @@ type Main =
             arcFile: ArcFiles,
             setArcFile: ArcFiles -> unit,
             pickPaths: unit -> Fable.Core.JS.Promise<string[]>,
-            activeView: ActiveView,
-            setActiveView: ActiveView -> unit,
             ?widgetNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?trailingNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
+            ?startingActiveView: ActiveView,
             ?onImportJson: JsonImportRequest -> JS.Promise<Result<unit, exn>>,
             ?onError: string -> unit
         ) =
 
         let onError =
             defaultArg onError (fun errorMsg -> console.error ("Error in ArcFileEditor: " + errorMsg))
+
+        let activeView, setActiveView =
+            React.useState (startingActiveView |> Option.defaultValue ActiveView.Metadata)
+
+        // The ARC file is caller-owned and can be replaced independently of this component.
+        // Keep the internally owned view valid when the available file views change.
+        React.useEffect (
+            (fun () ->
+                let nextActiveView = ActiveView.Forward(arcFile, activeView)
+
+                if nextActiveView <> activeView then
+                    setActiveView nextActiveView
+            ),
+            [|
+                box activeView
+                box (arcFile.Tables().Count)
+                box (arcFile.CanRenderDataMapView())
+                box (arcFile.HasMetadata())
+            |]
+        )
 
         let headerProps = {
             arcFile = arcFile
@@ -440,7 +459,6 @@ type Main =
             )
 
         let (arcFile: ArcFiles), setArcFile = React.useState (ArcFiles.Assay(startAssay))
-        let activeView, setActiveView = React.useState (ActiveView.Table 0)
 
         let loadTemplates =
             fun () ->
@@ -501,6 +519,6 @@ type Main =
             loadTemplates,
             React.Fragment [
                 ColumnCountTestDisplay()
-                Main.ArcFileEditor(arcFile, setArcFile, pickPathsMockFn, activeView, setActiveView)
+                Main.ArcFileEditor(arcFile, setArcFile, pickPathsMockFn, startingActiveView = ActiveView.Table 0)
             ]
         )

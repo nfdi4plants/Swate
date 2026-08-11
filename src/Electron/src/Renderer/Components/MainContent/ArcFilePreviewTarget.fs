@@ -15,23 +15,8 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, activeView: ActiveView option) =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let errorModal = useErrorModalCtx ()
 
-    let activeView = activeView |> Option.defaultValue ActiveView.Metadata
-
-    let editorStateRef = React.useRef (arcFile, activeView)
-
-    React.useEffect ((fun () -> editorStateRef.current <- arcFile, activeView), [| box arcFile; box activeView |])
-
-    let publishEditorState (nextArcFile, nextActiveView) =
-        editorStateRef.current <- nextArcFile, nextActiveView
-        pageStateCtx.setState (Some(Renderer.Types.PageState.ArcFilePage(nextArcFile, Some nextActiveView)))
-
     let setArcFilePageState (nextArcFile: ArcFiles) =
-        let _, currentActiveView = editorStateRef.current
-        publishEditorState (nextArcFile, currentActiveView)
-
-    let setActiveView (nextActiveView: ActiveView) =
-        let currentArcFile, _ = editorStateRef.current
-        publishEditorState (currentArcFile, nextActiveView)
+        pageStateCtx.setState (Some(Renderer.Types.PageState.ArcFilePage(nextArcFile, activeView)))
 
     let setArcFileInMemoryWithErrorModal (nextArcFile: ArcFiles) =
         promise {
@@ -42,10 +27,9 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, activeView: ActiveView option) =
         }
         |> Promise.start
 
-    let setArcFile =
-        fun (nextArcFile: ArcFiles) ->
-            setArcFilePageState nextArcFile
-            setArcFileInMemoryWithErrorModal nextArcFile
+    let setArcFile nextArcFile =
+        setArcFilePageState nextArcFile
+        setArcFileInMemoryWithErrorModal nextArcFile
 
     let onSaveArcFile =
         fun _ ->
@@ -81,7 +65,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, activeView: ActiveView option) =
         )
 
     let widgetNavbarElements =
-        fun props ->
+        fun (props: ArcFileEditorHeaderProps) ->
             let button (dataMap: ARCtrl.DataMap option) =
                 Swate.Components.Primitive.Buttons.Buttons.QuickAccessButton(
                     Html.i [
@@ -122,16 +106,28 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, activeView: ActiveView option) =
             | ArcFiles.Workflow workflow -> button workflow.DataMap
             | _ -> Html.none
 
-    Swate.Components.Page.ArcFileEditor.Main.ArcFileEditor(
-        arcFile,
-        setArcFile,
-        pickFilePaths,
-        activeView,
-        setActiveView,
-        widgetNavbarElements = widgetNavbarElements,
-        onImportJson = importJson,
-        onError =
-            (fun message ->
-                errorModal.enqueue (ErrorModalRequest.create (message, title = "Could not update ARC file editor"))
+    let editorKey =
+        arcFile.TryGetRelativePath()
+        |> Option.defaultValue (string arcFile.RelatedArcFilesDiscriminate),
+        activeView |> Option.map _.ViewIndex
+
+    Html.div [
+        prop.key (string editorKey)
+        prop.className "swt:contents"
+        prop.children [
+            Swate.Components.Page.ArcFileEditor.Main.ArcFileEditor(
+                arcFile,
+                setArcFile,
+                pickFilePaths,
+                widgetNavbarElements = widgetNavbarElements,
+                startingActiveView = (activeView |> Option.defaultValue ActiveView.Metadata),
+                onImportJson = importJson,
+                onError =
+                    (fun message ->
+                        errorModal.enqueue (
+                            ErrorModalRequest.create (message, title = "Could not update ARC file editor")
+                        )
+                    )
             )
-    )
+        ]
+    ]

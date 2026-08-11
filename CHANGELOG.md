@@ -25,8 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
--   Prevent deleted ARC table tabs from reappearing by keeping the add-table handler current and applying table operations to a copied editor state.
--   Control the ARC editor's active view from its caller and preserve DataMap view selection when sidebar navigation redirects to the owning ARC workbook.
+-   Prevent deleted ARC table tabs from reappearing by applying chained rename, delete, and add operations to the latest copied editor state.
+-   Keep active-view ownership inside the reusable ARC editor while remounting it for Electron sidebar file and view selections, so Metadata, table, and DataMap targets open on the requested tab.
 -   Preserve stable table identifiers across rerenders so drag-and-drop state is not invalidated while dragging.
 -   Create DataMaps from a copied ARC value instead of mutating the value held in React state.
 -   Keep table-tab keys unambiguous by rejecting duplicate table names.
