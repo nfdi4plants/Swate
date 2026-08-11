@@ -22,6 +22,7 @@ type PageState =
     //| LandingDraftPage
     | NotesDraftPage
     | NotesSearchPage
+    | BOATPage
     | ProvenanceGroupingPage
     | GitDiffPage of GitDiffViewDataDto
     | GitMergeConflictPage of GitMergeConflictViewDataDto

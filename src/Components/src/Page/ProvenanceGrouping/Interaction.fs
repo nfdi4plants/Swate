@@ -17,6 +17,9 @@ module DragDrop =
     let propertyHeaderIdentity (header: ProvenancePropertyHeader) =
         $"{encode header.Kind.Id}:{termIdentity header.Category}"
 
+    let propertyKeyIdentity (property: ProvenancePropertyKey) =
+        $"{propertyHeaderIdentity property.Header}:Origin:{encode property.OriginSource.Id}"
+
     let propertyValueIdentity (propertyValue: ProvenancePropertyValue) =
         let value =
             match propertyValue.Value with
@@ -31,11 +34,7 @@ module DragDrop =
     /// Id-free identity for one grouping value, so a freshly dropped value can be
     /// found again on the card it regrouped into (the model assigns it a new id
     /// there). Quote-safe for use inside quoted attribute selectors.
-    let groupingValueIdentity
-        (header: ProvenancePropertyHeader)
-        (value: ProvenanceValue)
-        (unit: ProvenanceTerm option)
-        =
+    let groupingValueIdentity (property: ProvenancePropertyKey) (value: ProvenanceValue) (unit: ProvenanceTerm option) =
         let valueText =
             match value with
             | ProvenanceValue.Text text -> $"Text:{encode text}"
@@ -46,16 +45,16 @@ module DragDrop =
         let unitText = unit |> Option.map termIdentity |> Option.defaultValue ""
 
         // encode maps to encodeURIComponent, which leaves apostrophes alone.
-        $"{propertyHeaderIdentity header}:{valueText}:Unit:{unitText}".Replace("'", "%27")
+        $"{propertyKeyIdentity property}:{valueText}:Unit:{unitText}".Replace("'", "%27")
 
     let valueDragId propertyValueId =
         $"provenance-value|{encode propertyValueId}"
 
-    let propertyDragId side header =
-        $"provenance-property|{side}|{encode (propertyHeaderIdentity header)}"
+    let propertyDragId side property =
+        $"provenance-property|{side}|{encode (propertyKeyIdentity property)}"
 
-    let folderPropertyDragId side header =
-        $"provenance-folder-property|{side}|{encode (propertyHeaderIdentity header)}"
+    let folderPropertyDragId side property =
+        $"provenance-folder-property|{side}|{encode (propertyKeyIdentity property)}"
 
     let propertyRailDropId side = $"provenance-property-drop|{side}"
 

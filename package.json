@@ -4,7 +4,7 @@
   "type": "module",
   "engines": {
     "node": "~22",
-    "npm": "~10 || ~11"
+    "npm": "~11"
   },
   "workspaces": [
     "src/Client",

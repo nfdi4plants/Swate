@@ -24,7 +24,7 @@ import {GitLabEntry as DataHubBrowser} from '../src/Page/DataHubBrowser/DataHubB
 import {Entry as ARCSelectorEntry} from '../src/Composite/ArcSelector/ArcSelector.fs.ts';
 import {Entry as ArcFileEditor} from '../src/Page/ArcFileEditor/ArcFileEditor.fs.ts';
 import {Entry as SettingsPage} from '../src/Page/SettingsPage/SettingsPage.fs.ts';
-import WorkspaceEntry from '../src/Composite/Workspace/Workspace.fixture.fs.ts';
+import {Entry as BOAT} from '../src/Page/BOAT/BOAT.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -208,17 +208,22 @@ function ArcFileEditorContainer() {
   </div>
 }
 
-function WorkspaceContainer() {
-  return (
-    <div className='swt:flex swt:flex-col swt:h-screen swt:w-screen swt:overflow-hidden'>
-      <WorkspaceEntry />
-    </div>
-  );
+function BOATContainer() {
+  return <div className='swt:flex swt:flex-col swt:gap-4 swt:h-screen swt:w-screen swt:overflow-hidden'>
+    <BOAT />
+  </div>
 }
 
 const App = () => {
     return (
-        <WorkspaceContainer />
+        <BOATContainer />
+        // <ArcFileEditorContainer />
+        // <AuthButtonContainer />
+        // <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-8 swt:mb-12">
+        //     <NoteSearch />
+        //     <MarkdownTextContainer />
+        //     <LandingContainer />
+        // </div>
     );
 };
 

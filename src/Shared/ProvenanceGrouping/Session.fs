@@ -391,7 +391,7 @@ module Session =
                     OutputSets = targetLayer.Model.OutputSets |> Map.add targetSet.Id targetSet
                     PropertyValues = propertyValues
               }
-            |> ProvenanceModel.refreshInheritedOutputProperties
+            |> ProvenanceModel.refreshInheritedProperties
 
         replaceLayer { targetLayer with Model = targetModel } session
 

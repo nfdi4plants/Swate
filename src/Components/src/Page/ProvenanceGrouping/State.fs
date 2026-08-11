@@ -8,9 +8,14 @@ open Swate.Components.Page.ProvenanceGrouping.Types
 /// Shared key helpers used by the UI state maps and sets.
 module Keys =
 
-    let groupingKey header : GroupingKey = { Header = header }
+    let groupingKey (property: ProvenancePropertyKey) : GroupingKey = property
 
-    let propertySlot layerId side header = layerId, side, groupingKey header
+    let propertyKey originSource header : ProvenancePropertyKey = {
+        Header = header
+        OriginSource = originSource
+    }
+
+    let propertySlot layerId side property = layerId, side, groupingKey property
 
     let paletteKey layerId side = layerId, side
 
@@ -145,13 +150,13 @@ module PropertyColors =
             DefaultSourceId = rootLayer.Model.Source.Id
         }
 
-    let private visiblePropertyColorKey contextId header = {
+    let private visiblePropertyColorKey contextId property = {
         ContextId = contextId
-        Header = header
+        Property = property
     }
 
-    let setColor contextId (header: ProvenancePropertyHeader) color state =
-        let key = visiblePropertyColorKey contextId header
+    let setColor contextId (property: ProvenancePropertyKey) color state =
+        let key = visiblePropertyColorKey contextId property
 
         {
             state with
@@ -161,8 +166,8 @@ module PropertyColors =
                 }
         }
 
-    let clearColor contextId (header: ProvenancePropertyHeader) state =
-        let key = visiblePropertyColorKey contextId header
+    let clearColor contextId (property: ProvenancePropertyKey) state =
+        let key = visiblePropertyColorKey contextId property
 
         {
             state with
@@ -423,7 +428,7 @@ module RailOrder =
     let get layerId side state =
         tryGet layerId side state |> Option.defaultValue []
 
-    let apply (order: ProvenancePropertyHeader list) (headers: ProvenancePropertyHeader list) =
+    let apply (order: ProvenancePropertyKey list) (headers: ProvenancePropertyKey list) =
         let headerSet = headers |> Set.ofList
         let ordered = order |> List.filter (fun header -> headerSet.Contains header)
         let orderedSet = ordered |> Set.ofList
@@ -477,15 +482,15 @@ module RailOrder =
 /// Tracks explicit side drop-zone placement without changing grouping selection.
 module PropertyPlacement =
 
-    let place layerId side header state =
-        let key = Keys.groupingKey header
+    let place layerId side property state =
+        let key = Keys.groupingKey property
 
         {
             state with
                 PropertyRailPlacements = state.PropertyRailPlacements |> Map.add (layerId, key) side
                 Error = None
         }
-        |> RailOrder.appendHeader layerId side header
+        |> RailOrder.appendHeader layerId side property
 
 /// Consolidates a hidden side's switchable annotations onto the still-visible rail.
 module SideVisibility =
@@ -499,7 +504,7 @@ module SideVisibility =
         layerId
         (hiddenSide: ProvenanceSide)
         (hiddenSideId: ProvenanceLayerSideId)
-        (canSwitch: ProvenancePropertyHeader -> bool)
+        (canSwitch: ProvenancePropertyKey -> bool)
         state
         =
         let visibleSide =
@@ -514,7 +519,7 @@ module SideVisibility =
             |> Map.toList
             |> List.choose (fun ((placementLayerId, key), side) ->
                 if placementLayerId = layerId && side = hiddenSide then
-                    Some key.Header
+                    Some key
                 else
                     None
             )
@@ -522,7 +527,7 @@ module SideVisibility =
         let soloGroupedHeaders =
             (Sides.get hiddenSideId state).GroupingAssignments
             |> List.filter (fun assignment -> assignment.Scope = hiddenScope)
-            |> List.map (fun assignment -> assignment.Key.Header)
+            |> List.map (fun assignment -> assignment.Key)
 
         let headers =
             [ yield! placedHeaders; yield! soloGroupedHeaders ]
@@ -531,8 +536,8 @@ module SideVisibility =
 
         headers
         |> List.fold
-            (fun state header ->
-                let key = Keys.groupingKey header
+            (fun state property ->
+                let key = Keys.groupingKey property
 
                 let withoutSolo =
                     Sides.update
@@ -552,19 +557,20 @@ module SideVisibility =
                         PropertyRailPlacements =
                             withoutSolo.PropertyRailPlacements |> Map.add (layerId, key) visibleSide
                 }
-                |> RailOrder.removeHeader layerId hiddenSide header
-                |> RailOrder.appendHeader layerId visibleSide header
+                |> RailOrder.removeHeader layerId hiddenSide property
+                |> RailOrder.appendHeader layerId visibleSide property
             )
             state
 
 /// Tracks expanded property value panels on the side rails.
 module PropertyExpansion =
 
-    let isExpanded layerId side header state =
-        state.ExpandedProperties |> Set.contains (Keys.propertySlot layerId side header)
+    let isExpanded layerId side property state =
+        state.ExpandedProperties
+        |> Set.contains (Keys.propertySlot layerId side property)
 
-    let toggle layerId side header state =
-        let slot = Keys.propertySlot layerId side header
+    let toggle layerId side property state =
+        let slot = Keys.propertySlot layerId side property
 
         let expanded =
             if state.ExpandedProperties.Contains slot then
@@ -585,15 +591,15 @@ module Palette =
         |> Map.tryFind (Keys.paletteKey layerId side)
         |> Option.defaultValue []
 
-    let valuesForHeader layerId side header state =
+    let valuesForProperty layerId side property state =
         valuesForSide layerId side state
-        |> List.filter (fun propertyValue -> propertyValue.Header = header)
+        |> List.filter (ProvenancePropertyValue.belongsTo property)
 
-    let headersForSide layerId side state =
+    let propertiesForSide layerId side state =
         valuesForSide layerId side state
-        |> List.map (fun propertyValue -> propertyValue.Header)
+        |> List.map ProvenancePropertyValue.propertyKey
         |> List.distinct
-        |> List.sortBy (fun header -> header.Category.Name)
+        |> List.sortBy (fun property -> property.Header.Category.Name, property.OriginSource.Id)
 
     let tryFindValue propertyValueId state =
         state.PaletteValues
@@ -620,21 +626,21 @@ module Palette =
 
         loop (existing.Count + 1)
 
-    let addValue layerId source side header value unit state =
+    let addValue layerId side property value unit state =
         let key = Keys.paletteKey layerId side
 
         let anchor = {
-            Source = source
+            Source = property.OriginSource
             ProcessId = None
             ProcessName = None
-            Header = header
+            Header = property.Header
             InputNames = []
             OutputNames = []
         }
 
         let propertyValue: ProvenancePropertyValue = {
             Id = nextValueId layerId side state
-            Header = header
+            Header = property.Header
             Value = value
             Unit = unit
             Origin = ProvenancePropertyOrigin.Virtual anchor
@@ -645,11 +651,13 @@ module Palette =
         {
             state with
                 PaletteValues = state.PaletteValues |> Map.add key nextValues
-                PropertyRailPlacements = state.PropertyRailPlacements |> Map.add (layerId, Keys.groupingKey header) side
-                ExpandedProperties = state.ExpandedProperties |> Set.add (Keys.propertySlot layerId side header)
+                PropertyRailPlacements =
+                    state.PropertyRailPlacements
+                    |> Map.add (layerId, Keys.groupingKey property) side
+                ExpandedProperties = state.ExpandedProperties |> Set.add (Keys.propertySlot layerId side property)
                 Error = None
         }
-        |> RailOrder.appendHeader layerId side header
+        |> RailOrder.appendHeader layerId side property
 
 /// Manages batch assignment confirmation state for dropped property values.
 module AssignmentBatch =
@@ -668,12 +676,12 @@ module AssignmentBatch =
 /// Updates grouping assignments and side placement for properties.
 module GroupingAssignments =
 
-    let private removeHeader header (assignments: GroupingAssignment list) : GroupingAssignment list =
-        let key = Keys.groupingKey header
+    let private removeProperty property (assignments: GroupingAssignment list) : GroupingAssignment list =
+        let key = Keys.groupingKey property
         assignments |> List.filter (fun assignment -> assignment.Key <> key)
 
-    let private removeHeaderScope header scope (assignments: GroupingAssignment list) : GroupingAssignment list =
-        let key = Keys.groupingKey header
+    let private removePropertyScope property scope (assignments: GroupingAssignment list) : GroupingAssignment list =
+        let key = Keys.groupingKey property
 
         assignments
         |> List.filter (fun assignment -> assignment.Key <> key || assignment.Scope <> scope)
@@ -686,11 +694,11 @@ module GroupingAssignments =
         |> List.filter (fun current -> current.Key <> assignment.Key)
         |> fun retained -> retained @ [ assignment ]
 
-    let toggleSide sideId side header state =
+    let toggleSide sideId side property state =
         Sides.update
             sideId
             (fun current ->
-                let key = Keys.groupingKey header
+                let key = Keys.groupingKey property
                 let scope = scopeForSide side
                 let assignment: GroupingAssignment = { Key = key; Scope = scope }
 
@@ -700,7 +708,7 @@ module GroupingAssignments =
 
                 let nextAssignments =
                     if isSelected then
-                        removeHeaderScope header scope current.GroupingAssignments
+                        removePropertyScope property scope current.GroupingAssignments
                     else
                         upsert assignment current.GroupingAssignments
 
@@ -711,8 +719,8 @@ module GroupingAssignments =
             )
             state
 
-    let toggleBoth inputSideId outputSideId header state =
-        let key = Keys.groupingKey header
+    let toggleBoth inputSideId outputSideId property state =
+        let key = Keys.groupingKey property
 
         let isSelected =
             [ inputSideId; outputSideId ]
@@ -727,7 +735,7 @@ module GroupingAssignments =
                 (fun current ->
                     let nextAssignments =
                         if isSelected then
-                            removeHeaderScope header GroupingScope.Both current.GroupingAssignments
+                            removePropertyScope property GroupingScope.Both current.GroupingAssignments
                         else
                             upsert
                                 ({
@@ -747,8 +755,8 @@ module GroupingAssignments =
         let withInput = setSide state inputSideId
         setSide withInput outputSideId
 
-    let move layerId sourceSideId targetSideId targetSide header state =
-        let key = Keys.groupingKey header
+    let move layerId sourceSideId targetSideId targetSide property state =
+        let key = Keys.groupingKey property
 
         let sourceSide =
             match targetSide with
@@ -766,7 +774,7 @@ module GroupingAssignments =
                 sourceSideId
                 (fun current -> {
                     current with
-                        GroupingAssignments = removeHeader header current.GroupingAssignments
+                        GroupingAssignments = removeProperty property current.GroupingAssignments
                 })
                 state
 
@@ -791,8 +799,8 @@ module GroupingAssignments =
             withTarget with
                 PropertyRailPlacements = withTarget.PropertyRailPlacements |> Map.add (layerId, key) targetSide
         }
-        |> RailOrder.removeHeader layerId sourceSide header
-        |> RailOrder.appendHeader layerId targetSide header
+        |> RailOrder.removeHeader layerId sourceSide property
+        |> RailOrder.appendHeader layerId targetSide property
 
 /// Tracks selected input/output groups for layer creation.
 module Selection =

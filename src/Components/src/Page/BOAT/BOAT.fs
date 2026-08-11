@@ -1,0 +1,97 @@
+namespace App
+
+open Fable.Core
+open Fable.Core.JsInterop
+open Feliz
+open Types
+open Components
+open Fable.SimpleJson
+open ARCtrl.Json
+open Thoth.Json.Core
+
+[<Erase; Mangle(false)>]
+type BOAT =
+
+    [<ReactComponent(true)>]
+    static member Entry() =
+
+        let isLocalStorageClear (key: string) () =
+            match (Browser.WebStorage.localStorage.getItem key) with
+            | null -> true // Local storage is clear if the item doesn't exist
+            | _ -> false //if false then something exists and the else case gets started
+
+        let initialInteraction (id: string) =
+            try
+                if isLocalStorageClear id () = true then
+                    []
+                else
+                    Decode.fromJsonString decoderAnno (Browser.WebStorage.localStorage.getItem id)
+            with e ->
+                Browser.Dom.console.warn (sprintf "Error parsing JSON from localStorage for key '%s': %s" id e.Message)
+                []
+
+        let (AnnotationState: Annotation list, setAnnotationState) =
+            React.useState (initialInteraction "Annotations")
+
+        let setLocalStorageAnnotation (id: string) (nextAnnos: Annotation list) =
+            let JSONstring =
+
+                nextAnnos |> List.map encoderAnno |> Encode.list |> Encode.toJsonString 0
+
+            // log JSONstring
+            Browser.WebStorage.localStorage.setItem (id, JSONstring)
+            log JSONstring
+
+        let setState (state: Annotation list) =
+            setAnnotationState state
+            setLocalStorageAnnotation "Annotations" state
+
+        let setLocalFileName (id: string) (nextNAme: string) =
+            let JSONstring = Json.stringify nextNAme
+            Browser.WebStorage.localStorage.setItem (id, JSONstring)
+
+        let initialFileName (id: string) =
+            try
+                if isLocalStorageClear id () = true then
+                    ""
+                else
+                    Json.parseAs<string> (Browser.WebStorage.localStorage.getItem id)
+            with e ->
+                Browser.Dom.console.warn (sprintf "Error parsing JSON from localStorage for key '%s': %s" id e.Message)
+                ""
+
+        let fileName, setFileName = React.useState (initialFileName "fileName")
+
+        let fileNamewithoutType = fileName.Split('.').[0] //splits the file name and takes the first part before the dot
+
+        let elementID = "Paper"
+
+        React.StrictMode [
+            Html.div [
+                prop.id "mainView"
+                prop.className "swt:flex swt:w-full swt:min-h-screen swt:flex-col swt:text-accent-content"
+                prop.children [
+                    // Components.Navbar.Main(setpage, currentpage, AnnotationState, setState, fileNamewithoutType)
+                    Html.div [
+                        prop.testId "contentView"
+                        prop.className "swt:grow swt:w-full swt:overflow-y-hidden swt:min-h-0"
+                        prop.children [
+                            // match currentpage with
+                            // | Types.Page.Builder ->
+                            Builder.Main(
+                                AnnotationState,
+                                setState,
+                                isLocalStorageClear,
+                                elementID,
+                                fileName,
+                                setFileName,
+                                setLocalFileName
+
+                            )
+                        // | Types.Page.Contact -> Components.Contact.Main()
+                        // | Types.Page.Help -> Components.Help.Main()
+                        ]
+                    ]
+                ]
+            ]
+        ]

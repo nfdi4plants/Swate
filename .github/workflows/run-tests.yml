@@ -35,6 +35,11 @@ jobs:
           node-version: 22
           cache: "npm"
 
+      # Trusted publishing with npm requires at least npm version 11.5.1, BUT node v22 comes with npm v10.x.
+      # https://docs.npmjs.com/trusted-publishers
+      - name: Update npm version to at least 11.5.1
+        run: npm install -g npm@11.5.1
+
       # Install npm dependencies
       - name: Install root npm dependencies
         run: npm i
@@ -51,4 +56,4 @@ jobs:
         run: dotnet build ./Swate.sln
 
       - name: Run Tests
-        run: dotnet run --project ./build/Build.fsproj test
+        run: dotnet run --project ./build/Build.fsproj -- test

@@ -24,9 +24,16 @@ Vitest.describe (
             fun () ->
                 let session = sampleSession ()
                 let pair = Session.activePair session
-                let header = pair.Model.PropertyValues |> Map.toList |> List.head |> snd |> _.Header
 
-                let staleSlot = "removed-pair", ProvenanceSide.Input, State.Keys.groupingKey header
+                let property =
+                    pair.Model.PropertyValues
+                    |> Map.toList
+                    |> List.head
+                    |> snd
+                    |> ProvenancePropertyValue.propertyKey
+
+                let staleSlot =
+                    "removed-pair", ProvenanceSide.Input, State.Keys.groupingKey property
 
                 let state = {
                     State.Sides.ensure session (State.init session) with

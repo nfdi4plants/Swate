@@ -560,7 +560,7 @@ type GroupCard =
                                             category,
                                             valueText,
                                             DragDrop.groupingValueIdentity
-                                                groupingValue.Key.Header
+                                                groupingValue.Key
                                                 groupingValue.Value
                                                 groupingValue.Unit,
                                             tabPalette.[index % tabPalette.Length],

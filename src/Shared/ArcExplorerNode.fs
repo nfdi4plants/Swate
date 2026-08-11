@@ -16,6 +16,7 @@ type PageState =
     | LandingDraftPage
     | NotesDraftPage
     | NotesSearchPage
+    | BOATPage
     | ErrorPage of string
 
 [<StringEnum>]

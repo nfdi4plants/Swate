@@ -5,7 +5,7 @@ open SimpleExec
 open ProjectInfo
 open System.IO
 
-let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
+let npm (version: Changelog.Version) (isDryRun: bool) =
 
     let isPrerelease = version.Version.IsPrerelease
 
@@ -26,17 +26,11 @@ let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
 
         let version = VersionIO.updateComponentsPackageJSONVersion version
 
+        printGreenfn "Start building npm package"
+
         let build = run "npm" [ "run"; "build" ] ProjectPaths.componentsPath
 
-        let setConfig =
-            run
-                "npm"
-                [
-                    "config"
-                    "set"
-                    $"//registry.npmjs.org/:_authToken={key}"
-                ]
-                ProjectPaths.componentsPath
+        printGreenfn "Start updating .css file to use @layer swt-base instead of @layer base"
 
         let cssFilePath =
             Path.Combine(ProjectPaths.componentsPath, "dist", "assets", "swate-components.css")
@@ -48,6 +42,8 @@ let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
         let replacedContent = content.Replace("@layer base", "@layer swt-base")
         System.IO.File.WriteAllText(cssFilePath, replacedContent)
 
+        printGreenfn "Start publishing npm package"
+
         let publish =
             run
                 "npm"
@@ -55,6 +51,7 @@ let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
                     "publish"
                     "--access"
                     "public"
+                    "--provenance"
                     if isPrerelease then
                         "--tag"
                         "next"
@@ -103,7 +100,6 @@ let nuget (key: string) (isDryRun: bool) =
     ()
 
 let docker (username: string) (key: string) (version: Changelog.Version) (isDryRun: bool) =
-    // Placeholder for docker release logic
 
     VersionIO.updateVersionFiles version
     VersionIO.updateFSharpProjectVersions version
@@ -118,7 +114,9 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
                 "login"
                 "--username"
                 username
-                "--password"
+                // --pasword-stdin requires a completly different setup. this needs to be checked.
+                // https://docs.docker.com/reference/cli/docker/login/#password-stdin
+                "--password" // ⚠️
                 key
                 dockerRegistryTarget
             ]
@@ -129,6 +127,8 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
     let imageVersioned = $"{imageName}:{version.Version.ToString()}"
     let imageLatest = $"{imageName}:latest"
     let imageNext = $"{imageName}:next"
+
+    // docker build -t ghcr.io/nfdi4plants/swate:next -t ghcr.io/nfdi4plants/swate:2.0.0 -t ghcr.io/nfdi4plants/swate:latest -f ./build/Dockerfile.publish .
 
     let build =
         run
