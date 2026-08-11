@@ -10,30 +10,23 @@ open Swate.Components.Composite.Tree.Types
 type TreeNode =
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
-    static member Row<'T>
+    static member private Surface<'T>
         (
-            row: TreeVisibleNode<'T>,
+            node: TreeItem<'T>,
+            depth: int,
             isExpanded: bool,
             isSelected: bool,
             isFocused: bool,
             isLoading: bool,
             error: string option,
             canExpand: bool,
-            ?onToggle: unit -> unit,
-            ?onSelect: MouseEvent -> unit,
-            ?onFocus: unit -> unit,
-            ?onKeyDown: KeyboardEvent -> unit
+            onToggle: unit -> unit,
+            onSelect: MouseEvent -> unit
         ) =
         let config = useTreeCtx<'T> ()
-        let node = row.node
-        let canSelect = not config.SelectionDisabled && config.IsNodeSelectable node
-        let onToggle = defaultArg onToggle ignore
-        let onSelect = defaultArg onSelect ignore
-        let onFocus = defaultArg onFocus ignore
-        let onKeyDown = defaultArg onKeyDown ignore
 
         let renderProps =
-            TreeRenderProps(node, row.depth, isExpanded, isSelected, isFocused, isLoading, error, onToggle, onSelect)
+            TreeRenderProps(node, depth, isExpanded, isSelected, isFocused, isLoading, error, onToggle, onSelect)
 
         let expandButton =
             if canExpand then
@@ -116,6 +109,45 @@ type TreeNode =
                 | Some trailing -> trailing
                 | None -> Html.none
 
+        React.Fragment [
+            Html.div [
+                prop.className [
+                    "swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:gap-2"
+                    if node.kind = TreeNodeKind.Branch then
+                        "swt:pl-4"
+                ]
+                prop.children [ leadingContent; nodeContent ]
+            ]
+
+            Html.div [
+                prop.className "swt:ml-auto swt:flex swt:shrink-0 swt:items-center swt:justify-end swt:gap-2"
+                prop.children [ trailingContent; errorContent; expandButton ]
+            ]
+        ]
+
+    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
+    static member Row<'T>
+        (
+            row: TreeVisibleNode<'T>,
+            isExpanded: bool,
+            isSelected: bool,
+            isFocused: bool,
+            isLoading: bool,
+            error: string option,
+            canExpand: bool,
+            ?onToggle: unit -> unit,
+            ?onSelect: MouseEvent -> unit,
+            ?onFocus: unit -> unit,
+            ?onKeyDown: KeyboardEvent -> unit
+        ) =
+        let config = useTreeCtx<'T> ()
+        let node = row.node
+        let canSelect = not config.SelectionDisabled && config.IsNodeSelectable node
+        let onToggle = defaultArg onToggle ignore
+        let onSelect = defaultArg onSelect ignore
+        let onFocus = defaultArg onFocus ignore
+        let onKeyDown = defaultArg onKeyDown ignore
+
         Html.div [
             prop.role "treeitem"
             prop.tabIndex (if isFocused then 0 else -1)
@@ -139,18 +171,17 @@ type TreeNode =
             prop.onFocus (fun _ -> onFocus ())
             prop.onKeyDown onKeyDown
             prop.children [
-                Html.div [
-                    prop.className [
-                        "swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:gap-2"
-                        if node.kind = TreeNodeKind.Branch then
-                            "swt:pl-4"
-                    ]
-                    prop.children [ leadingContent; nodeContent ]
-                ]
-
-                Html.div [
-                    prop.className "swt:ml-auto swt:flex swt:shrink-0 swt:items-center swt:justify-end swt:gap-2"
-                    prop.children [ trailingContent; errorContent; expandButton ]
-                ]
+                TreeNode.Surface(
+                    node,
+                    row.depth,
+                    isExpanded,
+                    isSelected,
+                    isFocused,
+                    isLoading,
+                    error,
+                    canExpand,
+                    onToggle,
+                    onSelect
+                )
             ]
         ]

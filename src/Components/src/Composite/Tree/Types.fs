@@ -121,11 +121,6 @@ type TreeContextMenuEvent<'T> = delegate of MouseEvent * TreeItem<'T> option -> 
 /// Context value shared by tree subcomponents that need access to tree-level configuration.
 type TreeContextValue<'T> = {
     DataSource: TreeDataSource<'T> option
-    SelectionMode: TreeSelectionMode
-    SelectedIds: string[] option
-    DefaultSelectedIds: string[] option
-    DefaultExpandedIds: string[] option
-    OnSelectionChange: (string[] -> unit) option
     SelectionDisabled: bool
     IsNodeSelectable: TreeItem<'T> -> bool
     EnableLazyLoading: bool

@@ -13,20 +13,28 @@ open Swate.Components.Composite.Tree.Types
 type Tree =
 
     [<ReactComponent>]
-    static member private Root<'T>(items: TreeItem<'T>[]) =
+    static member private Root<'T>
+        (
+            items: TreeItem<'T>[],
+            selectionMode: TreeSelectionMode,
+            selectedIds: string[] option,
+            defaultSelectedIds: string[] option,
+            defaultExpandedIds: string[] option,
+            onSelectionChange: (string[] -> unit) option
+        ) =
         let config = useTreeCtx<'T> ()
         let treeRef = React.useElementRef ()
         let scrollRef = React.useElementRef ()
-        let loadingNodeIdsRef = React.useRef<ResizeArray<string>> (ResizeArray())
+        let activeRequestIdsRef = React.useRef<Map<string, int>> Map.empty
         let loadRequestIdRef = React.useRef 0
 
         let treeState: TreeState<'T> =
-            useTreeState config.DefaultExpandedIds config.DefaultSelectedIds
+            useTreeState selectionMode defaultExpandedIds defaultSelectedIds
 
         let effectiveSelectedIds, setSelection =
-            useControlledSelection config.SelectedIds config.OnSelectionChange treeState
+            useControlledSelection selectionMode selectedIds onSelectionChange treeState
 
-        useTreeApi config.ApiRef loadingNodeIdsRef treeState.SetLoadedChildren treeState.SetExpandedIds
+        useTreeApi config.ApiRef activeRequestIdsRef treeState.SetLoadedChildren treeState.SetExpandedIds
 
         let lookup =
             React.useMemo (
@@ -66,11 +74,12 @@ type Tree =
             useTreeNodeActions
                 treeRef
                 scrollToIndex
-                loadingNodeIdsRef
+                activeRequestIdsRef
                 loadRequestIdRef
                 treeState
                 lookup
                 focusedId
+                selectionMode
                 effectiveSelectedIds
                 setSelection
 
@@ -156,7 +165,7 @@ type Tree =
             prop.ref treeRef
             prop.role "tree"
             prop.ariaLabel config.AriaLabel
-            prop.custom ("aria-multiselectable", (config.SelectionMode = TreeSelectionMode.Multiple))
+            prop.custom ("aria-multiselectable", (selectionMode = TreeSelectionMode.Multiple))
             prop.custom ("data-tree-root", "true")
             yield!
                 config.OnContextMenu
@@ -231,11 +240,6 @@ type Tree =
             React.useMemo (
                 (fun () -> {
                     DataSource = dataSource
-                    SelectionMode = selectionMode
-                    SelectedIds = selectedIds
-                    DefaultSelectedIds = defaultSelectedIds
-                    DefaultExpandedIds = defaultExpandedIds
-                    OnSelectionChange = onSelectionChange
                     SelectionDisabled = isSelectionDisabled
                     IsNodeSelectable = isNodeSelectable
                     EnableLazyLoading = enableLazyLoading
@@ -253,11 +257,6 @@ type Tree =
                 }),
                 [|
                     box dataSource
-                    box selectionMode
-                    box selectedIds
-                    box defaultSelectedIds
-                    box defaultExpandedIds
-                    box onSelectionChange
                     box isSelectionDisabled
                     box isNodeSelectable
                     box enableLazyLoading
@@ -275,4 +274,7 @@ type Tree =
                 |]
             )
 
-        TreeCtx.Provider(unbox<TreeContextValue<obj>> (box contextValue), Tree.Root(items))
+        TreeCtx.Provider(
+            unbox<TreeContextValue<obj>> (box contextValue),
+            Tree.Root(items, selectionMode, selectedIds, defaultSelectedIds, defaultExpandedIds, onSelectionChange)
+        )

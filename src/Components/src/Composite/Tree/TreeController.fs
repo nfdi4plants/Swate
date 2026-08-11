@@ -5,16 +5,19 @@ open Feliz
 open Swate.Components.Composite.Tree.State
 open Swate.Components.Composite.Tree.Types
 
-let private isLoadActive (loadingNodeIdsRef: IRefValue<ResizeArray<string>>) nodeId loadedChildren =
+let private isLoadActive (activeRequestIdsRef: IRefValue<Map<string, int>>) nodeId loadedChildren =
     hasActiveOrLoadedChildren nodeId loadedChildren
-    || loadingNodeIdsRef.current.Contains nodeId
+    || activeRequestIdsRef.current |> Map.containsKey nodeId
 
-let private markLoadStarted (loadingNodeIdsRef: IRefValue<ResizeArray<string>>) nodeId =
-    if not (loadingNodeIdsRef.current.Contains nodeId) then
-        loadingNodeIdsRef.current.Add nodeId
+let private markLoadStarted (activeRequestIdsRef: IRefValue<Map<string, int>>) nodeId requestId =
+    activeRequestIdsRef.current <- activeRequestIdsRef.current |> Map.add nodeId requestId
 
-let private markLoadFinished (loadingNodeIdsRef: IRefValue<ResizeArray<string>>) nodeId =
-    loadingNodeIdsRef.current.Remove nodeId |> ignore
+let private isRequestCurrent (activeRequestIdsRef: IRefValue<Map<string, int>>) nodeId requestId =
+    activeRequestIdsRef.current |> Map.tryFind nodeId = Some requestId
+
+let private markLoadFinished (activeRequestIdsRef: IRefValue<Map<string, int>>) nodeId requestId =
+    if isRequestCurrent activeRequestIdsRef nodeId requestId then
+        activeRequestIdsRef.current <- activeRequestIdsRef.current |> Map.remove nodeId
 
 let private nextRequestId (loadRequestIdRef: IRefValue<int>) =
     loadRequestIdRef.current <- loadRequestIdRef.current + 1
@@ -28,7 +31,7 @@ let private isLoadStillPending nodeId requestId loadedChildren =
 let loadBranchChildren
     (dataSource: TreeDataSource<'T> option)
     enableLazyLoading
-    (loadingNodeIdsRef: IRefValue<ResizeArray<string>>)
+    (activeRequestIdsRef: IRefValue<Map<string, int>>)
     (loadRequestIdRef: IRefValue<int>)
     (loadedChildren: Map<string, TreeLoadState<'T>>)
     (setLoadedChildren: (Map<string, TreeLoadState<'T>> -> Map<string, TreeLoadState<'T>>) -> unit)
@@ -41,12 +44,12 @@ let loadBranchChildren
             dataSource,
             enableLazyLoading,
             directChildren loadedChildren node,
-            isLoadActive loadingNodeIdsRef node.id loadedChildren
+            isLoadActive activeRequestIdsRef node.id loadedChildren
         with
         | Some source, true, None, false ->
             let requestId = nextRequestId loadRequestIdRef
 
-            markLoadStarted loadingNodeIdsRef node.id
+            markLoadStarted activeRequestIdsRef node.id requestId
 
             setLoadedChildren (fun current ->
                 if
@@ -69,24 +72,25 @@ let loadBranchChildren
                             current
                     )
                 with ex ->
-                    setLoadedChildren (fun current ->
-                        if isLoadStillPending node.id requestId current then
-                            withLoadError node.id ex.Message current
-                        else
-                            current
-                    )
+                    if isRequestCurrent activeRequestIdsRef node.id requestId then
+                        setLoadedChildren (fun current ->
+                            if isLoadStillPending node.id requestId current then
+                                withLoadError node.id ex.Message current
+                            else
+                                current
+                        )
 
-                    setExpandedIds (fun current -> current |> Set.remove node.id)
-                    onError ex
+                        setExpandedIds (fun current -> current |> Set.remove node.id)
+                        onError ex
             finally
-                markLoadFinished loadingNodeIdsRef node.id
+                markLoadFinished activeRequestIdsRef node.id requestId
         | _ -> ()
     }
 
 let expandNode
     (dataSource: TreeDataSource<'T> option)
     enableLazyLoading
-    (loadingNodeIdsRef: IRefValue<ResizeArray<string>>)
+    (activeRequestIdsRef: IRefValue<Map<string, int>>)
     (loadRequestIdRef: IRefValue<int>)
     (loadedChildren: Map<string, TreeLoadState<'T>>)
     (expandedIds: Set<string>)
@@ -102,7 +106,7 @@ let expandNode
             loadBranchChildren
                 dataSource
                 enableLazyLoading
-                loadingNodeIdsRef
+                activeRequestIdsRef
                 loadRequestIdRef
                 loadedChildren
                 setLoadedChildren

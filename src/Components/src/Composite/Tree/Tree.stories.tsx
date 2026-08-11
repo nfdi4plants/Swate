@@ -29,6 +29,22 @@ const leaf = (id: string, label: string, payload?: DemoPayload): DemoNode =>
 
 const delayed = <T,>(value: T, ms = 300) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms));
 
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason: Error) => void;
+};
+
+const createDeferred = <T,>(): Deferred<T> => {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+};
+
 const expectLoadingIndicator = async (canvasElement: HTMLElement) => {
   await waitFor(() => expect(canvasElement.querySelector(".swt\\:loading")).toBeTruthy());
 };
@@ -162,6 +178,43 @@ export const MultiSelectionWithoutCheckboxes: Story = {
   },
 };
 
+const SelectionModeNormalizationTree = () => {
+  const items = React.useMemo(() => [leaf("alpha.txt", "alpha.txt"), leaf("beta.txt", "beta.txt")], []);
+  const [selectionMode, setSelectionMode] = React.useState<"multiple" | "single">("multiple");
+  const [selected, setSelected] = React.useState(["alpha.txt", "beta.txt"]);
+
+  return (
+    <div className="swt:w-96 swt:space-y-2">
+      <Tree
+        items={items}
+        selectionMode={selectionMode as any}
+        selectedIds={selected}
+        onSelectionChange={setSelected}
+        debug
+      />
+      <button type="button" className="swt:btn swt:btn-sm" onClick={() => setSelectionMode("single")}>
+        Use single selection
+      </button>
+    </div>
+  );
+};
+
+export const SingleSelectionNormalizesControlledIds: Story = {
+  render: () => <SelectionModeNormalizationTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByTestId("tree-node-alpha.txt")).toHaveAttribute("aria-selected", "true");
+    await expect(canvas.getByTestId("tree-node-beta.txt")).toHaveAttribute("aria-selected", "true");
+
+    await userEvent.click(canvas.getByRole("button", { name: "Use single selection" }));
+    await expect(canvas.getByTestId("tree-node-alpha.txt")).toHaveAttribute("aria-selected", "true");
+    await expect(canvas.getByTestId("tree-node-beta.txt")).toHaveAttribute("aria-selected", "false");
+    await expect(canvas.getByTestId("tree-selected-ids")).toHaveTextContent("alpha.txt");
+    await expect(canvas.getByTestId("tree-selected-ids")).not.toHaveTextContent("beta.txt");
+  },
+};
+
 const DisabledSelectionTree = () => {
   const [selected, setSelected] = React.useState<string[]>([]);
 
@@ -246,6 +299,82 @@ export const LazyLoadingCachesChildren: Story = {
     await expectLoadingIndicator(canvasElement);
     await expect(await canvas.findByText("Study 02")).toBeVisible();
     await expect(canvas.getByTestId("load-count")).toHaveTextContent("Loads: 3");
+  },
+};
+
+const StaleFailureTree = () => {
+  const apiRef = React.useRef<TreeApi | null>(null);
+  const requestsRef = React.useRef<Deferred<DemoNode[]>[]>([]);
+  const [requestCount, setRequestCount] = React.useState(0);
+  const [errorCount, setErrorCount] = React.useState(0);
+  const items = React.useMemo(() => [branch("arc/concurrent", "concurrent", undefined)], []);
+
+  const dataSource = React.useMemo(
+    () => ({
+      getChildrenCount: (item: DemoNode | null | undefined) => (item?.id === "arc/concurrent" ? 1 : 0),
+      getTreeItems: async (item: DemoNode | null | undefined) => {
+        if (item?.id !== "arc/concurrent") return [];
+        const request = createDeferred<DemoNode[]>();
+        requestsRef.current.push(request);
+        setRequestCount(requestsRef.current.length);
+        return request.promise;
+      },
+    }),
+    [],
+  );
+
+  return (
+    <div className="swt:w-96 swt:space-y-2">
+      <Tree
+        items={items}
+        dataSource={dataSource as any}
+        apiRef={apiRef as any}
+        onError={() => setErrorCount((count) => count + 1)}
+        debug
+      />
+      <button type="button" className="swt:btn swt:btn-sm" onClick={() => apiRef.current?.invalidateNode("arc/concurrent")}>
+        Invalidate pending request
+      </button>
+      <button
+        type="button"
+        className="swt:btn swt:btn-sm"
+        onClick={() => requestsRef.current[1]?.resolve([leaf("arc/concurrent/fresh.txt", "fresh.txt")])}
+      >
+        Resolve second request
+      </button>
+      <button type="button" className="swt:btn swt:btn-sm" onClick={() => requestsRef.current[0]?.reject(new Error("stale failure"))}>
+        Reject first request
+      </button>
+      <div data-testid="stale-request-count">Requests: {requestCount}</div>
+      <div data-testid="stale-error-count">Errors: {errorCount}</div>
+    </div>
+  );
+};
+
+export const StaleLazyFailureDoesNotCollapseNewerResult: Story = {
+  render: () => <StaleFailureTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: "Expand concurrent" }));
+    await expectLoadingIndicator(canvasElement);
+    await expect(canvas.getByTestId("stale-request-count")).toHaveTextContent("Requests: 1");
+
+    await userEvent.click(canvas.getByRole("button", { name: "Invalidate pending request" }));
+    await expect(canvas.getByRole("button", { name: "Expand concurrent" })).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Expand concurrent" }));
+    await expectLoadingIndicator(canvasElement);
+    await expect(canvas.getByTestId("stale-request-count")).toHaveTextContent("Requests: 2");
+
+    await userEvent.click(canvas.getByRole("button", { name: "Resolve second request" }));
+    await expect(await canvas.findByText("fresh.txt")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Collapse concurrent" })).toBeVisible();
+
+    await userEvent.click(canvas.getByRole("button", { name: "Reject first request" }));
+    await expect(canvas.getByText("fresh.txt")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Collapse concurrent" })).toBeVisible();
+    await expect(canvas.getByTestId("stale-error-count")).toHaveTextContent("Errors: 0");
+    await expect(canvas.queryByText("Error")).not.toBeInTheDocument();
   },
 };
 
@@ -739,6 +868,7 @@ const SelectiveRenderingTree = () => {
     leaf("stable-one.txt", "stable-one.txt"),
     leaf("stable-two.txt", "stable-two.txt"),
   ]);
+  const [selected, setSelected] = React.useState<string[]>([]);
   const [renderCounts, setRenderCounts] = React.useState<Record<string, number>>({});
   const expandedIds = React.useMemo(() => ["workspace"], []);
 
@@ -783,8 +913,18 @@ const SelectiveRenderingTree = () => {
 
   return (
     <div className="swt:w-96 swt:space-y-2">
-      <Tree items={items} defaultExpandedIds={expandedIds} renderNode={renderNode as any} debug />
+      <Tree
+        items={items}
+        defaultExpandedIds={expandedIds}
+        selectedIds={selected}
+        onSelectionChange={setSelected}
+        renderNode={renderNode as any}
+        debug
+      />
       <div className="swt:flex swt:gap-2">
+        <button type="button" className="swt:btn swt:btn-sm" onClick={() => setSelected(["workspace/beta.txt"])}>
+          Select beta
+        </button>
         <button type="button" className="swt:btn swt:btn-sm" onClick={renameBeta}>
           Rename beta
         </button>
@@ -808,6 +948,22 @@ export const OnlyAffectedNodesRerender: Story = {
     const renderCount = (nodeId: string) => Number(canvas.getByTestId(`render-count-${nodeId}`).textContent);
 
     await waitFor(() => expect(renderCount("workspace/beta.txt")).toBeGreaterThan(0));
+    const beforeSelection = {
+      workspace: renderCount("workspace"),
+      alpha: renderCount("workspace/alpha.txt"),
+      beta: renderCount("workspace/beta.txt"),
+      stableOne: renderCount("stable-one.txt"),
+      stableTwo: renderCount("stable-two.txt"),
+    };
+
+    await userEvent.click(canvas.getByRole("button", { name: "Select beta" }));
+    await waitFor(() => expect(renderCount("workspace/beta.txt")).toBeGreaterThan(beforeSelection.beta));
+    await expect(canvas.getByTestId("tree-node-workspace/beta.txt")).toHaveAttribute("aria-selected", "true");
+    expect(renderCount("workspace")).toBe(beforeSelection.workspace);
+    expect(renderCount("workspace/alpha.txt")).toBe(beforeSelection.alpha);
+    expect(renderCount("stable-one.txt")).toBe(beforeSelection.stableOne);
+    expect(renderCount("stable-two.txt")).toBe(beforeSelection.stableTwo);
+
     const beforeRename = {
       workspace: renderCount("workspace"),
       alpha: renderCount("workspace/alpha.txt"),
@@ -825,6 +981,9 @@ export const OnlyAffectedNodesRerender: Story = {
     expect(renderCount("stable-two.txt")).toBe(beforeRename.stableTwo);
 
     const beforeAdd = {
+      workspace: renderCount("workspace"),
+      alpha: renderCount("workspace/alpha.txt"),
+      beta: renderCount("workspace/beta.txt"),
       stableOne: renderCount("stable-one.txt"),
       stableTwo: renderCount("stable-two.txt"),
     };
@@ -832,8 +991,62 @@ export const OnlyAffectedNodesRerender: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Add gamma" }));
     await waitFor(() => expect(renderCount("workspace/gamma.txt")).toBeGreaterThan(0));
     await expect(canvas.getByText("gamma.txt")).toBeVisible();
+    expect(renderCount("workspace")).toBeGreaterThan(beforeAdd.workspace);
+    expect(renderCount("workspace/alpha.txt")).toBe(beforeAdd.alpha);
+    expect(renderCount("workspace/beta.txt")).toBe(beforeAdd.beta);
     expect(renderCount("stable-one.txt")).toBe(beforeAdd.stableOne);
     expect(renderCount("stable-two.txt")).toBe(beforeAdd.stableTwo);
+  },
+};
+
+const DescendantKeyboardTree = () => {
+  const [selected, setSelected] = React.useState<string[]>([]);
+  const items = React.useMemo(() => [branch("interactive", "interactive", [leaf("interactive/child.txt", "child.txt")])], []);
+
+  const renderNode = React.useCallback(
+    (props: { node: DemoNode }) =>
+      props.node.id === "interactive" ? (
+        <input
+          aria-label="Tree node editor"
+          className="swt:input swt:input-sm swt:input-bordered"
+          onClick={(event) => event.stopPropagation()}
+        />
+      ) : (
+        <span>{props.node.label}</span>
+      ),
+    [],
+  );
+
+  return (
+    <div className="swt:w-96">
+      <Tree
+        items={items}
+        defaultExpandedIds={["interactive"]}
+        selectedIds={selected}
+        onSelectionChange={setSelected}
+        renderNode={renderNode as any}
+        debug
+      />
+      <div data-testid="descendant-key-selected">{selected.join(",") || "none"}</div>
+    </div>
+  );
+};
+
+export const DescendantKeyboardEventsKeepDefaultBehavior: Story = {
+  render: () => <DescendantKeyboardTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const editor = canvas.getByRole("textbox", { name: "Tree node editor" });
+
+    editor.focus();
+    expect(fireEvent.keyDown(editor, { key: "ArrowLeft" })).toBe(true);
+    await expect(editor).toHaveFocus();
+    await expect(canvas.getByText("child.txt")).toBeVisible();
+
+    await userEvent.type(editor, "alpha beta", { skipClick: true });
+    await expect(editor).toHaveValue("alpha beta");
+    await expect(canvas.getByText("child.txt")).toBeVisible();
+    await expect(canvas.getByTestId("descendant-key-selected")).toHaveTextContent("none");
   },
 };
 

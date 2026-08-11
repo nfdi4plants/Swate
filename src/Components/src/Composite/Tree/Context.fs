@@ -6,11 +6,6 @@ open Swate.Components.Composite.Tree.Types
 let TreeCtx =
     React.createContext<TreeContextValue<obj>> {
         DataSource = None
-        SelectionMode = TreeSelectionMode.Single
-        SelectedIds = None
-        DefaultSelectedIds = None
-        DefaultExpandedIds = None
-        OnSelectionChange = None
         SelectionDisabled = false
         IsNodeSelectable = fun _ -> true
         EnableLazyLoading = false
