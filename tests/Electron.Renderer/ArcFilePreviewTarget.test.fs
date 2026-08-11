@@ -5,6 +5,7 @@ open Fable.Core
 open ARCtrl
 open Renderer.Components.MainContent.ArcFilePreviewTargetHelper
 open Swate.Components.Composite.Widgets.JsonImport.Types
+open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Shared
 
 
@@ -21,6 +22,88 @@ let private jsonImportRequest importedFile = {
     SourceFileName = Some "import.json"
     JsonFormat = JsonExportFormat.ARCtrl
 }
+
+Vitest.describe (
+    "ArcFilePreviewTarget active-view behavior",
+    fun () ->
+        Vitest.test (
+            "preserves an internally selected table across ordinary ARC value updates",
+            fun () ->
+                let arcFile, _ = createAssayArcFile [| "First"; "Selected" |]
+                let refreshedArcFile = ArcFiles.refreshRef arcFile
+
+                Vitest.expect(ActiveView.Forward(refreshedArcFile, ActiveView.Table 1)).toEqual (ActiveView.Table 1)
+        )
+
+        Vitest.test (
+            "changes the editor remount key for sidebar view selections but not ARC value refreshes",
+            fun () ->
+                let arcFile, _ = createAssayArcFile [| "Table" |]
+                let refreshedArcFile = ArcFiles.refreshRef arcFile
+                let tableKey = editorKey arcFile (Some(ActiveView.Table 0))
+
+                Vitest.expect(editorKey refreshedArcFile (Some(ActiveView.Table 0))).toEqual (tableKey)
+                Vitest.expect(editorKey arcFile (Some ActiveView.Metadata)).not.toEqual (tableKey)
+                Vitest.expect(editorKey arcFile (Some ActiveView.DataMap)).not.toEqual (tableKey)
+        )
+
+        Vitest.test (
+            "creates a DataMap from a copy and publishes the same value that is persisted",
+            fun () -> promise {
+                let arcFile, originalAssay = createAssayArcFile [| "Table" |]
+                let publishedArcFiles = ResizeArray<ArcFiles>()
+                let persistedArcFiles = ResizeArray<ArcFiles>()
+
+                let! result =
+                    createDataMapInCurrentTarget
+                        arcFile
+                        publishedArcFiles.Add
+                        (fun nextArcFile -> promise {
+                            persistedArcFiles.Add nextArcFile
+                            return Ok()
+                        })
+
+                match result with
+                | Error exn -> failwith $"Expected DataMap creation to succeed: {exn.Message}"
+                | Ok() -> ()
+
+                Vitest.expect(originalAssay.DataMap.IsNone).toBe (true)
+                Vitest.expect(publishedArcFiles.Count).toBe (1)
+                Vitest.expect(persistedArcFiles.Count).toBe (1)
+                Vitest.expect(obj.ReferenceEquals(publishedArcFiles.[0], persistedArcFiles.[0])).toBe (true)
+
+                match publishedArcFiles.[0] with
+                | ArcFiles.Assay assay -> Vitest.expect(assay.DataMap.IsSome).toBe (true)
+                | _ -> failwith "Expected the published ARC file to remain an Assay."
+            }
+        )
+
+        Vitest.test (
+            "keeps the active table valid through reorder and deletion while drag identifiers stay stable",
+            fun () ->
+                let arcFile, _ = createAssayArcFile [| "First"; "Selected"; "Last" |]
+
+                let dragIdsBefore =
+                    Swate.Components.Page.ArcFileEditor.Helper.tableDragIds (arcFile.Tables().Count)
+                    |> Seq.toArray
+
+                let reorderedArcFile = ArcFiles.refreshRef arcFile
+                reorderedArcFile.ArcTables().MoveTable(1, 2)
+                let activeAfterReorder = ActiveView.Table 2
+
+                let dragIdsAfterReorder =
+                    Swate.Components.Page.ArcFileEditor.Helper.tableDragIds (reorderedArcFile.Tables().Count)
+                    |> Seq.toArray
+
+                Vitest.expect(ActiveView.Forward(reorderedArcFile, activeAfterReorder)).toEqual (activeAfterReorder)
+                Vitest.expect(dragIdsAfterReorder).toEqual (dragIdsBefore)
+
+                let afterDeletion = ArcFiles.refreshRef reorderedArcFile
+                afterDeletion.ArcTables().RemoveTableAt 2
+
+                Vitest.expect(ActiveView.Forward(afterDeletion, activeAfterReorder)).toEqual (ActiveView.Table 0)
+        )
+)
 
 Vitest.describe (
     "ArcFilePreviewTarget JSON import",

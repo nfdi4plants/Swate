@@ -74,20 +74,12 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, activeView: ActiveView option) =
                     "Add DataMap",
                     (fun _ ->
                         if dataMap.IsNone then
-                            let nextArcFile = ArcFiles.refreshRef props.arcFile
-
-                            match nextArcFile with
-                            | ArcFiles.Assay assay -> assay.DataMap <- Some(ARCtrl.DataMap.init ())
-                            | ArcFiles.Study(study, _) -> study.DataMap <- Some(ARCtrl.DataMap.init ())
-                            | ArcFiles.Run run -> run.DataMap <- Some(ARCtrl.DataMap.init ())
-                            | ArcFiles.Workflow workflow -> workflow.DataMap <- Some(ARCtrl.DataMap.init ())
-                            | _ -> ()
-
-                            setArcFilePageState nextArcFile
                             props.setActiveView ActiveView.DataMap
 
                             promise {
-                                match! Helper.saveArcFile nextArcFile with
+                                match!
+                                    createDataMapInCurrentTarget props.arcFile setArcFilePageState Helper.saveArcFile
+                                with
                                 | Ok() -> ()
                                 | Error exn ->
                                     errorModal.enqueue (
@@ -106,13 +98,8 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, activeView: ActiveView option) =
             | ArcFiles.Workflow workflow -> button workflow.DataMap
             | _ -> Html.none
 
-    let editorKey =
-        arcFile.TryGetRelativePath()
-        |> Option.defaultValue (string arcFile.RelatedArcFilesDiscriminate),
-        activeView |> Option.map _.ViewIndex
-
     Html.div [
-        prop.key (string editorKey)
+        prop.key (string (editorKey arcFile activeView))
         prop.className "swt:contents"
         prop.children [
             Swate.Components.Page.ArcFileEditor.Main.ArcFileEditor(

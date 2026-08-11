@@ -18,7 +18,7 @@ module private ArcFileFooterTabsHelper =
     [<Literal>]
     let TableDragIdPrefix = "table-"
 
-    let mkTableDragId (index: int) = $"{TableDragIdPrefix}{index}"
+    let mkTableDragId (index: int) = Helper.tableDragId index
 
     let tryParseTableDragId (i: string) =
         if i.StartsWith TableDragIdPrefix then
@@ -397,10 +397,7 @@ type ArcFileFooterTabs =
 
 
         let tableIds =
-            React.useMemo (
-                (fun () -> tables |> Seq.mapi (fun index _ -> mkTableDragId index) |> ResizeArray),
-                [| box tables.TableCount |]
-            )
+            React.useMemo ((fun () -> Helper.tableDragIds tables.TableCount), [| box tables.TableCount |])
 
         let tableTabModels: TableTabViewModel[] =
             React.useMemo (
