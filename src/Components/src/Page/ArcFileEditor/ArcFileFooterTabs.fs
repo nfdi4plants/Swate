@@ -15,14 +15,11 @@ module private ArcFileFooterTabsHelper =
     [<Literal>]
     let FooterTabIdDataKey = "footertabid"
 
-    [<Literal>]
-    let TableDragIdPrefix = "table-"
-
     let mkTableDragId (index: int) = Helper.tableDragId index
 
     let tryParseTableDragId (i: string) =
-        if i.StartsWith TableDragIdPrefix then
-            match System.Int32.TryParse(i.Substring(TableDragIdPrefix.Length)) with
+        if i.StartsWith Helper.TableDragIdPrefix then
+            match System.Int32.TryParse(i.Substring(Helper.TableDragIdPrefix.Length)) with
             | true, index -> Some index
             | _ -> None
         else

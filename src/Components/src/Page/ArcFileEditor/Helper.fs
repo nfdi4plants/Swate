@@ -4,7 +4,10 @@ open Swate.Components.Shared
 open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Composite.Widgets.DataAnnotator.Types
 
-let tableDragId index = $"table-{index}"
+[<Literal>]
+let TableDragIdPrefix = "table-"
+
+let tableDragId index = $"{TableDragIdPrefix}{index}"
 
 let tableDragIds tableCount =
     Seq.init tableCount tableDragId |> ResizeArray
