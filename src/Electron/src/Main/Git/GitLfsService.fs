@@ -130,6 +130,20 @@ let run
 /// Runs Git LFS without progress or cancellation hooks.
 let runSilently (request: GitLfsRequest) : JS.Promise<Result<GitLfsResult, exn>> = run request ignore (fun () -> false)
 
+/// Validates manual Track/Untrack requests against the DataHub LFS tracking ruleset.
+/// File sizes are not available here, so the size rule is enforced by the callers that know them.
+let validateTrackingRulesetRequest (command: GitLfsCommand) (filePath: string option) : Result<unit, string> =
+    match command, filePath with
+    | Track, Some relativePath ->
+        match GitLfsRules.tryGetMarkAsLfsBlockedReason relativePath with
+        | Some blockedReason -> Error blockedReason
+        | None -> Ok()
+    | Untrack, Some relativePath ->
+        match GitLfsRules.tryGetUnmarkAsLfsBlockedReason relativePath None with
+        | Some blockedReason -> Error blockedReason
+        | None -> Ok()
+    | _ -> Ok()
+
 /// Tracks a repository-relative path in Git LFS. GitService uses this during automatic large-file staging.
 let track (repoPath: string) (relativePath: string) : JS.Promise<Result<unit, string>> = promise {
     let! result = createRequest repoPath Track (Some relativePath) None |> runSilently
