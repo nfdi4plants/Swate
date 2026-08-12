@@ -284,6 +284,14 @@ Settings are stored in local repository config:
 
 Renderer state starts with `DownloadLargeFiles = false` until repository settings are loaded. Use `getGitLfsSettings` after opening an ARC to get the effective repository values.
 
+Manual LFS marking follows the DataHub tracking ruleset (`Swate.Components.Shared.GitLfsRules`):
+
+- `isa.*.xlsx` metadata files must never be tracked with Git LFS. They cannot be marked manually and are exempt from stage-time auto tracking and commit-time size validation.
+- Files below a `dataset` folder must stay tracked with Git LFS and cannot be unmarked.
+- LFS files larger than 25 MB must stay tracked with Git LFS and cannot be unmarked.
+
+The file tree context menu disables blocked toggle actions, and the Main process rejects blocked `Track`/`Untrack` requests as a second line of defense.
+
 When Git LFS is required but unavailable, operations return `FailureKind = Some GitFailureKind.LfsInstallRequired` with a message suitable for the install prompt. The renderer workflow calls `installGitLfs` and retries the original operation after a successful install.
 
 Clone always sets `GIT_LFS_SKIP_SMUDGE=1` first. If `DownloadLargeFiles = true`, clone then persists the setting and runs `git lfs pull` to hydrate content.

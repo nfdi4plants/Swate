@@ -711,21 +711,25 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 match vault.path with
                 | None -> return Error(exn "ARC is not loaded.")
                 | Some arcPath ->
-                    // Always enforce the active ARC root to avoid running against arbitrary repos.
-                    let enforcedRequest = { request with RepoPath = arcPath }
-                    let! result = GitLfs.runChannel vault.window enforcedRequest
+                    match Main.Git.GitLfsService.validateTrackingRulesetRequest request.Command request.FilePath with
+                    | Error blockedReason -> return Error(exn blockedReason)
+                    | Ok() ->
 
-                    match result with
-                    | Error e ->
-                        Swate.Components.console.log ($"Error: {e.Message}")
-                        return Error e
-                    | Ok successResult ->
-                        match enforcedRequest.Command with
-                        | Track
-                        | Untrack -> do! vault.RefreshFileTree()
-                        | _ -> ()
+                        // Always enforce the active ARC root to avoid running against arbitrary repos.
+                        let enforcedRequest = { request with RepoPath = arcPath }
+                        let! result = GitLfs.runChannel vault.window enforcedRequest
 
-                        return Ok successResult
+                        match result with
+                        | Error e ->
+                            Swate.Components.console.log ($"Error: {e.Message}")
+                            return Error e
+                        | Ok successResult ->
+                            match enforcedRequest.Command with
+                            | Track
+                            | Untrack -> do! vault.RefreshFileTree()
+                            | _ -> ()
+
+                            return Ok successResult
         }
     cancelGitLfs = fun (requestId: string) -> GitLfs.cancelChannel requestId
     resolveCloseRequest =
