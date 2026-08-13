@@ -2,6 +2,7 @@ namespace Swate.Components.Primitive.Buttons
 
 open Feliz
 open Fable.Core
+open Swate.Components
 open Swate.Components.Primitive
 
 [<Erase; Mangle(false)>]
@@ -127,29 +128,71 @@ type Buttons =
             ?classes: string
         ) =
         let isDisabled = defaultArg isDisabled false
+        let tooltipId = FloatingUI.useId ()
+        let showTooltip, setShowTooltip = React.useState false
 
-        Html.button [
-            prop.className [
-                "swt:btn swt:btn-sm swt:btn-neutral swt:btn-square"
+        let floating =
+            FloatingUI.useFloating (
+                ``open`` = showTooltip,
+                placement = FloatingUI.Placement.Bottom,
+                strategy = FloatingUI.FloatingStrategy.Fixed,
+                middleware = [|
+                    FloatingUI.Middleware.offset 8
+                    FloatingUI.Middleware.flip ()
+                    FloatingUI.Middleware.shift {| padding = 8 |}
+                |],
+                whileElementsMounted = FloatingUI.autoUpdate
+            )
 
-                match color with
-                | Some DaisyuiColors.Primary -> "swt:hover:text-primary!"
-                | Some DaisyuiColors.Secondary -> "swt:hover:text-secondary!"
-                | Some DaisyuiColors.Accent -> "swt:hover:text-accent!"
-                | Some DaisyuiColors.Error -> "swt:hover:text-error!"
-                | Some DaisyuiColors.Info -> "swt:hover:text-info!"
-                | Some DaisyuiColors.Success -> "swt:hover:text-success!"
-                | Some DaisyuiColors.Warning -> "swt:hover:text-warning!"
-                | None -> "swt:hover:text-primary!"
+        React.Fragment [
+            Html.span [
+                prop.ref floating.refs.setReference
+                prop.className "swt:inline-flex"
+                prop.onMouseEnter (fun _ -> setShowTooltip true)
+                prop.onMouseLeave (fun _ -> setShowTooltip false)
+                prop.onFocus (fun _ -> setShowTooltip true)
+                prop.onBlur (fun _ -> setShowTooltip false)
+                prop.children [
+                    Html.button [
+                        prop.className [
+                            "swt:btn swt:btn-sm swt:btn-neutral swt:btn-square"
 
-                if classes.IsSome then
-                    classes.Value
+                            match color with
+                            | Some DaisyuiColors.Primary -> "swt:hover:text-primary!"
+                            | Some DaisyuiColors.Secondary -> "swt:hover:text-secondary!"
+                            | Some DaisyuiColors.Accent -> "swt:hover:text-accent!"
+                            | Some DaisyuiColors.Error -> "swt:hover:text-error!"
+                            | Some DaisyuiColors.Info -> "swt:hover:text-info!"
+                            | Some DaisyuiColors.Success -> "swt:hover:text-success!"
+                            | Some DaisyuiColors.Warning -> "swt:hover:text-warning!"
+                            | None -> "swt:hover:text-primary!"
+
+                            if classes.IsSome then
+                                classes.Value
+                        ]
+                        prop.tabIndex (if isDisabled then -1 else 0)
+                        prop.disabled isDisabled
+                        prop.onClick onclick
+                        if props.IsSome then
+                            yield! props.Value
+                        prop.ariaLabel title
+                        prop.ariaDescribedBy tooltipId
+                        prop.children children
+                    ]
+                ]
             ]
-            prop.tabIndex (if isDisabled then -1 else 0)
-            prop.title title
-            prop.disabled isDisabled
-            prop.onClick onclick
-            if props.IsSome then
-                yield! props.Value
-            prop.children children
+            if showTooltip then
+                FloatingUI.FloatingPortal(
+                    preserveTabOrder = false,
+                    children =
+                        Html.div [
+                            prop.id tooltipId
+                            prop.ref floating.refs.setFloating
+                            prop.custom ("style", floating.floatingStyles)
+                            prop.role "tooltip"
+                            prop.className
+                                "swt:z-[9999] swt:rounded-field swt:bg-neutral swt:px-2 swt:py-1 swt:text-sm swt:text-neutral-content swt:pointer-events-none"
+                            prop.text title
+                        ]
+                )
         ]
