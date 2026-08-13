@@ -278,11 +278,11 @@ swt:p-0"""
                                 if isSafari then
                                     style.custom ("willChange", "transform")
                                     style.custom ("minHeight", $"{rowVirtualizer.getTotalSize ()}px")
-                                    style.minWidth (columnVirtualizer.getTotalSize () + 800)
+                                    style.minWidth (columnVirtualizer.getTotalSize ())
                                     style.custom ("contain", "size layout paint")
                                 else
                                     style.height (rowVirtualizer.getTotalSize ())
-                                    style.width (columnVirtualizer.getTotalSize () + 800) // extra space to improve UX with rightmost columns
+                                    style.width (columnVirtualizer.getTotalSize ())
 
                                 style.position.relative
                             ]
