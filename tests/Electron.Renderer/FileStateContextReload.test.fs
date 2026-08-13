@@ -273,4 +273,20 @@ Vitest.describe (
                 | _ -> failwith "Expected the DataMap starting view."
         )
 
+        Vitest.test (
+            "a redirected DataMap sidebar click opens the owning workbook on DataMap",
+            fun () ->
+                let assay = ArcAssay.init "assay"
+                assay.AddTable(ArcTable.init "table")
+
+                let pageState =
+                    RendererPageState.ArcFilePage(ArcFiles.Assay assay, Some(ActiveView.Table 0))
+                    |> Renderer.Components.Helper.ArcViewSelection.applyRequestedPathView
+                        "assays/assay/isa.datamap.xlsx"
+
+                match pageState with
+                | RendererPageState.ArcFilePage(_, Some ActiveView.DataMap) -> ()
+                | _ -> failwith "Expected the redirected DataMap click to select the DataMap view."
+        )
+
 )

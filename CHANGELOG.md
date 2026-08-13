@@ -25,10 +25,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Simplify Electron FileTree navigation so ARC editors initialize the requested Metadata, table, or DataMap view directly, and show the DataHub download action only in the sidebar.
 -   Consolidate Electron ARC editor page state, safely resolve canonical entity workbooks, and reuse shared path normalization for ARC-root-relative references.
 -   Harden canonical entity path resolution for Electron rename and delete operations, and document the behavior of the shared path-normalization helpers.
+-   Keep table deletion in the existing footer-tab context menu instead of exposing a second, inconsistent navbar action.
+-   Isolate requested ARC view selection from eager Electron IPC proxy initialization as a temporary testability workaround; a follow-up should inject the file-opening dependency and keep `openView` as a thin Electron adapter.
 
 ### Fixed
 
--   Prevent deleted ARC table tabs from reappearing when adding a new table by applying tab operations to the current immutable editor state.
+-   Prevent deleted ARC table tabs from reappearing by applying rename, delete, and add operations to a fresh copy of the current editor state without mutating refs during React rendering.
+-   Keep active-view ownership inside the reusable ARC editor, preserve valid table selections across immutable ARC updates, and remount it for Electron sidebar Metadata, table, and DataMap selections.
+-   Preserve stable table identifiers across rerenders and reorder operations, use one shared prefix for drag-ID generation and parsing, and normalize the active view after table deletion so drag-and-drop and tab state remain valid.
+-   Create DataMaps from a copied ARC value, publish the same value to the editor and Electron persistence, and keep the requested remount view aligned with the visible DataMap tab.
 -   Keep table-tab keys unambiguous by rejecting duplicate table names.
 -   Append imported templates to a fresh table model when the active table is empty.
 -   Allow hidden filesystem files such as `.DS_Store` to be deleted from ARC add-zone roots without treating them as ARC entities.
