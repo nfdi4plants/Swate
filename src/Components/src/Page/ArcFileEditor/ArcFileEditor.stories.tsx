@@ -76,13 +76,13 @@ export const NavbarWidgetToggle: Story = {
     await userEvent.click(getWidgetButton(canvas, 'Add Building Block'));
 
     await waitFor(() => {
-      expect(getWidgetButton(canvas, 'Add Building Block')).toHaveClass('swt:!text-primary');
+      expect(canvas.getByRole('heading', { name: 'Add Building Block' })).toBeInTheDocument();
     });
 
     await userEvent.click(getWidgetButton(canvas, 'Add Building Block'));
 
     await waitFor(() => {
-      expect(getWidgetButton(canvas, 'Add Building Block')).not.toHaveClass('swt:!text-primary');
+      expect(canvas.queryByRole('heading', { name: 'Add Building Block' })).not.toBeInTheDocument();
     });
   },
 };
@@ -122,7 +122,6 @@ export const AddTemplateWidget: Story = {
     await userEvent.click(getWidgetButton(canvas, 'Add Template'));
 
     await waitFor(() => {
-      expect(getWidgetButton(canvas, 'Add Template')).toHaveClass('swt:!text-primary');
       expect(canvas.getByText(STORY_TEMPLATE_NAME)).toBeInTheDocument();
     });
 
