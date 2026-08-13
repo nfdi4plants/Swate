@@ -8,6 +8,7 @@
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Api.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="Components\Helper\ArcViewSelection.fs" />
     <Compile Include="IpcReceiver.fs" />
     <Compile Include="MainSyncedState.fs" />
     <Compile Include="GitApiClient.fs" />
