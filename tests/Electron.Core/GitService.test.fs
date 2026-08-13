@@ -174,6 +174,62 @@ Vitest.describe (
         )
 )
 
+Vitest.describe (
+    "Git commit identity",
+    fun () ->
+        Vitest.test (
+            "commitIdentityConfigEntries pins user.name and user.email for a signed-in account",
+            fun () ->
+                let entries =
+                    GitService.commitIdentityConfigEntries (
+                        Some {
+                            Name = " swate-test-account "
+                            Email = " swate-test-account@datahub.example.org "
+                        }
+                    )
+
+                Vitest
+                    .expect(entries)
+                    .toEqual (
+                        [|
+                            "user.name=swate-test-account"
+                            "user.email=swate-test-account@datahub.example.org"
+                        |]
+                    )
+        )
+
+        Vitest.test (
+            "commitIdentityConfigEntries stays empty without a usable account identity",
+            fun () ->
+                Vitest.expect(GitService.commitIdentityConfigEntries None).toEqual ([||]: string[])
+
+                Vitest
+                    .expect(GitService.commitIdentityConfigEntries (Some { Name = "  "; Email = "a@b.org" }))
+                    .toEqual ([||]: string[])
+
+                Vitest
+                    .expect(GitService.commitIdentityConfigEntries (Some { Name = "someone"; Email = "" }))
+                    .toEqual ([||]: string[])
+        )
+
+        // #1305: users who never configured git got the raw "Please tell me who you are" text.
+        Vitest.test (
+            "classifyFailureKind reports git identity errors as IdentityMissing",
+            fun () ->
+                let identityErrors = [|
+                    "*** Please tell me who you are."
+                    "fatal: unable to auto-detect email address (got 'user@host.(none)')"
+                    "Author identity unknown"
+                    "fatal: empty ident name (for <user@host>) not allowed"
+                |]
+
+                for identityError in identityErrors do
+                    Vitest
+                        .expect(GitService.classifyFailureKind identityError = GitFailureKind.IdentityMissing)
+                        .toBe (true)
+        )
+)
+
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private osDynamic: obj = importAll "os"
 
@@ -408,6 +464,26 @@ let private withTestTokenProvider (body: unit -> JS.Promise<'T>) = promise {
         GitTokenProvider.setTokenProvider GitTokenProvider.defaultTokenProvider
 }
 
+let private testAccountIdentity: GitTokenProvider.GitCommitIdentity = {
+    Name = "swate-test-account"
+    Email = "swate-test-account@datahub.example.org"
+}
+
+let private withTestIdentityProvider
+    (identity: GitTokenProvider.GitCommitIdentity option)
+    (body: unit -> JS.Promise<'T>)
+    =
+    promise {
+        GitTokenProvider.setIdentityProvider {
+            TryGetCommitIdentity = fun _ -> promise { return identity }
+        }
+
+        try
+            return! body ()
+        finally
+            GitTokenProvider.setIdentityProvider GitTokenProvider.defaultIdentityProvider
+    }
+
 let private withTestRemoteProvisioningProvider createProject (body: unit -> JS.Promise<'T>) = promise {
     GitRemoteProvisioningProvider.setProvider { CreateProject = createProject }
 
@@ -629,6 +705,157 @@ Vitest.describe (
 
                         Vitest.expect(featureBranchStatus.Current |> Option.defaultValue "").toBe (featureBranchName)
                     })
+            }
+        )
+
+        // Regression for #1304: without a pinned identity git falls back to an OS-derived author
+        // (Windows display name plus <user>@<host>), which GitLab cannot link to the DataHub account.
+        Vitest.test (
+            "commit signs with the signed-in account identity instead of the ambient git config",
+            fun () -> promise {
+                do!
+                    withTestIdentityProvider
+                        (Some testAccountIdentity)
+                        (fun () ->
+                            withTempRepository (fun context -> promise {
+                                let filePath = join [| context.RepoPath; "tracked.txt" |]
+                                do! writeUtf8FileAsync filePath "first\n"
+
+                                let! stageResult = GitService.stagePaths context.RepoPath [| "tracked.txt" |]
+                                expectOk "stage tracked file" stageResult |> ignore
+
+                                let! commitResult = GitService.commit context.RepoPath "test: signed commit"
+                                expectOk "commit tracked file" commitResult |> ignore
+
+                                let! author = context.Git.raw [| "log"; "-1"; "--pretty=%an|%ae" |]
+
+                                Vitest
+                                    .expect(author.Trim())
+                                    .toBe ($"{testAccountIdentity.Name}|{testAccountIdentity.Email}")
+                            })
+                        )
+            }
+        )
+
+        Vitest.test (
+            "commit falls back to the local git config when no account is signed in",
+            fun () -> promise {
+                do!
+                    withTestIdentityProvider
+                        None
+                        (fun () ->
+                            withTempRepository (fun context -> promise {
+                                let filePath = join [| context.RepoPath; "tracked.txt" |]
+                                do! writeUtf8FileAsync filePath "first\n"
+
+                                let! stageResult = GitService.stagePaths context.RepoPath [| "tracked.txt" |]
+                                expectOk "stage tracked file" stageResult |> ignore
+
+                                let! commitResult = GitService.commit context.RepoPath "test: unsigned commit"
+                                expectOk "commit tracked file" commitResult |> ignore
+
+                                let! author = context.Git.raw [| "log"; "-1"; "--pretty=%an|%ae" |]
+
+                                Vitest
+                                    .expect(author.Trim())
+                                    .toBe ("Swate Electron Tests|swate-electron-tests@example.org")
+                            })
+                        )
+            }
+        )
+
+        // Regression for the multi-account case: commit and token lookup must resolve against the
+        // same remote host, so the commit path asks the identity provider for the origin host
+        // instead of blindly taking the active account.
+        Vitest.test (
+            "commit resolves the identity for the origin remote host",
+            fun () -> promise {
+                let mutable requestedHost: string option option = None
+
+                GitTokenProvider.setIdentityProvider {
+                    TryGetCommitIdentity =
+                        fun host -> promise {
+                            requestedHost <- Some host
+                            return Some testAccountIdentity
+                        }
+                }
+
+                try
+                    do!
+                        withTempRepository (fun context -> promise {
+                            let! _ = context.Git.raw [| "remote"; "add"; "origin"; testRemoteUrl |]
+
+                            let filePath = join [| context.RepoPath; "tracked.txt" |]
+                            do! writeUtf8FileAsync filePath "first\n"
+
+                            let! stageResult = GitService.stagePaths context.RepoPath [| "tracked.txt" |]
+                            expectOk "stage tracked file" stageResult |> ignore
+
+                            let! commitResult = GitService.commit context.RepoPath "test: host-aware commit"
+                            expectOk "commit tracked file" commitResult |> ignore
+
+                            Vitest.expect(requestedHost).toEqual (Some(Some testRemoteHost))
+                        })
+
+                    // scp-style SSH remotes are rejected by the auth URL policy but still name the
+                    // hub, so identity selection must resolve their host too.
+                    requestedHost <- None
+
+                    do!
+                        withTempRepository (fun context -> promise {
+                            let! _ =
+                                context.Git.raw [|
+                                    "remote"
+                                    "add"
+                                    "origin"
+                                    $"git@{testRemoteHost}:group/arc.git"
+                                |]
+
+                            let filePath = join [| context.RepoPath; "tracked.txt" |]
+                            do! writeUtf8FileAsync filePath "first\n"
+
+                            let! stageResult = GitService.stagePaths context.RepoPath [| "tracked.txt" |]
+                            expectOk "stage tracked file" stageResult |> ignore
+
+                            let! commitResult = GitService.commit context.RepoPath "test: scp host-aware commit"
+                            expectOk "commit tracked file" commitResult |> ignore
+
+                            Vitest.expect(requestedHost).toEqual (Some(Some testRemoteHost))
+                        })
+                finally
+                    GitTokenProvider.setIdentityProvider GitTokenProvider.defaultIdentityProvider
+            }
+        )
+
+        // A pull over divergent history writes a merge commit, so the authenticated remote session
+        // resolves the same identity as the local commit session. Pull itself only accepts https/ssh
+        // remotes, which a local test remote cannot provide, so the shared resolver is asserted instead.
+        Vitest.test (
+            "commit-capable sessions resolve the identity of the signed-in account",
+            fun () -> promise {
+                do!
+                    withTestIdentityProvider
+                        (Some testAccountIdentity)
+                        (fun () -> promise {
+                            let! entries = GitService.resolveCommitIdentityConfigEntries (Some testRemoteHost)
+
+                            Vitest
+                                .expect(entries)
+                                .toEqual (
+                                    [|
+                                        $"user.name={testAccountIdentity.Name}"
+                                        $"user.email={testAccountIdentity.Email}"
+                                    |]
+                                )
+                        })
+
+                do!
+                    withTestIdentityProvider
+                        None
+                        (fun () -> promise {
+                            let! entries = GitService.resolveCommitIdentityConfigEntries None
+                            Vitest.expect(entries).toEqual ([||]: string[])
+                        })
             }
         )
 
