@@ -76,13 +76,13 @@ export const NavbarWidgetToggle: Story = {
     await userEvent.click(getWidgetButton(canvas, 'Add Building Block'));
 
     await waitFor(() => {
-      expect(canvas.getByRole('heading', { name: 'Add Building Block' })).toBeInTheDocument();
+      expect(canvas.getByRole('button', { name: 'Add Column' })).toBeInTheDocument();
     });
 
     await userEvent.click(getWidgetButton(canvas, 'Add Building Block'));
 
     await waitFor(() => {
-      expect(canvas.queryByRole('heading', { name: 'Add Building Block' })).not.toBeInTheDocument();
+      expect(canvas.queryByRole('button', { name: 'Add Column' })).not.toBeInTheDocument();
     });
   },
 };
