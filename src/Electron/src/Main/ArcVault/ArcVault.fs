@@ -551,10 +551,11 @@ type ArcVaults() =
             if arr.Length > 0 then
                 arr
                 |> Array.iter (fun vault ->
-                    Remoting.createIpc ()
-                    |> Remoting.withWindow vault.window
-                    |> Remoting.buildProxySender<IRecentArcsRendererApi>
-                    |> fun client -> client.recentARCsUpdate recentARCs
+                    if not (vault.window.isDestroyed ()) then
+                        Remoting.createIpc ()
+                        |> Remoting.withWindow vault.window
+                        |> Remoting.buildProxySender<IRecentArcsRendererApi>
+                        |> fun client -> client.recentARCsUpdate recentARCs
                 )
 
     /// Centralized side-effect: update recent ARCs store and broadcast to all windows.
