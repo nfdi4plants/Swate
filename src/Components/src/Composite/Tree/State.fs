@@ -51,9 +51,12 @@ let withLoadError nodeId message loadedChildren =
 let invalidateNode nodeId loadedChildren = loadedChildren |> Map.remove nodeId
 
 let directChildren (loadedChildren: Map<string, TreeLoadState<'T>>) (node: TreeItem<'T>) =
-    match loadedChildren |> Map.tryFind node.id |> Option.bind _.Children with
-    | Some children -> Some children
-    | None -> node.children
+    match node.kind with
+    | TreeNodeKind.Leaf -> None
+    | TreeNodeKind.Branch ->
+        match loadedChildren |> Map.tryFind node.id |> Option.bind _.Children with
+        | Some children -> Some children
+        | None -> node.children
 
 let canExpand
     (dataSource: TreeDataSource<'T> option)
@@ -90,7 +93,7 @@ let flattenVisible loadedChildren expandedIds items =
                 nodeMap.Add(item.id, item)
                 parentId |> Option.iter (fun parentId -> parentMap.Add(item.id, parentId))
 
-                if expandedIds |> Set.contains item.id then
+                if item.kind = TreeNodeKind.Branch && expandedIds |> Set.contains item.id then
                     match directChildren loadedChildren item with
                     | Some children -> loop (ancestors |> Set.add item.id) (Some item.id) (depth + 1) children
                     | None -> ()

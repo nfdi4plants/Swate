@@ -126,7 +126,7 @@ let useTreeNodeActions
     (lookup: TreeRowLookup<'T>)
     focusedId
     selectionMode
-    effectiveSelectedIds
+    (effectiveSelectedIdsRef: IRefValue<Set<string>>)
     setSelection
     =
     let config = useTreeCtx<'T> ()
@@ -190,7 +190,7 @@ let useTreeNodeActions
             selectionMode
             config.SelectionDisabled
             config.IsNodeSelectable
-            effectiveSelectedIds
+            effectiveSelectedIdsRef.current
             setSelection
             node
             extendSelection

@@ -215,6 +215,61 @@ export const SingleSelectionNormalizesControlledIds: Story = {
   },
 };
 
+const UncontrolledMultiSelectionTree = () => {
+  const items = React.useMemo(() => [leaf("alpha.txt", "alpha.txt"), leaf("beta.txt", "beta.txt")], []);
+
+  return (
+    <div className="swt:w-96">
+      <Tree items={items} selectionMode={"multiple" as any} debug />
+    </div>
+  );
+};
+
+export const UncontrolledMultiSelectionUsesLatestState: Story = {
+  render: () => <UncontrolledMultiSelectionTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByText("alpha.txt"));
+    fireEvent.click(canvas.getByText("beta.txt"), { ctrlKey: true, bubbles: true });
+
+    await expect(canvas.getByTestId("tree-node-alpha.txt")).toHaveAttribute("aria-selected", "true");
+    await expect(canvas.getByTestId("tree-node-beta.txt")).toHaveAttribute("aria-selected", "true");
+    await expect(canvas.getByTestId("tree-selected-ids")).toHaveTextContent("alpha.txt");
+    await expect(canvas.getByTestId("tree-selected-ids")).toHaveTextContent("beta.txt");
+  },
+};
+
+const LeafWithChildrenTree = () => {
+  const items = React.useMemo(
+    () => [
+      {
+        ...leaf("malformed-leaf", "Malformed leaf"),
+        children: [leaf("malformed-leaf/hidden.txt", "hidden.txt")],
+      } as DemoNode,
+    ],
+    [],
+  );
+
+  return (
+    <div className="swt:w-96">
+      <Tree items={items} defaultExpandedIds={["malformed-leaf"]} debug />
+    </div>
+  );
+};
+
+export const LeafNodesNeverExposeChildren: Story = {
+  render: () => <LeafWithChildrenTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const leafNode = canvas.getByTestId("tree-node-malformed-leaf");
+
+    await expect(leafNode).not.toHaveAttribute("aria-expanded");
+    await expect(canvas.queryByRole("button", { name: "Collapse Malformed leaf" })).not.toBeInTheDocument();
+    await expect(canvas.queryByText("hidden.txt")).not.toBeInTheDocument();
+  },
+};
+
 const DisabledSelectionTree = () => {
   const [selected, setSelected] = React.useState<string[]>([]);
 

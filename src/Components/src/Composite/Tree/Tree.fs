@@ -34,6 +34,9 @@ type Tree =
         let effectiveSelectedIds, setSelection =
             useControlledSelection selectionMode selectedIds onSelectionChange treeState
 
+        let effectiveSelectedIdsRef = React.useRef effectiveSelectedIds
+        effectiveSelectedIdsRef.current <- effectiveSelectedIds
+
         useTreeApi config.ApiRef activeRequestIdsRef treeState.SetLoadedChildren treeState.SetExpandedIds
 
         let lookup =
@@ -80,7 +83,7 @@ type Tree =
                 lookup
                 focusedId
                 selectionMode
-                effectiveSelectedIds
+                effectiveSelectedIdsRef
                 setSelection
 
         let renderRow row =
