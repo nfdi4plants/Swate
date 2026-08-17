@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Sign commits created in Swate with the stored DataHub account matching the ARC's remote host (using the active account when no remote is configured yet, and leaving the user's own git config untouched for hubs without a stored account) instead of git's OS-derived fallback identity, so commits link to the account on the hub they are pushed to #1304.
 -   Report a missing git identity as its own failure with setup guidance instead of passing git's raw "Please tell me who you are" output to the user #1305.
 -   Respect GitLab's "use a private email in commits" setting by signing commits with the account's commit email instead of its primary email.
+-   Fix Template bug "You've hit dummy code" #1266, #1264 (by @Freymaurer) 
 
 ## 2.0.7 - 2026-08-06
 
