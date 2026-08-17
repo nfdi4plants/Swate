@@ -42,8 +42,7 @@ module Generic =
             (ArcFilesDiscriminate.Template, JsonExportFormat.ARCtrlCompressed),
             fun json -> Template.fromCompressedJsonString json |> ArcFiles.Template
 
-            (ArcFilesDiscriminate.Run, JsonExportFormat.ARCtrl),
-            fun json -> ArcRun.fromJsonString json |> ArcFiles.Run
+            (ArcFilesDiscriminate.Run, JsonExportFormat.ARCtrl), fun json -> ArcRun.fromJsonString json |> ArcFiles.Run
             (ArcFilesDiscriminate.Run, JsonExportFormat.ARCtrlCompressed),
             fun json -> ArcRun.fromCompressedJsonString json |> ArcFiles.Run
 
@@ -167,9 +166,7 @@ module Import =
                 let importedTables = importedArcFile.Tables()
 
                 if importedTables.Count = 0 then
-                    Error(
-                        exn $"Imported {arcFileTypeLabel importedFileType} JSON does not contain tables to append."
-                    )
+                    Error(exn $"Imported {arcFileTypeLabel importedFileType} JSON does not contain tables to append.")
                 else
                     let targetTables = currentArcFile.ArcTables()
                     let mutable usedNames = targetTables.TableNames |> Set.ofSeq
@@ -243,7 +240,8 @@ module Export =
             | ArcFiles.Investigation ai, JsonExportFormat.ROCrate ->
                 nameFromId ai.Identifier, ArcInvestigation.toROCrateJsonString 0 ai
 
-            | ArcFiles.Study(as', _), JsonExportFormat.ARCtrl -> nameFromId as'.Identifier, ArcStudy.toJsonString 0 (as')
+            | ArcFiles.Study(as', _), JsonExportFormat.ARCtrl ->
+                nameFromId as'.Identifier, ArcStudy.toJsonString 0 (as')
             | ArcFiles.Study(as', _), JsonExportFormat.ARCtrlCompressed ->
                 nameFromId as'.Identifier, ArcStudy.toCompressedJsonString 0 (as')
             | ArcFiles.Study(as', aaList), JsonExportFormat.ISA ->
@@ -255,7 +253,8 @@ module Export =
             | ArcFiles.Assay aa, JsonExportFormat.ARCtrlCompressed ->
                 nameFromId aa.Identifier, ArcAssay.toCompressedJsonString 0 aa
             | ArcFiles.Assay aa, JsonExportFormat.ISA -> nameFromId aa.Identifier, ArcAssay.toISAJsonString 0 aa
-            | ArcFiles.Assay aa, JsonExportFormat.ROCrate -> nameFromId aa.Identifier, ArcAssay.toROCrateJsonString () aa
+            | ArcFiles.Assay aa, JsonExportFormat.ROCrate ->
+                nameFromId aa.Identifier, ArcAssay.toROCrateJsonString () aa
 
             | ArcFiles.Template t, JsonExportFormat.ARCtrl ->
                 nameFromId (t.Name.Replace(" ", "_") + ".xlsx"), Template.toJsonString 0 t
@@ -265,8 +264,10 @@ module Export =
                 failwithf "Error. It is not intended to parse Template to %s format." (string anyElse)
 
             | ArcFiles.Run r, JsonExportFormat.ARCtrl -> nameFromId r.Identifier, ArcRun.toJsonString 0 r
-            | ArcFiles.Run r, JsonExportFormat.ARCtrlCompressed -> nameFromId r.Identifier, ArcRun.toCompressedJsonString 0 r
-            | ArcFiles.Run _, anyElse -> failwithf "Error. It is not intended to parse Run to %s format." (string anyElse)
+            | ArcFiles.Run r, JsonExportFormat.ARCtrlCompressed ->
+                nameFromId r.Identifier, ArcRun.toCompressedJsonString 0 r
+            | ArcFiles.Run _, anyElse ->
+                failwithf "Error. It is not intended to parse Run to %s format." (string anyElse)
 
             | ArcFiles.Workflow w, JsonExportFormat.ARCtrl -> nameFromId w.Identifier, ArcWorkflow.toJsonString 0 w
             | ArcFiles.Workflow w, JsonExportFormat.ARCtrlCompressed ->
@@ -288,6 +289,5 @@ module Export =
                 Error exn
         else
             Error(
-                exn
-                    $"JSON export format {jef.AsStringRdbl} is not supported for {arcfile.RelatedArcFilesDiscriminate}."
+                exn $"JSON export format {jef.AsStringRdbl} is not supported for {arcfile.RelatedArcFilesDiscriminate}."
             )
