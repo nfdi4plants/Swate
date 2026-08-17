@@ -16,6 +16,8 @@ open ARCtrl
 open Types
 open Helper
 open FileTreeMaterialization
+open Renderer
+open Renderer.Components.LeftSidebar.FileExplorer.Types
 
 module private FileTreeHelper =
 

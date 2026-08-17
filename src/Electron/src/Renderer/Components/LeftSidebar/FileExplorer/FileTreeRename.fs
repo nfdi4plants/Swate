@@ -8,6 +8,7 @@ open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.RenamePathRules
 open Renderer.Components.LeftSidebar.FileExplorer.Types
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameHelper
+open Renderer
 
 module FileTreeRenameWorkflow =
 

@@ -10,6 +10,7 @@ open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Vitest
+open Renderer
 
 module RenameWorkflow = Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameWorkflow
 module FileTreeContextMenu = Renderer.Components.LeftSidebar.FileExplorer.FileTreeContextMenu

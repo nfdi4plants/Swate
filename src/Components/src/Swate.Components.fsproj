@@ -76,6 +76,7 @@
     <Compile Include="ARCtrl\TermCollection.fs" />
     <Compile Include="ARCtrl\Helper.fs" />
     <Compile Include="ARCtrl\ArcIO.fs" />
+    <Compile Include="ARCtrl\Json.fs" />
     <Compile Include="ARCtrl\Types\CompositeCellDiscriminate.fs" />
     <Compile Include="ARCtrl\Types\CompositeHeaderDiscriminate.fs" />
     <Compile Include="ARCtrl\ArcTable.fs" />
@@ -302,24 +303,6 @@
     <Compile Include="Page\ArcFileEditor\Widgets.fs" />
     <Compile Include="Page\ArcFileEditor\ArcFileFooterTabs.fs" />
     <Compile Include="Page\ArcFileEditor\ArcFileEditor.fs" />
-    <Compile Include="Page\ArcObjectExplorer\GraphExplorer\Model.fs" />
-    <Compile Include="Page\ArcObjectExplorer\GraphExplorer\GraphExplorerNodes.fs" />
-    <Compile Include="Page\ArcObjectExplorer\ArcObjectDetailsLayout.fs" />
-    <Compile Include="Page\ArcObjectExplorer\GraphExplorer\GraphObjectDetails.fs" />
-    <Compile Include="Page\ArcObjectExplorer\ARCExplorer.fs" />
-    <Compile Include="Page\ArcObjectExplorer\ARCObjectPanel.fs" />
-    <Compile Include="Page\ArcObjectExplorer\KindFilter.fs" />
-    <Compile Include="Page\ArcObjectExplorer\Types.fs" />
-    <Compile Include="Page\ArcObjectExplorer\ARCObjectWidget.fs" />
-    <Compile Include="Page\ArcObjectExplorer\Model.fs" />
-    <Compile Include="Page\ArcObjectExplorer\ArcObjectExplorerContent.fs" />
-    <Compile Include="Page\ArcObjectExplorer\ARCObjectFixture.fs" />
-    <Compile Include="Page\ArcObjectExplorer\ARCObjectExplorer.fs" />
-    <Compile Include="Page\ArcObjectExplorer\GraphExplorer\GraphObjectFixture.fs" />
-    <Compile Include="Page\ArcObjectExplorer\GraphExplorer\GraphObjectExplorerTreeData.fs" />
-    <Compile Include="Page\ArcObjectExplorer\GraphExplorer\GraphObjectExplorerFilter.fs" />
-    <Compile Include="Page\ArcObjectExplorer\GraphExplorer\GraphObjectExplorer.fs" />
-    
 
     <Compile Include="Style.fs" />
   </ItemGroup>

@@ -5,6 +5,7 @@ open Swate.Components.Page.Landing
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
+open Renderer
 
 [<ReactComponent>]
 let LandingDraftTarget () =
