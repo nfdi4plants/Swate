@@ -5,6 +5,7 @@
 @import "tailwindcss/theme.css" layer(swt-theme) prefix(swt);
 @import "tailwindcss/preflight.css" layer(swt-base) prefix(swt);
 @import "tailwindcss/utilities.css" layer(swt-utilities) prefix(swt);
+@import "@xyflow/react/dist/style.css";
 
 @source "../fable_output/**/*.fs.jsx";
 @plugin "@tailwindcss/typography";
@@ -340,5 +341,150 @@
     }
     .swt\:scrollbar-fade:hover::-webkit-scrollbar-thumb {
         background-color: color-mix(in oklch, var(--color-base-content) 40%, transparent);
+    }
+}
+
+@layer swt-components {
+    /* CwlEditor workflow canvas */
+    .swt-cwl-workflow-canvas-flow {
+        min-height: 420px;
+        height: clamp(420px, 62vh, 760px);
+        border: 1px solid var(--color-base-300);
+        border-radius: 0.55rem;
+        background: var(--color-base-100);
+        overflow: hidden;
+    }
+
+    .swt-cwl-workflow-canvas-flow .react-flow__controls {
+        box-shadow: none;
+        border: 1px solid var(--color-base-300);
+    }
+
+    .swt-cwl-workflow-canvas-flow .react-flow__edge .react-flow__edge-text {
+        opacity: 0 !important;
+        transition: opacity 120ms ease;
+    }
+
+    .swt-cwl-workflow-canvas-flow .react-flow__edge:hover .react-flow__edge-text {
+        opacity: 1 !important;
+    }
+
+    .swt-cwl-workflow-canvas-flow .react-flow__node.dragging {
+        border-color: var(--color-primary);
+        animation: swt-cwl-workflow-node-drag-pulse 0.8s ease-in-out infinite alternate;
+    }
+
+    .swt-cwl-workflow-canvas-flow .react-flow__minimap {
+        background: var(--color-base-200);
+        border: 1px solid var(--color-base-300);
+    }
+
+    @keyframes swt-cwl-workflow-node-drag-pulse {
+        0% {
+            box-shadow: 0 1px 2px color-mix(in oklch, var(--color-base-content) 5%, transparent);
+        }
+        100% {
+            box-shadow: 0 8px 20px color-mix(in oklch, var(--color-primary) 24%, transparent);
+        }
+    }
+
+    .swt-cwl-node {
+        min-width: 160px;
+        padding: 0.5rem 0.6rem;
+        border: 1px solid var(--color-base-300);
+        border-radius: 0.5rem;
+        background: var(--color-base-100);
+        position: relative;
+        font-size: 0.82rem;
+        box-shadow: 0 1px 2px color-mix(in oklch, var(--color-base-content) 5%, transparent);
+    }
+
+    .swt-cwl-node-step {
+        min-width: 220px;
+        background: var(--color-base-100);
+    }
+
+    .swt-cwl-node-input {
+        border-color: var(--color-primary);
+        background: color-mix(in oklch, var(--color-primary) 10%, var(--color-base-100));
+    }
+
+    .swt-cwl-node-output {
+        border-color: var(--color-success);
+        background: color-mix(in oklch, var(--color-success) 10%, var(--color-base-100));
+    }
+
+    .swt-cwl-node-title {
+        font-weight: 700;
+        margin-bottom: 0.45rem;
+        color: var(--color-base-content);
+    }
+
+    .swt-cwl-node-ports {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.6rem;
+    }
+
+    .swt-cwl-node-port-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .swt-cwl-node-port-row {
+        position: relative;
+        min-height: 1.15rem;
+        display: flex;
+        align-items: center;
+        padding-left: 0.45rem;
+        padding-right: 0.45rem;
+    }
+
+    .swt-cwl-node-port-row-input {
+        justify-content: flex-start;
+    }
+
+    .swt-cwl-node-port-row-output {
+        justify-content: flex-end;
+    }
+
+    .swt-cwl-node-port-row-add {
+        margin-top: 0.25rem;
+        border-top: 1px dashed var(--color-success);
+        padding-top: 0.35rem;
+    }
+
+    .swt-cwl-node-port {
+        font-size: 0.78rem;
+        color: var(--color-base-content);
+        white-space: nowrap;
+    }
+
+    .swt-cwl-node-port-input {
+        text-align: left;
+        padding-left: 0.2rem;
+    }
+
+    .swt-cwl-node-port-output {
+        text-align: right;
+        padding-right: 0.2rem;
+    }
+
+    .swt-cwl-canvas-context-menu {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-width: 170px;
+        padding: 0.4rem;
+        border: 1px solid var(--color-base-300);
+        border-radius: 0.45rem;
+        background: var(--color-base-100);
+        box-shadow: 0 8px 20px color-mix(in oklch, var(--color-base-content) 16%, transparent);
+    }
+
+    .swt-cwl-canvas-context-menu button {
+        width: 100%;
+        text-align: left;
     }
 }
