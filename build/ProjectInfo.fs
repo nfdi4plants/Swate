@@ -17,6 +17,7 @@ module ProjectPaths =
 
     let sharedTestsPath = Path.GetFullPath "tests/Shared"
     let serverTestsPath = Path.GetFullPath "tests/Server"
+    let cwlTestsPath = Path.GetFullPath "tests/Cwl"
     let clientTestsPath = Path.GetFullPath "tests/Client"
     let electronCoreTestsPath = Path.GetFullPath "tests/Electron.Core"
     let electronRendererTestsPath = Path.GetFullPath "tests/Electron.Renderer"

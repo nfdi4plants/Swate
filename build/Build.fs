@@ -41,6 +41,10 @@ let main args =
             match Test.Run.server |> Async.RunSynchronously with
             | Ok() -> 0
             | Error _ -> 1
+        | "run" :: "cwl" :: _ ->
+            match Test.Run.cwl |> Async.RunSynchronously with
+            | Ok() -> 0
+            | Error _ -> 1
         | "run" :: "client" :: _ ->
             match Test.Run.client |> Async.RunSynchronously with
             | Ok() -> 0

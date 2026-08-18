@@ -24,6 +24,7 @@ let Watch () =
 
     [
         runAsync "server" "dotnet" [ "watch"; "run" ] ProjectPaths.serverTestsPath
+        runAsync "cwl" "dotnet" [ "watch"; "run" ] ProjectPaths.cwlTestsPath
         // This below will start web ui for tests, but cannot execute due to office-addin-mock
         runAsync
             "client"
@@ -135,6 +136,7 @@ let WatchJs () =
 
 module Run =
     let server = runAsync "server" "dotnet" [ "run" ] ProjectPaths.serverTestsPath
+    let cwl = runAsync "cwl" "dotnet" [ "run" ] ProjectPaths.cwlTestsPath
 
     let client =
         cleanGeneratedOutput ProjectPaths.clientTestsPath
@@ -201,6 +203,8 @@ module Run =
             printGreenfn "Running all tests..."
             printGreenfn "Running server tests..."
             let! serverResult = server
+            printGreenfn "Running CWL tests..."
+            let! cwlResult = cwl
             printGreenfn "Running client tests..."
             let! clientResult = client
             printGreenfn "Running electron core tests..."
@@ -210,13 +214,18 @@ module Run =
             printGreenfn "Running component tests..."
             let! componentsResult = components
 
-            match serverResult, clientResult, electronCoreResult, electronRendererResult, componentsResult with
-            | Ok(), Ok(), Ok(), Ok(), Ok() ->
+            match
+                serverResult, cwlResult, clientResult, electronCoreResult, electronRendererResult, componentsResult
+            with
+            | Ok(), Ok(), Ok(), Ok(), Ok(), Ok() ->
                 printGreenfn "All tests passed!"
                 exit 0
             | _ ->
                 if serverResult.IsError then
                     printRedfn "Server tests failed."
+
+                if cwlResult.IsError then
+                    printRedfn "CWL tests failed."
 
                 if clientResult.IsError then
                     printRedfn "Client tests failed."
