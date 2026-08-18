@@ -5,6 +5,7 @@ open Feliz
 open Swate.Components
 open Swate.Components.Composite.Widgets
 open Swate.Components.Shared
+open ARCtrl
 
 
 module private JsonExportHelper =
