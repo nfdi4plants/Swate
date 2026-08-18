@@ -1,17 +1,17 @@
-module CWLBuilder.Renderer.Tests.ArCtrlAdapterTests
+module Swate.Tests.Cwl.ArCtrlAdapterTests
 
 open System.IO
 open Expecto
 open ARCtrl.CWL
-open CWLBuilder.CwlHandling.CwlService
-open CWLBuilder.Domain.Tests.TestFixtures
-open CWLBuilder.Electron.Renderer.Adapters.ArCtrlDecode
-open CWLBuilder.Electron.Renderer.Adapters.ArCtrlEncode
-open CWLBuilder.Electron.Renderer.Adapters.ValidationAdapter
-open CWLBuilder.Electron.Renderer.Documents.Types
-open CWLBuilder.Validation.ValidationContext
+open Swate.Components.Shared.Cwl.CwlService
+open Swate.Tests.Cwl.TestFixtures
+open Swate.Components.Shared.Cwl.Adapters.ArCtrlDecode
+open Swate.Components.Shared.Cwl.Adapters.ArCtrlEncode
+open Swate.Components.Shared.Cwl.Adapters.ValidationAdapter
+open Swate.Components.Shared.Cwl.Documents.Types
+open Swate.Components.Shared.Cwl.Validation.ValidationContext
 
-module GraphAdapter = CWLBuilder.Electron.Renderer.Adapters.WorkflowGraphAdapter
+module GraphAdapter = Swate.Components.Shared.Cwl.Adapters.WorkflowGraphAdapter
 
 let private resolveRunReferences (workflowPath: string) (yaml: string) =
     let tryDecodeCwlFile (filePath: string) =
@@ -21,6 +21,7 @@ let private resolveRunReferences (workflowPath: string) (yaml: string) =
             None
 
     let processingUnit = Decode.decodeCWLProcessingUnit yaml
+
     ARCtrl.CWLRunResolver.resolveRunReferencesFromLookup workflowPath processingUnit tryDecodeCwlFile
     |> Encode.encodeProcessingUnit
 
@@ -37,10 +38,16 @@ let adapterRoundtripTests =
         }
 
         test "workflow decode from resolved processing unit preserves external run reference on encode" {
-            let resolvedYaml = resolveRunReferences workflowWithExternalRunPath workflowWithExternalRunYaml
+            let resolvedYaml =
+                resolveRunReferences workflowWithExternalRunPath workflowWithExternalRunYaml
 
             let loadedState =
-                match tryLoadToEditorWithResolved workflowWithExternalRunYaml (Some resolvedYaml) workflowWithExternalRunPath with
+                match
+                    tryLoadToEditorWithResolved
+                        workflowWithExternalRunYaml
+                        (Some resolvedYaml)
+                        workflowWithExternalRunPath
+                with
                 | Ok state -> state
                 | Error message -> failtestf "Expected workflow load success but got %s" message
 
@@ -51,17 +58,17 @@ let adapterRoundtripTests =
             | CWLProcessingUnit.Workflow workflow ->
                 match workflow.Steps.[0].Run with
                 | WorkflowStepRun.RunString runTarget ->
-                    Expect.equal runTarget "tools/echo.cwl" "Adapter encode should restore external workflow run strings"
-                | _ ->
-                    failtest "Expected external workflow run string after adapter encode"
-            | _ ->
-                failtest "Expected Workflow processing unit"
+                    Expect.equal
+                        runTarget
+                        "tools/echo.cwl"
+                        "Adapter encode should restore external workflow run strings"
+                | _ -> failtest "Expected external workflow run string after adapter encode"
+            | _ -> failtest "Expected Workflow processing unit"
         }
 
         test "validation adapter reuses the current validation engine" {
             let document =
-                Decode.decodeCWLProcessingUnit minimalExpressionToolYaml
-                |> fromProcessingUnit
+                Decode.decodeCWLProcessingUnit minimalExpressionToolYaml |> fromProcessingUnit
 
             let result = validateDocument OnSave document
 
@@ -70,8 +77,7 @@ let adapterRoundtripTests =
 
         test "workflow graph adapter projects nodes, edges, and diagnostics from immutable workflow model" {
             let document =
-                Decode.decodeCWLProcessingUnit minimalWorkflowYaml
-                |> fromProcessingUnit
+                Decode.decodeCWLProcessingUnit minimalWorkflowYaml |> fromProcessingUnit
 
             match document with
             | WorkflowDoc workflow ->
@@ -82,8 +88,7 @@ let adapterRoundtripTests =
                 Expect.isGreaterThan canvasGraph.Edges.Count 0 "Canvas graph should contain edges"
                 Expect.isGreaterThan readModel.NodeCount 0 "Read model should contain nodes"
                 Expect.isGreaterThan readModel.EdgeCount 0 "Read model should contain edges"
-            | _ ->
-                failtest "Expected Workflow document"
+            | _ -> failtest "Expected Workflow document"
         }
 
         test "requirements and hints fixture survives adapter encode" {
@@ -91,7 +96,10 @@ let adapterRoundtripTests =
             let document = fromProcessingUnit processingUnit
             let encodedYaml = document |> toProcessingUnit |> Encode.encodeProcessingUnit
 
-            Expect.isTrue (encodedYaml.Contains "InlineJavascriptRequirement") "Requirements should survive adapter encode"
+            Expect.isTrue
+                (encodedYaml.Contains "InlineJavascriptRequirement")
+                "Requirements should survive adapter encode"
+
             Expect.isTrue (encodedYaml.Contains "DockerRequirement") "Hints should survive adapter encode"
         }
     ]

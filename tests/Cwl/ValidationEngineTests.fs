@@ -1,10 +1,10 @@
-module CWLBuilder.Validation.Tests.ValidationEngineTests
+module Swate.Tests.Cwl.ValidationEngineTests
 
 open Expecto
 open ARCtrl.CWL
-open CWLBuilder.Validation.ValidationTypes
-open CWLBuilder.Validation.ValidationContext
-open CWLBuilder.Validation.ValidationEngine
+open Swate.Components.Shared.Cwl.Validation.ValidationTypes
+open Swate.Components.Shared.Cwl.Validation.ValidationContext
+open Swate.Components.Shared.Cwl.Validation.ValidationEngine
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -31,8 +31,8 @@ let engineTests =
         test "Valid minimal tool produces no errors" {
             let td = CWLToolDescription(ResizeArray [| CWLOutput("out") |])
             td.CWLVersion <- "v1.2"
-            td.BaseCommand <- Some (ResizeArray [| "echo" |])
-            td.Inputs <- Some (ResizeArray [| CWLInput("msg") |])
+            td.BaseCommand <- Some(ResizeArray [| "echo" |])
+            td.Inputs <- Some(ResizeArray [| CWLInput("msg") |])
             let result = validateProcessingUnit (CWLProcessingUnit.CommandLineTool td) OnSave
             Expect.isTrue result.IsValid "Should be valid"
             Expect.isEmpty result.Errors "Should have no errors"
@@ -50,7 +50,7 @@ let engineTests =
         test "Tool with empty input name triggers COM.002" {
             let td = CWLToolDescription(ResizeArray [| CWLOutput("out") |])
             td.CWLVersion <- "v1.2"
-            td.Inputs <- Some (ResizeArray [| CWLInput("") |])
+            td.Inputs <- Some(ResizeArray [| CWLInput("") |])
             let result = validateProcessingUnit (CWLProcessingUnit.CommandLineTool td) OnSave
             let comIssues = result.Issues |> List.filter (fun i -> i.RuleId = RuleId "COM.002")
             Expect.isNonEmpty comIssues "Should trigger COM.002"
@@ -82,8 +82,12 @@ let engineTests =
         }
 
         test "Workflow with empty step id triggers WF.002" {
-            let step = WorkflowStep("", ResizeArray(), ResizeArray(), WorkflowStepRun.RunString "tool.cwl")
-            let wd = CWLWorkflowDescription(ResizeArray [| step |], ResizeArray(), ResizeArray())
+            let step =
+                WorkflowStep("", ResizeArray(), ResizeArray(), WorkflowStepRun.RunString "tool.cwl")
+
+            let wd =
+                CWLWorkflowDescription(ResizeArray [| step |], ResizeArray(), ResizeArray())
+
             wd.CWLVersion <- "v1.2"
             let result = validateProcessingUnit (CWLProcessingUnit.Workflow wd) OnSave
             let issues = result.Issues |> List.filter (fun i -> i.RuleId = RuleId "WF.002")
@@ -107,7 +111,9 @@ let engineTests =
         }
 
         test "Operation can be validated without rule-engine crashes" {
-            let op = CWLOperationDescription(ResizeArray [| CWLInput("in") |], ResizeArray [| CWLOutput("out") |])
+            let op =
+                CWLOperationDescription(ResizeArray [| CWLInput("in") |], ResizeArray [| CWLOutput("out") |])
+
             op.CWLVersion <- "v1.2"
             let result = validateProcessingUnit (CWLProcessingUnit.Operation op) OnSave
             Expect.isTrue result.IsValid "Minimal operation should be valid"
@@ -119,7 +125,7 @@ let engineTests =
             let resource = ResourceRequirementInstance()
             resource.SetProperty("coresMin", 8L)
             resource.SetProperty("coresMax", 4L)
-            td.Requirements <- Some (ResizeArray [| Requirement.ResourceRequirement resource |])
+            td.Requirements <- Some(ResizeArray [| Requirement.ResourceRequirement resource |])
 
             let result = validateProcessingUnit (CWLProcessingUnit.CommandLineTool td) OnSave
             let reqIssues = result.Issues |> List.filter (fun i -> i.RuleId = RuleId "REQ.005")
@@ -130,13 +136,14 @@ let engineTests =
         test "EnvVarRequirement with duplicate names triggers REQ.006" {
             let td = CWLToolDescription(ResizeArray [| CWLOutput("out") |])
             td.CWLVersion <- "v1.2"
+
             td.Requirements <-
-                Some (
+                Some(
                     ResizeArray [|
-                        Requirement.EnvVarRequirement (
+                        Requirement.EnvVarRequirement(
                             ResizeArray [|
-                                { EnvName = "PATH"; EnvValue = "/bin" }
-                                { EnvName = "PATH"; EnvValue = "/usr/bin" }
+                                EnvironmentDef("PATH", "/bin")
+                                EnvironmentDef("PATH", "/usr/bin")
                             |]
                         )
                     |]
@@ -151,11 +158,12 @@ let engineTests =
         test "InplaceUpdate=true with WorkReuse enabled triggers REQ.007 warning" {
             let td = CWLToolDescription(ResizeArray [| CWLOutput("out") |])
             td.CWLVersion <- "v1.2"
+
             td.Requirements <-
-                Some (
+                Some(
                     ResizeArray [|
-                        Requirement.InplaceUpdateRequirement { InplaceUpdate = true }
-                        Requirement.WorkReuseRequirement { EnableReuse = true }
+                        Requirement.InplaceUpdateRequirement(InplaceUpdateRequirementValue(true))
+                        Requirement.WorkReuseRequirement(WorkReuseRequirementValue(true))
                     |]
                 )
 
@@ -168,26 +176,26 @@ let engineTests =
         test "isValid returns true for well-formed tool" {
             let td = CWLToolDescription(ResizeArray [| CWLOutput("out") |])
             td.CWLVersion <- "v1.2"
-            td.BaseCommand <- Some (ResizeArray [| "echo" |])
-            td.Inputs <- Some (ResizeArray [| CWLInput("msg") |])
+            td.BaseCommand <- Some(ResizeArray [| "echo" |])
+            td.Inputs <- Some(ResizeArray [| CWLInput("msg") |])
             Expect.isTrue (isValid (CWLProcessingUnit.CommandLineTool td)) "Should be valid"
         }
 
         test "isValid returns false for tool with empty input name" {
             let td = CWLToolDescription(ResizeArray [| CWLOutput("out") |])
             td.CWLVersion <- "v1.2"
-            td.Inputs <- Some (ResizeArray [| CWLInput("") |])
+            td.Inputs <- Some(ResizeArray [| CWLInput("") |])
             Expect.isFalse (isValid (CWLProcessingUnit.CommandLineTool td)) "Should be invalid"
         }
 
         test "All rules in catalog have unique ids" {
-            let ids = CWLBuilder.Validation.RuleCatalog.allRules |> List.map (fun r -> r.Id)
+            let ids =
+                Swate.Components.Shared.Cwl.Validation.RuleCatalog.allRules
+                |> List.map (fun r -> r.Id)
+
             let uniqueIds = ids |> List.distinct
             Expect.equal ids.Length uniqueIds.Length "All rule IDs must be unique"
         }
     ]
 
-let allTests =
-    testList "CWLBuilder.Validation" [
-        engineTests
-    ]
+let allTests = testList "Cwl.Validation" [ engineTests ]

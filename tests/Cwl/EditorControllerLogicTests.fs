@@ -1,23 +1,22 @@
-module CWLBuilder.Renderer.Tests.EditorControllerLogicTests
+module Swate.Tests.Cwl.EditorControllerLogicTests
 
 open Expecto
 open ARCtrl.CWL
-open CWLBuilder.Domain.EditorTypes
-open CWLBuilder.Domain.CommandLineToolMutations
-open CWLBuilder.Domain.WorkflowMutations
-open CWLBuilder.Domain.ExpressionToolMutations
-open CWLBuilder.Domain.Tests.TestFixtures
-open CWLBuilder.Electron.Shared.IPCTypes.DTOs
-open CWLBuilder.Electron.Renderer.EditorControllerLogic
+open Swate.Components.Shared.Cwl.EditorTypes
+open Swate.Components.Shared.Cwl.CommandLineToolMutations
+open Swate.Components.Shared.Cwl.WorkflowMutations
+open Swate.Components.Shared.Cwl.ExpressionToolMutations
+open Swate.Tests.Cwl.TestFixtures
+open Swate.Components.Shared.Cwl.HostTypes
+open Swate.Components.Shared.Cwl.EditorControllerLogic
 
-let private mkLoadResponse success yaml filePath error =
-    {
-        Success = success
-        Yaml = yaml
-        ResolvedYaml = None
-        FilePath = filePath
-        Error = error
-    }
+let private mkLoadResponse success yaml filePath error = {
+    Success = success
+    Yaml = yaml
+    ResolvedYaml = None
+    FilePath = filePath
+    Error = error
+}
 
 let loadEditSaveTests =
     testList "Renderer load/edit/save flow" [
@@ -35,13 +34,13 @@ let loadEditSaveTests =
                 let inputs = tool.Inputs |> Option.defaultValue (ResizeArray())
                 renameInputAt inputs newInputIndex "extra_arg"
                 setBaseCommand tool "cat"
-            | _ ->
-                failtest "Expected CommandLineTool state"
+            | _ -> failtest "Expected CommandLineTool state"
 
             let touched = touch state
+
             match ensureCanSave touched with
             | Error message -> failtestf "Save should be allowed, got %s" message
-            | Ok () ->
+            | Ok() ->
                 let yaml = createSaveYamlForPath touched "example.cwl"
                 Expect.isTrue (yaml.Contains "cat") "Updated baseCommand should be encoded"
                 Expect.isTrue (yaml.Contains "extra_arg") "New input should be encoded"
@@ -60,13 +59,13 @@ let loadEditSaveTests =
                 let newStepIndex = addWorkflowStep workflow
                 setWorkflowStepIdAt workflow.Steps newStepIndex "stage_2"
                 setWorkflowStepRunAt workflow.Steps newStepIndex "stage2.cwl"
-            | _ ->
-                failtest "Expected Workflow state"
+            | _ -> failtest "Expected Workflow state"
 
             let touched = touch state
+
             match ensureCanSave touched with
             | Error message -> failtestf "Workflow save should be allowed, got %s" message
-            | Ok () ->
+            | Ok() ->
                 let yaml = createSaveYamlForPath touched "workflow.cwl"
                 Expect.isTrue (yaml.Contains "stage_2") "New workflow step id should be encoded"
                 Expect.isTrue (yaml.Contains "stage2.cwl") "Workflow run target should be encoded"
@@ -86,13 +85,13 @@ let loadEditSaveTests =
                 let inputs = CWLExpressionToolDescription.getInputsOrEmpty expressionTool
                 renameInputAt inputs newInputIndex "delta"
                 setExpressionText expressionTool "${ return {'output_val': inputs.delta}; }"
-            | _ ->
-                failtest "Expected ExpressionTool state"
+            | _ -> failtest "Expected ExpressionTool state"
 
             let touched = touch state
+
             match ensureCanSave touched with
             | Error message -> failtestf "ExpressionTool save should be allowed, got %s" message
-            | Ok () ->
+            | Ok() ->
                 let yaml = createSaveYamlForPath touched "expr.cwl"
                 Expect.isTrue (yaml.Contains "delta") "New expression input should be encoded"
                 Expect.isTrue (yaml.Contains "output_val") "Expression output key should be encoded"
@@ -107,15 +106,14 @@ let loadEditSaveTests =
                 | Error message -> failtestf "Expected operation load success but got %s" message
 
             match state.ProcessingUnit with
-            | CWLProcessingUnit.Operation operation ->
-                operation.Intent <- parseIntentText "service"
-            | _ ->
-                failtest "Expected Operation state"
+            | CWLProcessingUnit.Operation operation -> operation.Intent <- parseIntentText "service"
+            | _ -> failtest "Expected Operation state"
 
             let touched = touch state
+
             match ensureCanSave touched with
             | Error message -> failtestf "Operation save should be allowed, got %s" message
-            | Ok () ->
+            | Ok() ->
                 let yaml = createSaveYamlForPath touched "operation.cwl"
                 Expect.isTrue (yaml.Contains "Operation") "Operation class should be encoded"
                 Expect.isTrue (yaml.Contains "service") "Updated operation intent should be encoded"
@@ -139,14 +137,18 @@ let failurePathTests =
         test "empty yaml load surfaces explicit empty-document error without duplicate prefix" {
             let response = mkLoadResponse true (Some "") "empty.cwl" None
             let result = tryCreateLoadedState response
-            Expect.equal result (Error "Failed to decode CWL: CWL document is empty.") "Error should be explicit and have a single decode prefix"
+
+            Expect.equal
+                result
+                (Error "Failed to decode CWL: CWL document is empty.")
+                "Error should be explicit and have a single decode prefix"
         }
 
         test "save is blocked when validation has errors" {
             let state = createNew CommandLineTool
+
             match state.ProcessingUnit with
-            | CWLProcessingUnit.CommandLineTool tool ->
-                tool.Inputs <- Some (ResizeArray [| CWLInput("") |])
+            | CWLProcessingUnit.CommandLineTool tool -> tool.Inputs <- Some(ResizeArray [| CWLInput("") |])
             | _ -> failtest "Expected CommandLineTool"
 
             let invalidState = touch state
@@ -160,7 +162,8 @@ let saveMergeBehaviorTests =
         test "successful save clears dirty state and returns saved notification when no newer edits exist" {
             let stateAtSaveClick = createNew CommandLineTool |> touch
 
-            let result = mergeSuccessfulSave stateAtSaveClick (Some stateAtSaveClick) "saved.cwl"
+            let result =
+                mergeSuccessfulSave stateAtSaveClick (Some stateAtSaveClick) "saved.cwl"
 
             Expect.equal result.InfoMessage "Saved to saved.cwl" "Save notification should confirm the saved file path"
 
@@ -168,8 +171,7 @@ let saveMergeBehaviorTests =
             | Some nextState ->
                 Expect.equal nextState.FilePath (Some "saved.cwl") "Merged state should carry the saved file path"
                 Expect.isFalse nextState.IsDirty "Merged state should be clean when no newer edits exist"
-            | None ->
-                failtest "Expected merged state when save result matches the active editor session"
+            | None -> failtest "Expected merged state when save result matches the active editor session"
         }
 
         test "successful save preserves dirty state and returns snapshot notification when newer edits already exist" {
@@ -178,15 +180,25 @@ let saveMergeBehaviorTests =
 
             let result = mergeSuccessfulSave stateAtSaveClick (Some latestState) "saved.cwl"
 
-            Expect.equal result.InfoMessage "Saved snapshot to saved.cwl. New edits remain unsaved." "Notification should explain that a newer dirty revision still exists"
+            Expect.equal
+                result.InfoMessage
+                "Saved snapshot to saved.cwl. New edits remain unsaved."
+                "Notification should explain that a newer dirty revision still exists"
 
             match result.NextState with
             | Some nextState ->
-                Expect.equal nextState.FilePath (Some "saved.cwl") "Merged state should still update the saved file path"
+                Expect.equal
+                    nextState.FilePath
+                    (Some "saved.cwl")
+                    "Merged state should still update the saved file path"
+
                 Expect.isTrue nextState.IsDirty "Newer edits should remain dirty after the earlier save completes"
-                Expect.equal nextState.Version latestState.Version "Merge should not roll back the latest revision counter"
-            | None ->
-                failtest "Expected merged state when save result matches the active editor session"
+
+                Expect.equal
+                    nextState.Version
+                    latestState.Version
+                    "Merge should not roll back the latest revision counter"
+            | None -> failtest "Expected merged state when save result matches the active editor session"
         }
     ]
 

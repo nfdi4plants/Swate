@@ -1,17 +1,16 @@
-module CWLBuilder.Renderer.Tests.StateReducerTests
+module Swate.Tests.Cwl.StateReducerTests
 
 open Expecto
-open CWLBuilder.Electron.Renderer.Documents.Common
-open CWLBuilder.Electron.Renderer.Documents.Types
-open CWLBuilder.Electron.Renderer.State.Actions
-open CWLBuilder.Electron.Renderer.State.Effects
-open CWLBuilder.Electron.Renderer.State.Init
-open CWLBuilder.Electron.Renderer.State.Reducer
-open CWLBuilder.Electron.Renderer.State.Selectors
-open CWLBuilder.Electron.Renderer.State.Types
+open Swate.Components.Shared.Cwl.Documents.Common
+open Swate.Components.Shared.Cwl.Documents.Types
+open Swate.Components.Shared.Cwl.State.Actions
+open Swate.Components.Shared.Cwl.State.Effects
+open Swate.Components.Shared.Cwl.State.Init
+open Swate.Components.Shared.Cwl.State.Reducer
+open Swate.Components.Shared.Cwl.State.Selectors
+open Swate.Components.Shared.Cwl.State.Types
 
-let private sampleDocument =
-    CommandLineToolDoc (createCommandLineToolModel "v1.2")
+let private sampleDocument = CommandLineToolDoc(createCommandLineToolModel "v1.2")
 
 let reducerTests =
     testList "Renderer state reducer" [
@@ -21,7 +20,12 @@ let reducerTests =
             Expect.isSome nextState.Document "Reducer should store the new document"
             Expect.isSome nextState.Meta "Reducer should create document metadata"
             Expect.equal nextState.SessionId 1 "New document should begin a new session"
-            Expect.equal effects [ FocusMainWindow "session.entry" ] "Reducer should request window focus after session entry"
+
+            Expect.equal
+                effects
+                [ FocusMainWindow "session.entry" ]
+                "Reducer should request window focus after session entry"
+
             Expect.isFalse (isDirty nextState) "Fresh document should not be dirty"
         }
 
@@ -50,7 +54,11 @@ let reducerTests =
 
             Expect.isFalse (isDirty nextState) "Save completion should align saved revision with current revision"
             Expect.equal (currentFilePath nextState) (Some "saved.cwl") "Save completion should persist the file path"
-            Expect.equal nextState.Notifications.InfoMessage (Some "Saved to saved.cwl") "Save completion should produce an info notification"
+
+            Expect.equal
+                nextState.Notifications.InfoMessage
+                (Some "Saved to saved.cwl")
+                "Save completion should produce an info notification"
         }
     ]
 

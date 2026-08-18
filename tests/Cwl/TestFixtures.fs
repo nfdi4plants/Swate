@@ -1,24 +1,22 @@
 /// CWL YAML test fixtures and roundtrip helpers.
 /// These were previously in production code (CwlHandling/Roundtrip.fs) and have
 /// been relocated here so production assemblies contain only production code.
-module CWLBuilder.Domain.Tests.TestFixtures
+module Swate.Tests.Cwl.TestFixtures
 
 open System.IO
 open ARCtrl.CWL
 
 let private fixtureRoot =
-    Path.GetFullPath(Path.Combine(__SOURCE_DIRECTORY__, "..", "Fixtures", "Cwl"))
+    Path.GetFullPath(Path.Combine(__SOURCE_DIRECTORY__, "Fixtures", "Cwl"))
 
 let private combineFixturePath (segments: string list) =
-    segments |> List.fold (fun current segment -> Path.Combine(current, segment)) fixtureRoot
+    segments
+    |> List.fold (fun current segment -> Path.Combine(current, segment)) fixtureRoot
 
-let private normalizeFixtureText (text: string) =
-    text.Replace("\r\n", "\n")
+let private normalizeFixtureText (text: string) = text.Replace("\r\n", "\n")
 
 let private readFixture (segments: string list) =
-    combineFixturePath segments
-    |> File.ReadAllText
-    |> normalizeFixtureText
+    combineFixturePath segments |> File.ReadAllText |> normalizeFixtureText
 
 // ---------------------------------------------------------------------------
 // File-backed CWL fixtures for testing
@@ -57,6 +55,7 @@ let runRoundtrip (yaml: string) : CWLProcessingUnit * string =
 /// Verify that a minimal tool can be roundtripped.
 let verifyToolRoundtrip () =
     let pu, encoded = runRoundtrip minimalToolYaml
+
     match pu with
     | CWLProcessingUnit.CommandLineTool _ -> Ok encoded
     | _ -> Error "Expected CommandLineTool but got different type"
@@ -64,6 +63,7 @@ let verifyToolRoundtrip () =
 /// Verify that a minimal workflow can be roundtripped.
 let verifyWorkflowRoundtrip () =
     let pu, encoded = runRoundtrip minimalWorkflowYaml
+
     match pu with
     | CWLProcessingUnit.Workflow _ -> Ok encoded
     | _ -> Error "Expected Workflow but got different type"
@@ -71,6 +71,7 @@ let verifyWorkflowRoundtrip () =
 /// Verify that a minimal expression tool can be roundtripped.
 let verifyExpressionToolRoundtrip () =
     let pu, encoded = runRoundtrip minimalExpressionToolYaml
+
     match pu with
     | CWLProcessingUnit.ExpressionTool _ -> Ok encoded
     | _ -> Error "Expected ExpressionTool but got different type"
@@ -78,6 +79,7 @@ let verifyExpressionToolRoundtrip () =
 /// Verify that a minimal operation can be roundtripped.
 let verifyOperationRoundtrip () =
     let pu, encoded = runRoundtrip minimalOperationYaml
+
     match pu with
     | CWLProcessingUnit.Operation _ -> Ok encoded
     | _ -> Error "Expected Operation but got different type"

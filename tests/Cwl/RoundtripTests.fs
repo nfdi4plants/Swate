@@ -1,53 +1,53 @@
-module CWLBuilder.Domain.Tests.RoundtripTests
+module Swate.Tests.Cwl.RoundtripTests
 
 open System
 open System.IO
 open Expecto
 open ARCtrl.CWL
-open CWLBuilder.CwlHandling.CwlService
-open CWLBuilder.Domain.Tests.TestFixtures
-open CWLBuilder.Domain.CwlDefaults
-open CWLBuilder.Domain.EditorTypes
-open CWLBuilder.Domain.EditorMutations
-open CWLBuilder.Domain.CommandLineToolMutations
-open CWLBuilder.Domain.RequirementMutations
-open CWLBuilder.Domain.WorkflowMutations
-open CWLBuilder.Domain.ExpressionToolMutations
-open CWLBuilder.Domain.WorkflowCanvasAdapter
-open CWLBuilder.Validation.ValidationTypes
-open CWLBuilder.Validation.ValidationContext
-open CWLBuilder.Validation.ValidationEngine
+open Swate.Components.Shared.Cwl.CwlService
+open Swate.Tests.Cwl.TestFixtures
+open Swate.Components.Shared.Cwl.CwlDefaults
+open Swate.Components.Shared.Cwl.EditorTypes
+open Swate.Components.Shared.Cwl.EditorMutations
+open Swate.Components.Shared.Cwl.CommandLineToolMutations
+open Swate.Components.Shared.Cwl.RequirementMutations
+open Swate.Components.Shared.Cwl.WorkflowMutations
+open Swate.Components.Shared.Cwl.ExpressionToolMutations
+open Swate.Components.Shared.Cwl.WorkflowCanvasAdapter
+open Swate.Components.Shared.Cwl.Validation.ValidationTypes
+open Swate.Components.Shared.Cwl.Validation.ValidationContext
+open Swate.Components.Shared.Cwl.Validation.ValidationEngine
 
 let roundtripTests =
     testList "Roundtrip" [
         test "Minimal CommandLineTool round-trips" {
             let result = verifyToolRoundtrip ()
+
             match result with
             | Result.Ok encoded ->
                 Expect.isTrue (encoded.Contains "CommandLineTool") "Should contain class"
                 Expect.isTrue (encoded.Contains "echo") "Should contain baseCommand"
-            | Result.Error msg ->
-                failtest msg
+            | Result.Error msg -> failtest msg
         }
 
         test "Minimal Workflow round-trips" {
             let result = verifyWorkflowRoundtrip ()
+
             match result with
             | Result.Ok encoded ->
                 Expect.isTrue (encoded.Contains "Workflow") "Should contain class"
                 Expect.isTrue (encoded.Contains "step1") "Should contain step"
-            | Result.Error msg ->
-                failtest msg
+            | Result.Error msg -> failtest msg
         }
 
         test "Minimal ExpressionTool round-trips" {
             let result = verifyExpressionToolRoundtrip ()
+
             match result with
             | Result.Ok encoded ->
                 Expect.isTrue (encoded.Contains "ExpressionTool") "Should contain class"
                 Expect.isTrue (encoded.Contains "expression") "Should contain expression"
-            | Result.Error msg ->
-                failtest msg
+            | Result.Error msg -> failtest msg
         }
 
         test "ExpressionTool single-line expression encodes as quoted scalar and decodes unchanged" {
@@ -58,48 +58,56 @@ let roundtripTests =
             | CWLProcessingUnit.ExpressionTool et ->
                 et.Expression <- expression
                 let encoded = Encode.encodeProcessingUnit pu
-                Expect.isTrue (encoded.Contains "expression: \"") "Single-line expression should be quoted in YAML output"
+
+                Expect.isTrue
+                    (encoded.Contains "expression: \"")
+                    "Single-line expression should be quoted in YAML output"
 
                 match Decode.decodeCWLProcessingUnit encoded with
                 | CWLProcessingUnit.ExpressionTool decoded ->
                     Expect.equal decoded.Expression expression "Quoted expression should decode back to original value"
-                | _ ->
-                    failtest "Expected ExpressionTool after decode"
-            | _ ->
-                failtest "Expected ExpressionTool fixture"
+                | _ -> failtest "Expected ExpressionTool after decode"
+            | _ -> failtest "Expected ExpressionTool fixture"
         }
 
         test "ExpressionTool multiline expression preserves blank lines via block scalar roundtrip" {
             let normalize (value: string) =
                 value.Replace("\r\n", "\n").TrimEnd('\r', '\n')
 
-            let expression = "${\n  const next = inputs.input_val + 1;\n\n  return {'output_val': next};\n}"
+            let expression =
+                "${\n  const next = inputs.input_val + 1;\n\n  return {'output_val': next};\n}"
+
             let pu = Decode.decodeCWLProcessingUnit minimalExpressionToolYaml
 
             match pu with
             | CWLProcessingUnit.ExpressionTool et ->
                 et.Expression <- expression
                 let encoded = Encode.encodeProcessingUnit pu
-                Expect.isTrue (encoded.Contains "expression: |") "Multiline expression should be emitted as block scalar"
+
+                Expect.isTrue
+                    (encoded.Contains "expression: |")
+                    "Multiline expression should be emitted as block scalar"
 
                 match Decode.decodeCWLProcessingUnit encoded with
                 | CWLProcessingUnit.ExpressionTool decoded ->
                     Expect.isTrue (decoded.Expression.Contains "\n\n") "Decoded expression should preserve blank lines"
-                    Expect.equal (normalize decoded.Expression) (normalize expression) "Multiline expression should roundtrip text content"
-                | _ ->
-                    failtest "Expected ExpressionTool after decode"
-            | _ ->
-                failtest "Expected ExpressionTool fixture"
+
+                    Expect.equal
+                        (normalize decoded.Expression)
+                        (normalize expression)
+                        "Multiline expression should roundtrip text content"
+                | _ -> failtest "Expected ExpressionTool after decode"
+            | _ -> failtest "Expected ExpressionTool fixture"
         }
 
         test "Minimal Operation round-trips" {
             let result = verifyOperationRoundtrip ()
+
             match result with
             | Result.Ok encoded ->
                 Expect.isTrue (encoded.Contains "Operation") "Should contain class"
                 Expect.isTrue (encoded.Contains "input_val") "Should contain operation input"
-            | Result.Error msg ->
-                failtest msg
+            | Result.Error msg -> failtest msg
         }
 
         test "tryLoad returns Ok for valid CWL" {
@@ -119,7 +127,11 @@ let roundtripTests =
 
         test "tryLoad returns clear error for comment-only CWL input" {
             let result = tryLoad "# only a comment\n\n---\n...\n"
-            Expect.equal result (Result.Error "CWL document is empty.") "Comment/doc-marker-only input should return explicit error"
+
+            Expect.equal
+                result
+                (Result.Error "CWL document is empty.")
+                "Comment/doc-marker-only input should return explicit error"
         }
 
         test "roundtrip function succeeds for tool yaml" {
@@ -138,9 +150,10 @@ let goldenFixtureTests =
 
             match result with
             | Result.Ok encoded ->
-                Expect.isTrue (encoded.Contains "run: tools/echo.cwl") "Workflow roundtrip should preserve relative external run path"
-            | Result.Error message ->
-                failtest message
+                Expect.isTrue
+                    (encoded.Contains "run: tools/echo.cwl")
+                    "Workflow roundtrip should preserve relative external run path"
+            | Result.Error message -> failtest message
         }
 
         test "command line tool fixture with requirements and hints roundtrips" {
@@ -148,10 +161,14 @@ let goldenFixtureTests =
 
             match result with
             | Result.Ok encoded ->
-                Expect.isTrue (encoded.Contains "InlineJavascriptRequirement") "Roundtrip should preserve representative requirement content"
-                Expect.isTrue (encoded.Contains "DockerRequirement") "Roundtrip should preserve representative hint content"
-            | Result.Error message ->
-                failtest message
+                Expect.isTrue
+                    (encoded.Contains "InlineJavascriptRequirement")
+                    "Roundtrip should preserve representative requirement content"
+
+                Expect.isTrue
+                    (encoded.Contains "DockerRequirement")
+                    "Roundtrip should preserve representative hint content"
+            | Result.Error message -> failtest message
         }
     ]
 
@@ -162,6 +179,7 @@ let editorTests =
             Expect.equal state.Version 0 "Initial version should be 0"
             Expect.isFalse state.IsDirty "Should not be dirty"
             Expect.isNone state.FilePath "Should have no file path"
+
             match state.ProcessingUnit with
             | CWLProcessingUnit.CommandLineTool _ -> ()
             | _ -> failtest "Expected CommandLineTool"
@@ -169,6 +187,7 @@ let editorTests =
 
         test "createNew Workflow produces valid state" {
             let state = createNew Workflow
+
             match state.ProcessingUnit with
             | CWLProcessingUnit.Workflow _ -> ()
             | _ -> failtest "Expected Workflow"
@@ -176,6 +195,7 @@ let editorTests =
 
         test "createNew ExpressionTool produces valid state" {
             let state = createNew ExpressionTool
+
             match state.ProcessingUnit with
             | CWLProcessingUnit.ExpressionTool _ -> ()
             | _ -> failtest "Expected ExpressionTool"
@@ -220,7 +240,10 @@ let validationTests =
             let wd = CWLWorkflowDescription(ResizeArray(), ResizeArray(), ResizeArray())
             let result = validateProcessingUnit (CWLProcessingUnit.Workflow wd) OnSave
             Expect.isTrue result.IsValid "Should be valid"
-            Expect.isTrue (result.Issues |> List.exists (fun i -> i.Message.Contains "no steps")) "Should warn about no steps"
+
+            Expect.isTrue
+                (result.Issues |> List.exists (fun i -> i.Message.Contains "no steps"))
+                "Should warn about no steps"
         }
 
         test "ExpressionTool with empty expression fails" {
@@ -235,15 +258,21 @@ let mutationTests =
         test "Decode tool, add input, re-encode preserves new input" {
             // Decode
             let pu = Decode.decodeCWLProcessingUnit minimalToolYaml
+
             match pu with
             | CWLProcessingUnit.CommandLineTool td ->
                 // Mutate: add a new input
                 let newInput = CWLInput("extra_arg")
                 newInput.SetProperty("type", CWLType.Int)
+
                 let inputs =
                     match td.Inputs with
                     | Some existing -> existing
-                    | None -> let ra = ResizeArray() in td.Inputs <- Some ra; ra
+                    | None ->
+                        let ra = ResizeArray() in
+                        td.Inputs <- Some ra
+                        ra
+
                 inputs.Add(newInput)
                 // Re-encode
                 let yaml = Encode.encodeProcessingUnit pu
@@ -254,6 +283,7 @@ let mutationTests =
 
         test "Decode workflow, add step output, re-encode preserves mutation" {
             let pu = Decode.decodeCWLProcessingUnit minimalWorkflowYaml
+
             match pu with
             | CWLProcessingUnit.Workflow wd ->
                 // Verify we can inspect the decoded workflow
@@ -271,6 +301,7 @@ let mutationTests =
 
         test "Decode tool, mutate via EditorState touch, version increments" {
             let result = tryLoadToEditor minimalToolYaml "test.cwl"
+
             match result with
             | Result.Ok state ->
                 Expect.equal state.Version 0 "Initial version"
@@ -284,7 +315,8 @@ let mutationTests =
         }
 
         test "saveFromEditorForPath preserves original workflow step run string for same file" {
-            let rawWorkflowYaml = """
+            let rawWorkflowYaml =
+                """
 cwlVersion: v1.2
 class: Workflow
 inputs: {}
@@ -299,7 +331,8 @@ steps:
         out: [out]
 """
 
-            let resolvedWorkflowYaml = """
+            let resolvedWorkflowYaml =
+                """
 cwlVersion: v1.2
 class: Workflow
 inputs: {}
@@ -327,12 +360,19 @@ steps:
             | Result.Error message -> failtestf "Expected load success but got %s" message
             | Result.Ok state ->
                 let savedYaml = saveFromEditorForPath state workflowPath
-                Expect.isTrue (savedYaml.Contains "run: tools/echo.cwl") "Save should keep original run string when saving same file"
-                Expect.isFalse (savedYaml.Contains "class: CommandLineTool") "Save should not inline resolved run object"
+
+                Expect.isTrue
+                    (savedYaml.Contains "run: tools/echo.cwl")
+                    "Save should keep original run string when saving same file"
+
+                Expect.isFalse
+                    (savedYaml.Contains "class: CommandLineTool")
+                    "Save should not inline resolved run object"
         }
 
         test "saveFromEditorForPath rewrites workflow step run string relative to save target" {
-            let rawWorkflowYaml = """
+            let rawWorkflowYaml =
+                """
 cwlVersion: v1.2
 class: Workflow
 inputs: {}
@@ -347,7 +387,8 @@ steps:
         out: [out]
 """
 
-            let resolvedWorkflowYaml = """
+            let resolvedWorkflowYaml =
+                """
 cwlVersion: v1.2
 class: Workflow
 inputs: {}
@@ -376,8 +417,14 @@ steps:
             | Result.Error message -> failtestf "Expected load success but got %s" message
             | Result.Ok state ->
                 let savedYaml = saveFromEditorForPath state copyWorkflowPath
-                Expect.isTrue (savedYaml.Contains "run: ../wf/tools/echo.cwl") "Save-as copy should rewrite run path relative to new workflow location"
-                Expect.isFalse (savedYaml.Contains "class: CommandLineTool") "Save-as copy should not inline resolved run object"
+
+                Expect.isTrue
+                    (savedYaml.Contains "run: ../wf/tools/echo.cwl")
+                    "Save-as copy should rewrite run path relative to new workflow location"
+
+                Expect.isFalse
+                    (savedYaml.Contains "class: CommandLineTool")
+                    "Save-as copy should not inline resolved run object"
         }
 
     ]
@@ -409,7 +456,7 @@ let editorMutationHelperTests =
             let source = CWLInput("original")
             source.Type_ <- Some CWLType.String
             source.Optional <- Some true
-            source.InputBinding <- Some (InputBinding.create(prefix = "--in", position = 1))
+            source.InputBinding <- Some(InputBinding.create (prefix = "--in", position = 1))
             source.SetProperty("doc", "input docs")
 
             let cloned = cloneInputWithName source "renamed"
@@ -418,7 +465,12 @@ let editorMutationHelperTests =
             Expect.equal cloned.Type_ source.Type_ "Clone should preserve type"
             Expect.equal cloned.Optional source.Optional "Clone should preserve optional flag"
             Expect.equal cloned.InputBinding source.InputBinding "Clone should preserve input binding"
-            Expect.equal (cloned.GetPropertyValue("doc").ToString()) "input docs" "Clone should preserve custom properties"
+
+            Expect.equal
+                (cloned.GetPropertyValue("doc").ToString())
+                "input docs"
+                "Clone should preserve custom properties"
+
             Expect.notEqual cloned.Name source.Name "Clone rename must not mutate source"
         }
 
@@ -435,14 +487,18 @@ let editorMutationHelperTests =
 
             Expect.equal cloned.Name "renamed" "Clone should keep constructor-based renamed input key"
             Expect.isFalse hasShadowName "Clone should not carry a dynamic name shadow property"
-            Expect.equal (cloned.GetPropertyValue("doc").ToString()) "input docs" "Clone should still preserve non-name custom properties"
+
+            Expect.equal
+                (cloned.GetPropertyValue("doc").ToString())
+                "input docs"
+                "Clone should still preserve non-name custom properties"
         }
 
         test "cloneOutputWithName preserves fields and custom properties" {
             let source = CWLOutput("original")
-            source.Type_ <- Some (CWLType.file ())
-            source.OutputSource <- Some (OutputSource.Single "step/out")
-            source.OutputBinding <- Some (OutputBinding.create(glob = "*.txt"))
+            source.Type_ <- Some(CWLType.file ())
+            source.OutputSource <- Some(OutputSource.Single "step/out")
+            source.OutputBinding <- Some(OutputBinding.create (glob = "*.txt"))
             source.SetProperty("label", "report output")
 
             let cloned = cloneOutputWithName source "renamed"
@@ -451,7 +507,12 @@ let editorMutationHelperTests =
             Expect.equal cloned.Type_ source.Type_ "Clone should preserve type"
             Expect.equal cloned.OutputSource source.OutputSource "Clone should preserve outputSource"
             Expect.equal cloned.OutputBinding source.OutputBinding "Clone should preserve outputBinding"
-            Expect.equal (cloned.GetPropertyValue("label").ToString()) "report output" "Clone should preserve custom properties"
+
+            Expect.equal
+                (cloned.GetPropertyValue("label").ToString())
+                "report output"
+                "Clone should preserve custom properties"
+
             Expect.notEqual cloned.Name source.Name "Clone rename must not mutate source"
         }
 
@@ -468,7 +529,11 @@ let editorMutationHelperTests =
 
             Expect.equal cloned.Name "renamed" "Clone should keep constructor-based renamed output key"
             Expect.isFalse hasShadowName "Clone should not carry a dynamic name shadow property"
-            Expect.equal (cloned.GetPropertyValue("label").ToString()) "report output" "Clone should still preserve non-name custom properties"
+
+            Expect.equal
+                (cloned.GetPropertyValue("label").ToString())
+                "report output"
+                "Clone should still preserve non-name custom properties"
         }
     ]
 
@@ -498,12 +563,20 @@ let commandLineToolMutationTests =
             let tool = CWLToolDescription(ResizeArray())
             setRequirementEnabled tool "docker" true
             let reqs = tool.Requirements |> Option.defaultValue (ResizeArray())
-            let dockerCount = reqs |> Seq.filter (fun req -> requirementKey req = Some "docker") |> Seq.length
+
+            let dockerCount =
+                reqs |> Seq.filter (fun req -> requirementKey req = Some "docker") |> Seq.length
+
             Expect.equal dockerCount 1 "Docker requirement should be present once"
 
             setRequirementEnabled tool "docker" false
             let afterDisable = tool.Requirements |> Option.defaultValue (ResizeArray())
-            let dockerAfterDisable = afterDisable |> Seq.filter (fun req -> requirementKey req = Some "docker") |> Seq.length
+
+            let dockerAfterDisable =
+                afterDisable
+                |> Seq.filter (fun req -> requirementKey req = Some "docker")
+                |> Seq.length
+
             Expect.equal dockerAfterDisable 0 "Docker requirement should be removed"
         }
 
@@ -516,13 +589,20 @@ let commandLineToolMutationTests =
             let inlineJavascript =
                 tool.Requirements
                 |> Option.defaultValue (ResizeArray())
-                |> Seq.tryPick (function
+                |> Seq.tryPick (
+                    function
                     | Requirement.InlineJavascriptRequirement value -> Some value
-                    | _ -> None)
+                    | _ -> None
+                )
                 |> Option.defaultWith (fun () -> failwith "InlineJavascriptRequirement should exist")
 
-            let expressionLib = inlineJavascript.ExpressionLib |> Option.defaultValue (ResizeArray())
-            Expect.sequenceEqual expressionLib [ "lib/a.js"; "lib/b.js" ] "Expression library entries should be parsed and stored"
+            let expressionLib =
+                inlineJavascript.ExpressionLib |> Option.defaultValue (ResizeArray())
+
+            Expect.sequenceEqual
+                expressionLib
+                [ "lib/a.js"; "lib/b.js" ]
+                "Expression library entries should be parsed and stored"
 
             setRequirementEnabled tool "load-listing" true
             setRequirementField tool "load-listing" "loadListing" "deep_listing"
@@ -530,9 +610,11 @@ let commandLineToolMutationTests =
             let loadListing =
                 tool.Requirements
                 |> Option.defaultValue (ResizeArray())
-                |> Seq.tryPick (function
+                |> Seq.tryPick (
+                    function
                     | Requirement.LoadListingRequirement value -> Some value.LoadListing
-                    | _ -> None)
+                    | _ -> None
+                )
                 |> Option.defaultWith (fun () -> failwith "LoadListingRequirement should exist")
 
             Expect.equal loadListing LoadListingEnum.DeepListing "loadListing should be updated via enum value"
@@ -544,9 +626,11 @@ let commandLineToolMutationTests =
             let expressionTimeLimit =
                 tool.Requirements
                 |> Option.defaultValue (ResizeArray())
-                |> Seq.tryPick (function
-                    | Requirement.ToolTimeLimitRequirement (ToolTimeLimitExpression expression) -> Some expression
-                    | _ -> None)
+                |> Seq.tryPick (
+                    function
+                    | Requirement.ToolTimeLimitRequirement(ToolTimeLimitExpression expression) -> Some expression
+                    | _ -> None
+                )
 
             Expect.equal expressionTimeLimit (Some "$(inputs.timeout)") "ToolTimeLimit should switch to expression mode"
 
@@ -556,9 +640,11 @@ let commandLineToolMutationTests =
             let secondsTimeLimit =
                 tool.Requirements
                 |> Option.defaultValue (ResizeArray())
-                |> Seq.tryPick (function
-                    | Requirement.ToolTimeLimitRequirement (ToolTimeLimitSeconds seconds) -> Some seconds
-                    | _ -> None)
+                |> Seq.tryPick (
+                    function
+                    | Requirement.ToolTimeLimitRequirement(ToolTimeLimitSeconds seconds) -> Some seconds
+                    | _ -> None
+                )
 
             Expect.equal secondsTimeLimit (Some 42L) "ToolTimeLimit should switch back to numeric seconds"
 
@@ -569,13 +655,19 @@ let commandLineToolMutationTests =
             let resource =
                 tool.Requirements
                 |> Option.defaultValue (ResizeArray())
-                |> Seq.tryPick (function
+                |> Seq.tryPick (
+                    function
                     | Requirement.ResourceRequirement value -> Some value
-                    | _ -> None)
+                    | _ -> None
+                )
                 |> Option.defaultWith (fun () -> failwith "ResourceRequirement should exist")
 
             Expect.equal (resource.TryGetInt64("coresMin")) (Some 2L) "Resource coresMin should parse as integer"
-            Expect.equal (resource.TryGetExpression("coresMax")) (Some "$(inputs.max_cores)") "Resource coresMax should preserve expression value"
+
+            Expect.equal
+                (resource.TryGetExpression("coresMax"))
+                (Some "$(inputs.max_cores)")
+                "Resource coresMax should preserve expression value"
 
             setRequirementEnabled tool "schema-def" true
             setRequirementField tool "schema-def" "schema.add" ""
@@ -585,13 +677,16 @@ let commandLineToolMutationTests =
             let schemaTypes =
                 tool.Requirements
                 |> Option.defaultValue (ResizeArray())
-                |> Seq.tryPick (function
+                |> Seq.tryPick (
+                    function
                     | Requirement.SchemaDefRequirement values -> Some values
-                    | _ -> None)
+                    | _ -> None
+                )
                 |> Option.defaultWith (fun () -> failwith "SchemaDefRequirement should exist")
 
             Expect.equal schemaTypes.Count 1 "SchemaDef should contain one type entry"
             Expect.equal schemaTypes.[0].Name "SampleType" "Schema type name should be editable"
+
             match schemaTypes.[0].Type_ with
             | CWLType.Int -> ()
             | _ -> failtest "Schema type should update to int"
@@ -605,15 +700,25 @@ let commandLineToolMutationTests =
             let softwarePackages =
                 tool.Requirements
                 |> Option.defaultValue (ResizeArray())
-                |> Seq.tryPick (function
+                |> Seq.tryPick (
+                    function
                     | Requirement.SoftwareRequirement values -> Some values
-                    | _ -> None)
+                    | _ -> None
+                )
                 |> Option.defaultWith (fun () -> failwith "SoftwareRequirement should exist")
 
             Expect.equal softwarePackages.Count 1 "SoftwareRequirement should contain one package entry"
             Expect.equal softwarePackages.[0].Package "samtools" "Software package name should be editable"
-            Expect.sequenceEqual (softwarePackages.[0].Version |> Option.defaultValue (ResizeArray())) [ "1.18"; "1.19" ] "Software versions should parse from textarea input"
-            Expect.sequenceEqual (softwarePackages.[0].Specs |> Option.defaultValue (ResizeArray())) [ "https://example.org/spec" ] "Software specs should parse from textarea input"
+
+            Expect.sequenceEqual
+                (softwarePackages.[0].Version |> Option.defaultValue (ResizeArray()))
+                [ "1.18"; "1.19" ]
+                "Software versions should parse from textarea input"
+
+            Expect.sequenceEqual
+                (softwarePackages.[0].Specs |> Option.defaultValue (ResizeArray()))
+                [ "https://example.org/spec" ]
+                "Software specs should parse from textarea input"
 
             setRequirementEnabled tool "env-vars" true
             setRequirementField tool "env-vars" "env.add" ""
@@ -623,9 +728,11 @@ let commandLineToolMutationTests =
             let envVars =
                 tool.Requirements
                 |> Option.defaultValue (ResizeArray())
-                |> Seq.tryPick (function
+                |> Seq.tryPick (
+                    function
                     | Requirement.EnvVarRequirement values -> Some values
-                    | _ -> None)
+                    | _ -> None
+                )
                 |> Option.defaultWith (fun () -> failwith "EnvVarRequirement should exist")
 
             Expect.equal envVars.Count 1 "EnvVarRequirement should contain one env var entry"
@@ -653,42 +760,62 @@ let commandLineToolMutationTests =
             let listing =
                 tool.Requirements
                 |> Option.defaultValue (ResizeArray())
-                |> Seq.tryPick (function
+                |> Seq.tryPick (
+                    function
                     | Requirement.InitialWorkDirRequirement values -> Some values
-                    | _ -> None)
+                    | _ -> None
+                )
                 |> Option.defaultWith (fun () -> failwith "InitialWorkDirRequirement should exist")
 
             Expect.equal listing.Count 4 "InitialWorkDir should contain four entries"
+
             match listing.[0] with
-            | StringEntry (SchemaSaladString.Literal text) -> Expect.equal text "config.txt" "String entry should be editable"
+            | StringEntry(SchemaSaladString.Literal text) ->
+                Expect.equal text "config.txt" "String entry should be editable"
             | _ -> failtest "Expected first InitialWorkDir entry to be a string literal"
+
             match listing.[1] with
             | DirentEntry dirent ->
                 match dirent.Entry with
                 | SchemaSaladString.Import "config/template.json" -> ()
                 | _ -> failtest "Dirent entry should preserve schema-salad mode"
+
                 match dirent.Entryname with
-                | Some (SchemaSaladString.Include "rendered.json") -> ()
+                | Some(SchemaSaladString.Include "rendered.json") -> ()
                 | _ -> failtest "Dirent entryname should preserve schema-salad mode"
+
                 Expect.equal dirent.Writable (Some true) "Dirent writable should be editable"
             | _ -> failtest "Expected second InitialWorkDir entry to be a Dirent entry"
+
             match listing.[2] with
-            | FileEntry file -> Expect.equal (string (file.GetPropertyValue("location"))) "file:///tmp/data.txt" "File entry should store location"
+            | FileEntry file ->
+                Expect.equal
+                    (string (file.GetPropertyValue("location")))
+                    "file:///tmp/data.txt"
+                    "File entry should store location"
             | _ -> failtest "Expected third InitialWorkDir entry to be a File entry"
 
             let dockerRequirement =
                 tool.Requirements
                 |> Option.defaultValue (ResizeArray())
-                |> Seq.tryPick (function
+                |> Seq.tryPick (
+                    function
                     | Requirement.DockerRequirement value -> Some value
-                    | _ -> None)
+                    | _ -> None
+                )
                 |> Option.defaultWith (fun () -> failwith "DockerRequirement should exist")
 
             match dockerRequirement.DockerFile with
-            | Some (SchemaSaladString.Include "docker/Dockerfile") -> ()
+            | Some(SchemaSaladString.Include "docker/Dockerfile") -> ()
             | _ -> failtest "Docker dockerFile mode should be editable"
-            let dockerRunOptions = dockerRequirement.DockerRunOptions |> Option.defaultValue (ResizeArray())
-            Expect.sequenceEqual dockerRunOptions [ "--rm"; "--network=host" ] "Docker dockerRunOptions should be editable"
+
+            let dockerRunOptions =
+                dockerRequirement.DockerRunOptions |> Option.defaultValue (ResizeArray())
+
+            Expect.sequenceEqual
+                dockerRunOptions
+                [ "--rm"; "--network=host" ]
+                "Docker dockerRunOptions should be editable"
         }
 
         test "setHintField updates known hint payloads" {
@@ -699,9 +826,11 @@ let commandLineToolMutationTests =
             let hintLoadListing =
                 tool.Hints
                 |> Option.defaultValue (ResizeArray())
-                |> Seq.tryPick (function
-                    | KnownHint (Requirement.LoadListingRequirement value) -> Some value.LoadListing
-                    | _ -> None)
+                |> Seq.tryPick (
+                    function
+                    | KnownHint(Requirement.LoadListingRequirement value) -> Some value.LoadListing
+                    | _ -> None
+                )
 
             Expect.equal hintLoadListing (Some LoadListingEnum.ShallowListing) "Known hint payload should be editable"
         }
@@ -754,15 +883,14 @@ let workflowMutationTests =
 
             let step = workflow.Steps.[stepIndex]
             Expect.equal step.Id "quality_check" "Step id should be updated"
+
             match step.Run with
-            | WorkflowStepRun.RunString runTarget ->
-                Expect.equal runTarget "qc.cwl" "Step run should be updated"
-            | _ ->
-                failtest "Expected run target to stay a run string"
+            | WorkflowStepRun.RunString runTarget -> Expect.equal runTarget "qc.cwl" "Step run should be updated"
+            | _ -> failtest "Expected run target to stay a run string"
 
             let inputSource =
-                step.In.[stepInputIndex].Source
-                |> Option.defaultValue (ResizeArray())
+                step.In.[stepInputIndex].Source |> Option.defaultValue (ResizeArray())
+
             Expect.sequenceEqual inputSource [ "input_reads" ] "Step input source should be updated"
             Expect.equal (step.Out.[stepOutputIndex] |> stepOutputId) "qc_report" "Step output id should be updated"
         }
@@ -770,19 +898,23 @@ let workflowMutationTests =
         test "workflow requirements toggle deterministically" {
             let workflow = CWLWorkflowDescription(ResizeArray(), ResizeArray(), ResizeArray())
             setWorkflowRequirementEnabled workflow "docker" true
+
             let reqKeys =
                 workflow.Requirements
                 |> Option.defaultValue (ResizeArray())
                 |> Seq.choose requirementKey
                 |> Set.ofSeq
+
             Expect.isTrue (reqKeys.Contains "docker") "Docker requirement should be present"
 
             setWorkflowRequirementEnabled workflow "docker" false
+
             let reqKeysAfterDisable =
                 workflow.Requirements
                 |> Option.defaultValue (ResizeArray())
                 |> Seq.choose requirementKey
                 |> Set.ofSeq
+
             Expect.isFalse (reqKeysAfterDisable.Contains "docker") "Docker requirement should be removed"
         }
 
@@ -795,7 +927,10 @@ let workflowMutationTests =
             setWorkflowStepIdAt workflow.Steps -1 "bad_index"
             setWorkflowStepIdAt workflow.Steps 999 "bad_index"
 
-            Expect.equal workflow.Steps.[stepIndex].Id "initial_id" "Whitespace and invalid-index updates should not change step id"
+            Expect.equal
+                workflow.Steps.[stepIndex].Id
+                "initial_id"
+                "Whitespace and invalid-index updates should not change step id"
         }
 
         test "step move operations clamp at list boundaries" {
@@ -808,13 +943,16 @@ let workflowMutationTests =
             let moveFirstUp = moveWorkflowStepUp (Some 0) workflow.Steps
             Expect.equal moveFirstUp (Some 0) "Moving first step up should keep index"
 
-            let moveLastDown = moveWorkflowStepDown (Some (workflow.Steps.Count - 1)) workflow.Steps
-            Expect.equal moveLastDown (Some (workflow.Steps.Count - 1)) "Moving last step down should keep index"
+            let moveLastDown =
+                moveWorkflowStepDown (Some(workflow.Steps.Count - 1)) workflow.Steps
+
+            Expect.equal moveLastDown (Some(workflow.Steps.Count - 1)) "Moving last step down should keep index"
         }
 
         test "step input source parsing trims entries and removes empty tokens" {
             let workflow = CWLWorkflowDescription(ResizeArray(), ResizeArray(), ResizeArray())
             let stepIndex = addWorkflowStep workflow
+
             let stepInputIndex =
                 match addWorkflowStepInputAt workflow.Steps stepIndex with
                 | Some index -> index
@@ -825,13 +963,18 @@ let workflowMutationTests =
             let parsed =
                 workflow.Steps.[stepIndex].In.[stepInputIndex].Source
                 |> Option.defaultValue (ResizeArray())
+
             Expect.sequenceEqual parsed [ "reads"; "step1/out" ] "Source parser should trim and drop empty items"
         }
 
         test "inline run target is preserved when user attempts text overwrite" {
             let inlineTool = CWLToolDescription(ResizeArray())
-            let step = WorkflowStep("step_inline", ResizeArray(), ResizeArray(), WorkflowStepRunOps.fromTool inlineTool)
-            let workflow = CWLWorkflowDescription(ResizeArray [| step |], ResizeArray(), ResizeArray())
+
+            let step =
+                WorkflowStep("step_inline", ResizeArray(), ResizeArray(), WorkflowStepRunOps.fromTool inlineTool)
+
+            let workflow =
+                CWLWorkflowDescription(ResizeArray [| step |], ResizeArray(), ResizeArray())
 
             setWorkflowStepRunAt workflow.Steps 0 "should_not_replace_inline"
 
@@ -841,23 +984,32 @@ let workflowMutationTests =
         }
 
         test "step run-kind mutation can switch between string and inline variants" {
-            let step = WorkflowStep.fromRunPath("step1", ResizeArray(), ResizeArray(), "tool.cwl")
-            let workflow = CWLWorkflowDescription(ResizeArray [| step |], ResizeArray(), ResizeArray())
+            let step =
+                WorkflowStep.fromRunPath ("step1", ResizeArray(), ResizeArray(), "tool.cwl")
+
+            let workflow =
+                CWLWorkflowDescription(ResizeArray [| step |], ResizeArray(), ResizeArray())
 
             setWorkflowStepRunKindAt workflow.Steps 0 RunWorkflowKind
+
             match workflow.Steps.[0].Run with
             | WorkflowStepRun.RunWorkflow _ -> ()
             | _ -> failtest "Run kind should switch to inline workflow"
 
             setWorkflowStepRunKindAt workflow.Steps 0 RunOperationKind
+
             match workflow.Steps.[0].Run with
             | WorkflowStepRun.RunOperation _ -> ()
             | _ -> failtest "Run kind should switch to inline operation"
 
             setWorkflowStepRunKindAt workflow.Steps 0 RunStringKind
+
             match workflow.Steps.[0].Run with
             | WorkflowStepRun.RunString runTarget ->
-                Expect.equal runTarget "tool.cwl" "Switching back to string should preserve existing run target when available"
+                Expect.equal
+                    runTarget
+                    "tool.cwl"
+                    "Switching back to string should preserve existing run target when available"
             | _ -> failtest "Run kind should switch back to run-string"
         }
     ]
@@ -876,9 +1028,17 @@ let expressionToolMutationTests =
             setExpressionText expressionTool "${ return { out: inputs.sample }; }"
             setExpressionRequirementEnabled expressionTool "inline-javascript" true
 
-            let yaml = expressionTool |> CWLProcessingUnit.ExpressionTool |> Encode.encodeProcessingUnit
+            let yaml =
+                expressionTool
+                |> CWLProcessingUnit.ExpressionTool
+                |> Encode.encodeProcessingUnit
+
             Expect.isTrue (yaml.Contains "sample") "Encoded yaml should include renamed input"
-            Expect.isTrue (yaml.Contains "InlineJavascriptRequirement") "Encoded yaml should include InlineJavascriptRequirement"
+
+            Expect.isTrue
+                (yaml.Contains "InlineJavascriptRequirement")
+                "Encoded yaml should include InlineJavascriptRequirement"
+
             Expect.isTrue (yaml.Contains "expression") "Encoded yaml should include expression field"
         }
     ]
@@ -886,9 +1046,10 @@ let expressionToolMutationTests =
 let workflowCanvasAdapterTests =
     testList "Workflow canvas adapter" [
         test "sourcePorts and targetPorts expose workflow endpoints for canvas selection" {
-            let stepInput = StepInput.create("reads")
+            let stepInput = StepInput.create ("reads")
+
             let step =
-                WorkflowStep.fromRunPath(
+                WorkflowStep.fromRunPath (
                     "qc",
                     ResizeArray [| stepInput |],
                     ResizeArray [| StepOutput.StepOutputString "report" |],
@@ -935,14 +1096,25 @@ let workflowCanvasAdapterTests =
         test "addConnection and removeConnection mutate graph edge set safely" {
             let workflow = CWLWorkflowDescription(ResizeArray(), ResizeArray(), ResizeArray())
             workflow.Inputs.Add(CWLInput("reads"))
-            let step = WorkflowStep.fromRunPath("qc", ResizeArray [| StepInput.create("reads") |], ResizeArray [| StepOutput.StepOutputString "report" |], "qc.cwl")
+
+            let step =
+                WorkflowStep.fromRunPath (
+                    "qc",
+                    ResizeArray [| StepInput.create ("reads") |],
+                    ResizeArray [| StepOutput.StepOutputString "report" |],
+                    "qc.cwl"
+                )
+
             workflow.Steps.Add(step)
             workflow.Outputs.Add(CWLOutput("final"))
 
             let graph = toCanvasGraph workflow
 
-            let firstAdd = addConnection graph WorkflowInputSourceNodeId "reads" "step:qc" "reads"
-            let duplicateAdd = addConnection graph WorkflowInputSourceNodeId "reads" "step:qc" "reads"
+            let firstAdd =
+                addConnection graph WorkflowInputSourceNodeId "reads" "step:qc" "reads"
+
+            let duplicateAdd =
+                addConnection graph WorkflowInputSourceNodeId "reads" "step:qc" "reads"
 
             Expect.isTrue firstAdd "Valid edge should be addable"
             Expect.isFalse duplicateAdd "Duplicate edge should be ignored"
@@ -959,31 +1131,65 @@ let workflowCanvasAdapterTests =
         }
 
         test "toCanvasGraph maps workflow inputs, steps, outputs and links" {
-            let stepInput = StepInput.create("message", source = ResizeArray [| "message" |])
-            let step = WorkflowStep.fromRunPath("step1", ResizeArray [| stepInput |], ResizeArray [| StepOutput.StepOutputString "out" |], "tool.cwl")
+            let stepInput = StepInput.create ("message", source = ResizeArray [| "message" |])
+
+            let step =
+                WorkflowStep.fromRunPath (
+                    "step1",
+                    ResizeArray [| stepInput |],
+                    ResizeArray [| StepOutput.StepOutputString "out" |],
+                    "tool.cwl"
+                )
+
             let wfOutput = CWLOutput("final", outputSource = OutputSource.Single "step1/out")
-            let workflow = CWLWorkflowDescription(ResizeArray [| step |], ResizeArray [| CWLInput("message") |], ResizeArray [| wfOutput |])
+
+            let workflow =
+                CWLWorkflowDescription(
+                    ResizeArray [| step |],
+                    ResizeArray [| CWLInput("message") |],
+                    ResizeArray [| wfOutput |]
+                )
 
             let graph = toCanvasGraph workflow
 
-            Expect.isTrue (graph.Nodes |> Seq.exists (fun n -> n.Id = WorkflowInputSourceNodeId)) "Input node should exist"
-            Expect.isTrue (graph.Nodes |> Seq.exists (fun n -> n.Id = "step:step1")) "Step node should exist"
-            Expect.isTrue (graph.Nodes |> Seq.exists (fun n -> n.Id = WorkflowOutputSinkNodeId)) "Workflow output sink node should exist"
-            Expect.isTrue (graph.Edges |> Seq.exists (fun e -> e.Kind = InputToStep && e.TargetNodeId = "step:step1")) "Input -> step edge should exist"
-            Expect.isTrue (graph.Edges |> Seq.exists (fun e -> e.Kind = StepToOutput && e.TargetNodeId = WorkflowOutputSinkNodeId)) "Step -> output edge should exist"
+            Expect.isTrue
+                (graph.Nodes |> Seq.exists (fun n -> n.Id = WorkflowInputSourceNodeId))
+                "Input node should exist"
 
-            let outIds =
-                step.Out
-                |> Seq.map stepOutputId
-                |> ResizeArray
+            Expect.isTrue (graph.Nodes |> Seq.exists (fun n -> n.Id = "step:step1")) "Step node should exist"
+
+            Expect.isTrue
+                (graph.Nodes |> Seq.exists (fun n -> n.Id = WorkflowOutputSinkNodeId))
+                "Workflow output sink node should exist"
+
+            Expect.isTrue
+                (graph.Edges
+                 |> Seq.exists (fun e -> e.Kind = InputToStep && e.TargetNodeId = "step:step1"))
+                "Input -> step edge should exist"
+
+            Expect.isTrue
+                (graph.Edges
+                 |> Seq.exists (fun e -> e.Kind = StepToOutput && e.TargetNodeId = WorkflowOutputSinkNodeId))
+                "Step -> output edge should exist"
+
+            let outIds = step.Out |> Seq.map stepOutputId |> ResizeArray
             Expect.sequenceEqual outIds [ "out" ] "Step output ids should be extractable from step.Out"
         }
 
         test "toCanvasGraph uses a single workflow output sink node for multiple outputs" {
-            let step = WorkflowStep.fromRunPath("step1", ResizeArray(), ResizeArray [| StepOutput.StepOutputString "out" |], "tool.cwl")
+            let step =
+                WorkflowStep.fromRunPath (
+                    "step1",
+                    ResizeArray(),
+                    ResizeArray [| StepOutput.StepOutputString "out" |],
+                    "tool.cwl"
+                )
+
             let wfOutputA = CWLOutput("finalA", outputSource = OutputSource.Single "step1/out")
             let wfOutputB = CWLOutput("finalB", outputSource = OutputSource.Single "step1/out")
-            let workflow = CWLWorkflowDescription(ResizeArray [| step |], ResizeArray(), ResizeArray [| wfOutputA; wfOutputB |])
+
+            let workflow =
+                CWLWorkflowDescription(ResizeArray [| step |], ResizeArray(), ResizeArray [| wfOutputA; wfOutputB |])
 
             let graph = toCanvasGraph workflow
 
@@ -1002,32 +1208,67 @@ let workflowCanvasAdapterTests =
         }
 
         test "applyConnections writes edge changes back into workflow" {
-            let stepInput = StepInput.create("message", source = ResizeArray [| "message" |])
-            let step = WorkflowStep.fromRunPath("step1", ResizeArray [| stepInput |], ResizeArray [| StepOutput.StepOutputString "out" |], "tool.cwl")
+            let stepInput = StepInput.create ("message", source = ResizeArray [| "message" |])
+
+            let step =
+                WorkflowStep.fromRunPath (
+                    "step1",
+                    ResizeArray [| stepInput |],
+                    ResizeArray [| StepOutput.StepOutputString "out" |],
+                    "tool.cwl"
+                )
+
             let wfOutput = CWLOutput("final", outputSource = OutputSource.Single "step1/out")
-            let workflow = CWLWorkflowDescription(ResizeArray [| step |], ResizeArray [| CWLInput("message") |], ResizeArray [| wfOutput |])
+
+            let workflow =
+                CWLWorkflowDescription(
+                    ResizeArray [| step |],
+                    ResizeArray [| CWLInput("message") |],
+                    ResizeArray [| wfOutput |]
+                )
 
             let graph = toCanvasGraph workflow
             graph.Edges.Clear()
-            graph.Edges.Add({
-                Id = $"edge:{WorkflowInputSourceNodeId}/message->{WorkflowOutputSinkNodeId}/final"
-                Kind = InputToOutput
-                SourceNodeId = WorkflowInputSourceNodeId
-                SourcePortId = "message"
-                TargetNodeId = WorkflowOutputSinkNodeId
-                TargetPortId = "final"
-                SourceReference = None
-            })
+
+            graph.Edges.Add(
+                {
+                    Id = $"edge:{WorkflowInputSourceNodeId}/message->{WorkflowOutputSinkNodeId}/final"
+                    Kind = InputToOutput
+                    SourceNodeId = WorkflowInputSourceNodeId
+                    SourcePortId = "message"
+                    TargetNodeId = WorkflowOutputSinkNodeId
+                    TargetPortId = "final"
+                    SourceReference = None
+                }
+            )
 
             applyConnections graph workflow
-            Expect.equal workflow.Outputs.[0].OutputSource (Some (OutputSource.Single "message")) "OutputSource should be updated from graph edge"
+
+            Expect.equal
+                workflow.Outputs.[0].OutputSource
+                (Some(OutputSource.Single "message"))
+                "OutputSource should be updated from graph edge"
         }
 
         test "applyConnections preserves source reference formatting for unchanged graph edges" {
-            let stepInput = StepInput.create("message", source = ResizeArray [| "#message" |])
-            let step = WorkflowStep.fromRunPath("step1", ResizeArray [| stepInput |], ResizeArray [| StepOutput.StepOutputString "out" |], "tool.cwl")
+            let stepInput = StepInput.create ("message", source = ResizeArray [| "#message" |])
+
+            let step =
+                WorkflowStep.fromRunPath (
+                    "step1",
+                    ResizeArray [| stepInput |],
+                    ResizeArray [| StepOutput.StepOutputString "out" |],
+                    "tool.cwl"
+                )
+
             let wfOutput = CWLOutput("final", outputSource = OutputSource.Single "#step1/out")
-            let workflow = CWLWorkflowDescription(ResizeArray [| step |], ResizeArray [| CWLInput("message") |], ResizeArray [| wfOutput |])
+
+            let workflow =
+                CWLWorkflowDescription(
+                    ResizeArray [| step |],
+                    ResizeArray [| CWLInput("message") |],
+                    ResizeArray [| wfOutput |]
+                )
 
             let graph = toCanvasGraph workflow
             applyConnections graph workflow
@@ -1035,14 +1276,21 @@ let workflowCanvasAdapterTests =
             let normalizedInputSources =
                 workflow.Steps.[0].In.[0].Source |> Option.defaultValue (ResizeArray())
 
-            Expect.sequenceEqual normalizedInputSources [ "#message" ] "Step input source formatting should be preserved"
-            Expect.equal workflow.Outputs.[0].OutputSource (Some (OutputSource.Single "#step1/out")) "Workflow output source formatting should be preserved"
+            Expect.sequenceEqual
+                normalizedInputSources
+                [ "#message" ]
+                "Step input source formatting should be preserved"
+
+            Expect.equal
+                workflow.Outputs.[0].OutputSource
+                (Some(OutputSource.Single "#step1/out"))
+                "Workflow output source formatting should be preserved"
         }
 
         test "applyConnections infers workflow output type from connected step output" {
             let tool = CWLToolDescription(ResizeArray())
             let dbFolderOutput = CWLOutput("dbFolder")
-            dbFolderOutput.Type_ <- Some (CWLType.directory ())
+            dbFolderOutput.Type_ <- Some(CWLType.directory ())
             tool.Outputs <- ResizeArray [| dbFolderOutput |]
 
             let step =
@@ -1053,12 +1301,14 @@ let workflowCanvasAdapterTests =
                     WorkflowStepRunOps.fromTool tool
                 )
 
-            let workflow = CWLWorkflowDescription(ResizeArray [| step |], ResizeArray(), ResizeArray())
+            let workflow =
+                CWLWorkflowDescription(ResizeArray [| step |], ResizeArray(), ResizeArray())
 
             let outputIndex = addWorkflowOutput workflow
             let outputName = workflow.Outputs.[outputIndex].Name
 
             let graph = toCanvasGraph workflow
+
             let connectionAdded =
                 addConnection graph "step:PeptideDB" "dbFolder" WorkflowOutputSinkNodeId outputName
 
@@ -1067,32 +1317,66 @@ let workflowCanvasAdapterTests =
             applyConnections graph workflow
 
             match workflow.Outputs.[outputIndex].Type_ with
-            | Some (CWLType.Directory _) -> ()
+            | Some(CWLType.Directory _) -> ()
             | _ -> failtest "Connected workflow output should inherit Directory type from source step output"
         }
 
         test "toCanvasGraph/applyConnections preserves OutputSource.Multiple" {
-            let stepA = WorkflowStep.fromRunPath("stepA", ResizeArray(), ResizeArray [| StepOutput.StepOutputString "outA" |], "a.cwl")
-            let stepB = WorkflowStep.fromRunPath("stepB", ResizeArray(), ResizeArray [| StepOutput.StepOutputString "outB" |], "b.cwl")
+            let stepA =
+                WorkflowStep.fromRunPath (
+                    "stepA",
+                    ResizeArray(),
+                    ResizeArray [| StepOutput.StepOutputString "outA" |],
+                    "a.cwl"
+                )
+
+            let stepB =
+                WorkflowStep.fromRunPath (
+                    "stepB",
+                    ResizeArray(),
+                    ResizeArray [| StepOutput.StepOutputString "outB" |],
+                    "b.cwl"
+                )
+
             let multipleSources = ResizeArray [| "stepA/outA"; "stepB/outB" |]
-            let wfOutput = CWLOutput("final", outputSource = OutputSource.Multiple multipleSources)
-            let workflow = CWLWorkflowDescription(ResizeArray [| stepA; stepB |], ResizeArray(), ResizeArray [| wfOutput |])
+
+            let wfOutput =
+                CWLOutput("final", outputSource = OutputSource.Multiple multipleSources)
+
+            let workflow =
+                CWLWorkflowDescription(ResizeArray [| stepA; stepB |], ResizeArray(), ResizeArray [| wfOutput |])
 
             let graph = toCanvasGraph workflow
             applyConnections graph workflow
 
             match workflow.Outputs.[0].OutputSource with
-            | Some (OutputSource.Multiple values) ->
-                Expect.sequenceEqual values [ "stepA/outA"; "stepB/outB" ] "Multiple outputSource values should roundtrip through graph adapter"
-            | _ ->
-                failtest "Expected OutputSource.Multiple after graph roundtrip"
+            | Some(OutputSource.Multiple values) ->
+                Expect.sequenceEqual
+                    values
+                    [ "stepA/outA"; "stepB/outB" ]
+                    "Multiple outputSource values should roundtrip through graph adapter"
+            | _ -> failtest "Expected OutputSource.Multiple after graph roundtrip"
         }
 
         test "buildWorkflowGraphReadModel has no diagnostics for valid workflow wiring" {
-            let stepInput = StepInput.create("message", source = ResizeArray [| "message" |])
-            let step = WorkflowStep.fromRunPath("step1", ResizeArray [| stepInput |], ResizeArray [| StepOutput.StepOutputString "out" |], "tool.cwl")
+            let stepInput = StepInput.create ("message", source = ResizeArray [| "message" |])
+
+            let step =
+                WorkflowStep.fromRunPath (
+                    "step1",
+                    ResizeArray [| stepInput |],
+                    ResizeArray [| StepOutput.StepOutputString "out" |],
+                    "tool.cwl"
+                )
+
             let wfOutput = CWLOutput("final", outputSource = OutputSource.Single "step1/out")
-            let workflow = CWLWorkflowDescription(ResizeArray [| step |], ResizeArray [| CWLInput("message") |], ResizeArray [| wfOutput |])
+
+            let workflow =
+                CWLWorkflowDescription(
+                    ResizeArray [| step |],
+                    ResizeArray [| CWLInput("message") |],
+                    ResizeArray [| wfOutput |]
+                )
 
             let readModel = buildWorkflowGraphReadModel workflow None None
 
@@ -1102,9 +1386,19 @@ let workflowCanvasAdapterTests =
         }
 
         test "buildWorkflowGraphReadModel reports missing-reference diagnostics for invalid source links" {
-            let brokenInput = StepInput.create("reads", source = ResizeArray [| "missingStep/out" |])
-            let step = WorkflowStep.fromRunPath("qc", ResizeArray [| brokenInput |], ResizeArray [| StepOutput.StepOutputString "report" |], "qc.cwl")
-            let workflow = CWLWorkflowDescription(ResizeArray [| step |], ResizeArray [| CWLInput("reads") |], ResizeArray())
+            let brokenInput =
+                StepInput.create ("reads", source = ResizeArray [| "missingStep/out" |])
+
+            let step =
+                WorkflowStep.fromRunPath (
+                    "qc",
+                    ResizeArray [| brokenInput |],
+                    ResizeArray [| StepOutput.StepOutputString "report" |],
+                    "qc.cwl"
+                )
+
+            let workflow =
+                CWLWorkflowDescription(ResizeArray [| step |], ResizeArray [| CWLInput("reads") |], ResizeArray())
 
             let readModel = buildWorkflowGraphReadModel workflow None None
 
@@ -1117,7 +1411,7 @@ let workflowCanvasAdapterTests =
     ]
 
 let allTests =
-    testList "CWLBuilder" [
+    testList "Cwl" [
         roundtripTests
         goldenFixtureTests
         editorTests
