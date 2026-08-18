@@ -65,7 +65,6 @@ export { WidgetController, Entry as WidgetEntry } from './dist/Composite/Widgets
 export { default as ArcFileEditor } from './dist/Page/ArcFileEditor/ArcFileEditor.fs';
 export { default as ArcFileFooterTabs } from './dist/Page/ArcFileEditor/ArcFileFooterTabs.fs';
 export { default as EmptyTableView } from './dist/Page/ArcFileEditor/EmptyTableView/Main.fs';
-export { default as ARCObjectExplorer } from './dist/Page/ArcObjectExplorer/ARCObjectExplorer.fs';
 export { default as DataHubBrowser } from './dist/Page/DataHubBrowser/DataHubBrowser.fs';
 export { default as FileExplorer } from './dist/Page/FileExplorer/FileExplorer.fs';
 export { default as GitDiffViewer } from './dist/Page/GitComparison/GitDiffViewer.fs';
