@@ -323,6 +323,7 @@
     <Compile Include="Page\CwlEditor\UiHelpers.fs" />
     <Compile Include="Page\CwlEditor\EditorController.fs" />
     <Compile Include="Page\CwlEditor\LayoutEngine.fs" />
+    <Compile Include="Page\CwlEditor\ValidationPanel.fs" />
     
 
     <Compile Include="Style.fs" />
