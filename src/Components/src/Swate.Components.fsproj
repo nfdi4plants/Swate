@@ -320,6 +320,7 @@
     <Compile Include="Page\ArcObjectExplorer\GraphExplorer\GraphObjectExplorer.fs" />
     <Compile Include="Page\CwlEditor\Types.fs" />
     <Compile Include="Page\CwlEditor\Context.fs" />
+    <Compile Include="Page\CwlEditor\UiHelpers.fs" />
     
 
     <Compile Include="Style.fs" />
