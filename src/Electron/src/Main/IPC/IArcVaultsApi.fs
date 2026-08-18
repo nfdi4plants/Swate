@@ -539,7 +539,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                     finally
                                         vault.isBusyWriting <- wasBusyWriting
                             | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile _,
-                                                                                              normalizedGenericPath)
+                                                                                              normalizedDataMapPath) ->
+                                match vault.arc, DatamapParentInfo.tryFromPath normalizedDataMapPath with
+                                | None, _ -> return Error(exn "ARC is not loaded.")
+                                | _, None -> return Error(exn "Could not determine the DataMap parent from its path.")
+                                | Some _, Some parentInfo -> return! vault.DeleteDataMap parentInfo
                             | ArcEntityPathRules.DeletePathClassification.GenericTarget normalizedGenericPath
                             | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget(_,
                                                                                                   normalizedGenericPath) ->

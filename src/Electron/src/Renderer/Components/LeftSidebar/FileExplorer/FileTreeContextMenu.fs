@@ -20,6 +20,7 @@ type ContextMenuConfig = {
     openItem: FileItem -> unit
     arcRootPath: string option
     openCreateModal: ArcExplorerNodeKind -> unit
+    createDataMap: FileItem -> unit
     openFileSystemCreateModal: FileSystemItemKind -> FileItem -> unit
     requestRenameItem: FileItem -> unit
     requestDeleteItem: FileItem -> unit
@@ -153,6 +154,26 @@ let arcCreateContextMenuItems (openCreateModal: ArcExplorerNodeKind -> unit) (it
     else
         []
 
+let tryGetDataMapParentInfo (item: FileItem) =
+    if item.IsDirectory then
+        item.Path
+        |> Option.map (fun path -> ARCtrl.ArcPathHelper.combineMany [| path; DatamapParentInfo.DatamapFileName |])
+        |> Option.bind DatamapParentInfo.tryFromPath
+    else
+        None
+
+let dataMapCreateContextMenuItems (createDataMap: FileItem -> unit) (item: FileItem) =
+    let hasDataMap =
+        item.Children
+        |> Option.defaultValue []
+        |> List.exists (fun child -> child.Path |> Option.bind DatamapParentInfo.tryFromPath |> Option.isSome)
+
+    match tryGetDataMapParentInfo item with
+    | Some _ when not hasDataMap -> [
+        ContextMenuItem.create "Add DataMap" "swt:fluent--database-arrow-up-20-regular" (fun () -> createDataMap item)
+      ]
+    | _ -> []
+
 let fileSystemCreateContextMenuItems
     (openFileSystemCreateModal: FileSystemItemKind -> FileItem -> unit)
     (item: FileItem)
@@ -220,6 +241,7 @@ let createContextMenuItems (config: ContextMenuConfig) arcScopeId =
             openContextMenuItems config item
             copyPathContextMenuItems config.arcRootPath item
             fileSystemCreateContextMenuItems config.openFileSystemCreateModal item
+            dataMapCreateContextMenuItems config.createDataMap item
             Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems
                 item
                 toggleLfsMark

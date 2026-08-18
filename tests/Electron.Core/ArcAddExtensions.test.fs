@@ -90,6 +90,44 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "adds a parent-backed DataMap without replacing its assay",
+            fun () ->
+                withTempArc
+                    (fun arc -> arc.AddAssay(ArcAssay("DataMapAssay")))
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+                        let parentInfo = DatamapParentInfo.create "DataMapAssay" DataMapParent.Assay
+                        let vault = ArcVault(testWindow ())
+                        vault.path <- Some arcPath
+                        vault.SetArc arc
+
+                        match! vault.AddDataMap(parentInfo, DataMap.init ()) with
+                        | Error error -> failwith error.Message
+                        | Ok() -> ()
+
+                        Vitest.expect(arc.ContainsAssay("DataMapAssay")).toBe (true)
+                        Vitest.expect(arc.GetAssay("DataMapAssay").DataMap.IsSome).toBe (true)
+
+                        let dataMapPath = join [| arcPath; "assays"; "DataMapAssay"; "isa.datamap.xlsx" |]
+                        let assayPath = join [| arcPath; "assays"; "DataMapAssay"; "isa.assay.xlsx" |]
+                        let! dataMapExists = pathExistsAsync dataMapPath
+                        let! assayExists = pathExistsAsync assayPath
+                        Vitest.expect(dataMapExists).toBe (true)
+                        Vitest.expect(assayExists).toBe (true)
+
+                        let dataMapIsLoadedInFileTree =
+                            vault.fileTree.Values
+                            |> Seq.exists (fun entry -> PathHelpers.pathsEqual entry.path dataMapPath)
+
+                        Vitest.expect(dataMapIsLoadedInFileTree).toBe (true)
+
+                        let! reloadedArc = loadArcAsync arcPath
+                        Vitest.expect(reloadedArc.ContainsAssay("DataMapAssay")).toBe (true)
+                        Vitest.expect(reloadedArc.GetAssay("DataMapAssay").DataMap.IsSome).toBe (true)
+                    })
+        )
+
+        Vitest.test (
             "adds the file explorer default assay via vault add path",
             fun () ->
                 withTempArc

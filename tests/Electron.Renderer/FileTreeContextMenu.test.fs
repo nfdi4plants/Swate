@@ -17,6 +17,7 @@ let private createContextMenuConfig () : ContextMenuConfig = {
     openItem = ignore
     arcRootPath = Some "C:\\arc-root"
     openCreateModal = ignore
+    createDataMap = ignore
     openFileSystemCreateModal = fun _ _ -> ()
     requestRenameItem = ignore
     requestDeleteItem = ignore
@@ -175,6 +176,8 @@ Vitest.describe (
                             "New File"
                             "New Folder"
                             "<divider>"
+                            "Add DataMap"
+                            "<divider>"
                             "Add Study"
                             "Add Assay"
                             "Add Workflow"
@@ -250,6 +253,38 @@ Vitest.describe (
                 addNoteItem.OnClick()
 
                 Vitest.expect(requestedCreateKind).toEqual (Some ArcExplorerNodeKind.Note)
+        )
+
+        Vitest.test (
+            "supported ARC owner folders expose DataMap creation until one exists",
+            fun () ->
+                let owner = createFolderItem "AssayA" (Some "assays/AssayA")
+                let mutable requestedItem = None
+
+                let config = {
+                    createContextMenuConfig () with
+                        createDataMap = fun item -> requestedItem <- Some item
+                }
+
+                let addDataMap =
+                    createComposedContextMenuItems config owner
+                    |> List.find (fun item -> item.Label = "Add DataMap")
+
+                addDataMap.OnClick()
+                Vitest.expect(requestedItem |> Option.map _.Path).toEqual (Some owner.Path)
+
+                let ownerWithDataMap = {
+                    owner with
+                        Children =
+                            Some [
+                                createFileItem DatamapParentInfo.DatamapFileName (Some "assays/AssayA/isa.datamap.xlsx")
+                            ]
+                }
+
+                let labelsWithDataMap =
+                    createComposedContextMenuItems config ownerWithDataMap |> labels
+
+                Vitest.expect(labelsWithDataMap).not.toContain ("Add DataMap")
         )
 
         Vitest.test (

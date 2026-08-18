@@ -15,6 +15,7 @@ open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
+open ARCtrl.Contract
 
 /// <summary>
 /// Represents a vault window in the application, optionally associated with a file path.
@@ -92,6 +93,21 @@ type ArcVault(window: BrowserWindow) =
 
 [<AutoOpen>]
 module ArcVaultExtensions =
+
+    let private tryGetDataMapAccess (arc: ARC) (parentInfo: DatamapParentInfo) =
+        match parentInfo.Parent with
+        | DataMapParent.Assay ->
+            arc.TryGetAssay parentInfo.ParentId
+            |> Option.map (fun assay -> assay.DataMap, fun value -> assay.DataMap <- value)
+        | DataMapParent.Study ->
+            arc.TryGetStudy parentInfo.ParentId
+            |> Option.map (fun study -> study.DataMap, fun value -> study.DataMap <- value)
+        | DataMapParent.Run ->
+            arc.TryGetRun parentInfo.ParentId
+            |> Option.map (fun run -> run.DataMap, fun value -> run.DataMap <- value)
+        | DataMapParent.Workflow ->
+            arc.TryGetWorkflow parentInfo.ParentId
+            |> Option.map (fun workflow -> workflow.DataMap, fun value -> workflow.DataMap <- value)
 
     type ArcVault with
 
@@ -261,6 +277,73 @@ module ArcVaultExtensions =
             | _ -> return Error(exn "ARC is not loaded.")
         }
 
+        member this.AddDataMap
+            (parentInfo: DatamapParentInfo, dataMap: DataMap)
+            : Fable.Core.JS.Promise<Result<unit, exn>> =
+            promise {
+                match this.arc with
+                | Some arc ->
+                    let addDataMap =
+                        tryGetDataMapAccess arc parentInfo
+                        |> Option.bind (fun (currentDataMap, setDataMap) ->
+                            if currentDataMap.IsNone then Some setDataMap else None
+                        )
+
+                    match addDataMap with
+                    | None ->
+                        return Error(exn $"ARC parent '{parentInfo.ParentId}' does not exist or already has a DataMap.")
+                    | Some setDataMap ->
+                        setDataMap (Some dataMap)
+
+                        match! this.WriteArc() with
+                        | Ok() ->
+                            do! this.RefreshFileTreeEntry(DatamapParentInfo.toPath parentInfo)
+                            return Ok()
+                        | Error error ->
+                            setDataMap None
+                            arc.UpdateFileSystem()
+                            return Error error
+                | _ -> return Error(exn "ARC is not loaded.")
+            }
+
+        member this.DeleteDataMap(parentInfo: DatamapParentInfo) : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
+            match this.path, this.arc with
+            | Some arcPath, Some arc ->
+                let contractAndRemove =
+                    tryGetDataMapAccess arc parentInfo
+                    |> Option.bind (fun (currentDataMap, setDataMap) ->
+                        currentDataMap
+                        |> Option.map (fun dataMap ->
+                            let contract =
+                                match parentInfo.Parent with
+                                | DataMapParent.Assay -> dataMap.ToDeleteContractForAssay(parentInfo.ParentId)
+                                | DataMapParent.Study -> dataMap.ToDeleteContractForStudy(parentInfo.ParentId)
+                                | DataMapParent.Run -> dataMap.ToDeleteContractForRun(parentInfo.ParentId)
+                                | DataMapParent.Workflow -> dataMap.ToDeleteContractForWorkflow(parentInfo.ParentId)
+
+                            contract, fun () -> setDataMap None
+                        )
+                    )
+
+                match contractAndRemove with
+                | None -> return Error(exn $"ARC does not contain a DataMap for '{parentInfo.ParentId}'.")
+                | Some(deleteContract, removeDataMap) ->
+                    this.isBusyWriting <- true
+
+                    try
+                        match! fullFillContractBatchAsync arcPath [| deleteContract |] with
+                        | Error errors ->
+                            return Error(exn $"Could not delete DataMap: {PathHelpers.formatContractErrors errors}")
+                        | Ok _ ->
+                            removeDataMap ()
+                            arc.UpdateFileSystem()
+                            this.RefreshHasUnsavedArcChangesFlag()
+                            return Ok()
+                    finally
+                        this.isBusyWriting <- false
+            | _ -> return Error(exn "ARC is not loaded.")
+        }
+
         /// Adds a new ARC entity through ARCtrl's scoped add path.
         /// Watcher ARC merges are suppressed during the disk write; static hashes are resynced from disk afterwards.
         member this.AddArcFile(request: FileContentDTO) : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
@@ -271,6 +354,8 @@ module ArcVaultExtensions =
 
                 match Swate.Electron.Shared.FileIOHelper.FileContentDTO.toArcFile normalizedRequest with
                 | None -> return Error(exn $"Unsupported file type for adding: {normalizedRequest.fileType}")
+                | Some(ArcFiles.DataMap(None, _)) -> return Error(exn "Adding a DataMap requires parent information.")
+                | Some(ArcFiles.DataMap(Some parentInfo, dataMap)) -> return! this.AddDataMap(parentInfo, dataMap)
                 | Some arcFile ->
                     let wasBusyWriting = this.isBusyWriting
                     this.isBusyWriting <- true
@@ -325,6 +410,16 @@ module ArcVaultExtensions =
                     this.fileTree <- createFileEntryTree fileEntries
 
                 return toRendererFileTree arcPath this.fileTree.Values
+        }
+
+        /// Refresh one known file without rescanning the ARC directory.
+        member this.RefreshFileTreeEntry(relativePath: string) = promise {
+            match this.path with
+            | Some arcPath ->
+                let absolutePath = Main.Bindings.Path.join [| arcPath; relativePath |]
+                let! entry = getFileEntry absolutePath
+                this.SetFileTree(upsertFileEntry entry this.fileTree)
+            | None -> ()
         }
 
         member this.LoadArc() = promise {

@@ -11,7 +11,7 @@ let private tryCreateArcFileSaveRequest (arcFile: ArcFiles) : Result<FileContent
     | Some request -> Ok request
     | None -> Error(exn "Saving this file type is not supported in Electron yet.")
 
-let private withArcFileRequest
+let withArcFileRequest
     (arcFile: ArcFiles)
     (execute: FileContentDTO -> JS.Promise<Result<'T, exn>>)
     : JS.Promise<Result<'T, exn>> =

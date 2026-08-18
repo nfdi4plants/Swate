@@ -81,7 +81,7 @@ module ArcAddExtensions =
                 (fun () -> ArcFileCreateContracts.createContracts true (ArcFiles.Workflow workflowCopy))
                 includeUpdateContractsFlag
         | ArcFiles.Investigation _ -> failwith "Adding investigation files is not supported."
-        | ArcFiles.DataMap _ -> failwith "Adding datamap files is not supported."
+        | ArcFiles.DataMap _ -> failwith "DataMaps use their parent-specific add contract."
         | ArcFiles.Template _ -> failwith "Adding template files is not supported."
 
     let private commitAddedArcFile (targetArc: ARC) (workingArc: ARC) (arcFile: ArcFiles) =
@@ -134,16 +134,19 @@ module ArcAddExtensions =
 
         member this.TryAddArcFileAsync(arcPath: string, arcFile: ArcFiles, ?includeUpdateContractsFlag: bool) = crossAsync {
             try
-                let workingArc, contracts =
-                    prepareAddContracts this arcFile includeUpdateContractsFlag
+                match arcFile with
+                | ArcFiles.DataMap _ -> return Error [| "datamap files are added through ArcVault.AddDataMap." |]
+                | _ ->
+                    let workingArc, contracts =
+                        prepareAddContracts this arcFile includeUpdateContractsFlag
 
-                let! result = fullFillContractBatchAsync arcPath contracts
+                    let! result = fullFillContractBatchAsync arcPath contracts
 
-                match result with
-                | Ok _ -> commitAddedArcFile this workingArc arcFile
-                | Error _ -> ()
+                    match result with
+                    | Ok _ -> commitAddedArcFile this workingArc arcFile
+                    | Error _ -> ()
 
-                return result
+                    return result
             with error ->
                 return Error [| error.Message |]
         }

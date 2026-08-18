@@ -25,13 +25,19 @@ module private FileTreeHelper =
         | RenameDialog of ArcRenameDraft
         | DeleteDialog of FileItem
 
-    let saveArcFileAndOpen (arcFile: ArcFiles) : JS.Promise<Result<FileContentDTO, exn>> = promise {
+    let saveArcFile (arcFile: ArcFiles) : JS.Promise<Result<FileContentDTO, exn>> = promise {
         match FileContentDTO.fromArcFile arcFile with
         | None -> return Error(exn "Saving this file type is not supported in Electron yet.")
         | Some request ->
             match! Api.ipcArcVaultApi.addArcFile request with
             | Error saveError -> return Error saveError
-            | Ok() -> return! Api.ipcArcVaultApi.openFile request.path
+            | Ok() -> return Ok request
+    }
+
+    let saveArcFileAndOpen (arcFile: ArcFiles) : JS.Promise<Result<FileContentDTO, exn>> = promise {
+        match! saveArcFile arcFile with
+        | Error saveError -> return Error saveError
+        | Ok request -> return! Api.ipcArcVaultApi.openFile request.path
     }
 
 open FileTreeHelper
@@ -396,6 +402,18 @@ type FileTree =
         let renameContextMenuItems =
             FileTreeContextMenu.renameContextMenuItems requestRenameItem
 
+        let createDataMap item =
+            match FileTreeContextMenu.tryGetDataMapParentInfo item with
+            | None -> ()
+            | Some parentInfo ->
+                promise {
+                    match! saveArcFile (ArcFiles.DataMap(Some parentInfo, DataMap.init ())) with
+                    | Error exn -> applyCreateError exn.Message
+                    | Ok _ -> ()
+                }
+                |> Promise.catch (fun exn -> applyCreateError exn.Message)
+                |> Promise.start
+
         let itemActions item = [
             yield!
                 rootFolderContextMenuItems
@@ -411,6 +429,7 @@ type FileTree =
             openItem = openPreview
             arcRootPath = appStateCtx
             openCreateModal = openCreateModal
+            createDataMap = createDataMap
             openFileSystemCreateModal = openFileSystemCreateModal
             requestRenameItem = requestRenameItem
             requestDeleteItem = requestDeleteItem

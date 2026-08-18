@@ -31,6 +31,70 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
         setArcFilePageState requestedView nextArcFile
         setArcFileInMemoryWithErrorModal nextArcFile
 
+    let addDataMap () =
+        match arcFile.TryGetDataMapParentInfo() with
+        | None -> ()
+        | Some parentInfo ->
+            let dataMap = ARCtrl.DataMap.init ()
+
+            promise {
+                match!
+                    Helper.withArcFileRequest (ArcFiles.DataMap(Some parentInfo, dataMap)) Api.ipcArcVaultApi.addArcFile
+                with
+                | Ok() ->
+                    match arcFile.TryGetRelativePath() with
+                    | None ->
+                        errorModal.enqueue (
+                            ErrorModalRequest.create (
+                                "Could not resolve the parent ARC file path.",
+                                title = "Could not open created DataMap"
+                            )
+                        )
+                    | Some parentPath ->
+                        match! Api.ipcArcVaultApi.openFile parentPath with
+                        | Ok parentDto ->
+                            match Swate.Electron.Shared.FileIOHelper.FileContentDTO.toArcFile parentDto with
+                            | Some nextArcFile -> setArcFilePageState requestedView nextArcFile
+                            | None ->
+                                errorModal.enqueue (
+                                    ErrorModalRequest.create (
+                                        "Could not read the reloaded parent ARC file.",
+                                        title = "Could not open created DataMap"
+                                    )
+                                )
+                        | Error exn ->
+                            errorModal.enqueue (
+                                ErrorModalRequest.create (exn.Message, title = "Could not open created DataMap")
+                            )
+                | Error exn ->
+                    errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not add DataMap"))
+            }
+            |> Promise.catch (fun exn ->
+                errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not add DataMap"))
+            )
+            |> Promise.start
+
+    let deleteDataMap () =
+        match arcFile.TryGetDataMapParentInfo() |> Option.map DatamapParentInfo.toPath with
+        | None -> ()
+        | Some path ->
+            promise {
+                match! Api.ipcArcVaultApi.deletePath path with
+                | Ok() ->
+                    let nextArcFile = ArcFiles.refreshRef arcFile
+
+                    if nextArcFile.TrySetParentDataMap None then
+                        setArcFilePageState (Some ActiveView.Metadata) nextArcFile
+                    else
+                        pageStateCtx.setState None
+                | Error exn ->
+                    errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not delete DataMap"))
+            }
+            |> Promise.catch (fun exn ->
+                errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not delete DataMap"))
+            )
+            |> Promise.start
+
     let pickFilePaths =
         React.useCallback (
             (fun () -> promise {
@@ -66,6 +130,8 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
                 arcFile,
                 setArcFile,
                 pickFilePaths,
+                addDataMap,
+                deleteDataMap,
                 startingActiveView = (requestedView |> Option.defaultValue ActiveView.Metadata),
                 onImportJson = importJson,
                 onError =

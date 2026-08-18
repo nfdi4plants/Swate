@@ -6,6 +6,7 @@ open Fable.Core.JsInterop
 open Feliz
 open Swate.Components
 open Swate.Components.Primitive
+open Swate.Components.Primitive.Buttons
 open Swate.Components.Primitive.Navbar
 open Swate.Components.Composite.Widgets.Context
 open Swate.Components.Composite.DataMapTable
@@ -289,6 +290,8 @@ type Main =
             arcFile: ArcFiles,
             setArcFile: ArcFiles -> unit,
             pickPaths: unit -> Fable.Core.JS.Promise<string[]>,
+            ?onAddDataMap: unit -> unit,
+            ?onDeleteDataMap: unit -> unit,
             ?trailingNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?startingActiveView: ActiveView,
             ?onImportJson: JsonImportRequest -> JS.Promise<Result<unit, exn>>,
@@ -297,6 +300,9 @@ type Main =
 
         let onError =
             defaultArg onError (fun errorMsg -> console.error ("Error in ArcFileEditor: " + errorMsg))
+
+        let onAddDataMap = defaultArg onAddDataMap ignore
+        let onDeleteDataMap = defaultArg onDeleteDataMap ignore
 
         let activeView, setActiveView =
             React.useState (startingActiveView |> Option.defaultValue ActiveView.Metadata)
@@ -326,6 +332,9 @@ type Main =
 
         let activeTableIndex = activeView.TryTableIndex
 
+        let canAddDataMap =
+            arcFile.TryGetDataMapParentInfo().IsSome && not (arcFile.CanRenderDataMapView())
+
         let trailingNavbarElement =
             match trailingNavbarElements with
             | Some renderTrailingNavbarElements -> renderTrailingNavbarElements headerProps
@@ -341,6 +350,15 @@ type Main =
                                 prop.className "swt:flex swt:items-center swt:gap-2"
                                 prop.children [
                                     Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns()
+                                    Buttons.QuickAccessButton(
+                                        Html.i [
+                                            prop.className
+                                                "swt:iconify swt:fluent--database-arrow-up-20-regular swt:size-6"
+                                        ],
+                                        "Add DataMap",
+                                        (fun _ -> onAddDataMap ()),
+                                        isDisabled = not canAddDataMap
+                                    )
                                 ]
                             ],
                         right = trailingNavbarElement
@@ -407,7 +425,7 @@ type Main =
                         prop.children [ Main.ArcFileContentView(activeView, arcFile, setArcFile) ]
                     ]
                     Main.AddRowsFooter(activeView, arcFile, setArcFile)
-                    ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFile)
+                    ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFile, onDeleteDataMap)
                 ]
             ]
 
@@ -520,6 +538,13 @@ type Main =
             loadTemplates,
             React.Fragment [
                 ColumnCountTestDisplay()
-                Main.ArcFileEditor(arcFile, setArcFile, pickPathsMockFn, startingActiveView = ActiveView.Table 0)
+                Main.ArcFileEditor(
+                    arcFile,
+                    setArcFile,
+                    pickPathsMockFn,
+                    ignore,
+                    ignore,
+                    startingActiveView = ActiveView.Table 0
+                )
             ]
         )
