@@ -53,6 +53,8 @@ type IArcVaultsApi = {
     getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
     pathExists: string -> JS.Promise<Result<bool, exn>>
     openFile: string -> JS.Promise<Result<FileContentDTO, exn>>
+    /// Reads a .cwl file (ARC-relative path) and additionally returns YAML with external run-references resolved. Lookup is restricted to the ARC root.
+    openCwlFile: string -> JS.Promise<Result<CwlFileDTO, exn>>
     openArcFolderInFileExplorer: unit -> JS.Promise<Result<unit, exn>>
     showPathInFileExplorer: string -> JS.Promise<Result<unit, exn>>
     openPathWithDefaultApplication: string -> JS.Promise<Result<unit, exn>>

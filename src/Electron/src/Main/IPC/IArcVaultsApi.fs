@@ -19,6 +19,8 @@ open Main.IPC.Delete
 open Main.IPC.Rename
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
 open Main.IPC.FileSystemIO
+open Main.Bindings.Filesystem
+open ARCtrl.CWL
 
 
 let ensureNotesFolderAtArcPath =
@@ -700,6 +702,66 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     with e ->
                         return Error(exn $"Could not read file {relativePath}: {e.Message}")
             | _ -> return Error(exn "ARC is not loaded.")
+        }
+    openCwlFile =
+        fun (relativePath: string) -> promise {
+            let windowId = windowIdFromIpcEvent event
+
+            match ARC_VAULTS.TryGetVault(windowId) with
+            | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+            | Some vault ->
+                match vault.path with
+                | None -> return Error(exn "ARC is not loaded.")
+                | Some arcPath ->
+                    match FileSystemIO.tryResolveArcRelativePath arcPath relativePath with
+                    | Error pathError -> return Error pathError
+                    | Ok absolutePath ->
+                        try
+                            let! rawYaml = ARCtrl.FileSystemHelper.readFileTextAsync absolutePath
+
+                            let resolvedYaml =
+                                try
+                                    let processingUnit = Decode.decodeCWLProcessingUnit rawYaml
+
+                                    let cwlDirectoryPath = Main.Bindings.Path.dirname absolutePath
+
+                                    let lookup (referencedPath: string) : CWLProcessingUnit option =
+                                        try
+                                            let referencedAbsolutePath =
+                                                Main.Bindings.Path.join [| cwlDirectoryPath; referencedPath |]
+
+                                            let referencedRelativePath =
+                                                Main.Bindings.Path.relative arcPath referencedAbsolutePath
+
+                                            match
+                                                FileSystemIO.tryResolveArcRelativePath arcPath referencedRelativePath
+                                            with
+                                            | Error _ -> None
+                                            | Ok resolvedReferencedPath ->
+                                                let referencedYaml =
+                                                    readFileSync resolvedReferencedPath TextEncoding.Utf8
+
+                                                Decode.decodeCWLProcessingUnit referencedYaml |> Some
+                                        with _ ->
+                                            None
+
+                                    let resolvedProcessingUnit =
+                                        ARCtrl.CWLRunResolver.resolveRunReferencesFromLookup
+                                            absolutePath
+                                            processingUnit
+                                            lookup
+
+                                    Encode.encodeProcessingUnit resolvedProcessingUnit |> Some
+                                with _ ->
+                                    None
+
+                            return
+                                Ok {
+                                    raw = rawYaml
+                                    resolved = resolvedYaml
+                                }
+                        with e ->
+                            return Error(exn $"Could not read file {relativePath}: {e.Message}")
         }
     runGitLfs =
         fun (request: GitLfsRequest) -> promise {

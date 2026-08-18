@@ -82,6 +82,8 @@ type FileContentDTO = {|
     path: string
 |}
 
+type CwlFileDTO = { raw: string; resolved: string option }
+
 type RenamePathRequest = {
     relativePath: string
     newName: string
