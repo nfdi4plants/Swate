@@ -22,7 +22,6 @@ type StartScreen =
             |> Option.defaultWith (fun () -> failwith "StartScreen requires a CwlEditorHost context.")
 
         Html.div [
-            prop.key (sprintf "cwl-start-screen-%d" version)
             prop.className
                 "swt:flex swt:flex-col swt:items-center swt:justify-center swt:gap-4 swt:h-full swt:bg-base-100"
             prop.children [

@@ -68,7 +68,6 @@ type CommandLineToolEditor =
             | HintBucket -> onSetHintField key fieldKey value
 
         Html.div [
-            prop.key (sprintf "cwl-command-line-tool-editor-%d" version)
             prop.testId "cwl-command-line-tool-editor"
             prop.className "swt:flex swt:flex-col swt:h-full swt:min-h-0"
             prop.children [

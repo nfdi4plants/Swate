@@ -73,7 +73,6 @@ type WorkflowEditor =
             | HintBucket -> onSetHintField key fieldKey value
 
         Html.div [
-            prop.key (sprintf "cwl-workflow-editor-%d" version)
             prop.testId "cwl-workflow-editor"
             prop.className "swt:flex swt:flex-col swt:h-full swt:min-h-0"
             prop.children [

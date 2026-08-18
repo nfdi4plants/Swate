@@ -68,7 +68,6 @@ type ExpressionToolEditor =
             | HintBucket -> onSetHintField key fieldKey value
 
         Html.div [
-            prop.key (sprintf "cwl-expression-tool-editor-%d" version)
             prop.testId "cwl-expression-tool-editor"
             prop.className "swt:flex swt:flex-col swt:h-full swt:min-h-0"
             prop.children [
