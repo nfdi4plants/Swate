@@ -175,7 +175,7 @@ module ArcLoadExtensions =
 
     type ARC with
 
-        /// Hotfix for #619, not fixed in the consumed ARCtrl 3.0.0-beta.12.
+        /// Hotfix for #619, introduced against ARCtrl 3.0.0-beta.12; retained on 3.2.0 pending re-evaluation.
         /// Mirrors ARC.tryLoadAsync, changing only filesystem traversal so `.git` directories are never enumerated.
         static member LoadAsyncSwate(arcPath: string) = promise {
             let! discoveredPaths = getAllArcFilePathsAsync arcPath
@@ -190,7 +190,7 @@ module ArcLoadExtensions =
             | Error errors -> return Error errors
         }
 
-        /// Hotfix for #620, not fixed in the consumed ARCtrl 3.0.0-beta.12.
+        /// Hotfix for #620, introduced against ARCtrl 3.0.0-beta.12; retained on 3.2.0 pending re-evaluation.
         /// Repairs only zero-byte canonical workbooks left by interrupted creates, then retries LoadAsyncSwate.
         static member LoadAsyncSwateZeroByteRepair(arcPath: string) = promise {
             match! ARC.LoadAsyncSwate arcPath with

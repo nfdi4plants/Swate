@@ -38,7 +38,7 @@ module ArcWriteExtensions =
 
     type ARC with
 
-        /// Hotfix for #618, not fixed in the consumed ARCtrl 3.0.0-beta.12.
+        /// Hotfix for #618, introduced against ARCtrl 3.0.0-beta.12; retained on 3.2.0 pending re-evaluation.
         /// Mirrors ARCtrl.GetWriteContracts except that it emits only managed ARC payload contracts instead of
         /// iterating the complete filesystem model, where stale or Git metadata paths could be recreated.
         member this.GetWriteContractsSwate(?skipUpdateFS: bool) =
