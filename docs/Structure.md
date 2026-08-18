@@ -13,6 +13,10 @@ A reusable React component library that can be published to npm and reused by `s
 
 This project contains Storybook/Vitest-based component tests and usage documentation.
 
+### `src/Components/src/Page/CwlEditor`
+
+The CWL editor UI consists of React components, including the xyflow workflow canvas. It is host-agnostic through an injected `CwlEditorHost` context and is consumed by the Electron renderer, npm package, and Storybook.
+
 ## `src/Client`
 
 The main browser application (React + Elmish). Used for [swate.nfdi4plants.org](https://swate.nfdi4plants.org/), ARCitect v1 integration, and the Excel add-in.
@@ -28,6 +32,10 @@ This project must not be Fable-compatible.
 ## `src/Shared`
 
 Shared, Fable-compatible .NET code used by Client and Server as the ground truth for shared types and client-server contracts.
+
+### `src/Shared/Cwl`
+
+CWL editor domain logic, including ARCtrl.CWL-based mutations, the validation engine, and the YAML encode/decode service. This code is Electron-free and UI-free, and is tested by `tests/Cwl`.
 
 ## `src/Electron`
 
