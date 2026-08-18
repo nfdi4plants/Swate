@@ -458,6 +458,8 @@ type Main =
                     else
                         startAssay.AddTable(ArcTable.init (sprintf "Table %i" i))
 
+                startAssay.DataMap <- Some(ARCtrl.DataMap.init ())
+
                 startAssay
             )
 
@@ -518,36 +520,10 @@ type Main =
             |]
         }
 
-        let widgetNavbarElements =
-            fun props ->
-                match props.arcFile with
-                | ArcFiles.Assay assay ->
-                    Swate.Components.Primitive.Buttons.Buttons.QuickAccessButton(
-                        Html.i [
-                            prop.className "swt:iconify swt:fluent--database-arrow-up-20-regular swt:size-5"
-                        ],
-                        "Add DataMap",
-                        (fun _ ->
-                            if assay.DataMap.IsNone then
-                                assay.DataMap <- Some(ARCtrl.DataMap.init ())
-                                let nextArcFile = ArcFiles.refreshRef props.arcFile
-                                setArcFile nextArcFile
-                                props.setActiveView ActiveView.DataMap
-                        ),
-                        isDisabled = assay.DataMap.IsSome
-                    )
-                | _ -> Html.none
-
         Swate.Components.Composite.Template.TemplateCacheProvider.TemplateCacheProvider(
             loadTemplates,
             React.Fragment [
                 ColumnCountTestDisplay()
-                Main.ArcFileEditor(
-                    arcFile,
-                    setArcFile,
-                    pickPathsMockFn,
-                    widgetNavbarElements = widgetNavbarElements,
-                    startingActiveView = ActiveView.Table 0
-                )
+                Main.ArcFileEditor(arcFile, setArcFile, pickPathsMockFn, startingActiveView = ActiveView.Table 0)
             ]
         )

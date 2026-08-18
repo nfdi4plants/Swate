@@ -49,22 +49,6 @@ export const IntegratedNavbar: Story = {
     expect(getWidgetButton(canvas, 'Data Annotator')).toBeEnabled();
     expect(getWidgetButton(canvas, 'Import JSON')).toBeEnabled();
     expect(getWidgetButton(canvas, 'Export JSON')).toBeEnabled();
-    expect(getWidgetButton(canvas, 'Add DataMap')).toBeEnabled();
-  },
-};
-
-export const AddDataMap: Story = {
-  parameters: { isolated: true },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const addDataMap = getWidgetButton(canvas, 'Add DataMap');
-
-    await userEvent.click(addDataMap);
-
-    await waitFor(() => {
-      expect(addDataMap).toBeDisabled();
-      expect(canvas.getByRole('button', { name: 'DataMap' })).toHaveClass('swt:tab-active');
-    });
   },
 };
 
