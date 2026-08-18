@@ -289,7 +289,6 @@ type Main =
             arcFile: ArcFiles,
             setArcFile: ArcFiles -> unit,
             pickPaths: unit -> Fable.Core.JS.Promise<string[]>,
-            ?widgetNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?trailingNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?startingActiveView: ActiveView,
             ?onImportJson: JsonImportRequest -> JS.Promise<Result<unit, exn>>,
@@ -342,9 +341,6 @@ type Main =
                                 prop.className "swt:flex swt:items-center swt:gap-2"
                                 prop.children [
                                     Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns()
-                                    match widgetNavbarElements with
-                                    | Some renderWidgetNavbarElements -> renderWidgetNavbarElements headerProps
-                                    | None -> ()
                                 ]
                             ],
                         right = trailingNavbarElement
