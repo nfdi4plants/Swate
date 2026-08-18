@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+-   Upgraded ARCtrl from 3.0.0-beta.12 to 3.2.0 (includes DataMap→Datamap rename, CompositeCell JS hash fix, stable CWL & WorkflowGraph APIs), YAMLicious to 1.0.2, FSharp.Core to 10.1.400, Fable.Core to 5.2.0; removed the FABLE_COMPILER_JAVASCRIPT hotfix define (ARCtrl #603 fixed upstream).
 -   Simplify Electron FileTree navigation so ARC editors initialize the requested Metadata, table, or DataMap view directly, and show the DataHub download action only in the sidebar.
 -   Consolidate Electron ARC editor page state, safely resolve canonical entity workbooks, and reuse shared path normalization for ARC-root-relative references.
 -   Harden canonical entity path resolution for Electron rename and delete operations, and document the behavior of the shared path-normalization helpers.
