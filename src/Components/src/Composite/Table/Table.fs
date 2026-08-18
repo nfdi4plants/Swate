@@ -125,17 +125,18 @@ swt:p-0"""
             )
 
         /// ⚠️ There is bug with the ``scrollToIndex`` function and the ``paddingEnd`` option for ``useVirtualizer``.
-        /// It seems like ``scrollToIndex(lastIndex)`` does not actually scroll to the element, but instead scrolls to the end of the scroll container. 
-        /// Using ``align = center`` is a workaround for this issue, but it is not ideal. 
+        /// It seems like ``scrollToIndex(lastIndex)`` does not actually scroll to the element, but instead scrolls to the end of the scroll container.
+        /// Using ``align = center`` is a workaround for this issue, but it is not ideal.
         /// This is a issue with the library and is being tracked here: https://github.com/TanStack/virtual/issues/1257
         let scrollTo =
             fun (coordinate: CellCoordinate) ->
                 if coordinate.y = rowCount - 1 then
-                    rowVirtualizer.scrollToIndex(coordinate.y, align = Virtual.AlignOption.Center)
+                    rowVirtualizer.scrollToIndex (coordinate.y, align = Virtual.AlignOption.Center)
                 else
                     rowVirtualizer.scrollToIndex (coordinate.y)
+
                 if coordinate.x = columnCount - 1 then
-                    columnVirtualizer.scrollToIndex(coordinate.x, align = Virtual.AlignOption.Center)
+                    columnVirtualizer.scrollToIndex (coordinate.x, align = Virtual.AlignOption.Center)
                 else
                     columnVirtualizer.scrollToIndex (coordinate.x)
 
