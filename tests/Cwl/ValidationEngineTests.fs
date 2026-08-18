@@ -122,9 +122,7 @@ let engineTests =
         test "ResourceRequirement with max < min triggers REQ.005" {
             let td = CWLToolDescription(ResizeArray [| CWLOutput("out") |])
             td.CWLVersion <- "v1.2"
-            let resource = ResourceRequirementInstance()
-            resource.SetProperty("coresMin", 8L)
-            resource.SetProperty("coresMax", 4L)
+            let resource = ResourceRequirementInstance(coresMin = box 8L, coresMax = box 4L)
             td.Requirements <- Some(ResizeArray [| Requirement.ResourceRequirement resource |])
 
             let result = validateProcessingUnit (CWLProcessingUnit.CommandLineTool td) OnSave

@@ -466,9 +466,18 @@ let private setRequirementFieldValue (requirement: Requirement) (fieldKey: strin
             ]
 
         if editableFields.Contains fieldKey then
-            match parseResourceScalar value with
-            | Some parsed -> resource.SetProperty(fieldKey, parsed)
-            | None -> resource.SetProperty(fieldKey, null)
+            let parsed = parseResourceScalar value
+
+            match fieldKey with
+            | "coresMin" -> resource.CoresMin <- parsed
+            | "coresMax" -> resource.CoresMax <- parsed
+            | "ramMin" -> resource.RamMin <- parsed
+            | "ramMax" -> resource.RamMax <- parsed
+            | "tmpdirMin" -> resource.TmpdirMin <- parsed
+            | "tmpdirMax" -> resource.TmpdirMax <- parsed
+            | "outdirMin" -> resource.OutdirMin <- parsed
+            | "outdirMax" -> resource.OutdirMax <- parsed
+            | _ -> ()
 
             Requirement.ResourceRequirement resource
         else
@@ -505,14 +514,14 @@ let private setRequirementFieldValue (requirement: Requirement) (fieldKey: strin
                             DirentEntry dirent
                         | FileEntry file ->
                             match nonEmptyOrNone value with
-                            | Some location -> file.SetProperty("location", location)
-                            | None -> file.SetProperty("location", null)
+                            | Some location -> file.Location <- Some location
+                            | None -> file.Location <- None
 
                             FileEntry file
                         | DirectoryEntry directory ->
                             match nonEmptyOrNone value with
-                            | Some location -> directory.SetProperty("location", location)
-                            | None -> directory.SetProperty("location", null)
+                            | Some location -> directory.Location <- Some location
+                            | None -> directory.Location <- None
 
                             DirectoryEntry directory
 

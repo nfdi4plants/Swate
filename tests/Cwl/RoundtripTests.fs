@@ -789,10 +789,7 @@ let commandLineToolMutationTests =
 
             match listing.[2] with
             | FileEntry file ->
-                Expect.equal
-                    (string (file.GetPropertyValue("location")))
-                    "file:///tmp/data.txt"
-                    "File entry should store location"
+                Expect.equal file.Location (Some "file:///tmp/data.txt") "File entry should store location"
             | _ -> failtest "Expected third InitialWorkDir entry to be a File entry"
 
             let dockerRequirement =
