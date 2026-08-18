@@ -9,7 +9,8 @@ export default defineConfig({
         react({
             include: /\.(js|jsx|ts|tsx)$/,
             babel: {
-                plugins: ['babel-plugin-react-compiler'],
+                // CwlEditor uses a mutation-based rendering model that breaks under compiler memoization.
+                plugins: [['babel-plugin-react-compiler', { sources: (filename) => !filename.includes("CwlEditor") }]],
             },
         }),
         tailwindcss(),
