@@ -334,7 +334,8 @@
     <Compile Include="Page\CwlEditor\CommandLineToolEditor.fs" />
     <Compile Include="Page\CwlEditor\WorkflowEditor.fs" />
     <Compile Include="Page\CwlEditor\ExpressionToolEditor.fs" />
-    
+    <Compile Include="Page\CwlEditor\CwlEditor.fs" />
+
 
     <Compile Include="Style.fs" />
   </ItemGroup>
