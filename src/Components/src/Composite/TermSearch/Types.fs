@@ -5,6 +5,20 @@ open Swate.Components.Shared.Extensions
 open Fable.Core
 open Feliz
 
+[<RequireQualifiedAccess>]
+type TermSearchSource =
+    | [<CompiledName("TIB")>] TIB
+    | [<CompiledName("OLS")>] OLS
+
+    member this.DefaultKey =
+        match this with
+        | TIB -> "TIB_DataPLANT"
+        | OLS -> "OLS_DataPLANT Project"
+
+let create (source: TermSearchSource) collectionName = $"{source}_{collectionName}"
+
+let belongsTo (source: TermSearchSource) (key: string) = key.StartsWith $"{source}_"
+
 [<JS.PojoAttribute>]
 type Term
     (?name: string, ?id: string, ?description: string, ?source: string, ?href: string, ?isObsolete: bool, ?data: obj) =
@@ -188,7 +202,7 @@ module TIBTypesExtensions =
 
     type Api.TIBApi.TIBTypes.SearchApi with
         /// This function is used to transform TIB term type into the Swate compatible Term type.
-        member this.ToMyTerm() =
+        member this.ToSwateTerms() =
             this.response.docs
             |> Array.map (fun t ->
                 Term(
@@ -200,3 +214,45 @@ module TIBTypesExtensions =
                     t.is_obsolete |> Option.defaultValue false
                 )
             )
+
+[<AutoOpen>]
+module OLSTypesExtensions =
+
+    let private normalizeShortForm (value: string) =
+        let separatorIndex = value.IndexOf "_"
+
+        if separatorIndex > 0 && separatorIndex < value.Length - 1 then
+            value.Substring(0, separatorIndex) + ":" + value.Substring(separatorIndex + 1)
+        else
+            value
+
+    let toSwateTerm (term: Api.OLSApi.OLSTypes.Term) =
+        let iri = term.iri |> Option.orElse term.URI
+
+        let id =
+            term.short_form
+            |> Option.orElse term.shortForm
+            |> Option.map normalizeShortForm
+            |> Option.orElse iri
+
+        let description =
+            term.description
+            |> Option.orElse (term.definition |> Option.bind _.value)
+            |> Option.map (String.concat ";")
+
+        Term(
+            ?name = term.label,
+            ?id = id,
+            ?description = description,
+            ?source = (term.ontology_name |> Option.orElse term.ontologyId),
+            ?href = iri,
+            ?isObsolete = (term.is_obsolete |> Option.orElse term.isObsolete |> Option.orElse term.obsolete),
+            data = term
+        )
+
+    let toSwateTerms = Array.map toSwateTerm
+
+    type Api.OLSApi.OLSTypes.SearchApi with
+        /// Transform an OLS gateway search result into Swate-compatible terms.
+        member this.ToSwateTerms() =
+            this |> Api.OLSApi.OLSTypes.searchTerms |> toSwateTerms

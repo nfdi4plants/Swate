@@ -124,7 +124,7 @@ type SettingsPage =
             defaultArg onAutoCreateNotesFolderEnabled ignore
 
         ThemeProvider.ThemeProvider(
-            TermSearchConfigProvider.TIBQueryProvider(
+            TermSearchConfigProvider.DefaultQueryProvider(
                 SettingsPage.SettingsPage(onAutoCreateNotesFolderEnabled = onAutoCreateNotesFolderEnabled)
             )
         )

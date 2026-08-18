@@ -91,6 +91,7 @@
     <Compile Include="Api\SwateApi.fs" />
     <Compile Include="Api\GitLabApi.fs" />
     <Compile Include="Api\TIBApi.fs" />
+    <Compile Include="Api\OLSApi.fs" />
    
     <Compile Include="Primitive\Types.fs" />
     <Compile Include="Primitive\Icons.fs" />
