@@ -318,6 +318,8 @@
     <Compile Include="Page\ArcObjectExplorer\GraphExplorer\GraphObjectExplorerTreeData.fs" />
     <Compile Include="Page\ArcObjectExplorer\GraphExplorer\GraphObjectExplorerFilter.fs" />
     <Compile Include="Page\ArcObjectExplorer\GraphExplorer\GraphObjectExplorer.fs" />
+    <Compile Include="Page\CwlEditor\Types.fs" />
+    <Compile Include="Page\CwlEditor\Context.fs" />
     
 
     <Compile Include="Style.fs" />
