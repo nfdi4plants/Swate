@@ -55,7 +55,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@fable-org/fable-library-ts": "^2.2.0",
     "@floating-ui/react": "^0.27.15",
-    "@nfdi4plants/arctrl": "^3.0.0-alpha.4",
+    "@nfdi4plants/arctrl": "^3.2.0",
     "@tanstack/react-virtual": "^3.13.2",
     "@uidotdev/usehooks": "^2.4.1",
     "@uiw/react-markdown-preview": "^5.1.4",
