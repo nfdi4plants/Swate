@@ -68,6 +68,17 @@ module private LazyComponents =
         Renderer.Components.MainContent.MarkdownEditorTargetView.MarkdownEditorTarget(content)
 
     [<ReactLazyComponent>]
+    let LazyCwlEditorTarget
+        (props:
+            {|
+                path: string
+                raw: string
+                resolved: string option
+            |})
+        =
+        Renderer.Components.MainContent.CwlEditorTarget.CwlEditorTarget props.path props.raw props.resolved
+
+    [<ReactLazyComponent>]
     let ProvenanceGroupingTarget () =
         Renderer.Components.MainContent.ProvenanceGroupingTarget.ProvenanceGroupingTarget()
 
@@ -99,6 +110,23 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                         React.Suspense(
                             [ LazyComponents.LazyMarkdownEditorTarget(content) ],
                             fallback = LazyComponents.FullPageLoadingSpinner("Loading markdown editor...")
+                        )
+                    | Some _, Some(PageState.CwlPage(path, raw, resolved)) ->
+                        React.Suspense(
+                            [
+                                Html.div [
+                                    prop.key path
+                                    prop.className "swt:contents"
+                                    prop.children [
+                                        LazyComponents.LazyCwlEditorTarget {|
+                                            path = path
+                                            raw = raw
+                                            resolved = resolved
+                                        |}
+                                    ]
+                                ]
+                            ],
+                            fallback = LazyComponents.FullPageLoadingSpinner("Loading CWL editor...")
                         )
                     | Some _, Some(PageState.TextPage content) -> TextPreviewTarget content
                     | Some _, Some PageState.UnknownPage -> UnknownPreviewTarget()

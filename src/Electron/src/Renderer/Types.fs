@@ -18,6 +18,7 @@ type GitUnsupportedPageData = GitUnsupportedContentDto
 type PageState =
     | ArcFilePage of arcFile: ArcFiles * requestedView: ActiveView option
     | MarkdownPage of string
+    | CwlPage of path: string * raw: string * resolved: string option
     | TextPage of string
     | UnknownPage
     //| LandingDraftPage
@@ -34,6 +35,7 @@ type PageState =
     static member fromFileContentDTO(dto: FileContentDTO) : PageState =
         match dto.fileType with
         | FileContentType.Markdown -> PageState.MarkdownPage dto.content
+        | FileContentType.CWL -> PageState.CwlPage(dto.path, dto.content, None)
         | FileContentType.FileContentTypeIsPlainTextVariant -> PageState.TextPage dto.content
         | FileContentType.FileContentTypeIsISAFileVariant ->
             let arcfile = FileContentDTO.toArcFile dto
