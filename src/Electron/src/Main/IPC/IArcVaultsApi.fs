@@ -147,7 +147,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 let! arcPathExists = pathExistsAsync arcPath
 
                 if not arcPathExists then
-                    return Error(exn $"The ARC path no longer exists: '{arcPath}'.")
+                    return Error(exn $"The ARC cannot be found at location: '{arcPath}'.")
                 else
                     let windowId = windowIdFromIpcEvent event
                     let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
