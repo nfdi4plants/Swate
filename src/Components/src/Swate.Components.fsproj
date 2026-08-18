@@ -326,6 +326,7 @@
     <Compile Include="Page\CwlEditor\ValidationPanel.fs" />
     <Compile Include="Page\CwlEditor\RequirementPicker.fs" />
     <Compile Include="Page\CwlEditor\Header.fs" />
+    <Compile Include="Page\CwlEditor\InputsEditor.fs" />
     
 
     <Compile Include="Style.fs" />
