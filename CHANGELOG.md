@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 -   Prevent simultaneous Swate Electron window shutdowns from sending recent-ARC updates to already destroyed windows.
+-   Show the error modal when a recently used ARC no longer exists at its saved path instead of opening an Electron system error.
 -   Prevent deleted ARC table tabs from reappearing by applying rename, delete, and add operations to a fresh copy of the current editor state without mutating refs during React rendering.
 -   Keep active-view ownership inside the reusable ARC editor, preserve valid table selections across immutable ARC updates, and remount it for Electron sidebar Metadata, table, and DataMap selections.
 -   Preserve stable table identifiers across rerenders and reorder operations, use one shared prefix for drag-ID generation and parsing, and normalize the active view after table deletion so drag-and-drop and tab state remain valid.
