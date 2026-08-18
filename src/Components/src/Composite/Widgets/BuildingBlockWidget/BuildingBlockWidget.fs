@@ -314,11 +314,13 @@ type BuildingBlockWidget =
                 let header = BuildingBlockWidgetState.createCompositeHeaderFromState state
 
                 let cells =
+                    /// Ensure there is at least one row in the table when adding a new column.
+                    let rowCount = System.Math.Max(1, table.RowCount)
                     match BuildingBlockWidgetState.tryCreateCompositeCellFromState state with
                     | Some bodyCell ->
-                        let rowCount = System.Math.Max(1, table.RowCount)
                         Array.init rowCount (fun _ -> bodyCell.Copy()) |> ResizeArray
-                    | None -> state.HeaderCellType.CreateEmptyDefaultCells table.RowCount
+                    | None -> 
+                        state.HeaderCellType.CreateEmptyDefaultCells rowCount
 
                 let cells =
                     match header with
