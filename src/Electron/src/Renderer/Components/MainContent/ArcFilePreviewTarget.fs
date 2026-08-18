@@ -60,7 +60,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
 
     let widgetNavbarElements =
         fun (props: ArcFileEditorHeaderProps) ->
-            let button (dataMap: ARCtrl.DataMap option) =
+            let button (dataMap: ARCtrl.Datamap option) =
                 Swate.Components.Primitive.Buttons.Buttons.QuickAccessButton(
                     Html.i [
                         prop.className "swt:iconify swt:fluent--database-arrow-up-20-regular swt:size-5"
@@ -84,10 +84,10 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
                 )
 
             match props.arcFile with
-            | ArcFiles.Assay assay -> button assay.DataMap
-            | ArcFiles.Study(study, _) -> button study.DataMap
-            | ArcFiles.Run run -> button run.DataMap
-            | ArcFiles.Workflow workflow -> button workflow.DataMap
+            | ArcFiles.Assay assay -> button assay.Datamap
+            | ArcFiles.Study(study, _) -> button study.Datamap
+            | ArcFiles.Run run -> button run.Datamap
+            | ArcFiles.Workflow workflow -> button workflow.Datamap
             | _ -> Html.none
 
     Html.div [

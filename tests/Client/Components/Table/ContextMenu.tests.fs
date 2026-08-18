@@ -204,14 +204,14 @@ type TestCases =
 
     static member DataMapCopyIncludesSelector() =
         let dataMap =
-            DataMap(ResizeArray [ DataContext(name = "DatamapTesting.txt#row=2") ])
+            Datamap(ResizeArray [ DataContext(name = "DatamapTesting.txt#row=2") ])
 
         let copiedText = dataMap.SelectedCellsToTabText [ {| x = 1; y = 1 |} ]
 
         Expect.equal copiedText "DatamapTesting.txt#row=2" "Copied DataMap data should include its selector."
 
         let dataMapWithoutSelector =
-            DataMap(ResizeArray [ DataContext(name = "DatamapTesting.txt") ])
+            Datamap(ResizeArray [ DataContext(name = "DatamapTesting.txt") ])
 
         let copiedTextWithoutSelector =
             dataMapWithoutSelector.SelectedCellsToTabText [ {| x = 1; y = 1 |} ]
@@ -235,7 +235,7 @@ type TestCases =
             "A table data cell and its selector must occupy one clipboard cell."
 
     static member DataMapCellPastePreservesSelector() =
-        let dataMap = DataMap(ResizeArray [ DataContext() ])
+        let dataMap = Datamap(ResizeArray [ DataContext() ])
 
         dataMap.PasteTabText({| x = 1; y = 1 |}, "DatamapTesting.txt#row=2")
 
@@ -244,7 +244,7 @@ type TestCases =
 
     static member DataMapLabelSurvivesArcFileRefresh() =
         let assay = ArcAssay.init "assay"
-        assay.DataMap <- Some(DataMap(ResizeArray [ DataContext(label = "asdhjasklhd") ]))
+        assay.Datamap <- Some(Datamap(ResizeArray [ DataContext(label = "asdhjasklhd") ]))
 
         let refreshed =
             Swate.Components.Shared.ARCtrlHelper.ArcFiles.refreshRef (
@@ -256,7 +256,7 @@ type TestCases =
         Expect.equal label (Some "asdhjasklhd") "Refreshing an ARC file must preserve DataMap labels."
 
     static member DataMapGridPasteGrowsRows() =
-        let dataMap = DataMap(ResizeArray [ DataContext() ])
+        let dataMap = Datamap(ResizeArray [ DataContext() ])
 
         dataMap.PasteTabText({| x = 1; y = 1 |}, "first.txt#row=2\tFirst\nsecond.txt#row=3\tSecond")
 
@@ -267,7 +267,7 @@ type TestCases =
 
     static member DataMapFillColumnCopiesCompleteCell() =
         let dataMap =
-            DataMap(
+            Datamap(
                 ResizeArray [
                     DataContext(name = "first.txt#row=2", format = "text/csv")
                     DataContext(name = "second.txt#row=3")
@@ -287,7 +287,7 @@ type TestCases =
 
     static member DataMapRowAndClearActions() =
         let dataMap =
-            DataMap(
+            Datamap(
                 ResizeArray [
                     DataContext(name = "first.txt#row=2", label = "First")
                     DataContext(name = "second.txt#row=3", label = "Second")

@@ -18,7 +18,7 @@ let downloadFromString (filename, content: string) =
 //     open Thoth.Json
 //     open Thoth.Json.Core
 
-//     let wholeDatamapEncoder (parentId: string) (parent: ARCtrl.ARCtrlHelper.DataMapParent) (datamap: ARCtrl.DataMap) =
+//     let wholeDatamapEncoder (parentId: string) (parent: ARCtrl.ARCtrlHelper.DataMapParent) (datamap: ARCtrl.Datamap) =
 //         Encode.object [
 //             "ParentId", Encode.string parentId
 //             "Parent", Encode.string (parent.ToString())

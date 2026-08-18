@@ -29,10 +29,10 @@ let createDataMapInCurrentTarget
         let nextArcFile = ArcFiles.refreshRef currentArcFile
 
         match nextArcFile with
-        | ArcFiles.Assay assay -> assay.DataMap <- Some(ARCtrl.DataMap.init ())
-        | ArcFiles.Study(study, _) -> study.DataMap <- Some(ARCtrl.DataMap.init ())
-        | ArcFiles.Run run -> run.DataMap <- Some(ARCtrl.DataMap.init ())
-        | ArcFiles.Workflow workflow -> workflow.DataMap <- Some(ARCtrl.DataMap.init ())
+        | ArcFiles.Assay assay -> assay.Datamap <- Some(ARCtrl.Datamap.init ())
+        | ArcFiles.Study(study, _) -> study.Datamap <- Some(ARCtrl.Datamap.init ())
+        | ArcFiles.Run run -> run.Datamap <- Some(ARCtrl.Datamap.init ())
+        | ArcFiles.Workflow workflow -> workflow.Datamap <- Some(ARCtrl.Datamap.init ())
         | _ -> ()
 
         return! publishAndPersistArcFile nextArcFile (publishArcFile (Some ActiveView.DataMap)) saveArcFile

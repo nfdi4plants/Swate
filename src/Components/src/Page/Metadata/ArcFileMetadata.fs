@@ -31,7 +31,7 @@ type private LazyComponents =
         WorkflowMetadata.WorkflowMetadata(workflow = workflow, setWorkflow = setWorkflow)
 
     [<ReactLazyComponent>]
-    static member LazyDataMapMetadata(datamap: DataMap) =
+    static member LazyDataMapMetadata(datamap: Datamap) =
         DataMapMetadata.DataMapMetadata(datamap = datamap)
 
     [<ReactLazyComponent>]
@@ -92,7 +92,7 @@ type ArcFileMetadata =
         )
 
     [<ReactComponent>]
-    static member private LazyDataMapMetadata(datamap: DataMap) =
+    static member private LazyDataMapMetadata(datamap: Datamap) =
         React.Suspense(
             [ LazyComponents.LazyDataMapMetadata(datamap) ],
             fallback = ArcFileMetadata.LazyFallback("Loading datamap metadata...")

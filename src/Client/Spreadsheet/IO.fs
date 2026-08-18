@@ -28,7 +28,7 @@ module Xlsx =
                     ->
                     ARCtrl.Spreadsheet.Template.fromFsWorkbook fswb |> ArcFiles.Template
                 | _ when ws.Exists(fun ws -> ws.Name.ToLower().Contains("datamap")) ->
-                    let datamap = DataMap.fromFsWorkbook fswb
+                    let datamap = Datamap.fromFsWorkbook fswb
                     ArcFiles.DataMap(Some(DatamapParentInfo.create "default" DataMapParent.Assay), datamap)
 
                 //Adapt to FSWorkBook and FromFSWorkbook of ARCtrl to include DatamapParentInfo
@@ -58,7 +58,7 @@ module Json =
             (ArcFilesDiscriminate.Investigation, JsonExportFormat.ISA),
             fun json -> ArcInvestigation.fromISAJsonString json |> ArcFiles.Investigation
             (ArcFilesDiscriminate.Investigation, JsonExportFormat.ROCrate),
-            fun json -> ArcInvestigation.fromROCrateJsonString json |> ArcFiles.Investigation
+            fun json -> (ARC.fromROCrateJsonString json :> ArcInvestigation) |> ArcFiles.Investigation
 
             (ArcFilesDiscriminate.Study, JsonExportFormat.ARCtrl),
             fun json -> ArcStudy.fromJsonString json |> fun x -> ArcFiles.Study(x, [])
@@ -93,5 +93,5 @@ module Json =
             fun json -> ArcWorkflow.fromCompressedJsonString json |> ArcFiles.Workflow
 
             (ArcFilesDiscriminate.DataMap, JsonExportFormat.ARCtrl),
-            fun json -> ArcFiles.DataMap(None, DataMap.fromJsonString json)
+            fun json -> ArcFiles.DataMap(None, Datamap.fromJsonString json)
         ]

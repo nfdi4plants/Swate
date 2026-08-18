@@ -854,10 +854,11 @@ type FormComponents =
 
     [<ReactComponent>]
     static member ValueInput
-        (input: ARCtrl.Value option, setter: ARCtrl.Value option -> unit, ?label: string, ?rmv: MouseEvent -> unit)
+        (input: ScalarValue option, setter: ScalarValue option -> unit, ?label: string, ?rmv: MouseEvent -> unit)
         =
         let list =
-            FSharpType.GetUnionCases(typeof<Value>) |> Array.map (fun item -> item.Name)
+            FSharpType.GetUnionCases(typeof<ScalarValue>)
+            |> Array.map (fun item -> item.Name)
 
         let NoneOption = "None"
 
@@ -865,7 +866,7 @@ type FormComponents =
         let init =
             match input with
             | Some v ->
-                match FSharpValue.GetUnionFields(v, typeof<Value>) with
+                match FSharpValue.GetUnionFields(v, typeof<ScalarValue>) with
                 | case, _ -> case.Name
             | None -> NoneOption
 
@@ -899,8 +900,8 @@ type FormComponents =
                                 prop.type'.number
                                 prop.defaultValue (
                                     match input with
-                                    | Some(Value.Int i) -> string i
-                                    | Some(Value.Float f) -> string f
+                                    | Some(ScalarValue.Int i) -> string i
+                                    | Some(ScalarValue.Float f) -> string f
                                     | _ -> ""
                                 )
                                 prop.onChange (fun (value: string) ->
@@ -911,14 +912,14 @@ type FormComponents =
                                         match valueType with
                                         | "Int" ->
                                             match System.Int32.TryParse value with
-                                            | (true, v) -> (Value.Int v)
-                                            | _ -> (Value.Int 0)
+                                            | (true, v) -> ScalarValue.Int v
+                                            | _ -> ScalarValue.Int 0
                                             |> Some
                                             |> setter
                                         | "Float" ->
                                             match System.Double.TryParse value with
-                                            | (true, v) -> (Value.Float v)
-                                            | _ -> (Value.Float 0.0)
+                                            | (true, v) -> ScalarValue.Float v
+                                            | _ -> ScalarValue.Float 0.0
                                             |> Some
                                             |> setter
                                         | _ -> setter None
@@ -930,27 +931,27 @@ type FormComponents =
                                 prop.type'.text
                                 prop.defaultValue (
                                     match input with
-                                    | Some(Value.Name s) -> s
+                                    | Some(ScalarValue.Name s) -> s
                                     | _ -> ""
                                 )
                                 prop.onChange (fun (value: string) ->
                                     if System.String.IsNullOrWhiteSpace value then
                                         setter None
                                     else
-                                        Value.Name value |> Some |> setter
+                                        ScalarValue.Name value |> Some |> setter
                                 )
                             ]
                         | "Ontology" ->
                             let oa =
                                 match input with
-                                | Some(Value.Ontology oa) -> oa
+                                | Some(ScalarValue.Ontology oa) -> oa
                                 | _ -> OntologyAnnotation.create ("")
 
                             FormComponents.OntologyAnnotationInput(
                                 Some oa,
                                 (fun oas ->
                                     if oas.IsSome then
-                                        Value.Ontology oas.Value |> Some |> setter
+                                        ScalarValue.Ontology oas.Value |> Some |> setter
                                     else
                                         setter None
                                 )
@@ -1040,16 +1041,19 @@ type FormComponents =
 
     [<ReactComponent>]
     static member ParametersInput
-        (
-            parameters: ResizeArray<Process.ProtocolParameter>,
-            setter: ResizeArray<Process.ProtocolParameter> -> unit,
-            ?label: string
-        ) =
+        (parameters: ResizeArray<OntologyAnnotation>, setter: ResizeArray<OntologyAnnotation> -> unit, ?label: string)
+        =
         FormComponents.InputSequence(
             parameters,
-            Process.ProtocolParameter.create,
+            OntologyAnnotation.empty,
             setter,
-            (fun (v, setV, rmv) -> FormComponents.ParameterInput(v, setV, rmv)),
+            (fun (v, setV, rmv) ->
+                FormComponents.OntologyAnnotationInput(
+                    Some v,
+                    (fun nextValue -> nextValue |> Option.defaultValue (OntologyAnnotation.empty ()) |> setV),
+                    ?rmv = Some rmv
+                )
+            ),
             ?label = label
         )
 

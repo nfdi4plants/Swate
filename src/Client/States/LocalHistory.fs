@@ -148,7 +148,7 @@ module ConversionTypes =
                 | Some(ArcFiles.Run r) -> JsonArcFiles.Run, ArcRun.toJsonString 0 r
                 | Some(ArcFiles.Workflow w) -> JsonArcFiles.Workflow, ArcWorkflow.toJsonString 0 w
                 | Some(ArcFiles.DataMap(p, d)) ->
-                    let data = DataMap.encoder d |> Encode.toJsonString (Encode.defaultSpaces (Some 0))
+                    let data = ARCtrl.Datamap.toJsonString 0 d
                     JsonArcFiles.DataMap p, data
                 | None -> JsonArcFiles.None, ""
 
@@ -180,7 +180,7 @@ module ConversionTypes =
                     | JsonArcFiles.Workflow ->
                         ArcWorkflow.fromJsonString decompressedString |> ArcFiles.Workflow |> Some
                     | JsonArcFiles.DataMap p ->
-                        let dataMap = Decode.fromJsonString DataMap.decoder decompressedString
+                        let dataMap = ARCtrl.Datamap.fromJsonString decompressedString
                         ArcFiles.DataMap(p, dataMap) |> Some
                     | JsonArcFiles.Template -> Template.fromJsonString decompressedString |> ArcFiles.Template |> Some
                     | JsonArcFiles.None -> None

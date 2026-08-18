@@ -33,7 +33,7 @@ type AnnotationTarget =
 [<RequireQualifiedAccess>]
 type AnnotationDestination =
     | Table of ArcTable
-    | DataMap of DataMap
+    | DataMap of Datamap
 
 type AnnotationInput = {
     Selectors: string[]

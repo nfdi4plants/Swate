@@ -20,46 +20,46 @@ let private pathDynamic: obj = importAll "path"
 
 /// This function mutably sets the datamap on the correct parent based on the datamap parent info included in the file content DTO.
 /// It also ensures that the static hash is preserved to avoid unnecessary changes to the ARC when saving a datamap.
-let private setDataMapByParentInfo (arc: ARC) (dmpi: DatamapParentInfo) (dm: DataMap) : Result<unit, exn> =
+let private setDataMapByParentInfo (arc: ARC) (dmpi: DatamapParentInfo) (dm: Datamap) : Result<unit, exn> =
     try
         match dmpi.Parent with
         | DataMapParent.Study ->
             arc.TryGetStudy dmpi.ParentId
             |> Option.iter (fun study ->
-                if study.DataMap.IsSome then
-                    dm.StaticHash <- study.DataMap.Value.StaticHash
+                if study.Datamap.IsSome then
+                    dm.StaticHash <- study.Datamap.Value.StaticHash
 
-                study.DataMap <- Some dm
+                study.Datamap <- Some dm
             )
 
             Ok()
         | DataMapParent.Assay ->
             arc.TryGetAssay dmpi.ParentId
             |> Option.iter (fun assay ->
-                if assay.DataMap.IsSome then
-                    dm.StaticHash <- assay.DataMap.Value.StaticHash
+                if assay.Datamap.IsSome then
+                    dm.StaticHash <- assay.Datamap.Value.StaticHash
 
-                assay.DataMap <- Some dm
+                assay.Datamap <- Some dm
             )
 
             Ok()
         | DataMapParent.Workflow ->
             arc.TryGetWorkflow dmpi.ParentId
             |> Option.iter (fun workflow ->
-                if workflow.DataMap.IsSome then
-                    dm.StaticHash <- workflow.DataMap.Value.StaticHash
+                if workflow.Datamap.IsSome then
+                    dm.StaticHash <- workflow.Datamap.Value.StaticHash
 
-                workflow.DataMap <- Some dm
+                workflow.Datamap <- Some dm
             )
 
             Ok()
         | DataMapParent.Run ->
             arc.TryGetRun dmpi.ParentId
             |> Option.iter (fun run ->
-                if run.DataMap.IsSome then
-                    dm.StaticHash <- run.DataMap.Value.StaticHash
+                if run.Datamap.IsSome then
+                    dm.StaticHash <- run.Datamap.Value.StaticHash
 
-                run.DataMap <- Some dm
+                run.Datamap <- Some dm
             )
 
             Ok()

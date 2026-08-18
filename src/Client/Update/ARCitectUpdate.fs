@@ -59,7 +59,7 @@ module ARCitect =
                         if dataMapParent.IsNone then
                             failwith "No parent for datamap is available!"
 
-                        let dataMap = DataMap.fromJsonString json
+                        let dataMap = Datamap.fromJsonString json
 
                         ArcFiles.DataMap(dataMapParent, dataMap)
 
@@ -79,7 +79,7 @@ module ARCitect =
                 | ArcFiles.Workflow workflow -> ArcFilesDiscriminate.Workflow, ArcWorkflow.toJsonString 0 workflow, None
                 | ArcFiles.Template template -> ArcFilesDiscriminate.Template, Template.toJsonString 0 template, None
                 | ArcFiles.DataMap(datamapParent, datamap) ->
-                    ArcFilesDiscriminate.DataMap, DataMap.toJsonString 0 datamap, datamapParent
+                    ArcFilesDiscriminate.DataMap, Datamap.toJsonString 0 datamap, datamapParent
 
             let cmd =
                 Cmd.OfPromise.attempt

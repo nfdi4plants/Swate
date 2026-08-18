@@ -86,7 +86,7 @@ module private ArcObjectExplorerContentHelper =
     let optionalTextRow label value =
         value |> asOptionalText |> Option.map (fun text -> textRow label text)
 
-    let dataMapSummaryRows (dataMap: DataMap) =
+    let dataMapSummaryRows (dataMap: Datamap) =
         let headers =
             seq {
                 for index in 0 .. dataMap.ColumnCount - 1 do

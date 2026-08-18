@@ -57,7 +57,7 @@ let private findLastNonEmptyDataCellIndex (cells: ResizeArray<CompositeCell>) =
 
     lastNonEmptyIndex
 
-let private findLastNonEmptyDataContextIndex (dataMap: DataMap) =
+let private findLastNonEmptyDataContextIndex (dataMap: Datamap) =
     let mutable lastNonEmptyIndex = -1
 
     for index in 0 .. dataMap.DataContexts.Count - 1 do
@@ -138,7 +138,7 @@ let applyToTable (table: ArcTable) (input: AnnotationInput) =
             with exceptionValue ->
                 Error exceptionValue.Message
 
-let applyToDataMap (dataMap: DataMap) (input: AnnotationInput) =
+let applyToDataMap (dataMap: Datamap) (input: AnnotationInput) =
     match input.Target with
     | AnnotationTarget.Table _ -> Error "Table target cannot be applied to a DataMap destination."
     | AnnotationTarget.DataMap writeMode ->

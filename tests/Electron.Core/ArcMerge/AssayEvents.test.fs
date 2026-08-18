@@ -41,13 +41,13 @@ Vitest.describe (
             "change event: in-memory DataMap is forwarded onto the disc entity",
             fun () ->
                 let arcLocal, arcRemote = MockData.createTwoCleanCopies ()
-                arcLocal.Assays.[0].DataMap <- Some(DataMap.init ())
+                arcLocal.Assays.[0].Datamap <- Some(Datamap.init ())
                 arcRemote.Assays.[0].Title <- Some "Disc Title"
 
                 let merged = ARC.merge arcLocal arcRemote [ assayEvent EventName.Change "My Assay" ]
 
                 Vitest.expect(merged.Assays.[0].Title).toEqual (Some "Disc Title")
-                Vitest.expect(merged.Assays.[0].DataMap.IsSome).toBe (true)
+                Vitest.expect(merged.Assays.[0].Datamap.IsSome).toBe (true)
         )
 
         Vitest.test (

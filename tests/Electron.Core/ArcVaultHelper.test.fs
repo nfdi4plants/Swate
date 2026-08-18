@@ -26,19 +26,19 @@ let private arctrlDefaultGitignoreContent () =
 
 let private addDataMapToAllEntityTypes (arc: ARC) =
     let study = ArcStudy("Study With DataMap")
-    study.DataMap <- Some(DataMap.init ())
+    study.Datamap <- Some(Datamap.init ())
     arc.AddStudy(study)
 
     let assay = ArcAssay("Assay With DataMap")
-    assay.DataMap <- Some(DataMap.init ())
+    assay.Datamap <- Some(Datamap.init ())
     arc.AddAssay(assay)
 
     let workflow = ArcWorkflow("Workflow With DataMap")
-    workflow.DataMap <- Some(DataMap.init ())
+    workflow.Datamap <- Some(Datamap.init ())
     arc.AddWorkflow(workflow)
 
     let run = ArcRun("Run With DataMap")
-    run.DataMap <- Some(DataMap.init ())
+    run.Datamap <- Some(Datamap.init ())
     arc.AddRun(run)
 
 Vitest.describe (
@@ -556,14 +556,14 @@ Vitest.describe (
                         Vitest.expect(vault.arc.Value.hasInMemoryChanges ()).toBe (false)
 
                         let loadedArc = vault.arc.Value
-                        Vitest.expect(loadedArc.GetAssay("Assay With DataMap").DataMap.Value.StaticHash).not.toBe (0)
-                        Vitest.expect(loadedArc.GetStudy("Study With DataMap").DataMap.Value.StaticHash).not.toBe (0)
+                        Vitest.expect(loadedArc.GetAssay("Assay With DataMap").Datamap.Value.StaticHash).not.toBe (0)
+                        Vitest.expect(loadedArc.GetStudy("Study With DataMap").Datamap.Value.StaticHash).not.toBe (0)
 
                         Vitest
-                            .expect(loadedArc.GetWorkflow("Workflow With DataMap").DataMap.Value.StaticHash)
+                            .expect(loadedArc.GetWorkflow("Workflow With DataMap").Datamap.Value.StaticHash)
                             .not.toBe (0)
 
-                        Vitest.expect(loadedArc.GetRun("Run With DataMap").DataMap.Value.StaticHash).not.toBe (0)
+                        Vitest.expect(loadedArc.GetRun("Run With DataMap").Datamap.Value.StaticHash).not.toBe (0)
                     })
         )
 )

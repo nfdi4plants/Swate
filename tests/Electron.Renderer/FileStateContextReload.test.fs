@@ -264,7 +264,7 @@ Vitest.describe (
 
                 let dto =
                     Swate.Electron.Shared.FileIOHelper.FileContentDTO.fromArcFile (
-                        ArcFiles.DataMap(Some parent, DataMap.init ())
+                        ArcFiles.DataMap(Some parent, Datamap.init ())
                     )
                     |> Option.defaultWith (fun () -> failwith "Expected a DataMap DTO.")
 

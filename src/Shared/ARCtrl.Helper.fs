@@ -8,14 +8,6 @@ open ARCtrl
 [<AutoOpen>]
 module ARCtrlHelper =
 
-    /// WORKAROUND: ARCtrl's DataContext.Copy() omits DataContext.Label.
-    /// Remove this function after upgrading to an ARCtrl version that preserves labels.
-    let preserveDataMapLabelsWorkaround (source: DataMap) (target: DataMap) =
-        Seq.iter2
-            (fun (source: DataContext) (target: DataContext) -> target.Label <- source.Label)
-            source.DataContexts
-            target.DataContexts
-
     [<RequireQualifiedAccess; StringEnum>]
     type ArcFilesDiscriminate =
         | [<CompiledName("investigation")>] Investigation
@@ -117,7 +109,7 @@ module ARCtrlHelper =
         | Assay of ArcAssay
         | Run of ArcRun
         | Workflow of ArcWorkflow
-        | DataMap of (DatamapParentInfo option * DataMap)
+        | DataMap of (DatamapParentInfo option * Datamap)
 
         member this.HasMetadata() =
             match this with
@@ -187,10 +179,10 @@ module ARCtrlHelper =
 
         member this.TryGetDataMap() =
             match this with
-            | ArcFiles.Assay assay when assay.DataMap.IsSome -> Some assay.DataMap.Value
-            | ArcFiles.Study(study, _) when study.DataMap.IsSome -> Some study.DataMap.Value
-            | ArcFiles.Workflow workflow when workflow.DataMap.IsSome -> Some workflow.DataMap.Value
-            | ArcFiles.Run run when run.DataMap.IsSome -> Some run.DataMap.Value
+            | ArcFiles.Assay assay when assay.Datamap.IsSome -> Some assay.Datamap.Value
+            | ArcFiles.Study(study, _) when study.Datamap.IsSome -> Some study.Datamap.Value
+            | ArcFiles.Workflow workflow when workflow.Datamap.IsSome -> Some workflow.Datamap.Value
+            | ArcFiles.Run run when run.Datamap.IsSome -> Some run.Datamap.Value
             | ArcFiles.DataMap(_, dataMap) -> Some dataMap
             | _ -> None
 
@@ -207,10 +199,6 @@ module ARCtrlHelper =
                 | ArcFiles.Workflow workflow -> ArcFiles.Workflow <| workflow.Copy()
                 | ArcFiles.DataMap(parent, dataMap) -> ArcFiles.DataMap(parent, dataMap.Copy())
                 | ArcFiles.Template template -> ArcFiles.Template <| template.Copy()
-
-            match arcFile.TryGetDataMap(), copy.TryGetDataMap() with
-            | Some source, Some target -> preserveDataMapLabelsWorkaround source target
-            | _ -> ()
 
             copy
 
@@ -329,7 +317,7 @@ module Json =
                 (ArcFilesDiscriminate.Investigation, JsonExportFormat.ISA),
                 fun json -> ArcInvestigation.fromISAJsonString json |> ArcFiles.Investigation
                 (ArcFilesDiscriminate.Investigation, JsonExportFormat.ROCrate),
-                fun json -> ArcInvestigation.fromROCrateJsonString json |> ArcFiles.Investigation
+                fun json -> (ARC.fromROCrateJsonString json :> ArcInvestigation) |> ArcFiles.Investigation
 
                 (ArcFilesDiscriminate.Study, JsonExportFormat.ARCtrl),
                 fun json -> ArcStudy.fromJsonString json |> fun x -> ArcFiles.Study(x, [])
@@ -365,7 +353,7 @@ module Json =
                 fun json -> ArcWorkflow.fromCompressedJsonString json |> ArcFiles.Workflow
 
                 (ArcFilesDiscriminate.DataMap, JsonExportFormat.ARCtrl),
-                fun json -> ArcFiles.DataMap(None, DataMap.fromJsonString json)
+                fun json -> ArcFiles.DataMap(None, Datamap.fromJsonString json)
             ]
 
         let toFileName (id: string) (fileType: ArcFilesDiscriminate) (jsonType: JsonExportFormat) =
@@ -553,7 +541,7 @@ module Json =
                 | Investigation ai, JsonExportFormat.ISA ->
                     nameFromId ai.Identifier, ArcInvestigation.toISAJsonString 0 ai
                 | Investigation ai, JsonExportFormat.ROCrate ->
-                    nameFromId ai.Identifier, ArcInvestigation.toROCrateJsonString 0 ai
+                    nameFromId ai.Identifier, (ARC.fromArcInvestigation ai).ToROCrateJsonString(spaces = 0)
 
                 | Study(as', _), JsonExportFormat.ARCtrl -> nameFromId as'.Identifier, ArcStudy.toJsonString 0 (as')
                 | Study(as', _), JsonExportFormat.ARCtrlCompressed ->
@@ -586,7 +574,7 @@ module Json =
                 | Workflow _, anyElse ->
                     failwithf "Error. It is not intended to parse Workflow to %s format." (string anyElse)
 
-                | DataMap(_, d), JsonExportFormat.ARCtrl -> nameFromId "", DataMap.toJsonString 0 d
+                | DataMap(_, d), JsonExportFormat.ARCtrl -> nameFromId "", Datamap.toJsonString 0 d
                 | DataMap(_), anyElse ->
                     failwithf "Error. It is not intended to parse Datamap to %s format." (string anyElse)
 

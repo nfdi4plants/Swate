@@ -137,7 +137,7 @@ module ArcAddExtensions =
                 let workingArc, contracts =
                     prepareAddContracts this arcFile includeUpdateContractsFlag
 
-                let! result = fullFillContractBatchAsync arcPath contracts
+                let! result = fullFillContractBatchAsync true arcPath contracts
 
                 match result with
                 | Ok _ -> commitAddedArcFile this workingArc arcFile

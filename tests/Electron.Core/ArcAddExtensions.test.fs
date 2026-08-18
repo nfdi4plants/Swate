@@ -282,7 +282,7 @@ Vitest.describe (
 
                         let unsupportedArcFiles = [|
                             ArcFiles.Investigation(ArcInvestigation("Investigation")), "investigation"
-                            ArcFiles.DataMap(None, DataMap.init ()), "datamap"
+                            ArcFiles.DataMap(None, Datamap.init ()), "datamap"
                             ArcFiles.Template(Template.init "Template"), "template"
                         |]
 

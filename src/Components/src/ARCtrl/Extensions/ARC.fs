@@ -38,49 +38,49 @@ type ARC with
             run |> Option.map ArcFiles.Run
         | DatamapPath _ ->
             match splitPath with
-            | [| AssaysFolderName; anyAssayName; DataMapFileName |] ->
+            | [| AssaysFolderName; anyAssayName; DatamapFileName |] ->
                 let assay = this.TryGetAssay(Identifier.Assay.identifierFromFileName anyAssayName)
 
                 let datamap =
                     assay
-                    |> Option.bind (fun a -> a.DataMap)
+                    |> Option.bind (fun a -> a.Datamap)
                     |> Option.map (fun dm ->
                         let dmpi = DatamapParentInfo.create anyAssayName DataMapParent.Assay |> Some
                         dmpi, dm
                     )
 
                 datamap |> Option.map ArcFiles.DataMap
-            | [| StudiesFolderName; anyStudyName; DataMapFileName |] ->
+            | [| StudiesFolderName; anyStudyName; DatamapFileName |] ->
                 let study = this.TryGetStudy(Identifier.Study.identifierFromFileName anyStudyName)
 
                 let datamap =
                     study
-                    |> Option.bind (fun s -> s.DataMap)
+                    |> Option.bind (fun s -> s.Datamap)
                     |> Option.map (fun dm ->
                         let dmpi = DatamapParentInfo.create anyStudyName DataMapParent.Study |> Some
                         dmpi, dm
                     )
 
                 datamap |> Option.map ArcFiles.DataMap
-            | [| WorkflowsFolderName; anyWorkflowName; DataMapFileName |] ->
+            | [| WorkflowsFolderName; anyWorkflowName; DatamapFileName |] ->
                 let workflow =
                     this.TryGetWorkflow(Identifier.Workflow.identifierFromFileName anyWorkflowName)
 
                 let datamap =
                     workflow
-                    |> Option.bind (fun w -> w.DataMap)
+                    |> Option.bind (fun w -> w.Datamap)
                     |> Option.map (fun dm ->
                         let dmpi = DatamapParentInfo.create anyWorkflowName DataMapParent.Workflow |> Some
                         dmpi, dm
                     )
 
                 datamap |> Option.map ArcFiles.DataMap
-            | [| RunsFolderName; anyRunName; DataMapFileName |] ->
+            | [| RunsFolderName; anyRunName; DatamapFileName |] ->
                 let run = this.TryGetRun(Identifier.Run.identifierFromFileName anyRunName)
 
                 let datamap =
                     run
-                    |> Option.bind (fun r -> r.DataMap)
+                    |> Option.bind (fun r -> r.Datamap)
                     |> Option.map (fun dm ->
                         let dmpi = DatamapParentInfo.create anyRunName DataMapParent.Run |> Some
                         dmpi, dm

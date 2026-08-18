@@ -67,7 +67,7 @@ Vitest.describe (
                 | Error exn -> failwith $"Expected DataMap creation to succeed: {exn.Message}"
                 | Ok() -> ()
 
-                Vitest.expect(originalAssay.DataMap.IsNone).toBe (true)
+                Vitest.expect(originalAssay.Datamap.IsNone).toBe (true)
                 Vitest.expect(publishedPageStates.Count).toBe (1)
                 Vitest.expect(persistedArcFiles.Count).toBe (1)
                 let publishedView, publishedArcFile = publishedPageStates.[0]
@@ -75,7 +75,7 @@ Vitest.describe (
                 Vitest.expect(obj.ReferenceEquals(publishedArcFile, persistedArcFiles.[0])).toBe (true)
 
                 match publishedArcFile with
-                | ArcFiles.Assay assay -> Vitest.expect(assay.DataMap.IsSome).toBe (true)
+                | ArcFiles.Assay assay -> Vitest.expect(assay.Datamap.IsSome).toBe (true)
                 | _ -> failwith "Expected the published ARC file to remain an Assay."
             }
         )
@@ -144,8 +144,8 @@ Vitest.describe (
             "preserves DataMap parent info while replacing imported DataMap content",
             fun () ->
                 let parentInfo = DatamapParentInfo.create "assay-parent" DataMapParent.Assay
-                let currentDataMap = DataMap.init ()
-                let importedDataMap = DataMap.init ()
+                let currentDataMap = Datamap.init ()
+                let importedDataMap = Datamap.init ()
                 importedDataMap.DataContexts.Add(DataContext())
 
                 let result =
