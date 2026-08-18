@@ -67,7 +67,7 @@ type Tree =
             if shouldUseVirtualization then
                 virtualizer.scrollToIndex (
                     index,
-                    {|
+                    options = {|
                         align = Some Virtual.AlignOption.Auto
                         behavior = Some Virtual.ScrollBehavior.Auto
                     |}
