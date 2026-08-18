@@ -69,6 +69,9 @@ let renameAsync (oldPath: string) (newPath: string) : JS.Promise<unit> = jsNativ
 [<Import("rm", "fs/promises")>]
 let rmAsync (path: string) (options: RmOptions) : JS.Promise<unit> = jsNative
 
+[<Import("copyFile", "fs/promises")>]
+let copyFileAsync (sourcePath: string) (targetPath: string) : JS.Promise<unit> = jsNative
+
 [<Import("stat", "fs/promises")>]
 let statAsync (path: string) : JS.Promise<Stats> = jsNative
 

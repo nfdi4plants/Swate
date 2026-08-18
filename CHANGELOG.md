@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+-   Add an Electron FileTree context-menu action for selecting external files and importing them into the chosen ARC folder.
 -   Enforce the DataHub Git LFS tracking ruleset: `isa.*.xlsx` metadata files are never tracked with Git LFS (skipped by automatic tracking, exempt from the commit size policy, and blocked from manual marking), while files inside a `dataset` folder or larger than 25 MB can no longer be unmarked #1316.
 
 ### Changed

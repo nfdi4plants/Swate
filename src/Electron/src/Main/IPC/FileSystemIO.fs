@@ -6,6 +6,8 @@ open Fable.Core.JsInterop
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.RenamePathRules
+open Main.Bindings.Filesystem
+open Main.Bindings.Path
 
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
@@ -202,6 +204,37 @@ let mapRenameDiskError (sourcePath: string) (targetPath: string) (renameError: e
 
 [<RequireQualifiedAccess>]
 module ArcFileSystemHelper =
+
+    let importExternalFilesOnDisk
+        (arcPath: string)
+        (targetRelativePath: string)
+        (sourcePaths: string[])
+        : JS.Promise<Result<unit, exn>> =
+        promise {
+            let normalizedTargetPath =
+                PathHelpers.normalizeCanonicalRelativePath targetRelativePath
+
+            let targetDirectoryResult =
+                if String.IsNullOrWhiteSpace normalizedTargetPath then
+                    Ok(resolveAbsolutePath arcPath)
+                else
+                    tryResolveArcRelativePath arcPath normalizedTargetPath
+
+            match targetDirectoryResult with
+            | Error pathError -> return Error pathError
+            | Ok targetDirectory ->
+                let! targetIsDirectory = ARCtrl.FileSystemHelper.directoryExistsAsync targetDirectory
+
+                if not targetIsDirectory then
+                    return Error(exn $"Cannot import because '{targetRelativePath}' is not a folder.")
+                else
+                    for sourcePath in sourcePaths do
+                        let sourceAbsolutePath = resolveAbsolutePath sourcePath
+                        let targetAbsolutePath = join [| targetDirectory; basename sourceAbsolutePath |]
+                        do! copyFileAsync sourceAbsolutePath targetAbsolutePath
+
+                    return Ok()
+        }
 
     type CreateFileSystemItemPlan = {
         ParentPath: string

@@ -67,6 +67,7 @@ type FileTree =
 
         let activeDialog, setActiveDialog = React.useState<FileTreeDialog option> None
         let isDialogBusy, setIsDialogBusy = React.useState false
+        let isImportingFiles, setIsImportingFiles = React.useState false
         // The file watcher emits the initial tree too; only later tree updates should refresh open previews.
         let hasObservedFileTreeUpdateRef = React.useRef false
 
@@ -417,6 +418,30 @@ type FileTree =
             pathActionConfig = {
                 openPathInFileExplorer = Api.ipcArcVaultApi.showPathInFileExplorer
                 openPathWithDefaultApplication = Api.ipcArcVaultApi.openPathWithDefaultApplication
+                importExternalFiles =
+                    fun targetRelativePath -> promise {
+                        match! Api.ipcArcVaultApi.pickAbsolutePaths () with
+                        | Error exn -> return Error exn
+                        | Ok [||] -> return Ok()
+                        | Ok sourceAbsolutePaths ->
+                            setIsImportingFiles true
+
+                            try
+                                // Give React an event-loop turn to render the progress modal before copying starts.
+                                do! Promise.sleep 0
+                                let minimumVisibility = Promise.sleep 300
+
+                                let! result =
+                                    Api.ipcArcVaultApi.tryImportExternalFiles {
+                                        targetRelativePath = targetRelativePath
+                                        sourceAbsolutePaths = sourceAbsolutePaths
+                                    }
+
+                                do! minimumVisibility
+                                return result
+                            finally
+                                setIsImportingFiles false
+                    }
                 enqueueError = errorModal.enqueue
             }
             enqueueError = errorModal.enqueue
@@ -514,6 +539,30 @@ type FileTree =
                 isRenaming = isDialogBusy
             )
 
+        let importingFilesModal =
+            if isImportingFiles then
+                Html.div [
+                    prop.className "swt:modal swt:modal-open"
+                    prop.role "dialog"
+                    prop.custom ("aria-modal", "true")
+                    prop.children [
+                        Html.div [
+                            prop.className "swt:modal-box"
+                            prop.children [
+                                Html.h2 [
+                                    prop.className "swt:text-lg swt:font-semibold"
+                                    prop.text "Importing files"
+                                ]
+                                Swate.Components.Primitive.LoadingSpinner.LoadingSpinner.LoadingSpinner(
+                                    text = "Copying the selected files..."
+                                )
+                            ]
+                        ]
+                    ]
+                ]
+            else
+                Html.none
+
         match fileItem with
         | Some rootItem ->
             let visibleItems = rootItem.Children |> Option.defaultValue []
@@ -547,6 +596,7 @@ type FileTree =
                 fileSystemCreateModal
                 renameModal
                 deleteConfirmModal
+                importingFilesModal
             ]
         | None ->
             React.Fragment [
@@ -555,4 +605,5 @@ type FileTree =
                 fileSystemCreateModal
                 renameModal
                 deleteConfirmModal
+                importingFilesModal
             ]

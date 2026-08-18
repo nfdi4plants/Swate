@@ -103,3 +103,8 @@ type CreateFileSystemItemRequest = {
     name: string
     kind: FileSystemItemKind
 }
+
+type ImportExternalFilesRequest = {
+    targetRelativePath: string
+    sourceAbsolutePaths: string[]
+}

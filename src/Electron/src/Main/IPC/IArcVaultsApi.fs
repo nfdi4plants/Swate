@@ -93,6 +93,21 @@ let private runLoadedArcPathAction
             return Error e
     }
 
+let private pickAbsolutePaths (event: IpcMainInvokeEvent) = promise {
+    let properties = [|
+        Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
+        Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
+    |]
+
+    let window = dialogParentFromIpcEvent event
+    let! result = dialog.showOpenDialog (?window = window, properties = properties)
+
+    if result.canceled then
+        return Ok None
+    else
+        return Ok(Some result.filePaths)
+}
+
 let private initGitRepositoryForCreatedArcDisposition
     (initRepository: string -> JS.Promise<Main.Git.GitService.GitResult<string>>)
     (initGit: bool)
@@ -322,19 +337,10 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
     pickAbsolutePaths =
         fun () -> promise {
             try
-                let properties = [|
-                    Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
-                    Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
-                |]
-
-                let window = dialogParentFromIpcEvent event
-
-                let! result = dialog.showOpenDialog (?window = window, properties = properties)
-
-                if result.canceled then
-                    return Error(exn "Cancelled")
-                else
-                    return Ok result.filePaths
+                match! pickAbsolutePaths event with
+                | Error exn -> return Error exn
+                | Ok None -> return Ok [||]
+                | Ok(Some paths) -> return Ok paths
             with e ->
                 return Error(exn $"Could not pick files: {e.Message}")
         }
@@ -371,6 +377,27 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     return Ok(importedFiles.ToArray())
             with e ->
                 return Error(exn $"Could not import external text files: {e.Message}")
+        }
+    tryImportExternalFiles =
+        fun (request: ImportExternalFilesRequest) -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            match!
+                                ArcFileSystemHelper.importExternalFilesOnDisk
+                                    vault.path.Value
+                                    request.targetRelativePath
+                                    request.sourceAbsolutePaths
+                            with
+                            | Error exn -> return Error exn
+                            | Ok() ->
+                                do! vault.RefreshFileTree()
+                                return Ok()
+                        })
+            with e ->
+                return Error(exn $"Could not import files: {e.Message}")
         }
     getFileTree =
         fun () -> promise {

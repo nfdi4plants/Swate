@@ -158,6 +158,25 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "imports an external file into an ARC folder",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let sourcePath = join [| dirname arcPath; "external.txt" |]
+                    do! writeRelativeFileAsync (dirname arcPath) "external.txt" "imported content"
+
+                    match! ArcFileSystemHelper.importExternalFilesOnDisk arcPath "assays/AssayA" [| sourcePath |] with
+                    | Error error -> failwith error.Message
+                    | Ok() ->
+                        let importedPath = absoluteArcPath arcPath "assays/AssayA/external.txt"
+
+                        let! importedContent =
+                            fsPromisesDynamic?readFile (importedPath, "utf8") |> unbox<JS.Promise<string>>
+
+                        Vitest.expect(importedContent).toBe ("imported content")
+                })
+        )
+
+        Vitest.test (
             "protects structural entity child folders while allowing their contents",
             fun () ->
                 withAssayArc (fun arcPath -> promise {

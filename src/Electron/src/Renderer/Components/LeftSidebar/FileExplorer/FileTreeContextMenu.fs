@@ -13,6 +13,7 @@ open Renderer.Components.LeftSidebar.FileExplorer.Helper
 type PathActionConfig = {
     openPathInFileExplorer: string -> JS.Promise<Result<unit, exn>>
     openPathWithDefaultApplication: string -> JS.Promise<Result<unit, exn>>
+    importExternalFiles: string -> JS.Promise<Result<unit, exn>>
     enqueueError: ErrorModalRequest -> unit
 }
 
@@ -99,6 +100,12 @@ let private pathActionContextMenuItemsForRelativePath
                 "Open with Default Application"
                 "swt:fluent--open-24-regular"
                 (fun () -> runPathAction config "Open file failed" config.openPathWithDefaultApplication relativePath)
+
+        else
+            ContextMenuItem.create
+                "Import files"
+                "swt:fluent--arrow-import-24-regular swt:rotate-180"
+                (fun () -> runPathAction config "Import failed" config.importExternalFiles relativePath)
 
         ContextMenuItem.create
             "Open Folder Location"
