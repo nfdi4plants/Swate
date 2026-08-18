@@ -333,6 +333,7 @@
     <Compile Include="Page\CwlEditor\StartScreen.fs" />
     <Compile Include="Page\CwlEditor\CommandLineToolEditor.fs" />
     <Compile Include="Page\CwlEditor\WorkflowEditor.fs" />
+    <Compile Include="Page\CwlEditor\ExpressionToolEditor.fs" />
     
 
     <Compile Include="Style.fs" />
