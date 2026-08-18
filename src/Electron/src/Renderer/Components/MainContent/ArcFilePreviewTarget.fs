@@ -58,38 +58,6 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
             [| box arcFile; box pageStateCtx |]
         )
 
-    let widgetNavbarElements =
-        fun (props: ArcFileEditorHeaderProps) ->
-            let button (dataMap: ARCtrl.DataMap option) =
-                Swate.Components.Primitive.Buttons.Buttons.QuickAccessButton(
-                    Html.i [
-                        prop.className "swt:iconify swt:fluent--database-arrow-up-20-regular swt:size-5"
-                    ],
-                    "Add DataMap",
-                    (fun _ ->
-                        if dataMap.IsNone then
-                            promise {
-                                match!
-                                    createDataMapInCurrentTarget props.arcFile setArcFilePageState Helper.saveArcFile
-                                with
-                                | Ok() -> ()
-                                | Error exn ->
-                                    errorModal.enqueue (
-                                        ErrorModalRequest.create (exn.Message, title = "Could not save DataMap")
-                                    )
-                            }
-                            |> Promise.start
-                    ),
-                    isDisabled = dataMap.IsSome
-                )
-
-            match props.arcFile with
-            | ArcFiles.Assay assay -> button assay.DataMap
-            | ArcFiles.Study(study, _) -> button study.DataMap
-            | ArcFiles.Run run -> button run.DataMap
-            | ArcFiles.Workflow workflow -> button workflow.DataMap
-            | _ -> Html.none
-
     Html.div [
         prop.key (string (editorKey arcFile requestedView))
         prop.className "swt:contents"
@@ -98,7 +66,6 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
                 arcFile,
                 setArcFile,
                 pickFilePaths,
-                widgetNavbarElements = widgetNavbarElements,
                 startingActiveView = (requestedView |> Option.defaultValue ActiveView.Metadata),
                 onImportJson = importJson,
                 onError =

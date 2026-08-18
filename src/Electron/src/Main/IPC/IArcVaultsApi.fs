@@ -144,9 +144,14 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
         fun (arcPath: string) -> promise {
             try
                 let arcPath = PathHelpers.normalizePath arcPath
-                let windowId = windowIdFromIpcEvent event
-                let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
-                return Ok(ArcOpenDisposition.path disposition)
+                let! arcPathExists = pathExistsAsync arcPath
+
+                if not arcPathExists then
+                    return Error(exn $"The ARC cannot be found at location: '{arcPath}'.")
+                else
+                    let windowId = windowIdFromIpcEvent event
+                    let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
+                    return Ok(ArcOpenDisposition.path disposition)
             with e ->
                 return Error e
         }

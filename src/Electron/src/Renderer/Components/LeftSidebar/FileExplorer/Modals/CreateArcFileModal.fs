@@ -5,6 +5,7 @@ open Feliz
 open Swate.Components.Shared
 open Swate.Components.Primitive.Dialog
 open Renderer.Components.LeftSidebar.FileExplorer.Helper
+open Renderer.Components.LeftSidebar.FileExplorer.Types
 
 [<Erase; Mangle(false)>]
 type CreateArcFileModal =

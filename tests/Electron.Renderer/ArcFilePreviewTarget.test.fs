@@ -48,39 +48,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "creates a DataMap from a copy and publishes it with the DataMap remount request",
-            fun () -> promise {
-                let arcFile, originalAssay = createAssayArcFile [| "Table" |]
-                let publishedPageStates = ResizeArray<ActiveView option * ArcFiles>()
-                let persistedArcFiles = ResizeArray<ArcFiles>()
-
-                let! result =
-                    createDataMapInCurrentTarget
-                        arcFile
-                        (fun requestedView nextArcFile -> publishedPageStates.Add(requestedView, nextArcFile))
-                        (fun nextArcFile -> promise {
-                            persistedArcFiles.Add nextArcFile
-                            return Ok()
-                        })
-
-                match result with
-                | Error exn -> failwith $"Expected DataMap creation to succeed: {exn.Message}"
-                | Ok() -> ()
-
-                Vitest.expect(originalAssay.DataMap.IsNone).toBe (true)
-                Vitest.expect(publishedPageStates.Count).toBe (1)
-                Vitest.expect(persistedArcFiles.Count).toBe (1)
-                let publishedView, publishedArcFile = publishedPageStates.[0]
-                Vitest.expect(publishedView).toEqual (Some ActiveView.DataMap)
-                Vitest.expect(obj.ReferenceEquals(publishedArcFile, persistedArcFiles.[0])).toBe (true)
-
-                match publishedArcFile with
-                | ArcFiles.Assay assay -> Vitest.expect(assay.DataMap.IsSome).toBe (true)
-                | _ -> failwith "Expected the published ARC file to remain an Assay."
-            }
-        )
-
-        Vitest.test (
             "keeps the active table valid through reorder and deletion while drag identifiers stay stable",
             fun () ->
                 let arcFile, _ = createAssayArcFile [| "First"; "Selected"; "Last" |]
