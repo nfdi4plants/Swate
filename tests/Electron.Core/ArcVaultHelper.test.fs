@@ -14,8 +14,12 @@ open Swate.Electron.Shared.FileIOHelper
 open Vitest
 
 let private lifecycleTestWindow id isDestroyed onSend =
+    // The remoting proxy calls webContents.send with channel and payload arguments.
+    // Discard those transport details so lifecycle tests only observe whether a send occurred.
     let send: obj = emitJsExpr onSend "((..._args) => $0())"
 
+    // ArcVault only needs this subset of BrowserWindow for lifecycle broadcasts. Keeping the
+    // fixture minimal avoids constructing a real Electron window in the Vitest environment.
     createObj [
         "id" ==> id
         "isDestroyed" ==> (fun () -> isDestroyed)
