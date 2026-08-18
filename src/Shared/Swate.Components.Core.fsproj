@@ -34,6 +34,42 @@
     <Compile Include="ProvenanceGrouping\Session.fs" />
     <Compile Include="ProvenanceGrouping\ARCtrlConverter.fs" />
     <Compile Include="ProvenanceGrouping\Fixtures.fs" />
+    <Compile Include="Cwl\Domain\CwlDefaults.fs" />
+    <Compile Include="Cwl\Domain\EditorMutations.fs" />
+    <Compile Include="Cwl\Domain\EditorTypes.fs" />
+    <Compile Include="Cwl\Domain\RequirementMutations.fs" />
+    <Compile Include="Cwl\Domain\CommandLineToolMutations.fs" />
+    <Compile Include="Cwl\Domain\WorkflowMutations.fs" />
+    <Compile Include="Cwl\Domain\ExpressionToolMutations.fs" />
+    <Compile Include="Cwl\Domain\WorkflowLayout.fs" />
+    <Compile Include="Cwl\Domain\WorkflowCanvasAdapter.fs" />
+    <Compile Include="Cwl\Validation\ValidationTypes.fs" />
+    <Compile Include="Cwl\Validation\ValidationContext.fs" />
+    <Compile Include="Cwl\Validation\ValidationRule.fs" />
+    <Compile Include="Cwl\Validation\Rules\CommonRules.fs" />
+    <Compile Include="Cwl\Validation\Rules\CommandLineToolRules.fs" />
+    <Compile Include="Cwl\Validation\Rules\WorkflowRules.fs" />
+    <Compile Include="Cwl\Validation\Rules\ExpressionToolRules.fs" />
+    <Compile Include="Cwl\Validation\Rules\RequirementsRules.fs" />
+    <Compile Include="Cwl\Validation\RuleCatalog.fs" />
+    <Compile Include="Cwl\Validation\ValidationEngine.fs" />
+    <Compile Include="Cwl\CwlService.fs" />
+    <Compile Include="Cwl\HostTypes.fs" />
+    <Compile Include="Cwl\EditorControllerLogic.fs" />
+    <Compile Include="Cwl\Documents\Common.fs" />
+    <Compile Include="Cwl\Documents\Types.fs" />
+    <Compile Include="Cwl\Documents\Selectors.fs" />
+    <Compile Include="Cwl\Documents\Mutations.fs" />
+    <Compile Include="Cwl\State\Types.fs" />
+    <Compile Include="Cwl\State\Actions.fs" />
+    <Compile Include="Cwl\State\Effects.fs" />
+    <Compile Include="Cwl\State\Init.fs" />
+    <Compile Include="Cwl\State\Selectors.fs" />
+    <Compile Include="Cwl\State\Reducer.fs" />
+    <Compile Include="Cwl\Adapters\ArCtrlDecode.fs" />
+    <Compile Include="Cwl\Adapters\ArCtrlEncode.fs" />
+    <Compile Include="Cwl\Adapters\ValidationAdapter.fs" />
+    <Compile Include="Cwl\Adapters\WorkflowGraphAdapter.fs" />
     <Compile Include="ArcExplorerNode.fs" />
     <Compile Include="Shared.fs" />
   </ItemGroup>
@@ -42,6 +78,9 @@
     <PackageReference Include="ARCtrl.Core" />
     <PackageReference Include="ARCtrl.Javascript" />
     <PackageReference Include="ARCtrl.Spreadsheet" />
+    <PackageReference Include="ARCtrl.CWL" />
+    <PackageReference Include="ARCtrl.WorkflowGraph" />
+    <PackageReference Include="DynamicObj" />
     <PackageReference Include="Fable.Core" />
   </ItemGroup>
 
