@@ -1120,6 +1120,7 @@ type RequirementPicker =
                     prop.text title
                 ]
                 Html.ul [
+                    prop.testId (sprintf "cwl-requirement-dropzone-%s" (bucketKey bucket))
                     prop.className [
                         "swt:menu swt:bg-base-100 swt:rounded-box"
                         if isDragActive then
@@ -1199,6 +1200,7 @@ type RequirementPicker =
                     prop.text title
                 ]
                 Html.ul [
+                    prop.testId (sprintf "cwl-requirement-dropzone-%s" (bucketKey bucket))
                     prop.className [
                         "swt:menu swt:bg-base-100 swt:rounded-box"
                         if isDragActive then
