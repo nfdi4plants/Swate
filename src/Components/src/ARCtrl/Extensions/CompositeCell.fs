@@ -2,6 +2,7 @@
 module ARCtrl.CompositeCellExtensions
 
 open ARCtrl
+open ARCtrl.Helper
 
 type CompositeCell with
 
@@ -51,13 +52,21 @@ type CompositeCell with
         if header.IsSome then
             let header = header.Value
 
-            let isNumber (input: string) =
-                let success, _ = System.Double.TryParse(input)
-                success
-
             match content with
+            // Clipboard fitting treats term/unit columns as variable-width cells, so a pasted
+            // value + unit can arrive here as one cell with two fields.
+            // Unitized columns are represented by term headers; missing unit metadata is restored
+            // later from a matching unit annotation when available.
+            | [| value; unit |] when
+                header.IsTermColumn
+                && isNumber value
+                && not (System.String.IsNullOrWhiteSpace unit)
+                ->
+                CompositeCell.createUnitized (value, OntologyAnnotation.create unit)
             | arr when arr.Length > 0 && arr.Length < 4 && header.IsTermColumn && isNumber arr.[0] ->
                 CompositeCell.createUnitizedFromString (arr.[0]) |> _.ConvertToValidCell(header)
+            | [| value; _ |] when header.IsTermColumn ->
+                CompositeCell.createFreeText value |> _.ConvertToValidCell(header)
             | [| freetext |] when header.IsSingleColumn -> CompositeCell.createFreeText freetext
             | [| freetext |] -> CompositeCell.createFreeText freetext |> _.ConvertToValidCell(header)
             | [| name; tsr; tan |] when header.IsTermColumn -> CompositeCell.createTermFromString (name, tsr, tan)
