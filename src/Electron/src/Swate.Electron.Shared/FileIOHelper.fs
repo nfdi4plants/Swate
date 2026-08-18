@@ -334,6 +334,8 @@ module FileContentDTO =
 
         if normalizedPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase) then
             FileContentType.Markdown
+        elif normalizedPath.EndsWith(".cwl", StringComparison.OrdinalIgnoreCase) then
+            FileContentType.CWL
         else
             FileContentType.PlainText
 
