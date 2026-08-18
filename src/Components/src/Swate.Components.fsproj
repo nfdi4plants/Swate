@@ -321,6 +321,7 @@
     <Compile Include="Page\CwlEditor\Types.fs" />
     <Compile Include="Page\CwlEditor\Context.fs" />
     <Compile Include="Page\CwlEditor\UiHelpers.fs" />
+    <Compile Include="Page\CwlEditor\EditorController.fs" />
     
 
     <Compile Include="Style.fs" />
