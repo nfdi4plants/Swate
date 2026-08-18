@@ -8,6 +8,13 @@ open ARCtrl
 [<AutoOpen>]
 module ARCtrlHelper =
 
+    /// WORKAROUND: ARCtrl's DataContext.Copy() omits DataContext.Label (still broken in 3.2.0). Remove after upstream fix.
+    let preserveDataMapLabelsWorkaround (source: Datamap) (target: Datamap) =
+        Seq.iter2
+            (fun (source: DataContext) (target: DataContext) -> target.Label <- source.Label)
+            source.DataContexts
+            target.DataContexts
+
     [<RequireQualifiedAccess; StringEnum>]
     type ArcFilesDiscriminate =
         | [<CompiledName("investigation")>] Investigation
@@ -199,6 +206,10 @@ module ARCtrlHelper =
                 | ArcFiles.Workflow workflow -> ArcFiles.Workflow <| workflow.Copy()
                 | ArcFiles.DataMap(parent, dataMap) -> ArcFiles.DataMap(parent, dataMap.Copy())
                 | ArcFiles.Template template -> ArcFiles.Template <| template.Copy()
+
+            match arcFile.TryGetDataMap(), copy.TryGetDataMap() with
+            | Some source, Some target -> preserveDataMapLabelsWorkaround source target
+            | _ -> ()
 
             copy
 

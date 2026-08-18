@@ -166,4 +166,4 @@ module ArcWriteExtensions =
             |> Array.filter (isUnmanagedPlainTextCreateContract >> not)
 
         member this.TryUpdateAsyncSwate(arcPath: string) =
-            this.GetUpdateContractsSwate() |> fullFillContractBatchAsync false arcPath
+            this.GetUpdateContractsSwate() |> fullFillContractBatchAsync true arcPath
