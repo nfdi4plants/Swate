@@ -329,6 +329,7 @@
     <Compile Include="Page\CwlEditor\InputsEditor.fs" />
     <Compile Include="Page\CwlEditor\OutputsEditor.fs" />
     <Compile Include="Page\CwlEditor\WorkflowCanvas.fs" />
+    <Compile Include="Page\CwlEditor\WorkflowSteps.fs" />
     
 
     <Compile Include="Style.fs" />
