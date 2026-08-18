@@ -129,18 +129,31 @@ type FileTree =
                 FileTreeMaterialization.toMaterializedFileItemTree Helper.createItem reconciledMaterializedState.Paths
             )
 
-        let openSelectedPreview (itemName: string) (selectedPath: string) = promise {
-            let! result = openView selectedPath
-
+        let applyPreviewResult itemName result =
             match result with
-            | Ok pageState ->
-                console.log ("[Renderer] Received data, processing...")
-                pageStateCtx.setState (Some pageState)
+            | Ok pageState -> pageStateCtx.setState (Some pageState)
             | Error errorMessage ->
                 let fullErrorMessage = $"Could not open preview for '{itemName}': {errorMessage}"
                 console.log ($"[Renderer] Error: {fullErrorMessage}")
                 pageStateCtx.setState (Some(Renderer.Types.PageState.ErrorPage fullErrorMessage))
-        }
+
+        let withStartingView activeView =
+            function
+            | Renderer.Types.PageState.ArcFilePage(arcFile, _) ->
+                Renderer.Types.PageState.ArcFilePage(arcFile, Some activeView)
+            | pageState -> pageState
+
+        let tryGetArcEntityWorkbookName (path: string) =
+            ArcEntityPathRules.tryGetRenameEntityFolderTarget (PathHelpers.normalizePath path)
+            |> Option.bind (fun (zone, identifier) ->
+                ArcEntityPathRules.buildCanonicalEntityPaths zone identifier
+                |> List.tryHead
+                |> Option.map PathHelpers.getFileName
+            )
+
+        let isArcEntityDirectory (item: FileItem) =
+            item.IsDirectory
+            && item.Path |> Option.bind tryGetArcEntityWorkbookName |> Option.isSome
 
         let openPreview (item: FileItem) =
             promise {
@@ -152,7 +165,20 @@ type FileTree =
                 | Some path when item.IsDirectory ->
                     let selectedPath = PathHelpers.normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-                    pageStateCtx.setState None
+
+                    if isArcEntityDirectory item then
+                        match tryGetArcEntityWorkbookName selectedPath with
+                        | Some workbookName ->
+                            let! result = openView $"{selectedPath}/{workbookName}"
+
+                            result
+                            |> Result.map (
+                                withStartingView Swate.Components.Page.ArcFileEditor.Types.ActiveView.Metadata
+                            )
+                            |> applyPreviewResult item.Name
+                        | None -> pageStateCtx.setState None
+                    else
+                        pageStateCtx.setState None
                 | Some path ->
                     let selectedPath = PathHelpers.normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
@@ -160,7 +186,8 @@ type FileTree =
                     if Swate.Components.Page.FileExplorer.Helper.needsLfsDownload item then
                         pageStateCtx.setState None
                     else
-                        do! openSelectedPreview item.Name selectedPath
+                        let! result = openView selectedPath
+                        applyPreviewResult item.Name result
             }
             |> Promise.start
 
@@ -498,6 +525,7 @@ type FileTree =
                         Swate.Components.Page.FileExplorer.FileExplorer.FileExplorer(
                             initialItems = visibleItems,
                             onItemClick = openPreview,
+                            directoryChevronToggleOnlyForItem = isArcEntityDirectory,
                             onDirectoryExpansionChange = handleExpansionChange,
                             onContextMenu = createContextMenuItems,
                             getItemIconClass = getItemIconClass,

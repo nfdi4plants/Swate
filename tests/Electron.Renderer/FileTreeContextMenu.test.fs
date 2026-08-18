@@ -438,6 +438,93 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "composed menu disables marking isa metadata files as Git LFS",
+            fun () -> promise {
+                let item = createFileItem "isa.study.xlsx" (Some "studies/study_01/isa.study.xlsx")
+
+                let mutable toggledPath = None
+
+                let config = {
+                    createContextMenuConfig () with
+                        runToggleLfsMark =
+                            fun path _ -> promise {
+                                toggledPath <- Some path
+                                return Ok()
+                            }
+                }
+
+                let menuItems = createComposedContextMenuItems config item
+
+                let markItem =
+                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Mark Git LFS")
+
+                Vitest.expect(markItem.Disabled).toEqual (Some true)
+
+                markItem.OnClick()
+                do! Promise.sleep 0
+
+                Vitest.expect(toggledPath).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "composed menu keeps marking ordinary files as Git LFS enabled",
+            fun () ->
+                let item = createFileItem "raw.bin" (Some "assays/AssayA/raw.bin")
+                let menuItems = createComposedContextMenuItems (createContextMenuConfig ()) item
+
+                let markItem =
+                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Mark Git LFS")
+
+                Vitest.expect(markItem.Disabled).toEqual (None)
+        )
+
+        Vitest.test (
+            "composed menu disables unmarking dataset files from Git LFS",
+            fun () ->
+                let item = createLfsFileItem "raw.bin" "assays/AssayA/dataset/raw.bin" true false
+
+                let menuItems = createComposedContextMenuItems (createContextMenuConfig ()) item
+
+                let unmarkItem =
+                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Unmark Git LFS")
+
+                Vitest.expect(unmarkItem.Disabled).toEqual (Some true)
+        )
+
+        Vitest.test (
+            "composed menu disables unmarking LFS files larger than 25 MB",
+            fun () ->
+                let item = {
+                    createLfsFileItem "large.bin" "data/large.bin" true false with
+                        Size = Some(26L * 1024L * 1024L)
+                }
+
+                let menuItems = createComposedContextMenuItems (createContextMenuConfig ()) item
+
+                let unmarkItem =
+                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Unmark Git LFS")
+
+                Vitest.expect(unmarkItem.Disabled).toEqual (Some true)
+        )
+
+        Vitest.test (
+            "composed menu keeps unmarking small non-dataset LFS files enabled",
+            fun () ->
+                let item = {
+                    createLfsFileItem "small.bin" "data/small.bin" true false with
+                        Size = Some 1024L
+                }
+
+                let menuItems = createComposedContextMenuItems (createContextMenuConfig ()) item
+
+                let unmarkItem =
+                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Unmark Git LFS")
+
+                Vitest.expect(unmarkItem.Disabled).toEqual (None)
+        )
+
+        Vitest.test (
             "delete action is styled as destructive ARC action",
             fun () ->
                 let item = createFileItem "protocol.md" (Some "assays/AssayA/protocol.md")

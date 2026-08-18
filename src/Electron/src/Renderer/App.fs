@@ -130,6 +130,8 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage) setLeftSideba
     let leftSidebarCtx =
         Swate.Components.Composite.Layout.LeftSidebarContext.useLeftSidebarCtx ()
 
+    let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+
     let toggleTarget target =
         if leftSidebarTarget = target then
             leftSidebarCtx.setState (not leftSidebarCtx.state)
@@ -149,6 +151,12 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage) setLeftSideba
             tooltip = "Git",
             isActive = (leftSidebarTarget = LeftSidebarPage.Git),
             onClick = fun () -> toggleTarget LeftSidebarPage.Git
+        )
+        Layout.LayoutBtn(
+            iconClassName = "swt:fluent--cloud-beaker-24-regular",
+            tooltip = "Download ARC from DataHub",
+            isActive = false,
+            onClick = fun () -> pageStateCtx.setState (Some PageState.DataHubBrowser)
         )
     ]
 

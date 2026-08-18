@@ -4,6 +4,14 @@ open Swate.Components.Shared
 open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Composite.Widgets.DataAnnotator.Types
 
+[<Literal>]
+let TableDragIdPrefix = "table-"
+
+let tableDragId index = $"{TableDragIdPrefix}{index}"
+
+let tableDragIds tableCount =
+    Seq.init tableCount tableDragId |> ResizeArray
+
 let tryGetAddRowsTarget (activeView: ActiveView, arcFileState: ArcFiles) =
     match activeView with
     | ActiveView.Table tableIndex ->
@@ -28,16 +36,36 @@ let applyDataAnnotatorInputToArcFile
     (destination: AnnotationDestination, arcFile: ArcFiles, setArcFile: ArcFiles -> unit)
     =
     (fun annotationInput ->
+        // Apply changes to a copy so React can compare it with the unchanged current ARC.
+        let nextArcFile = ArcFiles.refreshRef arcFile
+
         let result =
+            let rootRelativeInput = {
+                annotationInput with
+                    FileName = toArcRootRelativeFilePath arcFile annotationInput.FileName
+            }
+
             match destination with
             | AnnotationDestination.Table table ->
-                Swate.Components.Composite.Widgets.DataAnnotator.Helper.applyToTable table annotationInput
-            | AnnotationDestination.DataMap dataMap ->
-                Swate.Components.Composite.Widgets.DataAnnotator.Helper.applyToDataMap dataMap annotationInput
+                let tableIndex =
+                    arcFile.Tables()
+                    |> Seq.tryFindIndex (fun candidate -> System.Object.ReferenceEquals(candidate, table))
+
+                match tableIndex with
+                | Some index when index < nextArcFile.Tables().Count ->
+                    let nextTable = nextArcFile.Tables().[index]
+
+                    Swate.Components.Composite.Widgets.DataAnnotator.Helper.applyToTable nextTable rootRelativeInput
+                | _ -> Error "The Data Annotator target table is no longer available."
+            | AnnotationDestination.DataMap _ ->
+                match nextArcFile.TryGetDataMap() with
+                | Some dataMap ->
+                    Swate.Components.Composite.Widgets.DataAnnotator.Helper.applyToDataMap dataMap rootRelativeInput
+                | None -> Error "The Data Annotator target DataMap is no longer available."
 
         match result with
         | Ok _ ->
-            setArcFile (ArcFiles.refreshRef arcFile)
+            setArcFile nextArcFile
             result
         | Error _ -> result
     )

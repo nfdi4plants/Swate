@@ -12,7 +12,7 @@ import {
     Swate_Components_Composite_Workspace_Types_WorkspaceModel$1__WorkspaceModel$1_SplitPane_Static as WorkspaceModel_SplitPane,
     Swate_Components_Composite_Workspace_Types_WorkspaceModel$1__WorkspaceModel$1_ClosePane_Static as WorkspaceModel_ClosePane,
     Swate_Components_Composite_Workspace_Types_WorkspaceModel$1__WorkspaceModel$1_CleanupEmptyPanes_Static_5649D743 as WorkspaceModel_CleanupEmptyPanes,
-} from './WorkspaceModel.fs.ts';
+} from '../WorkspaceModel.fs.ts';
 import {
     Tab,
     TabId,
@@ -42,6 +42,10 @@ function createTab(id: string, label: string = id, payload: string = '{}'): TabT
     return new Tab<string>(id, label, payload);
 }
 
+function tabsOf(pane: any): TabType<string>[] {
+    return [...pane.Tabs];
+}
+
 function getLayoutLeafCount(layout: any): number {
     function count(l: any): number {
         if (l.tag === 0) return 1;
@@ -63,7 +67,7 @@ describe('WorkspaceModel.Init', () => {
         const tabs = [createTab('a'), createTab('b')];
         const model = WorkspaceModel_Init<string>(tabs);
         const pane = [...model.PanesMap.values()][0];
-        expect(pane.Tabs.length).toBe(2);
+        expect(tabsOf(pane)).toHaveLength(2);
     });
 
     it('initializes with active tab', () => {
@@ -79,7 +83,7 @@ describe('AddTab', () => {
         const model = WorkspaceModel_Init<string>();
         const updated = WorkspaceModel_AddTab(createTab('new'), model);
         const pane = [...updated.PanesMap.values()][0];
-        expect(pane.Tabs.length).toBe(1);
+        expect(tabsOf(pane)).toHaveLength(1);
         expect(pane.FocusedTab).toBe('new');
     });
 });
@@ -89,7 +93,7 @@ describe('RemoveTab', () => {
         const model = WorkspaceModel_Init<string>([createTab('a'), createTab('b')], 'a');
         const updated = WorkspaceModel_RemoveTab('a', model);
         const pane = [...updated.PanesMap.values()][0];
-        expect(pane.Tabs.length).toBe(1);
+        expect(tabsOf(pane)).toHaveLength(1);
     });
 
     it('CleanupEmptyPanes collapses single empty pane', () => {
@@ -114,10 +118,11 @@ describe('FocusTab', () => {
 describe('MoveTab', () => {
     it('moves tab between panes', () => {
         const model = WorkspaceModel_Init<string>([createTab('a'), createTab('b')]);
-        const afterSplit = WorkspaceModel_SplitPane('a', 'right' as EdgeDirection, model);
+        const sourcePaneId = model.FocusedPane;
+        const afterSplit = WorkspaceModel_SplitPane(sourcePaneId, 'right' as EdgeDirection, model);
         const afterMove = WorkspaceModel_MoveTab('b', afterSplit.FocusedPane, afterSplit);
-        const srcPane = [...afterMove.PanesMap.values()].find((p: any) => p.Tabs.length === 1)!;
-        expect(srcPane.Tabs[0].Id).toBe('a');
+        expect(tabsOf(afterMove.PanesMap.get(sourcePaneId)).map(tab => tab.Id)).toEqual(['a']);
+        expect(tabsOf(afterMove.PanesMap.get(afterSplit.FocusedPane)).map(tab => tab.Id)).toEqual(['b']);
     });
 });
 
@@ -126,9 +131,7 @@ describe('ReorderTabs', () => {
         const model = WorkspaceModel_Init<string>([createTab('a'), createTab('b'), createTab('c')]);
         const updated = WorkspaceModel_ReorderTabs(model.FocusedPane, 0, 1, model);
         const pane = [...updated.PanesMap.values()][0];
-        expect(pane.Tabs[0].Id).toBe('b');
-        expect(pane.Tabs[1].Id).toBe('a');
-        expect(pane.Tabs[2].Id).toBe('c');
+        expect(tabsOf(pane).map(tab => tab.Id)).toEqual(['b', 'a', 'c']);
     });
 });
 
@@ -145,7 +148,7 @@ describe('SplitPane', () => {
 describe('ClosePane', () => {
     it('removes all tabs from pane', () => {
         const model = WorkspaceModel_Init<string>([createTab('a'), createTab('b')]);
-        const afterSplit = WorkspaceModel_SplitPane('a', 'right' as EdgeDirection, model);
+        const afterSplit = WorkspaceModel_SplitPane(model.FocusedPane, 'right' as EdgeDirection, model);
         const closed = WorkspaceModel_ClosePane(afterSplit.FocusedPane, afterSplit);
         const cleaned = WorkspaceModel_CleanupEmptyPanes<string>(closed);
         expect(cleaned.PanesMap.size).toBe(1);
@@ -157,8 +160,7 @@ describe('RemoveOtherTabs', () => {
         const model = WorkspaceModel_Init<string>([createTab('a'), createTab('b'), createTab('c')]);
         const updated = WorkspaceModel_RemoveOtherTabs('b', model);
         const pane = [...updated.PanesMap.values()][0];
-        expect(pane.Tabs.length).toBe(1);
-        expect(pane.Tabs[0].Id).toBe('b');
+        expect(tabsOf(pane).map(tab => tab.Id)).toEqual(['b']);
     });
 });
 
@@ -168,7 +170,7 @@ describe('RemoveAllTabs', () => {
         const updated = WorkspaceModel_RemoveAllTabs<string>(model);
         expect(updated.PanesMap.size).toBe(1);
         const pane = [...updated.PanesMap.values()][0];
-        expect(pane.Tabs.length).toBe(0);
+        expect(tabsOf(pane)).toHaveLength(0);
     });
 });
 
@@ -177,13 +179,12 @@ describe('update function', () => {
         const model = WorkspaceModel_Init<string>();
         const next = update(model, AddTab(createTab('x')));
         const pane = [...next.PanesMap.values()][0];
-        expect(pane.Tabs[0].Id).toBe('x');
+        expect(tabsOf(pane)[0].Id).toBe('x');
     });
 
     it('RemoveTab via update triggers cleanup', () => {
         const model = WorkspaceModel_Init<string>([createTab('a')]);
         const next = update(model, RemoveTab('a'));
-        const pane = [...next.PanesMap.values()][0];
-        expect(pane.Tabs.length).toBe(0);
+        expect(next.PanesMap.size).toBe(0);
     });
 });

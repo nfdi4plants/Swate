@@ -99,6 +99,7 @@ type CurrentUserDto = {
     username: string
     name: string
     email: string
+    commit_email: string option
     avatar_url: string option
 }
 
@@ -199,6 +200,7 @@ type private GitLabCurrentUserResponse = {
     username: string
     name: string
     email: string
+    commit_email: string option
     avatar_url: string option
 }
 
@@ -403,6 +405,7 @@ module private Internals =
         username = user.username
         name = user.name
         email = user.email
+        commit_email = user.commit_email
         avatar_url = user.avatar_url
     }
 

@@ -135,6 +135,33 @@ let tests =
                                                                              _) -> ()
             | _ -> failwith "Expected study entity folder classification."
 
+        testCase "delete and rename classifiers treat hidden files in add-zone roots as generic targets"
+        <| fun _ ->
+            let deleteClassification =
+                ArcEntityPathRules.classifyDeleteTarget "assays/.DS_Store"
+
+            match deleteClassification with
+            | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget(ArcEntityPathRules.AddZone.Assays,
+                                                                                  normalizedPath) ->
+                Expect.equal normalizedPath "assays/.DS_Store" "The hidden file path should remain unchanged."
+            | _ -> failwith "Expected a generic assay-zone descendant classification."
+
+            Expect.isTrue
+                (ArcEntityPathRules.isDeletePathAllowed "assays/.DS_Store")
+                "Safe hidden files in add-zone roots should be deletable."
+
+            let renameClassification =
+                ArcEntityPathRules.classifyRenameTarget "assays/.DS_Store"
+
+            match renameClassification with
+            | ArcEntityPathRules.RenamePathClassification.GenericTarget normalizedPath ->
+                Expect.equal normalizedPath "assays/.DS_Store" "The hidden file path should remain unchanged."
+            | _ -> failwith "Expected a generic rename target."
+
+            Expect.isTrue
+                (ArcEntityPathRules.isRenamePathAllowed "assays/.DS_Store")
+                "Safe hidden files in add-zone roots should be renameable."
+
         testCase "isDeletePathAllowed keeps broad add-zone descendants"
         <| fun _ ->
             Expect.isTrue

@@ -6,6 +6,7 @@ open Swate.Components
 open Swate.Components.Composite.AnnotationTable.Types
 open global.Swate.Components.Composite.AnnotationTable
 open global.Swate.Components.Composite.AnnotationTable.Types.AnnotationTableContextMenu
+open global.Swate.Components.Composite.DataMapTable.Types
 open global.Swate.Components.Composite.Table
 open global.Swate.Components.Composite.Table.Types
 open global.Swate.Components.Primitive.ContextMenu.Types
@@ -194,6 +195,120 @@ type TestCases =
             expectedFirstCellAfterDelete
             "After deleting first row, second row content should become first row"
 
+    static member DataMainFieldPreservesSelector() =
+        let original = CompositeCell.createDataFromString "old.txt"
+        let updated = original.UpdateMainField "DatamapTesting.txt#row=2"
+
+        Expect.equal updated.AsData.FilePath (Some "DatamapTesting.txt") "The path should exclude the selector."
+        Expect.equal updated.AsData.Selector (Some "row=2") "The selector behind # should be preserved."
+
+    static member DataMapCopyIncludesSelector() =
+        let dataMap =
+            DataMap(ResizeArray [ DataContext(name = "DatamapTesting.txt#row=2") ])
+
+        let copiedText = dataMap.SelectedCellsToTabText [ {| x = 1; y = 1 |} ]
+
+        Expect.equal copiedText "DatamapTesting.txt#row=2" "Copied DataMap data should include its selector."
+
+        let dataMapWithoutSelector =
+            DataMap(ResizeArray [ DataContext(name = "DatamapTesting.txt") ])
+
+        let copiedTextWithoutSelector =
+            dataMapWithoutSelector.SelectedCellsToTabText [ {| x = 1; y = 1 |} ]
+
+        Expect.equal
+            copiedTextWithoutSelector
+            "DatamapTesting.txt"
+            "Copied DataMap data should not include trailing tabs for empty metadata."
+
+    static member TableCopyIncludesSelector() =
+        let dataCell = CompositeCell.createDataFromString "DatamapTesting.txt#row=2"
+
+        Expect.equal
+            (dataCell.ToClipboardStr())
+            "DatamapTesting.txt#row=2"
+            "Copied table data should include its selector in the displayed clipboard cell."
+
+        Expect.equal
+            (CompositeCell.ToClipboardTableTxt [| [| dataCell; CompositeCell.FreeText "label" |] |])
+            "DatamapTesting.txt#row=2\tlabel"
+            "A table data cell and its selector must occupy one clipboard cell."
+
+    static member DataMapCellPastePreservesSelector() =
+        let dataMap = DataMap(ResizeArray [ DataContext() ])
+
+        dataMap.PasteTabText({| x = 1; y = 1 |}, "DatamapTesting.txt#row=2")
+
+        Expect.equal dataMap.DataContexts.[0].FilePath (Some "DatamapTesting.txt") "The path should be pasted."
+        Expect.equal dataMap.DataContexts.[0].Selector (Some "row=2") "The selector should be pasted."
+
+    static member DataMapLabelSurvivesArcFileRefresh() =
+        let assay = ArcAssay.init "assay"
+        assay.DataMap <- Some(DataMap(ResizeArray [ DataContext(label = "asdhjasklhd") ]))
+
+        let refreshed =
+            Swate.Components.Shared.ARCtrlHelper.ArcFiles.refreshRef (
+                Swate.Components.Shared.ARCtrlHelper.ArcFiles.Assay assay
+            )
+
+        let label = refreshed.TryGetDataMap().Value.DataContexts.[0].Label
+
+        Expect.equal label (Some "asdhjasklhd") "Refreshing an ARC file must preserve DataMap labels."
+
+    static member DataMapGridPasteGrowsRows() =
+        let dataMap = DataMap(ResizeArray [ DataContext() ])
+
+        dataMap.PasteTabText({| x = 1; y = 1 |}, "first.txt#row=2\tFirst\nsecond.txt#row=3\tSecond")
+
+        Expect.equal dataMap.DataContexts.Count 2 "The DataMap should grow for additional clipboard rows."
+        Expect.equal dataMap.DataContexts.[1].FilePath (Some "second.txt") "The second path should be pasted."
+        Expect.equal dataMap.DataContexts.[1].Selector (Some "row=3") "The second selector should be pasted."
+        Expect.equal dataMap.DataContexts.[1].Label (Some "Second") "The second label should be pasted."
+
+    static member DataMapFillColumnCopiesCompleteCell() =
+        let dataMap =
+            DataMap(
+                ResizeArray [
+                    DataContext(name = "first.txt#row=2", format = "text/csv")
+                    DataContext(name = "second.txt#row=3")
+                ]
+            )
+
+        Swate.Components.Composite.Table.Helper.fillColumn
+            dataMap.RowCount
+            {| x = 1; y = 1 |}
+            (fun coordinate -> dataMap.GetCell(coordinate.x - 1, coordinate.y - 1))
+            _.Copy()
+            (fun coordinate cell -> dataMap.SetCell(coordinate.x - 1, coordinate.y - 1, cell))
+
+        Expect.equal dataMap.DataContexts.[1].FilePath (Some "first.txt") "The complete source path should be copied."
+        Expect.equal dataMap.DataContexts.[1].Selector (Some "row=2") "The complete source selector should be copied."
+        Expect.equal dataMap.DataContexts.[1].Format (Some "text/csv") "The complete source format should be copied."
+
+    static member DataMapRowAndClearActions() =
+        let dataMap =
+            DataMap(
+                ResizeArray [
+                    DataContext(name = "first.txt#row=2", label = "First")
+                    DataContext(name = "second.txt#row=3", label = "Second")
+                ]
+            )
+
+        dataMap.ClearCells [ {| x = 2; y = 1 |} ]
+        Expect.equal dataMap.DataContexts.[0].Label None "Clear should affect only the selected cell."
+
+        for rowIndex in 0 .. dataMap.RowCount - 1 do
+            dataMap.Clear(0, rowIndex)
+
+        Expect.equal dataMap.DataContexts.[0].FilePath None "Clear Column should clear the first row."
+        Expect.equal dataMap.DataContexts.[1].FilePath None "Clear Column should clear the second row."
+
+        ([ {| x = 1; y = 1 |} ]: CellCoordinate list)
+        |> Swate.Components.Composite.Table.Helper.selectedRowIndices dataMap.RowCount
+        |> Array.iter dataMap.DataContexts.RemoveAt
+
+        Expect.equal dataMap.DataContexts.Count 1 "Only the unselected row should remain."
+
     static member HeaderMoveColumnUsesSelectedHeaderIndex() =
         let table = Fixture.mkTable ()
         let selectHandle = TestCases.NoSelectionHandle()
@@ -306,6 +421,22 @@ let Main =
             <| fun _ -> TestCases.AddUnknownPattern([| [| "" |] |])
         ]
         testList "Regression" [
+            testCase "DataMap cell copy includes the selector behind #"
+            <| fun _ -> TestCases.DataMapCopyIncludesSelector()
+            testCase "Table cell copy includes the selector behind #"
+            <| fun _ -> TestCases.TableCopyIncludesSelector()
+            testCase "DataMap cell paste includes the selector behind #"
+            <| fun _ -> TestCases.DataMapCellPastePreservesSelector()
+            testCase "DataMap labels survive ARC file refreshes"
+            <| fun _ -> TestCases.DataMapLabelSurvivesArcFileRefresh()
+            testCase "DataMap grid paste grows rows"
+            <| fun _ -> TestCases.DataMapGridPasteGrowsRows()
+            testCase "DataMap fill column copies the complete cell"
+            <| fun _ -> TestCases.DataMapFillColumnCopiesCompleteCell()
+            testCase "DataMap delete-row and clear actions update the selected targets"
+            <| fun _ -> TestCases.DataMapRowAndClearActions()
+            testCase "Data main-field paste preserves the selector behind #"
+            <| fun _ -> TestCases.DataMainFieldPreservesSelector()
             testCase "Header delete targets first column correctly"
             <| fun _ -> TestCases.HeaderDeleteFirstColumn()
             testCase "Index delete targets first row correctly"

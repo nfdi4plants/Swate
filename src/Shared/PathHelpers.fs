@@ -9,23 +9,27 @@ module PathHelpers =
     let formatContractErrors (errors: string[]) =
         errors |> Array.map string |> String.concat "\n"
 
-    /// normalizes the path by replacing backslashes with forward slashes, trimming whitespace, and removing trailing slashes
+    /// Normalizes path separators by replacing backslashes with forward slashes.
     let normalizeSeparators (path: string) = path.Replace("\\", "/")
 
-    /// normalizes the path by replacing backslashes with forward slashes, trimming whitespace, and removing trailing slashes
+    /// Normalizes separators, trims surrounding whitespace, and removes trailing slashes.
     let normalizePath (path: string) =
         normalizeSeparators path |> fun normalized -> normalized.Trim().TrimEnd('/')
 
+    /// Normalizes separators and trims surrounding whitespace and leading or trailing slashes.
     let normalizeRelativePath (path: string) =
         normalizeSeparators path |> fun normalized -> normalized.Trim('/').Trim()
 
+    /// Produces a canonical relative path by normalizing separators, whitespace, and boundary slashes.
     let normalizeCanonicalRelativePath (path: string) =
         path |> normalizeRelativePath |> normalizePath
 
+    /// Normalizes separators, whitespace, and trailing slashes, then lowercases the path for comparison.
     let normalizeForComparison (path: string) =
         normalizeSeparators path
         |> fun normalized -> normalized.Trim().TrimEnd('/').ToLowerInvariant()
 
+    /// Produces a normalized, case-insensitive path suitable for filesystem comparisons.
     let normalizePathForFsComparison (path: string) =
         path |> normalizePath |> normalizeForComparison
 
@@ -208,7 +212,11 @@ module ArcEntityPathRules =
     let private classifyStructuralArcPath =
         function
         | [| zoneSegment |] when isAddZoneSegment zoneSegment -> StructuralArcPath.AddZoneRoot
-        | [| zoneSegment; _ |] when isAddZoneSegment zoneSegment -> StructuralArcPath.EntityFolder
+        | [| zoneSegment; name |] when
+            isAddZoneSegment zoneSegment
+            && not (name.StartsWith(".", StringComparison.Ordinal))
+            ->
+            StructuralArcPath.EntityFolder
         | [| zoneSegment; _; childFolderName |] ->
             match tryParseZone zoneSegment with
             | Some zone when PathHelpers.pathMatchesAny (nativeEntityChildFolderNames zone) childFolderName ->
@@ -289,6 +297,8 @@ module ArcEntityPathRules =
                 | None -> DeletePathClassification.GenericTarget normalizedRelativePath
             | [| zoneSegment; identifier |] ->
                 match tryParseZone zoneSegment with
+                | Some zone when identifier.StartsWith(".", StringComparison.Ordinal) ->
+                    DeletePathClassification.AddZoneDescendantTarget(zone, normalizedRelativePath)
                 | Some zone -> DeletePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath)
                 | None -> DeletePathClassification.GenericTarget normalizedRelativePath
             | [| zoneSegment; identifier; fileName |] ->
@@ -411,6 +421,8 @@ module ArcEntityPathRules =
                         | None -> RenamePathClassification.GenericTarget normalizedRelativePath
                 | [| zoneSegment; identifier |] ->
                     match tryParseZone zoneSegment with
+                    | Some _ when identifier.StartsWith(".", StringComparison.Ordinal) ->
+                        RenamePathClassification.GenericTarget normalizedRelativePath
                     | Some zone -> RenamePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath)
                     | None -> RenamePathClassification.GenericTarget normalizedRelativePath
                 | [| zoneSegment; identifier; fileName |] ->

@@ -278,13 +278,15 @@ module ConnectorPaths =
         overlayState
         =
         railProjection.Headers
-        |> List.filter (fun header -> not (ConnectorOverlayState.isPropertyExpanded layerId side header overlayState))
-        |> List.collect (fun header ->
+        |> List.filter (fun property ->
+            not (ConnectorOverlayState.isPropertyExpanded layerId side property overlayState)
+        )
+        |> List.collect (fun property ->
             let color =
                 railProjection.ColorByHeader
-                |> Map.tryFind header
+                |> Map.tryFind property
                 |> Option.bind id
-                |> Option.orElseWith (fun () -> colorByHeader |> Map.tryFind header |> Option.bind id)
+                |> Option.orElseWith (fun () -> colorByHeader |> Map.tryFind property.Header |> Option.bind id)
 
             groups
             |> List.collect (
@@ -293,13 +295,13 @@ module ConnectorPaths =
                     inputGroups
                     outputGroups
                     connections
-                    (fun propertyValue -> propertyValue.Header = header)
+                    (ProvenancePropertyValue.belongsTo property)
                     side
                     overlayState
             )
             |> List.map (fun target ->
                 spec
-                    $"property:{side}:{DragDrop.propertyHeaderIdentity header}:{target.KeySuffix}"
+                    $"property:{side}:{DragDrop.propertyKeyIdentity property}:{target.KeySuffix}"
                     "provenance-property-connection"
                     "swt:text-secondary swt:pointer-events-none"
                     1.75
@@ -308,13 +310,13 @@ module ConnectorPaths =
                     None
                     color
                     true
-                    (ConnectorHandles.propertyHeader side header)
+                    (ConnectorHandles.propertyHeader side property)
                     target.Handle
             )
         )
 
-    let private propertyValueMatches header value unit' (propertyValue: ProvenancePropertyValue) =
-        propertyValue.Header = header
+    let private propertyValueMatches property value unit' (propertyValue: ProvenancePropertyValue) =
+        ProvenancePropertyValue.belongsTo property propertyValue
         && propertyValue.Value = value
         && propertyValue.Unit = unit'
 
@@ -331,16 +333,16 @@ module ConnectorPaths =
         overlayState
         =
         railProjection.Headers
-        |> List.filter (fun header -> ConnectorOverlayState.isPropertyExpanded layerId side header overlayState)
-        |> List.collect (fun header ->
+        |> List.filter (fun property -> ConnectorOverlayState.isPropertyExpanded layerId side property overlayState)
+        |> List.collect (fun property ->
             let color =
                 railProjection.ColorByHeader
-                |> Map.tryFind header
+                |> Map.tryFind property
                 |> Option.bind id
-                |> Option.orElseWith (fun () -> colorByHeader |> Map.tryFind header |> Option.bind id)
+                |> Option.orElseWith (fun () -> colorByHeader |> Map.tryFind property.Header |> Option.bind id)
 
             railProjection.ValuesByHeader
-            |> Map.tryFind header
+            |> Map.tryFind property
             |> Option.defaultValue []
             |> List.collect (fun propertyValue ->
                 groups
@@ -350,13 +352,13 @@ module ConnectorPaths =
                         inputGroups
                         outputGroups
                         connections
-                        (propertyValueMatches header propertyValue.Value propertyValue.Unit)
+                        (propertyValueMatches property propertyValue.Value propertyValue.Unit)
                         side
                         overlayState
                 )
                 |> List.map (fun target ->
                     spec
-                        $"value:{side}:{DragDrop.propertyHeaderIdentity header}:{Formatting.formatValue propertyValue.Value propertyValue.Unit}:{target.KeySuffix}"
+                        $"value:{side}:{DragDrop.propertyKeyIdentity property}:{Formatting.formatValue propertyValue.Value propertyValue.Unit}:{target.KeySuffix}"
                         "provenance-value-connection"
                         "swt:text-accent swt:pointer-events-none"
                         2.0

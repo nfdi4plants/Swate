@@ -15,13 +15,16 @@ open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Composite.AnnotationTable
 open Swate.Components.Composite.Widgets.DataAnnotator.Types
 
-type private AddRowsFooterViewProps = {
-    rowsToAdd: int
-    minRowsToAdd: int
-    onRowsToAddChange: int -> unit
-    onAddRows: unit -> unit
-    onAddRowsAndReset: unit -> unit
-}
+module private ArcFileEditorTypes =
+    type AddRowsFooterViewProps = {
+        rowsToAdd: int
+        minRowsToAdd: int
+        onRowsToAddChange: int -> unit
+        onAddRows: unit -> unit
+        onAddRowsAndReset: unit -> unit
+    }
+
+open ArcFileEditorTypes
 
 type private LazyComponents =
 
@@ -240,12 +243,11 @@ type Main =
         let tryGetAddRowsTarget () =
             Helper.tryGetAddRowsTarget (activeView, arcFileState)
 
-        let hasColumns =
-            activeView.TryGetActiveTable(arcFileState)
-            |> Option.map (fun t -> t.ColumnCount > 0)
-            |> Option.defaultValue false
-
-        let canAddRows = tryGetAddRowsTarget () |> Option.isSome && hasColumns
+        let canAddRows =
+            match tryGetAddRowsTarget () with
+            | Some(AddRowsTarget.Table table) -> table.ColumnCount > 0
+            | Some(AddRowsTarget.DataMap dataMap) -> dataMap.ColumnCount > 0
+            | None -> false
 
         let addRowsWithCount rowCount =
             match tryGetAddRowsTarget () with
@@ -276,12 +278,18 @@ type Main =
         else
             Html.none
 
+    /// <summary>Renders an editor for an ARC file.</summary>
+    /// <param name="startingActiveView">
+    /// The initial active view. This value is read only when the component mounts; to apply a later value,
+    /// the caller must remount the editor by changing the React key.
+    /// </param>
     [<ReactComponent>]
     static member ArcFileEditor
         (
             arcFile: ArcFiles,
             setArcFile: ArcFiles -> unit,
             pickPaths: unit -> Fable.Core.JS.Promise<string[]>,
+            ?widgetNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?trailingNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?startingActiveView: ActiveView,
             ?onImportJson: JsonImportRequest -> JS.Promise<Result<unit, exn>>,
@@ -294,157 +302,118 @@ type Main =
         let activeView, setActiveView =
             React.useState (startingActiveView |> Option.defaultValue ActiveView.Metadata)
 
+        // The ARC file is caller-owned and can be replaced independently of this component.
+        // Keep the internally owned view valid when the available file views change.
         React.useEffect (
             (fun () ->
                 let nextActiveView = ActiveView.Forward(arcFile, activeView)
 
-                setActiveView nextActiveView
+                if nextActiveView <> activeView then
+                    setActiveView nextActiveView
             ),
             [|
+                box activeView
                 box (arcFile.Tables().Count)
                 box (arcFile.CanRenderDataMapView())
                 box (arcFile.HasMetadata())
             |]
         )
 
-        let headerProps =
-            React.useMemo (
-                (fun () -> {
-                    arcFile = arcFile
-                    activeView = activeView
-                    setActiveView = setActiveView
-                }),
-                [| box arcFile; box activeView; box setActiveView |]
-            )
+        let headerProps = {
+            arcFile = arcFile
+            activeView = activeView
+            setActiveView = setActiveView
+        }
 
         let activeTableIndex = activeView.TryTableIndex
 
         let trailingNavbarElement =
-            React.useMemo (
-                (fun () ->
-                    match trailingNavbarElements with
-                    | Some renderTrailingNavbarElements -> renderTrailingNavbarElements headerProps
-                    | None -> Html.none
-                ),
-                [| box trailingNavbarElements; box headerProps |]
-            )
+            match trailingNavbarElements with
+            | Some renderTrailingNavbarElements -> renderTrailingNavbarElements headerProps
+            | None -> Html.none
 
         let navbar =
-            React.useMemo (
-                (fun () ->
-                    Html.div [
-                        prop.className "swt:shrink-0 swt:border-b swt:border-base-300"
-                        prop.children [
-                            Navbar.Main(
-                                left = Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns(),
-                                right = trailingNavbarElement
-                            )
-                        ]
-                    ]
-                ),
-                [| box trailingNavbarElement |]
-            )
-
-        let widgetElements =
-            React.useMemo (
-                (fun () -> {|
-                    buildingBlock =
-                        Main.LazyLoaderWithMessage(
-                            LazyComponents.LazyBuildingBlockWidget(arcFile, activeTableIndex, setArcFile),
-                            "Loading Building Block Widget..."
-                        )
-                    template =
-                        Main.LazyLoaderWithMessage(
-                            LazyComponents.LazyTemplateWidget(arcFile, activeTableIndex, setArcFile),
-                            "Loading Template Widget..."
-                        )
-                    filePicker =
-                        Main.LazyLoaderWithMessage(
-                            LazyComponents.LazyFilePickerWidget(arcFile, activeTableIndex, setArcFile, pickPaths),
-                            "Loading File Picker Widget..."
-                        )
-                    dataAnnotator =
-                        match Helper.tryGetDataAnnotatorDestination (activeView, arcFile) with
-                        | Ok destination ->
-                            Main.LazyLoaderWithMessage(
-                                LazyComponents.LazyDataAnnotator(
-                                    destination,
-                                    Helper.applyDataAnnotatorInputToArcFile (destination, arcFile, setArcFile),
-                                    onError = onError
-                                ),
-                                "Loading Data Annotator Widget..."
-                            )
-                        | Error message ->
+            Html.div [
+                prop.className "swt:shrink-0 swt:border-b swt:border-base-300"
+                prop.children [
+                    Navbar.Main(
+                        left =
                             Html.div [
-                                prop.className "swt:p-3 swt:text-sm swt:opacity-70"
-                                prop.text message
-                            ]
-                    jsonImport =
-                        Main.LazyLoaderWithMessage(
-                            LazyComponents.LazyJsonImportWidget(
-                                arcFile,
-                                setArcFile,
-                                onImportJson,
-                                (fun exn -> onError exn.Message)
-                            ),
-                            "Loading JSON Import Widget..."
-                        )
-                    jsonExport =
-                        Main.LazyLoaderWithMessage(
-                            LazyComponents.LazyJsonExportWidget(arcFile, (fun exn -> onError exn.Message)),
-                            "Loading JSON Export Widget..."
-                        )
-                |}),
-                [|
-                    box arcFile
-                    box activeView
-                    box activeTableIndex
-                    box setArcFile
-                    box onImportJson
-                    pickPaths
-                |]
-            )
+                                prop.className "swt:flex swt:items-center swt:gap-2"
+                                prop.children [
+                                    Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns()
+                                    match widgetNavbarElements with
+                                    | Some renderWidgetNavbarElements -> renderWidgetNavbarElements headerProps
+                                    | None -> ()
+                                ]
+                            ],
+                        right = trailingNavbarElement
+                    )
+                ]
+            ]
 
-        /// ArcFiles type is too complex for react. Therefore we check hashcode instead and compare that.
-        let arcFileHashCode = arcFile.GetHashCode()
-        let activeViewHash = activeView.GetHashCode()
-
-        let ArcFileContentViewMemo =
-            React.useMemo (
-                (fun () -> Main.ArcFileContentView(activeView, arcFile, setArcFile)),
-                [| box activeViewHash; box arcFileHashCode |]
-            )
-
-        let AddRowsFooterMemo =
-            React.useMemo (
-                (fun () -> Main.AddRowsFooter(activeView, arcFile, setArcFile)),
-                [| box activeViewHash; box arcFileHashCode |]
-            )
+        let widgetElements = {|
+            buildingBlock =
+                Main.LazyLoaderWithMessage(
+                    LazyComponents.LazyBuildingBlockWidget(arcFile, activeTableIndex, setArcFile),
+                    "Loading Building Block Widget..."
+                )
+            template =
+                Main.LazyLoaderWithMessage(
+                    LazyComponents.LazyTemplateWidget(arcFile, activeTableIndex, setArcFile),
+                    "Loading Template Widget..."
+                )
+            filePicker =
+                Main.LazyLoaderWithMessage(
+                    LazyComponents.LazyFilePickerWidget(arcFile, activeTableIndex, setArcFile, pickPaths),
+                    "Loading File Picker Widget..."
+                )
+            dataAnnotator =
+                match Helper.tryGetDataAnnotatorDestination (activeView, arcFile) with
+                | Ok destination ->
+                    Main.LazyLoaderWithMessage(
+                        LazyComponents.LazyDataAnnotator(
+                            destination,
+                            Helper.applyDataAnnotatorInputToArcFile (destination, arcFile, setArcFile),
+                            onError = onError
+                        ),
+                        "Loading Data Annotator Widget..."
+                    )
+                | Error message ->
+                    Html.div [
+                        prop.className "swt:p-3 swt:text-sm swt:opacity-70"
+                        prop.text message
+                    ]
+            jsonImport =
+                Main.LazyLoaderWithMessage(
+                    LazyComponents.LazyJsonImportWidget(
+                        arcFile,
+                        setArcFile,
+                        onImportJson,
+                        (fun exn -> onError exn.Message)
+                    ),
+                    "Loading JSON Import Widget..."
+                )
+            jsonExport =
+                Main.LazyLoaderWithMessage(
+                    LazyComponents.LazyJsonExportWidget(arcFile, (fun exn -> onError exn.Message)),
+                    "Loading JSON Export Widget..."
+                )
+        |}
 
         let content =
-            React.useMemo (
-                (fun () ->
+            Html.div [
+                prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
+                prop.children [
+                    navbar
                     Html.div [
                         prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
-                        prop.children [
-                            navbar
-                            Html.div [
-                                prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
-                                prop.children [ ArcFileContentViewMemo ]
-                            ]
-                            AddRowsFooterMemo
-                            ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFile)
-                        ]
+                        prop.children [ Main.ArcFileContentView(activeView, arcFile, setArcFile) ]
                     ]
-                ),
-                [|
-                    box navbar
-                    box activeViewHash
-                    box arcFileHashCode
-                    box setArcFile
-                    box setActiveView
-                |]
-            )
+                    Main.AddRowsFooter(activeView, arcFile, setArcFile)
+                    ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFile)
+                ]
+            ]
 
         AnnotationTableContextProvider.AnnotationTableContextProvider(
             Swate.Components.Page.ArcFileEditor.Widgets.Main.Widgets(

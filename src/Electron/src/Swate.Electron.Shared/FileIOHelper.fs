@@ -17,6 +17,11 @@ let getPathDepth (path: string) =
 let pathsEqual (left: string) (right: string) =
     PathHelpers.normalizePath left = PathHelpers.normalizePath right
 
+let isLegacyDataMapPath (path: string) =
+    getNonEmptyPathParts path
+    |> Array.tryLast
+    |> Option.exists (fun fileName -> String.Equals(fileName, "isa_datamap", StringComparison.OrdinalIgnoreCase))
+
 let isRootFolderPath (rootFolderName: string) (candidateRelativePath: string) =
     match getNonEmptyPathParts candidateRelativePath with
     | [| candidateRoot |] -> pathsEqual rootFolderName candidateRoot

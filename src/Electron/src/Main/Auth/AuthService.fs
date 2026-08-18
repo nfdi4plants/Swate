@@ -143,8 +143,10 @@ let private reconcileActiveAccountInvariant () =
 let private toMetadata (localSwateAccountId: string) (summary: AccountSummary) : SecureAuthStore.AuthMetadata = {
     LocalSwateAccountId = localSwateAccountId
     Id = summary.User.Id
+    Username = summary.User.Username
     Name = summary.User.Name
     Email = summary.User.Email
+    CommitEmail = summary.User.CommitEmail
     AvatarUrl = summary.User.AvatarUrl
     TargetDataHub = summary.User.TargetDataHub
     DateAdded = summary.DateAdded
@@ -202,9 +204,63 @@ let tryGetTokenForHost (host: string) : string option =
                 None
         )
 
+/// Commit identity of an account user.
+/// The GitLab username is preferred over the display name so commits link to the account;
+/// accounts stored before usernames were persisted fall back to the display name.
+/// The commit email is preferred over the primary email so GitLab's
+/// "use a private email in commits" setting is respected; GitLab links noreply addresses too.
+/// Tests call this directly because it decides which identity ends up in a commit.
+let commitIdentityOfUser (user: AuthUserDto) : Main.Git.GitTokenProvider.GitCommitIdentity = {
+    Name =
+        if String.IsNullOrWhiteSpace user.Username then
+            user.Name
+        else
+            user.Username
+    Email =
+        match user.CommitEmail with
+        | Some commitEmail when not (String.IsNullOrWhiteSpace commitEmail) -> commitEmail
+        | _ -> user.Email
+}
+
+/// Commit identity for a commit that will be pushed to the given host (used by GitIdentityProvider).
+/// Policy: the account matching the host, preferring the active one, so the author links on the hub
+/// being pushed to. With no host known (no remote yet) the active account is used, since publishing
+/// targets its hub. A known host that matches no stored account yields None — the injected `-c`
+/// entries outrank every git config level, so stamping an unrelated account would silently override
+/// an identity the user may have configured for that hub themselves. Unlike token lookup, token
+/// validity is ignored: an expired token cannot authenticate, but its account's email still links
+/// commits. The GitLab username is preferred over the display name so commits link to the account;
+/// accounts stored before usernames were persisted fall back to the display name.
+let tryGetCommitIdentity (host: string option) : Main.Git.GitTokenProvider.GitCommitIdentity option =
+    let selectedAccountState =
+        match host with
+        | None -> getActiveAccountState ()
+        | Some host ->
+            let matchesHost (accountState: AccountState) =
+                String.Equals(
+                    SecureAuthStore.extractHost accountState.Summary.User.TargetDataHub,
+                    host,
+                    StringComparison.OrdinalIgnoreCase
+                )
+
+            getActiveAccountState ()
+            |> Option.filter matchesHost
+            |> Option.orElseWith (fun () ->
+                accounts
+                |> Map.tryPick (fun _ accountState -> if matchesHost accountState then Some accountState else None)
+            )
+
+    selectedAccountState
+    |> Option.map _.Summary.User
+    |> Option.map commitIdentityOfUser
+
 let private refreshTokenProvider () =
     Main.Git.GitTokenProvider.setTokenProvider {
         TryGetAccessToken = fun host -> promise { return tryGetTokenForHost host }
+    }
+
+    Main.Git.GitTokenProvider.setIdentityProvider {
+        TryGetCommitIdentity = fun host -> promise { return tryGetCommitIdentity host }
     }
 
     Main.Git.GitTokenProvider.RemoteProvisioning.setProvider {
@@ -575,8 +631,10 @@ let tryRestoreFromStorage () : unit =
         let user: AuthUserDto = {
             Id = credential.Metadata.Id
             LocalSwateAccountId = credential.Metadata.LocalSwateAccountId
+            Username = credential.Metadata.Username
             Name = credential.Metadata.Name
             Email = credential.Metadata.Email
+            CommitEmail = credential.Metadata.CommitEmail
             AvatarUrl = credential.Metadata.AvatarUrl
             TargetDataHub = credential.Metadata.TargetDataHub
         }

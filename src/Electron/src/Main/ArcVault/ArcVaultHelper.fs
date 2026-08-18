@@ -350,6 +350,7 @@ let createFileWatcher (path: string) (usePolling: bool option) =
 
             System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
             || isGitMetadataPath normalizedPath
+            || isLegacyDataMapPath normalizedPath
 
     // Native Windows file events can keep handles that block app-initiated folder renames.
     let usePolling =

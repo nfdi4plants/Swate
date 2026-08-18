@@ -43,34 +43,16 @@ let tryGetTargetHeader (table: ArcTable) (targetColumn: TargetColumn) =
         | None, Some _ -> Ok(CompositeHeader.Input IOType.Data)
         | Some _, Some _ -> Error "Both Input and Output columns already exist. Select Input or Output explicitly."
 
-let private targetColumnToHeader (targetColumn: TargetColumn) =
-    match targetColumn with
-    | TargetColumn.Input -> CompositeHeader.Input IOType.Data
-    | TargetColumn.Output -> CompositeHeader.Output IOType.Data
-    | TargetColumn.Autodetect -> CompositeHeader.Output IOType.Data
-
-let private tryGetExistingTargetColumn (table: ArcTable) (targetColumn: TargetColumn) =
-    match targetColumn with
-    | TargetColumn.Input -> table.TryGetInputColumn()
-    | TargetColumn.Output -> table.TryGetOutputColumn()
-    | TargetColumn.Autodetect -> None
-
 let private isSomeNonEmptyString = Option.exists (String.IsNullOrWhiteSpace >> not)
-
-let private isDataContextNonEmpty (dataContext: DataContext) =
-    isSomeNonEmptyString dataContext.FilePath
-    || isSomeNonEmptyString dataContext.Selector
-    || isSomeNonEmptyString dataContext.Format
-    || isSomeNonEmptyString dataContext.SelectorFormat
-
-let private isCompositeCellNonEmpty (cell: CompositeCell) =
-    cell.GetContentSwate() |> Array.exists (String.IsNullOrWhiteSpace >> not)
 
 let private findLastNonEmptyDataCellIndex (cells: ResizeArray<CompositeCell>) =
     let mutable lastNonEmptyIndex = -1
 
     for index in 0 .. cells.Count - 1 do
-        if isCompositeCellNonEmpty cells.[index] then
+        if
+            cells.[index].GetContentSwate()
+            |> Array.exists (String.IsNullOrWhiteSpace >> not)
+        then
             lastNonEmptyIndex <- index
 
     lastNonEmptyIndex
@@ -79,44 +61,46 @@ let private findLastNonEmptyDataContextIndex (dataMap: DataMap) =
     let mutable lastNonEmptyIndex = -1
 
     for index in 0 .. dataMap.DataContexts.Count - 1 do
-        if isDataContextNonEmpty dataMap.DataContexts.[index] then
+        let dataContext = dataMap.DataContexts.[index]
+
+        if
+            isSomeNonEmptyString dataContext.FilePath
+            || isSomeNonEmptyString dataContext.Selector
+            || isSomeNonEmptyString dataContext.Format
+            || isSomeNonEmptyString dataContext.SelectorFormat
+        then
             lastNonEmptyIndex <- index
 
     lastNonEmptyIndex
 
-let private clearDataContextData (dataContext: DataContext) =
-    dataContext.FilePath <- None
-    dataContext.Selector <- None
-    dataContext.Format <- None
-    dataContext.SelectorFormat <- None
-
-let private tryGetTableWriteHeader (table: ArcTable) (targetColumn: TargetColumn) (writeMode: WriteMode) =
-    match targetColumn, writeMode with
-    | TargetColumn.Autodetect, WriteMode.Append -> Error "Append mode requires selecting Input or Output explicitly."
-    | TargetColumn.Autodetect, WriteMode.Replace -> tryGetTargetHeader table targetColumn
-    | _ -> Ok(targetColumnToHeader targetColumn)
-
-let private mkDataCell (fileName: string) (fileType: string) (selector: string) =
-    let data = Data()
+let private setDataContextFields (fileName: string) (fileType: string) (selector: string) (data: Data) =
     data.FilePath <- Some fileName
     data.Selector <- Some selector
     data.Format <- Some fileType
     data.SelectorFormat <- Some URLs.Data.SelectorFormat.csv
-    CompositeCell.createData data
-
-let private mkEmptyDataCell () =
-    let data = Data()
-    CompositeCell.createData data
+    data
 
 let applyToTable (table: ArcTable) (input: AnnotationInput) =
     match input.Target with
     | AnnotationTarget.DataMap _ -> Error "DataMap target cannot be applied to a table destination."
     | AnnotationTarget.Table(targetColumn, writeMode) ->
-        match tryGetTableWriteHeader table targetColumn writeMode with
+        let headerResult =
+            match targetColumn, writeMode with
+            | TargetColumn.Autodetect, WriteMode.Append ->
+                Error "Append mode requires selecting Input or Output explicitly."
+            | TargetColumn.Autodetect, WriteMode.Replace -> tryGetTargetHeader table targetColumn
+            | TargetColumn.Input, _ -> Ok(CompositeHeader.Input IOType.Data)
+            | TargetColumn.Output, _ -> Ok(CompositeHeader.Output IOType.Data)
+
+        match headerResult with
         | Error errorMessage -> Error errorMessage
         | Ok header ->
             try
-                let existingColumn = tryGetExistingTargetColumn table targetColumn
+                let existingColumn =
+                    match targetColumn with
+                    | TargetColumn.Input -> table.TryGetInputColumn()
+                    | TargetColumn.Output -> table.TryGetOutputColumn()
+                    | TargetColumn.Autodetect -> None
 
                 let startRowIndex =
                     match writeMode, existingColumn with
@@ -137,12 +121,15 @@ let applyToTable (table: ArcTable) (input: AnnotationInput) =
                         for rowIndex in 0 .. targetRowCount - 1 do
                             if rowIndex >= startRowIndex && rowIndex < selectorEndExclusive then
                                 let selectorIndex = rowIndex - startRowIndex
-                                mkDataCell input.FileName input.FileType input.Selectors.[selectorIndex]
+
+                                Data()
+                                |> setDataContextFields input.FileName input.FileType input.Selectors.[selectorIndex]
+                                |> CompositeCell.createData
                             else
                                 match writeMode, existingColumn with
                                 | WriteMode.Append, Some column when rowIndex < column.Cells.Count ->
                                     column.Cells.[rowIndex]
-                                | _ -> mkEmptyDataCell ()
+                                | _ -> CompositeCell.createData (Data())
                     |]
                     |> ResizeArray
 
@@ -171,16 +158,19 @@ let applyToDataMap (dataMap: DataMap) (input: AnnotationInput) =
 
             if writeMode = WriteMode.Replace then
                 for index in requiredCount .. dataMap.DataContexts.Count - 1 do
-                    clearDataContextData dataMap.DataContexts.[index]
+                    let dataContext = dataMap.DataContexts.[index]
+                    dataContext.FilePath <- None
+                    dataContext.Selector <- None
+                    dataContext.Format <- None
+                    dataContext.SelectorFormat <- None
 
             for selectorOffset in 0 .. input.Selectors.Length - 1 do
                 let targetIndex = startIndex + selectorOffset
                 let selector = input.Selectors.[selectorOffset]
-                let dataContext = dataMap.DataContexts.[targetIndex]
-                dataContext.FilePath <- Some input.FileName
-                dataContext.Selector <- Some selector
-                dataContext.Format <- Some input.FileType
-                dataContext.SelectorFormat <- Some URLs.Data.SelectorFormat.csv
+
+                dataMap.DataContexts.[targetIndex]
+                |> setDataContextFields input.FileName input.FileType selector
+                |> ignore
 
             Ok input.Selectors.Length
         with exceptionValue ->

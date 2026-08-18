@@ -16,6 +16,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+-   Enforce the DataHub Git LFS tracking ruleset: `isa.*.xlsx` metadata files are never tracked with Git LFS (skipped by automatic tracking, exempt from the commit size policy, and blocked from manual marking), while files inside a `dataset` folder or larger than 25 MB can no longer be unmarked #1316.
+
+### Changed
+
+-   Simplify Electron FileTree navigation so ARC editors initialize the requested Metadata, table, or DataMap view directly, and show the DataHub download action only in the sidebar.
+-   Consolidate Electron ARC editor page state, safely resolve canonical entity workbooks, and reuse shared path normalization for ARC-root-relative references.
+-   Harden canonical entity path resolution for Electron rename and delete operations, and document the behavior of the shared path-normalization helpers.
+-   Keep table deletion in the existing footer-tab context menu instead of exposing a second, inconsistent navbar action.
+-   Isolate requested ARC view selection from eager Electron IPC proxy initialization as a temporary testability workaround; a follow-up should inject the file-opening dependency and keep `openView` as a thin Electron adapter.
+
+### Fixed
+
+-   Prevent deleted ARC table tabs from reappearing by applying rename, delete, and add operations to a fresh copy of the current editor state without mutating refs during React rendering.
+-   Keep active-view ownership inside the reusable ARC editor, preserve valid table selections across immutable ARC updates, and remount it for Electron sidebar Metadata, table, and DataMap selections.
+-   Preserve stable table identifiers across rerenders and reorder operations, use one shared prefix for drag-ID generation and parsing, and normalize the active view after table deletion so drag-and-drop and tab state remain valid.
+-   Create DataMaps from a copied ARC value, publish the same value to the editor and Electron persistence, and keep the requested remount view aligned with the visible DataMap tab.
+-   Keep table-tab keys unambiguous by rejecting duplicate table names.
+-   Append imported templates to a fresh table model when the active table is empty.
+-   Allow hidden filesystem files such as `.DS_Store` to be deleted from ARC add-zone roots without treating them as ARC entities.
+-   Sign commits created in Swate with the stored DataHub account matching the ARC's remote host (using the active account when no remote is configured yet, and leaving the user's own git config untouched for hubs without a stored account) instead of git's OS-derived fallback identity, so commits link to the account on the hub they are pushed to #1304.
+-   Report a missing git identity as its own failure with setup guidance instead of passing git's raw "Please tell me who you are" output to the user #1305.
+-   Respect GitLab's "use a private email in commits" setting by signing commits with the account's commit email instead of its primary email.
+
+## 2.0.7 - 2026-08-06
+
+### Added
+
+-   Add an Electron ARC file editor navbar action for creating and immediately saving DataMaps on assays, studies, runs, and workflows. The action remains visible and is disabled when a DataMap already exists.
+
+## 2.0.6 - 2026-08-05
+
+### 🔄 Changed
+
+-   Add Download ARC from the ARC selector into the sidebar below Git.
+-   Update FileTree ARC entity navigation: selecting an entity name opens Metadata, expansion and collapse are controlled only by the arrow, and table/DataMap files open their corresponding tabs.
+-   Store File Picker and Data Annotator references with an explicit `./` ARC-root-relative path in both table and DataMap views.
+
+### 🐛 Fixed
+
+-   Load templates through ARCtrl's JavaScript web API in Electron's main process, avoiding incompatible .NET/Fable server bindings and browser CORS restrictions.
+-   Show Actionbar overflow options whenever the button count exceeds the configured visible-button limit.
+-   Use consistent clipboard formatting across normal table and DataMap views, preserving data selectors after `#` when copying single or multiple cells.
+- Ensure switching between FileTree ARC files refreshes the selected editor tab instead of retaining the previous entity's tab.
+
+## 2.0.5 - 2026-08-05
+
+### 🐛 Fixed
+
+-   Preserve ARC static hash baselines during file watcher merges so saving metadata no longer overwrites unchanged XLSX files.
+-   Support Ctrl/Cmd+C, Ctrl/Cmd+X, and Ctrl/Cmd+V for single and multi-cell DataMap selections, preserve selectors after `#`, omit trailing whitespace when copying, and grow rows when pasting.
+-   Preserve pasted and edited DataMap Label values when rerendering the ARC file.
+-   Add table-consistent Copy, Cut, Paste, Clear, Fill Column, Clear Column, and Delete Selected Rows actions to the DataMap context menu.
+-   Rerender DataMap cells immediately after clearing them with the Delete key.
+-   Enable Add Rows and File Picker insertion in DataMap views.
+-   Store File Picker and Data Annotator references relative to the ARC root for assay, study, run, and workflow DataMaps, and rerender immediately after insertion.
+-   Migrate the outdated `isa_datamap` file to `isa.datamap.xlsx` during ARC loading, while preserving an existing canonical workbook.
+-   Fix the DataMap delete-row regression test to use the strongly typed `CellCoordinate` API.
+
+## 2.0.4 - 2026-07-20
+
+### 🐛 Fixed
+
+- Added missing `type` field to contributors in `.zenodo.json`
+
+## 2.0.3 - 2026-07-20
+
+### ✨ Added
+
+- Added `.zenodo.json` metadata file for zenodo release and related DOI generation (by @Freymaurer) 
+
+## 2.0.2 - 2026-07-15
+
+### 🔄 Changed
+
+-   Provenance editor: a property's identity is now its header **plus** its source table, so same-named properties from different tables (e.g. "Temperature" from Growth vs. Cultivation) get their own rail row, color, drag identity and connector lines instead of collapsing into one property #1255 (by @Caroott)
+
+### 🐛 Fixed
+
+-   Fix connection annotation inheritance in the provenance editor: values spread bidirectionally through a layer's connections to all transitively connected endpoints, removing a connection retracts exactly the values it carried, and upstream values are left untouched #1255 (by @Caroott)
+-   Group overwrites in the provenance editor now respect the property's origin: only assignments of the exact property are replaced (all writeback occurrences of a value together), upstream-originated properties can't be attached to entities that never had them, and drops on entities without a single shared existing value are rejected with a clear error instead of silently creating or mixing assignments #1255 (by @Caroott)
+
+
 ## 2.0.1 - 2026-07-14
 
 ### 🐛 Fixed

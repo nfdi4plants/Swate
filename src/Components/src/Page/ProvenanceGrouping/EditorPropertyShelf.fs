@@ -44,20 +44,20 @@ module PropertyShelf =
         | Some(PropertyCountBadge.DistinctValues count) -> Some(string count)
         | Some(PropertyCountBadge.Coverage(withValue, total)) -> Some($"{withValue}/{total}")
 
-    let private headerIdentity (header: ProvenancePropertyHeader) = DragDrop.propertyHeaderIdentity header
+    let private headerIdentity (property: ProvenancePropertyKey) = DragDrop.propertyKeyIdentity property
 
-    let private headerId (header: ProvenancePropertyHeader) = headerIdentity header |> slug
+    let private headerId (property: ProvenancePropertyKey) = headerIdentity property |> slug
 
     let private sourceSideForHeader
         (layerId: ProvenanceLayerId)
         (inputProjection: PropertyRails.RailProjection)
         (outputProjection: PropertyRails.RailProjection)
         (uiState: UiState)
-        (header: ProvenancePropertyHeader)
+        (property: ProvenancePropertyKey)
         =
-        match uiState.PropertyRailPlacements |> Map.tryFind (layerId, { Header = header }) with
+        match uiState.PropertyRailPlacements |> Map.tryFind (layerId, property) with
         | Some side -> side
-        | None when outputProjection.Headers |> List.contains header -> ProvenanceSide.Output
+        | None when outputProjection.Headers |> List.contains property -> ProvenanceSide.Output
         | _ -> ProvenanceSide.Input
 
     let private originsForHeader
@@ -65,11 +65,11 @@ module PropertyShelf =
         (_sourceSide: ProvenanceSide)
         (inputProjection: PropertyRails.RailProjection)
         (outputProjection: PropertyRails.RailProjection)
-        (header: ProvenancePropertyHeader)
+        (property: ProvenancePropertyKey)
         =
         [
-            inputProjection.OriginByHeader |> Map.tryFind header
-            outputProjection.OriginByHeader |> Map.tryFind header
+            inputProjection.OriginByHeader |> Map.tryFind property
+            outputProjection.OriginByHeader |> Map.tryFind property
         ]
         |> List.choose id
         |> List.fold Set.union Set.empty
@@ -138,18 +138,18 @@ module PropertyShelf =
             1, layerIndex, folderName key
         | UnknownFolder -> 2, Int32.MaxValue, folderName key
 
-    let private manualColor (session: ProvenanceSession) (uiState: UiState) (header: ProvenancePropertyHeader) =
+    let private manualColor (session: ProvenanceSession) (uiState: UiState) (property: ProvenancePropertyKey) =
         let layer = Session.activeLayer session
         let colorContext = State.PropertyColors.visibleColorContextForLayer session layer
 
         uiState.PropertyColors.ManualPropertyColors
         |> Map.tryFind {
             ContextId = colorContext.Id
-            Header = header
+            Property = property
         }
 
-    let private isPlacedInCurrentLayer (layer: ProvenanceLayer) (uiState: UiState) header =
-        let key = State.Keys.groupingKey header
+    let private isPlacedInCurrentLayer (layer: ProvenanceLayer) (uiState: UiState) property =
+        let key = State.Keys.groupingKey property
 
         let placedInRail = uiState.PropertyRailPlacements |> Map.containsKey (layer.Id, key)
 
@@ -168,12 +168,14 @@ module PropertyShelf =
         (inputProjection: PropertyRails.RailProjection)
         (outputProjection: PropertyRails.RailProjection)
         (uiState: UiState)
-        (header: ProvenancePropertyHeader)
+        (property: ProvenancePropertyKey)
         : FolderedDraggableItem<PropertyShelfItemPayload> =
+        let header = property.Header
+
         let badge =
             outputProjection.BadgeByHeader
-            |> Map.tryFind header
-            |> Option.orElseWith (fun () -> inputProjection.BadgeByHeader |> Map.tryFind header)
+            |> Map.tryFind property
+            |> Option.orElseWith (fun () -> inputProjection.BadgeByHeader |> Map.tryFind property)
             |> badgeText
 
         let tooltip =
@@ -185,13 +187,13 @@ module PropertyShelf =
             |> String.concat " · "
 
         {
-            Id = $"{folderKeyId folderKey}-{headerId header}"
+            Id = $"{folderKeyId folderKey}-{headerId property}"
             Label = header.Category.Name
             Payload = {
-                Header = header
+                Property = property
                 SourceSide = sourceSide
             }
-            Color = manualColor session uiState header
+            Color = manualColor session uiState property
             Badge = badge
             Tooltip =
                 if String.IsNullOrWhiteSpace tooltip then
@@ -223,20 +225,16 @@ module PropertyShelf =
 
         let itemEntries =
             headers
-            |> List.collect (fun header ->
+            |> List.collect (fun property ->
                 let sourceSide =
-                    sourceSideForHeader layer.Id inputProjection outputProjection uiState header
+                    sourceSideForHeader layer.Id inputProjection outputProjection uiState property
 
-                originsForHeader layer.Id sourceSide inputProjection outputProjection header
-                |> Set.toList
-                |> function
-                    | [] -> [ UnknownFolder ]
-                    | origins -> origins |> List.map folderKeyForOrigin
-                |> List.distinct
-                |> List.map (fun folderKey ->
+                let folderKey = SourceFolder property.OriginSource
+
+                [
                     folderKey,
-                    itemForHeader session sourceSide folderKey inputProjection outputProjection uiState header
-                )
+                    itemForHeader session sourceSide folderKey inputProjection outputProjection uiState property
+                ]
             )
 
         let folderKeys =

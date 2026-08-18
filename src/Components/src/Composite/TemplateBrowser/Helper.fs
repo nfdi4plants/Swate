@@ -119,7 +119,11 @@ let updateTables
                 |> Array.ofSeq
                 |> Array.rev
 
-            let tempTable = activeTable.Copy()
+            let tempTable =
+                if activeTable.ColumnCount = 0 then
+                    ArcTable.init activeTable.Name
+                else
+                    activeTable.Copy()
 
             for table in selectedColumnTables do
                 if table.RowCount = 0 then
@@ -145,7 +149,11 @@ let updateTables
                     table.AddRowsEmpty(tempTable.RowCount - table.RowCount)
 
                 let preparedTemplate = Table.distinctByHeader tempTable table
-                tempTable.Join(preparedTemplate, joinOptions = importConfig.ImportType)
+
+                if tempTable.ColumnCount = 0 then
+                    tempTable.AddColumns(preparedTemplate.Columns)
+                else
+                    tempTable.Join(preparedTemplate, joinOptions = importConfig.ImportType)
 
             existingTables.[tableIndex] <- tempTable
         | _ -> ()

@@ -2,6 +2,7 @@ module Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper
 
 open Fable.Core
 open Swate.Components.Page.FileExplorer.Types
+open Swate.Components.Shared
 
 module FileItemHelper = Swate.Components.Page.FileExplorer.Helper
 
@@ -22,11 +23,14 @@ let toggleLfsMark
                 if System.String.IsNullOrWhiteSpace relativePath then
                     setError (Some "Cannot mark ARC root as a Git LFS file.")
                 else
-                    let! result = runToggle relativePath markAsLfs
+                    match GitLfsRules.tryGetToggleBlockedReason relativePath item.Size markAsLfs with
+                    | Some blockedReason -> setError (Some blockedReason)
+                    | None ->
+                        let! result = runToggle relativePath markAsLfs
 
-                    match result with
-                    | Ok _ -> setError None
-                    | Error msg -> setError (Some $"Git LFS update failed for '{item.Name}': {msg}")
+                        match result with
+                        | Ok _ -> setError None
+                        | Error msg -> setError (Some $"Git LFS update failed for '{item.Name}': {msg}")
         }
         |> Promise.start
 
@@ -113,14 +117,25 @@ let contextMenuItems
         let needsDownload = FileItemHelper.needsLfsDownload item
         let hasLocalCopy = FileItemHelper.hasLocalLfsCopy item
 
+        let toggleBlockedReason =
+            item.Path
+            |> Option.bind (fun relativePath ->
+                GitLfsRules.tryGetToggleBlockedReason relativePath item.Size (not isMarked)
+            )
+
+        let toggleLabel = if isMarked then "Unmark Git LFS" else "Mark Git LFS"
+
+        let toggleIcon =
+            if isMarked then
+                "swt:fluent--document-dismiss-24-regular"
+            else
+                "swt:fluent--document-add-24-regular"
+
         [
-            ContextMenuItem.create
-                (if isMarked then "Unmark Git LFS" else "Mark Git LFS")
-                (if isMarked then
-                     "swt:fluent--document-dismiss-24-regular"
-                 else
-                     "swt:fluent--document-add-24-regular")
-                (fun () -> onToggleLfsMark item (not isMarked))
+            if toggleBlockedReason.IsSome then
+                ContextMenuItem.disabled toggleLabel toggleIcon
+            else
+                ContextMenuItem.create toggleLabel toggleIcon (fun () -> onToggleLfsMark item (not isMarked))
 
             if isMarked then
                 yield!

@@ -4,7 +4,6 @@ open Feliz
 open Renderer.Components.MainContent
 open Renderer.Components.MainContent.ArcFilePreviewTargetHelper
 open Swate.Components.Page.ArcFileEditor.Types
-open Swate.Components.Composite.AnnotationTable
 open Swate.Components.Composite.Widgets.JsonImport.Types
 open Swate.Components
 open Swate.Components.Shared
@@ -12,82 +11,25 @@ open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
 
 [<ReactComponent>]
-let private TableNavbarActions (props: ArcFileEditorHeaderProps, setArcFile: ArcFiles -> unit) =
-    let isDeleteModalOpen, setIsDeleteModalOpen = React.useState false
-
-    match props.activeView with
-    | ActiveView.Table tableIndex when tableIndex >= 0 && tableIndex < props.arcFile.Tables().Count ->
-        let tableName = props.arcFile.Tables().[tableIndex].Name
-        let deleteLabel = $"Delete Table: {tableName}"
-
-        let openDeleteModal = fun _ -> setIsDeleteModalOpen true
-
-        let confirmDelete () =
-            deleteSelectedTable props.arcFile tableIndex setArcFile props.setActiveView
-
-        React.Fragment [
-            ResetTableConfirmationModal.ResetTableConfirmationModal(
-                isDeleteModalOpen,
-                setIsDeleteModalOpen,
-                confirmDelete,
-                tableName = tableName
-            )
-            Html.div [
-                prop.className "swt:flex swt:items-center swt:gap-2"
-                prop.children [
-                    Html.button [
-                        prop.type'.button
-                        prop.className
-                            "swt:btn swt:btn-square swt:btn-ghost swt:btn-sm swt:hover:bg-error swt:hover:text-error-content swt:hover:border-error"
-                        prop.onClick openDeleteModal
-                        prop.title deleteLabel
-                        prop.ariaLabel deleteLabel
-                        prop.children [
-                            Html.i [
-                                prop.className "swt:iconify swt:fluent--delete-20-filled swt:size-5"
-                            ]
-                        ]
-                    ]
-                ]
-            ]
-        ]
-    | _ -> Html.none
-
-[<ReactComponent>]
-let ArcFilePreviewTarget (arcFile: ArcFiles) =
+let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let errorModal = useErrorModalCtx ()
 
-    let setArcFilePageState (nextArcFile: ArcFiles) =
-        let page = Renderer.Types.PageState.ArcFilePage nextArcFile
-
-        pageStateCtx.setState (Some page)
-
-    let updateArcFileInMemory (nextArcFile: ArcFiles) = Helper.setArcFileInMemory nextArcFile
+    let setArcFilePageState nextRequestedView (nextArcFile: ArcFiles) =
+        pageStateCtx.setState (Some(Renderer.Types.PageState.ArcFilePage(nextArcFile, nextRequestedView)))
 
     let setArcFileInMemoryWithErrorModal (nextArcFile: ArcFiles) =
         promise {
-            match! updateArcFileInMemory nextArcFile with
+            match! Helper.setArcFileInMemory nextArcFile with
             | Ok() -> ()
             | Error exn ->
                 errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not update ARC in memory"))
         }
         |> Promise.start
 
-    let setArcFile =
-        fun (nextArcFile: ArcFiles) ->
-            setArcFilePageState nextArcFile
-            setArcFileInMemoryWithErrorModal nextArcFile
-
-    let onSaveArcFile =
-        fun _ ->
-            promise {
-                match! Helper.saveArcFile arcFile with
-                | Ok() -> ()
-                | Error exn ->
-                    errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not save ARC file"))
-            }
-            |> Promise.start
+    let setArcFile nextArcFile =
+        setArcFilePageState requestedView nextArcFile
+        setArcFileInMemoryWithErrorModal nextArcFile
 
     let pickFilePaths =
         React.useCallback (
@@ -106,22 +48,65 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
     let importJson =
         React.useCallback (
             (fun (request: JsonImportRequest) -> promise {
-                return! importJsonRequestIntoCurrentTarget arcFile request setArcFilePageState updateArcFileInMemory
+                return!
+                    importJsonRequestIntoCurrentTarget
+                        arcFile
+                        request
+                        (setArcFilePageState requestedView)
+                        Helper.setArcFileInMemory
             }),
             [| box arcFile; box pageStateCtx |]
         )
 
-    let trailingNavbarElements =
-        React.useCallback ((fun props -> TableNavbarActions(props, setArcFile)), [| box setArcFile |])
+    let widgetNavbarElements =
+        fun (props: ArcFileEditorHeaderProps) ->
+            let button (dataMap: ARCtrl.DataMap option) =
+                Swate.Components.Primitive.Buttons.Buttons.QuickAccessButton(
+                    Html.i [
+                        prop.className "swt:iconify swt:fluent--database-arrow-up-20-regular swt:size-5"
+                    ],
+                    "Add DataMap",
+                    (fun _ ->
+                        if dataMap.IsNone then
+                            promise {
+                                match!
+                                    createDataMapInCurrentTarget props.arcFile setArcFilePageState Helper.saveArcFile
+                                with
+                                | Ok() -> ()
+                                | Error exn ->
+                                    errorModal.enqueue (
+                                        ErrorModalRequest.create (exn.Message, title = "Could not save DataMap")
+                                    )
+                            }
+                            |> Promise.start
+                    ),
+                    isDisabled = dataMap.IsSome
+                )
 
-    Swate.Components.Page.ArcFileEditor.Main.ArcFileEditor(
-        arcFile,
-        setArcFile,
-        pickFilePaths,
-        trailingNavbarElements = trailingNavbarElements,
-        onImportJson = importJson,
-        onError =
-            (fun message ->
-                errorModal.enqueue (ErrorModalRequest.create (message, title = "Could not update ARC file editor"))
+            match props.arcFile with
+            | ArcFiles.Assay assay -> button assay.DataMap
+            | ArcFiles.Study(study, _) -> button study.DataMap
+            | ArcFiles.Run run -> button run.DataMap
+            | ArcFiles.Workflow workflow -> button workflow.DataMap
+            | _ -> Html.none
+
+    Html.div [
+        prop.key (string (editorKey arcFile requestedView))
+        prop.className "swt:contents"
+        prop.children [
+            Swate.Components.Page.ArcFileEditor.Main.ArcFileEditor(
+                arcFile,
+                setArcFile,
+                pickFilePaths,
+                widgetNavbarElements = widgetNavbarElements,
+                startingActiveView = (requestedView |> Option.defaultValue ActiveView.Metadata),
+                onImportJson = importJson,
+                onError =
+                    (fun message ->
+                        errorModal.enqueue (
+                            ErrorModalRequest.create (message, title = "Could not update ARC file editor")
+                        )
+                    )
             )
-    )
+        ]
+    ]
