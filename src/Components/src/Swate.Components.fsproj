@@ -70,6 +70,8 @@
     <Compile Include="JsBindings\Virtual.fs" />
     <Compile Include="JsBindings\FloatingUI.fs" />
     <Compile Include="JsBindings\DndKit.fs" />
+    <Compile Include="JsBindings\XyFlow.fs" />
+    <Compile Include="JsBindings\Dagre.fs" />
     <Compile Include="ARCtrl\TermCollection.fs" />
     <Compile Include="ARCtrl\Helper.fs" />
     <Compile Include="ARCtrl\ArcIO.fs" />
