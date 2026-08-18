@@ -1,6 +1,8 @@
 module ElectronCore.ArcVaultHelperTests
 
 open ARCtrl
+open Fable.Core.JsInterop
+open Fable.Electron.Main
 open Main.ARCtrlExtensions
 open Main.ArcVault
 open Main.ArcVaultHelper
@@ -10,6 +12,20 @@ open Main.Notes.NoteConstants
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Vitest
+
+let private lifecycleTestWindow id isDestroyed onSend =
+    // The remoting proxy calls webContents.send with channel and payload arguments.
+    // Discard those transport details so lifecycle tests only observe whether a send occurred.
+    let send: obj = emitJsExpr onSend "((..._args) => $0())"
+
+    // ArcVault only needs this subset of BrowserWindow for lifecycle broadcasts. Keeping the
+    // fixture minimal avoids constructing a real Electron window in the Vitest environment.
+    createObj [
+        "id" ==> id
+        "isDestroyed" ==> (fun () -> isDestroyed)
+        "webContents" ==> createObj [ "send" ==> send ]
+    ]
+    |> unbox<BrowserWindow>
 
 let private mkdirRecursiveAsync (directoryPath: string) = promise {
     let! _ = mkdirAsync directoryPath (MkdirOptions(recursive = true))
@@ -44,6 +60,26 @@ let private addDataMapToAllEntityTypes (arc: ARC) =
 Vitest.describe (
     "ArcVaultHelper",
     fun () ->
+        Vitest.test (
+            "recent ARC broadcasts skip windows destroyed during simultaneous shutdown",
+            fun () ->
+                let mutable aliveWindowSendCount = 0
+
+                let aliveWindow =
+                    lifecycleTestWindow 1 false (fun () -> aliveWindowSendCount <- aliveWindowSendCount + 1)
+
+                let destroyedWindow =
+                    lifecycleTestWindow 2 true (fun () -> failwith "Destroyed window received an IPC message.")
+
+                let vaults = ArcVaults()
+                vaults.Vaults.Add(aliveWindow.id, ArcVault(aliveWindow))
+                vaults.Vaults.Add(destroyedWindow.id, ArcVault(destroyedWindow))
+
+                vaults.BroadcastRecentARCs()
+
+                Vitest.expect(aliveWindowSendCount).toBe (1)
+        )
+
         Vitest.test (
             "file watcher polling defaults to Windows only",
             fun () ->

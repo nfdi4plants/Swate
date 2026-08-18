@@ -21,8 +21,6 @@
     <Compile Include="ArcVaultHelper.test.fs" />
     <Compile Include="ArcAddExtensions.test.fs" />
     <Compile Include="ArcDeleteHelper.test.fs" />
-    <Compile Include="ArcObjectWidget.test.fs" />
-    <Compile Include="ArcObjectGraphExplorer.test.fs" />
     <Compile Include="JsonDTOUnwrapper.test.fs" />
     <Compile Include="NoteConversion.test.fs" />
     <Compile Include="NoteSearchReader.test.fs" />

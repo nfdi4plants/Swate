@@ -6,6 +6,7 @@ open Swate.Components.Composite.Notes.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.DTOs.NoteSearchDto
+open Renderer
 
 [<ReactComponent>]
 let NotesSearchTarget () =
