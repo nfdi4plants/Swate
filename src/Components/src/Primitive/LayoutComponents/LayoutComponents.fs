@@ -8,6 +8,46 @@ open Swate.Components.Primitive
 type LayoutComponents =
 
     [<ReactComponent>]
+    static member private KeyValueRow(label: string, value: string) =
+        Html.div [
+            prop.className
+                "swt:grid swt:grid-cols-[10rem_1fr] swt:gap-3 swt:border-b swt:border-base-content/10 swt:py-2 last:swt:border-b-0"
+            prop.children [
+                Html.div [
+                    prop.className "swt:text-sm swt:font-medium swt:text-base-content/70"
+                    prop.text label
+                ]
+                Html.div [
+                    prop.className "swt:min-w-0 swt:break-words"
+                    prop.text value
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member KeyValuePanel(title: string, fields: (string * string) list, ?className: string) =
+        Html.div [
+            prop.className [
+                "swt:rounded-box swt:border swt:border-base-content/15 swt:bg-base-100 swt:p-4"
+                if className.IsSome then
+                    className.Value
+            ]
+            prop.children [
+                Html.div [
+                    prop.className "swt:mb-2 swt:text-sm swt:font-semibold"
+                    prop.text title
+                ]
+                Html.div [
+                    prop.className "swt:flex swt:flex-col"
+                    prop.children [
+                        for label, value in fields do
+                            LayoutComponents.KeyValueRow(label, value)
+                    ]
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
     static member FieldTitle(title: string) =
         Html.h5 [
             prop.className "swt:text-primary swt:font-semibold swt:mt-6 swt:mb-2"

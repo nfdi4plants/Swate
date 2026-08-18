@@ -43,6 +43,27 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+async function openTransformAction(
+  canvasElement: HTMLElement,
+  cellTestId: string,
+  actionName: RegExp,
+) {
+  const canvas = within(canvasElement);
+  const cell = await canvas.findByTestId(cellTestId);
+
+  await fireEvent.contextMenu(cell);
+
+  const contextMenu = await screen.findByTestId("context_menu");
+  await expect(contextMenu).toBeVisible();
+
+  const transformAction = within(contextMenu).getByRole("button", {
+    name: actionName,
+  });
+  await expect(transformAction).toBeVisible();
+
+  await userEvent.click(transformAction);
+}
+
 export const Default: Story = {
   render: renderTable,
   args: {
@@ -381,6 +402,77 @@ export const UnitizedDetails: Story = {
       },
       { timeout: 5000 },
     );
+  },
+};
+
+export const AddUnitTransform: Story = {
+  render: renderTable,
+  args: {
+    height: 600,
+    debug: true,
+  },
+  play: async ({ canvasElement }) => {
+    await openTransformAction(canvasElement, "cell-1-3", /^Add Unit\b/i);
+
+    const modal = await screen.findByRole("dialog", { name: /Add Unit/i });
+    const modalView = within(modal);
+
+    expect(modal).toHaveAttribute("data-testid", "modal_Transform_AddUnit");
+    expect(modal).toHaveTextContent("Add Unit");
+    expect(modalView.getByText("Unit")).toBeInTheDocument();
+    const termSearchInput = modalView.getByTestId("term-search-input");
+    expect(termSearchInput).toBeInTheDocument();
+    expect(termSearchInput).toHaveValue("SCIEX instrument model");
+    const submitButton = modalView.getByRole("button", { name: /^Submit$/i });
+    expect(submitButton).toBeEnabled();
+
+    for (const invalidInput of ["", "42", "unfinished unit"]) {
+      await userEvent.clear(termSearchInput);
+      if (invalidInput) {
+        await userEvent.type(termSearchInput, invalidInput);
+      }
+      await waitFor(() => expect(termSearchInput).toHaveValue(invalidInput));
+      await waitFor(() => expect(submitButton).toBeDisabled());
+    }
+
+    await userEvent.keyboard("{Enter}");
+    expect(modal).toBeVisible();
+
+    expect(modalView.queryByText(/Keep value/i)).not.toBeInTheDocument();
+    expect(modalView.queryByText(/Keep unit/i)).not.toBeInTheDocument();
+  },
+};
+
+export const RemoveUnitTransform: Story = {
+  render: renderTable,
+  args: {
+    height: 600,
+    debug: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await openTransformAction(canvasElement, "cell-1-5", /^Remove Unit\b/i);
+
+    const modal = await screen.findByRole("dialog", { name: /Remove Unit/i });
+    const modalView = within(modal);
+
+    expect(modal).toHaveAttribute("data-testid", "modal_Transform_RemoveUnit");
+    expect(modal).toHaveTextContent("Remove Unit");
+    expect(modalView.getByText("Current cell")).toBeInTheDocument();
+    expect(modalView.getByText("Result")).toBeInTheDocument();
+    expect(modalView.getByText("degree celsius")).toBeInTheDocument();
+    expect(modalView.getAllByText("0").length).toBeGreaterThan(0);
+    expect(modalView.queryByText(/Keep value/i)).not.toBeInTheDocument();
+    expect(modalView.queryByText(/Keep unit/i)).not.toBeInTheDocument();
+
+    await userEvent.click(modalView.getByRole("button", { name: /^Submit$/i }));
+
+    await waitFor(() => {
+      const updatedCell = canvas.getByTestId("cell-1-5");
+      expect(updatedCell).toHaveTextContent("0");
+      expect(updatedCell).not.toHaveTextContent(/degree celsius/i);
+    });
   },
 };
 
