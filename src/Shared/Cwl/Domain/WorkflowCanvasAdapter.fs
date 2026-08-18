@@ -462,12 +462,9 @@ let applyConnections (graph: WorkflowCanvasGraph) (workflow: CWLWorkflowDescript
                 |> List.filter (String.IsNullOrWhiteSpace >> not)
                 |> ResizeArray
 
-            let updatedInput = {
-                stepInput with
-                    Source = if newSources.Count = 0 then None else Some newSources
-            }
+            stepInput.Source <- if newSources.Count = 0 then None else Some newSources
 
-            step.In.[index] <- updatedInput
+            step.In.[index] <- stepInput
 
     for output in workflow.Outputs do
         let targetNodeId = WorkflowOutputSinkNodeId

@@ -81,7 +81,10 @@ let tryLoad (yaml: string) : Result<CWLProcessingUnit, string> =
         with ex ->
             let message = ex.Message
 
-            if message.Contains("Field not found: class: Object []", System.StringComparison.OrdinalIgnoreCase) then
+            if
+                message.IndexOf("Field not found: class: Object []", System.StringComparison.OrdinalIgnoreCase)
+                >= 0
+            then
                 Error "CWL root 'class' is missing or empty."
             else
                 Error(sprintf "Failed to decode CWL: %s" message)

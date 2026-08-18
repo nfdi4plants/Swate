@@ -361,7 +361,13 @@ let setWorkflowStepInputIdAt (steps: ResizeArray<WorkflowStep>) (stepIndex: int)
         let trimmed = newId.Trim()
 
         if String.IsNullOrWhiteSpace trimmed |> not then
-            WorkflowStep.updateInputAt inputIndex (fun input -> { input with Id = trimmed }) step
+            WorkflowStep.updateInputAt
+                inputIndex
+                (fun input ->
+                    input.Id <- trimmed
+                    input
+                )
+                step
     | None -> ()
 
 let setWorkflowStepInputSourceAt
@@ -373,7 +379,14 @@ let setWorkflowStepInputSourceAt
     match tryGetStep steps stepIndex with
     | Some step ->
         let source = sourceText |> nonEmptyOrNone |> Option.bind parseSourceText
-        WorkflowStep.updateInputAt inputIndex (fun input -> { input with Source = source }) step
+
+        WorkflowStep.updateInputAt
+            inputIndex
+            (fun input ->
+                input.Source <- source
+                input
+            )
+            step
     | None -> ()
 
 let addWorkflowStepOutputAt (steps: ResizeArray<WorkflowStep>) (stepIndex: int) =
@@ -408,7 +421,9 @@ let setWorkflowStepOutputIdAt (steps: ResizeArray<WorkflowStep>) (stepIndex: int
             let updatedOutput =
                 match step.Out.[outputIndex] with
                 | StepOutput.StepOutputString _ -> StepOutput.StepOutputString trimmed
-                | StepOutput.StepOutputRecord record -> StepOutput.StepOutputRecord { record with Id = trimmed }
+                | StepOutput.StepOutputRecord record ->
+                    record.Id <- trimmed
+                    StepOutput.StepOutputRecord record
 
             step.Out.[outputIndex] <- updatedOutput
     | _ -> ()

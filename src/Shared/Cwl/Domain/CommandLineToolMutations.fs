@@ -91,10 +91,8 @@ let setInputPrefixAt (inputs: ResizeArray<CWLInput>) (index: int) (prefix: strin
         let input = inputs.[index]
         let binding = input.InputBinding |> Option.defaultValue (InputBinding.create ())
 
-        let nextBinding = {
-            binding with
-                Prefix = nonEmptyOrNone prefix
-        }
+        binding.Prefix <- nonEmptyOrNone prefix
+        let nextBinding = binding
 
         input.InputBinding <- normalizeInputBinding nextBinding
 
@@ -103,10 +101,8 @@ let setInputPositionAt (inputs: ResizeArray<CWLInput>) (index: int) (position: s
         let input = inputs.[index]
         let binding = input.InputBinding |> Option.defaultValue (InputBinding.create ())
 
-        let nextBinding = {
-            binding with
-                Position = parseIntOrNone position
-        }
+        binding.Position <- parseIntOrNone position
+        let nextBinding = binding
 
         input.InputBinding <- normalizeInputBinding nextBinding
 
@@ -145,10 +141,8 @@ let setOutputGlobAt (outputs: ResizeArray<CWLOutput>) (index: int) (glob: string
         let output = outputs.[index]
         let binding = output.OutputBinding |> Option.defaultValue (OutputBinding.create ())
 
-        let nextBinding = {
-            binding with
-                Glob = nonEmptyOrNone glob
-        }
+        binding.Glob <- nonEmptyOrNone glob
+        let nextBinding = binding
 
         output.OutputBinding <- normalizeOutputBinding nextBinding
 
