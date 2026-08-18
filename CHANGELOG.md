@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Report a missing git identity as its own failure with setup guidance instead of passing git's raw "Please tell me who you are" output to the user #1305.
 -   Respect GitLab's "use a private email in commits" setting by signing commits with the account's commit email instead of its primary email.
 -   Fix Template bug "You've hit dummy code" #1266, #1264 (by @Freymaurer) 
+-   Fix overscroll issue on last table column on smaller screens (by @Freymaurer)
 
 ## 2.0.7 - 2026-08-06
 
