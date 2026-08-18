@@ -17,7 +17,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="@(Compile)" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
     <Compile Include="PathHelpers.fs" />
     <Compile Include="GitLfsRules.fs" />
     <Compile Include="Database.fs" />
@@ -87,6 +86,8 @@
   <ItemGroup>
     <!-- Include all files that are compiled with this project -->
     <!-- Include the project file itself as well -->
+    <!-- NOTE: this Content item must stay AFTER the Compile ItemGroup, otherwise @(Compile) is empty at evaluation time and the nupkg ships no sources -->
+    <Content Include="@(Compile)" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
     <Content Include="$(MSBuildThisFileFullPath)" Pack="true" PackagePath="fable/" />
   </ItemGroup>
 </Project>

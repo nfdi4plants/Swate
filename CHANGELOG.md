@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Isolate requested ARC view selection from eager Electron IPC proxy initialization as a temporary testability workaround; a follow-up should inject the file-opening dependency and keep `openView` as a thin Electron adapter.
 
 ### Fixed
+-   Fixed the Swate.Components.Core NuGet package shipping no Fable source files (the @(Compile) pack item evaluated before the compile list was declared).
 
 -   Prevent deleted ARC table tabs from reappearing by applying rename, delete, and add operations to a fresh copy of the current editor state without mutating refs during React rendering.
 -   Keep active-view ownership inside the reusable ARC editor, preserve valid table selections across immutable ARC updates, and remount it for Electron sidebar Metadata, table, and DataMap selections.
