@@ -43,10 +43,12 @@ export const IntegratedNavbar: Story = {
     const navbar = canvas.getByRole('navigation', { name: 'arc navigation' });
     expect(navbar).toBeInTheDocument();
 
-    expect(getWidgetButton(canvas, 'Open Add Building Block')).toBeEnabled();
-    expect(getWidgetButton(canvas, 'Open Add Template')).toBeEnabled();
-    expect(getWidgetButton(canvas, 'Open File Picker')).toBeEnabled();
-    expect(getWidgetButton(canvas, 'Open Data Annotator')).toBeEnabled();
+    expect(getWidgetButton(canvas, 'Add Building Block')).toBeEnabled();
+    expect(getWidgetButton(canvas, 'Add Template')).toBeEnabled();
+    expect(getWidgetButton(canvas, 'File Picker')).toBeEnabled();
+    expect(getWidgetButton(canvas, 'Data Annotator')).toBeEnabled();
+    expect(getWidgetButton(canvas, 'Import JSON')).toBeEnabled();
+    expect(getWidgetButton(canvas, 'Export JSON')).toBeEnabled();
   },
 };
 
@@ -55,16 +57,16 @@ export const NavbarWidgetToggle: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(getWidgetButton(canvas, 'Open Add Building Block'));
+    await userEvent.click(getWidgetButton(canvas, 'Add Building Block'));
 
     await waitFor(() => {
-      expect(getWidgetButton(canvas, 'Close Add Building Block')).toBeInTheDocument();
+      expect(canvas.getByRole('button', { name: 'Add Column' })).toBeInTheDocument();
     });
 
-    await userEvent.click(getWidgetButton(canvas, 'Close Add Building Block'));
+    await userEvent.click(getWidgetButton(canvas, 'Add Building Block'));
 
     await waitFor(() => {
-      expect(getWidgetButton(canvas, 'Open Add Building Block')).toBeInTheDocument();
+      expect(canvas.queryByRole('button', { name: 'Add Column' })).not.toBeInTheDocument();
     });
   },
 };
@@ -101,10 +103,9 @@ export const AddTemplateWidget: Story = {
 
     const initialColumnCount = parseColumnCount(canvas.getByTestId('arc-file-editor-column-count').textContent);
 
-    await userEvent.click(getWidgetButton(canvas, 'Open Add Template'));
+    await userEvent.click(getWidgetButton(canvas, 'Add Template'));
 
     await waitFor(() => {
-      expect(getWidgetButton(canvas, 'Close Add Template')).toBeInTheDocument();
       expect(canvas.getByText(STORY_TEMPLATE_NAME)).toBeInTheDocument();
     });
 
@@ -135,7 +136,7 @@ export const AppendTemplateToEmptyTable: Story = {
     await userEvent.click(canvas.getByRole('button', { name: 'Table 1' }));
     expect(canvas.getByText('Start with template!')).toBeInTheDocument();
 
-    await userEvent.click(getWidgetButton(canvas, 'Open Add Template'));
+    await userEvent.click(getWidgetButton(canvas, 'Add Template'));
     await userEvent.click(await canvas.findByText(STORY_TEMPLATE_NAME));
     await userEvent.click(canvas.getByRole('button', { name: /^Import$/i }));
 
