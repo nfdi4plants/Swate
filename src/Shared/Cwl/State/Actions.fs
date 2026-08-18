@@ -1,8 +1,8 @@
-module CWLBuilder.Electron.Renderer.State.Actions
+module Swate.Components.Shared.Cwl.State.Actions
 
 open System
-open CWLBuilder.Electron.Renderer.Documents.Types
-open CWLBuilder.Electron.Renderer.State.Types
+open Swate.Components.Shared.Cwl.Documents.Types
+open Swate.Components.Shared.Cwl.State.Types
 
 type AppAction =
     | NewDocumentCreated of EditorDocument

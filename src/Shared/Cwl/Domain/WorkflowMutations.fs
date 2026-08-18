@@ -1,12 +1,12 @@
 /// Workflow-focused mutation helpers.
 /// Keeps step/list mutation logic out of renderer components.
-module CWLBuilder.Domain.WorkflowMutations
+module Swate.Components.Shared.Cwl.WorkflowMutations
 
 open System
 open ARCtrl
 open ARCtrl.CWL
-open CWLBuilder.Domain.EditorMutations
-open CWLBuilder.Domain.RequirementMutations
+open Swate.Components.Shared.Cwl.EditorMutations
+open Swate.Components.Shared.Cwl.RequirementMutations
 
 type WorkflowStepRunKind =
     | RunStringKind
@@ -30,17 +30,18 @@ let WorkflowStepExternalRunAbsolutePathKey = "_cwlbuilder_external_run_abs_path"
 let private tryGetStepMetadataString (step: WorkflowStep) (key: string) =
     try
         let value = step.GetPropertyValue(key)
-        if isNull value then None else Some (string value)
+        if isNull value then None else Some(string value)
     with _ ->
         None
 
 let private toWorkflowRelativePath (workflowPath: string) (targetFilePath: string) =
     let workflowSegments = ArcPathHelper.split (ArcPathHelper.normalize workflowPath)
+
     let workflowDirectorySegments =
         if workflowSegments.Length <= 1 then
             [||]
         else
-            workflowSegments.[0..workflowSegments.Length - 2]
+            workflowSegments.[0 .. workflowSegments.Length - 2]
 
     let targetSegments = ArcPathHelper.split (ArcPathHelper.normalize targetFilePath)
 
@@ -48,7 +49,11 @@ let private toWorkflowRelativePath (workflowPath: string) (targetFilePath: strin
     let maxShared = min workflowDirectorySegments.Length targetSegments.Length
 
     while sharedCount < maxShared
-          && String.Equals(workflowDirectorySegments.[sharedCount], targetSegments.[sharedCount], StringComparison.OrdinalIgnoreCase) do
+          && String.Equals(
+              workflowDirectorySegments.[sharedCount],
+              targetSegments.[sharedCount],
+              StringComparison.OrdinalIgnoreCase
+          ) do
         sharedCount <- sharedCount + 1
 
     let upSegments = Array.create (workflowDirectorySegments.Length - sharedCount) ".."
@@ -64,15 +69,19 @@ let private normalizeAbsolutePath (workflowPath: string) (runString: string) =
     let trimmedRunString = runString.Trim()
     let normalizedRun = ArcPathHelper.normalize trimmedRunString
 
-    if normalizedRun.StartsWith("/", StringComparison.Ordinal)
-       || normalizedRun.StartsWith("//", StringComparison.Ordinal)
-       || (normalizedRun.Length > 2 && normalizedRun.[1] = ':' && normalizedRun.[2] = '/') then
+    if
+        normalizedRun.StartsWith("/", StringComparison.Ordinal)
+        || normalizedRun.StartsWith("//", StringComparison.Ordinal)
+        || (normalizedRun.Length > 2 && normalizedRun.[1] = ':' && normalizedRun.[2] = '/')
+    then
         normalizedRun
     else
-        ArcPathHelper.resolvePathFromFile workflowPath normalizedRun |> ArcPathHelper.normalize
+        ArcPathHelper.resolvePathFromFile workflowPath normalizedRun
+        |> ArcPathHelper.normalize
 
 let setWorkflowStepExternalRunMetadata (workflowPath: string) (step: WorkflowStep) (runString: string) =
     let trimmedRun = runString.Trim()
+
     if String.IsNullOrWhiteSpace trimmedRun |> not then
         step.SetProperty(WorkflowStepOriginalRunStringKey, trimmedRun)
         step.SetProperty(WorkflowStepExternalRunAbsolutePathKey, normalizeAbsolutePath workflowPath trimmedRun)
@@ -89,17 +98,26 @@ let tryGetWorkflowStepExternalRunAbsolutePath (step: WorkflowStep) =
     tryGetStepMetadataString step WorkflowStepExternalRunAbsolutePathKey
     |> Option.bind (fun value -> if String.IsNullOrWhiteSpace value then None else Some value)
 
-let tryGetWorkflowStepExternalRunPathForSave (step: WorkflowStep) (targetWorkflowPath: string) (sourceWorkflowPath: string option) =
+let tryGetWorkflowStepExternalRunPathForSave
+    (step: WorkflowStep)
+    (targetWorkflowPath: string)
+    (sourceWorkflowPath: string option)
+    =
     match tryGetWorkflowStepOriginalRunString step, tryGetWorkflowStepExternalRunAbsolutePath step with
     | Some originalRun, Some absolutePath ->
         let normalizedTargetWorkflowPath = ArcPathHelper.normalizePathKey targetWorkflowPath
+
         match sourceWorkflowPath with
-        | Some sourcePath when String.Equals(ArcPathHelper.normalizePathKey sourcePath, normalizedTargetWorkflowPath, StringComparison.OrdinalIgnoreCase) ->
+        | Some sourcePath when
+            String.Equals(
+                ArcPathHelper.normalizePathKey sourcePath,
+                normalizedTargetWorkflowPath,
+                StringComparison.OrdinalIgnoreCase
+            )
+            ->
             Some originalRun
-        | _ ->
-            Some (toWorkflowRelativePath normalizedTargetWorkflowPath absolutePath)
-    | _ ->
-        None
+        | _ -> Some(toWorkflowRelativePath normalizedTargetWorkflowPath absolutePath)
+    | _ -> None
 
 let tryEncodeWorkflowStepRunYaml (step: WorkflowStep) =
     match step.Run with
@@ -112,7 +130,10 @@ let tryEncodeWorkflowStepRunYaml (step: WorkflowStep) =
         CWLProcessingUnit.Workflow workflow |> Encode.encodeProcessingUnit |> Some
     | WorkflowStepRun.RunExpressionTool expressionToolObj ->
         let expressionTool = unbox<CWLExpressionToolDescription> expressionToolObj
-        CWLProcessingUnit.ExpressionTool expressionTool |> Encode.encodeProcessingUnit |> Some
+
+        CWLProcessingUnit.ExpressionTool expressionTool
+        |> Encode.encodeProcessingUnit
+        |> Some
     | WorkflowStepRun.RunOperation operationObj ->
         let operation = unbox<CWLOperationDescription> operationObj
         CWLProcessingUnit.Operation operation |> Encode.encodeProcessingUnit |> Some
@@ -125,15 +146,13 @@ let tryGetWorkflowStepRunDetails (step: WorkflowStep) =
         |> Seq.toArray
 
     let toOutputIds (outputs: ResizeArray<CWLOutput>) =
-        outputs
-        |> Seq.map (fun output -> output.Name)
-        |> Seq.toArray
+        outputs |> Seq.map (fun output -> output.Name) |> Seq.toArray
 
     match step.Run with
-    | WorkflowStepRun.RunString _ ->
-        None
+    | WorkflowStepRun.RunString _ -> None
     | WorkflowStepRun.RunCommandLineTool toolObj ->
         let tool = unbox<CWLToolDescription> toolObj
+
         Some {
             KindLabel = "CommandLineTool"
             InputIds = toInputIds tool.Inputs
@@ -141,6 +160,7 @@ let tryGetWorkflowStepRunDetails (step: WorkflowStep) =
         }
     | WorkflowStepRun.RunWorkflow workflowObj ->
         let workflow = unbox<CWLWorkflowDescription> workflowObj
+
         Some {
             KindLabel = "Workflow"
             InputIds = workflow.Inputs |> Seq.map (fun input -> input.Name) |> Seq.toArray
@@ -148,6 +168,7 @@ let tryGetWorkflowStepRunDetails (step: WorkflowStep) =
         }
     | WorkflowStepRun.RunExpressionTool expressionToolObj ->
         let expressionTool = unbox<CWLExpressionToolDescription> expressionToolObj
+
         Some {
             KindLabel = "ExpressionTool"
             InputIds = toInputIds expressionTool.Inputs
@@ -155,6 +176,7 @@ let tryGetWorkflowStepRunDetails (step: WorkflowStep) =
         }
     | WorkflowStepRun.RunOperation operationObj ->
         let operation = unbox<CWLOperationDescription> operationObj
+
         Some {
             KindLabel = "Operation"
             InputIds = operation.Inputs |> Seq.map (fun input -> input.Name) |> Seq.toArray
@@ -162,10 +184,13 @@ let tryGetWorkflowStepRunDetails (step: WorkflowStep) =
         }
 
 let private tryGetStep (steps: ResizeArray<WorkflowStep>) (stepIndex: int) =
-    if stepIndex >= 0 && stepIndex < steps.Count then Some steps.[stepIndex] else None
+    if stepIndex >= 0 && stepIndex < steps.Count then
+        Some steps.[stepIndex]
+    else
+        None
 
 let private parseSourceText (text: string) =
-    text.Split([|','|], StringSplitOptions.RemoveEmptyEntries)
+    text.Split([| ',' |], StringSplitOptions.RemoveEmptyEntries)
     |> Array.map (fun item -> item.Trim())
     |> Array.filter (String.IsNullOrWhiteSpace >> not)
     |> ResizeArray
@@ -215,7 +240,12 @@ let setWorkflowRequirementField (workflow: CWLWorkflowDescription) (key: string)
 let setWorkflowHintField (workflow: CWLWorkflowDescription) (key: string) (fieldKey: string) (value: string) =
     setHintFieldByKey workflow.Hints key fieldKey value
 
-let setWorkflowRequirementDockerField (workflow: CWLWorkflowDescription) (key: string) (fieldKey: string) (value: string) =
+let setWorkflowRequirementDockerField
+    (workflow: CWLWorkflowDescription)
+    (key: string)
+    (fieldKey: string)
+    (value: string)
+    =
     setWorkflowRequirementField workflow key fieldKey value
 
 let setWorkflowHintDockerField (workflow: CWLWorkflowDescription) (key: string) (fieldKey: string) (value: string) =
@@ -229,23 +259,27 @@ let addWorkflowInput (workflow: CWLWorkflowDescription) =
     workflow.Inputs.Count - 1
 
 let addWorkflowOutput (workflow: CWLWorkflowDescription) =
-    let name = nextName "output" (workflow.Outputs |> Seq.map (fun output -> output.Name))
+    let name =
+        nextName "output" (workflow.Outputs |> Seq.map (fun output -> output.Name))
+
     let output = CWLOutput(name)
-    output.Type_ <- Some (CWLType.file ())
+    output.Type_ <- Some(CWLType.file ())
     workflow.Outputs.Add(output)
     workflow.Outputs.Count - 1
 
 let addWorkflowStep (workflow: CWLWorkflowDescription) =
     let stepId = nextName "step" (workflow.Steps |> Seq.map (fun step -> step.Id))
-    let step = WorkflowStep.fromRunPath(stepId, ResizeArray(), ResizeArray(), "tool.cwl")
+
+    let step =
+        WorkflowStep.fromRunPath (stepId, ResizeArray(), ResizeArray(), "tool.cwl")
+
     workflow.Steps.Add(step)
     workflow.Steps.Count - 1
 
 let removeWorkflowStep (activeStepIndex: int option) (steps: ResizeArray<WorkflowStep>) =
     removeAtAndSelectNext activeStepIndex steps
 
-let moveWorkflowStepUp (activeStepIndex: int option) (steps: ResizeArray<WorkflowStep>) =
-    moveUp activeStepIndex steps
+let moveWorkflowStepUp (activeStepIndex: int option) (steps: ResizeArray<WorkflowStep>) = moveUp activeStepIndex steps
 
 let moveWorkflowStepDown (activeStepIndex: int option) (steps: ResizeArray<WorkflowStep>) =
     moveDown activeStepIndex steps
@@ -254,6 +288,7 @@ let setWorkflowStepIdAt (steps: ResizeArray<WorkflowStep>) (stepIndex: int) (new
     match tryGetStep steps stepIndex with
     | Some step ->
         let trimmed = newId.Trim()
+
         if String.IsNullOrWhiteSpace trimmed |> not then
             step.Id <- trimmed
     | None -> ()
@@ -291,6 +326,7 @@ let setWorkflowStepRunKindAt (steps: ResizeArray<WorkflowStep>) (stepIndex: int)
                 WorkflowStepRunOps.fromOperation operation
 
         step.Run <- nextRun
+
         if runKind <> RunStringKind then
             clearWorkflowStepExternalRunMetadata step
     | None -> ()
@@ -299,9 +335,9 @@ let addWorkflowStepInputAt (steps: ResizeArray<WorkflowStep>) (stepIndex: int) =
     match tryGetStep steps stepIndex with
     | Some step ->
         let inputId = nextName "in" (step.In |> Seq.map (fun input -> input.Id))
-        let stepInput = StepInput.create(inputId)
+        let stepInput = StepInput.create (inputId)
         WorkflowStep.addInput stepInput step
-        Some (step.In.Count - 1)
+        Some(step.In.Count - 1)
     | None -> None
 
 let removeWorkflowStepInputAt (steps: ResizeArray<WorkflowStep>) (stepIndex: int) (activeInputIndex: int option) =
@@ -323,11 +359,17 @@ let setWorkflowStepInputIdAt (steps: ResizeArray<WorkflowStep>) (stepIndex: int)
     match tryGetStep steps stepIndex with
     | Some step ->
         let trimmed = newId.Trim()
+
         if String.IsNullOrWhiteSpace trimmed |> not then
             WorkflowStep.updateInputAt inputIndex (fun input -> { input with Id = trimmed }) step
     | None -> ()
 
-let setWorkflowStepInputSourceAt (steps: ResizeArray<WorkflowStep>) (stepIndex: int) (inputIndex: int) (sourceText: string) =
+let setWorkflowStepInputSourceAt
+    (steps: ResizeArray<WorkflowStep>)
+    (stepIndex: int)
+    (inputIndex: int)
+    (sourceText: string)
+    =
     match tryGetStep steps stepIndex with
     | Some step ->
         let source = sourceText |> nonEmptyOrNone |> Option.bind parseSourceText
@@ -339,7 +381,7 @@ let addWorkflowStepOutputAt (steps: ResizeArray<WorkflowStep>) (stepIndex: int) 
     | Some step ->
         let outputId = nextName "out" (step.Out |> Seq.map stepOutputId)
         step.Out.Add(StepOutput.StepOutputString outputId)
-        Some (step.Out.Count - 1)
+        Some(step.Out.Count - 1)
     | None -> None
 
 let removeWorkflowStepOutputAt (steps: ResizeArray<WorkflowStep>) (stepIndex: int) (activeOutputIndex: int option) =
@@ -361,10 +403,12 @@ let setWorkflowStepOutputIdAt (steps: ResizeArray<WorkflowStep>) (stepIndex: int
     match tryGetStep steps stepIndex with
     | Some step when outputIndex >= 0 && outputIndex < step.Out.Count ->
         let trimmed = newId.Trim()
+
         if String.IsNullOrWhiteSpace trimmed |> not then
             let updatedOutput =
                 match step.Out.[outputIndex] with
                 | StepOutput.StepOutputString _ -> StepOutput.StepOutputString trimmed
                 | StepOutput.StepOutputRecord record -> StepOutput.StepOutputRecord { record with Id = trimmed }
+
             step.Out.[outputIndex] <- updatedOutput
     | _ -> ()

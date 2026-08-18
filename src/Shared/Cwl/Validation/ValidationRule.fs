@@ -1,8 +1,8 @@
 /// Contract for a single validation rule.
-module CWLBuilder.Validation.ValidationRule
+module Swate.Components.Shared.Cwl.Validation.ValidationRule
 
-open CWLBuilder.Validation.ValidationTypes
-open CWLBuilder.Validation.ValidationContext
+open Swate.Components.Shared.Cwl.Validation.ValidationTypes
+open Swate.Components.Shared.Cwl.Validation.ValidationContext
 
 /// A validation rule is a function that examines the context and returns
 /// zero or more issues. Rules are pure functions — no side effects.
@@ -16,5 +16,9 @@ type ValidationRule = {
 }
 
 /// Helper: create an issue stamped with this rule's id.
-let issue (rule: ValidationRule) (sev: Severity) (path: string) (msg: string) : ValidationIssue =
-    { RuleId = rule.Id; Severity = sev; Path = path; Message = msg }
+let issue (rule: ValidationRule) (sev: Severity) (path: string) (msg: string) : ValidationIssue = {
+    RuleId = rule.Id
+    Severity = sev
+    Path = path
+    Message = msg
+}

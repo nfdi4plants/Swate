@@ -1,6 +1,6 @@
-module CWLBuilder.Electron.Renderer.Documents.Types
+module Swate.Components.Shared.Cwl.Documents.Types
 
-open CWLBuilder.Electron.Renderer.Documents.Common
+open Swate.Components.Shared.Cwl.Documents.Common
 
 type RequirementNode = {
     Id: RequirementNodeId
@@ -13,9 +13,7 @@ type InputBindingModel = {
     Position: int option
 }
 
-type OutputBindingModel = {
-    Glob: string option
-}
+type OutputBindingModel = { Glob: string option }
 
 type InputModel = {
     Id: InputId
@@ -113,101 +111,91 @@ type EditorDocument =
     | ExpressionToolDoc of ExpressionToolModel
     | OperationDoc of OperationModel
 
-let createRequirementNode key =
-    {
-        Id = newRequirementNodeId ()
-        Key = key
-        Fields = emptyStringMap
-    }
+let createRequirementNode key = {
+    Id = newRequirementNodeId ()
+    Key = key
+    Fields = emptyStringMap
+}
 
-let createInput name =
-    {
-        Id = newInputId ()
-        Name = name
-        CwlType = None
-        Optional = false
-        InputBinding = None
-        Metadata = emptyStringMap
-    }
+let createInput name = {
+    Id = newInputId ()
+    Name = name
+    CwlType = None
+    Optional = false
+    InputBinding = None
+    Metadata = emptyStringMap
+}
 
-let createOutput name =
-    {
-        Id = newOutputId ()
-        Name = name
-        CwlType = None
-        OutputBinding = None
-        OutputSource = []
-        Metadata = emptyStringMap
-    }
+let createOutput name = {
+    Id = newOutputId ()
+    Name = name
+    CwlType = None
+    OutputBinding = None
+    OutputSource = []
+    Metadata = emptyStringMap
+}
 
-let createStepInput name =
-    {
-        Id = newStepInputId ()
-        Name = name
-        Sources = []
-        Metadata = emptyStringMap
-    }
+let createStepInput name = {
+    Id = newStepInputId ()
+    Name = name
+    Sources = []
+    Metadata = emptyStringMap
+}
 
-let createStepOutput name =
-    {
-        Id = newStepOutputId ()
-        Name = name
-        Metadata = emptyStringMap
-    }
+let createStepOutput name = {
+    Id = newStepOutputId ()
+    Name = name
+    Metadata = emptyStringMap
+}
 
-let createWorkflowStep name run =
-    {
-        Id = newStepId ()
-        Name = name
-        Run = run
-        Inputs = []
-        Outputs = []
-        Metadata = emptyStringMap
-    }
+let createWorkflowStep name run = {
+    Id = newStepId ()
+    Name = name
+    Run = run
+    Inputs = []
+    Outputs = []
+    Metadata = emptyStringMap
+}
 
-let createCommandLineToolModel cwlVersion =
-    {
-        CwlVersion = cwlVersion
-        Intent = []
-        BaseCommand = []
-        Inputs = []
-        Outputs = []
-        Requirements = []
-        Hints = []
-        Metadata = emptyStringMap
-    }
+let createCommandLineToolModel cwlVersion = {
+    CwlVersion = cwlVersion
+    Intent = []
+    BaseCommand = []
+    Inputs = []
+    Outputs = []
+    Requirements = []
+    Hints = []
+    Metadata = emptyStringMap
+}
 
-let createWorkflowModel cwlVersion =
-    {
-        CwlVersion = cwlVersion
-        Intent = []
-        Inputs = []
-        Outputs = []
-        Steps = []
-        Requirements = []
-        Hints = []
-        Metadata = emptyStringMap
-    }
+let createWorkflowModel cwlVersion = {
+    CwlVersion = cwlVersion
+    Intent = []
+    Inputs = []
+    Outputs = []
+    Steps = []
+    Requirements = []
+    Hints = []
+    Metadata = emptyStringMap
+}
 
-let createExpressionToolModel cwlVersion expression =
-    {
-        CwlVersion = cwlVersion
-        Intent = []
-        Expression = expression
-        Inputs = []
-        Outputs = []
-        Requirements = []
-        Hints = []
-        Metadata = emptyStringMap
-    }
+let createExpressionToolModel cwlVersion expression = {
+    CwlVersion = cwlVersion
+    Intent = []
+    Expression = expression
+    Inputs = []
+    Outputs = []
+    Requirements = []
+    Hints = []
+    Metadata = emptyStringMap
+}
 
-let createOperationModel cwlVersion =
-    {
-        CwlVersion = cwlVersion
-        Intent = []
-        Inputs = []
-        Outputs = []
-        Requirements = []
-        Hints = []
-        Metadata = emptyStringMap
-    }
+let createOperationModel cwlVersion = {
+    CwlVersion = cwlVersion
+    Intent = []
+    Inputs = []
+    Outputs = []
+    Requirements = []
+    Hints = []
+    Metadata = emptyStringMap
+}

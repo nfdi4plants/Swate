@@ -1,11 +1,11 @@
 /// Adapter between ARCtrl workflow types and a canvas-friendly graph model.
 /// This isolates upcoming workflow-canvas logic from renderer-specific state.
-module CWLBuilder.Domain.WorkflowCanvasAdapter
+module Swate.Components.Shared.Cwl.WorkflowCanvasAdapter
 
 open System
 open ARCtrl.CWL
 open ARCtrl.WorkflowGraph
-open CWLBuilder.Domain.WorkflowMutations
+open Swate.Components.Shared.Cwl.WorkflowMutations
 
 type CanvasNodeKind =
     | WorkflowInputNode
@@ -64,14 +64,16 @@ type private SourceParts = {
 }
 
 let private stepNodeId (stepId: string) = $"step:{stepId}"
+
 [<Literal>]
 let WorkflowInputSourceNodeId = "in:workflow"
+
 [<Literal>]
 let WorkflowOutputSinkNodeId = "out:workflow"
 
 let private tryStepIdFromNodeId (nodeId: string) =
     if nodeId.StartsWith("step:", StringComparison.Ordinal) then
-        Some (nodeId.Substring("step:".Length))
+        Some(nodeId.Substring("step:".Length))
     else
         None
 
@@ -105,8 +107,7 @@ let private tryResolveEdgeSourceType (workflow: CWLWorkflowDescription) (edge: C
                 | WorkflowStepRun.RunWorkflow nestedWorkflowObj ->
                     let nestedWorkflow = unbox<CWLWorkflowDescription> nestedWorkflowObj
                     tryFindOutputTypeByName nestedWorkflow.Outputs edge.SourcePortId
-                | WorkflowStepRun.RunString _ ->
-                    None
+                | WorkflowStepRun.RunString _ -> None
                 | WorkflowStepRun.RunOperation operationObj ->
                     let operation = unbox<CWLOperationDescription> operationObj
                     tryFindOutputTypeByName operation.Outputs edge.SourcePortId
@@ -123,27 +124,44 @@ let private parseSourceReference (source: string) =
         // The original source token is kept on edges and reused on writeback.
         let normalized =
             let trimmed = source.Trim()
-            if trimmed.StartsWith "#" then trimmed.Substring(1) else trimmed
+
+            if trimmed.StartsWith "#" then
+                trimmed.Substring(1)
+            else
+                trimmed
 
         let separatorIndex = normalized.IndexOf('/')
+
         if separatorIndex < 0 then
-            { StepId = None; PortId = normalized.Trim() }
+            {
+                StepId = None
+                PortId = normalized.Trim()
+            }
         else
             let stepId = normalized.Substring(0, separatorIndex).Trim()
             let portId = normalized.Substring(separatorIndex + 1).Trim()
+
             {
-                StepId = if String.IsNullOrWhiteSpace stepId then None else Some stepId
+                StepId =
+                    if String.IsNullOrWhiteSpace stepId then
+                        None
+                    else
+                        Some stepId
                 PortId = portId
             }
 
 let private edgeSourceReference (edge: CanvasEdge) =
     edge.SourceReference
-    |> Option.bind (fun source -> if String.IsNullOrWhiteSpace source then None else Some (source.Trim()))
+    |> Option.bind (fun source ->
+        if String.IsNullOrWhiteSpace source then
+            None
+        else
+            Some(source.Trim())
+    )
     |> Option.defaultWith (fun () ->
         match edge.Kind with
         | InputToStep
-        | InputToOutput ->
-            edge.SourcePortId
+        | InputToOutput -> edge.SourcePortId
         | StepToStep
         | StepToOutput ->
             match tryStepIdFromNodeId edge.SourceNodeId with
@@ -152,10 +170,12 @@ let private edgeSourceReference (edge: CanvasEdge) =
     )
 
 let private tryAddEdge (edges: ResizeArray<CanvasEdge>) (edge: CanvasEdge) =
-    if String.IsNullOrWhiteSpace edge.SourceNodeId
-       || String.IsNullOrWhiteSpace edge.SourcePortId
-       || String.IsNullOrWhiteSpace edge.TargetNodeId
-       || String.IsNullOrWhiteSpace edge.TargetPortId then
+    if
+        String.IsNullOrWhiteSpace edge.SourceNodeId
+        || String.IsNullOrWhiteSpace edge.SourcePortId
+        || String.IsNullOrWhiteSpace edge.TargetNodeId
+        || String.IsNullOrWhiteSpace edge.TargetPortId
+    then
         false
     elif edges |> Seq.exists (fun existing -> existing.Id = edge.Id) then
         false
@@ -203,14 +223,12 @@ let buildWorkflowGraphReadModel
 
     let diagnostics =
         graph.Diagnostics
-        |> Seq.map (fun issue ->
-            {
-                Kind = graphIssueKindKey issue.Kind
-                Message = issue.Message
-                Scope = issue.Scope
-                Reference = issue.Reference
-            }
-        )
+        |> Seq.map (fun issue -> {
+            Kind = graphIssueKindKey issue.Kind
+            Message = issue.Message
+            Scope = issue.Scope
+            Reference = issue.Reference
+        })
         |> ResizeArray
 
     {
@@ -223,20 +241,25 @@ let sourcePorts (workflow: CWLWorkflowDescription) =
     let ports = ResizeArray<CanvasPort>()
 
     for input in workflow.Inputs do
-        ports.Add({
-            NodeId = WorkflowInputSourceNodeId
-            PortId = input.Name
-            Label = $"input/{input.Name}"
-        })
+        ports.Add(
+            {
+                NodeId = WorkflowInputSourceNodeId
+                PortId = input.Name
+                Label = $"input/{input.Name}"
+            }
+        )
 
     for step in workflow.Steps do
         for stepOutput in step.Out do
             let outputId = stepOutputId stepOutput
-            ports.Add({
-                NodeId = stepNodeId step.Id
-                PortId = outputId
-                Label = $"{step.Id}/{outputId}"
-            })
+
+            ports.Add(
+                {
+                    NodeId = stepNodeId step.Id
+                    PortId = outputId
+                    Label = $"{step.Id}/{outputId}"
+                }
+            )
 
     ports
 
@@ -245,42 +268,57 @@ let targetPorts (workflow: CWLWorkflowDescription) =
 
     for step in workflow.Steps do
         for stepInput in step.In do
-            ports.Add({
-                NodeId = stepNodeId step.Id
-                PortId = stepInput.Id
-                Label = $"{step.Id}/{stepInput.Id}"
-            })
+            ports.Add(
+                {
+                    NodeId = stepNodeId step.Id
+                    PortId = stepInput.Id
+                    Label = $"{step.Id}/{stepInput.Id}"
+                }
+            )
 
     for output in workflow.Outputs do
-        ports.Add({
-            NodeId = WorkflowOutputSinkNodeId
-            PortId = output.Name
-            Label = $"output/{output.Name}"
-        })
-
-    ports
-
-let tryCreateConnectionEdge (sourceNodeId: string) (sourcePortId: string) (targetNodeId: string) (targetPortId: string) =
-    if String.IsNullOrWhiteSpace sourceNodeId
-       || String.IsNullOrWhiteSpace sourcePortId
-       || String.IsNullOrWhiteSpace targetNodeId
-       || String.IsNullOrWhiteSpace targetPortId then
-        None
-    else
-        edgeKindFromNodeIds sourceNodeId targetNodeId
-        |> Option.map (fun kind ->
+        ports.Add(
             {
-                Id = createEdgeId sourceNodeId sourcePortId targetNodeId targetPortId
-                Kind = kind
-                SourceNodeId = sourceNodeId
-                SourcePortId = sourcePortId
-                TargetNodeId = targetNodeId
-                TargetPortId = targetPortId
-                SourceReference = None
+                NodeId = WorkflowOutputSinkNodeId
+                PortId = output.Name
+                Label = $"output/{output.Name}"
             }
         )
 
-let addConnection (graph: WorkflowCanvasGraph) (sourceNodeId: string) (sourcePortId: string) (targetNodeId: string) (targetPortId: string) =
+    ports
+
+let tryCreateConnectionEdge
+    (sourceNodeId: string)
+    (sourcePortId: string)
+    (targetNodeId: string)
+    (targetPortId: string)
+    =
+    if
+        String.IsNullOrWhiteSpace sourceNodeId
+        || String.IsNullOrWhiteSpace sourcePortId
+        || String.IsNullOrWhiteSpace targetNodeId
+        || String.IsNullOrWhiteSpace targetPortId
+    then
+        None
+    else
+        edgeKindFromNodeIds sourceNodeId targetNodeId
+        |> Option.map (fun kind -> {
+            Id = createEdgeId sourceNodeId sourcePortId targetNodeId targetPortId
+            Kind = kind
+            SourceNodeId = sourceNodeId
+            SourcePortId = sourcePortId
+            TargetNodeId = targetNodeId
+            TargetPortId = targetPortId
+            SourceReference = None
+        })
+
+let addConnection
+    (graph: WorkflowCanvasGraph)
+    (sourceNodeId: string)
+    (sourcePortId: string)
+    (targetNodeId: string)
+    (targetPortId: string)
+    =
     match tryCreateConnectionEdge sourceNodeId sourcePortId targetNodeId targetPortId with
     | Some edge -> tryAddEdge graph.Edges edge
     | None -> false
@@ -296,24 +334,30 @@ let toCanvasGraph (workflow: CWLWorkflowDescription) =
     let nodes = ResizeArray<CanvasNode>()
     let edges = ResizeArray<CanvasEdge>()
 
-    nodes.Add({
-        Id = WorkflowInputSourceNodeId
-        Kind = WorkflowInputNode
-        Label = "workflow inputs"
-    })
+    nodes.Add(
+        {
+            Id = WorkflowInputSourceNodeId
+            Kind = WorkflowInputNode
+            Label = "workflow inputs"
+        }
+    )
 
     for step in workflow.Steps do
-        nodes.Add({
-            Id = stepNodeId step.Id
-            Kind = WorkflowStepNode
-            Label = step.Id
-        })
+        nodes.Add(
+            {
+                Id = stepNodeId step.Id
+                Kind = WorkflowStepNode
+                Label = step.Id
+            }
+        )
 
-    nodes.Add({
-        Id = WorkflowOutputSinkNodeId
-        Kind = WorkflowOutputNode
-        Label = "workflow outputs"
-    })
+    nodes.Add(
+        {
+            Id = WorkflowOutputSinkNodeId
+            Kind = WorkflowOutputNode
+            Label = "workflow outputs"
+        }
+    )
 
     for step in workflow.Steps do
         for stepInput in step.In do
@@ -321,10 +365,12 @@ let toCanvasGraph (workflow: CWLWorkflowDescription) =
             | Some sources ->
                 for source in sources do
                     let parsed = parseSourceReference source
+
                     match parsed.StepId with
                     | Some sourceStepId ->
                         let sourceNodeId = stepNodeId sourceStepId
                         let targetNodeId = stepNodeId step.Id
+
                         let edge = {
                             Id = createEdgeId sourceNodeId parsed.PortId targetNodeId stepInput.Id
                             Kind = StepToStep
@@ -332,12 +378,14 @@ let toCanvasGraph (workflow: CWLWorkflowDescription) =
                             SourcePortId = parsed.PortId
                             TargetNodeId = targetNodeId
                             TargetPortId = stepInput.Id
-                            SourceReference = Some (source.Trim())
+                            SourceReference = Some(source.Trim())
                         }
+
                         tryAddEdge edges edge |> ignore
                     | None ->
                         let sourceNodeId = WorkflowInputSourceNodeId
                         let targetNodeId = stepNodeId step.Id
+
                         let edge = {
                             Id = createEdgeId sourceNodeId parsed.PortId targetNodeId stepInput.Id
                             Kind = InputToStep
@@ -345,8 +393,9 @@ let toCanvasGraph (workflow: CWLWorkflowDescription) =
                             SourcePortId = parsed.PortId
                             TargetNodeId = targetNodeId
                             TargetPortId = stepInput.Id
-                            SourceReference = Some (source.Trim())
+                            SourceReference = Some(source.Trim())
                         }
+
                         tryAddEdge edges edge |> ignore
             | None -> ()
 
@@ -355,10 +404,12 @@ let toCanvasGraph (workflow: CWLWorkflowDescription) =
         | Some outputSource ->
             for source in outputSource.AsValues() do
                 let parsed = parseSourceReference source
+
                 match parsed.StepId with
                 | Some sourceStepId ->
                     let sourceNodeId = stepNodeId sourceStepId
                     let targetNodeId = WorkflowOutputSinkNodeId
+
                     let edge = {
                         Id = createEdgeId sourceNodeId parsed.PortId targetNodeId output.Name
                         Kind = StepToOutput
@@ -366,12 +417,14 @@ let toCanvasGraph (workflow: CWLWorkflowDescription) =
                         SourcePortId = parsed.PortId
                         TargetNodeId = targetNodeId
                         TargetPortId = output.Name
-                        SourceReference = Some (source.Trim())
+                        SourceReference = Some(source.Trim())
                     }
+
                     tryAddEdge edges edge |> ignore
                 | None ->
                     let sourceNodeId = WorkflowInputSourceNodeId
                     let targetNodeId = WorkflowOutputSinkNodeId
+
                     let edge = {
                         Id = createEdgeId sourceNodeId parsed.PortId targetNodeId output.Name
                         Kind = InputToOutput
@@ -379,15 +432,13 @@ let toCanvasGraph (workflow: CWLWorkflowDescription) =
                         SourcePortId = parsed.PortId
                         TargetNodeId = targetNodeId
                         TargetPortId = output.Name
-                        SourceReference = Some (source.Trim())
+                        SourceReference = Some(source.Trim())
                     }
+
                     tryAddEdge edges edge |> ignore
         | None -> ()
 
-    {
-        Nodes = nodes
-        Edges = edges
-    }
+    { Nodes = nodes; Edges = edges }
 
 let applyConnections (graph: WorkflowCanvasGraph) (workflow: CWLWorkflowDescription) =
     let edgeList = graph.Edges |> Seq.toList
@@ -396,6 +447,7 @@ let applyConnections (graph: WorkflowCanvasGraph) (workflow: CWLWorkflowDescript
         for index = 0 to step.In.Count - 1 do
             let stepInput = step.In.[index]
             let targetNodeId = stepNodeId step.Id
+
             let matchingEdges =
                 edgeList
                 |> List.filter (fun edge ->
@@ -410,15 +462,16 @@ let applyConnections (graph: WorkflowCanvasGraph) (workflow: CWLWorkflowDescript
                 |> List.filter (String.IsNullOrWhiteSpace >> not)
                 |> ResizeArray
 
-            let updatedInput =
-                { stepInput with
+            let updatedInput = {
+                stepInput with
                     Source = if newSources.Count = 0 then None else Some newSources
-                }
+            }
 
             step.In.[index] <- updatedInput
 
     for output in workflow.Outputs do
         let targetNodeId = WorkflowOutputSinkNodeId
+
         let matchingEdges =
             edgeList
             |> List.filter (fun edge ->
@@ -437,9 +490,9 @@ let applyConnections (graph: WorkflowCanvasGraph) (workflow: CWLWorkflowDescript
             if sourceReferences.Count = 0 then
                 None
             elif sourceReferences.Count = 1 then
-                Some (OutputSource.Single sourceReferences.[0])
+                Some(OutputSource.Single sourceReferences.[0])
             else
-                Some (OutputSource.Multiple sourceReferences)
+                Some(OutputSource.Multiple sourceReferences)
 
         match matchingEdges |> List.tryHead |> Option.bind (tryResolveEdgeSourceType workflow) with
         | Some inferredType -> output.Type_ <- Some inferredType

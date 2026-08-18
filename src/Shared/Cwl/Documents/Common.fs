@@ -1,4 +1,4 @@
-module CWLBuilder.Electron.Renderer.Documents.Common
+module Swate.Components.Shared.Cwl.Documents.Common
 
 open System
 
@@ -13,7 +13,7 @@ type RequirementNodeId = RequirementNodeId of Guid
 
 type StringMap = Map<string, string>
 
-let emptyStringMap : StringMap = Map.empty
+let emptyStringMap: StringMap = Map.empty
 
 let newDocumentId () = DocumentId(Guid.NewGuid())
 let newRevision value = Revision value

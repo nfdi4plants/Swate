@@ -1,8 +1,8 @@
-module CWLBuilder.Electron.Renderer.State.Selectors
+module Swate.Components.Shared.Cwl.State.Selectors
 
-open CWLBuilder.Electron.Renderer.Documents.Common
-open CWLBuilder.Electron.Renderer.Documents.Types
-open CWLBuilder.Electron.Renderer.State.Types
+open Swate.Components.Shared.Cwl.Documents.Common
+open Swate.Components.Shared.Cwl.Documents.Types
+open Swate.Components.Shared.Cwl.State.Types
 
 let isDirty (state: AppState) =
     match state.Meta with
@@ -14,11 +14,13 @@ let currentFilePath (state: AppState) =
 
 let currentKindLabel (state: AppState) =
     match state.Document with
-    | Some (CommandLineToolDoc _) -> Some "CommandLineTool"
-    | Some (WorkflowDoc _) -> Some "Workflow"
-    | Some (ExpressionToolDoc _) -> Some "ExpressionTool"
-    | Some (OperationDoc _) -> Some "Operation"
+    | Some(CommandLineToolDoc _) -> Some "CommandLineTool"
+    | Some(WorkflowDoc _) -> Some "Workflow"
+    | Some(ExpressionToolDoc _) -> Some "ExpressionTool"
+    | Some(OperationDoc _) -> Some "Operation"
     | None -> None
 
 let currentRevision (state: AppState) =
-    state.Meta |> Option.map (fun meta -> meta.Revision) |> Option.defaultValue (Revision 0)
+    state.Meta
+    |> Option.map (fun meta -> meta.Revision)
+    |> Option.defaultValue (Revision 0)

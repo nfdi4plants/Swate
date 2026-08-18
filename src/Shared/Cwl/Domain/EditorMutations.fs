@@ -1,6 +1,6 @@
 /// Editor-side mutation helpers for ARCtrl mutable collections and types.
 /// Keeps array/object mutation logic out of renderer components.
-module CWLBuilder.Domain.EditorMutations
+module Swate.Components.Shared.Cwl.EditorMutations
 
 open System
 open DynamicObj
@@ -13,20 +13,22 @@ let nextName (prefix: string) (existing: seq<string>) =
     let existingSet = existing |> Set.ofSeq
     let mutable index = 1
     let mutable candidate = sprintf "%s_%d" prefix index
+
     while existingSet.Contains candidate do
         index <- index + 1
         candidate <- sprintf "%s_%d" prefix index
+
     candidate
 
 let removeAtAndSelectNext (index: int option) (items: ResizeArray<'T>) =
     match index with
     | Some i when i >= 0 && i < items.Count ->
         items.RemoveAt i
+
         if items.Count = 0 then None
-        elif i >= items.Count then Some (items.Count - 1)
+        elif i >= items.Count then Some(items.Count - 1)
         else Some i
-    | _ ->
-        index
+    | _ -> index
 
 let moveUp (index: int option) (items: ResizeArray<'T>) =
     match index with
@@ -34,11 +36,9 @@ let moveUp (index: int option) (items: ResizeArray<'T>) =
         let previous = items.[i - 1]
         items.[i - 1] <- items.[i]
         items.[i] <- previous
-        Some (i - 1)
-    | Some i when i >= 0 && i < items.Count ->
-        Some i
-    | _ ->
-        None
+        Some(i - 1)
+    | Some i when i >= 0 && i < items.Count -> Some i
+    | _ -> None
 
 let moveDown (index: int option) (items: ResizeArray<'T>) =
     match index with
@@ -46,11 +46,9 @@ let moveDown (index: int option) (items: ResizeArray<'T>) =
         let next = items.[i + 1]
         items.[i + 1] <- items.[i]
         items.[i] <- next
-        Some (i + 1)
-    | Some i when i >= 0 && i < items.Count ->
-        Some i
-    | _ ->
-        None
+        Some(i + 1)
+    | Some i when i >= 0 && i < items.Count -> Some i
+    | _ -> None
 
 let private copyDynamicPropertiesForRenamedPort (source: DynamicObj) (target: DynamicObj) =
     source.GetProperties(false)
@@ -63,12 +61,7 @@ let private copyDynamicPropertiesForRenamedPort (source: DynamicObj) (target: Dy
 
 let cloneInputWithName (source: CWLInput) (name: string) =
     let replacement =
-        CWLInput(
-            name,
-            ?type_ = source.Type_,
-            ?inputBinding = source.InputBinding,
-            ?optional = source.Optional
-        )
+        CWLInput(name, ?type_ = source.Type_, ?inputBinding = source.InputBinding, ?optional = source.Optional)
 
     copyDynamicPropertiesForRenamedPort source replacement
     replacement

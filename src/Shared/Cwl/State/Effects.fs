@@ -1,4 +1,4 @@
-module CWLBuilder.Electron.Renderer.State.Effects
+module Swate.Components.Shared.Cwl.State.Effects
 
 open System
 

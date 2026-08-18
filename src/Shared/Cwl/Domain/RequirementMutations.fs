@@ -1,10 +1,10 @@
 /// Shared requirement/hint mutation helpers across processing-unit editors.
-module CWLBuilder.Domain.RequirementMutations
+module Swate.Components.Shared.Cwl.RequirementMutations
 
 open System
 open System.Globalization
 open ARCtrl.CWL
-open CWLBuilder.Domain.EditorMutations
+open Swate.Components.Shared.Cwl.EditorMutations
 
 type RequirementTemplate = {
     Key: string
@@ -12,30 +12,100 @@ type RequirementTemplate = {
     Create: unit -> Requirement
 }
 
-let requirementTemplates : RequirementTemplate list = [
-    { Key = "inline-javascript"; Label = "InlineJavascriptRequirement"; Create = fun () -> Requirement.defaultInlineJavascriptRequirement }
-    { Key = "schema-def"; Label = "SchemaDefRequirement"; Create = fun () -> Requirement.SchemaDefRequirement (ResizeArray()) }
-    { Key = "docker"; Label = "DockerRequirement"; Create = fun () -> Requirement.DockerRequirement (DockerRequirement.create()) }
-    { Key = "network-access"; Label = "NetworkAccessRequirement"; Create = fun () -> Requirement.NetworkAccessRequirement { NetworkAccess = true } }
-    { Key = "initial-workdir"; Label = "InitialWorkDirRequirement"; Create = fun () -> Requirement.InitialWorkDirRequirement (ResizeArray()) }
-    { Key = "resource"; Label = "ResourceRequirement"; Create = fun () -> Requirement.ResourceRequirement (ResourceRequirementInstance()) }
-    { Key = "env-vars"; Label = "EnvVarRequirement"; Create = fun () -> Requirement.EnvVarRequirement (ResizeArray()) }
-    { Key = "load-listing"; Label = "LoadListingRequirement"; Create = fun () -> Requirement.LoadListingRequirement { LoadListing = LoadListingEnum.NoListing } }
-    { Key = "shell-command"; Label = "ShellCommandRequirement"; Create = fun () -> Requirement.ShellCommandRequirement }
-    { Key = "software"; Label = "SoftwareRequirement"; Create = fun () -> Requirement.SoftwareRequirement (ResizeArray()) }
-    { Key = "work-reuse"; Label = "WorkReuseRequirement"; Create = fun () -> Requirement.WorkReuseRequirement { EnableReuse = true } }
-    { Key = "inplace-update"; Label = "InplaceUpdateRequirement"; Create = fun () -> Requirement.InplaceUpdateRequirement { InplaceUpdate = true } }
-    { Key = "tool-time-limit"; Label = "ToolTimeLimitRequirement"; Create = fun () -> Requirement.ToolTimeLimitRequirement (ToolTimeLimitSeconds 0L) }
-    { Key = "subworkflow-feature"; Label = "SubworkflowFeatureRequirement"; Create = fun () -> Requirement.SubworkflowFeatureRequirement }
-    { Key = "scatter-feature"; Label = "ScatterFeatureRequirement"; Create = fun () -> Requirement.ScatterFeatureRequirement }
-    { Key = "multiple-input-feature"; Label = "MultipleInputFeatureRequirement"; Create = fun () -> Requirement.MultipleInputFeatureRequirement }
-    { Key = "step-input-expression"; Label = "StepInputExpressionRequirement"; Create = fun () -> Requirement.StepInputExpressionRequirement }
+let requirementTemplates: RequirementTemplate list = [
+    {
+        Key = "inline-javascript"
+        Label = "InlineJavascriptRequirement"
+        Create = fun () -> Requirement.defaultInlineJavascriptRequirement
+    }
+    {
+        Key = "schema-def"
+        Label = "SchemaDefRequirement"
+        Create = fun () -> Requirement.SchemaDefRequirement(ResizeArray())
+    }
+    {
+        Key = "docker"
+        Label = "DockerRequirement"
+        Create = fun () -> Requirement.DockerRequirement(DockerRequirement.create ())
+    }
+    {
+        Key = "network-access"
+        Label = "NetworkAccessRequirement"
+        Create = fun () -> Requirement.NetworkAccessRequirement { NetworkAccess = true }
+    }
+    {
+        Key = "initial-workdir"
+        Label = "InitialWorkDirRequirement"
+        Create = fun () -> Requirement.InitialWorkDirRequirement(ResizeArray())
+    }
+    {
+        Key = "resource"
+        Label = "ResourceRequirement"
+        Create = fun () -> Requirement.ResourceRequirement(ResourceRequirementInstance())
+    }
+    {
+        Key = "env-vars"
+        Label = "EnvVarRequirement"
+        Create = fun () -> Requirement.EnvVarRequirement(ResizeArray())
+    }
+    {
+        Key = "load-listing"
+        Label = "LoadListingRequirement"
+        Create =
+            fun () ->
+                Requirement.LoadListingRequirement {
+                    LoadListing = LoadListingEnum.NoListing
+                }
+    }
+    {
+        Key = "shell-command"
+        Label = "ShellCommandRequirement"
+        Create = fun () -> Requirement.ShellCommandRequirement
+    }
+    {
+        Key = "software"
+        Label = "SoftwareRequirement"
+        Create = fun () -> Requirement.SoftwareRequirement(ResizeArray())
+    }
+    {
+        Key = "work-reuse"
+        Label = "WorkReuseRequirement"
+        Create = fun () -> Requirement.WorkReuseRequirement { EnableReuse = true }
+    }
+    {
+        Key = "inplace-update"
+        Label = "InplaceUpdateRequirement"
+        Create = fun () -> Requirement.InplaceUpdateRequirement { InplaceUpdate = true }
+    }
+    {
+        Key = "tool-time-limit"
+        Label = "ToolTimeLimitRequirement"
+        Create = fun () -> Requirement.ToolTimeLimitRequirement(ToolTimeLimitSeconds 0L)
+    }
+    {
+        Key = "subworkflow-feature"
+        Label = "SubworkflowFeatureRequirement"
+        Create = fun () -> Requirement.SubworkflowFeatureRequirement
+    }
+    {
+        Key = "scatter-feature"
+        Label = "ScatterFeatureRequirement"
+        Create = fun () -> Requirement.ScatterFeatureRequirement
+    }
+    {
+        Key = "multiple-input-feature"
+        Label = "MultipleInputFeatureRequirement"
+        Create = fun () -> Requirement.MultipleInputFeatureRequirement
+    }
+    {
+        Key = "step-input-expression"
+        Label = "StepInputExpressionRequirement"
+        Create = fun () -> Requirement.StepInputExpressionRequirement
+    }
 ]
 
 let private requirementTemplateByKey =
-    requirementTemplates
-    |> List.map (fun item -> item.Key, item)
-    |> Map.ofList
+    requirementTemplates |> List.map (fun item -> item.Key, item) |> Map.ofList
 
 let requirementKey (req: Requirement) =
     match req with
@@ -94,7 +164,7 @@ let private parseFloatOrNone (value: string) =
     | _ -> None
 
 let private parseDelimitedStringsOrNone (value: string) =
-    value.Split([|','; '\r'; '\n'|], StringSplitOptions.RemoveEmptyEntries)
+    value.Split([| ','; '\r'; '\n' |], StringSplitOptions.RemoveEmptyEntries)
     |> Array.map (fun token -> token.Trim())
     |> Array.filter (String.IsNullOrWhiteSpace >> not)
     |> ResizeArray
@@ -114,15 +184,16 @@ let private parseBoolOrNone (value: string) =
 
 let private parseResourceScalar (value: string) =
     let trimmed = value.Trim()
+
     if String.IsNullOrWhiteSpace trimmed then
         None
     else
         match parseInt64OrNone trimmed with
-        | Some intValue -> Some (box intValue)
+        | Some intValue -> Some(box intValue)
         | None ->
             match parseFloatOrNone trimmed with
-            | Some floatValue -> Some (box floatValue)
-            | None -> Some (box trimmed)
+            | Some floatValue -> Some(box floatValue)
+            | None -> Some(box trimmed)
 
 let private schemaSaladText (value: SchemaSaladString) =
     match value with
@@ -158,13 +229,14 @@ let private cwlTypeFromSchemaTypeKey (value: string) =
     | "boolean" -> Some CWLType.Boolean
     | "stdout" -> Some CWLType.Stdout
     | "null" -> Some CWLType.Null
-    | "file" -> Some (CWLType.file ())
-    | "directory" -> Some (CWLType.directory ())
+    | "file" -> Some(CWLType.file ())
+    | "directory" -> Some(CWLType.directory ())
     | _ -> None
 
 let private tryParseIndexedFieldKey (prefix: string) (fieldKey: string) =
     if fieldKey.StartsWith(prefix, StringComparison.Ordinal) then
         let indexText = fieldKey.Substring(prefix.Length)
+
         match Int32.TryParse indexText with
         | true, index -> Some index
         | _ -> None
@@ -205,21 +277,35 @@ let toggleHint (key: string) (enabled: bool) (items: ResizeArray<HintEntry> opti
 
 let private setDockerRequirementField (docker: DockerRequirement) (fieldKey: string) (value: string) =
     let nextValue = nonEmptyOrNone value
+
     match fieldKey with
     | "dockerPull" -> { docker with DockerPull = nextValue }
-    | "dockerImageId" -> { docker with DockerImageId = nextValue }
+    | "dockerImageId" -> {
+        docker with
+            DockerImageId = nextValue
+      }
     | "dockerLoad" -> { docker with DockerLoad = nextValue }
     | "dockerImport" -> { docker with DockerImport = nextValue }
     | "dockerFile" ->
         let currentMode =
-            docker.DockerFile
-            |> Option.map schemaSaladMode
-            |> Option.defaultValue "literal"
-        { docker with DockerFile = nextValue |> Option.map (schemaSaladFromMode currentMode) }
-    | "dockerFileMode" ->
-        { docker with DockerFile = docker.DockerFile |> Option.map (schemaSaladWithMode value) }
-    | "dockerOutputDirectory" -> { docker with DockerOutputDirectory = nextValue }
-    | "dockerRunOptions" -> { docker with DockerRunOptions = parseDelimitedStringsOrNone value }
+            docker.DockerFile |> Option.map schemaSaladMode |> Option.defaultValue "literal"
+
+        {
+            docker with
+                DockerFile = nextValue |> Option.map (schemaSaladFromMode currentMode)
+        }
+    | "dockerFileMode" -> {
+        docker with
+            DockerFile = docker.DockerFile |> Option.map (schemaSaladWithMode value)
+      }
+    | "dockerOutputDirectory" -> {
+        docker with
+            DockerOutputDirectory = nextValue
+      }
+    | "dockerRunOptions" -> {
+        docker with
+            DockerRunOptions = parseDelimitedStringsOrNone value
+      }
     | _ -> docker
 
 let private setRequirementFieldValue (requirement: Requirement) (fieldKey: string) (value: string) =
@@ -238,10 +324,14 @@ let private setRequirementFieldValue (requirement: Requirement) (fieldKey: strin
         | "schema.add" ->
             let nextName =
                 nextName "type" (schemaTypes |> Seq.map (fun schemaType -> schemaType.Name))
-            schemaTypes.Add({
-                Name = nextName
-                Type_ = CWLType.String
-            })
+
+            schemaTypes.Add(
+                {
+                    Name = nextName
+                    Type_ = CWLType.String
+                }
+            )
+
             Requirement.SchemaDefRequirement schemaTypes
         | _ ->
             match tryParseIndexedFieldKey "schema.remove:" fieldKey with
@@ -253,7 +343,13 @@ let private setRequirementFieldValue (requirement: Requirement) (fieldKey: strin
                 | Some index when index >= 0 && index < schemaTypes.Count ->
                     let trimmed = value.Trim()
                     let current = schemaTypes.[index]
-                    let nextName = if String.IsNullOrWhiteSpace trimmed then current.Name else trimmed
+
+                    let nextName =
+                        if String.IsNullOrWhiteSpace trimmed then
+                            current.Name
+                        else
+                            trimmed
+
                     schemaTypes.[index] <- { current with Name = nextName }
                     Requirement.SchemaDefRequirement schemaTypes
                 | _ ->
@@ -264,22 +360,23 @@ let private setRequirementFieldValue (requirement: Requirement) (fieldKey: strin
                             let current = schemaTypes.[index]
                             schemaTypes.[index] <- { current with Type_ = cwlType }
                             Requirement.SchemaDefRequirement schemaTypes
-                        | None ->
-                            requirement
-                    | _ ->
-                        requirement
+                        | None -> requirement
+                    | _ -> requirement
 
     | Requirement.DockerRequirement docker ->
-        Requirement.DockerRequirement (setDockerRequirementField docker fieldKey value)
+        Requirement.DockerRequirement(setDockerRequirementField docker fieldKey value)
 
     | Requirement.SoftwareRequirement packages ->
         match fieldKey with
         | "software.add" ->
-            packages.Add({
-                Package = ""
-                Version = None
-                Specs = None
-            })
+            packages.Add(
+                {
+                    Package = ""
+                    Version = None
+                    Specs = None
+                }
+            )
+
             Requirement.SoftwareRequirement packages
         | _ ->
             match tryParseIndexedFieldKey "software.remove:" fieldKey with
@@ -296,32 +393,42 @@ let private setRequirementFieldValue (requirement: Requirement) (fieldKey: strin
                     match tryParseIndexedFieldKey "software.version:" fieldKey with
                     | Some index when index >= 0 && index < packages.Count ->
                         let current = packages.[index]
-                        packages.[index] <- { current with Version = parseDelimitedStringsOrNone value }
+
+                        packages.[index] <- {
+                            current with
+                                Version = parseDelimitedStringsOrNone value
+                        }
+
                         Requirement.SoftwareRequirement packages
                     | _ ->
                         match tryParseIndexedFieldKey "software.specs:" fieldKey with
                         | Some index when index >= 0 && index < packages.Count ->
                             let current = packages.[index]
-                            packages.[index] <- { current with Specs = parseDelimitedStringsOrNone value }
+
+                            packages.[index] <- {
+                                current with
+                                    Specs = parseDelimitedStringsOrNone value
+                            }
+
                             Requirement.SoftwareRequirement packages
-                        | _ ->
-                            requirement
+                        | _ -> requirement
 
     | Requirement.LoadListingRequirement loadListing ->
         match fieldKey with
         | "loadListing" ->
             match LoadListingEnum.tryParse value with
-            | Some parsed -> Requirement.LoadListingRequirement { loadListing with LoadListing = parsed }
+            | Some parsed ->
+                Requirement.LoadListingRequirement {
+                    loadListing with
+                        LoadListing = parsed
+                }
             | None -> requirement
         | _ -> requirement
 
     | Requirement.EnvVarRequirement envDefs ->
         match fieldKey with
         | "env.add" ->
-            envDefs.Add({
-                EnvName = ""
-                EnvValue = ""
-            })
+            envDefs.Add({ EnvName = ""; EnvValue = "" })
             Requirement.EnvVarRequirement envDefs
         | _ ->
             match tryParseIndexedFieldKey "env.remove:" fieldKey with
@@ -340,8 +447,7 @@ let private setRequirementFieldValue (requirement: Requirement) (fieldKey: strin
                         let current = envDefs.[index]
                         envDefs.[index] <- { current with EnvValue = value }
                         Requirement.EnvVarRequirement envDefs
-                    | _ ->
-                        requirement
+                    | _ -> requirement
 
     | Requirement.ToolTimeLimitRequirement timeLimit ->
         match fieldKey with
@@ -354,8 +460,9 @@ let private setRequirementFieldValue (requirement: Requirement) (fieldKey: strin
                     | Some seconds -> ToolTimeLimitSeconds seconds
                     | None -> ToolTimeLimitSeconds 0L
                 | "expression", ToolTimeLimitExpression expression -> ToolTimeLimitExpression expression
-                | "expression", ToolTimeLimitSeconds seconds -> ToolTimeLimitExpression (string seconds)
+                | "expression", ToolTimeLimitSeconds seconds -> ToolTimeLimitExpression(string seconds)
                 | _ -> timeLimit
+
             Requirement.ToolTimeLimitRequirement nextTimeLimit
         | "timelimitValue" ->
             let nextTimeLimit =
@@ -365,18 +472,29 @@ let private setRequirementFieldValue (requirement: Requirement) (fieldKey: strin
                     | Some parsed -> ToolTimeLimitSeconds parsed
                     | None when String.IsNullOrWhiteSpace value -> ToolTimeLimitSeconds 0L
                     | None -> ToolTimeLimitSeconds seconds
-                | ToolTimeLimitExpression _ ->
-                    ToolTimeLimitExpression value
+                | ToolTimeLimitExpression _ -> ToolTimeLimitExpression value
+
             Requirement.ToolTimeLimitRequirement nextTimeLimit
         | _ -> requirement
 
     | Requirement.ResourceRequirement resource ->
         let editableFields =
-            set [ "coresMin"; "coresMax"; "ramMin"; "ramMax"; "tmpdirMin"; "tmpdirMax"; "outdirMin"; "outdirMax" ]
+            set [
+                "coresMin"
+                "coresMax"
+                "ramMin"
+                "ramMax"
+                "tmpdirMin"
+                "tmpdirMax"
+                "outdirMin"
+                "outdirMax"
+            ]
+
         if editableFields.Contains fieldKey then
             match parseResourceScalar value with
             | Some parsed -> resource.SetProperty(fieldKey, parsed)
             | None -> resource.SetProperty(fieldKey, null)
+
             Requirement.ResourceRequirement resource
         else
             requirement
@@ -384,20 +502,23 @@ let private setRequirementFieldValue (requirement: Requirement) (fieldKey: strin
     | Requirement.InitialWorkDirRequirement listing ->
         match fieldKey with
         | "iwd.addString" ->
-            listing.Add(StringEntry (SchemaSaladString.Literal ""))
+            listing.Add(StringEntry(SchemaSaladString.Literal ""))
             Requirement.InitialWorkDirRequirement listing
         | "iwd.addDirent" ->
-            listing.Add(DirentEntry {
-                Entry = SchemaSaladString.Literal ""
-                Entryname = None
-                Writable = None
-            })
+            listing.Add(
+                DirentEntry {
+                    Entry = SchemaSaladString.Literal ""
+                    Entryname = None
+                    Writable = None
+                }
+            )
+
             Requirement.InitialWorkDirRequirement listing
         | "iwd.addFile" ->
-            listing.Add(FileEntry (FileInstance()))
+            listing.Add(FileEntry(FileInstance()))
             Requirement.InitialWorkDirRequirement listing
         | "iwd.addDirectory" ->
-            listing.Add(DirectoryEntry (DirectoryInstance()))
+            listing.Add(DirectoryEntry(DirectoryInstance()))
             Requirement.InitialWorkDirRequirement listing
         | _ ->
             match tryParseIndexedFieldKey "iwd.remove:" fieldKey with
@@ -409,20 +530,25 @@ let private setRequirementFieldValue (requirement: Requirement) (fieldKey: strin
                 | Some index when index >= 0 && index < listing.Count ->
                     let updatedEntry =
                         match listing.[index] with
-                        | StringEntry entry ->
-                            StringEntry (schemaSaladWithText value entry)
+                        | StringEntry entry -> StringEntry(schemaSaladWithText value entry)
                         | DirentEntry dirent ->
-                            DirentEntry { dirent with Entry = schemaSaladWithText value dirent.Entry }
+                            DirentEntry {
+                                dirent with
+                                    Entry = schemaSaladWithText value dirent.Entry
+                            }
                         | FileEntry file ->
                             match nonEmptyOrNone value with
                             | Some location -> file.SetProperty("location", location)
                             | None -> file.SetProperty("location", null)
+
                             FileEntry file
                         | DirectoryEntry directory ->
                             match nonEmptyOrNone value with
                             | Some location -> directory.SetProperty("location", location)
                             | None -> directory.SetProperty("location", null)
+
                             DirectoryEntry directory
+
                     listing.[index] <- updatedEntry
                     Requirement.InitialWorkDirRequirement listing
                 | _ ->
@@ -430,12 +556,14 @@ let private setRequirementFieldValue (requirement: Requirement) (fieldKey: strin
                     | Some index when index >= 0 && index < listing.Count ->
                         let updatedEntry =
                             match listing.[index] with
-                            | StringEntry entry ->
-                                StringEntry (schemaSaladWithMode value entry)
+                            | StringEntry entry -> StringEntry(schemaSaladWithMode value entry)
                             | DirentEntry dirent ->
-                                DirentEntry { dirent with Entry = schemaSaladWithMode value dirent.Entry }
-                            | _ ->
-                                listing.[index]
+                                DirentEntry {
+                                    dirent with
+                                        Entry = schemaSaladWithMode value dirent.Entry
+                                }
+                            | _ -> listing.[index]
+
                         listing.[index] <- updatedEntry
                         Requirement.InitialWorkDirRequirement listing
                     | _ ->
@@ -448,13 +576,16 @@ let private setRequirementFieldValue (requirement: Requirement) (fieldKey: strin
                                         match nonEmptyOrNone value with
                                         | Some nextValue ->
                                             match dirent.Entryname with
-                                            | Some existing -> Some (schemaSaladWithText nextValue existing)
-                                            | None -> Some (SchemaSaladString.Literal nextValue)
-                                        | None ->
-                                            None
-                                    DirentEntry { dirent with Entryname = nextEntryName }
-                                | _ ->
-                                    listing.[index]
+                                            | Some existing -> Some(schemaSaladWithText nextValue existing)
+                                            | None -> Some(SchemaSaladString.Literal nextValue)
+                                        | None -> None
+
+                                    DirentEntry {
+                                        dirent with
+                                            Entryname = nextEntryName
+                                    }
+                                | _ -> listing.[index]
+
                             listing.[index] <- updatedEntry
                             Requirement.InitialWorkDirRequirement listing
                         | _ ->
@@ -465,11 +596,15 @@ let private setRequirementFieldValue (requirement: Requirement) (fieldKey: strin
                                     | DirentEntry dirent ->
                                         let nextEntryName =
                                             match dirent.Entryname with
-                                            | Some existing -> Some (schemaSaladWithMode value existing)
-                                            | None -> Some (schemaSaladFromMode value "")
-                                        DirentEntry { dirent with Entryname = nextEntryName }
-                                    | _ ->
-                                        listing.[index]
+                                            | Some existing -> Some(schemaSaladWithMode value existing)
+                                            | None -> Some(schemaSaladFromMode value "")
+
+                                        DirentEntry {
+                                            dirent with
+                                                Entryname = nextEntryName
+                                        }
+                                    | _ -> listing.[index]
+
                                 listing.[index] <- updatedEntry
                                 Requirement.InitialWorkDirRequirement listing
                             | _ ->
@@ -485,18 +620,17 @@ let private setRequirementFieldValue (requirement: Requirement) (fieldKey: strin
                                                     match parseBoolOrNone value with
                                                     | Some writable -> Some writable
                                                     | None -> dirent.Writable
+
                                             DirentEntry { dirent with Writable = nextWritable }
-                                        | _ ->
-                                            listing.[index]
+                                        | _ -> listing.[index]
+
                                     listing.[index] <- updatedEntry
                                     Requirement.InitialWorkDirRequirement listing
-                                | _ ->
-                                    requirement
+                                | _ -> requirement
 
     | Requirement.WorkReuseRequirement workReuse ->
         match fieldKey with
-        | "workReuseMode" when value = "expression" ->
-            Requirement.WorkReuseExpressionRequirement "true"
+        | "workReuseMode" when value = "expression" -> Requirement.WorkReuseExpressionRequirement "true"
         | "workReuseValue" ->
             match parseBoolOrNone value with
             | Some parsed -> Requirement.WorkReuseRequirement { workReuse with EnableReuse = parsed }
@@ -509,17 +643,19 @@ let private setRequirementFieldValue (requirement: Requirement) (fieldKey: strin
             match parseBoolOrNone expression with
             | Some parsed -> Requirement.WorkReuseRequirement { EnableReuse = parsed }
             | None -> Requirement.WorkReuseRequirement { EnableReuse = true }
-        | "workReuseValue" ->
-            Requirement.WorkReuseExpressionRequirement value
+        | "workReuseValue" -> Requirement.WorkReuseExpressionRequirement value
         | _ -> requirement
 
     | Requirement.NetworkAccessRequirement networkAccess ->
         match fieldKey with
-        | "networkAccessMode" when value = "expression" ->
-            Requirement.NetworkAccessExpressionRequirement "true"
+        | "networkAccessMode" when value = "expression" -> Requirement.NetworkAccessExpressionRequirement "true"
         | "networkAccessValue" ->
             match parseBoolOrNone value with
-            | Some parsed -> Requirement.NetworkAccessRequirement { networkAccess with NetworkAccess = parsed }
+            | Some parsed ->
+                Requirement.NetworkAccessRequirement {
+                    networkAccess with
+                        NetworkAccess = parsed
+                }
             | None -> requirement
         | _ -> requirement
 
@@ -529,48 +665,43 @@ let private setRequirementFieldValue (requirement: Requirement) (fieldKey: strin
             match parseBoolOrNone expression with
             | Some parsed -> Requirement.NetworkAccessRequirement { NetworkAccess = parsed }
             | None -> Requirement.NetworkAccessRequirement { NetworkAccess = true }
-        | "networkAccessValue" ->
-            Requirement.NetworkAccessExpressionRequirement value
+        | "networkAccessValue" -> Requirement.NetworkAccessExpressionRequirement value
         | _ -> requirement
 
     | Requirement.InplaceUpdateRequirement inplaceUpdate ->
         match fieldKey with
         | "inplaceUpdate" ->
             match parseBoolOrNone value with
-            | Some parsed -> Requirement.InplaceUpdateRequirement { inplaceUpdate with InplaceUpdate = parsed }
+            | Some parsed ->
+                Requirement.InplaceUpdateRequirement {
+                    inplaceUpdate with
+                        InplaceUpdate = parsed
+                }
             | None -> requirement
         | _ -> requirement
 
     | _ -> requirement
 
-let setRequirementFieldByKey
-    (items: ResizeArray<Requirement> option)
-    (key: string)
-    (fieldKey: string)
-    (value: string)
-    =
+let setRequirementFieldByKey (items: ResizeArray<Requirement> option) (key: string) (fieldKey: string) (value: string) =
     items
     |> Option.iter (fun requirements ->
         for index in 0 .. requirements.Count - 1 do
             let requirement = requirements.[index]
+
             match requirementKey requirement with
             | Some requirementKey when requirementKey = key ->
                 requirements.[index] <- setRequirementFieldValue requirement fieldKey value
             | _ -> ()
     )
 
-let setHintFieldByKey
-    (items: ResizeArray<HintEntry> option)
-    (key: string)
-    (fieldKey: string)
-    (value: string)
-    =
+let setHintFieldByKey (items: ResizeArray<HintEntry> option) (key: string) (fieldKey: string) (value: string) =
     items
     |> Option.iter (fun hints ->
         for index in 0 .. hints.Count - 1 do
             let hint = hints.[index]
+
             match hint with
             | KnownHint requirement when requirementKey requirement = Some key ->
-                hints.[index] <- KnownHint (setRequirementFieldValue requirement fieldKey value)
+                hints.[index] <- KnownHint(setRequirementFieldValue requirement fieldKey value)
             | _ -> ()
     )

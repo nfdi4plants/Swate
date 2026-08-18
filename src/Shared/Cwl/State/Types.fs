@@ -1,8 +1,8 @@
-module CWLBuilder.Electron.Renderer.State.Types
+module Swate.Components.Shared.Cwl.State.Types
 
 open System
-open CWLBuilder.Electron.Renderer.Documents.Common
-open CWLBuilder.Electron.Renderer.Documents.Types
+open Swate.Components.Shared.Cwl.Documents.Common
+open Swate.Components.Shared.Cwl.Documents.Types
 
 type EditorMeta = {
     DocumentId: DocumentId

@@ -1,15 +1,13 @@
 /// Validation engine: runs all registered rules against a processing unit.
-module CWLBuilder.Validation.ValidationEngine
+module Swate.Components.Shared.Cwl.Validation.ValidationEngine
 
 open ARCtrl.CWL
-open CWLBuilder.Validation.ValidationTypes
-open CWLBuilder.Validation.ValidationContext
+open Swate.Components.Shared.Cwl.Validation.ValidationTypes
+open Swate.Components.Shared.Cwl.Validation.ValidationContext
 
 /// Run all rules from the catalog against the given context.
 let validate (ctx: ValidationContext) : ValidationResult =
-    let issues =
-        RuleCatalog.allRules
-        |> List.collect (fun rule -> rule.Run ctx)
+    let issues = RuleCatalog.allRules |> List.collect (fun rule -> rule.Run ctx)
     { Issues = issues }
 
 /// Convenience: validate a processing unit with a mode, auto-extracting cwlVersion.
@@ -20,6 +18,7 @@ let validateProcessingUnit (pu: CWLProcessingUnit) (mode: ValidationMode) : Vali
         | CWLProcessingUnit.Workflow wd -> wd.CWLVersion
         | CWLProcessingUnit.ExpressionTool et -> et.CWLVersion
         | CWLProcessingUnit.Operation op -> op.CWLVersion
+
     let ctx = create pu cwlVer mode
     validate ctx
 

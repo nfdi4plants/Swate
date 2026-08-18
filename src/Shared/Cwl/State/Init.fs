@@ -1,6 +1,6 @@
-module CWLBuilder.Electron.Renderer.State.Init
+module Swate.Components.Shared.Cwl.State.Init
 
-open CWLBuilder.Electron.Renderer.State.Types
+open Swate.Components.Shared.Cwl.State.Types
 
 let emptySelection = {
     ActiveInputId = None

@@ -1,10 +1,10 @@
 /// Editor-level types that wrap ARCtrl CWL types for UI state management.
 /// These DTOs decouple the UI layer from DynamicObj internals, providing
 /// typed, immutable snapshots that the view can render and the user can edit.
-module CWLBuilder.Domain.EditorTypes
+module Swate.Components.Shared.Cwl.EditorTypes
 
 open ARCtrl.CWL
-open CWLBuilder.Domain.CwlDefaults
+open Swate.Components.Shared.Cwl.CwlDefaults
 
 // ---------------------------------------------------------------------------
 // Processing-unit kind selector (start-mode)
@@ -61,6 +61,7 @@ let createNew (kind: ProcessingUnitKind) : EditorState =
         | Operation ->
             let op = CWLOperationDescription(ResizeArray(), ResizeArray())
             CWLProcessingUnit.Operation op
+
     {
         ProcessingUnit = pu
         Version = 0
@@ -77,6 +78,7 @@ let fromLoaded (pu: CWLProcessingUnit) (filePath: string) : EditorState =
         | CWLProcessingUnit.Workflow wd -> wd.CWLVersion
         | CWLProcessingUnit.ExpressionTool et -> et.CWLVersion
         | CWLProcessingUnit.Operation op -> op.CWLVersion
+
     {
         ProcessingUnit = pu
         Version = 0
@@ -86,5 +88,8 @@ let fromLoaded (pu: CWLProcessingUnit) (filePath: string) : EditorState =
     }
 
 /// Bump the version counter and mark state dirty after a mutation.
-let touch (state: EditorState) : EditorState =
-    { state with Version = state.Version + 1; IsDirty = true }
+let touch (state: EditorState) : EditorState = {
+    state with
+        Version = state.Version + 1
+        IsDirty = true
+}

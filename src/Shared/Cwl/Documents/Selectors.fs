@@ -1,12 +1,9 @@
-module CWLBuilder.Electron.Renderer.Documents.Selectors
+module Swate.Components.Shared.Cwl.Documents.Selectors
 
-open CWLBuilder.Electron.Renderer.Documents.Common
-open CWLBuilder.Electron.Renderer.Documents.Types
+open Swate.Components.Shared.Cwl.Documents.Common
+open Swate.Components.Shared.Cwl.Documents.Types
 
-type RequirementLookup = {
-    Node: RequirementNode
-    IsHint: bool
-}
+type RequirementLookup = { Node: RequirementNode; IsHint: bool }
 
 let private tryFindInputInList (inputId: InputId) (inputs: InputModel list) =
     inputs |> List.tryFind (fun (input: InputModel) -> input.Id = inputId)
@@ -18,13 +15,16 @@ let private tryFindStepInList (stepId: StepId) (steps: WorkflowStepModel list) =
     steps |> List.tryFind (fun (step: WorkflowStepModel) -> step.Id = stepId)
 
 let private tryFindStepInputInList (stepInputId: StepInputId) (stepInputs: StepInputModel list) =
-    stepInputs |> List.tryFind (fun (stepInput: StepInputModel) -> stepInput.Id = stepInputId)
+    stepInputs
+    |> List.tryFind (fun (stepInput: StepInputModel) -> stepInput.Id = stepInputId)
 
 let private tryFindStepOutputInList (stepOutputId: StepOutputId) (stepOutputs: StepOutputModel list) =
-    stepOutputs |> List.tryFind (fun (stepOutput: StepOutputModel) -> stepOutput.Id = stepOutputId)
+    stepOutputs
+    |> List.tryFind (fun (stepOutput: StepOutputModel) -> stepOutput.Id = stepOutputId)
 
 let private tryFindRequirementInList (requirementNodeId: RequirementNodeId) (nodes: RequirementNode list) =
-    nodes |> List.tryFind (fun (node: RequirementNode) -> node.Id = requirementNodeId)
+    nodes
+    |> List.tryFind (fun (node: RequirementNode) -> node.Id = requirementNodeId)
 
 let tryFindInput (inputId: InputId) (document: EditorDocument) =
     match document with

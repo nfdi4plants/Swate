@@ -1,5 +1,5 @@
 /// Validation context: information available to every rule.
-module CWLBuilder.Validation.ValidationContext
+module Swate.Components.Shared.Cwl.Validation.ValidationContext
 
 open ARCtrl.CWL
 
@@ -23,9 +23,11 @@ type ValidationContext = {
 }
 
 /// Construct a context from a processing unit and mode.
-let create (pu: CWLProcessingUnit) (cwlVersion: string) (mode: ValidationMode) : ValidationContext =
-    { ProcessingUnit = pu; CwlVersion = cwlVersion; Mode = mode }
+let create (pu: CWLProcessingUnit) (cwlVersion: string) (mode: ValidationMode) : ValidationContext = {
+    ProcessingUnit = pu
+    CwlVersion = cwlVersion
+    Mode = mode
+}
 
 /// Advisory rules (Info/Warning) should be suppressed during Live editing.
-let includeAdvisoryIssues (mode: ValidationMode) =
-    mode <> Live
+let includeAdvisoryIssues (mode: ValidationMode) = mode <> Live

@@ -1,4 +1,4 @@
-module CWLBuilder.Domain.WorkflowLayout
+module Swate.Components.Shared.Cwl.WorkflowLayout
 
 type LayoutNode = {
     Id: string
@@ -6,10 +6,7 @@ type LayoutNode = {
     Height: float
 }
 
-type LayoutEdge = {
-    SourceId: string
-    TargetId: string
-}
+type LayoutEdge = { SourceId: string; TargetId: string }
 
 type LayoutDirection =
     | LeftToRight
@@ -19,8 +16,6 @@ type LayoutResult = Map<string, float * float>
 
 type IWorkflowLayoutEngine =
     abstract member Name: string
+
     abstract member Layout:
-        nodes: seq<LayoutNode> ->
-        edges: seq<LayoutEdge> ->
-        direction: LayoutDirection ->
-        LayoutResult
+        nodes: seq<LayoutNode> -> edges: seq<LayoutEdge> -> direction: LayoutDirection -> LayoutResult

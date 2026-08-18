@@ -1,12 +1,12 @@
-module CWLBuilder.Electron.Renderer.Adapters.ArCtrlEncode
+module Swate.Components.Shared.Cwl.Adapters.ArCtrlEncode
 
 open System
 open DynamicObj
 open ARCtrl.CWL
-open CWLBuilder.Domain.RequirementMutations
-open CWLBuilder.Domain.WorkflowMutations
-open CWLBuilder.Electron.Renderer.Documents.Common
-open CWLBuilder.Electron.Renderer.Documents.Types
+open Swate.Components.Shared.Cwl.RequirementMutations
+open Swate.Components.Shared.Cwl.WorkflowMutations
+open Swate.Components.Shared.Cwl.Documents.Common
+open Swate.Components.Shared.Cwl.Documents.Types
 
 let private cwlTypeFromKey (value: string option) =
     match value with
@@ -21,28 +21,34 @@ let private cwlTypeFromKey (value: string option) =
         | "boolean" -> Some CWLType.Boolean
         | "stdout" -> Some CWLType.Stdout
         | "null" -> Some CWLType.Null
-        | "file" -> Some (CWLType.file ())
-        | "directory" -> Some (CWLType.directory ())
+        | "file" -> Some(CWLType.file ())
+        | "directory" -> Some(CWLType.directory ())
         | _ -> None
 
 let private setMetadata (metadata: StringMap) (target: obj) =
     match target with
-    | :? DynamicObj as dynamicObj ->
-        metadata |> Map.iter (fun key value -> dynamicObj.SetProperty(key, value))
-    | _ ->
-        ()
+    | :? DynamicObj as dynamicObj -> metadata |> Map.iter (fun key value -> dynamicObj.SetProperty(key, value))
+    | _ -> ()
 
-let private asResizeArray<'T> (values: 'T seq) =
-    ResizeArray<'T>(values)
+let private asResizeArray<'T> (values: 'T seq) = ResizeArray<'T>(values)
 
 let private optionalResizeArray values =
-    if List.isEmpty values then None else Some (asResizeArray values)
+    if List.isEmpty values then
+        None
+    else
+        Some(asResizeArray values)
 
 let private encodeInputBinding (binding: InputBindingModel option) =
     binding
     |> Option.bind (fun item ->
-        let binding = InputBinding.create(?prefix = item.Prefix, ?position = item.Position)
-        if binding.Prefix.IsNone && binding.Position.IsNone && binding.ItemSeparator.IsNone && binding.Separate.IsNone then
+        let binding = InputBinding.create (?prefix = item.Prefix, ?position = item.Position)
+
+        if
+            binding.Prefix.IsNone
+            && binding.Position.IsNone
+            && binding.ItemSeparator.IsNone
+            && binding.Separate.IsNone
+        then
             None
         else
             Some binding
@@ -51,7 +57,7 @@ let private encodeInputBinding (binding: InputBindingModel option) =
 let private encodeOutputBinding (binding: OutputBindingModel option) =
     binding
     |> Option.bind (fun item ->
-        let binding = OutputBinding.create(?glob = item.Glob)
+        let binding = OutputBinding.create (?glob = item.Glob)
         if binding.Glob.IsNone then None else Some binding
     )
 
@@ -71,8 +77,8 @@ let private encodeOutput (output: OutputModel) =
     let outputSource =
         match output.OutputSource with
         | [] -> None
-        | [ single ] -> Some (OutputSource.Single single)
-        | many -> Some (OutputSource.Multiple (asResizeArray many))
+        | [ single ] -> Some(OutputSource.Single single)
+        | many -> Some(OutputSource.Multiple(asResizeArray many))
 
     let encoded =
         CWLOutput(
@@ -87,20 +93,28 @@ let private encodeOutput (output: OutputModel) =
 
 let private orderedRequirementFields (fields: StringMap) =
     let priority key =
-        if key = "dockerFile" then 10
-        elif key = "dockerFileMode" then 20
-        elif key = "timelimitMode" || key = "workReuseMode" || key = "networkAccessMode" then 10
-        elif key = "timelimitValue" || key = "workReuseValue" || key = "networkAccessValue" then 20
-        elif key.StartsWith("iwd.value:", StringComparison.Ordinal) then 10
-        elif key.StartsWith("iwd.entryMode:", StringComparison.Ordinal) then 20
-        elif key.StartsWith("iwd.entryname:", StringComparison.Ordinal) then 30
-        elif key.StartsWith("iwd.entrynameMode:", StringComparison.Ordinal) then 40
-        elif key.StartsWith("iwd.writable:", StringComparison.Ordinal) then 50
-        else 100
+        if key = "dockerFile" then
+            10
+        elif key = "dockerFileMode" then
+            20
+        elif key = "timelimitMode" || key = "workReuseMode" || key = "networkAccessMode" then
+            10
+        elif key = "timelimitValue" || key = "workReuseValue" || key = "networkAccessValue" then
+            20
+        elif key.StartsWith("iwd.value:", StringComparison.Ordinal) then
+            10
+        elif key.StartsWith("iwd.entryMode:", StringComparison.Ordinal) then
+            20
+        elif key.StartsWith("iwd.entryname:", StringComparison.Ordinal) then
+            30
+        elif key.StartsWith("iwd.entrynameMode:", StringComparison.Ordinal) then
+            40
+        elif key.StartsWith("iwd.writable:", StringComparison.Ordinal) then
+            50
+        else
+            100
 
-    fields
-    |> Map.toList
-    |> List.sortBy (fun (key, _) -> priority key, key)
+    fields |> Map.toList |> List.sortBy (fun (key, _) -> priority key, key)
 
 let private maxIndexedField prefix (fields: StringMap) =
     fields
@@ -108,6 +122,7 @@ let private maxIndexedField prefix (fields: StringMap) =
     |> List.choose (fun (key, _) ->
         if key.StartsWith(prefix, StringComparison.Ordinal) then
             let indexText = key.Substring(prefix.Length)
+
             match Int32.TryParse indexText with
             | true, index -> Some index
             | _ -> None
@@ -116,7 +131,7 @@ let private maxIndexedField prefix (fields: StringMap) =
     )
     |> function
         | [] -> None
-        | values -> Some (List.max values)
+        | values -> Some(List.max values)
 
 let private bootstrapRequirementFields addField key fields items =
     let repeat fieldKey count =
@@ -140,8 +155,9 @@ let private bootstrapRequirementFields addField key fields items =
             |> List.choose (fun (fieldKey, value) ->
                 if fieldKey.StartsWith("iwd.kind:", StringComparison.Ordinal) then
                     let indexText = fieldKey.Substring("iwd.kind:".Length)
+
                     match Int32.TryParse indexText with
-                    | true, index -> Some (index, value)
+                    | true, index -> Some(index, value)
                     | _ -> None
                 else
                     None
@@ -159,35 +175,33 @@ let private bootstrapRequirementFields addField key fields items =
 
             if String.IsNullOrWhiteSpace addFieldKey |> not then
                 addField items key addFieldKey ""
-    | _ ->
-        ()
+    | _ -> ()
 
 let private encodeRequirementCollection bootstrap addField nodes =
     nodes
-    |> List.fold (fun state node ->
-        let nextState = bootstrap node.Key true state
-        bootstrapRequirementFields addField node.Key node.Fields nextState
-        orderedRequirementFields node.Fields
-        |> List.fold (fun acc (fieldKey, value) ->
-            if fieldKey.StartsWith("iwd.kind:", StringComparison.Ordinal) then
-                acc
-            else
-                addField acc node.Key fieldKey value
-                acc
-        ) nextState
-    ) None
+    |> List.fold
+        (fun state node ->
+            let nextState = bootstrap node.Key true state
+            bootstrapRequirementFields addField node.Key node.Fields nextState
+
+            orderedRequirementFields node.Fields
+            |> List.fold
+                (fun acc (fieldKey, value) ->
+                    if fieldKey.StartsWith("iwd.kind:", StringComparison.Ordinal) then
+                        acc
+                    else
+                        addField acc node.Key fieldKey value
+                        acc
+                )
+                nextState
+        )
+        None
 
 let private encodeRequirements nodes =
-    encodeRequirementCollection
-        toggleRequirement
-        setRequirementFieldByKey
-        nodes
+    encodeRequirementCollection toggleRequirement setRequirementFieldByKey nodes
 
 let private encodeHints nodes =
-    encodeRequirementCollection
-        toggleHint
-        setHintFieldByKey
-        nodes
+    encodeRequirementCollection toggleHint setHintFieldByKey nodes
 
 let private setWorkflowStepExternalRunMetadataFromModel (stepModel: WorkflowStepModel) (step: WorkflowStep) =
     stepModel.Metadata
@@ -199,7 +213,9 @@ let private setWorkflowStepExternalRunMetadataFromModel (stepModel: WorkflowStep
     |> Option.iter (fun value -> step.SetProperty(WorkflowStepExternalRunAbsolutePathKey, value))
 
 let rec private encodeCommandLineTool (model: CommandLineToolModel) =
-    let encoded = CWLToolDescription(asResizeArray (model.Outputs |> List.map encodeOutput))
+    let encoded =
+        CWLToolDescription(asResizeArray (model.Outputs |> List.map encodeOutput))
+
     encoded.CWLVersion <- model.CwlVersion
     encoded.Intent <- optionalResizeArray model.Intent
     encoded.BaseCommand <- optionalResizeArray model.BaseCommand
@@ -226,10 +242,7 @@ and private encodeWorkflow (model: WorkflowModel) =
 
 and private encodeExpressionTool (model: ExpressionToolModel) =
     let encoded =
-        CWLExpressionToolDescription(
-            asResizeArray (model.Outputs |> List.map encodeOutput),
-            model.Expression
-        )
+        CWLExpressionToolDescription(asResizeArray (model.Outputs |> List.map encodeOutput), model.Expression)
 
     encoded.CWLVersion <- model.CwlVersion
     encoded.Intent <- optionalResizeArray model.Intent
@@ -268,9 +281,9 @@ and private encodeWorkflowStep (model: WorkflowStepModel) =
             let source =
                 match input.Sources with
                 | [] -> None
-                | values -> Some (asResizeArray values)
+                | values -> Some(asResizeArray values)
 
-            StepInput.create(input.Name, ?source = source)
+            StepInput.create (input.Name, ?source = source)
         )
         |> asResizeArray
 
@@ -279,16 +292,20 @@ and private encodeWorkflowStep (model: WorkflowStepModel) =
         |> List.map (fun output -> StepOutput.StepOutputString output.Name)
         |> asResizeArray
 
-    let encoded = WorkflowStep(model.Name, stepInputs, stepOutputs, encodeWorkflowRun model)
+    let encoded =
+        WorkflowStep(model.Name, stepInputs, stepOutputs, encodeWorkflowRun model)
+
     setMetadata model.Metadata encoded
+
     match model.Run with
     | ExternalRun _ -> setWorkflowStepExternalRunMetadataFromModel model encoded
     | _ -> ()
+
     encoded
 
 let toProcessingUnit (document: EditorDocument) =
     match document with
-    | CommandLineToolDoc model -> CWLProcessingUnit.CommandLineTool (encodeCommandLineTool model)
-    | WorkflowDoc model -> CWLProcessingUnit.Workflow (encodeWorkflow model)
-    | ExpressionToolDoc model -> CWLProcessingUnit.ExpressionTool (encodeExpressionTool model)
-    | OperationDoc model -> CWLProcessingUnit.Operation (encodeOperation model)
+    | CommandLineToolDoc model -> CWLProcessingUnit.CommandLineTool(encodeCommandLineTool model)
+    | WorkflowDoc model -> CWLProcessingUnit.Workflow(encodeWorkflow model)
+    | ExpressionToolDoc model -> CWLProcessingUnit.ExpressionTool(encodeExpressionTool model)
+    | OperationDoc model -> CWLProcessingUnit.Operation(encodeOperation model)

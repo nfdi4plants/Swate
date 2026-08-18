@@ -1,9 +1,9 @@
-module CWLBuilder.Electron.Renderer.Adapters.ValidationAdapter
+module Swate.Components.Shared.Cwl.Adapters.ValidationAdapter
 
-open CWLBuilder.Validation.ValidationContext
-open CWLBuilder.Validation.ValidationEngine
-open CWLBuilder.Electron.Renderer.Documents.Types
-open CWLBuilder.Electron.Renderer.Adapters.ArCtrlEncode
+open Swate.Components.Shared.Cwl.Validation.ValidationContext
+open Swate.Components.Shared.Cwl.Validation.ValidationEngine
+open Swate.Components.Shared.Cwl.Documents.Types
+open Swate.Components.Shared.Cwl.Adapters.ArCtrlEncode
 
 let validateDocument (mode: ValidationMode) (document: EditorDocument) =
     document

@@ -1,11 +1,11 @@
 /// Central catalog of all validation rules, in execution order.
-module CWLBuilder.Validation.RuleCatalog
+module Swate.Components.Shared.Cwl.Validation.RuleCatalog
 
-open CWLBuilder.Validation.ValidationRule
-open CWLBuilder.Validation.Rules
+open Swate.Components.Shared.Cwl.Validation.ValidationRule
+open Swate.Components.Shared.Cwl.Validation.Rules
 
 /// All registered rules. Common rules run first, then type-specific, then requirements.
-let allRules : ValidationRule list =
+let allRules: ValidationRule list =
     List.concat [
         CommonRules.all
         CommandLineToolRules.all

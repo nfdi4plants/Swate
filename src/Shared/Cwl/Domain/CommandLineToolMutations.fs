@@ -1,11 +1,11 @@
 /// CommandLineTool-focused mutation helpers.
 /// Keeps field/list mutation logic out of renderer components.
-module CWLBuilder.Domain.CommandLineToolMutations
+module Swate.Components.Shared.Cwl.CommandLineToolMutations
 
 open System
 open ARCtrl.CWL
-open CWLBuilder.Domain.EditorMutations
-open CWLBuilder.Domain.RequirementMutations
+open Swate.Components.Shared.Cwl.EditorMutations
+open Swate.Components.Shared.Cwl.RequirementMutations
 
 let private parseIntOrNone (value: string) =
     match Int32.TryParse value with
@@ -13,20 +13,22 @@ let private parseIntOrNone (value: string) =
     | _ -> None
 
 let parseIntentText (value: string) =
-    value.Split([|','|], StringSplitOptions.RemoveEmptyEntries)
+    value.Split([| ',' |], StringSplitOptions.RemoveEmptyEntries)
     |> Array.map (fun token -> token.Trim())
     |> Array.filter (String.IsNullOrWhiteSpace >> not)
     |> ResizeArray
     |> fun values -> if values.Count = 0 then None else Some values
 
 let intentText (value: ResizeArray<string> option) =
-    value
-    |> Option.defaultValue (ResizeArray())
-    |> Seq.toList
-    |> String.concat ", "
+    value |> Option.defaultValue (ResizeArray()) |> Seq.toList |> String.concat ", "
 
 let private normalizeInputBinding (binding: InputBinding) =
-    if binding.Prefix.IsNone && binding.Position.IsNone && binding.ItemSeparator.IsNone && binding.Separate.IsNone then
+    if
+        binding.Prefix.IsNone
+        && binding.Position.IsNone
+        && binding.ItemSeparator.IsNone
+        && binding.Separate.IsNone
+    then
         None
     else
         Some binding
@@ -43,7 +45,7 @@ let setProcessingUnitVersion (newVersion: string) (processingUnit: CWLProcessing
 
 let setBaseCommand (tool: CWLToolDescription) (command: string) =
     match nonEmptyOrNone command with
-    | Some value -> tool.BaseCommand <- Some (ResizeArray [| value |])
+    | Some value -> tool.BaseCommand <- Some(ResizeArray [| value |])
     | None -> tool.BaseCommand <- None
 
 let setRequirementEnabled (tool: CWLToolDescription) (key: string) (enabled: bool) =
@@ -75,6 +77,7 @@ let addInput (tool: CWLToolDescription) =
 let renameInputAt (inputs: ResizeArray<CWLInput>) (index: int) (newName: string) =
     if index >= 0 && index < inputs.Count then
         let trimmed = newName.Trim()
+
         if String.IsNullOrWhiteSpace trimmed |> not then
             let replacement = cloneInputWithName inputs.[index] trimmed
             inputs.[index] <- replacement
@@ -86,15 +89,25 @@ let setInputTypeAt (inputs: ResizeArray<CWLInput>) (index: int) (cwlType: CWLTyp
 let setInputPrefixAt (inputs: ResizeArray<CWLInput>) (index: int) (prefix: string) =
     if index >= 0 && index < inputs.Count then
         let input = inputs.[index]
-        let binding = input.InputBinding |> Option.defaultValue (InputBinding.create())
-        let nextBinding = { binding with Prefix = nonEmptyOrNone prefix }
+        let binding = input.InputBinding |> Option.defaultValue (InputBinding.create ())
+
+        let nextBinding = {
+            binding with
+                Prefix = nonEmptyOrNone prefix
+        }
+
         input.InputBinding <- normalizeInputBinding nextBinding
 
 let setInputPositionAt (inputs: ResizeArray<CWLInput>) (index: int) (position: string) =
     if index >= 0 && index < inputs.Count then
         let input = inputs.[index]
-        let binding = input.InputBinding |> Option.defaultValue (InputBinding.create())
-        let nextBinding = { binding with Position = parseIntOrNone position }
+        let binding = input.InputBinding |> Option.defaultValue (InputBinding.create ())
+
+        let nextBinding = {
+            binding with
+                Position = parseIntOrNone position
+        }
+
         input.InputBinding <- normalizeInputBinding nextBinding
 
 let setInputOptionalAt (inputs: ResizeArray<CWLInput>) (index: int) (isOptional: bool) =
@@ -104,22 +117,21 @@ let setInputOptionalAt (inputs: ResizeArray<CWLInput>) (index: int) (isOptional:
 let removeInput (activeIndex: int option) (inputs: ResizeArray<CWLInput>) =
     removeAtAndSelectNext activeIndex inputs
 
-let moveInputUp (activeIndex: int option) (inputs: ResizeArray<CWLInput>) =
-    moveUp activeIndex inputs
+let moveInputUp (activeIndex: int option) (inputs: ResizeArray<CWLInput>) = moveUp activeIndex inputs
 
-let moveInputDown (activeIndex: int option) (inputs: ResizeArray<CWLInput>) =
-    moveDown activeIndex inputs
+let moveInputDown (activeIndex: int option) (inputs: ResizeArray<CWLInput>) = moveDown activeIndex inputs
 
 let addOutput (outputs: ResizeArray<CWLOutput>) =
     let name = nextName "output" (outputs |> Seq.map (fun item -> item.Name))
     let output = CWLOutput(name)
-    output.Type_ <- Some (CWLType.file ())
+    output.Type_ <- Some(CWLType.file ())
     outputs.Add(output)
     outputs.Count - 1
 
 let renameOutputAt (outputs: ResizeArray<CWLOutput>) (index: int) (newName: string) =
     if index >= 0 && index < outputs.Count then
         let trimmed = newName.Trim()
+
         if String.IsNullOrWhiteSpace trimmed |> not then
             let replacement = cloneOutputWithName outputs.[index] trimmed
             outputs.[index] <- replacement
@@ -131,15 +143,18 @@ let setOutputTypeAt (outputs: ResizeArray<CWLOutput>) (index: int) (cwlType: CWL
 let setOutputGlobAt (outputs: ResizeArray<CWLOutput>) (index: int) (glob: string) =
     if index >= 0 && index < outputs.Count then
         let output = outputs.[index]
-        let binding = output.OutputBinding |> Option.defaultValue (OutputBinding.create())
-        let nextBinding = { binding with Glob = nonEmptyOrNone glob }
+        let binding = output.OutputBinding |> Option.defaultValue (OutputBinding.create ())
+
+        let nextBinding = {
+            binding with
+                Glob = nonEmptyOrNone glob
+        }
+
         output.OutputBinding <- normalizeOutputBinding nextBinding
 
 let removeOutput (activeIndex: int option) (outputs: ResizeArray<CWLOutput>) =
     removeAtAndSelectNext activeIndex outputs
 
-let moveOutputUp (activeIndex: int option) (outputs: ResizeArray<CWLOutput>) =
-    moveUp activeIndex outputs
+let moveOutputUp (activeIndex: int option) (outputs: ResizeArray<CWLOutput>) = moveUp activeIndex outputs
 
-let moveOutputDown (activeIndex: int option) (outputs: ResizeArray<CWLOutput>) =
-    moveDown activeIndex outputs
+let moveOutputDown (activeIndex: int option) (outputs: ResizeArray<CWLOutput>) = moveDown activeIndex outputs

@@ -1,7 +1,7 @@
 /// IPC channel definitions and shared type contracts between Main and Renderer.
 /// All IPC communication goes through typed APIs; raw channel strings are
 /// defined here as the single source of truth.
-module CWLBuilder.Electron.Shared.IPCTypes
+module Swate.Components.Shared.Cwl.HostTypes
 
 /// Channel names for Electron IPC communication.
 module Channels =

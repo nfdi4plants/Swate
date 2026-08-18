@@ -1,7 +1,7 @@
-/// Core types for the CWLBuilder validation subsystem.
-/// Replaces the lightweight Validation.fs in CWLBuilder.Domain with a
+/// Core types for the CWL editor validation subsystem.
+/// Replaces the lightweight Validation.fs in the domain model with a
 /// rule-based engine that lives in its own project.
-module CWLBuilder.Validation.ValidationTypes
+module Swate.Components.Shared.Cwl.Validation.ValidationTypes
 
 /// How severe is this issue?
 type Severity =
@@ -25,18 +25,15 @@ type ValidationIssue = {
 /// Aggregate result of running all applicable rules.
 type ValidationResult = {
     Issues: ValidationIssue list
-}
-with
+} with
+
     /// True when no Error-severity issues exist.
-    member this.IsValid =
-        this.Issues |> List.forall (fun i -> i.Severity <> Error)
+    member this.IsValid = this.Issues |> List.forall (fun i -> i.Severity <> Error)
 
     /// Only the issues that would block a save.
-    member this.Errors =
-        this.Issues |> List.filter (fun i -> i.Severity = Error)
+    member this.Errors = this.Issues |> List.filter (fun i -> i.Severity = Error)
 
     /// Combine two results.
-    static member merge (a: ValidationResult) (b: ValidationResult) =
-        { Issues = a.Issues @ b.Issues }
+    static member merge (a: ValidationResult) (b: ValidationResult) = { Issues = a.Issues @ b.Issues }
 
     static member ok = { Issues = [] }

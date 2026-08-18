@@ -1,11 +1,11 @@
-module CWLBuilder.Electron.Renderer.State.Reducer
+module Swate.Components.Shared.Cwl.State.Reducer
 
-open CWLBuilder.Electron.Renderer.Documents.Common
-open CWLBuilder.Electron.Renderer.State.Actions
-open CWLBuilder.Electron.Renderer.State.Effects
-open CWLBuilder.Electron.Renderer.State.Init
-open CWLBuilder.Electron.Renderer.State.Selectors
-open CWLBuilder.Electron.Renderer.State.Types
+open Swate.Components.Shared.Cwl.Documents.Common
+open Swate.Components.Shared.Cwl.State.Actions
+open Swate.Components.Shared.Cwl.State.Effects
+open Swate.Components.Shared.Cwl.State.Init
+open Swate.Components.Shared.Cwl.State.Selectors
+open Swate.Components.Shared.Cwl.State.Types
 
 let private nextRevision (Revision value) = Revision(value + 1)
 
@@ -23,7 +23,11 @@ let private clearEditorState (state: AppState) = {
         Selection = emptySelection
         Overlay = NoOverlay
         Notifications = emptyNotifications
-        Async = { state.Async with IsLoading = false; IsSaving = false }
+        Async = {
+            state.Async with
+                IsLoading = false
+                IsSaving = false
+        }
 }
 
 let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
@@ -32,24 +36,32 @@ let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
         {
             state with
                 Document = Some document
-                Meta = Some (newMeta None)
+                Meta = Some(newMeta None)
                 Selection = emptySelection
                 Overlay = NoOverlay
                 Notifications = emptyNotifications
-                Async = { state.Async with IsLoading = false; IsSaving = false }
+                Async = {
+                    state.Async with
+                        IsLoading = false
+                        IsSaving = false
+                }
                 SessionId = state.SessionId + 1
         },
         [ FocusMainWindow "session.entry" ]
 
-    | ExistingDocumentLoaded (document, filePath) ->
+    | ExistingDocumentLoaded(document, filePath) ->
         {
             state with
                 Document = Some document
-                Meta = Some (newMeta (Some filePath))
+                Meta = Some(newMeta (Some filePath))
                 Selection = emptySelection
                 Overlay = NoOverlay
                 Notifications = emptyNotifications
-                Async = { state.Async with IsLoading = false; PendingLoadRequestId = None }
+                Async = {
+                    state.Async with
+                        IsLoading = false
+                        PendingLoadRequestId = None
+                }
                 SessionId = state.SessionId + 1
         },
         [ FocusMainWindow "session.entry" ]
@@ -57,26 +69,32 @@ let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
     | DocumentUpdated document ->
         let nextMeta =
             state.Meta
-            |> Option.map (fun meta ->
-                { meta with Revision = nextRevision meta.Revision }
-            )
+            |> Option.map (fun meta -> {
+                meta with
+                    Revision = nextRevision meta.Revision
+            })
 
         {
             state with
                 Document = Some document
                 Meta = nextMeta
-                Notifications = { state.Notifications with InfoMessage = None }
+                Notifications = {
+                    state.Notifications with
+                        InfoMessage = None
+                }
         },
         []
 
-    | SelectionChanged selection ->
-        { state with Selection = selection }, []
+    | SelectionChanged selection -> { state with Selection = selection }, []
 
     | PreviewOpened yaml ->
-        { state with Overlay = PreviewYaml yaml }, []
+        {
+            state with
+                Overlay = PreviewYaml yaml
+        },
+        []
 
-    | PreviewClosed ->
-        { state with Overlay = NoOverlay }, []
+    | PreviewClosed -> { state with Overlay = NoOverlay }, []
 
     | LeaveEditorRequested ->
         if isDirty state then
@@ -84,48 +102,99 @@ let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
         else
             clearEditorState state, []
 
-    | DiscardConfirmed ->
-        clearEditorState state, []
+    | DiscardConfirmed -> clearEditorState state, []
 
-    | DiscardCancelled ->
-        { state with Overlay = NoOverlay }, []
+    | DiscardCancelled -> { state with Overlay = NoOverlay }, []
 
     | ErrorNotificationSet message ->
-        { state with Notifications = { state.Notifications with ErrorMessage = message } }, []
+        {
+            state with
+                Notifications = {
+                    state.Notifications with
+                        ErrorMessage = message
+                }
+        },
+        []
 
     | InfoNotificationSet message ->
-        { state with Notifications = { state.Notifications with InfoMessage = message } }, []
+        {
+            state with
+                Notifications = {
+                    state.Notifications with
+                        InfoMessage = message
+                }
+        },
+        []
 
     | LoadingStarted requestId ->
-        { state with Async = { state.Async with IsLoading = true; PendingLoadRequestId = requestId } }, []
+        {
+            state with
+                Async = {
+                    state.Async with
+                        IsLoading = true
+                        PendingLoadRequestId = requestId
+                }
+        },
+        []
 
     | LoadingFinished ->
-        { state with Async = { state.Async with IsLoading = false; PendingLoadRequestId = None } }, []
+        {
+            state with
+                Async = {
+                    state.Async with
+                        IsLoading = false
+                        PendingLoadRequestId = None
+                }
+        },
+        []
 
     | SavingStarted requestId ->
-        { state with Async = { state.Async with IsSaving = true; PendingSaveRequestId = requestId } }, []
+        {
+            state with
+                Async = {
+                    state.Async with
+                        IsSaving = true
+                        PendingSaveRequestId = requestId
+                }
+        },
+        []
 
     | SaveCompleted filePath ->
         let nextMeta =
             state.Meta
-            |> Option.map (fun meta ->
-                { meta with
+            |> Option.map (fun meta -> {
+                meta with
                     FilePath = Some filePath
-                    SavedRevision = meta.Revision }
-            )
+                    SavedRevision = meta.Revision
+            })
 
         {
             state with
                 Meta = nextMeta
-                Async = { state.Async with IsSaving = false; PendingSaveRequestId = None }
-                Notifications = { state.Notifications with ErrorMessage = None; InfoMessage = Some $"Saved to {filePath}" }
+                Async = {
+                    state.Async with
+                        IsSaving = false
+                        PendingSaveRequestId = None
+                }
+                Notifications = {
+                    state.Notifications with
+                        ErrorMessage = None
+                        InfoMessage = Some $"Saved to {filePath}"
+                }
         },
         []
 
     | SaveFailed message ->
         {
             state with
-                Async = { state.Async with IsSaving = false; PendingSaveRequestId = None }
-                Notifications = { state.Notifications with ErrorMessage = Some message }
+                Async = {
+                    state.Async with
+                        IsSaving = false
+                        PendingSaveRequestId = None
+                }
+                Notifications = {
+                    state.Notifications with
+                        ErrorMessage = Some message
+                }
         },
         []
