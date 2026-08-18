@@ -53,6 +53,14 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "inferTextFileTypeFromPath detects CWL by .cwl extension",
+            fun () ->
+                Vitest.expect(FileContentDTO.inferTextFileTypeFromPath "x.cwl").toEqual (FileContentType.CWL)
+
+                Vitest.expect(FileContentDTO.inferTextFileTypeFromPath "X.CWL").toEqual (FileContentType.CWL)
+        )
+
+        Vitest.test (
             "updateARCByFileContentDTO updates an existing ISA assay while preserving static hash",
             fun () ->
                 let oldArc = ARC("test-arc")

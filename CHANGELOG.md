@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -   Enforce the DataHub Git LFS tracking ruleset: `isa.*.xlsx` metadata files are never tracked with Git LFS (skipped by automatic tracking, exempt from the commit size policy, and blocked from manual marking), while files inside a `dataset` folder or larger than 25 MB can no longer be unmarked #1316.
 -   Added CWL editor domain logic (ported from CWLBuilder) with .NET test suite tests/Cwl.
+-   .cwl files in the ARC file tree now open in the new CWL editor (Electron).
 
 ### Changed
 
