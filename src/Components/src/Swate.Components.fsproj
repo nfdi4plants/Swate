@@ -327,6 +327,7 @@
     <Compile Include="Page\CwlEditor\RequirementPicker.fs" />
     <Compile Include="Page\CwlEditor\Header.fs" />
     <Compile Include="Page\CwlEditor\InputsEditor.fs" />
+    <Compile Include="Page\CwlEditor\OutputsEditor.fs" />
     
 
     <Compile Include="Style.fs" />
