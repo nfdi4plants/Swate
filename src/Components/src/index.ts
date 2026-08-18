@@ -63,7 +63,7 @@ export { WidgetController, Entry as WidgetEntry } from './dist/Composite/Widgets
 // ---------------------------------------------------------------------------
 
 export { default as ArcFileEditor } from './dist/Page/ArcFileEditor/ArcFileEditor.fs';
-export { default as ArcFileFooterTabs } from './dist/Page/ArcFileEditor/ArcFileFooterTabs.fs';
+export { Main as ArcFileFooterTabs } from './dist/Page/ArcFileEditor/ArcFileFooterTabs.fs';
 export { default as EmptyTableView } from './dist/Page/ArcFileEditor/EmptyTableView/Main.fs';
 export { default as ARCObjectExplorer } from './dist/Page/ArcObjectExplorer/ARCObjectExplorer.fs';
 export { default as CwlEditor } from './dist/Page/CwlEditor/CwlEditor.fs';
