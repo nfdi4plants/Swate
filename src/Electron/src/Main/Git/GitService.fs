@@ -1145,8 +1145,7 @@ type private AuthenticatedGitSession = {
 
 let private createLocalGitSession arcPath progressCallback (abortSignal: IAbortSignal option) =
     let options =
-        createOptions arcPath syncTimeout progressCallback
-        |> withAbortSignal abortSignal
+        createOptionsWithAbort arcPath syncTimeout progressCallback abortSignal
 
     {
         Git = createGit options |> withGitOutputProgress progressCallback
@@ -1194,8 +1193,7 @@ let private createAuthenticatedGitSession
 
                         try
                             let operationOptions =
-                                createOptions arcPath syncTimeout progressCallback
-                                |> withAbortSignal abortSignal
+                                createOptionsWithAbort arcPath syncTimeout progressCallback abortSignal
                                 |> withConfigEntries commitIdentityEntries
 
                             let git =

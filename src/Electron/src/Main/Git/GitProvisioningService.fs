@@ -393,8 +393,11 @@ let cloneRepository
                                                 )
 
                                             let cloneOptions =
-                                                createOptions targetParent syncTimeout progress
-                                                |> withAbortSignal (Some(cancellationScope.CreateAbortSignal()))
+                                                createOptionsWithAbort
+                                                    targetParent
+                                                    syncTimeout
+                                                    progress
+                                                    (Some(cancellationScope.CreateAbortSignal()))
 
                                             // The pre-clone state was missing or empty, so on cancellation the
                                             // partially cloned target can be deleted without touching user data.
