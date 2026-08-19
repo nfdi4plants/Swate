@@ -90,3 +90,22 @@ Components in `src/Components` are expected to be reusable and application-agnos
 
 - Keep states at the lowest level possible. Every state change forces a re-render of the component and all its children. If a state is only used in a subcomponent, it should be defined in that subcomponent. 
 - Only use "useEffect" when absolutly necessary. It is a common source of bugs and should be avoided if possible. Check out this read: https://react.dev/learn/you-might-not-need-an-effect
+
+# Zen
+
+> The GitHub API consolidates the Zen of GitHub in its own codebase, in 14 aphorisms:
+
+- Responsive is better than fast
+- It’s not fully shipped until it’s fast
+- Anything added dilutes everything else
+- Practicality beats purity
+- Approachable is better than simple
+- Mind your words, they are important
+- Speak like a human
+- Half measures are as bad as nothing at all
+- Encourage flow
+- Non-blocking is better than blocking
+- Favor focus over features
+- Avoid administrative distraction
+- Design for failure
+- Keep it logically awesome

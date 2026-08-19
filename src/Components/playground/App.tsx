@@ -220,7 +220,7 @@ function WorkspaceContainer() {
 function ValidationPackageSelectorFixtureContainer() {
   return (
     <div className='swt:flex swt:flex-col swt:h-screen swt:w-screen swt:overflow-hidden'>
-      <ValidationPackageSelectorFixture.Main />
+      <ValidationPackageSelectorFixture />
     </div>
   );
 }
