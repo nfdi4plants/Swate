@@ -64,4 +64,44 @@ type PageState =
                     $"Failed to parse ARC file: {dto.path} - {dto.fileType} - unsupported format or corrupted content."
         | _ -> PageState.UnknownPage
 
-let pageStateOfFileContentDTO (dto: FileContentDTO) : PageState = PageState.fromFileContentDTO dto
+
+type ArcSelection = {
+    TreePath: string option
+    ExplorerNodeId: string option
+} with
+
+    static member Empty = {
+        TreePath = None
+        ExplorerNodeId = None
+    }
+
+[<RequireQualifiedAccess>]
+module ArcSelection =
+
+    let private normalizeTreePath = Option.map PathHelpers.normalizePath
+
+    let empty = ArcSelection.Empty
+
+    let normalize (selection: ArcSelection) = {
+        selection with
+            TreePath = normalizeTreePath selection.TreePath
+    }
+
+    let forTreePath (treePath: string option) =
+        {
+            TreePath = treePath
+            ExplorerNodeId = None
+        }
+        |> normalize
+
+    let forExplorerNode (explorerNodeId: string) (treePath: string option) =
+        {
+            TreePath = treePath
+            ExplorerNodeId = Some explorerNodeId
+        }
+        |> normalize
+
+    let clearExplorerNode (selection: ArcSelection) = {
+        normalize selection with
+            ExplorerNodeId = None
+    }

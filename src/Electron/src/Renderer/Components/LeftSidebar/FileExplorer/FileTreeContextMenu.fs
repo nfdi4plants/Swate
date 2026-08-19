@@ -9,6 +9,7 @@ open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameHelper
 open Renderer.Components.LeftSidebar.FileExplorer.Helper
+open Renderer.Components.LeftSidebar.FileExplorer.Types
 
 type PathActionConfig = {
     openPathInFileExplorer: string -> JS.Promise<Result<unit, exn>>

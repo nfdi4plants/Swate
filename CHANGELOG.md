@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 2.1.0 - 2026-08-19
+
 ### ✨ Added
 
 -   Add separate FileTree context-menu actions to open a selected folder and reveal a selected file or folder in its parent location #1228.
@@ -50,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Sign commits created in Swate with the stored DataHub account matching the ARC's remote host (using the active account when no remote is configured yet, and leaving the user's own git config untouched for hubs without a stored account) instead of git's OS-derived fallback identity, so commits link to the account on the hub they are pushed to #1304.
 -   Report a missing git identity as its own failure with setup guidance instead of passing git's raw "Please tell me who you are" output to the user #1305.
 -   Respect GitLab's "use a private email in commits" setting by signing commits with the account's commit email instead of its primary email.
+-   Fix Template bug "You've hit dummy code" #1266, #1264 (by @Freymaurer) 
+-   Fix overscroll issue on last table column on smaller screens (by @Freymaurer)
 
 ## 2.0.7 - 2026-08-06
 
