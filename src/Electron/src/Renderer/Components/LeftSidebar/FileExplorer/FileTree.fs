@@ -25,21 +25,6 @@ module private FileTreeHelper =
         | RenameDialog of ArcRenameDraft
         | DeleteDialog of FileItem
 
-    let saveArcFile (arcFile: ArcFiles) : JS.Promise<Result<FileContentDTO, exn>> = promise {
-        match FileContentDTO.fromArcFile arcFile with
-        | None -> return Error(exn "Saving this file type is not supported in Electron yet.")
-        | Some request ->
-            match! Api.ipcArcVaultApi.addArcFile request with
-            | Error saveError -> return Error saveError
-            | Ok() -> return Ok request
-    }
-
-    let saveArcFileAndOpen (arcFile: ArcFiles) : JS.Promise<Result<FileContentDTO, exn>> = promise {
-        match! saveArcFile arcFile with
-        | Error saveError -> return Error saveError
-        | Ok request -> return! Api.ipcArcVaultApi.openFile request.path
-    }
-
 open FileTreeHelper
 
 [<Erase; Mangle(false)>]
@@ -333,7 +318,14 @@ type FileTree =
                     setIsDialogBusy true
 
                     promise {
-                        let! createResult = saveArcFileAndOpen draft.ArcFile
+                        let! createResult =
+                            Renderer.Components.MainContent.Helper.withArcFileRequest
+                                draft.ArcFile
+                                (fun request -> promise {
+                                    match! Api.ipcArcVaultApi.addArcFile request with
+                                    | Error exn -> return Error exn
+                                    | Ok() -> return! Api.ipcArcVaultApi.openFile request.path
+                                })
 
                         match createResult with
                         | Error exn ->
@@ -407,7 +399,11 @@ type FileTree =
             | None -> ()
             | Some parentInfo ->
                 promise {
-                    match! saveArcFile (ArcFiles.DataMap(Some parentInfo, DataMap.init ())) with
+                    match!
+                        Renderer.Components.MainContent.Helper.withArcFileRequest
+                            (ArcFiles.DataMap(Some parentInfo, DataMap.init ()))
+                            Api.ipcArcVaultApi.addArcFile
+                    with
                     | Error exn -> applyCreateError exn.Message
                     | Ok _ -> ()
                 }
