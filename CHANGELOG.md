@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 2.1.0 - 2026-08-19
+
 ### ✨ Added
 
 -   Add separate FileTree context-menu actions to open a selected folder and reveal a selected file or folder in its parent location #1228.
