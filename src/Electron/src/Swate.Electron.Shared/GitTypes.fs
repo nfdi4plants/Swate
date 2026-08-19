@@ -121,6 +121,11 @@ type GitRemoteOperationRequest = {
     Branch: string option
 }
 
+/// Cancels the in-flight git operation. TargetPath is only needed for operations without an
+/// active ARC window (cloning), where it must match the clone target path; otherwise the
+/// current vault's ARC path is used.
+type GitCancelOperationRequest = { TargetPath: string option }
+
 [<RequireQualifiedAccess>]
 type GitPullPreflightStatus =
     | SafeToPull

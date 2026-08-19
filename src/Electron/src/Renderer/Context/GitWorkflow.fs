@@ -22,7 +22,7 @@ type GitBusyOperation =
     | FetchingFromRemote
     | PullingFromRemote
     | PushingToRemote
-    | CloningRepository
+    | CloningRepository of targetPath: string
     | CommittingSelectedChanges
     | CommittingAllChanges
     | DiscardingSelectedChanges
@@ -247,7 +247,7 @@ type GitDependencies = {
     gitFetch: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitPush: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
-    gitCancelPush: unit -> JS.Promise<Result<GitOperationResult, string>>
+    gitCancelOperation: GitCancelOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitCloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, string>>
     createBranch: GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
     checkoutBranch: GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
@@ -270,6 +270,15 @@ let staleMergeConflictTokens = [|
     "changed on disk since it was opened"
 |]
 
+// Mirrors the token set GitService uses to classify GitFailureKind.Canceled, so cancelled
+// operations surface as a warning notice instead of an error dialog.
+let cancellationMessageTokens = [| "cancel"; "abort" |]
+
+let isCancellationMessage (message: string) =
+    let normalizedMessage = message.ToLowerInvariant()
+
+    cancellationMessageTokens |> Array.exists normalizedMessage.Contains
+
 let staleArcSessionMessage =
     "Git operation was canceled because the active ARC changed."
 
@@ -289,7 +298,7 @@ let busyNoticeFromOperation =
     | GitBusyOperation.FetchingFromRemote -> Some "Fetching from remote"
     | GitBusyOperation.PullingFromRemote -> Some "Pulling from remote"
     | GitBusyOperation.PushingToRemote -> Some "Pushing to remote"
-    | GitBusyOperation.CloningRepository -> Some "Cloning repository"
+    | GitBusyOperation.CloningRepository _ -> Some "Cloning repository"
     | GitBusyOperation.CommittingSelectedChanges -> Some "Committing selected changes"
     | GitBusyOperation.CommittingAllChanges -> Some "Committing all changes"
     | GitBusyOperation.DiscardingSelectedChanges -> Some "Discarding selected changes"
@@ -649,7 +658,7 @@ let private busyOperationForWriteRequest =
     | Pull -> GitBusyOperation.PullingFromRemote
     | Push -> GitBusyOperation.PushingToRemote
     | PrimarySave prepared -> prepared.BusyOperation
-    | Clone _ -> GitBusyOperation.CloningRepository
+    | Clone(request, _) -> GitBusyOperation.CloningRepository request.TargetPath
     | CommitSelection prepared -> prepared.BusyOperation
     | CommitAll prepared -> prepared.BusyOperation
     | DiscardSelection _ -> GitBusyOperation.DiscardingSelectedChanges
@@ -753,7 +762,7 @@ let private runCloneAttemptAsync (deps: GitDependencies) (request: GitCloneRepos
     let! result = deps.gitCloneRepository request
 
     return
-        match classifyWriteResult GitBusyOperation.CloningRepository result with
+        match classifyWriteResult (GitBusyOperation.CloningRepository request.TargetPath) result with
         | Error message -> Error message
         | Ok(WriteOperationNeedsLfsInstall promptMessage) -> Ok(RequiresLfsInstall promptMessage)
         | Ok(WriteOperationRemoteProjectAlreadyExists message) -> Error message
@@ -1332,29 +1341,36 @@ let update
     | PullRequested -> model, Cmd.ofMsg (WriteRequested Pull)
     | PushRequested -> model, Cmd.ofMsg (WriteRequested Push)
     | CancelCurrentOperationRequested ->
+        // Clone runs without an ARC window, so its cancellation is addressed by the clone target path.
+        let cancelRequest =
+            match model.BusyOperation with
+            | Some(GitBusyOperation.CloningRepository targetPath) -> { TargetPath = Some targetPath }
+            | _ -> { TargetPath = None }
+
         let nextModel = {
             model with
-                WarningNotice = Some "Canceling push..."
+                WarningNotice = Some "Canceling operation..."
         }
 
         let cmd =
             Cmd.OfPromise.either
-                deps.gitCancelPush
-                ()
+                deps.gitCancelOperation
+                cancelRequest
                 CancelCurrentOperationCompleted
                 (fun err -> CancelCurrentOperationCompleted(Error(string err)))
 
         nextModel, cmd
     | CancelCurrentOperationCompleted(Ok operationResult) when not operationResult.Success ->
         let message =
-            operationResult.Message |> Option.defaultValue "Could not cancel push."
+            operationResult.Message
+            |> Option.defaultValue "Could not cancel the Git operation."
 
         {
             model with
                 ErrorNotice = Some message
                 WarningNotice = None
         },
-        reportErrorCmd deps "Could not cancel push" message
+        reportErrorCmd deps "Could not cancel Git operation" message
     | CancelCurrentOperationCompleted _ -> model, Cmd.none
     | UpdateFromOnlineRequested when model.CurrentArcPath.IsNone -> model, Cmd.none
     | UpdateFromOnlineRequested ->
@@ -1416,6 +1432,15 @@ let update
                         CancelLabel = "Cancel"
                     }
                 PendingRemoteAction = GitPendingRemoteAction.UpdateFromOnline
+        },
+        Cmd.none
+    | UpdatePreflightCompleted(_, Error message) when isCancellationMessage message ->
+        {
+            model with
+                BusyOperation = None
+                BusyNotice = None
+                CurrentProgress = None
+                WarningNotice = Some "Git operation cancelled."
         },
         Cmd.none
     | UpdatePreflightCompleted(_, Error message) ->
@@ -1613,6 +1638,17 @@ let update
         nextModel, cmd
     | WriteCompleted(sessionId, request, result) when sessionId <> model.ArcSessionId ->
         model, resolveStaleWriteCompletedCmd request result
+    | WriteCompleted(_, request, Error message) when isCancellationMessage message ->
+        let nextModel = {
+            model with
+                BusyOperation = None
+                BusyNotice = None
+                CurrentProgress = None
+                ErrorNotice = None
+                WarningNotice = Some "Git operation cancelled."
+        }
+
+        nextModel, resolveCloneReplyCmd request (Error message)
     | WriteCompleted(_, request, Error message) ->
         let nextModel = writeErrorModel message model
 

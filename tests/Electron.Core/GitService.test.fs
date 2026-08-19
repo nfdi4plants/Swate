@@ -3550,3 +3550,92 @@ Vitest.describe (
             }
         )
 )
+
+Vitest.describe (
+    "Git operation cancellation scopes",
+    fun () ->
+        Vitest.test (
+            "cancelOperation flags the scope and aborts signals created for it",
+            fun () ->
+                let key, scope = GitService.startCancellationScope "C:/cancel-scope-repo"
+
+                try
+                    let signal = scope.CreateAbortSignal()
+
+                    Vitest.expect(scope.CancelCheck()).toBe (false)
+                    Vitest.expect(signal.aborted).toBe (false)
+
+                    GitService.cancelOperation "C:/cancel-scope-repo" |> ignore
+
+                    Vitest.expect(scope.CancelCheck()).toBe (true)
+                    Vitest.expect(signal.aborted).toBe (true)
+                finally
+                    GitService.clearCancellationScope key scope
+        )
+
+        Vitest.test (
+            "signals created after cancellation abort immediately",
+            fun () ->
+                let key, scope = GitService.startCancellationScope "C:/cancel-late-signal-repo"
+
+                try
+                    GitService.cancelOperation "C:/cancel-late-signal-repo" |> ignore
+
+                    let lateSignal = scope.CreateAbortSignal()
+                    Vitest.expect(lateSignal.aborted).toBe (true)
+                finally
+                    GitService.clearCancellationScope key scope
+        )
+
+        Vitest.test (
+            "cancelOperation matches scopes regardless of path casing and trailing separators",
+            fun () ->
+                let key, scope = GitService.startCancellationScope "C:/Cancel-Normalized-Repo"
+
+                try
+                    GitService.cancelOperation "c:/cancel-normalized-repo/" |> ignore
+                    Vitest.expect(scope.CancelCheck()).toBe (true)
+                finally
+                    GitService.clearCancellationScope key scope
+        )
+
+        Vitest.test (
+            "cancelOperation after the scope is cleared succeeds without affecting later scopes",
+            fun () ->
+                let firstKey, firstScope =
+                    GitService.startCancellationScope "C:/cancel-cleared-repo"
+
+                GitService.clearCancellationScope firstKey firstScope
+
+                let cancelResult = GitService.cancelOperation "C:/cancel-cleared-repo"
+
+                Vitest.expect(Result.isOk cancelResult).toBe (true)
+                Vitest.expect(firstScope.CancelCheck()).toBe (false)
+
+                let secondKey, secondScope =
+                    GitService.startCancellationScope "C:/cancel-cleared-repo"
+
+                try
+                    Vitest.expect(secondScope.CancelCheck()).toBe (false)
+                finally
+                    GitService.clearCancellationScope secondKey secondScope
+        )
+
+        Vitest.test (
+            "starting a new scope replaces the previous one for the same path",
+            fun () ->
+                let _staleKey, staleScope =
+                    GitService.startCancellationScope "C:/cancel-replaced-repo"
+
+                let freshKey, freshScope =
+                    GitService.startCancellationScope "C:/cancel-replaced-repo"
+
+                try
+                    GitService.cancelOperation "C:/cancel-replaced-repo" |> ignore
+
+                    Vitest.expect(staleScope.CancelCheck()).toBe (false)
+                    Vitest.expect(freshScope.CancelCheck()).toBe (true)
+                finally
+                    GitService.clearCancellationScope freshKey freshScope
+        )
+)

@@ -34,6 +34,7 @@ previewGitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitPullPreflightR
 gitFetch: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
 gitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
 gitPush: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
+gitCancelOperation: GitCancelOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
 gitInitRepository: string -> JS.Promise<Result<string, string>>
 gitAddRemote: GitRemoteConfigRequest -> JS.Promise<Result<GitOperationResult, string>>
 gitCloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, string>>
@@ -371,6 +372,8 @@ Operations not wrapped:
 - System Git LFS install.
 
 Progress is sent through `IMainUpdateRendererApi.gitProgressUpdate`. Fetch, preview pull, pull, push, and clone can report progress. Clone only reports progress when Main can resolve a vault from the IPC window id; otherwise the clone still runs.
+
+Fetch, preview pull, pull, push, clone, and Git LFS transfers can be cancelled with `gitCancelOperation`. The request's `TargetPath` is `None` for operations on the active ARC; for clone it must carry the clone target path because no vault window exists yet. Cancellation kills the underlying git process, then restores a clean repository state: a cancelled pull aborts any half-applied merge or rebase, and a cancelled clone deletes the partially cloned target directory. Cancelled operations report `GitFailureKind.Canceled`.
 
 ## 12. Extending Git Functionality
 

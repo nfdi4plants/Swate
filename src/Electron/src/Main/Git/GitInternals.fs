@@ -108,6 +108,11 @@ let internal createOptions
             ``unsafe`` = unsafeOptions
         )
 
+/// Attaches an optional abort signal so in-flight simple-git tasks can be killed on cancellation.
+let internal withAbortSignal (signal: IAbortSignal option) (options: SimpleGitOptions) =
+    signal |> Option.iter (fun value -> options.abort <- Some value)
+    options
+
 /// Creates a simple-git instance with non-interactive prompt suppression applied.
 let internal createGit (options: SimpleGitOptions) : ISimpleGit =
     SimpleGit.create options |> applyNonInteractiveEnv
