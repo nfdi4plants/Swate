@@ -7,6 +7,7 @@ open Browser.Types
 open Swate.Components.Composite.Widgets
 open Swate.Components.Composite.Widgets.JsonImport.Types
 open Swate.Components.Shared
+open ARCtrl
 
 module private JsonImportWidgetHelper =
 

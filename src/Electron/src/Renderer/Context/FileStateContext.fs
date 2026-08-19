@@ -7,6 +7,7 @@ open Swate.Components
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
+open Renderer
 
 type FileState = {
     FileTree: FileEntry[]

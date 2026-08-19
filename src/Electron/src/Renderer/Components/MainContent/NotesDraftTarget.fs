@@ -7,6 +7,7 @@ open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Renderer.Components.Helper
 open Renderer.Components.Helper.FileSystemHelper
+open Renderer
 
 
 [<ReactComponent>]
