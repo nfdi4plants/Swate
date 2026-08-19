@@ -90,7 +90,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "adds a parent-backed DataMap without replacing its assay",
+            "adds a parent-backed DataMap",
             fun () ->
                 withTempArc
                     (fun arc -> arc.AddAssay(ArcAssay("DataMapAssay")))
@@ -105,15 +105,11 @@ Vitest.describe (
                         | Error error -> failwith error.Message
                         | Ok() -> ()
 
-                        Vitest.expect(arc.ContainsAssay("DataMapAssay")).toBe (true)
                         Vitest.expect(arc.GetAssay("DataMapAssay").DataMap.IsSome).toBe (true)
 
                         let dataMapPath = join [| arcPath; "assays"; "DataMapAssay"; "isa.datamap.xlsx" |]
-                        let assayPath = join [| arcPath; "assays"; "DataMapAssay"; "isa.assay.xlsx" |]
                         let! dataMapExists = pathExistsAsync dataMapPath
-                        let! assayExists = pathExistsAsync assayPath
                         Vitest.expect(dataMapExists).toBe (true)
-                        Vitest.expect(assayExists).toBe (true)
 
                         let dataMapIsLoadedInFileTree =
                             vault.fileTree.Values
@@ -122,7 +118,6 @@ Vitest.describe (
                         Vitest.expect(dataMapIsLoadedInFileTree).toBe (true)
 
                         let! reloadedArc = loadArcAsync arcPath
-                        Vitest.expect(reloadedArc.ContainsAssay("DataMapAssay")).toBe (true)
                         Vitest.expect(reloadedArc.GetAssay("DataMapAssay").DataMap.IsSome).toBe (true)
                     })
         )

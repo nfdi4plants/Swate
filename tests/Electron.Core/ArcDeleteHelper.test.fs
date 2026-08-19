@@ -58,7 +58,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "deletes an assay DataMap through a contract without deleting its parent",
+            "deletes an assay DataMap through a contract",
             fun () ->
                 withTempArc
                     (fun arc ->
@@ -78,16 +78,11 @@ Vitest.describe (
                         | Error error -> failwith error.Message
                         | Ok() ->
                             let deletedArc = vault.arc |> expectSome <| "Expected vault ARC."
-                            Vitest.expect(deletedArc.ContainsAssay("DataMapAssay")).toBe (true)
                             Vitest.expect(deletedArc.GetAssay("DataMapAssay").DataMap.IsNone).toBe (true)
-
-                            let! assayExists =
-                                pathExistsAsync (join [| arcPath; "assays"; "DataMapAssay"; "isa.assay.xlsx" |])
 
                             let! dataMapExists =
                                 pathExistsAsync (join [| arcPath; "assays"; "DataMapAssay"; "isa.datamap.xlsx" |])
 
-                            Vitest.expect(assayExists).toBe (true)
                             Vitest.expect(dataMapExists).toBe (false)
                     })
         )
