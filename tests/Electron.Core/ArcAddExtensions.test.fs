@@ -128,6 +128,40 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "adding a DataMap does not persist unrelated dirty in-memory changes",
+            fun () ->
+                withTempArc
+                    (fun arc ->
+                        arc.AddAssay(ArcAssay("DataMapAssay"))
+                        arc.AddAssay(ArcAssay("DirtyAssay", title = "Persisted title"))
+                    )
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+                        arc.GetAssay("DirtyAssay").Title <- Some "Unsaved title"
+
+                        let vault = ArcVault(testWindow ())
+                        vault.path <- Some arcPath
+                        vault.SetArc arc
+                        vault.RefreshHasUnsavedArcChangesFlag()
+
+                        let parentInfo = DatamapParentInfo.create "DataMapAssay" DataMapParent.Assay
+
+                        match! vault.AddDataMap(parentInfo, DataMap.init ()) with
+                        | Error error -> failwith error.Message
+                        | Ok() -> ()
+
+                        let! reloadedArc = loadArcAsync arcPath
+                        Vitest.expect(reloadedArc.GetAssay("DataMapAssay").DataMap.IsSome).toBe (true)
+                        Vitest.expect(reloadedArc.GetAssay("DirtyAssay").Title).toEqual (Some "Persisted title")
+
+                        let inMemoryArc = vault.arc |> expectSome <| "Expected vault ARC."
+                        Vitest.expect(inMemoryArc.GetAssay("DataMapAssay").DataMap.IsSome).toBe (true)
+                        Vitest.expect(inMemoryArc.GetAssay("DirtyAssay").Title).toEqual (Some "Unsaved title")
+                        Vitest.expect(vault.hasUnsavedArcChanges).toBe (true)
+                    })
+        )
+
+        Vitest.test (
             "adds the file explorer default assay via vault add path",
             fun () ->
                 withTempArc

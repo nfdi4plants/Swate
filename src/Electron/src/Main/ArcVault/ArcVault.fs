@@ -281,8 +281,8 @@ module ArcVaultExtensions =
             (parentInfo: DatamapParentInfo, dataMap: DataMap)
             : Fable.Core.JS.Promise<Result<unit, exn>> =
             promise {
-                match this.arc with
-                | Some arc ->
+                match this.path, this.arc with
+                | Some arcPath, Some arc ->
                     let addDataMap =
                         tryGetDataMapAccess arc parentInfo
                         |> Option.bind (fun (currentDataMap, setDataMap) ->
@@ -293,16 +293,24 @@ module ArcVaultExtensions =
                     | None ->
                         return Error(exn $"ARC parent '{parentInfo.ParentId}' does not exist or already has a DataMap.")
                     | Some setDataMap ->
-                        setDataMap (Some dataMap)
+                        let createContracts =
+                            ArcFileCreateContracts.createContracts false (ArcFiles.DataMap(Some parentInfo, dataMap))
 
-                        match! this.WriteArc() with
-                        | Ok() ->
-                            do! this.RefreshFileTreeEntry(DatamapParentInfo.toPath parentInfo)
-                            return Ok()
-                        | Error error ->
-                            setDataMap None
-                            arc.UpdateFileSystem()
-                            return Error error
+                        this.isBusyWriting <- true
+
+                        try
+                            match! fullFillContractBatchAsync arcPath createContracts with
+                            | Error errors ->
+                                return Error(exn $"Could not add DataMap: {PathHelpers.formatContractErrors errors}")
+                            | Ok _ ->
+                                dataMap.StaticHash <- cleanDataMapStaticHash dataMap
+                                setDataMap (Some dataMap)
+                                arc.UpdateFileSystem()
+                                this.RefreshHasUnsavedArcChangesFlag()
+                                do! this.RefreshFileTreeEntry(DatamapParentInfo.toPath parentInfo)
+                                return Ok()
+                        finally
+                            this.isBusyWriting <- false
                 | _ -> return Error(exn "ARC is not loaded.")
             }
 

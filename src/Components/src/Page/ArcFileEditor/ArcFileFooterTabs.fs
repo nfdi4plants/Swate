@@ -215,7 +215,7 @@ type ArcFileFooterTabs =
             elementRef: IRefValue<option<Browser.Types.HTMLElement>>,
             setEditorMode: int option -> unit,
             deleteTable: int -> unit,
-            onDeleteDataMap: unit -> unit
+            onDeleteDataMap: (unit -> unit) option
         ) =
 
 
@@ -247,16 +247,19 @@ type ArcFileFooterTabs =
                         onClick = delete index
                     )
                   ]
-                | Some ActiveView.DataMap -> [
-                    ContextMenuItem(
-                        Html.span "Delete DataMap",
-                        icon =
-                            Html.i [
-                                prop.className "swt:iconify swt:fluent--delete-20-filled swt:size-4"
-                            ],
-                        onClick = (fun _ -> onDeleteDataMap ())
-                    )
-                  ]
+                | Some ActiveView.DataMap ->
+                    match onDeleteDataMap with
+                    | Some deleteDataMap -> [
+                        ContextMenuItem(
+                            Html.span "Delete DataMap",
+                            icon =
+                                Html.i [
+                                    prop.className "swt:iconify swt:fluent--delete-20-filled swt:size-4"
+                                ],
+                            onClick = (fun _ -> deleteDataMap ())
+                        )
+                      ]
+                    | None -> []
                 | _ -> []
 
 
@@ -298,7 +301,7 @@ type ArcFileFooterTabs =
             activeView: ActiveView,
             setActiveView: ActiveView -> unit,
             setArcFile: ArcFiles -> unit,
-            onDeleteDataMap: unit -> unit
+            onDeleteDataMap: (unit -> unit) option
         ) =
         let tables = arcFile.ArcTables()
         let canAddTable = arcFile.CanCreateTables()

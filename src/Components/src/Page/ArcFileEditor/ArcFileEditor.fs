@@ -301,9 +301,6 @@ type Main =
         let onError =
             defaultArg onError (fun errorMsg -> console.error ("Error in ArcFileEditor: " + errorMsg))
 
-        let onAddDataMap = defaultArg onAddDataMap ignore
-        let onDeleteDataMap = defaultArg onDeleteDataMap ignore
-
         let activeView, setActiveView =
             React.useState (startingActiveView |> Option.defaultValue ActiveView.Metadata)
 
@@ -333,7 +330,9 @@ type Main =
         let activeTableIndex = activeView.TryTableIndex
 
         let canAddDataMap =
-            arcFile.TryGetDataMapParentInfo().IsSome && not (arcFile.CanRenderDataMapView())
+            onAddDataMap.IsSome
+            && arcFile.TryGetDataMapParentInfo().IsSome
+            && not (arcFile.CanRenderDataMapView())
 
         let trailingNavbarElement =
             match trailingNavbarElements with
@@ -356,7 +355,7 @@ type Main =
                                                 "swt:iconify swt:fluent--database-arrow-up-20-regular swt:size-6"
                                         ],
                                         "Add DataMap",
-                                        (fun _ -> onAddDataMap ()),
+                                        (fun _ -> onAddDataMap |> Option.iter (fun handler -> handler ())),
                                         isDisabled = not canAddDataMap
                                     )
                                 ]
