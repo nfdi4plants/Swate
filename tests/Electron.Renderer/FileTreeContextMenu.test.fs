@@ -258,14 +258,16 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "supported ARC owner folders expose DataMap creation until one exists",
+            "supported ARC owner folders expose Add or Delete DataMap based on current content",
             fun () ->
                 let owner = createFolderItem "AssayA" (Some "assays/AssayA")
                 let mutable requestedItem = None
+                let mutable requestedDeleteItem = None
 
                 let config = {
                     createContextMenuConfig () with
                         createDataMap = fun item -> requestedItem <- Some item
+                        requestDeleteItem = fun item -> requestedDeleteItem <- Some item
                 }
 
                 let addDataMap =
@@ -275,18 +277,25 @@ Vitest.describe (
                 addDataMap.OnClick()
                 Vitest.expect(requestedItem |> Option.map _.Path).toEqual (Some owner.Path)
 
+                let dataMapItem =
+                    createFileItem DatamapParentInfo.DatamapFileName (Some "assays/AssayA/isa.datamap.xlsx")
+
                 let ownerWithDataMap = {
                     owner with
-                        Children =
-                            Some [
-                                createFileItem DatamapParentInfo.DatamapFileName (Some "assays/AssayA/isa.datamap.xlsx")
-                            ]
+                        Children = Some [ dataMapItem ]
                 }
 
-                let labelsWithDataMap =
-                    createComposedContextMenuItems config ownerWithDataMap |> labels
+                let menuItemsWithDataMap = createComposedContextMenuItems config ownerWithDataMap
+                let labelsWithDataMap = labels menuItemsWithDataMap
 
                 Vitest.expect(labelsWithDataMap).not.toContain ("Add DataMap")
+                Vitest.expect(labelsWithDataMap).toContain ("Delete DataMap")
+
+                menuItemsWithDataMap
+                |> List.find (fun item -> item.Label = "Delete DataMap")
+                |> fun item -> item.OnClick()
+
+                Vitest.expect(requestedDeleteItem |> Option.map _.Path).toEqual (Some dataMapItem.Path)
         )
 
         Vitest.test (

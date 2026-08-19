@@ -163,15 +163,22 @@ let tryGetDataMapParentInfo (item: FileItem) =
     else
         None
 
-let dataMapCreateContextMenuItems (createDataMap: FileItem -> unit) (item: FileItem) =
-    let hasDataMap =
+let dataMapContextMenuItems (createDataMap: FileItem -> unit) (requestDeleteItem: FileItem -> unit) (item: FileItem) =
+    let dataMapItem =
         item.Children
         |> Option.defaultValue []
-        |> List.exists (fun child -> child.Path |> Option.bind DatamapParentInfo.tryFromPath |> Option.isSome)
+        |> List.tryFind (fun child -> child.Path |> Option.bind DatamapParentInfo.tryFromPath |> Option.isSome)
 
-    match tryGetDataMapParentInfo item with
-    | Some _ when not hasDataMap -> [
+    match tryGetDataMapParentInfo item, dataMapItem with
+    | Some _, None -> [
         ContextMenuItem.create "Add DataMap" "swt:fluent--database-arrow-up-20-regular" (fun () -> createDataMap item)
+      ]
+    | Some _, Some dataMap -> [
+        ContextMenuItem.styled
+            "Delete DataMap"
+            "swt:fluent--delete-24-regular"
+            "swt:text-error"
+            (fun () -> requestDeleteItem dataMap)
       ]
     | _ -> []
 
@@ -242,7 +249,7 @@ let createContextMenuItems (config: ContextMenuConfig) arcScopeId =
             openContextMenuItems config item
             copyPathContextMenuItems config.arcRootPath item
             fileSystemCreateContextMenuItems config.openFileSystemCreateModal item
-            dataMapCreateContextMenuItems config.createDataMap item
+            dataMapContextMenuItems config.createDataMap config.requestDeleteItem item
             Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems
                 item
                 toggleLfsMark
