@@ -713,11 +713,7 @@ let private classifyWriteResult (busyOperation: GitBusyOperation) (result: Resul
         not operationResult.Success
         && operationResult.FailureKind = Some GitFailureKind.Canceled
         ->
-        Ok(
-            WriteOperationCancelled(
-                operationResult.Message |> Option.defaultValue GitOperationCancelledMessage
-            )
-        )
+        Ok(WriteOperationCancelled(operationResult.Message |> Option.defaultValue GitOperationCancelledMessage))
     | Ok operationResult when not operationResult.Success ->
         Error(
             operationResult.Message

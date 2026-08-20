@@ -1098,7 +1098,8 @@ Vitest.describe (
                         CurrentArcPath = Some "C:/arc"
                 }
 
-                let stateAfterRequest, requestCmd = update deps ignore (WriteRequested WriteRequest.Pull) state
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested WriteRequest.Pull) state
 
                 let! requestMessages = collectMessages requestCmd
 
@@ -1212,7 +1213,8 @@ Vitest.describe (
                         CurrentArcPath = Some "C:/arc"
                 }
 
-                let stateAfterRequest, requestCmd = update deps ignore (WriteRequested WriteRequest.Pull) state
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested WriteRequest.Pull) state
 
                 let! requestMessages = collectMessages requestCmd
 

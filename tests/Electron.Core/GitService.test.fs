@@ -3716,12 +3716,7 @@ Vitest.describe (
                         do! removeDirectoryAsync (join [| context.RepoPath; ".git"; "lfs"; "objects" |])
 
                         // Pull only hydrates when the download preference is enabled locally.
-                        let! _ =
-                            context.Git.raw [|
-                                "config"
-                                "swate.lfs.downloadlargefiles"
-                                "true"
-                            |]
+                        let! _ = context.Git.raw [| "config"; "swate.lfs.downloadlargefiles"; "true" |]
 
                         // Request cancellation the moment the pull reports the hydration phase,
                         // i.e. after `git pull` itself has completed.
@@ -3731,7 +3726,8 @@ Vitest.describe (
 
                         let! pullResult =
                             withTestTokenProvider (fun () ->
-                                GitService.pull context.RepoPath None None (Some progressHandler))
+                                GitService.pull context.RepoPath None None (Some progressHandler)
+                            )
 
                         // The pull itself already landed, so a cancelled hydration reports a
                         // successful pull carrying a Canceled warning instead of a failure.
