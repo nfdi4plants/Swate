@@ -3639,3 +3639,128 @@ Vitest.describe (
                     GitService.clearCancellationScope freshKey freshScope
         )
 )
+
+Vitest.describe (
+    "Cancellation review scenarios (PR #1329)",
+    fun () ->
+        // A genuine git failure whose text merely contains "abort" (git prints "Aborting" when
+        // local changes would be overwritten by merge) must not classify as a user cancellation.
+        Vitest.test (
+            "classifyFailureKind does not treat overwritten-by-merge 'Aborting' errors as Canceled",
+            fun () ->
+                let overwrittenByMergeError =
+                    "error: Your local changes to the following files would be overwritten by merge:\n\tdata.csv\nPlease commit your changes or stash them before you merge.\nAborting"
+
+                Vitest
+                    .expect(GitService.classifyFailureKind overwrittenByMergeError = GitFailureKind.Canceled)
+                    .toBe (false)
+        )
+
+        Vitest.test (
+            "classifyFailureKind still classifies explicit cancellation markers as Canceled",
+            fun () ->
+                Vitest
+                    .expect(GitService.classifyFailureKind "AbortError: The operation was aborted")
+                    .toEqual (GitFailureKind.Canceled)
+
+                Vitest
+                    .expect(GitService.classifyFailureKind "Git LFS command cancelled.")
+                    .toEqual (GitFailureKind.Canceled)
+        )
+
+        // Documents what actually happens when the user cancels while post-pull LFS hydration is
+        // running: the pull itself has already landed, so the repository stays on the new commits
+        // and the updated large file is left as an un-hydrated pointer. No rollback occurs.
+        Vitest.test (
+            "cancelling during post-pull LFS hydration keeps the pulled commits and leaves pointer files",
+            fun () -> promise {
+                do!
+                    withTempRepository (fun context -> promise {
+                        let remotePath = join [| context.RootPath; "origin.git" |]
+                        let trackedFilePath = join [| context.RepoPath; "data.bin" |]
+
+                        let! _ = context.Git.raw [| "lfs"; "install"; "--local" |]
+                        let! _ = context.Git.raw [| "lfs"; "track"; "*.bin" |]
+
+                        do! writeUtf8FileAsync trackedFilePath "small first version\n"
+                        let! _ = context.Git.raw [| "add"; ".gitattributes"; "data.bin" |]
+                        let! _ = context.Git.raw [| "commit"; "-m"; "test: lfs baseline" |]
+
+                        let! currentBranch = context.Git.raw [| "branch"; "--show-current" |]
+                        let branchName = currentBranch.Trim()
+
+                        let! _ =
+                            context.Git.raw [|
+                                "init"
+                                "--bare"
+                                $"--initial-branch={branchName}"
+                                remotePath
+                            |]
+
+                        do! configureLocalRemoteRewrite context.Git remotePath
+                        let! _ = context.Git.raw [| "remote"; "add"; "origin"; testRemoteUrl |]
+                        let! _ = context.Git.raw [| "push"; "-u"; "origin"; branchName |]
+
+                        // The updated LFS content is large enough that hydration cannot finish
+                        // before the cancellation poll fires.
+                        do! writeUtf8FileAsync trackedFilePath (String.replicate 12_000_000 "swate")
+                        let! _ = context.Git.raw [| "add"; "data.bin" |]
+                        let! _ = context.Git.raw [| "commit"; "-m"; "test: lfs update" |]
+                        let! _ = context.Git.raw [| "push"; "origin"; branchName |]
+
+                        let! updatedCommit = context.Git.raw [| "rev-parse"; "HEAD" |]
+
+                        // Rewind to the baseline and drop local LFS objects so hydration must
+                        // actually transfer the updated content from the remote.
+                        let! _ = context.Git.raw [| "reset"; "--hard"; "HEAD~1" |]
+                        do! removeDirectoryAsync (join [| context.RepoPath; ".git"; "lfs"; "objects" |])
+
+                        // Pull only hydrates when the download preference is enabled locally.
+                        let! _ =
+                            context.Git.raw [|
+                                "config"
+                                "swate.lfs.downloadlargefiles"
+                                "true"
+                            |]
+
+                        // Request cancellation the moment the pull reports the hydration phase,
+                        // i.e. after `git pull` itself has completed.
+                        let progressHandler (progress: GitProgressDto) =
+                            if progress.Stage = Some "Downloading Git LFS files" then
+                                GitService.cancelOperation context.RepoPath |> ignore
+
+                        let! pullResult =
+                            withTestTokenProvider (fun () ->
+                                GitService.pull context.RepoPath None None (Some progressHandler))
+
+                        // The pull itself already landed, so a cancelled hydration reports a
+                        // successful pull carrying a Canceled warning instead of a failure.
+                        match pullResult with
+                        | Error failure ->
+                            failwith $"Expected the cancelled hydration to keep the pull successful: {failure.Message}"
+                        | Ok pullPayload ->
+                            match pullPayload.Warning with
+                            | None -> failwith "Expected a hydration-cancellation warning on the pull result."
+                            | Some warning ->
+                                Vitest.expect(warning.Kind).toEqual (GitFailureKind.Canceled)
+                                Vitest.expect(warning.Message.Contains("Git pull completed")).toBe (true)
+
+                        // The pulled commits are not rolled back...
+                        let! headAfterCancel = context.Git.raw [| "rev-parse"; "HEAD" |]
+                        Vitest.expect(headAfterCancel.Trim()).toBe (updatedCommit.Trim())
+
+                        // ...the updated large file stays an un-hydrated LFS pointer...
+                        let! trackedFileContent = readUtf8FileAsync trackedFilePath
+                        Vitest.expect(trackedFileContent.StartsWith("version https://git-lfs")).toBe (true)
+
+                        // ...and no merge or rebase is left in progress.
+                        let! status =
+                            unwrapResultAsync
+                                (GitService.getStatus context.RepoPath)
+                                (expectOk "git status after cancelled hydration")
+
+                        Vitest.expect(status.IsMergeInProgress).toBe (false)
+                    })
+            }
+        )
+)
