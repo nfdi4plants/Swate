@@ -5,6 +5,12 @@ open Fable.Core
 [<Literal>]
 let GitLfsSkipSmudgeEnvKey = "GIT_LFS_SKIP_SMUDGE"
 
+/// Exact message the main process reports for operations that failed because the user requested
+/// cancellation. The renderer compares against this verbatim, so genuine git errors that merely
+/// contain words like "abort" or "cancel" are never mistaken for a user cancellation.
+[<Literal>]
+let GitOperationCancelledMessage = "Git operation was cancelled."
+
 // GIT LFS Types
 type GitLfsCommand =
     | Pull

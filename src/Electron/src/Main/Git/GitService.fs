@@ -125,6 +125,18 @@ let cancelOperation (path: string) : GitResult<unit> =
 
     Ok()
 
+/// A failure that surfaces while the operation's scope has a pending cancel request is reported
+/// as a cancellation with the exact shared message, so classification never depends on whatever
+/// error text the killed git process happened to emit.
+let private markCanceledIfRequested (scope: GitCancellationScope) (result: Result<'T, GitFailure>) =
+    match result with
+    | Error _ when scope.CancelRequested ->
+        Error {
+            Kind = GitFailureKind.Canceled
+            Message = GitOperationCancelledMessage
+        }
+    | _ -> result
+
 let private lfsInstallRequiredTokens = [|
     "git lfs is required for files larger than"
     "git lfs is required for this operation"
@@ -171,7 +183,10 @@ let classifyFailureKind (message: string) =
         |]
     then
         GitFailureKind.RemoteProjectAlreadyExists
-    elif containsAny [| "abort"; "cancelled"; "canceled"; "aborterror" |] then
+    // Cancellation is primarily reported through the cancellation scope (markCanceledIfRequested);
+    // these tokens only cover explicit cancel markers. A bare "abort" would misclassify genuine git
+    // errors such as the "Aborting" printed when local changes would be overwritten by merge.
+    elif containsAny [| "cancelled"; "canceled"; "aborterror" |] then
         GitFailureKind.Canceled
     elif containsAny [| "timed out"; "timeout"; "time out" |] then
         GitFailureKind.Timeout
@@ -1765,7 +1780,7 @@ let fetch
                                     return ()
                             })
 
-                    return result
+                    return markCanceledIfRequested cancellationScope result
                 finally
                     clearCancellationScope cancellationKey cancellationScope
     }
@@ -1817,7 +1832,7 @@ let previewPull
                             let cancellationKey, cancellationScope = startCancellationScope arcPath
 
                             try
-                                return!
+                                let! preflightResult =
                                     withAuthenticatedGit
                                         arcPath
                                         safeRemoteName
@@ -1880,6 +1895,8 @@ let previewPull
                                                                     $"Git pull preflight could not be classified safely: {trimmedDiagnostic}"
                                                     }
                                         })
+
+                                return markCanceledIfRequested cancellationScope preflightResult
                             finally
                                 clearCancellationScope cancellationKey cancellationScope
     }
@@ -1963,6 +1980,18 @@ let pull
 
                                         match lfsPullResult with
                                         | Ok() -> return { Warning = None }
+                                        | Error _ when cancellationScope.CancelRequested ->
+                                            // The pull itself already landed, so a cancelled hydration is a
+                                            // successful pull with pointers left behind — not a failure, and
+                                            // never a rollback. The warning tells the user exactly that.
+                                            return {
+                                                Warning =
+                                                    Some {
+                                                        Kind = GitFailureKind.Canceled
+                                                        Message =
+                                                            "Git pull completed, but the Git LFS download was cancelled. Large files stay as pointers until the next update."
+                                                    }
+                                            }
                                         | Error failure ->
                                             let hydrationFailure = createPullHydrationFailure failure
                                             return abortGitPromise hydrationFailure.Message
@@ -1974,7 +2003,7 @@ let pull
                         if cancellationScope.CancelRequested then
                             do! cleanupAfterCancelledPull arcPath
 
-                        return result
+                        return markCanceledIfRequested cancellationScope result
                 finally
                     clearCancellationScope cancellationKey cancellationScope
     }
@@ -2040,7 +2069,9 @@ let push
                     match gitResult with
                     | Error failure ->
                         clearCancellationScope cancellationKey cancellationScope
-                        return Error failure
+                        // Session creation can be killed through the scope's abort signal, so a
+                        // cancel arriving this early must still classify as a cancellation.
+                        return markCanceledIfRequested cancellationScope (Error failure)
                     | Ok session ->
                         let git = session.Git
                         let runGitCapturedForProgress = runGitCapturedWithOutput progressCallback
@@ -2050,7 +2081,7 @@ let push
                             let! pushStatusResult = runSimpleGit (fun currentGit -> currentGit.status ()) git
 
                             match pushStatusResult with
-                            | Error failure -> return Error failure
+                            | Error failure -> return markCanceledIfRequested cancellationScope (Error failure)
                             | Ok pushStatus ->
                                 let pushTarget =
                                     resolvePushTarget
@@ -2059,7 +2090,7 @@ let push
                                         pushStatus.tracking
                                         pushStatus.detached
 
-                                return!
+                                let! pushResult =
                                     executePushWorkflow
                                         pushTarget
                                         (fun () ->
@@ -2130,6 +2161,8 @@ let push
                                                 safeRemoteName
                                                 git
                                         )
+
+                                return markCanceledIfRequested cancellationScope pushResult
                         finally
                             clearCancellationScope cancellationKey cancellationScope
     }

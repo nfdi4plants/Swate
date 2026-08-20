@@ -157,6 +157,10 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
 
                 match result with
                 | Ok preview -> return Ok preview
+                // Cancellations travel as the exact shared message so the renderer can recognize
+                // them by equality instead of substring-matching arbitrary git error text.
+                | Error failure when failure.Kind = GitFailureKind.Canceled ->
+                    return Error(exn GitOperationCancelledMessage)
                 | Error failure -> return Error(exn $"git pull preview failed ({failure.Kind}): {failure.Message}")
         }
     getGitDiffSummary =
