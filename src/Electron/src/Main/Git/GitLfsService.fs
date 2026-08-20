@@ -740,6 +740,7 @@ let downloadObjectFromListing
     (commandAuth: GitCommandAuthentication)
     (relativePath: string)
     (listing: GitLfsLsFileInfo)
+    (cancelCheck: (unit -> bool) option)
     : JS.Promise<Result<unit, exn>> =
     promise {
         let! result =
@@ -751,7 +752,7 @@ let downloadObjectFromListing
                 |]
                 Environment = Some commandAuth.Environment
                 StandardInput = Some(buildPointerInput listing)
-                CancelCheck = None
+                CancelCheck = cancelCheck
                 TimeoutMs = None
             }
 

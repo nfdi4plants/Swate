@@ -149,8 +149,9 @@ let private mkdirRecursiveAsync (directoryPath: string) : JS.Promise<unit> = pro
     return ()
 }
 
+// Retries cover transient Windows file locks, e.g. from a git process that was just killed.
 let private removeRecursiveAsync (targetPath: string) : JS.Promise<unit> = promise {
-    let! _ = rmAsync targetPath (RmOptions(recursive = true, force = true))
+    let! _ = rmAsync targetPath (RmOptions(recursive = true, force = true, maxRetries = 10, retryDelay = 200))
     return ()
 }
 
@@ -228,9 +229,10 @@ let private createCloneLfsCommandAuth host tokenOption remoteUrl =
 let private hydrateClonedLfsContent
     (repoPath: string)
     (commandAuth: GitCommandAuthentication)
+    (cancelCheck: (unit -> bool) option)
     : JS.Promise<GitService.GitResult<unit>> =
     promise {
-        match! GitLfsService.pullAll repoPath commandAuth None with
+        match! GitLfsService.pullAll repoPath commandAuth cancelCheck with
         | Ok() -> return Ok()
         | Error error -> return errorResult error
     }
@@ -381,7 +383,39 @@ let cloneRepository
                                         match ensureCloneTargetIsEmpty cloneTargetState with
                                         | Error _ -> return createNonEmptyTargetFailure ()
                                         | Ok() ->
-                                            let cloneOptions = createOptions targetParent syncTimeout progress
+                                            // The scope is keyed by the clone target because no ARC window exists yet.
+                                            let cancellationKey, cancellationScope =
+                                                GitService.startCancellationScope normalizedTargetPath
+
+                                            use _ =
+                                                GitService.deferScopeCleanup (fun () ->
+                                                    GitService.clearCancellationScope cancellationKey cancellationScope
+                                                )
+
+                                            let cloneOptions =
+                                                createOptionsWithAbort
+                                                    targetParent
+                                                    syncTimeout
+                                                    progress
+                                                    (Some(cancellationScope.CreateAbortSignal()))
+
+                                            // The pre-clone state was missing or empty, so on cancellation the
+                                            // partially cloned target can be deleted without touching user data.
+                                            let finalizeCloneOutcome (result: GitService.GitResult<string>) = promise {
+                                                if cancellationScope.CancelCheck() then
+                                                    try
+                                                        do! removeRecursiveAsync normalizedTargetPath
+                                                    with _ ->
+                                                        ()
+
+                                                    return
+                                                        Error {
+                                                            GitService.GitFailure.Kind = GitFailureKind.Canceled
+                                                            GitService.GitFailure.Message = "ARC download cancelled."
+                                                        }
+                                                else
+                                                    return result
+                                            }
 
                                             let! tokenResult = promise {
                                                 try
@@ -418,7 +452,10 @@ let cloneRepository
                                                             createCloneLfsCommandAuth host tokenOption safeRemoteUrl
 
                                                         let! hydrateResult =
-                                                            hydrateClonedLfsContent normalizedTargetPath commandAuth
+                                                            hydrateClonedLfsContent
+                                                                normalizedTargetPath
+                                                                commandAuth
+                                                                (Some cancellationScope.CancelCheck)
 
                                                         match hydrateResult with
                                                         | Ok() -> return cloneResult
@@ -465,10 +502,10 @@ let cloneRepository
                                                                 normalizedTargetPath
                                                                 safeBranch
 
-                                                        match authenticatedCloneResult with
-                                                        | _ ->
-                                                            return!
-                                                                hydrateIfRequested (Some token) authenticatedCloneResult
+                                                        let! hydratedResult =
+                                                            hydrateIfRequested (Some token) authenticatedCloneResult
+
+                                                        return! finalizeCloneOutcome hydratedResult
                                                 | None ->
                                                     let unauthenticatedGit =
                                                         createGit cloneOptions
@@ -484,7 +521,10 @@ let cloneRepository
                                                             normalizedTargetPath
                                                             safeBranch
 
-                                                    return! hydrateIfRequested None unauthenticatedCloneResult
+                                                    let! hydratedResult =
+                                                        hydrateIfRequested None unauthenticatedCloneResult
+
+                                                    return! finalizeCloneOutcome hydratedResult
                             with error ->
                                 return errorResult error
     }

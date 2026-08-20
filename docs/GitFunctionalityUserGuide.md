@@ -34,6 +34,7 @@ previewGitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitPullPreflightR
 gitFetch: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
 gitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
 gitPush: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
+gitCancelOperation: GitCancelOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
 gitInitRepository: string -> JS.Promise<Result<string, string>>
 gitAddRemote: GitRemoteConfigRequest -> JS.Promise<Result<GitOperationResult, string>>
 gitCloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, string>>
@@ -371,6 +372,8 @@ Operations not wrapped:
 - System Git LFS install.
 
 Progress is sent through `IMainUpdateRendererApi.gitProgressUpdate`. Fetch, preview pull, pull, push, and clone can report progress. Clone only reports progress when Main can resolve a vault from the IPC window id; otherwise the clone still runs.
+
+Fetch, preview pull, pull, push, clone, and Git LFS transfers can be cancelled with `gitCancelOperation`. The request's `TargetPath` is `None` for operations on the active ARC; for clone it must carry the clone target path because no vault window exists yet. Cancellation kills the underlying git process, then restores a clean repository state: a cancelled pull aborts any half-applied merge or rebase, and a cancelled clone deletes the partially cloned target directory. Failures raised while the operation's cancellation scope has a pending cancel request report `GitFailureKind.Canceled` — with the shared `GitOperationCancelledMessage` for fetch, preview pull, pull, and push, and with a clone-specific message for cancelled ARC downloads; the renderer classifies cancellations by that structured kind (or by exact equality with `GitOperationCancelledMessage` on the string-only preview channel), never by matching substrings of git error text. Cancelling after the pull itself has completed (during Git LFS hydration) does not roll the pull back: it reports a successful pull with a `Canceled` warning, and the not-yet-downloaded large files stay as LFS pointers until the next update.
 
 ## 12. Extending Git Functionality
 

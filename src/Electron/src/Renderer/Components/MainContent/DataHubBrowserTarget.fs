@@ -105,7 +105,12 @@ let DataHubBrowserTarget () =
                 ?errorNotice = gitStateCtx.state.ErrorNotice,
                 ?warningNotice = gitStateCtx.state.WarningNotice,
                 busyTestId = "DataHubCloneProgressNotice",
-                errorTestId = "DataHubCloneErrorNotice"
+                errorTestId = "DataHubCloneErrorNotice",
+                ?onCancelOperation =
+                    (match gitStateCtx.state.BusyOperation with
+                     | Some(Renderer.Context.GitWorkflow.GitBusyOperation.CloningRepository _) ->
+                         Some gitStateCtx.cancelOperation
+                     | _ -> None)
             )
             DataHubBrowser.ExplorePanel(
                 accounts = authCtx,
