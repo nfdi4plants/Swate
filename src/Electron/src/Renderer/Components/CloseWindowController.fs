@@ -1,5 +1,4 @@
-module Renderer.Components.CloseWindowController
-
+namespace Renderer.Components
 
 open Feliz
 open Fable.Core
@@ -10,15 +9,16 @@ open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 
+[<Erase; Mangle(false)>]
 type CloseWindowController =
 
     [<ReactComponent>]
-    static member Subscription
+    static member CloseWindowController
         (
             ?onConfirmSave: unit -> JS.Promise<Result<unit, exn>>,
             ?onConfirmClose: unit -> unit,
             ?onCancelClose: unit -> unit
-        ) =
+        ) : ReactElement =
 
         let modalIsOpen, setModalIsOpen = React.useState false
         let errorModal = useErrorModalCtx ()

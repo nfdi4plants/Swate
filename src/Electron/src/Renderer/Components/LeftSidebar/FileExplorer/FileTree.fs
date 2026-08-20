@@ -22,7 +22,7 @@ open Renderer.Components.LeftSidebar.FileExplorer.Types
 module private FileTreeHelper =
 
     type FileTreeDialog =
-        | CreateDialog of ArcExplorerNodeKind
+        | CreateDialog of ArcFilesDiscriminate
         | FileSystemCreateDialog of FileSystemCreateDraft
         | RenameDialog of ArcRenameDraft
         | DeleteDialog of FileItem
@@ -257,13 +257,21 @@ type FileTree =
             setIsDialogBusy false
             setActiveDialog None
 
-        let openCreateModal kind =
-            match kind with
-            | ArcExplorerNodeKind.Note -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesDraftPage)
-            | _ -> openDialog (CreateDialog kind)
+        let openCreateModal kind = openDialog (CreateDialog kind)
 
-        let openFileSystemCreateModal kind item =
-            if canCreateFileSystemItemIn item then
+        let openNoteDraft () =
+            pageStateCtx.setState (Some Renderer.Types.PageState.NotesDraftPage)
+
+        let openFileSystemCreateModal kind (item: FileItem) =
+            if
+                item.IsDirectory
+                && (item.Path
+                    |> Option.map PathHelpers.normalizeCanonicalRelativePath
+                    |> Option.exists (fun path ->
+                        System.String.IsNullOrWhiteSpace path
+                        || ArcEntityPathRules.isGenericFileSystemParentAllowed path
+                    ))
+            then
                 openDialog (FileSystemCreateDialog { Parent = item; Kind = kind })
 
         let requestDeleteItem =
@@ -355,7 +363,7 @@ type FileTree =
                 match activeFileSystemCreateDraft with
                 | None -> closeDialog ()
                 | Some draft ->
-                    match tryGetItemRelativePath draft.Parent with
+                    match draft.Parent.Path |> Option.map PathHelpers.normalizeCanonicalRelativePath with
                     | None -> applyFileSystemCreateError "Could not resolve the selected folder path."
                     | Some parentPath ->
                         setIsDialogBusy true
@@ -404,15 +412,16 @@ type FileTree =
                     "notes"
                     "Create new item in"
                     "swt:fluent--note-add-24-regular"
-                    (fun () -> openCreateModal ArcExplorerNodeKind.Note)
+                    openNoteDraft
                     item
             yield! renameContextMenuItems item
         ]
 
-        let contextMenuConfig: FileTreeContextMenu.ContextMenuConfig = {
+        let contextMenuConfig: ContextMenuConfig = {
             openItem = openPreview
             arcRootPath = appStateCtx
             openCreateModal = openCreateModal
+            openNoteDraft = openNoteDraft
             openFileSystemCreateModal = openFileSystemCreateModal
             requestRenameItem = requestRenameItem
             requestDeleteItem = requestDeleteItem
@@ -471,7 +480,7 @@ type FileTree =
                     newName
 
         let createModalKind =
-            activeCreateKind |> Option.defaultValue ArcExplorerNodeKind.Study
+            activeCreateKind |> Option.defaultValue ArcFilesDiscriminate.Study
 
         let arcCreateModal =
             CreateArcFileModal.Main(
@@ -535,7 +544,12 @@ type FileTree =
                             onCreateItem = createFromItem,
                             getItemActions = itemActions,
                             getItemStatusAction = getItemStatusAction,
-                            canDeleteItem = canDeleteItem,
+                            canDeleteItem =
+                                (fun (item: FileItem) ->
+                                    item.Path
+                                    |> Option.map PathHelpers.normalizeCanonicalRelativePath
+                                    |> Option.exists ArcEntityPathRules.isDeletePathAllowed
+                                ),
                             onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
                             includeDefaultContextMenuItems = false,

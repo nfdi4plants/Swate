@@ -7,60 +7,44 @@ open Renderer.Types
 [<RequireQualifiedAccess>]
 module FileExplorerDeleteHelper =
 
-    let containsPath (paths: string seq) (relativePath: string) =
-        let normalizedTargetPath = PathHelpers.normalizePath relativePath
-
-        paths
-        |> Seq.exists (fun path -> PathHelpers.pathsEqual (PathHelpers.normalizePath path) normalizedTargetPath)
-
     let isSelectionMissing (paths: string seq) (selectionPath: string option) =
-        selectionPath
-        |> Option.map PathHelpers.normalizePath
-        |> Option.exists (fun selectedPath -> containsPath paths selectedPath |> not)
+        selectionPath |> Option.exists (PathHelpers.pathMatchesAny paths >> not)
 
-    let private resetsWhenSelectionIsRemoved =
+    type private PageRefreshBehavior =
+        | Keep
+        | Reload
+        | Reset
+
+    let private pageRefreshBehavior =
         function
-        | PageState.ArcFilePage _
+        | PageState.ArcFilePage _ -> Reset
         | PageState.MarkdownPage _
         | PageState.TextPage _
         | PageState.UnknownPage
-        | PageState.ErrorPage _ -> true
-        | _ -> false
+        | PageState.ErrorPage _ -> Reload
+        | _ -> Keep
 
     let shouldResetPageStateAfterSelectionRemoval (pageState: PageState option) =
-        pageState |> Option.exists resetsWhenSelectionIsRemoved
+        pageState
+        |> Option.exists (
+            pageRefreshBehavior
+            >> function
+                | Keep -> false
+                | _ -> true
+        )
 
-    let private reloadsWhenSelectedFileChanges =
-        function
-        | PageState.MarkdownPage _
-        | PageState.TextPage _
-        | PageState.UnknownPage
-        | PageState.ErrorPage _ -> true
+    let private shouldReloadSelectedFile pageState (entry: FileEntry) =
+        match (entry.lfs |> Option.map _.checkout), (pageState |> Option.map pageRefreshBehavior) with
+        | Some false, _ -> false
+        | _, Some Reload -> true
+        | Some true, None -> true
         | _ -> false
-
-    let private isCheckedOutLfsFile (entry: FileEntry) =
-        entry.lfs |> Option.exists (fun lfsInfo -> lfsInfo.checkout)
-
-    let private isPointerLfsFile (entry: FileEntry) =
-        entry.lfs |> Option.exists (fun lfsInfo -> not lfsInfo.checkout)
-
-    let private shouldReloadSelectedFile pageState entry =
-        if isPointerLfsFile entry then
-            false
-        else
-            match pageState with
-            | Some state -> reloadsWhenSelectedFileChanges state
-            | None -> isCheckedOutLfsFile entry
 
     let private tryFindSelectedFileEntry (fileTree: FileEntry[]) (selectionPath: string option) =
         selectionPath
-        |> Option.map PathHelpers.normalizePath
         |> Option.bind (fun selectedPath ->
             fileTree
-            |> Array.tryFind (fun entry ->
-                not entry.isDirectory
-                && PathHelpers.pathsEqual (PathHelpers.normalizePath entry.path) selectedPath
-            )
+            |> Array.tryFind (fun entry -> not entry.isDirectory && PathHelpers.pathsEqual entry.path selectedPath)
         )
 
     let shouldClearPageStateForLfsPointerSelection
@@ -68,9 +52,10 @@ module FileExplorerDeleteHelper =
         (selectionPath: string option)
         (pageState: PageState option)
         =
-        pageState |> Option.exists resetsWhenSelectionIsRemoved
+        shouldResetPageStateAfterSelectionRemoval pageState
         && (tryFindSelectedFileEntry fileTree selectionPath
-            |> Option.exists isPointerLfsFile)
+            |> Option.bind (fun entry -> entry.lfs |> Option.map _.checkout)
+            |> Option.exists not)
 
     let tryGetReloadableSelectedFilePath
         (fileTree: FileEntry[])

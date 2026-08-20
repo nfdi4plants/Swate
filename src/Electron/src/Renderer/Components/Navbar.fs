@@ -50,8 +50,6 @@ type private Selector =
                 dependencies = [||]
             }
 
-        let selectorControlRef = React.useRef ({ toggle = ignore }: SelectorRef)
-
         let onOpen =
             fun (isOpen: bool) ->
                 if isOpen then
@@ -72,7 +70,6 @@ type private Selector =
             actionbar = Selector.Actionbar(setNewArcModalIsOpen, onArcError),
             onOpenChange = onOpen,
             isLoading = recentArcs.isLoading,
-            controlRef = selectorControlRef,
             ?currentlyOpenArcPath = Renderer.Context.AppStateContext.useAppStateCtx ()
         )
 

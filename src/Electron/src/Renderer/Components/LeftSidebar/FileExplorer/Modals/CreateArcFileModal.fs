@@ -14,21 +14,21 @@ type CreateArcFileModal =
     static member Main
         (
             isOpen: bool,
-            kind: ArcExplorerNodeKind,
+            kind: ArcFilesDiscriminate,
             close: unit -> unit,
-            submit: ArcExplorerNodeKind -> string -> unit,
+            submit: ArcFilesDiscriminate -> string -> unit,
             ?isCreating: bool
         ) =
 
-        let label = ArcExplorerNodeKind.label kind
+        let config = arcCreateKinds |> List.find (fun config -> config.Kind = kind)
         let isCreating = defaultArg isCreating false
 
         Dialog.StringSubmissionDialog(
             isOpen = isOpen,
-            title = $"Add {label}",
-            description = $"Create a new {label.ToLowerInvariant()} in the current ARC.",
+            title = $"Add {config.Label}",
+            description = $"Create a new {config.Label.ToLowerInvariant()} in the current ARC.",
             fieldLabel = "Identifier",
-            initialValue = (arcCreateKindDefaultIdentifier kind),
+            initialValue = $"New {config.Label}",
             close = close,
             submit = (fun identifier -> submit kind identifier),
             validate =
@@ -38,7 +38,7 @@ type CreateArcFileModal =
                     else
                         Error arcCreateIdentifierError
                 ),
-            submitLabel = $"Create {label}",
+            submitLabel = $"Create {config.Label}",
             validationMessage = arcCreateIdentifierError,
             isBusy = isCreating,
             busyLabel = "Creating...",
