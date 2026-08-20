@@ -96,6 +96,8 @@ type ArcSelector =
         (
             recentARCs: ARCPointer[],
             onClick: ARCPointer -> unit,
+            isOpen: bool,
+            setIsOpen: bool -> unit,
             ?rmvRecentArc: ARCPointer -> unit,
             ?actionbar: ReactElement,
             ?potMaxWidth: int,
@@ -106,8 +108,6 @@ type ArcSelector =
         ) =
 
         let debug = defaultArg debug false
-
-        let isOpen, setIsOpen = React.useState (false)
 
         let currentlyOpenArcName =
             currentlyOpenArcPath
@@ -153,7 +153,7 @@ type ArcSelector =
             match isLoading with
             | Some true ->
                 Html.button [
-                    prop.className "swt:btn swt:btn-sm swt:btn-outline swt:flex-nowrap swt:cursor-not-allowed"
+                    prop.className "swt:btn swt:btn-sm swt:btn-outline swt:w-48 swt:flex-nowrap swt:cursor-not-allowed"
                     prop.disabled true
                     prop.children [
                         Html.span [
@@ -166,16 +166,21 @@ type ArcSelector =
                 Html.button [
                     prop.onClick (fun _ -> setIsOpen (not isOpen))
                     prop.role.button
-                    prop.className "swt:btn swt:btn-sm swt:btn-outline swt:flex-nowrap"
+                    prop.className "swt:btn swt:btn-sm swt:btn-outline swt:w-48 swt:flex-nowrap"
                     if debug then
                         prop.testId "selector-test"
                     prop.children [
                         Html.div [
+                            prop.className "swt:min-w-0 swt:flex-1 swt:truncate swt:text-left"
+                            if debug then
+                                prop.testId "selector-current-arc-name"
                             match currentlyOpenArcName with
-                            | Some name -> prop.text name
+                            | Some name ->
+                                prop.text name
+                                prop.title name
                             | None -> prop.text "Select an ARC"
                         ]
-                        Actionbar.MaterialIcon "swt:fluent--arrow-fit-height-24-regular swt:size-5"
+                        Actionbar.MaterialIcon "swt:fluent--arrow-fit-height-24-regular swt:size-5 swt:shrink-0"
                     ]
                 ]
 
@@ -202,7 +207,6 @@ type ArcSelector =
                         if debug then
                             prop.testId "selector-actionbar"
                         prop.className "swt:w-full"
-                        prop.onClick (fun _ -> setIsOpen false)
                         prop.children [
                             Html.div [
                                 prop.className "swt:flex swt:justify-center swt:w-full"

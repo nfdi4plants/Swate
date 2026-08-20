@@ -300,7 +300,10 @@ type ContextMenu =
                                     ]
                                 ]
                         )
-                )
+                ),
+                // Keep the portal within the owning element's DOM scope so parent
+                // click-away listeners do not treat menu interaction as external.
+                root = ref.current.Value
             )
         else
             Html.none

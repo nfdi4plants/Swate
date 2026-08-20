@@ -20,13 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -   Simplify Electron FileTree ARC creation by using `ArcFilesDiscriminate` throughout, centralizing creation labels, folders, and icons, and handling note drafts separately from ARC file creation.
 -   Consolidate FileTree creation, materialization, rename, and delete path validation around the shared canonical path rules, and share dialog busy-state and error handling across rename and delete operations.
--   Make the reusable ARC selector manage dropdown closing internally after selecting an ARC or invoking an action, remove its imperative controller and embedded demo state, and exercise the public component API directly in Storybook.
+-   Make the reusable ARC selector expose controlled dropdown state, remove its imperative controller and embedded demo state, and exercise the public component API directly in Storybook.
 -   Organize shared FileTree context-menu configuration in the component's shared types and remove redundant FileTree helper wrappers.
 -   Simplify `FileExplorerDeleteHelper` by sharing path comparisons, page-refresh classification, and Git LFS checkout-state handling instead of duplicating those operations.
 -   Align `CloseWindowController` with the reusable React component structure and naming conventions.
 
 ### 🐛 Fixed
 
+-   Keep the ARC selector at a stable width and truncate long ARC names, and close its dropdown only after direct or overflow actions are invoked without dismissing the overflow menu prematurely.
 -   Remap renamed ARC filesystem and active-selection paths only when they match the renamed path or are true descendants, leaving similarly prefixed and unrelated paths unchanged.
 
 ## 2.1.0 - 2026-08-19
