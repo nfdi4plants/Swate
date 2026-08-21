@@ -184,57 +184,56 @@ type FileTree =
             }
             |> Promise.start
 
-        let reloadSelectedPreviewAfterFileTreeUpdate () =
-            let reconciledPageState =
-                FileExplorerDeleteHelper.updatePageStateAfterMissingDataMap
-                    fileStateCtx.state.FileTree
-                    pageStateCtx.state
-
-            if reconciledPageState <> pageStateCtx.state then
-                pageStateCtx.setState reconciledPageState
-            elif
-                FileExplorerDeleteHelper.shouldClearPageStateForLfsPointerSelection
-                    fileStateCtx.state.FileTree
-                    fileStateCtx.state.Selection.TreePath
-                    pageStateCtx.state
-            then
-                pageStateCtx.setState None
-            else
-                match
-                    FileExplorerDeleteHelper.tryGetReloadableSelectedFilePath
-                        fileStateCtx.state.FileTree
-                        fileStateCtx.state.Selection.TreePath
-                        pageStateCtx.state
-                with
-                | None -> ()
-                | Some selectedPath ->
-                    promise {
-                        let! result = openView selectedPath
-
-                        match result with
-                        | Ok pageState -> pageStateCtx.setState (Some pageState)
-                        | Error errorMessage ->
-                            pageStateCtx.setState (
-                                Some(
-                                    Renderer.Types.PageState.ErrorPage
-                                        $"Could not reload preview for '{selectedPath}': {errorMessage}"
-                                )
-                            )
-                    }
-                    |> Promise.catch (fun exn ->
-                        pageStateCtx.setState (
-                            Some(
-                                Renderer.Types.PageState.ErrorPage
-                                    $"Could not reload preview for '{selectedPath}': {exn.Message}"
-                            )
+        let reloadPreviewAfterFileTreeUpdate path transformPageState =
+            promise {
+                match! openView path with
+                | Ok pageState -> pageStateCtx.setState (Some(transformPageState pageState))
+                | Error errorMessage ->
+                    pageStateCtx.setState (
+                        Some(
+                            Renderer.Types.PageState.ErrorPage $"Could not reload preview for '{path}': {errorMessage}"
                         )
                     )
-                    |> Promise.start
+            }
+            |> Promise.catch (fun exn ->
+                pageStateCtx.setState (
+                    Some(Renderer.Types.PageState.ErrorPage $"Could not reload preview for '{path}': {exn.Message}")
+                )
+            )
+            |> Promise.start
 
         React.useEffect (
             (fun () ->
                 if hasObservedFileTreeUpdateRef.current then
-                    reloadSelectedPreviewAfterFileTreeUpdate ()
+                    match
+                        FileExplorerDeleteHelper.tryGetDataMapMismatchReload
+                            fileStateCtx.state.FileTree
+                            pageStateCtx.state
+                    with
+                    | Some(parentPath, requestedView) ->
+                        reloadPreviewAfterFileTreeUpdate
+                            parentPath
+                            (function
+                            | Renderer.Types.PageState.ArcFilePage(nextArcFile, _) ->
+                                Renderer.Types.PageState.ArcFilePage(nextArcFile, requestedView)
+                            | pageState -> pageState
+                            )
+                    | None when
+                        FileExplorerDeleteHelper.shouldClearPageStateForLfsPointerSelection
+                            fileStateCtx.state.FileTree
+                            fileStateCtx.state.Selection.TreePath
+                            pageStateCtx.state
+                        ->
+                        pageStateCtx.setState None
+                    | None ->
+                        match
+                            FileExplorerDeleteHelper.tryGetReloadableSelectedFilePath
+                                fileStateCtx.state.FileTree
+                                fileStateCtx.state.Selection.TreePath
+                                pageStateCtx.state
+                        with
+                        | None -> ()
+                        | Some selectedPath -> reloadPreviewAfterFileTreeUpdate selectedPath id
                 else
                     hasObservedFileTreeUpdateRef.current <- true
             ),
@@ -419,6 +418,19 @@ type FileTree =
                 |> Promise.catch (fun exn -> applyCreateError exn.Message)
                 |> Promise.start
 
+        let tryFindDataMapItemByPath path =
+            fileStateCtx.state.FileTree
+            |> Array.tryFind (fun entry -> PathHelpers.pathsEqual entry.path path)
+            |> Option.map (fun entry ->
+                let item =
+                    Swate.Components.Page.FileExplorer.Types.FileTree.createFile
+                        entry.name
+                        (Some entry.path)
+                        FileItemIcon.Document
+
+                { item with Id = entry.path }
+            )
+
         let itemActions item = [
             yield!
                 rootFolderContextMenuItems
@@ -435,6 +447,7 @@ type FileTree =
             arcRootPath = appStateCtx
             openCreateModal = openCreateModal
             createDataMap = createDataMap
+            tryFindDataMapItemByPath = tryFindDataMapItemByPath
             openFileSystemCreateModal = openFileSystemCreateModal
             requestRenameItem = requestRenameItem
             requestDeleteItem = requestDeleteItem

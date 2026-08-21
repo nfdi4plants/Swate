@@ -31,25 +31,30 @@ module FileExplorerDeleteHelper =
     let shouldResetPageStateAfterSelectionRemoval (pageState: PageState option) =
         pageState |> Option.exists resetsWhenSelectionIsRemoved
 
-    let updatePageStateAfterMissingDataMap (fileTree: FileEntry[]) (pageState: PageState option) =
+    let tryGetDataMapMismatchReload (fileTree: FileEntry[]) (pageState: PageState option) =
         match pageState with
-        | Some(PageState.ArcFilePage(arcFile, requestedView)) when arcFile.TryGetDataMap().IsSome ->
+        | Some(PageState.ArcFilePage(arcFile, requestedView)) ->
             match arcFile.TryGetDataMapParentInfo() with
-            | Some parentInfo when
-                containsPath (fileTree |> Array.map _.path) (DatamapParentInfo.toPath parentInfo)
-                |> not
-                ->
-                let nextArcFile = ArcFiles.refreshRef arcFile
-                nextArcFile.TrySetParentDataMap None |> ignore
+            | Some parentInfo ->
+                let treeHasDataMap =
+                    containsPath (fileTree |> Array.map _.path) (DatamapParentInfo.toPath parentInfo)
 
-                let nextRequestedView =
-                    match requestedView with
-                    | Some ActiveView.DataMap -> Some ActiveView.Metadata
-                    | _ -> requestedView
+                let pageHasDataMap = arcFile.TryGetDataMap().IsSome
 
-                Some(PageState.ArcFilePage(nextArcFile, nextRequestedView))
-            | _ -> pageState
-        | _ -> pageState
+                if treeHasDataMap = pageHasDataMap then
+                    None
+                else
+                    arcFile.TryGetRelativePath()
+                    |> Option.map (fun parentPath ->
+                        let nextRequestedView =
+                            match treeHasDataMap, requestedView with
+                            | false, Some ActiveView.DataMap -> Some ActiveView.Metadata
+                            | _ -> requestedView
+
+                        PathHelpers.normalizePath parentPath, nextRequestedView
+                    )
+            | None -> None
+        | _ -> None
 
     let private reloadsWhenSelectedFileChanges =
         function

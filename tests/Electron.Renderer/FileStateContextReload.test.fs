@@ -213,7 +213,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "DataMap deletion removes it from the open parent preview and leaves DataMap view",
+            "DataMap tree changes reload a stale open parent preview",
             fun () ->
                 let assay = ArcAssay.init "DataMapAssay"
                 assay.DataMap <- Some(DataMap.init ())
@@ -225,29 +225,24 @@ Vitest.describe (
                     FileEntry.create ("isa.datamap.xlsx", "assays/DataMapAssay/isa.datamap.xlsx", false, None)
                 |]
 
-                let unchangedPageState =
-                    FileExplorerDeleteHelper.updatePageStateAfterMissingDataMap fileTreeWithDataMap pageState
-
-                match unchangedPageState with
-                | Some(RendererPageState.ArcFilePage(unchangedArcFile, _)) ->
-                    Vitest.expect(unchangedArcFile.TryGetDataMap().IsSome).toBe (true)
-                | _ -> failwith "Expected the open assay preview to remain active."
+                Vitest
+                    .expect(FileExplorerDeleteHelper.tryGetDataMapMismatchReload fileTreeWithDataMap pageState)
+                    .toEqual (None)
 
                 let fileTree = [|
                     FileEntry.create ("DataMapAssay", "assays/DataMapAssay", true, None)
                     FileEntry.create ("isa.assay.xlsx", "assays/DataMapAssay/isa.assay.xlsx", false, None)
                 |]
 
-                let nextPageState =
-                    FileExplorerDeleteHelper.updatePageStateAfterMissingDataMap fileTree pageState
+                Vitest
+                    .expect(FileExplorerDeleteHelper.tryGetDataMapMismatchReload fileTree pageState)
+                    .toEqual (Some("assays/DataMapAssay/isa.assay.xlsx", Some ActiveView.Metadata))
 
-                match nextPageState with
-                | Some(RendererPageState.ArcFilePage(nextArcFile, requestedView)) ->
-                    Vitest.expect(nextArcFile.TryGetDataMap().IsNone).toBe (true)
-                    Vitest.expect(requestedView).toEqual (Some ActiveView.Metadata)
-                | _ -> failwith "Expected the open assay preview to remain active."
+                assay.DataMap <- None
 
-                Vitest.expect(assay.DataMap.IsSome).toBe (true)
+                Vitest
+                    .expect(FileExplorerDeleteHelper.tryGetDataMapMismatchReload fileTreeWithDataMap pageState)
+                    .toEqual (Some("assays/DataMapAssay/isa.assay.xlsx", Some ActiveView.DataMap))
         )
 
         Vitest.test (

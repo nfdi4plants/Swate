@@ -16,6 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🔄 Changed
+
+-   Route DataMap creation through the shared ARC add pipeline used by assays, studies, runs, and workflows instead of a dedicated `ArcVault.AddDataMap` path.
+
+### 🐛 Fixed
+
+-   Keep open ARC editors synchronized when DataMaps are added or deleted through the File Explorer or by external filesystem changes.
+-   Show **Delete DataMap**, rather than **Add DataMap**, in the context menu of a collapsed ARC entity folder that already contains a DataMap.
+-   Preserve the disk-derived DataMap static-hash baseline when synchronizing a newly added DataMap back into the in-memory ARC.
+
 ## 2.1.0 - 2026-08-19
 
 ### ✨ Added

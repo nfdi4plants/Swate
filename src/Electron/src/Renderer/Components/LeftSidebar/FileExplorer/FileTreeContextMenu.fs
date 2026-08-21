@@ -22,6 +22,7 @@ type ContextMenuConfig = {
     arcRootPath: string option
     openCreateModal: ArcExplorerNodeKind -> unit
     createDataMap: FileItem -> unit
+    tryFindDataMapItemByPath: string -> FileItem option
     openFileSystemCreateModal: FileSystemItemKind -> FileItem -> unit
     requestRenameItem: FileItem -> unit
     requestDeleteItem: FileItem -> unit
@@ -163,13 +164,28 @@ let tryGetDataMapParentInfo (item: FileItem) =
     else
         None
 
-let dataMapContextMenuItems (createDataMap: FileItem -> unit) (requestDeleteItem: FileItem -> unit) (item: FileItem) =
-    let dataMapItem =
+let dataMapContextMenuItems
+    (createDataMap: FileItem -> unit)
+    (requestDeleteItem: FileItem -> unit)
+    (tryFindDataMapItemByPath: string -> FileItem option)
+    (item: FileItem)
+    =
+    let materializedDataMapItem =
         item.Children
         |> Option.defaultValue []
         |> List.tryFind (fun child -> child.Path |> Option.bind DatamapParentInfo.tryFromPath |> Option.isSome)
 
-    match tryGetDataMapParentInfo item, dataMapItem with
+    let parentInfo = tryGetDataMapParentInfo item
+
+    let dataMapItem =
+        materializedDataMapItem
+        |> Option.orElseWith (fun () ->
+            parentInfo
+            |> Option.map DatamapParentInfo.toPath
+            |> Option.bind tryFindDataMapItemByPath
+        )
+
+    match parentInfo, dataMapItem with
     | Some _, None -> [
         ContextMenuItem.create "Add DataMap" "swt:fluent--database-arrow-up-20-regular" (fun () -> createDataMap item)
       ]
@@ -249,7 +265,7 @@ let createContextMenuItems (config: ContextMenuConfig) arcScopeId =
             openContextMenuItems config item
             copyPathContextMenuItems config.arcRootPath item
             fileSystemCreateContextMenuItems config.openFileSystemCreateModal item
-            dataMapContextMenuItems config.createDataMap config.requestDeleteItem item
+            dataMapContextMenuItems config.createDataMap config.requestDeleteItem config.tryFindDataMapItemByPath item
             Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems
                 item
                 toggleLfsMark

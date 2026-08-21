@@ -54,7 +54,10 @@ let syncAddedArcFileFromPersisted (source: ARC) (target: ARC) (arcFile: ArcFiles
     | ArcFiles.DataMap(Some parentInfo, _) ->
         source.TryGetDataMapParentArcFile parentInfo
         |> Option.bind _.TryGetDataMap()
-        |> Option.iter (setDataMapByParentInfo target parentInfo >> ignore)
+        |> Option.iter (fun persistedDataMap ->
+            target.TryGetDataMapParentArcFile parentInfo
+            |> Option.iter (fun parentArcFile -> parentArcFile.TrySetParentDataMap(Some persistedDataMap) |> ignore)
+        )
     | _ -> ()
 
 /// This function should only be used for partial updates to an ARC based on a file content DTO.
