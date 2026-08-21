@@ -22,7 +22,7 @@ type GitBusyOperation =
     | FetchingFromRemote
     | PullingFromRemote
     | PushingToRemote
-    | CloningRepository
+    | CloningRepository of targetPath: string
     | CommittingSelectedChanges
     | CommittingAllChanges
     | DiscardingSelectedChanges
@@ -181,11 +181,13 @@ type WriteAttemptOutcome =
     | CompletedWithPendingRemoteFailure of WriteSuccess * string
     | RequiresRemoteProjectRename of string
     | RequiresLfsInstall of string
+    | OperationCancelled of string
 
 type private WriteOperationClassification =
     | WriteOperationReady of GitOperationResult
     | WriteOperationNeedsLfsInstall of string
     | WriteOperationRemoteProjectAlreadyExists of string
+    | WriteOperationCancelled of string
 
 type Msg =
     | ResetWorkflow
@@ -247,7 +249,7 @@ type GitDependencies = {
     gitFetch: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitPush: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
-    gitCancelPush: unit -> JS.Promise<Result<GitOperationResult, string>>
+    gitCancelOperation: GitCancelOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitCloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, string>>
     createBranch: GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
     checkoutBranch: GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
@@ -289,7 +291,7 @@ let busyNoticeFromOperation =
     | GitBusyOperation.FetchingFromRemote -> Some "Fetching from remote"
     | GitBusyOperation.PullingFromRemote -> Some "Pulling from remote"
     | GitBusyOperation.PushingToRemote -> Some "Pushing to remote"
-    | GitBusyOperation.CloningRepository -> Some "Cloning repository"
+    | GitBusyOperation.CloningRepository _ -> Some "Cloning repository"
     | GitBusyOperation.CommittingSelectedChanges -> Some "Committing selected changes"
     | GitBusyOperation.CommittingAllChanges -> Some "Committing all changes"
     | GitBusyOperation.DiscardingSelectedChanges -> Some "Discarding selected changes"
@@ -649,7 +651,7 @@ let private busyOperationForWriteRequest =
     | Pull -> GitBusyOperation.PullingFromRemote
     | Push -> GitBusyOperation.PushingToRemote
     | PrimarySave prepared -> prepared.BusyOperation
-    | Clone _ -> GitBusyOperation.CloningRepository
+    | Clone(request, _) -> GitBusyOperation.CloningRepository request.TargetPath
     | CommitSelection prepared -> prepared.BusyOperation
     | CommitAll prepared -> prepared.BusyOperation
     | DiscardSelection _ -> GitBusyOperation.DiscardingSelectedChanges
@@ -678,6 +680,7 @@ let private resolveStaleWriteCompletedCmd request result =
     | Ok(CompletedWithPendingRemoteFailure(success, _)) -> resolveCloneReplyCmd request (Ok success)
     | Ok(RequiresLfsInstall _) -> resolveCloneReplyCmd request (Error staleArcSessionMessage)
     | Ok(RequiresRemoteProjectRename _) -> resolveCloneReplyCmd request (Error staleArcSessionMessage)
+    | Ok(OperationCancelled message) -> resolveCloneReplyCmd request (Error message)
     | Error message -> resolveCloneReplyCmd request (Error message)
 
 let private writeErrorModel (message: string) (model: GitState) = {
@@ -706,6 +709,11 @@ let private classifyWriteResult (busyOperation: GitBusyOperation) (result: Resul
                 |> Option.defaultValue "A DataHub repository with this name already exists."
             )
         )
+    | Ok operationResult when
+        not operationResult.Success
+        && operationResult.FailureKind = Some GitFailureKind.Canceled
+        ->
+        Ok(WriteOperationCancelled(operationResult.Message |> Option.defaultValue GitOperationCancelledMessage))
     | Ok operationResult when not operationResult.Success ->
         Error(
             operationResult.Message
@@ -745,6 +753,7 @@ let private runSimpleWriteAttemptAsync
         | Error message -> return Error message
         | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
         | Ok(WriteOperationRemoteProjectAlreadyExists message) -> return Ok(RequiresRemoteProjectRename message)
+        | Ok(WriteOperationCancelled message) -> return Ok(OperationCancelled message)
         | Ok(WriteOperationReady operationResult) ->
             return! refreshAfterSuccess deps operationResult.WarningMessage GitPageChange.NoChange None
     }
@@ -753,10 +762,11 @@ let private runCloneAttemptAsync (deps: GitDependencies) (request: GitCloneRepos
     let! result = deps.gitCloneRepository request
 
     return
-        match classifyWriteResult GitBusyOperation.CloningRepository result with
+        match classifyWriteResult (GitBusyOperation.CloningRepository request.TargetPath) result with
         | Error message -> Error message
         | Ok(WriteOperationNeedsLfsInstall promptMessage) -> Ok(RequiresLfsInstall promptMessage)
         | Ok(WriteOperationRemoteProjectAlreadyExists message) -> Error message
+        | Ok(WriteOperationCancelled message) -> Ok(OperationCancelled message)
         | Ok(WriteOperationReady operationResult) ->
             Ok(Completed(CloneSuccess(operationResult.Path |> Option.defaultValue request.TargetPath)))
 }
@@ -768,6 +778,7 @@ let private runPullAttemptAsync (deps: GitDependencies) = promise {
     | Error message -> return Error message
     | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
     | Ok(WriteOperationRemoteProjectAlreadyExists message) -> return Error message
+    | Ok(WriteOperationCancelled message) -> return Ok(OperationCancelled message)
     | Ok(WriteOperationReady operationResult) ->
         let! refreshResult = refreshAllAsync deps
 
@@ -813,6 +824,7 @@ let private runCommitAttemptAsync (deps: GitDependencies) (prepared: PreparedCom
         | Error message -> return Error message
         | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
         | Ok(WriteOperationRemoteProjectAlreadyExists message) -> return Error message
+        | Ok(WriteOperationCancelled message) -> return Ok(OperationCancelled message)
         | Ok(WriteOperationReady _) ->
             let! stageResult = deps.gitStagePaths { Pathspecs = prepared.PathsToCommit }
 
@@ -820,6 +832,7 @@ let private runCommitAttemptAsync (deps: GitDependencies) (prepared: PreparedCom
             | Error message -> return Error message
             | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
             | Ok(WriteOperationRemoteProjectAlreadyExists message) -> return Error message
+            | Ok(WriteOperationCancelled message) -> return Ok(OperationCancelled message)
             | Ok(WriteOperationReady _) ->
                 let! commitResult = deps.gitCommit { Message = prepared.NormalizedMessage }
 
@@ -827,6 +840,7 @@ let private runCommitAttemptAsync (deps: GitDependencies) (prepared: PreparedCom
                 | Error message -> return Error message
                 | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
                 | Ok(WriteOperationRemoteProjectAlreadyExists message) -> return Error message
+                | Ok(WriteOperationCancelled message) -> return Ok(OperationCancelled message)
                 | Ok(WriteOperationReady operationResult) ->
                     return! refreshAfterSuccess deps operationResult.WarningMessage GitPageChange.NoChange None
 }
@@ -843,6 +857,7 @@ let private runDiscardAttemptAsync (deps: GitDependencies) (paths: string[]) = p
         | Error message -> return Error message
         | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
         | Ok(WriteOperationRemoteProjectAlreadyExists message) -> return Error message
+        | Ok(WriteOperationCancelled message) -> return Ok(OperationCancelled message)
         | Ok(WriteOperationReady operationResult) ->
             return! refreshAfterSuccess deps operationResult.WarningMessage GitPageChange.Clear (Some None)
 }
@@ -872,6 +887,7 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
     | Error message -> return Error message
     | Ok(RequiresLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
     | Ok(RequiresRemoteProjectRename message) -> return Ok(RequiresRemoteProjectRename message)
+    | Ok(OperationCancelled message) -> return Ok(OperationCancelled message)
     | Ok(Completed(UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, _))) ->
         let localSuccessWithPendingWarning =
             UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, Some pendingPrimarySaveWarning)
@@ -884,6 +900,9 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
             | Ok(WriteOperationNeedsLfsInstall promptMessage) ->
                 return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning promptMessage
             | Ok(WriteOperationRemoteProjectAlreadyExists message) -> return Ok(RequiresRemoteProjectRename message)
+            // The local commit already succeeded, so a cancelled push keeps the saved-locally outcome.
+            | Ok(WriteOperationCancelled message) ->
+                return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning message
             | Ok(WriteOperationReady operationResult) ->
                 return! refreshAfterSuccess deps operationResult.WarningMessage GitPageChange.NoChange None
         }
@@ -905,6 +924,8 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
                 | Ok(WriteOperationNeedsLfsInstall promptMessage) ->
                     return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning promptMessage
                 | Ok(WriteOperationRemoteProjectAlreadyExists message) ->
+                    return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning message
+                | Ok(WriteOperationCancelled message) ->
                     return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning message
                 | Ok(WriteOperationReady _) -> return! runPushAfterLocalCommit ()
             | Ok {
@@ -959,6 +980,7 @@ let private runSaveLfsSettingsAttemptAsync
         | Error message -> return Error message
         | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
         | Ok(WriteOperationRemoteProjectAlreadyExists message) -> return Error message
+        | Ok(WriteOperationCancelled message) -> return Ok(OperationCancelled message)
         | Ok(WriteOperationReady operationResult) ->
             return! refreshAfterSuccess deps operationResult.WarningMessage GitPageChange.NoChange None
     }
@@ -1332,29 +1354,36 @@ let update
     | PullRequested -> model, Cmd.ofMsg (WriteRequested Pull)
     | PushRequested -> model, Cmd.ofMsg (WriteRequested Push)
     | CancelCurrentOperationRequested ->
+        // Clone runs without an ARC window, so its cancellation is addressed by the clone target path.
+        let cancelRequest =
+            match model.BusyOperation with
+            | Some(GitBusyOperation.CloningRepository targetPath) -> { TargetPath = Some targetPath }
+            | _ -> { TargetPath = None }
+
         let nextModel = {
             model with
-                WarningNotice = Some "Canceling push..."
+                WarningNotice = Some "Canceling operation..."
         }
 
         let cmd =
             Cmd.OfPromise.either
-                deps.gitCancelPush
-                ()
+                deps.gitCancelOperation
+                cancelRequest
                 CancelCurrentOperationCompleted
                 (fun err -> CancelCurrentOperationCompleted(Error(string err)))
 
         nextModel, cmd
     | CancelCurrentOperationCompleted(Ok operationResult) when not operationResult.Success ->
         let message =
-            operationResult.Message |> Option.defaultValue "Could not cancel push."
+            operationResult.Message
+            |> Option.defaultValue "Could not cancel the Git operation."
 
         {
             model with
                 ErrorNotice = Some message
                 WarningNotice = None
         },
-        reportErrorCmd deps "Could not cancel push" message
+        reportErrorCmd deps "Could not cancel Git operation" message
     | CancelCurrentOperationCompleted _ -> model, Cmd.none
     | UpdateFromOnlineRequested when model.CurrentArcPath.IsNone -> model, Cmd.none
     | UpdateFromOnlineRequested ->
@@ -1416,6 +1445,15 @@ let update
                         CancelLabel = "Cancel"
                     }
                 PendingRemoteAction = GitPendingRemoteAction.UpdateFromOnline
+        },
+        Cmd.none
+    | UpdatePreflightCompleted(_, Error message) when message = GitOperationCancelledMessage ->
+        {
+            model with
+                BusyOperation = None
+                BusyNotice = None
+                CurrentProgress = None
+                WarningNotice = Some "Git operation cancelled."
         },
         Cmd.none
     | UpdatePreflightCompleted(_, Error message) ->
@@ -1613,6 +1651,17 @@ let update
         nextModel, cmd
     | WriteCompleted(sessionId, request, result) when sessionId <> model.ArcSessionId ->
         model, resolveStaleWriteCompletedCmd request result
+    | WriteCompleted(_, request, Ok(OperationCancelled message)) ->
+        let nextModel = {
+            model with
+                BusyOperation = None
+                BusyNotice = None
+                CurrentProgress = None
+                ErrorNotice = None
+                WarningNotice = Some "Git operation cancelled."
+        }
+
+        nextModel, resolveCloneReplyCmd request (Error message)
     | WriteCompleted(_, request, Error message) ->
         let nextModel = writeErrorModel message model
 
