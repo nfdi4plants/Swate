@@ -156,14 +156,6 @@ let arcCreateContextMenuItems (openCreateModal: ArcExplorerNodeKind -> unit) (it
     else
         []
 
-let tryGetDataMapParentInfo (item: FileItem) =
-    if item.IsDirectory then
-        item.Path
-        |> Option.map (fun path -> ARCtrl.ArcPathHelper.combineMany [| path; DatamapParentInfo.DatamapFileName |])
-        |> Option.bind DatamapParentInfo.tryFromPath
-    else
-        None
-
 let dataMapContextMenuItems
     (createDataMap: FileItem -> unit)
     (requestDeleteItem: FileItem -> unit)
@@ -175,7 +167,11 @@ let dataMapContextMenuItems
         |> Option.defaultValue []
         |> List.tryFind (fun child -> child.Path |> Option.bind DatamapParentInfo.tryFromPath |> Option.isSome)
 
-    let parentInfo = tryGetDataMapParentInfo item
+    let parentInfo =
+        if item.IsDirectory then
+            item.Path |> Option.bind DatamapParentInfo.tryFromFolderPath
+        else
+            None
 
     let dataMapItem =
         materializedDataMapItem

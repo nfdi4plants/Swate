@@ -1,4 +1,4 @@
-module Renderer.Components.MainContent.Helper
+module Renderer.Components.Helper.ArcFileApiHelper
 
 
 open Fable.Core
@@ -11,7 +11,7 @@ let private tryCreateArcFileSaveRequest (arcFile: ArcFiles) : Result<FileContent
     | Some request -> Ok request
     | None -> Error(exn "Saving this file type is not supported in Electron yet.")
 
-let withArcFileRequest
+let private withArcFileRequest
     (arcFile: ArcFiles)
     (execute: FileContentDTO -> JS.Promise<Result<'T, exn>>)
     : JS.Promise<Result<'T, exn>> =
@@ -20,6 +20,9 @@ let withArcFileRequest
         | Error saveError -> return Error saveError
         | Ok request -> return! execute request
     }
+
+let addArcFile (arcFile: ArcFiles) : JS.Promise<Result<unit, exn>> =
+    withArcFileRequest arcFile Api.ipcArcVaultApi.addArcFile
 
 let addArcFileAndOpen (arcFile: ArcFiles) : JS.Promise<Result<FileContentDTO, exn>> =
     withArcFileRequest

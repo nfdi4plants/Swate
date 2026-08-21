@@ -1,7 +1,8 @@
 namespace Renderer.Components.LeftSidebar.FileExplorer
 
 open Renderer.Components.Helper.ArcViewHelper
-open Renderer.Components.FileExplorerDeleteHelper
+open Renderer.Components.Helper
+open Renderer.Components.Helper
 open Renderer.Components.LeftSidebar.FileExplorer.Modals
 open Swate.Components
 open Swate.Components.Page.FileExplorer.Types
@@ -67,10 +68,14 @@ type FileTree =
             (fun () ->
                 let filePaths = fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
 
-                if FileExplorerDeleteHelper.isSelectionMissing filePaths fileStateCtx.state.Selection.TreePath then
+                if
+                    FileExplorerStateReconciliation.isSelectionMissing filePaths fileStateCtx.state.Selection.TreePath
+                then
                     fileStateCtx.setSelection ArcSelection.empty
 
-                    if FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval pageStateCtx.state then
+                    if
+                        FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval pageStateCtx.state
+                    then
                         pageStateCtx.setState None
             ),
             [|
@@ -206,7 +211,7 @@ type FileTree =
             (fun () ->
                 if hasObservedFileTreeUpdateRef.current then
                     match
-                        FileExplorerDeleteHelper.tryGetDataMapMismatchReload
+                        FileExplorerStateReconciliation.tryGetDataMapMismatchReload
                             fileStateCtx.state.FileTree
                             pageStateCtx.state
                     with
@@ -219,7 +224,7 @@ type FileTree =
                             | pageState -> pageState
                             )
                     | None when
-                        FileExplorerDeleteHelper.shouldClearPageStateForLfsPointerSelection
+                        FileExplorerStateReconciliation.shouldClearPageStateForLfsPointerSelection
                             fileStateCtx.state.FileTree
                             fileStateCtx.state.Selection.TreePath
                             pageStateCtx.state
@@ -227,7 +232,7 @@ type FileTree =
                         pageStateCtx.setState None
                     | None ->
                         match
-                            FileExplorerDeleteHelper.tryGetReloadableSelectedFilePath
+                            FileExplorerStateReconciliation.tryGetReloadableSelectedFilePath
                                 fileStateCtx.state.FileTree
                                 fileStateCtx.state.Selection.TreePath
                                 pageStateCtx.state
@@ -326,7 +331,7 @@ type FileTree =
                     setIsDialogBusy true
 
                     promise {
-                        let! createResult = Renderer.Components.MainContent.Helper.addArcFileAndOpen draft.ArcFile
+                        let! createResult = ArcFileApiHelper.addArcFileAndOpen draft.ArcFile
 
                         match createResult with
                         | Error exn ->
@@ -395,16 +400,18 @@ type FileTree =
         let renameContextMenuItems =
             FileTreeContextMenu.renameContextMenuItems requestRenameItem
 
-        let createDataMap item =
-            match FileTreeContextMenu.tryGetDataMapParentInfo item with
+        let createDataMap (item: FileItem) =
+            let parentInfo =
+                if item.IsDirectory then
+                    item.Path |> Option.bind DatamapParentInfo.tryFromFolderPath
+                else
+                    None
+
+            match parentInfo with
             | None -> ()
             | Some parentInfo ->
                 promise {
-                    match!
-                        Renderer.Components.MainContent.Helper.withArcFileRequest
-                            (ArcFiles.DataMap(Some parentInfo, DataMap.init ()))
-                            Api.ipcArcVaultApi.addArcFile
-                    with
+                    match! ArcFileApiHelper.addArcFile (ArcFiles.DataMap(Some parentInfo, DataMap.init ())) with
                     | Error exn -> applyCreateError exn.Message
                     | Ok _ -> ()
                 }

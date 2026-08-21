@@ -3,6 +3,7 @@ module Renderer.Components.MainContent.ArcFilePreviewTarget
 open Feliz
 open Renderer.Components.MainContent
 open Renderer.Components.MainContent.ArcFilePreviewTargetHelper
+open Renderer.Components.Helper
 open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Composite.Widgets.JsonImport.Types
 open Swate.Components
@@ -20,7 +21,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
 
     let setArcFileInMemoryWithErrorModal (nextArcFile: ArcFiles) =
         promise {
-            match! Helper.setArcFileInMemory nextArcFile with
+            match! ArcFileApiHelper.setArcFileInMemory nextArcFile with
             | Ok() -> ()
             | Error exn ->
                 errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not update ARC in memory"))
@@ -44,9 +45,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
         match arcFile.TryGetDataMapParentInfo() with
         | None -> ()
         | Some parentInfo ->
-            Helper.withArcFileRequest
-                (ArcFiles.DataMap(Some parentInfo, ARCtrl.DataMap.init ()))
-                Api.ipcArcVaultApi.addArcFile
+            ArcFileApiHelper.addArcFile (ArcFiles.DataMap(Some parentInfo, ARCtrl.DataMap.init ()))
             |> runDataMapMutation "Could not add DataMap"
 
     let deleteDataMap () =
@@ -78,7 +77,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
                         arcFile
                         request
                         (setArcFilePageState requestedView)
-                        Helper.setArcFileInMemory
+                        ArcFileApiHelper.setArcFileInMemory
             }),
             [| box arcFile; box pageStateCtx |]
         )

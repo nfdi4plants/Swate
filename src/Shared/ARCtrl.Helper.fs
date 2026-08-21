@@ -84,6 +84,16 @@ module ARCtrlHelper =
             | [| RunsFolderName; anyRunName; DatamapFileName |] -> create anyRunName DataMapParent.Run |> Some
             | _ -> None
 
+        let tryFromFolderPath (path: string) =
+            let segments = split path
+
+            match segments with
+            | [| AssaysFolderName; anyAssayName |] -> create anyAssayName DataMapParent.Assay |> Some
+            | [| StudiesFolderName; anyStudyName |] -> create anyStudyName DataMapParent.Study |> Some
+            | [| WorkflowsFolderName; anyWorkflowName |] -> create anyWorkflowName DataMapParent.Workflow |> Some
+            | [| RunsFolderName; anyRunName |] -> create anyRunName DataMapParent.Run |> Some
+            | _ -> None
+
         let toFolderPath (dmpi: DatamapParentInfo) =
             let folderName =
                 match dmpi.Parent with
