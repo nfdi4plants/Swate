@@ -8,9 +8,14 @@ open Swate.Components.Primitive.ErrorModal.Types
 
 let mutable private gitVersionCheckStarted = false
 
-let private isLfsUploadProgress (progress: Swate.Components.Page.GitSidebarTypes.GitSidebarProgress) =
-    progress.Method = Some "lfs"
-    && progress.Stage = Some "Uploading Git LFS objects"
+/// Remote transfer operations run cancellable git processes, so the cancel button is offered for all of them.
+let private isCancellableBusyOperation (busyOperation: Renderer.Context.GitWorkflow.GitBusyOperation) =
+    match busyOperation with
+    | Renderer.Context.GitWorkflow.GitBusyOperation.FetchingFromRemote
+    | Renderer.Context.GitWorkflow.GitBusyOperation.PullingFromRemote
+    | Renderer.Context.GitWorkflow.GitBusyOperation.PushingToRemote
+    | Renderer.Context.GitWorkflow.GitBusyOperation.CloningRepository _ -> true
+    | _ -> false
 
 [<ReactComponent>]
 let Main () =
@@ -94,7 +99,7 @@ let Main () =
         )
     | Some _ ->
         let canCancelOperation =
-            gitStateCtx.state.CurrentProgress |> Option.exists isLfsUploadProgress
+            gitStateCtx.state.BusyOperation |> Option.exists isCancellableBusyOperation
 
         Swate.Components.Page.GitSidebar.Main(
             status = gitStateCtx.state.Status,

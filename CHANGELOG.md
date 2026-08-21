@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ✨ Added
+
+-   Allow canceling in-flight Git network operations (ARC download/clone, fetch, update preview, pull, push, and Git LFS transfers) from the Git sidebar and the DataHub download view. Cancellation kills the underlying git process and restores a clean repository state: a canceled pull aborts any half-applied merge or rebase, and a canceled ARC download removes the partially cloned folder #1306.
+
 ### 🔄 Changed
 
 -   Simplify Electron FileTree ARC creation by using `ArcFilesDiscriminate` throughout, centralizing creation labels, folders, and icons, and handling note drafts separately from ARC file creation.
