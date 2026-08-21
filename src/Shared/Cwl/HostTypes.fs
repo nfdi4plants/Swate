@@ -1,6 +1,8 @@
 /// Host-abstraction data contracts for CWL operations.
 module Swate.Components.Shared.Cwl.HostTypes
 
+open Fable.Core
+
 /// Response after loading a CWL file.
 type LoadCwlResponse = {
     Success: bool
@@ -21,4 +23,12 @@ type SaveCwlResponse = {
 type DialogResult = {
     Canceled: bool
     FilePath: string option
+}
+
+/// Host operations consumed by the shared CWL effect runner.
+type CwlHostApi = {
+    ShowOpenDialog: unit -> JS.Promise<DialogResult>
+    ShowSaveDialog: unit -> JS.Promise<DialogResult>
+    LoadCwlFile: string -> JS.Promise<LoadCwlResponse>
+    SaveCwlFile: string -> string -> JS.Promise<SaveCwlResponse>
 }

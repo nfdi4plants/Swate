@@ -1,6 +1,7 @@
 module Swate.Tests.Cwl.StateReducerTests
 
 open Expecto
+open Swate.Components.Shared.Cwl.EditorTypes
 open Swate.Components.Shared.Cwl.Documents.Common
 open Swate.Components.Shared.Cwl.Documents.Types
 open Swate.Components.Shared.Cwl.State.Actions
@@ -12,10 +13,15 @@ open Swate.Components.Shared.Cwl.State.Types
 
 let private sampleDocument = CommandLineToolDoc(createCommandLineToolModel "v1.2")
 
+let private expectSingleSaveDialog effects =
+    match effects with
+    | [ ShowSaveDialog(requestId, revision) ] -> requestId, revision
+    | _ -> failtestf "Expected one save dialog effect but got %A" effects
+
 let reducerTests =
     testList "Renderer state reducer" [
         test "new document action creates session metadata and focus effect" {
-            let nextState, effects = update (NewDocumentCreated sampleDocument) emptyState
+            let nextState, effects = update (CreateNewRequested CommandLineTool) emptyState
 
             Expect.isSome nextState.Document "Reducer should store the new document"
             Expect.isSome nextState.Meta "Reducer should create document metadata"
@@ -30,7 +36,7 @@ let reducerTests =
         }
 
         test "document update increments revision and derives dirty state" {
-            let state, _ = update (NewDocumentCreated sampleDocument) emptyState
+            let state, _ = update (CreateNewRequested CommandLineTool) emptyState
             let nextState, effects = update (DocumentUpdated sampleDocument) state
 
             Expect.equal effects [] "Pure document updates should not emit effects"
@@ -38,7 +44,7 @@ let reducerTests =
         }
 
         test "leave editor with dirty document opens discard overlay" {
-            let state, _ = update (NewDocumentCreated sampleDocument) emptyState
+            let state, _ = update (CreateNewRequested CommandLineTool) emptyState
             let dirtyState, _ = update (DocumentUpdated sampleDocument) state
             let nextState, _ = update LeaveEditorRequested dirtyState
 
@@ -47,13 +53,13 @@ let reducerTests =
         }
 
         test "save completed updates saved revision and clears dirty state" {
-            let requestId = System.Guid.NewGuid()
-            let state, _ = update (NewDocumentCreated sampleDocument) emptyState
+            let state, _ = update (CreateNewRequested CommandLineTool) emptyState
             let dirtyState, _ = update (DocumentUpdated sampleDocument) state
-            let savingState, _ = update (SavingStarted(requestId, Revision 1)) dirtyState
+            let savingState, effects = update SaveRequested dirtyState
+            let requestId, revision = expectSingleSaveDialog effects
 
             let nextState, _ =
-                update (SaveSucceeded(requestId, Revision 1, "saved.cwl")) savingState
+                update (SaveSucceeded(requestId, revision, "saved.cwl")) savingState
 
             Expect.isFalse (isDirty nextState) "Save completion should align saved revision with current revision"
             Expect.equal (currentFilePath nextState) (Some "saved.cwl") "Save completion should persist the file path"
@@ -65,26 +71,56 @@ let reducerTests =
         }
 
         test "late save completion keeps newer revision dirty" {
-            let requestId = System.Guid.NewGuid()
-            let state, _ = update (NewDocumentCreated sampleDocument) emptyState
+            let state, _ = update (CreateNewRequested CommandLineTool) emptyState
             let dirtyState, _ = update (DocumentUpdated sampleDocument) state
-            let savingState, _ = update (SavingStarted(requestId, Revision 1)) dirtyState
+            let savingState, effects = update SaveRequested dirtyState
+            let requestId, revision = expectSingleSaveDialog effects
             let newerState, _ = update (DocumentUpdated sampleDocument) savingState
 
             let nextState, _ =
-                update (SaveSucceeded(requestId, Revision 1, "saved.cwl")) newerState
+                update (SaveSucceeded(requestId, revision, "saved.cwl")) newerState
 
             Expect.isTrue (isDirty nextState) "Later edits must remain dirty after an older save completes"
         }
 
         test "clear editor state resets pending async request ids" {
-            let requestId = System.Guid.NewGuid()
-            let state, _ = update (NewDocumentCreated sampleDocument) emptyState
-            let savingState, _ = update (SavingStarted(requestId, Revision 0)) state
+            let state, _ = update (CreateNewRequested CommandLineTool) emptyState
+            let savingState, _ = update SaveRequested state
             let nextState, _ = update DiscardConfirmed savingState
 
             Expect.equal nextState.Async.PendingSaveRequestId None "Discard should clear the save request id"
             Expect.equal nextState.Async.PendingLoadRequestId None "Discard should clear the load request id"
+        }
+
+        test "LoadExistingRequested emits ShowOpenDialog" {
+            let nextState, effects = update LoadExistingRequested emptyState
+
+            Expect.isTrue nextState.Async.IsLoading "Load request should set IsLoading"
+            Expect.hasLength effects 1 "Load request should emit one dialog effect"
+        }
+
+        test "PreviewRequested emits pure preview state" {
+            let state, _ = update (CreateNewRequested CommandLineTool) emptyState
+            let nextState, effects = update PreviewRequested state
+
+            Expect.equal effects [] "Preview should not emit file-system effects"
+            Expect.notEqual nextState.Overlay NoOverlay "Preview should open a preview overlay"
+        }
+
+        test "LeaveEditorRequested for clean state clears document immediately" {
+            let state, _ = update (CreateNewRequested CommandLineTool) emptyState
+            let nextState, _ = update LeaveEditorRequested state
+
+            Expect.isNone nextState.Document "Clean leave should clear the document immediately"
+        }
+
+        test "SaveRequested emits ShowSaveDialog with current revision snapshot" {
+            let state, _ = update (CreateNewRequested CommandLineTool) emptyState
+            let dirtyState, _ = update (DocumentUpdated sampleDocument) state
+            let nextState, effects = update SaveRequested dirtyState
+
+            Expect.hasLength effects 1 "Save should emit one dialog effect"
+            Expect.isTrue nextState.Async.IsSaving "Save should set IsSaving"
         }
     ]
 

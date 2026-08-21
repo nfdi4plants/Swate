@@ -3,6 +3,7 @@ module Swate.Components.Shared.Cwl.State.Types
 open System
 open Swate.Components.Shared.Cwl.Documents.Common
 open Swate.Components.Shared.Cwl.Documents.Types
+open Swate.Components.Shared.Cwl.State.Effects
 
 type EditorMeta = {
     DocumentId: DocumentId
@@ -45,4 +46,5 @@ type AppState = {
     Notifications: NotificationState
     Async: AsyncState
     SessionId: int
+    PendingEffects: AppEffect list
 }

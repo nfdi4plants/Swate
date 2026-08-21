@@ -1,6 +1,12 @@
 module Swate.Components.Shared.Cwl.State.Reducer
 
+open System
+open ARCtrl.CWL
+open Swate.Components.Shared.Cwl.CwlDefaults
+open Swate.Components.Shared.Cwl.EditorTypes
 open Swate.Components.Shared.Cwl.Documents.Common
+open Swate.Components.Shared.Cwl.Documents.Types
+open Swate.Components.Shared.Cwl.Adapters.ArCtrlEncode
 open Swate.Components.Shared.Cwl.State.Actions
 open Swate.Components.Shared.Cwl.State.Effects
 open Swate.Components.Shared.Cwl.State.Init
@@ -9,12 +15,22 @@ open Swate.Components.Shared.Cwl.State.Types
 
 let private nextRevision (Revision value) = Revision(value + 1)
 
+let private withEffects (effects: AppEffect list) (state: AppState) =
+    { state with PendingEffects = effects }, effects
+
 let private newMeta filePath = {
     DocumentId = newDocumentId ()
     Revision = Revision 0
     SavedRevision = Revision 0
     FilePath = filePath
 }
+
+let private createDocument kind =
+    match kind with
+    | ProcessingUnitKind.CommandLineTool -> CommandLineToolDoc(createCommandLineToolModel DefaultCwlVersion)
+    | ProcessingUnitKind.Workflow -> WorkflowDoc(createWorkflowModel DefaultCwlVersion)
+    | ProcessingUnitKind.ExpressionTool -> ExpressionToolDoc(createExpressionToolModel DefaultCwlVersion "$(inputs)")
+    | ProcessingUnitKind.Operation -> OperationDoc(createOperationModel DefaultCwlVersion)
 
 let private clearEditorState (state: AppState) = {
     state with
@@ -24,11 +40,14 @@ let private clearEditorState (state: AppState) = {
         Overlay = NoOverlay
         Notifications = emptyNotifications
         Async = emptyAsync
+        PendingEffects = []
 }
 
 let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
     match action with
-    | NewDocumentCreated document ->
+    | CreateNewRequested kind ->
+        let document = createDocument kind
+
         {
             state with
                 Document = Some document
@@ -38,8 +57,21 @@ let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
                 Notifications = emptyNotifications
                 Async = emptyAsync
                 SessionId = state.SessionId + 1
-        },
-        [ FocusMainWindow "session.entry" ]
+        }
+        |> withEffects [ FocusMainWindow "session.entry" ]
+
+    | LoadExistingRequested ->
+        let requestId = Guid.NewGuid()
+
+        {
+            state with
+                Async = {
+                    state.Async with
+                        IsLoading = true
+                        PendingLoadRequestId = Some requestId
+                }
+        }
+        |> withEffects [ ShowOpenDialog requestId ]
 
     | DocumentUpdated document ->
         let nextMeta =
@@ -57,29 +89,34 @@ let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
                     state.Notifications with
                         InfoMessage = None
                 }
-        },
-        []
+        }
+        |> withEffects []
 
-    | SelectionChanged selection -> { state with Selection = selection }, []
+    | SelectionChanged selection -> { state with Selection = selection } |> withEffects []
 
-    | PreviewOpened yaml ->
-        {
-            state with
-                Overlay = PreviewYaml yaml
-        },
-        []
+    | PreviewRequested ->
+        match state.Document with
+        | Some document ->
+            let yaml = document |> toProcessingUnit |> Encode.encodeProcessingUnit
 
-    | PreviewClosed -> { state with Overlay = NoOverlay }, []
+            {
+                state with
+                    Overlay = PreviewYaml yaml
+            }
+            |> withEffects []
+        | None -> state |> withEffects []
+
+    | PreviewClosed -> { state with Overlay = NoOverlay } |> withEffects []
 
     | LeaveEditorRequested ->
         if isDirty state then
-            { state with Overlay = ConfirmDiscard }, []
+            { state with Overlay = ConfirmDiscard } |> withEffects []
         else
-            clearEditorState state, []
+            clearEditorState state |> withEffects []
 
-    | DiscardConfirmed -> clearEditorState state, []
+    | DiscardConfirmed -> clearEditorState state |> withEffects []
 
-    | DiscardCancelled -> { state with Overlay = NoOverlay }, []
+    | DiscardCancelled -> { state with Overlay = NoOverlay } |> withEffects []
 
     | ErrorNotificationSet message ->
         {
@@ -88,8 +125,8 @@ let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
                     state.Notifications with
                         ErrorMessage = message
                 }
-        },
-        []
+        }
+        |> withEffects []
 
     | InfoNotificationSet message ->
         {
@@ -98,33 +135,26 @@ let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
                     state.Notifications with
                         InfoMessage = message
                 }
-        },
-        []
+        }
+        |> withEffects []
 
-    | LoadingStarted requestId ->
-        {
-            state with
-                Async = {
-                    state.Async with
-                        IsLoading = true
-                        PendingLoadRequestId = Some requestId
-                }
-        },
-        []
-
-    | LoadingFinished requestId ->
+    | LoadDialogCompleted(requestId, dialogResult) ->
         match state.Async.PendingLoadRequestId with
         | Some pendingId when pendingId = requestId ->
-            {
-                state with
-                    Async = {
-                        state.Async with
-                            IsLoading = false
-                            PendingLoadRequestId = None
-                    }
-            },
-            []
-        | _ -> state, []
+            match dialogResult.Canceled, dialogResult.FilePath with
+            | true, _
+            | _, None ->
+                {
+                    state with
+                        Async = {
+                            state.Async with
+                                IsLoading = false
+                                PendingLoadRequestId = None
+                        }
+                }
+                |> withEffects []
+            | false, Some filePath -> state |> withEffects [ LoadCwlFile(requestId, filePath) ]
+        | _ -> state |> withEffects []
 
     | LoadSucceeded(requestId, document, filePath) ->
         match state.Async.PendingLoadRequestId with
@@ -142,9 +172,9 @@ let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
                             PendingLoadRequestId = None
                     }
                     SessionId = state.SessionId + 1
-            },
-            [ FocusMainWindow "session.entry" ]
-        | _ -> state, []
+            }
+            |> withEffects [ FocusMainWindow "session.entry" ]
+        | _ -> state |> withEffects []
 
     | LoadFailed(requestId, message) ->
         match state.Async.PendingLoadRequestId with
@@ -160,20 +190,45 @@ let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
                         state.Notifications with
                             ErrorMessage = Some message
                     }
-            },
-            []
-        | _ -> state, []
+            }
+            |> withEffects []
+        | _ -> state |> withEffects []
 
-    | SavingStarted(requestId, _) ->
-        {
-            state with
-                Async = {
-                    state.Async with
-                        IsSaving = true
-                        PendingSaveRequestId = Some requestId
+    | SaveRequested ->
+        match state.Meta with
+        | Some meta ->
+            let requestId = Guid.NewGuid()
+
+            {
+                state with
+                    Async = {
+                        state.Async with
+                            IsSaving = true
+                            PendingSaveRequestId = Some requestId
+                    }
+            }
+            |> withEffects [ ShowSaveDialog(requestId, meta.Revision) ]
+        | None -> state |> withEffects []
+
+    | SaveDialogCompleted(requestId, revision, dialogResult) ->
+        match state.Async.PendingSaveRequestId, state.Document with
+        | Some pendingId, Some document when pendingId = requestId ->
+            match dialogResult.Canceled, dialogResult.FilePath with
+            | true, _
+            | _, None ->
+                {
+                    state with
+                        Async = {
+                            state.Async with
+                                IsSaving = false
+                                PendingSaveRequestId = None
+                        }
                 }
-        },
-        []
+                |> withEffects []
+            | false, Some filePath ->
+                let yaml = document |> toProcessingUnit |> Encode.encodeProcessingUnit
+                state |> withEffects [ SaveCwlFile(requestId, revision, filePath, yaml) ]
+        | _ -> state |> withEffects []
 
     | SaveSucceeded(requestId, savedRevision, filePath) ->
         match state.Async.PendingSaveRequestId, state.Meta with
@@ -202,9 +257,9 @@ let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
                             ErrorMessage = None
                             InfoMessage = Some $"Saved to {filePath}"
                     }
-            },
-            []
-        | _ -> state, []
+            }
+            |> withEffects []
+        | _ -> state |> withEffects []
 
     | SaveFailed(requestId, message) ->
         match state.Async.PendingSaveRequestId with
@@ -220,6 +275,6 @@ let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
                         state.Notifications with
                             ErrorMessage = Some message
                     }
-            },
-            []
-        | _ -> state, []
+            }
+            |> withEffects []
+        | _ -> state |> withEffects []

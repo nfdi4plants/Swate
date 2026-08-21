@@ -59,16 +59,17 @@
     <Compile Include="Cwl\Documents\Types.fs" />
     <Compile Include="Cwl\Documents\Selectors.fs" />
     <Compile Include="Cwl\Documents\Mutations.fs" />
+    <Compile Include="Cwl\State\Effects.fs" />
     <Compile Include="Cwl\State\Types.fs" />
     <Compile Include="Cwl\State\Actions.fs" />
-    <Compile Include="Cwl\State\Effects.fs" />
     <Compile Include="Cwl\State\Init.fs" />
     <Compile Include="Cwl\State\Selectors.fs" />
-    <Compile Include="Cwl\State\Reducer.fs" />
     <Compile Include="Cwl\Adapters\ArCtrlDecode.fs" />
     <Compile Include="Cwl\Adapters\ArCtrlEncode.fs" />
     <Compile Include="Cwl\Adapters\ValidationAdapter.fs" />
     <Compile Include="Cwl\Adapters\WorkflowGraphAdapter.fs" />
+    <Compile Include="Cwl\State\Reducer.fs" />
+    <Compile Include="Cwl\State\EffectRunner.fs" />
     <Compile Include="ArcExplorerNode.fs" />
     <Compile Include="Shared.fs" />
   </ItemGroup>

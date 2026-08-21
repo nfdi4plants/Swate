@@ -31,4 +31,5 @@ let emptyState = {
     Notifications = emptyNotifications
     Async = emptyAsync
     SessionId = 0
+    PendingEffects = []
 }
