@@ -164,7 +164,15 @@ Vitest.describe (
                     let sourcePath = join [| dirname arcPath; "external.txt" |]
                     do! writeRelativeFileAsync (dirname arcPath) "external.txt" "imported content"
 
-                    match! ArcFileSystemHelper.importExternalFilesOnDisk arcPath "assays/AssayA" [| sourcePath |] with
+                    let progress = ResizeArray<float>()
+
+                    match!
+                        ArcFileSystemHelper.importExternalFilesOnDisk
+                            arcPath
+                            "assays/AssayA"
+                            [| sourcePath |]
+                            progress.Add
+                    with
                     | Error error -> failwith error.Message
                     | Ok() ->
                         let importedPath = absoluteArcPath arcPath "assays/AssayA/external.txt"
@@ -173,6 +181,9 @@ Vitest.describe (
                             fsPromisesDynamic?readFile (importedPath, "utf8") |> unbox<JS.Promise<string>>
 
                         Vitest.expect(importedContent).toBe ("imported content")
+                        Vitest.expect(progress.Count).toBe (2)
+                        Vitest.expect(progress.[0]).toBe (0.0)
+                        Vitest.expect(progress.[1]).toBe (1.0)
                 })
         )
 

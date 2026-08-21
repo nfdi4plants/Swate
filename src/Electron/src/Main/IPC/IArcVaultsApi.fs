@@ -385,16 +385,36 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     withLoadedArcVault
                         event
                         (fun vault -> promise {
-                            match!
-                                ArcFileSystemHelper.importExternalFilesOnDisk
-                                    vault.path.Value
-                                    request.targetRelativePath
-                                    request.sourceAbsolutePaths
-                            with
-                            | Error exn -> return Error exn
-                            | Ok() ->
-                                do! vault.RefreshFileTree()
-                                return Ok()
+                            let reportImportProgress progress =
+                                if progress <= 0.0 then
+                                    vault.window.setProgressBar (
+                                        0.0,
+                                        BrowserWindow.SetProgressBar.Options(
+                                            Enums.BrowserWindow.SetProgressBar.Options.Mode.Indeterminate
+                                        )
+                                    )
+                                else
+                                    vault.window.setProgressBar (
+                                        progress,
+                                        BrowserWindow.SetProgressBar.Options(
+                                            Enums.BrowserWindow.SetProgressBar.Options.Mode.Normal
+                                        )
+                                    )
+
+                            try
+                                match!
+                                    ArcFileSystemHelper.importExternalFilesOnDisk
+                                        vault.path.Value
+                                        request.targetRelativePath
+                                        request.sourceAbsolutePaths
+                                        reportImportProgress
+                                with
+                                | Error exn -> return Error exn
+                                | Ok() ->
+                                    do! vault.RefreshFileTree()
+                                    return Ok()
+                            finally
+                                vault.window.setProgressBar -1.0
                         })
             with e ->
                 return Error(exn $"Could not import files: {e.Message}")

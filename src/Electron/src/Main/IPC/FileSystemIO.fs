@@ -209,6 +209,7 @@ module ArcFileSystemHelper =
         (arcPath: string)
         (targetRelativePath: string)
         (sourcePaths: string[])
+        (onProgress: float -> unit)
         : JS.Promise<Result<unit, exn>> =
         promise {
             let normalizedTargetPath =
@@ -228,10 +229,13 @@ module ArcFileSystemHelper =
                 if not targetIsDirectory then
                     return Error(exn $"Cannot import because '{targetRelativePath}' is not a folder.")
                 else
-                    for sourcePath in sourcePaths do
+                    onProgress 0.0
+
+                    for sourceIndex, sourcePath in sourcePaths |> Array.indexed do
                         let sourceAbsolutePath = resolveAbsolutePath sourcePath
                         let targetAbsolutePath = join [| targetDirectory; basename sourceAbsolutePath |]
                         do! copyFileAsync sourceAbsolutePath targetAbsolutePath
+                        onProgress (float (sourceIndex + 1) / float sourcePaths.Length)
 
                     return Ok()
         }

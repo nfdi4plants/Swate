@@ -53,6 +53,7 @@ type FileTree =
         let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
         let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
         let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
+
         let errorModal = useErrorModalCtx ()
 
         let arcScopeId =
@@ -427,18 +428,11 @@ type FileTree =
                             setIsImportingFiles true
 
                             try
-                                // Give React an event-loop turn to render the progress modal before copying starts.
-                                do! Promise.sleep 0
-                                let minimumVisibility = Promise.sleep 300
-
-                                let! result =
+                                return!
                                     Api.ipcArcVaultApi.tryImportExternalFiles {
                                         targetRelativePath = targetRelativePath
                                         sourceAbsolutePaths = sourceAbsolutePaths
                                     }
-
-                                do! minimumVisibility
-                                return result
                             finally
                                 setIsImportingFiles false
                     }
@@ -539,22 +533,20 @@ type FileTree =
                 isRenaming = isDialogBusy
             )
 
-        let importingFilesModal =
+        let importStatusNotice =
             if isImportingFiles then
                 Html.div [
-                    prop.className "swt:modal swt:modal-open"
-                    prop.role "dialog"
-                    prop.custom ("aria-modal", "true")
+                    prop.className
+                        "swt:fixed swt:inset-0 swt:z-50 swt:flex swt:items-center swt:justify-center swt:pointer-events-none"
+                    prop.role "status"
+                    prop.custom ("aria-live", "polite")
                     prop.children [
                         Html.div [
-                            prop.className "swt:modal-box"
+                            prop.className
+                                "swt:alert swt:alert-info swt:w-fit swt:max-w-md swt:shadow-lg swt:pointer-events-auto"
                             prop.children [
-                                Html.h2 [
-                                    prop.className "swt:text-lg swt:font-semibold"
-                                    prop.text "Importing files"
-                                ]
                                 Swate.Components.Primitive.LoadingSpinner.LoadingSpinner.LoadingSpinner(
-                                    text = "Copying the selected files..."
+                                    text = "Importing files..."
                                 )
                             ]
                         ]
@@ -596,7 +588,7 @@ type FileTree =
                 fileSystemCreateModal
                 renameModal
                 deleteConfirmModal
-                importingFilesModal
+                importStatusNotice
             ]
         | None ->
             React.Fragment [
@@ -605,5 +597,5 @@ type FileTree =
                 fileSystemCreateModal
                 renameModal
                 deleteConfirmModal
-                importingFilesModal
+                importStatusNotice
             ]
