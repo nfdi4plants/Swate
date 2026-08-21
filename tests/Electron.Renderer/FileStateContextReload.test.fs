@@ -213,6 +213,44 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "DataMap deletion removes it from the open parent preview and leaves DataMap view",
+            fun () ->
+                let assay = ArcAssay.init "DataMapAssay"
+                assay.DataMap <- Some(DataMap.init ())
+
+                let pageState =
+                    Some(RendererPageState.ArcFilePage(ArcFiles.Assay assay, Some ActiveView.DataMap))
+
+                let fileTreeWithDataMap = [|
+                    FileEntry.create ("isa.datamap.xlsx", "assays/DataMapAssay/isa.datamap.xlsx", false, None)
+                |]
+
+                let unchangedPageState =
+                    FileExplorerDeleteHelper.updatePageStateAfterMissingDataMap fileTreeWithDataMap pageState
+
+                match unchangedPageState with
+                | Some(RendererPageState.ArcFilePage(unchangedArcFile, _)) ->
+                    Vitest.expect(unchangedArcFile.TryGetDataMap().IsSome).toBe (true)
+                | _ -> failwith "Expected the open assay preview to remain active."
+
+                let fileTree = [|
+                    FileEntry.create ("DataMapAssay", "assays/DataMapAssay", true, None)
+                    FileEntry.create ("isa.assay.xlsx", "assays/DataMapAssay/isa.assay.xlsx", false, None)
+                |]
+
+                let nextPageState =
+                    FileExplorerDeleteHelper.updatePageStateAfterMissingDataMap fileTree pageState
+
+                match nextPageState with
+                | Some(RendererPageState.ArcFilePage(nextArcFile, requestedView)) ->
+                    Vitest.expect(nextArcFile.TryGetDataMap().IsNone).toBe (true)
+                    Vitest.expect(requestedView).toEqual (Some ActiveView.Metadata)
+                | _ -> failwith "Expected the open assay preview to remain active."
+
+                Vitest.expect(assay.DataMap.IsSome).toBe (true)
+        )
+
+        Vitest.test (
             "fromFileContentDTO maps markdown files to MarkdownPage",
             fun () ->
                 let dto: FileContentDTO = {|

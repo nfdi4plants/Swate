@@ -94,21 +94,6 @@ type ArcVault(window: BrowserWindow) =
 [<AutoOpen>]
 module ArcVaultExtensions =
 
-    let private tryGetDataMapAccess (arc: ARC) (parentInfo: DatamapParentInfo) =
-        match parentInfo.Parent with
-        | DataMapParent.Assay ->
-            arc.TryGetAssay parentInfo.ParentId
-            |> Option.map (fun assay -> assay.DataMap, fun value -> assay.DataMap <- value)
-        | DataMapParent.Study ->
-            arc.TryGetStudy parentInfo.ParentId
-            |> Option.map (fun study -> study.DataMap, fun value -> study.DataMap <- value)
-        | DataMapParent.Run ->
-            arc.TryGetRun parentInfo.ParentId
-            |> Option.map (fun run -> run.DataMap, fun value -> run.DataMap <- value)
-        | DataMapParent.Workflow ->
-            arc.TryGetWorkflow parentInfo.ParentId
-            |> Option.map (fun workflow -> workflow.DataMap, fun value -> workflow.DataMap <- value)
-
     type ArcVault with
 
         member private this.ApplyWatcherArcMerge(events: FileEvent list) = promise {
@@ -277,50 +262,13 @@ module ArcVaultExtensions =
             | _ -> return Error(exn "ARC is not loaded.")
         }
 
-        member this.AddDataMap
-            (parentInfo: DatamapParentInfo, dataMap: DataMap)
-            : Fable.Core.JS.Promise<Result<unit, exn>> =
-            promise {
-                match this.path, this.arc with
-                | Some arcPath, Some arc ->
-                    let addDataMap =
-                        tryGetDataMapAccess arc parentInfo
-                        |> Option.bind (fun (currentDataMap, setDataMap) ->
-                            if currentDataMap.IsNone then Some setDataMap else None
-                        )
-
-                    match addDataMap with
-                    | None ->
-                        return Error(exn $"ARC parent '{parentInfo.ParentId}' does not exist or already has a DataMap.")
-                    | Some setDataMap ->
-                        let createContracts =
-                            ArcFileCreateContracts.createContracts false (ArcFiles.DataMap(Some parentInfo, dataMap))
-
-                        this.isBusyWriting <- true
-
-                        try
-                            match! fullFillContractBatchAsync arcPath createContracts with
-                            | Error errors ->
-                                return Error(exn $"Could not add DataMap: {PathHelpers.formatContractErrors errors}")
-                            | Ok _ ->
-                                dataMap.StaticHash <- cleanDataMapStaticHash dataMap
-                                setDataMap (Some dataMap)
-                                arc.UpdateFileSystem()
-                                this.RefreshHasUnsavedArcChangesFlag()
-                                do! this.RefreshFileTreeEntry(DatamapParentInfo.toPath parentInfo)
-                                return Ok()
-                        finally
-                            this.isBusyWriting <- false
-                | _ -> return Error(exn "ARC is not loaded.")
-            }
-
         member this.DeleteDataMap(parentInfo: DatamapParentInfo) : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
             match this.path, this.arc with
             | Some arcPath, Some arc ->
                 let contractAndRemove =
-                    tryGetDataMapAccess arc parentInfo
-                    |> Option.bind (fun (currentDataMap, setDataMap) ->
-                        currentDataMap
+                    arc.TryGetDataMapParentArcFile parentInfo
+                    |> Option.bind (fun parentArcFile ->
+                        parentArcFile.TryGetDataMap()
                         |> Option.map (fun dataMap ->
                             let contract =
                                 match parentInfo.Parent with
@@ -329,7 +277,7 @@ module ArcVaultExtensions =
                                 | DataMapParent.Run -> dataMap.ToDeleteContractForRun(parentInfo.ParentId)
                                 | DataMapParent.Workflow -> dataMap.ToDeleteContractForWorkflow(parentInfo.ParentId)
 
-                            contract, fun () -> setDataMap None
+                            contract, fun () -> parentArcFile.TrySetParentDataMap None |> ignore
                         )
                     )
 
@@ -362,8 +310,6 @@ module ArcVaultExtensions =
 
                 match Swate.Electron.Shared.FileIOHelper.FileContentDTO.toArcFile normalizedRequest with
                 | None -> return Error(exn $"Unsupported file type for adding: {normalizedRequest.fileType}")
-                | Some(ArcFiles.DataMap(None, _)) -> return Error(exn "Adding a DataMap requires parent information.")
-                | Some(ArcFiles.DataMap(Some parentInfo, dataMap)) -> return! this.AddDataMap(parentInfo, dataMap)
                 | Some arcFile ->
                     let wasBusyWriting = this.isBusyWriting
                     this.isBusyWriting <- true
@@ -378,6 +324,12 @@ module ArcVaultExtensions =
                                 syncAddedArcFileFromPersisted persistedArc arcLocal arcFile
                                 syncArcStaticHashes persistedArc arcLocal
                                 this.RefreshHasUnsavedArcChangesFlag()
+
+                                match arcFile with
+                                | ArcFiles.DataMap(Some parentInfo, _) ->
+                                    do! this.RefreshFileTreeEntry(DatamapParentInfo.toPath parentInfo)
+                                | _ -> ()
+
                                 return Ok()
                             | Error loadErrors ->
                                 this.RefreshHasUnsavedArcChangesFlag()

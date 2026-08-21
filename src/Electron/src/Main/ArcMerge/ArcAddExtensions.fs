@@ -9,6 +9,17 @@ open Swate.Components.Shared
 [<AutoOpen>]
 module ArcAddExtensions =
 
+    type ARC with
+
+        member this.TryGetDataMapParentArcFile(parentInfo: DatamapParentInfo) =
+            match parentInfo.Parent with
+            | DataMapParent.Assay -> this.TryGetAssay parentInfo.ParentId |> Option.map ArcFiles.Assay
+            | DataMapParent.Study ->
+                this.TryGetStudy parentInfo.ParentId
+                |> Option.map (fun study -> ArcFiles.Study(study, []))
+            | DataMapParent.Run -> this.TryGetRun parentInfo.ParentId |> Option.map ArcFiles.Run
+            | DataMapParent.Workflow -> this.TryGetWorkflow parentInfo.ParentId |> Option.map ArcFiles.Workflow
+
     let private failIfEntityExists (entityKind: string) (identifier: string) (exists: bool) =
         if exists then
             failwith $"ARC already contains {entityKind} with identifier '{identifier}'."
@@ -81,7 +92,18 @@ module ArcAddExtensions =
                 (fun () -> ArcFileCreateContracts.createContracts true (ArcFiles.Workflow workflowCopy))
                 includeUpdateContractsFlag
         | ArcFiles.Investigation _ -> failwith "Adding investigation files is not supported."
-        | ArcFiles.DataMap _ -> failwith "DataMaps use their parent-specific add contract."
+        | ArcFiles.DataMap(None, _) -> failwith "Adding a DataMap requires parent information."
+        | ArcFiles.DataMap(Some parentInfo, dataMap) ->
+            let workingArc = copyArcPreservingStaticHashes sourceArc
+
+            match workingArc.TryGetDataMapParentArcFile parentInfo with
+            | None -> failwith $"ARC parent '{parentInfo.ParentId}' does not exist."
+            | Some parentArcFile when parentArcFile.TryGetDataMap().IsSome ->
+                failwith $"ARC parent '{parentInfo.ParentId}' already has a DataMap."
+            | Some parentArcFile ->
+                parentArcFile.TrySetParentDataMap(Some dataMap) |> ignore
+                workingArc.UpdateFileSystem()
+                workingArc, ArcFileCreateContracts.createContracts false arcFile
         | ArcFiles.Template _ -> failwith "Adding template files is not supported."
 
     let private commitAddedArcFile (targetArc: ARC) (workingArc: ARC) (arcFile: ArcFiles) =
@@ -98,6 +120,15 @@ module ArcAddExtensions =
         | ArcFiles.Workflow workflow ->
             workingArc.TryGetWorkflow workflow.Identifier
             |> Option.iter (fun sourceWorkflow -> targetArc.AddWorkflow(sourceWorkflow.Copy()))
+        | ArcFiles.DataMap(Some parentInfo, _) ->
+            workingArc.TryGetDataMapParentArcFile parentInfo
+            |> Option.bind _.TryGetDataMap()
+            |> Option.iter (fun dataMap ->
+                dataMap.StaticHash <- cleanDataMapStaticHash dataMap
+
+                targetArc.TryGetDataMapParentArcFile parentInfo
+                |> Option.iter (fun parentArcFile -> parentArcFile.TrySetParentDataMap(Some dataMap) |> ignore)
+            )
         | _ -> ()
 
         targetArc.UpdateFileSystem()
@@ -134,19 +165,16 @@ module ArcAddExtensions =
 
         member this.TryAddArcFileAsync(arcPath: string, arcFile: ArcFiles, ?includeUpdateContractsFlag: bool) = crossAsync {
             try
-                match arcFile with
-                | ArcFiles.DataMap _ -> return Error [| "datamap files are added through ArcVault.AddDataMap." |]
-                | _ ->
-                    let workingArc, contracts =
-                        prepareAddContracts this arcFile includeUpdateContractsFlag
+                let workingArc, contracts =
+                    prepareAddContracts this arcFile includeUpdateContractsFlag
 
-                    let! result = fullFillContractBatchAsync arcPath contracts
+                let! result = fullFillContractBatchAsync arcPath contracts
 
-                    match result with
-                    | Ok _ -> commitAddedArcFile this workingArc arcFile
-                    | Error _ -> ()
+                match result with
+                | Ok _ -> commitAddedArcFile this workingArc arcFile
+                | Error _ -> ()
 
-                    return result
+                return result
             with error ->
                 return Error [| error.Message |]
         }

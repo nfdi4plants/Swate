@@ -3,6 +3,7 @@ module Renderer.Components.FileExplorerDeleteHelper
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Renderer.Types
+open Swate.Components.Page.ArcFileEditor.Types
 
 [<RequireQualifiedAccess>]
 module FileExplorerDeleteHelper =
@@ -29,6 +30,26 @@ module FileExplorerDeleteHelper =
 
     let shouldResetPageStateAfterSelectionRemoval (pageState: PageState option) =
         pageState |> Option.exists resetsWhenSelectionIsRemoved
+
+    let updatePageStateAfterMissingDataMap (fileTree: FileEntry[]) (pageState: PageState option) =
+        match pageState with
+        | Some(PageState.ArcFilePage(arcFile, requestedView)) when arcFile.TryGetDataMap().IsSome ->
+            match arcFile.TryGetDataMapParentInfo() with
+            | Some parentInfo when
+                containsPath (fileTree |> Array.map _.path) (DatamapParentInfo.toPath parentInfo)
+                |> not
+                ->
+                let nextArcFile = ArcFiles.refreshRef arcFile
+                nextArcFile.TrySetParentDataMap None |> ignore
+
+                let nextRequestedView =
+                    match requestedView with
+                    | Some ActiveView.DataMap -> Some ActiveView.Metadata
+                    | _ -> requestedView
+
+                Some(PageState.ArcFilePage(nextArcFile, nextRequestedView))
+            | _ -> pageState
+        | _ -> pageState
 
     let private reloadsWhenSelectedFileChanges =
         function

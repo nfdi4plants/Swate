@@ -185,7 +185,14 @@ type FileTree =
             |> Promise.start
 
         let reloadSelectedPreviewAfterFileTreeUpdate () =
-            if
+            let reconciledPageState =
+                FileExplorerDeleteHelper.updatePageStateAfterMissingDataMap
+                    fileStateCtx.state.FileTree
+                    pageStateCtx.state
+
+            if reconciledPageState <> pageStateCtx.state then
+                pageStateCtx.setState reconciledPageState
+            elif
                 FileExplorerDeleteHelper.shouldClearPageStateForLfsPointerSelection
                     fileStateCtx.state.FileTree
                     fileStateCtx.state.Selection.TreePath

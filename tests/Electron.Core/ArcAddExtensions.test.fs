@@ -101,7 +101,12 @@ Vitest.describe (
                         vault.path <- Some arcPath
                         vault.SetArc arc
 
-                        match! vault.AddDataMap(parentInfo, DataMap.init ()) with
+                        let request =
+                            FileContentDTO.fromArcFile (ArcFiles.DataMap(Some parentInfo, DataMap.init ()))
+                            |> expectSome
+                            <| "Expected DataMap DTO."
+
+                        match! vault.AddArcFile request with
                         | Error error -> failwith error.Message
                         | Ok() -> ()
 
@@ -141,7 +146,12 @@ Vitest.describe (
 
                         let parentInfo = DatamapParentInfo.create "DataMapAssay" DataMapParent.Assay
 
-                        match! vault.AddDataMap(parentInfo, DataMap.init ()) with
+                        let request =
+                            FileContentDTO.fromArcFile (ArcFiles.DataMap(Some parentInfo, DataMap.init ()))
+                            |> expectSome
+                            <| "Expected DataMap DTO."
+
+                        match! vault.AddArcFile request with
                         | Error error -> failwith error.Message
                         | Ok() -> ()
 
@@ -349,7 +359,7 @@ Vitest.describe (
 
                         let unsupportedArcFiles = [|
                             ArcFiles.Investigation(ArcInvestigation("Investigation")), "investigation"
-                            ArcFiles.DataMap(None, DataMap.init ()), "datamap"
+                            ArcFiles.DataMap(None, DataMap.init ()), "parent information"
                             ArcFiles.Template(Template.init "Template"), "template"
                         |]
 
