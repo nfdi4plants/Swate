@@ -276,9 +276,7 @@ Vitest.describe (
                     |> List.find (fun item -> item.Label = "Add DataMap")
 
                 addDataMap.OnClick()
-                Vitest
-                    .expect(requestedParentInfo)
-                    .toEqual (Some(DatamapParentInfo.create "AssayA" DataMapParent.Assay))
+                Vitest.expect(requestedParentInfo).toEqual (Some(DatamapParentInfo.create "AssayA" DataMapParent.Assay))
 
                 let dataMapItem =
                     createFileItem DatamapParentInfo.DatamapFileName (Some "assays/AssayA/isa.datamap.xlsx")
