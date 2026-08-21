@@ -12,6 +12,7 @@ type AppAction =
     | LoadExistingRequested
     | DocumentUpdated of EditorDocument
     | SelectionChanged of SelectionState
+    | PreviewOpened of string
     | PreviewRequested
     | PreviewClosed
     | LeaveEditorRequested

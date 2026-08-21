@@ -54,16 +54,29 @@ let private metadataOption (metadata: MetadataMap) =
     else
         Some(populateDynamicObj metadata)
 
-let private setMetadata (metadata: MetadataMap) (target: obj) =
-    match target with
-    | :? CWLToolDescription as tool -> tool.Metadata <- metadataOption metadata
-    | :? CWLWorkflowDescription as workflow -> workflow.Metadata <- metadataOption metadata
-    | :? CWLExpressionToolDescription as expressionTool -> expressionTool.Metadata <- metadataOption metadata
-    | :? CWLOperationDescription as operation -> operation.Metadata <- metadataOption metadata
-    | :? DynamicObj as dynamicObj ->
-        metadata
-        |> Map.iter (fun key value -> dynamicObj.SetProperty(key, metadataValueToObj value))
-    | _ -> ()
+let private setInputMetadata (metadata: MetadataMap) (target: CWLInput) =
+    metadata
+    |> Map.iter (fun key value -> target.SetProperty(key, metadataValueToObj value))
+
+let private setOutputMetadata (metadata: MetadataMap) (target: CWLOutput) =
+    metadata
+    |> Map.iter (fun key value -> target.SetProperty(key, metadataValueToObj value))
+
+let private setToolMetadata (metadata: MetadataMap) (target: CWLToolDescription) =
+    target.Metadata <- metadataOption metadata
+
+let private setWorkflowMetadata (metadata: MetadataMap) (target: CWLWorkflowDescription) =
+    target.Metadata <- metadataOption metadata
+
+let private setExpressionToolMetadata (metadata: MetadataMap) (target: CWLExpressionToolDescription) =
+    target.Metadata <- metadataOption metadata
+
+let private setOperationMetadata (metadata: MetadataMap) (target: CWLOperationDescription) =
+    target.Metadata <- metadataOption metadata
+
+let private setWorkflowStepMetadata (metadata: MetadataMap) (target: WorkflowStep) =
+    metadata
+    |> Map.iter (fun key value -> target.SetProperty(key, metadataValueToObj value))
 
 let private asResizeArray<'T> (values: 'T seq) = ResizeArray<'T>(values)
 
@@ -105,7 +118,7 @@ let private encodeInput (input: InputModel) =
             optional = input.Optional
         )
 
-    setMetadata input.Metadata encoded
+    setInputMetadata input.Metadata encoded
     encoded
 
 let private encodeOutput (output: OutputModel) =
@@ -123,7 +136,7 @@ let private encodeOutput (output: OutputModel) =
             ?outputSource = outputSource
         )
 
-    setMetadata output.Metadata encoded
+    setOutputMetadata output.Metadata encoded
     encoded
 
 let private orderedRequirementFields (fields: StringMap) =
@@ -262,7 +275,7 @@ let rec private encodeCommandLineTool (model: CommandLineToolModel) =
     encoded.Inputs <- model.Inputs |> List.map encodeInput |> asResizeArray |> Some
     encoded.Requirements <- encodeRequirements model.Requirements
     encoded.Hints <- encodeHints model.Hints
-    setMetadata model.Metadata encoded
+    setToolMetadata model.Metadata encoded
     encoded
 
 and private encodeWorkflow (model: WorkflowModel) =
@@ -277,7 +290,7 @@ and private encodeWorkflow (model: WorkflowModel) =
     encoded.Intent <- optionalResizeArray model.Intent
     encoded.Requirements <- encodeRequirements model.Requirements
     encoded.Hints <- encodeHints model.Hints
-    setMetadata model.Metadata encoded
+    setWorkflowMetadata model.Metadata encoded
     encoded
 
 and private encodeExpressionTool (model: ExpressionToolModel) =
@@ -289,7 +302,7 @@ and private encodeExpressionTool (model: ExpressionToolModel) =
     encoded.Inputs <- model.Inputs |> List.map encodeInput |> asResizeArray |> Some
     encoded.Requirements <- encodeRequirements model.Requirements
     encoded.Hints <- encodeHints model.Hints
-    setMetadata model.Metadata encoded
+    setExpressionToolMetadata model.Metadata encoded
     encoded
 
 and private encodeOperation (model: OperationModel) =
@@ -303,7 +316,7 @@ and private encodeOperation (model: OperationModel) =
     encoded.Intent <- optionalResizeArray model.Intent
     encoded.Requirements <- encodeRequirements model.Requirements
     encoded.Hints <- encodeHints model.Hints
-    setMetadata model.Metadata encoded
+    setOperationMetadata model.Metadata encoded
     encoded
 
 and private encodeWorkflowRun (stepModel: WorkflowStepModel) =
@@ -335,7 +348,7 @@ and private encodeWorkflowStep (model: WorkflowStepModel) =
     let encoded =
         WorkflowStep(model.Name, stepInputs, stepOutputs, encodeWorkflowRun model)
 
-    setMetadata model.Metadata encoded
+    setWorkflowStepMetadata model.Metadata encoded
 
     match model.Run with
     | ExternalRun _ -> setWorkflowStepExternalRunMetadataFromModel model encoded

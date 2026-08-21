@@ -94,6 +94,13 @@ let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
 
     | SelectionChanged selection -> { state with Selection = selection } |> withEffects []
 
+    | PreviewOpened yaml ->
+        {
+            state with
+                Overlay = PreviewYaml yaml
+        }
+        |> withEffects []
+
     | PreviewRequested ->
         match state.Document with
         | Some document ->

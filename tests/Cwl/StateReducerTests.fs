@@ -107,6 +107,14 @@ let reducerTests =
             Expect.notEqual nextState.Overlay NoOverlay "Preview should open a preview overlay"
         }
 
+        test "PreviewOpened stores supplied YAML in the preview overlay" {
+            let state, _ = update (CreateNewRequested CommandLineTool) emptyState
+            let nextState, effects = update (PreviewOpened "class: CommandLineTool") state
+
+            Expect.equal effects [] "Opening supplied preview YAML should not emit effects"
+            Expect.equal nextState.Overlay (PreviewYaml "class: CommandLineTool") "Preview YAML should be preserved"
+        }
+
         test "LeaveEditorRequested for clean state clears document immediately" {
             let state, _ = update (CreateNewRequested CommandLineTool) emptyState
             let nextState, _ = update LeaveEditorRequested state

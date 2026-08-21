@@ -110,17 +110,6 @@ let rec private metadataValueFromObj (value: obj) =
         |> Map.ofSeq
         |> MetadataObject
         |> Some
-    | :? IDictionary as dictionary ->
-        dictionary
-        |> Seq.cast<DictionaryEntry>
-        |> Seq.choose (fun entry ->
-            match entry.Key with
-            | :? string as key -> metadataValueFromObj entry.Value |> Option.map (fun metadata -> key, metadata)
-            | _ -> None
-        )
-        |> Map.ofSeq
-        |> MetadataObject
-        |> Some
     | :? IEnumerable as items ->
         items
         |> Seq.cast<obj>
@@ -130,15 +119,7 @@ let rec private metadataValueFromObj (value: obj) =
         |> Some
     | _ -> invariantText value |> Option.map MetadataString
 
-let private metadataFromMetadataProperty (source: obj) =
-    let metadata =
-        match source with
-        | :? CWLToolDescription as tool -> tool.Metadata
-        | :? CWLWorkflowDescription as workflow -> workflow.Metadata
-        | :? CWLExpressionToolDescription as expressionTool -> expressionTool.Metadata
-        | :? CWLOperationDescription as operation -> operation.Metadata
-        | _ -> None
-
+let private metadataFromMetadataOption (metadata: DynamicObj option) =
     metadata
     |> Option.map (fun dynamicObj ->
         dynamicObj.GetProperties(false)
@@ -147,28 +128,26 @@ let private metadataFromMetadataProperty (source: obj) =
     )
     |> Option.defaultValue emptyMetadataMap
 
-let private metadataFromDynamicObj (excludedKeys: string seq) (source: obj) =
-    let propertyMetadata = metadataFromMetadataProperty source
+let private mergeMetadata baseMetadata additionalMetadata =
+    Map.fold (fun state key value -> Map.add key value state) baseMetadata additionalMetadata
 
-    let dynamicMetadata =
-        match source with
-        | :? DynamicObj as dynamicObj ->
-            let excluded =
-                excludedKeys |> Seq.map (fun key -> key.ToLowerInvariant()) |> Set.ofSeq
+let private metadataFromDynamicObj (excludedKeys: string seq) (source: DynamicObj) =
+    let excluded =
+        excludedKeys |> Seq.map (fun key -> key.ToLowerInvariant()) |> Set.ofSeq
 
-            ARCtrl.CWL.DynamicObjHelpers.dynamicPropertiesExcept Set.empty dynamicObj
-            |> Seq.choose (fun kvp ->
-                let normalizedKey = kvp.Key.ToLowerInvariant()
+    ARCtrl.CWL.DynamicObjHelpers.dynamicPropertiesExcept Set.empty source
+    |> Seq.choose (fun kvp ->
+        let normalizedKey = kvp.Key.ToLowerInvariant()
 
-                if excluded.Contains normalizedKey then
-                    None
-                else
-                    metadataValueFromObj kvp.Value |> Option.map (fun value -> kvp.Key, value)
-            )
-            |> Map.ofSeq
-        | _ -> emptyMetadataMap
+        if excluded.Contains normalizedKey then
+            None
+        else
+            metadataValueFromObj kvp.Value |> Option.map (fun value -> kvp.Key, value)
+    )
+    |> Map.ofSeq
 
-    Map.fold (fun state key value -> Map.add key value state) propertyMetadata dynamicMetadata
+let private metadataFromSource excludedKeys metadata source =
+    mergeMetadata (metadataFromMetadataOption metadata) (metadataFromDynamicObj excludedKeys source)
 
 let private addField key value fields =
     if String.IsNullOrWhiteSpace value then
@@ -202,7 +181,7 @@ let private decodeInput (input: CWLInput) = {
     CwlType = cwlTypeKey input.Type_
     Optional = input.Optional |> Option.defaultValue false
     InputBinding = decodeInputBinding input.InputBinding
-    Metadata = metadataFromDynamicObj [ "name"; "type"; "type_"; "optional"; "inputbinding" ] input
+    Metadata = metadataFromSource [ "name"; "type"; "type_"; "optional"; "inputbinding" ] None input
 }
 
 let private decodeOutput (output: CWLOutput) = {
@@ -211,7 +190,7 @@ let private decodeOutput (output: CWLOutput) = {
     CwlType = cwlTypeKey output.Type_
     OutputBinding = decodeOutputBinding output.OutputBinding
     OutputSource = output.OutputSource |> Option.map joinOutputSource |> Option.defaultValue []
-    Metadata = metadataFromDynamicObj [ "name"; "type"; "type_"; "outputbinding"; "outputsource" ] output
+    Metadata = metadataFromSource [ "name"; "type"; "type_"; "outputbinding"; "outputsource" ] None output
 }
 
 let private decodeRequirement (requirement: Requirement) =
@@ -424,7 +403,7 @@ let rec private decodeCommandLineTool (tool: CWLToolDescription) = {
         |> Seq.map decodeHint
         |> Seq.toList
     Metadata =
-        metadataFromDynamicObj
+        metadataFromSource
             [
                 "cwlversion"
                 "class"
@@ -435,6 +414,7 @@ let rec private decodeCommandLineTool (tool: CWLToolDescription) = {
                 "requirements"
                 "hints"
             ]
+            tool.Metadata
             tool
 }
 
@@ -455,7 +435,7 @@ and private decodeWorkflow (workflow: CWLWorkflowDescription) = {
         |> Seq.map decodeHint
         |> Seq.toList
     Metadata =
-        metadataFromDynamicObj
+        metadataFromSource
             [
                 "cwlversion"
                 "class"
@@ -466,6 +446,7 @@ and private decodeWorkflow (workflow: CWLWorkflowDescription) = {
                 "requirements"
                 "hints"
             ]
+            workflow.Metadata
             workflow
 }
 
@@ -490,7 +471,7 @@ and private decodeExpressionTool (tool: CWLExpressionToolDescription) = {
         |> Seq.map decodeHint
         |> Seq.toList
     Metadata =
-        metadataFromDynamicObj
+        metadataFromSource
             [
                 "cwlversion"
                 "class"
@@ -501,6 +482,7 @@ and private decodeExpressionTool (tool: CWLExpressionToolDescription) = {
                 "requirements"
                 "hints"
             ]
+            tool.Metadata
             tool
 }
 
@@ -520,7 +502,7 @@ and private decodeOperation (operation: CWLOperationDescription) = {
         |> Seq.map decodeHint
         |> Seq.toList
     Metadata =
-        metadataFromDynamicObj
+        metadataFromSource
             [
                 "cwlversion"
                 "class"
@@ -530,6 +512,7 @@ and private decodeOperation (operation: CWLOperationDescription) = {
                 "requirements"
                 "hints"
             ]
+            operation.Metadata
             operation
 }
 
@@ -577,7 +560,7 @@ and private decodeWorkflowStep (step: WorkflowStep) = {
             Metadata = emptyMetadataMap
         })
         |> Seq.toList
-    Metadata = metadataFromDynamicObj [ "id"; "run"; "in"; "out" ] step
+    Metadata = metadataFromSource [ "id"; "run"; "in"; "out" ] None step
 }
 
 let fromProcessingUnit (processingUnit: CWLProcessingUnit) =

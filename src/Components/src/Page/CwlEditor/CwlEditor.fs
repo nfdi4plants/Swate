@@ -1,18 +1,24 @@
 namespace Swate.Components.Page.CwlEditor
 
-open System
 open Browser.Dom
 open Fable.Core
-open Fable.Core.JsInterop
 open Feliz
 open ARCtrl.CWL
-open Swate.Components.Page.CwlEditor.EditorController
+open Swate.Components.Shared.Cwl.Adapters.ArCtrlDecode
+open Swate.Components.Shared.Cwl.Adapters.ArCtrlEncode
+open Swate.Components.Shared.Cwl.Adapters.ValidationAdapter
 open Swate.Components.Shared.Cwl.CommandLineToolMutations
-open Swate.Components.Shared.Cwl.CwlService
+open Swate.Components.Shared.Cwl.Documents.Common
 open Swate.Components.Shared.Cwl.EditorControllerLogic
 open Swate.Components.Shared.Cwl.EditorTypes
 open Swate.Components.Shared.Cwl.ExpressionToolMutations
 open Swate.Components.Shared.Cwl.HostTypes
+open Swate.Components.Shared.Cwl.State.Actions
+open Swate.Components.Shared.Cwl.State.EffectRunner
+open Swate.Components.Shared.Cwl.State.Init
+open Swate.Components.Shared.Cwl.State.Reducer
+open Swate.Components.Shared.Cwl.State.Selectors
+open Swate.Components.Shared.Cwl.State.Types
 open Swate.Components.Shared.Cwl.Validation.ValidationContext
 open Swate.Components.Shared.Cwl.Validation.ValidationEngine
 open Swate.Components.Shared.Cwl.WorkflowMutations
@@ -30,6 +36,47 @@ module private CwlEditorHelpers =
         let target = ev.target :?> Browser.Types.HTMLInputElement
         if isNull target then "" else target.value
 
+    let currentVersionNumber (state: AppState) =
+        let (Revision value) = currentRevision state
+        value
+
+    let currentCwlVersion (document: Swate.Components.Shared.Cwl.Documents.Types.EditorDocument) =
+        match document with
+        | Swate.Components.Shared.Cwl.Documents.Types.CommandLineToolDoc model -> model.CwlVersion
+        | Swate.Components.Shared.Cwl.Documents.Types.WorkflowDoc model -> model.CwlVersion
+        | Swate.Components.Shared.Cwl.Documents.Types.ExpressionToolDoc model -> model.CwlVersion
+        | Swate.Components.Shared.Cwl.Documents.Types.OperationDoc model -> model.CwlVersion
+
+    let initialAppState (initialFile: LoadCwlResponse option) =
+        match initialFile with
+        | Some fileResult ->
+            match tryCreateLoadedState fileResult with
+            | Ok loadedState ->
+                {
+                    emptyState with
+                        Document = Some(fromProcessingUnit loadedState.ProcessingUnit)
+                        Meta =
+                            Some {
+                                DocumentId = newDocumentId ()
+                                Revision = Revision 0
+                                SavedRevision = Revision 0
+                                FilePath = loadedState.FilePath
+                            }
+                        SessionId = 1
+                },
+                None
+            | Error message -> emptyState, Some message
+        | None -> emptyState, None
+
+module private CwlEditorPorts =
+
+    let liveTimerPort: TimerPort = {
+        SetTimeout = fun delay callback -> window.setTimeout ((fun _ -> callback ()), delay)
+        ClearTimeout = fun handle -> window.clearTimeout handle
+    }
+
+    let canceledDialog () = promise { return { Canceled = true; FilePath = None } }
+
 [<Erase; Mangle(false)>]
 type CwlEditor =
 
@@ -37,40 +84,38 @@ type CwlEditor =
     static member private Editor
         (initialFile: LoadCwlResponse option, onDirtyChange: (bool -> unit) option)
         : ReactElement =
-        let initialEditorState, initialLoadError =
-            match initialFile with
-            | Some fileResult ->
-                match tryCreateLoadedState fileResult with
-                | Ok loadedState -> Some loadedState, None
-                | Error message -> None, Some message
-            | None -> None, None
+        let initialState, initialLoadError = initialAppState initialFile
 
-        let editorState, setEditorState =
-            React.useState<EditorState option> (initialEditorState)
+        let state, dispatch =
+            React.useReducer ((fun currentState action -> update action currentState |> fst), initialState)
 
-        let editorSessionId, setEditorSessionId = React.useState (0)
-        let errorMsg, setErrorMsg = React.useState<string option> (None)
-        let infoMsg, setInfoMsg = React.useState<string option> (None)
-        let isLoading, setIsLoading = React.useState (false)
-        let isSaving, setIsSaving = React.useState (false)
-        let selectedInputIndex, setSelectedInputIndex = React.useState<int option> (None)
-        let selectedOutputIndex, setSelectedOutputIndex = React.useState<int option> (None)
-        let selectedStepIndex, setSelectedStepIndex = React.useState<int option> (None)
-        let previewYaml, setPreviewYaml = React.useState<string option> (None)
-        let showDiscardPrompt, setShowDiscardPrompt = React.useState (false)
-        let latestEditorStateRef = React.useRef (editorState)
-        let nextEditorSessionIdRef = React.useRef (0)
+        let selectedInputIndex, setSelectedInputIndex = React.useState<int option> None
+        let selectedOutputIndex, setSelectedOutputIndex = React.useState<int option> None
+        let selectedStepIndex, setSelectedStepIndex = React.useState<int option> None
 
         let host =
             Context.useCwlEditorHostCtx ()
             |> Option.defaultWith (fun () -> failwith "CwlEditor requires a CwlEditorHost context.")
 
-        latestEditorStateRef.current <- editorState
+        let isDirty = isDirty state
 
-        let isDirty =
-            editorState
-            |> Option.map (fun state -> state.IsDirty)
-            |> Option.defaultValue false
+        let resetEditorSelection =
+            React.useCallback (
+                (fun () ->
+                    setSelectedInputIndex None
+                    setSelectedOutputIndex None
+                    setSelectedStepIndex None
+                ),
+                [||]
+            )
+
+        React.useEffect (
+            (fun () ->
+                resetEditorSelection ()
+                fun () -> ()
+            ),
+            [| box state.SessionId |]
+        )
 
         React.useEffect (
             (fun () ->
@@ -83,111 +128,53 @@ type CwlEditor =
             [| box isDirty |]
         )
 
-        let beginEditorSession () =
-            nextEditorSessionIdRef.current <- nextEditorSessionIdRef.current + 1
-            setEditorSessionId nextEditorSessionIdRef.current
+        let hostApi: CwlHostApi = {
+            ShowOpenDialog =
+                fun () ->
+                    match host.pickOpenFile with
+                    | Some pickOpenFile -> pickOpenFile ()
+                    | None -> CwlEditorPorts.canceledDialog ()
+            ShowSaveDialog =
+                fun () ->
+                    match host.pickSavePath with
+                    | Some pickSavePath -> pickSavePath ()
+                    | None ->
+                        match currentFilePath state with
+                        | Some filePath -> promise {
+                            return {
+                                Canceled = false
+                                FilePath = Some filePath
+                            }
+                          }
+                        | None -> CwlEditorPorts.canceledDialog ()
+            LoadCwlFile = host.loadCwlFile
+            SaveCwlFile = host.saveCwlFile
+        }
 
-        let validationResult =
-            React.useMemo (
-                (fun () ->
-                    match editorState with
-                    | Some state -> Some(validateProcessingUnit state.ProcessingUnit Live)
-                    | None -> None
-                ),
-                [| box editorState |]
-            )
-
-        let resetEditorSelection =
-            React.useCallback (
-                (fun () ->
-                    setSelectedInputIndex None
-                    setSelectedOutputIndex None
-                    setSelectedStepIndex None
-                ),
-                [||]
-            )
-
-        let tryLeaveEditor =
-            React.useCallback (
-                (fun (state: EditorState) ->
-                    if state.IsDirty then
-                        setShowDiscardPrompt true
-                    else
-                        resetEditorSelection ()
-                        setEditorState None
-                        setInfoMsg None
-                        setErrorMsg None
-                        setPreviewYaml None
-                ),
-                [| box resetEditorSelection |]
-            )
-
-        let controllerCallbacks: ControllerCallbacks =
+        let ports =
             React.useMemo (
                 (fun () -> {
-                    ResetEditorSelection = resetEditorSelection
-                    SetEditorState =
-                        (fun nextState ->
-                            let shouldBeginSession =
-                                match latestEditorStateRef.current, nextState with
-                                | None, Some _ -> true
-                                | Some currentState, Some nextEditorState ->
-                                    Object.ReferenceEquals(
-                                        currentState.ProcessingUnit,
-                                        nextEditorState.ProcessingUnit
-                                    )
-                                    |> not
-                                | _ -> false
-
-                            setEditorState nextState
-
-                            if shouldBeginSession then
-                                beginEditorSession ()
-                        )
-                    SetErrorMessage = setErrorMsg
-                    SetInfoMessage = setInfoMsg
-                    SetIsLoading = setIsLoading
-                    SetIsSaving = setIsSaving
-                    GetLatestEditorState = (fun () -> latestEditorStateRef.current)
+                    HostApi = hostApi
+                    Timers = CwlEditorPorts.liveTimerPort
                 }),
-                [| box resetEditorSelection |]
+                [| box host; box (currentFilePath state) |]
             )
 
-        let runLoadCwl =
-            React.useCallback (
-                (fun () -> handleLoadCwl host controllerCallbacks ()),
-                [| box host; box controllerCallbacks |]
-            )
-
-        let runSaveCwl =
-            React.useCallback (
-                (fun (state: EditorState) -> handleSaveCwl host controllerCallbacks state),
-                [| box host; box controllerCallbacks |]
-            )
-
-        let runPreviewCwl =
-            React.useCallback (
-                (fun () ->
-                    match latestEditorStateRef.current with
-                    | Some currentState ->
-                        let yaml =
-                            match currentState.FilePath with
-                            | Some filePath -> saveFromEditorForPath currentState filePath
-                            | None -> saveFromEditor currentState
-
-                        setPreviewYaml (Some yaml)
-                    | None -> ()
-                ),
-                [||]
-            )
+        React.useEffect (
+            (fun () ->
+                state.PendingEffects |> List.iter (run ports dispatch)
+                fun () -> ()
+            ),
+            [| box state.PendingEffects |]
+        )
 
         let previewOverlay =
-            match previewYaml with
-            | Some yaml ->
+            match state.Overlay with
+            | PreviewYaml yaml ->
                 Html.div [
                     prop.className
                         "swt:fixed swt:inset-0 swt:bg-black/50 swt:z-50 swt:flex swt:items-center swt:justify-center"
-                    prop.onClick (fun _ -> setPreviewYaml None)
+                    prop.onClick (fun _ -> dispatch PreviewClosed)
                     prop.children [
                         Html.section [
                             prop.className
@@ -205,7 +192,7 @@ type CwlEditor =
                                             prop.testId "cwl-preview-close"
                                             prop.className "swt:btn swt:btn-sm swt:btn-ghost"
                                             prop.text "Close"
-                                            prop.onClick (fun _ -> setPreviewYaml None)
+                                            prop.onClick (fun _ -> dispatch PreviewClosed)
                                         ]
                                     ]
                                 ]
@@ -218,14 +205,15 @@ type CwlEditor =
                         ]
                     ]
                 ]
-            | None -> Html.none
+            | _ -> Html.none
 
         let discardOverlay =
-            if showDiscardPrompt then
+            match state.Overlay with
+            | ConfirmDiscard ->
                 Html.div [
                     prop.className
                         "swt:fixed swt:inset-0 swt:bg-black/50 swt:z-50 swt:flex swt:items-center swt:justify-center"
-                    prop.onClick (fun _ -> setShowDiscardPrompt false)
+                    prop.onClick (fun _ -> dispatch DiscardCancelled)
                     prop.children [
                         Html.section [
                             prop.className
@@ -252,20 +240,13 @@ type CwlEditor =
                                             prop.testId "cwl-discard-cancel"
                                             prop.className "swt:btn swt:btn-sm swt:btn-ghost"
                                             prop.text "Cancel"
-                                            prop.onClick (fun _ -> setShowDiscardPrompt false)
+                                            prop.onClick (fun _ -> dispatch DiscardCancelled)
                                         ]
                                         Html.button [
                                             prop.testId "cwl-discard-confirm"
                                             prop.className "swt:btn swt:btn-sm swt:btn-error"
                                             prop.text "Discard"
-                                            prop.onClick (fun _ ->
-                                                setShowDiscardPrompt false
-                                                resetEditorSelection ()
-                                                setEditorState None
-                                                setInfoMsg None
-                                                setErrorMsg None
-                                                setPreviewYaml None
-                                            )
+                                            prop.onClick (fun _ -> dispatch DiscardConfirmed)
                                         ]
                                     ]
                                 ]
@@ -273,41 +254,44 @@ type CwlEditor =
                         ]
                     ]
                 ]
-            else
-                Html.none
+            | _ -> Html.none
+
+        let processingUnit = state.Document |> Option.map toProcessingUnit
+
+        let commitMutation (mutate: unit -> unit) =
+            match processingUnit with
+            | Some currentProcessingUnit ->
+                mutate ()
+                currentProcessingUnit |> fromProcessingUnit |> DocumentUpdated |> dispatch
+            | None -> ()
+
+        let saveCurrent () =
+            match processingUnit, state.Document with
+            | Some currentProcessingUnit, Some document ->
+                dispatch (ErrorNotificationSet None)
+                dispatch (InfoNotificationSet None)
+
+                let legacyState = {
+                    ProcessingUnit = currentProcessingUnit
+                    Version = currentVersionNumber state
+                    FilePath = currentFilePath state
+                    IsDirty = isDirty
+                    CwlVersion = currentCwlVersion document
+                }
+
+                match ensureCanSave legacyState with
+                | Ok() ->
+                    match host.pickSavePath, currentFilePath state with
+                    | None, None -> dispatch (ErrorNotificationSet(Some "Cannot save: no file path is available."))
+                    | _ -> dispatch SaveRequested
+                | Error message -> dispatch (ErrorNotificationSet(Some message))
+            | _ -> ()
 
         let wrapEditorView (editorView: ReactElement) =
             Html.div [
-                prop.key (string editorSessionId)
+                prop.key (string state.SessionId)
                 prop.children [ editorView; previewOverlay; discardOverlay ]
             ]
-
-        let tryTouchCurrentEditor (processingUnit: CWLProcessingUnit) =
-            match latestEditorStateRef.current with
-            | Some currentState when Object.ReferenceEquals(currentState.ProcessingUnit, processingUnit) ->
-                setEditorState (Some(touch currentState))
-            | _ -> ()
-
-        let commitMutation (mutate: unit -> unit) =
-            mutate ()
-            setInfoMsg None
-
-            match editorState with
-            | Some state -> tryTouchCurrentEditor state.ProcessingUnit
-            | None -> ()
-
-        let setVersion (version: string) =
-            match editorState with
-            | Some state ->
-                setProcessingUnitVersion version state.ProcessingUnit
-                setInfoMsg None
-
-                match latestEditorStateRef.current with
-                | Some currentState when Object.ReferenceEquals(currentState.ProcessingUnit, state.ProcessingUnit) ->
-                    let nextState = touch currentState
-                    setEditorState (Some { nextState with CwlVersion = version })
-                | _ -> ()
-            | None -> ()
 
         match initialLoadError with
         | Some message ->
@@ -317,46 +301,29 @@ type CwlEditor =
                 prop.text message
             ]
         | None ->
-            match editorState with
-            | None ->
+            match state.Document, processingUnit with
+            | None, _ ->
                 StartScreen.StartScreen(
-                    0,
-                    errorMsg,
-                    isLoading,
-                    (fun () -> setErrorMsg None),
+                    currentVersionNumber state,
+                    state.Notifications.ErrorMessage,
+                    state.Async.IsLoading,
+                    (fun () -> dispatch (ErrorNotificationSet None)),
                     (fun kind ->
                         resetEditorSelection ()
-                        setPreviewYaml None
-                        setErrorMsg None
-                        setInfoMsg None
-                        let active: obj = document.activeElement
 
-                        if not (isNull active) && not (isNullOrUndefined active?blur) then
-                            active?blur ()
-
-                        window.setTimeout ((fun _ -> controllerCallbacks.SetEditorState(Some(createNew kind))), 0)
+                        CwlEditorPorts.liveTimerPort.SetTimeout 0 (fun () -> dispatch (CreateNewRequested kind))
                         |> ignore
                     ),
-                    runLoadCwl
+                    (fun () -> dispatch LoadExistingRequested)
                 )
-            | Some state ->
-                let kindLabel =
-                    match state.ProcessingUnit with
-                    | CWLProcessingUnit.CommandLineTool _ -> "CommandLineTool"
-                    | CWLProcessingUnit.Workflow _ -> "Workflow"
-                    | CWLProcessingUnit.ExpressionTool _ -> "ExpressionTool"
-                    | CWLProcessingUnit.Operation _ -> "Operation"
+            | Some document, Some processingUnit ->
+                let validationResult = validateDocument Live document
+                let kindLabel = currentKindLabel state |> Option.defaultValue "Unknown"
+                let fileLabel = currentFilePath state |> Option.defaultValue "unsaved.cwl"
+                let version = currentVersionNumber state
+                let stateCwlVersion = currentCwlVersion document
 
-                let fileLabel =
-                    match state.FilePath with
-                    | Some path -> path
-                    | None -> "unsaved.cwl"
-
-                let currentValidationResult =
-                    validationResult
-                    |> Option.defaultWith (fun () -> validateProcessingUnit state.ProcessingUnit Live)
-
-                match state.ProcessingUnit with
+                match processingUnit with
                 | CWLProcessingUnit.CommandLineTool tool ->
                     let baseCommandValue =
                         tool.BaseCommand
@@ -369,14 +336,14 @@ type CwlEditor =
                     let activeOutputIndex = clampIndex selectedOutputIndex outputs.Count
 
                     CommandLineToolEditor.CommandLineToolEditor(
-                        state.Version,
+                        version,
                         kindLabel,
                         fileLabel,
-                        state.IsDirty,
-                        isSaving,
-                        errorMsg,
-                        infoMsg,
-                        state.CwlVersion,
+                        isDirty,
+                        state.Async.IsSaving,
+                        state.Notifications.ErrorMessage,
+                        state.Notifications.InfoMessage,
+                        stateCwlVersion,
                         intentText tool.Intent,
                         baseCommandValue,
                         tool,
@@ -386,14 +353,16 @@ type CwlEditor =
                         activeOutputIndex,
                         tool.Requirements,
                         tool.Hints,
-                        currentValidationResult,
+                        validationResult,
                         commitMutation,
                         setSelectedInputIndex,
                         setSelectedOutputIndex,
-                        runPreviewCwl,
-                        (fun () -> runSaveCwl state),
-                        (fun () -> tryLeaveEditor state),
-                        setVersion,
+                        (fun () -> dispatch PreviewRequested),
+                        saveCurrent,
+                        (fun () -> dispatch LeaveEditorRequested),
+                        (fun nextVersion ->
+                            commitMutation (fun () -> setProcessingUnitVersion nextVersion processingUnit)
+                        ),
                         (fun value -> commitMutation (fun () -> tool.Intent <- parseIntentText value)),
                         (fun command -> commitMutation (fun () -> setBaseCommand tool command)),
                         (fun key isChecked -> commitMutation (fun () -> setRequirementEnabled tool key isChecked)),
@@ -412,16 +381,16 @@ type CwlEditor =
                     let activeStepIndex = clampIndex selectedStepIndex steps.Count
 
                     WorkflowEditor.WorkflowEditor(
-                        state.Version,
-                        editorSessionId,
+                        version,
+                        state.SessionId,
                         kindLabel,
                         fileLabel,
-                        state.FilePath,
-                        state.IsDirty,
-                        isSaving,
-                        errorMsg,
-                        infoMsg,
-                        state.CwlVersion,
+                        currentFilePath state,
+                        isDirty,
+                        state.Async.IsSaving,
+                        state.Notifications.ErrorMessage,
+                        state.Notifications.InfoMessage,
+                        stateCwlVersion,
                         intentText workflow.Intent,
                         workflow,
                         inputs,
@@ -431,15 +400,17 @@ type CwlEditor =
                         activeStepIndex,
                         workflow.Requirements,
                         workflow.Hints,
-                        currentValidationResult,
+                        validationResult,
                         commitMutation,
                         setSelectedInputIndex,
                         setSelectedOutputIndex,
                         setSelectedStepIndex,
-                        runPreviewCwl,
-                        (fun () -> runSaveCwl state),
-                        (fun () -> tryLeaveEditor state),
-                        setVersion,
+                        (fun () -> dispatch PreviewRequested),
+                        saveCurrent,
+                        (fun () -> dispatch LeaveEditorRequested),
+                        (fun nextVersion ->
+                            commitMutation (fun () -> setProcessingUnitVersion nextVersion processingUnit)
+                        ),
                         (fun value -> commitMutation (fun () -> workflow.Intent <- parseIntentText value)),
                         (fun key isChecked ->
                             commitMutation (fun () -> setWorkflowRequirementEnabled workflow key isChecked)
@@ -451,9 +422,9 @@ type CwlEditor =
                         (fun key field value ->
                             commitMutation (fun () -> setWorkflowHintField workflow key field value)
                         ),
-                        (fun yaml -> setPreviewYaml (Some yaml)),
-                        setInfoMsg,
-                        setErrorMsg
+                        (fun yaml -> dispatch (PreviewOpened yaml)),
+                        (fun message -> dispatch (InfoNotificationSet message)),
+                        (fun message -> dispatch (ErrorNotificationSet message))
                     )
                     |> wrapEditorView
 
@@ -464,14 +435,14 @@ type CwlEditor =
                     let activeOutputIndex = clampIndex selectedOutputIndex outputs.Count
 
                     ExpressionToolEditor.ExpressionToolEditor(
-                        state.Version,
+                        version,
                         kindLabel,
                         fileLabel,
-                        state.IsDirty,
-                        isSaving,
-                        errorMsg,
-                        infoMsg,
-                        state.CwlVersion,
+                        isDirty,
+                        state.Async.IsSaving,
+                        state.Notifications.ErrorMessage,
+                        state.Notifications.InfoMessage,
+                        stateCwlVersion,
                         intentText tool.Intent,
                         tool.Expression,
                         tool,
@@ -481,14 +452,16 @@ type CwlEditor =
                         activeOutputIndex,
                         tool.Requirements,
                         tool.Hints,
-                        currentValidationResult,
+                        validationResult,
                         commitMutation,
                         setSelectedInputIndex,
                         setSelectedOutputIndex,
-                        runPreviewCwl,
-                        (fun () -> runSaveCwl state),
-                        (fun () -> tryLeaveEditor state),
-                        setVersion,
+                        (fun () -> dispatch PreviewRequested),
+                        saveCurrent,
+                        (fun () -> dispatch LeaveEditorRequested),
+                        (fun nextVersion ->
+                            commitMutation (fun () -> setProcessingUnitVersion nextVersion processingUnit)
+                        ),
                         (fun value -> commitMutation (fun () -> tool.Intent <- parseIntentText value)),
                         (fun expression -> commitMutation (fun () -> setExpressionText tool expression)),
                         (fun key isChecked ->
@@ -504,7 +477,6 @@ type CwlEditor =
 
                 | CWLProcessingUnit.Operation operation ->
                     Html.div [
-                        prop.key (string editorSessionId)
                         prop.testId "cwl-operation-editor"
                         prop.className "swt:flex swt:flex-col swt:h-full swt:min-h-0"
                         prop.children [
@@ -562,19 +534,19 @@ type CwlEditor =
                                                                 prop.testId "cwl-operation-preview"
                                                                 prop.className "swt:btn swt:btn-sm swt:btn-ghost"
                                                                 prop.text "Preview"
-                                                                prop.onClick (fun _ -> runPreviewCwl ())
+                                                                prop.onClick (fun _ -> dispatch PreviewRequested)
                                                             ]
                                                             Html.button [
                                                                 prop.testId "cwl-operation-save"
                                                                 prop.className "swt:btn swt:btn-sm swt:btn-primary"
                                                                 prop.text "Save"
-                                                                prop.onClick (fun _ -> runSaveCwl state)
+                                                                prop.onClick (fun _ -> saveCurrent ())
                                                             ]
                                                             Html.button [
                                                                 prop.testId "cwl-operation-back"
                                                                 prop.className "swt:btn swt:btn-sm swt:btn-ghost"
                                                                 prop.text "Back"
-                                                                prop.onClick (fun _ -> tryLeaveEditor state)
+                                                                prop.onClick (fun _ -> dispatch LeaveEditorRequested)
                                                             ]
                                                         ]
                                                     ]
@@ -585,16 +557,15 @@ type CwlEditor =
                                 ]
                             ]
                             previewOverlay
+                            discardOverlay
                         ]
                     ]
+            | Some _, None -> Html.none
 
     [<ReactComponent(true)>]
     static member CwlEditor
-        (
-            ?initialFile: Swate.Components.Shared.Cwl.HostTypes.LoadCwlResponse,
-            ?host: Types.CwlEditorHost,
-            ?onDirtyChange: bool -> unit
-        ) : ReactElement =
+        (?initialFile: LoadCwlResponse, ?host: Types.CwlEditorHost, ?onDirtyChange: bool -> unit)
+        : ReactElement =
         let editor = CwlEditor.Editor(initialFile, onDirtyChange)
 
         match host with
