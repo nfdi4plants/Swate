@@ -92,6 +92,85 @@ let adapterRoundtripTests =
             | _ -> failtest "Expected Workflow document"
         }
 
+        test "workflow decode preserves sequence-style top-level inputs and outputs" {
+            let document =
+                workflowWithSequenceIoYaml
+                |> Decode.decodeCWLProcessingUnit
+                |> fromProcessingUnit
+
+            match document with
+            | WorkflowDoc workflow ->
+                Expect.equal
+                    (workflow.Inputs |> List.map (fun input -> input.Name))
+                    [ "sample_id"; "reads" ]
+                    "Sequence-style workflow inputs should be available to the renderer"
+
+                Expect.equal
+                    (workflow.Outputs |> List.map (fun output -> output.Name))
+                    [ "report" ]
+                    "Sequence-style workflow outputs should be available to the renderer"
+
+                Expect.equal
+                    workflow.Outputs.Head.OutputSource
+                    [ "qc/report" ]
+                    "Sequence-style workflow output sources should survive load"
+
+                let canvasGraph = GraphAdapter.toCanvasGraph workflow
+
+                let readModel =
+                    GraphAdapter.buildWorkflowGraphReadModel workflow (Some workflowWithSequenceIoPath) None
+
+                Expect.isGreaterThan canvasGraph.Nodes.Count 0 "Sequence-style workflow should produce canvas nodes"
+
+                Expect.isGreaterThan canvasGraph.Edges.Count 0 "Sequence-style workflow should produce canvas edges"
+
+                Expect.isGreaterThan
+                    readModel.NodeCount
+                    0
+                    "Sequence-style workflow should produce a read-model node count"
+            | _ -> failtest "Expected Workflow document"
+        }
+
+        test "workflow step decode ignores ARCtrl runtime backing fields as metadata" {
+            let stepInput = StepInput.create ("reads", source = ResizeArray [| "reads" |])
+
+            let step =
+                WorkflowStep.fromRunPath (
+                    "qc",
+                    ResizeArray [| stepInput |],
+                    ResizeArray [| StepOutput.StepOutputString "report" |],
+                    "tools/qc.cwl"
+                )
+
+            step.SetProperty("_id", "runtime-id")
+            step.SetProperty("_in", "runtime-inputs")
+            step.SetProperty("_out", "runtime-outputs")
+
+            let workflow =
+                CWLWorkflowDescription(
+                    ResizeArray [| step |],
+                    ResizeArray [| CWLInput("reads") |],
+                    ResizeArray [| CWLOutput("report") |]
+                )
+
+            match fromProcessingUnit (CWLProcessingUnit.Workflow workflow) with
+            | WorkflowDoc workflowModel ->
+                let metadata = workflowModel.Steps.Head.Metadata
+
+                Expect.isFalse
+                    (metadata |> Map.containsKey "_id")
+                    "Runtime id backing field must not become editor metadata"
+
+                Expect.isFalse
+                    (metadata |> Map.containsKey "_in")
+                    "Runtime input backing field must not become editor metadata"
+
+                Expect.isFalse
+                    (metadata |> Map.containsKey "_out")
+                    "Runtime output backing field must not become editor metadata"
+            | _ -> failtest "Expected Workflow document"
+        }
+
         test "requirements and hints fixture survives adapter encode" {
             let processingUnit = Decode.decodeCWLProcessingUnit toolWithRequirementsAndHintsYaml
             let document = fromProcessingUnit processingUnit

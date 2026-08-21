@@ -39,6 +39,12 @@ let workflowWithExternalRunToolPath =
 let workflowWithExternalRunYaml =
     readFixture [ "workflow-with-external-run"; "main.cwl" ]
 
+let workflowWithSequenceIoPath =
+    combineFixturePath [ "workflow-with-sequence-io"; "main.cwl" ]
+
+let workflowWithSequenceIoYaml =
+    readFixture [ "workflow-with-sequence-io"; "main.cwl" ]
+
 let toolWithRequirementsAndHintsYaml =
     readFixture [ "command-line-tool-with-requirements-hints.cwl" ]
 

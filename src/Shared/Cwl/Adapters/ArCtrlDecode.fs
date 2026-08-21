@@ -156,7 +156,7 @@ let private metadataFromDynamicObj (excludedKeys: string seq) (source: obj) =
             let excluded =
                 excludedKeys |> Seq.map (fun key -> key.ToLowerInvariant()) |> Set.ofSeq
 
-            dynamicObj.GetProperties(false)
+            ARCtrl.CWL.DynamicObjHelpers.dynamicPropertiesExcept Set.empty dynamicObj
             |> Seq.choose (fun kvp ->
                 let normalizedKey = kvp.Key.ToLowerInvariant()
 
