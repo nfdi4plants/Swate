@@ -124,30 +124,49 @@ let useTreeNodeActions
     (loadRequestIdRef: IRefValue<int>)
     (treeState: TreeState<'T>)
     (lookup: TreeRowLookup<'T>)
-    focusedId
-    selectionMode
+    (focusedId: string option)
+    (selectionMode: TreeSelectionMode)
     (effectiveSelectedIdsRef: IRefValue<Set<string>>)
-    setSelection
+    (setSelection: Set<string> -> unit)
     =
     let config = useTreeCtx<'T> ()
 
-    let focusController: TreeFocusController<'T> = {
-        Lookup = lookup
-        SetFocusedId = treeState.SetFocusedId
-        ScrollToIndex = scrollToIndex
+    let configRef = React.useRef config
+    let treeStateRef = React.useRef treeState
+    let lookupRef = React.useRef lookup
+    let focusedIdRef = React.useRef focusedId
+    let selectionModeRef = React.useRef selectionMode
+    let scrollToIndexRef = React.useRef<int -> unit> scrollToIndex
+    let setSelectionRef = React.useRef<Set<string> -> unit> setSelection
+
+    configRef.current <- config
+    treeStateRef.current <- treeState
+    lookupRef.current <- lookup
+    focusedIdRef.current <- focusedId
+    selectionModeRef.current <- selectionMode
+    scrollToIndexRef.current <- scrollToIndex
+    setSelectionRef.current <- setSelection
+
+    let currentFocusController () : TreeFocusController<'T> = {
+        Lookup = lookupRef.current
+        SetFocusedId = treeStateRef.current.SetFocusedId
+        ScrollToIndex = scrollToIndexRef.current
         FocusDom = focusNodeAfterRender treeRef
     }
 
     let loadNode (node: TreeItem<'T>) =
+        let currentConfig = configRef.current
+        let currentTreeState = treeStateRef.current
+
         TreeController.loadBranchChildren
-            config.DataSource
-            config.EnableLazyLoading
+            currentConfig.DataSource
+            currentConfig.EnableLazyLoading
             activeRequestIdsRef
             loadRequestIdRef
-            treeState.LoadedChildren
-            treeState.SetLoadedChildren
-            treeState.SetExpandedIds
-            config.OnError
+            currentTreeState.LoadedChildren
+            currentTreeState.SetLoadedChildren
+            currentTreeState.SetExpandedIds
+            currentConfig.OnError
             node
         |> Promise.start
 
@@ -173,37 +192,46 @@ let useTreeNodeActions
     )
 
     let expandNode (node: TreeItem<'T>) =
+        let currentConfig = configRef.current
+        let currentTreeState = treeStateRef.current
+
         TreeController.expandNode
-            config.DataSource
-            config.EnableLazyLoading
+            currentConfig.DataSource
+            currentConfig.EnableLazyLoading
             activeRequestIdsRef
             loadRequestIdRef
-            treeState.LoadedChildren
-            treeState.ExpandedIds
-            treeState.SetExpandedIds
-            treeState.SetLoadedChildren
-            config.OnError
+            currentTreeState.LoadedChildren
+            currentTreeState.ExpandedIds
+            currentTreeState.SetExpandedIds
+            currentTreeState.SetLoadedChildren
+            currentConfig.OnError
             node
 
     let selectNode (node: TreeItem<'T>) extendSelection =
+        let currentConfig = configRef.current
+
         TreeController.selectNode
-            selectionMode
-            config.SelectionDisabled
-            config.IsNodeSelectable
+            selectionModeRef.current
+            currentConfig.SelectionDisabled
+            currentConfig.IsNodeSelectable
             effectiveSelectedIdsRef.current
-            setSelection
+            setSelectionRef.current
             node
             extendSelection
 
     let onNodeKeyDown (node: TreeItem<'T>) (event: KeyboardEvent) =
         if obj.ReferenceEquals(event.target, event.currentTarget) then
+            let currentConfig = configRef.current
+            let currentTreeState = treeStateRef.current
+            let focusController = currentFocusController ()
+
             match event.key with
             | kbdEventCode.arrowDown ->
                 event.preventDefault ()
-                TreeController.focusByDelta focusController focusedId 1
+                TreeController.focusByDelta focusController focusedIdRef.current 1
             | kbdEventCode.arrowUp ->
                 event.preventDefault ()
-                TreeController.focusByDelta focusController focusedId -1
+                TreeController.focusByDelta focusController focusedIdRef.current -1
             // "Home" and "End" are KeyboardEvent.key values for jumping to the first or last visible node.
             | kbdEventCode.home ->
                 event.preventDefault ()
@@ -214,8 +242,14 @@ let useTreeNodeActions
             | kbdEventCode.arrowRight ->
                 event.preventDefault ()
 
-                if canExpand config.DataSource config.EnableLazyLoading treeState.LoadedChildren node then
-                    if treeState.ExpandedIds.Contains node.id then
+                if
+                    canExpand
+                        currentConfig.DataSource
+                        currentConfig.EnableLazyLoading
+                        currentTreeState.LoadedChildren
+                        node
+                then
+                    if currentTreeState.ExpandedIds.Contains node.id then
                         TreeController.focusFirstChild focusController node.id
                     else
                         expandNode node
@@ -224,14 +258,20 @@ let useTreeNodeActions
 
                 TreeController.collapseOrFocusParent
                     focusController
-                    treeState.ExpandedIds
-                    treeState.SetExpandedIds
+                    currentTreeState.ExpandedIds
+                    currentTreeState.SetExpandedIds
                     node.id
             | kbdEventCode.enter
             | kbdEventCode.space ->
                 event.preventDefault ()
 
-                if canExpand config.DataSource config.EnableLazyLoading treeState.LoadedChildren node then
+                if
+                    canExpand
+                        currentConfig.DataSource
+                        currentConfig.EnableLazyLoading
+                        currentTreeState.LoadedChildren
+                        node
+                then
                     expandNode node
 
                 selectNode node (event.shiftKey || event.ctrlKey || event.metaKey)

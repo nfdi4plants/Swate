@@ -4,6 +4,7 @@ open Browser.Types
 open Fable.Core
 open Feliz
 open Swate.Components.Composite.Tree.Context
+open Swate.Components.Composite.Tree.Dom
 open Swate.Components.Composite.Tree.Types
 
 [<Erase; Mangle(false)>]
@@ -167,7 +168,10 @@ type TreeNode =
             prop.className (TreeHelper.nodeContainerClasses row canSelect canExpand isSelected isFocused config.StyleFn)
             prop.style [ style.paddingLeft (length.rem (float row.depth * 1.25)) ]
             prop.title (node.tooltip |> Option.defaultValue node.label)
-            prop.onClick onSelect
+            prop.onClick (fun event ->
+                if not (originatesFromInteractiveDescendant event) then
+                    onSelect event
+            )
             prop.onFocus (fun _ -> onFocus ())
             prop.onKeyDown onKeyDown
             prop.children [

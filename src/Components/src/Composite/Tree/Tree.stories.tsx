@@ -1054,6 +1054,57 @@ export const OnlyAffectedNodesRerender: Story = {
   },
 };
 
+const LatestKeyboardNavigationTree = () => {
+  const requestRef = React.useRef<Deferred<DemoNode[]> | null>(null);
+  const items = React.useMemo(() => [branch("lazy-a", "Lazy A"), leaf("branch-b", "Branch B")], []);
+
+  const dataSource = React.useMemo(
+    () => ({
+      getChildrenCount: (item: DemoNode | null | undefined) => (item?.id === "lazy-a" ? 1 : 0),
+      getTreeItems: async (item: DemoNode | null | undefined) => {
+        if (item?.id !== "lazy-a") return [];
+        const request = createDeferred<DemoNode[]>();
+        requestRef.current = request;
+        return request.promise;
+      },
+    }),
+    [],
+  );
+
+  return (
+    <div className="swt:w-96 swt:space-y-2">
+      <Tree items={items} dataSource={dataSource as any} debug />
+      <button
+        type="button"
+        className="swt:btn swt:btn-sm"
+        onClick={() => requestRef.current?.resolve([leaf("lazy-a/child.txt", "Lazy child")])}
+      >
+        Resolve lazy child
+      </button>
+    </div>
+  );
+};
+
+export const KeyboardNavigationUsesLatestVisibleRows: Story = {
+  render: () => <LatestKeyboardNavigationTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: "Expand Lazy A" }));
+    await expectLoadingIndicator(canvasElement);
+
+    const branchB = canvas.getByTestId("tree-node-branch-b");
+    branchB.focus();
+    await expect(branchB).toHaveFocus();
+
+    await userEvent.click(canvas.getByRole("button", { name: "Resolve lazy child" }));
+    await expect(await canvas.findByText("Lazy child")).toBeVisible();
+
+    fireEvent.keyDown(branchB, { key: "ArrowUp" });
+    await waitFor(() => expect(canvas.getByTestId("tree-node-lazy-a/child.txt")).toHaveFocus());
+  },
+};
+
 const DescendantKeyboardTree = () => {
   const [selected, setSelected] = React.useState<string[]>([]);
   const items = React.useMemo(() => [branch("interactive", "interactive", [leaf("interactive/child.txt", "child.txt")])], []);
@@ -1064,7 +1115,6 @@ const DescendantKeyboardTree = () => {
         <input
           aria-label="Tree node editor"
           className="swt:input swt:input-sm swt:input-bordered"
-          onClick={(event) => event.stopPropagation()}
         />
       ) : (
         <span>{props.node.label}</span>
@@ -1085,6 +1135,19 @@ const DescendantKeyboardTree = () => {
       <div data-testid="descendant-key-selected">{selected.join(",") || "none"}</div>
     </div>
   );
+};
+
+export const DescendantInteractiveClicksKeepDefaultBehavior: Story = {
+  render: () => <DescendantKeyboardTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const editor = canvas.getByRole("textbox", { name: "Tree node editor" });
+
+    await userEvent.click(editor);
+    await expect(editor).toHaveFocus();
+    await expect(canvas.getByText("child.txt")).toBeVisible();
+    await expect(canvas.getByTestId("descendant-key-selected")).toHaveTextContent("none");
+  },
 };
 
 export const DescendantKeyboardEventsKeepDefaultBehavior: Story = {

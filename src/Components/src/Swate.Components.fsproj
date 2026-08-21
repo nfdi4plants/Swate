@@ -72,7 +72,6 @@
     <Compile Include="Util\ReactHooks.fs" />
     <Compile Include="JsBindings\Virtual.fs" />
     <Compile Include="JsBindings\FloatingUI.fs" />
-    <Compile Include="JsBindings\Dom.fs" />
     <Compile Include="JsBindings\DndKit.fs" />
     <Compile Include="ARCtrl\TermCollection.fs" />
     <Compile Include="ARCtrl\Helper.fs" />

@@ -129,15 +129,10 @@ let toggleSelection mode nodeId selectedIds =
         else
             selectedIds |> Set.add nodeId
 
-let replaceSelection mode nodeId =
-    match mode with
-    | TreeSelectionMode.Single -> Set.singleton nodeId
-    | TreeSelectionMode.Multiple -> Set.singleton nodeId
-
 let nextSelection mode extendSelection nodeId selectedIds =
     match mode, extendSelection with
     | TreeSelectionMode.Multiple, true -> toggleSelection mode nodeId selectedIds
-    | _ -> replaceSelection mode nodeId
+    | _ -> Set.singleton nodeId
 
 let focusedOrFirst focusedId visibleNodes =
     focusedId
