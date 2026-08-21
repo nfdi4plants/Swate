@@ -51,6 +51,9 @@ let toolWithRequirementsAndHintsYaml =
 let toolWithNestedMetadataYaml =
     readFixture [ "command-line-tool-with-nested-metadata.cwl" ]
 
+let toolWithIwdLocationsYaml =
+    readFixture [ "command-line-tool-with-iwd-locations.cwl" ]
+
 // ---------------------------------------------------------------------------
 // Roundtrip helpers
 // ---------------------------------------------------------------------------

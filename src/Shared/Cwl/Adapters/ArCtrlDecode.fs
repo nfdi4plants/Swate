@@ -290,13 +290,13 @@ let private decodeRequirement (requirement: Requirement) =
                   ]
                 | FileEntry file -> [
                     "iwd.kind:" + ix, "file"
-                    match file.TryGetPropertyValue("location") |> Option.bind invariantText with
+                    match file.Location with
                     | Some location -> "iwd.value:" + ix, location
                     | None -> ()
                   ]
                 | DirectoryEntry directory -> [
                     "iwd.kind:" + ix, "directory"
-                    match directory.TryGetPropertyValue("location") |> Option.bind invariantText with
+                    match directory.Location with
                     | Some location -> "iwd.value:" + ix, location
                     | None -> ()
                   ]

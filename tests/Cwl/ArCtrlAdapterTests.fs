@@ -220,6 +220,20 @@ let adapterRoundtripTests =
                     "Nested metadata should survive decode/encode/decode adapter roundtrip"
             | _ -> failtest "Expected CommandLineTool processing unit"
         }
+
+        test "initial work dir file and directory locations survive adapter roundtrip" {
+            let processingUnit = Decode.decodeCWLProcessingUnit toolWithIwdLocationsYaml
+            let document = fromProcessingUnit processingUnit
+            let encodedYaml = document |> toProcessingUnit |> Encode.encodeProcessingUnit
+
+            Expect.isTrue
+                (encodedYaml.Contains "file:///data/input.txt")
+                "InitialWorkDir file location should survive adapter roundtrip"
+
+            Expect.isTrue
+                (encodedYaml.Contains "file:///data/refs")
+                "InitialWorkDir directory location should survive adapter roundtrip"
+        }
     ]
 
 [<Tests>]
