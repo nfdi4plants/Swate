@@ -92,32 +92,30 @@ type Main =
         let errorModalCtx = useErrorModalCtx ()
         let arcNameContextMenuRef = React.useElementRef ()
 
-        let copyArcPathToClipboard =
-            fun path ->
-                promise {
-                    try
-                        do! navigator.clipboard.writeText path
-                    with ex ->
-                        errorModalCtx.enqueue (
-                            ErrorModalRequest.create ($"Failed to copy path: {ex.Message}", title = "Copy path failed")
-                        )
-                }
-                |> Promise.start
+        let copyArcPathToClipboard path =
+            promise {
+                try
+                    do! navigator.clipboard.writeText path
+                with ex ->
+                    errorModalCtx.enqueue (
+                        ErrorModalRequest.create ($"Failed to copy path: {ex.Message}", title = "Copy path failed")
+                    )
+            }
+            |> Promise.start
 
-        let openArcFolderInFileExplorer =
-            fun () ->
-                promise {
-                    match! Api.ipcArcVaultApi.openArcFolderInFileExplorer () with
-                    | Ok() -> ()
-                    | Error exn ->
-                        errorModalCtx.enqueue (
-                            ErrorModalRequest.create (
-                                $"Failed to open folder: {exn.Message}",
-                                title = "Open folder failed"
-                            )
+        let openArcFolderInFileExplorer () =
+            promise {
+                match! Api.ipcArcVaultApi.openArcFolderInFileExplorer () with
+                | Ok() -> ()
+                | Error exn ->
+                    errorModalCtx.enqueue (
+                        ErrorModalRequest.create (
+                            $"Failed to open folder: {exn.Message}",
+                            title = "Open folder failed"
                         )
-                }
-                |> Promise.start
+                    )
+            }
+            |> Promise.start
 
         match appStateCtx with
         | Some path ->

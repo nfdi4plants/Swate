@@ -32,7 +32,8 @@ module FileTreeDeleteWorkflow =
         | None -> config.closeDeleteModal ()
         | Some deletePath when ArcEntityPathRules.isDeletePathAllowed deletePath |> not -> config.closeDeleteModal ()
         | Some deletePath ->
-            let applyError = enqueueError "Could not delete item" config.enqueueError
+            let applyError message =
+                config.enqueueError (ErrorModalRequest.create (message, title = "Could not delete item"))
 
             run
                 config.setIsDeleting

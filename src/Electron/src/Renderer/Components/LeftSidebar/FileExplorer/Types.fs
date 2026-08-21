@@ -34,14 +34,7 @@ type ArcCreateKindConfig = {
     Label: string
     FolderName: string
     Icon: string
-} with
-
-    static member create(kind, label, folderName, icon) = {
-        Kind = kind
-        Label = label
-        FolderName = folderName
-        Icon = icon
-    }
+}
 
 type FileSystemCreateDraft = {
     Parent: FileItem

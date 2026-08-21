@@ -152,15 +152,30 @@ let createItem (node: FileTreeNode) : FileItem =
     |> Renderer.Components.FileExplorerLfs.withFileTreeNodeLfsState node
 
 let arcCreateKinds = [
-    ArcCreateKindConfig.create (ArcFilesDiscriminate.Study, "Study", "studies", "swt:fluent--document-table-24-regular")
-    ArcCreateKindConfig.create (ArcFilesDiscriminate.Assay, "Assay", "assays", "swt:fluent--beaker-24-regular")
-    ArcCreateKindConfig.create (
-        ArcFilesDiscriminate.Workflow,
-        "Workflow",
-        "workflows",
-        "swt:fluent--flowchart-24-regular"
-    )
-    ArcCreateKindConfig.create (ArcFilesDiscriminate.Run, "Run", "runs", "swt:fluent--play-24-regular")
+    {
+        Kind = ArcFilesDiscriminate.Study
+        Label = "Study"
+        FolderName = "studies"
+        Icon = "swt:fluent--document-table-24-regular"
+    }
+    {
+        Kind = ArcFilesDiscriminate.Assay
+        Label = "Assay"
+        FolderName = "assays"
+        Icon = "swt:fluent--beaker-24-regular"
+    }
+    {
+        Kind = ArcFilesDiscriminate.Workflow
+        Label = "Workflow"
+        FolderName = "workflows"
+        Icon = "swt:fluent--flowchart-24-regular"
+    }
+    {
+        Kind = ArcFilesDiscriminate.Run
+        Label = "Run"
+        FolderName = "runs"
+        Icon = "swt:fluent--play-24-regular"
+    }
 ]
 
 let isArcCreateIdentifierValid (identifier: string) =

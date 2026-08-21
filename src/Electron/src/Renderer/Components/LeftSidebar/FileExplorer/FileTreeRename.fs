@@ -45,10 +45,11 @@ module FileTreeRenameWorkflow =
         match tryBuildRenameDraft item with
         | Ok renameDraft -> setPendingRenameDraft (Some renameDraft)
         | Error validationError ->
-            FileTreeDialogWorkflow.enqueueError "Could not rename item" enqueueError validationError
+            enqueueError (ErrorModalRequest.create (validationError, title = "Could not rename item"))
 
     let confirmRenameItem (config: ConfirmRenameConfig) (newName: string) =
-        let applyError = enqueueError "Could not rename item" config.enqueueError
+        let applyError message =
+            config.enqueueError (ErrorModalRequest.create (message, title = "Could not rename item"))
 
         match config.pendingRenameDraft with
         | None -> config.closeRenameModal ()
