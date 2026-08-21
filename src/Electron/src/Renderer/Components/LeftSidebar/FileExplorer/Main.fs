@@ -109,10 +109,7 @@ type Main =
                 | Ok() -> ()
                 | Error exn ->
                     errorModalCtx.enqueue (
-                        ErrorModalRequest.create (
-                            $"Failed to open folder: {exn.Message}",
-                            title = "Open folder failed"
-                        )
+                        ErrorModalRequest.create ($"Failed to open folder: {exn.Message}", title = "Open folder failed")
                     )
             }
             |> Promise.start
