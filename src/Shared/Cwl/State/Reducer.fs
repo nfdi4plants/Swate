@@ -23,11 +23,7 @@ let private clearEditorState (state: AppState) = {
         Selection = emptySelection
         Overlay = NoOverlay
         Notifications = emptyNotifications
-        Async = {
-            state.Async with
-                IsLoading = false
-                IsSaving = false
-        }
+        Async = emptyAsync
 }
 
 let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
@@ -40,28 +36,7 @@ let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
                 Selection = emptySelection
                 Overlay = NoOverlay
                 Notifications = emptyNotifications
-                Async = {
-                    state.Async with
-                        IsLoading = false
-                        IsSaving = false
-                }
-                SessionId = state.SessionId + 1
-        },
-        [ FocusMainWindow "session.entry" ]
-
-    | ExistingDocumentLoaded(document, filePath) ->
-        {
-            state with
-                Document = Some document
-                Meta = Some(newMeta (Some filePath))
-                Selection = emptySelection
-                Overlay = NoOverlay
-                Notifications = emptyNotifications
-                Async = {
-                    state.Async with
-                        IsLoading = false
-                        PendingLoadRequestId = None
-                }
+                Async = emptyAsync
                 SessionId = state.SessionId + 1
         },
         [ FocusMainWindow "session.entry" ]
@@ -132,69 +107,119 @@ let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
                 Async = {
                     state.Async with
                         IsLoading = true
-                        PendingLoadRequestId = requestId
+                        PendingLoadRequestId = Some requestId
                 }
         },
         []
 
-    | LoadingFinished ->
-        {
-            state with
-                Async = {
-                    state.Async with
-                        IsLoading = false
-                        PendingLoadRequestId = None
-                }
-        },
-        []
+    | LoadingFinished requestId ->
+        match state.Async.PendingLoadRequestId with
+        | Some pendingId when pendingId = requestId ->
+            {
+                state with
+                    Async = {
+                        state.Async with
+                            IsLoading = false
+                            PendingLoadRequestId = None
+                    }
+            },
+            []
+        | _ -> state, []
 
-    | SavingStarted requestId ->
+    | LoadSucceeded(requestId, document, filePath) ->
+        match state.Async.PendingLoadRequestId with
+        | Some pendingId when pendingId = requestId ->
+            {
+                state with
+                    Document = Some document
+                    Meta = Some(newMeta (Some filePath))
+                    Selection = emptySelection
+                    Overlay = NoOverlay
+                    Notifications = emptyNotifications
+                    Async = {
+                        state.Async with
+                            IsLoading = false
+                            PendingLoadRequestId = None
+                    }
+                    SessionId = state.SessionId + 1
+            },
+            [ FocusMainWindow "session.entry" ]
+        | _ -> state, []
+
+    | LoadFailed(requestId, message) ->
+        match state.Async.PendingLoadRequestId with
+        | Some pendingId when pendingId = requestId ->
+            {
+                state with
+                    Async = {
+                        state.Async with
+                            IsLoading = false
+                            PendingLoadRequestId = None
+                    }
+                    Notifications = {
+                        state.Notifications with
+                            ErrorMessage = Some message
+                    }
+            },
+            []
+        | _ -> state, []
+
+    | SavingStarted(requestId, _) ->
         {
             state with
                 Async = {
                     state.Async with
                         IsSaving = true
-                        PendingSaveRequestId = requestId
+                        PendingSaveRequestId = Some requestId
                 }
         },
         []
 
-    | SaveCompleted filePath ->
-        let nextMeta =
-            state.Meta
-            |> Option.map (fun meta -> {
-                meta with
-                    FilePath = Some filePath
-                    SavedRevision = meta.Revision
-            })
+    | SaveSucceeded(requestId, savedRevision, filePath) ->
+        match state.Async.PendingSaveRequestId, state.Meta with
+        | Some pendingId, Some meta when pendingId = requestId ->
+            let nextSavedRevision =
+                if savedRevision > meta.SavedRevision then
+                    savedRevision
+                else
+                    meta.SavedRevision
 
-        {
-            state with
-                Meta = nextMeta
-                Async = {
-                    state.Async with
-                        IsSaving = false
-                        PendingSaveRequestId = None
-                }
-                Notifications = {
-                    state.Notifications with
-                        ErrorMessage = None
-                        InfoMessage = Some $"Saved to {filePath}"
-                }
-        },
-        []
+            {
+                state with
+                    Meta =
+                        Some {
+                            meta with
+                                FilePath = Some filePath
+                                SavedRevision = nextSavedRevision
+                        }
+                    Async = {
+                        state.Async with
+                            IsSaving = false
+                            PendingSaveRequestId = None
+                    }
+                    Notifications = {
+                        state.Notifications with
+                            ErrorMessage = None
+                            InfoMessage = Some $"Saved to {filePath}"
+                    }
+            },
+            []
+        | _ -> state, []
 
-    | SaveFailed message ->
-        {
-            state with
-                Async = {
-                    state.Async with
-                        IsSaving = false
-                        PendingSaveRequestId = None
-                }
-                Notifications = {
-                    state.Notifications with
-                        ErrorMessage = Some message
-                }
-        },
-        []
+    | SaveFailed(requestId, message) ->
+        match state.Async.PendingSaveRequestId with
+        | Some pendingId when pendingId = requestId ->
+            {
+                state with
+                    Async = {
+                        state.Async with
+                            IsSaving = false
+                            PendingSaveRequestId = None
+                    }
+                    Notifications = {
+                        state.Notifications with
+                            ErrorMessage = Some message
+                    }
+            },
+            []
+        | _ -> state, []

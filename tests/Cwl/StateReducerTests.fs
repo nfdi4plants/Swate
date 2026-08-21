@@ -47,10 +47,13 @@ let reducerTests =
         }
 
         test "save completed updates saved revision and clears dirty state" {
+            let requestId = System.Guid.NewGuid()
             let state, _ = update (NewDocumentCreated sampleDocument) emptyState
             let dirtyState, _ = update (DocumentUpdated sampleDocument) state
-            let savingState, _ = update (SavingStarted None) dirtyState
-            let nextState, _ = update (SaveCompleted "saved.cwl") savingState
+            let savingState, _ = update (SavingStarted(requestId, Revision 1)) dirtyState
+
+            let nextState, _ =
+                update (SaveSucceeded(requestId, Revision 1, "saved.cwl")) savingState
 
             Expect.isFalse (isDirty nextState) "Save completion should align saved revision with current revision"
             Expect.equal (currentFilePath nextState) (Some "saved.cwl") "Save completion should persist the file path"
@@ -59,6 +62,29 @@ let reducerTests =
                 nextState.Notifications.InfoMessage
                 (Some "Saved to saved.cwl")
                 "Save completion should produce an info notification"
+        }
+
+        test "late save completion keeps newer revision dirty" {
+            let requestId = System.Guid.NewGuid()
+            let state, _ = update (NewDocumentCreated sampleDocument) emptyState
+            let dirtyState, _ = update (DocumentUpdated sampleDocument) state
+            let savingState, _ = update (SavingStarted(requestId, Revision 1)) dirtyState
+            let newerState, _ = update (DocumentUpdated sampleDocument) savingState
+
+            let nextState, _ =
+                update (SaveSucceeded(requestId, Revision 1, "saved.cwl")) newerState
+
+            Expect.isTrue (isDirty nextState) "Later edits must remain dirty after an older save completes"
+        }
+
+        test "clear editor state resets pending async request ids" {
+            let requestId = System.Guid.NewGuid()
+            let state, _ = update (NewDocumentCreated sampleDocument) emptyState
+            let savingState, _ = update (SavingStarted(requestId, Revision 0)) state
+            let nextState, _ = update DiscardConfirmed savingState
+
+            Expect.equal nextState.Async.PendingSaveRequestId None "Discard should clear the save request id"
+            Expect.equal nextState.Async.PendingLoadRequestId None "Discard should clear the load request id"
         }
     ]
 
