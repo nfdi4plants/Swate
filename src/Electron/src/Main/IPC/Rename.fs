@@ -32,21 +32,11 @@ module ArcRenameHelper =
         | fileType -> failwith $"Renaming {fileType} is not supported."
 
     let private remapArcFileSystemPaths sourcePath targetPath (arc: ARC) =
-        let normalizedSourcePath = sourcePath |> PathHelpers.normalizeCanonicalRelativePath
-        let normalizedTargetPath = targetPath |> PathHelpers.normalizeCanonicalRelativePath
-        let sourcePrefix = normalizedSourcePath + "/"
-
         let remappedPaths =
             arc.FileSystem.Tree.ToFilePaths()
             |> Array.map (fun path ->
-                let normalizedPath = path |> PathHelpers.normalizeCanonicalRelativePath
-
-                if PathHelpers.pathsEqual normalizedPath normalizedSourcePath then
-                    normalizedTargetPath
-                elif normalizedPath.StartsWith(sourcePrefix, StringComparison.OrdinalIgnoreCase) then
-                    normalizedTargetPath + normalizedPath.Substring(normalizedSourcePath.Length)
-                else
-                    normalizedPath
+                PathHelpers.tryRemapPathPrefix sourcePath targetPath path
+                |> Option.defaultWith (fun () -> PathHelpers.normalizeCanonicalRelativePath path)
             )
             |> Array.distinctBy PathHelpers.normalizeForComparison
 

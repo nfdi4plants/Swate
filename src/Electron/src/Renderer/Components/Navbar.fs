@@ -17,7 +17,9 @@ open Renderer.Types
 type private Selector =
 
     [<ReactComponent>]
-    static member Actionbar(setNewArcModalIsOpen: bool -> unit, onArcError: string -> unit) =
+    static member Actionbar
+        (setNewArcModalIsOpen: bool -> unit, onArcError: string -> unit, onActionInvoked: unit -> unit)
+        =
         Actionbar.Main(
             [|
                 ButtonInfo.create (
@@ -31,11 +33,14 @@ type private Selector =
                     fun _ -> openArc onArcError |> Promise.start
                 )
             |],
-            2
+            2,
+            onActionInvoked = onActionInvoked
         )
 
     [<ReactComponent>]
     static member Main(onArcError: string -> unit, setNewArcModalIsOpen: bool -> unit) =
+
+        let selectorIsOpen, setSelectorIsOpen = React.useState false
 
         let recentArcs =
             Renderer.MainSyncedState.useMainSyncedState {
@@ -49,8 +54,6 @@ type private Selector =
                 onError = fun ex -> console.error ("Failed to load recent ARCs.", ex.Message)
                 dependencies = [||]
             }
-
-        let selectorControlRef = React.useRef ({ toggle = ignore }: SelectorRef)
 
         let onOpen =
             fun (isOpen: bool) ->
@@ -68,11 +71,12 @@ type private Selector =
         Swate.Components.Composite.ArcSelector.ArcSelector.Main(
             recentArcs.state,
             (fun clickedARC -> openArcByPath onArcError clickedARC.path |> Promise.start),
+            selectorIsOpen,
+            setSelectorIsOpen,
             rmvRecentArc = removeRecentArc,
-            actionbar = Selector.Actionbar(setNewArcModalIsOpen, onArcError),
+            actionbar = Selector.Actionbar(setNewArcModalIsOpen, onArcError, fun () -> setSelectorIsOpen false),
             onOpenChange = onOpen,
             isLoading = recentArcs.isLoading,
-            controlRef = selectorControlRef,
             ?currentlyOpenArcPath = Renderer.Context.AppStateContext.useAppStateCtx ()
         )
 

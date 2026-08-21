@@ -93,6 +93,15 @@ Vitest.describe (
 
                 Vitest.expect(remapped).toEqual (Some "assays/NewAssay/notes/protocol.md")
         )
+
+        Vitest.test (
+            "tryRemapSelectionPath ignores paths outside the renamed source prefix",
+            fun () ->
+                let remapped =
+                    tryRemapSelectionPath "assays/OldAssay" "assays/NewAssay" (Some "assays/OtherAssay/file.md")
+
+                Vitest.expect(remapped).toEqual None
+        )
 )
 
 let private getRenameMenuItems (item: FileItem) =

@@ -19,6 +19,7 @@ let private createContextMenuConfig () : ContextMenuConfig = {
     openItem = ignore
     arcRootPath = Some "C:\\arc-root"
     openCreateModal = ignore
+    openNoteDraft = ignore
     openFileSystemCreateModal = fun _ _ -> ()
     requestRenameItem = ignore
     requestDeleteItem = ignore
@@ -49,7 +50,7 @@ let private createFolderItem (name: string) (path: string option) = {
         Id = defaultArg path name
 }
 
-let private labels items =
+let private labels (items: ContextMenuItem list) =
     items |> List.map _.Label |> List.toArray
 
 let private groupedLabels items =
@@ -72,30 +73,30 @@ Vitest.describe (
             "ARC create drafts include a basic identifier-named annotation table when supported",
             fun () ->
                 let tableCapableKinds = [|
-                    ArcExplorerNodeKind.Study
-                    ArcExplorerNodeKind.Assay
-                    ArcExplorerNodeKind.Run
+                    ArcFilesDiscriminate.Study
+                    ArcFilesDiscriminate.Assay
+                    ArcFilesDiscriminate.Run
                 |]
 
                 for kind in tableCapableKinds do
-                    let identifier = $"Default {ArcExplorerNodeKind.label kind}"
+                    let config = arcCreateKinds |> List.find (fun config -> config.Kind = kind)
+                    let identifier = $"Default {config.Label}"
 
-                    match tryCreateArcFile kind identifier with
-                    | Ok arcFile ->
-                        let tables = arcFile.Tables()
-                        Vitest.expect(tables.Count).toBe (1)
-                        let table = tables.[0]
-                        Vitest.expect(table.Name).toBe ($"{identifier} Table")
-                        Vitest.expect(table.ColumnCount).toBe (3)
-                        Vitest.expect(table.RowCount).toBe (ARCtrlHelper.ArcFileDefaults.BasicAnnotationTableRowCount)
-                        Vitest.expect(table.Headers.[0].ToString()).toBe ("Input [Source Name]")
-                        Vitest.expect(table.Headers.[1].ToString()).toBe ("Protocol Uri")
-                        Vitest.expect(table.Headers.[2].ToString()).toBe ("Output [Sample Name]")
-                    | Error error -> failwith error
+                    let arcFile = ARCtrlHelper.ArcFileDefaults.createDefaultArcFile kind identifier
+                    let tables = arcFile.Tables()
+                    Vitest.expect(tables.Count).toBe (1)
+                    let table = tables.[0]
+                    Vitest.expect(table.Name).toBe ($"{identifier} Table")
+                    Vitest.expect(table.ColumnCount).toBe (3)
+                    Vitest.expect(table.RowCount).toBe (ARCtrlHelper.ArcFileDefaults.BasicAnnotationTableRowCount)
+                    Vitest.expect(table.Headers.[0].ToString()).toBe ("Input [Source Name]")
+                    Vitest.expect(table.Headers.[1].ToString()).toBe ("Protocol Uri")
+                    Vitest.expect(table.Headers.[2].ToString()).toBe ("Output [Sample Name]")
 
-                match tryCreateArcFile ArcExplorerNodeKind.Workflow "Default Workflow" with
-                | Ok arcFile -> Vitest.expect(arcFile.Tables().Count).toBe (0)
-                | Error error -> failwith error
+                let workflow =
+                    ARCtrlHelper.ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Workflow "Default Workflow"
+
+                Vitest.expect(workflow.Tables().Count).toBe (0)
         )
 
         Vitest.test (
@@ -237,11 +238,11 @@ Vitest.describe (
             "add note action requests note creation",
             fun () ->
                 let item = createFolderItem "AssayA" (Some "assays/AssayA")
-                let mutable requestedCreateKind = None
+                let mutable didRequestNote = false
 
                 let config = {
                     createContextMenuConfig () with
-                        openCreateModal = fun kind -> requestedCreateKind <- Some kind
+                        openNoteDraft = fun () -> didRequestNote <- true
                 }
 
                 let menuItems = createComposedContextMenuItems config item
@@ -251,7 +252,7 @@ Vitest.describe (
 
                 addNoteItem.OnClick()
 
-                Vitest.expect(requestedCreateKind).toEqual (Some ArcExplorerNodeKind.Note)
+                Vitest.expect(didRequestNote).toBeTruthy ()
         )
 
         Vitest.test (

@@ -11,16 +11,10 @@ type MaterializedState = {
 
 let empty = { ArcScopeId = None; Paths = Set.empty }
 
-let materialize path state =
-    let normalizedPath = PathHelpers.normalizePath path
-
-    if state.Paths.Contains normalizedPath then
-        state
-    else
-        {
-            state with
-                Paths = state.Paths.Add normalizedPath
-        }
+let materialize path state = {
+    state with
+        Paths = state.Paths.Add(PathHelpers.normalizePath path)
+}
 
 let rec private collectDirectoryPaths (node: FileTreeNode) (directoryPaths: Set<string>) =
     if node.isDirectory then
@@ -30,24 +24,6 @@ let rec private collectDirectoryPaths (node: FileTreeNode) (directoryPaths: Set<
             (Set.add (PathHelpers.normalizePath node.path) directoryPaths)
     else
         directoryPaths
-
-let private requiredMaterializedDirectoryPaths
-    (selectedTreeItemPath: string option)
-    (root: FileTreeNode)
-    (validDirectoryPaths: Set<string>)
-    =
-    let selectedPathChain =
-        selectedTreeItemPath
-        |> Option.map (fun selectedPath ->
-            validDirectoryPaths
-            |> Set.filter (fun directoryPath -> PathHelpers.isSameOrDescendantPath selectedPath directoryPath)
-        )
-        |> Option.defaultValue Set.empty
-
-    if root.isDirectory then
-        selectedPathChain.Add(PathHelpers.normalizePath root.path)
-    else
-        selectedPathChain
 
 let reconcileMaterializedState
     (arcScopeId: string option)
@@ -64,7 +40,17 @@ let reconcileMaterializedState
         let validDirectoryPaths = collectDirectoryPaths root Set.empty
 
         let requiredPaths =
-            requiredMaterializedDirectoryPaths selectedTreeItemPath root validDirectoryPaths
+            selectedTreeItemPath
+            |> Option.map (fun selectedPath ->
+                validDirectoryPaths
+                |> Set.filter (fun directoryPath -> PathHelpers.isSameOrDescendantPath selectedPath directoryPath)
+            )
+            |> Option.defaultValue Set.empty
+            |> fun paths ->
+                if root.isDirectory then
+                    paths.Add(PathHelpers.normalizePath root.path)
+                else
+                    paths
 
         let persistedPaths =
             if current.ArcScopeId = arcScopeId then
@@ -88,20 +74,16 @@ let rec toMaterializedFileItemTree
         let isDirectoryMaterialized =
             materializedDirectoryPaths.Contains normalizedParentPath
 
-        let hasSourceChildren = parent.children.Count > 0
-
-        let mappedChildren =
+        let children =
             if isDirectoryMaterialized then
                 parent.children.Values
                 |> Seq.map (toMaterializedFileItemTree createItem materializedDirectoryPaths)
                 |> List.ofSeq
+                |> Some
+            elif parent.children.Count = 0 then
+                Some []
             else
-                []
-
-        let children =
-            if isDirectoryMaterialized then Some mappedChildren
-            elif hasSourceChildren then None
-            else Some []
+                None
 
         {
             createItem parent with

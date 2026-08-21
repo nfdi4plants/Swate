@@ -114,24 +114,6 @@ let getItemIconClass (item: FileItem) =
         | Some colorClass -> Some colorClass
         | None -> colorClassForArcWorkbookFile fileName
 
-let canDeleteItem (item: FileItem) =
-    item.Path
-    |> Option.map PathHelpers.normalizeCanonicalRelativePath
-    |> Option.exists ArcEntityPathRules.isDeletePathAllowed
-
-let tryGetItemRelativePath (item: FileItem) =
-    item.Path
-    |> Option.map PathHelpers.normalizeRelativePath
-    |> Option.map PathHelpers.normalizePath
-
-let canCreateFileSystemItemIn (item: FileItem) =
-    item.IsDirectory
-    && (tryGetItemRelativePath item
-        |> Option.exists (fun path ->
-            String.IsNullOrWhiteSpace path
-            || ArcEntityPathRules.isGenericFileSystemParentAllowed path
-        ))
-
 let rootFolderContextMenuItems
     (rootFolderName: string)
     (label: string)
@@ -141,7 +123,9 @@ let rootFolderContextMenuItems
     =
     let isMatchingRootFolder (item: FileItem) =
         item.IsDirectory
-        && (tryGetItemRelativePath item |> Option.exists (isRootFolderPath rootFolderName))
+        && (item.Path
+            |> Option.map PathHelpers.normalizeCanonicalRelativePath
+            |> Option.exists (isRootFolderPath rootFolderName))
 
     ContextMenuItem.whenItem isMatchingRootFolder label icon (fun _ -> onClick ()) item
 
@@ -167,36 +151,32 @@ let createItem (node: FileTreeNode) : FileItem =
     { item with Id = node.path }
     |> Renderer.Components.FileExplorerLfs.withFileTreeNodeLfsState node
 
-let arcCreateKindIcon =
-    function
-    | ArcExplorerNodeKind.Study -> "swt:fluent--document-table-24-regular"
-    | ArcExplorerNodeKind.Assay -> "swt:fluent--beaker-24-regular"
-    | ArcExplorerNodeKind.Workflow -> "swt:fluent--flowchart-24-regular"
-    | ArcExplorerNodeKind.Run -> "swt:fluent--play-24-regular"
-    | kind -> failwithf "ARC node kind '%s' cannot be created from the file explorer." (ArcExplorerNodeKind.label kind)
-
 let arcCreateKinds = [
-    ArcExplorerNodeKind.Study
-    ArcExplorerNodeKind.Assay
-    ArcExplorerNodeKind.Workflow
-    ArcExplorerNodeKind.Run
+    {
+        Kind = ArcFilesDiscriminate.Study
+        Label = "Study"
+        FolderName = "studies"
+        Icon = "swt:fluent--document-table-24-regular"
+    }
+    {
+        Kind = ArcFilesDiscriminate.Assay
+        Label = "Assay"
+        FolderName = "assays"
+        Icon = "swt:fluent--beaker-24-regular"
+    }
+    {
+        Kind = ArcFilesDiscriminate.Workflow
+        Label = "Workflow"
+        FolderName = "workflows"
+        Icon = "swt:fluent--flowchart-24-regular"
+    }
+    {
+        Kind = ArcFilesDiscriminate.Run
+        Label = "Run"
+        FolderName = "runs"
+        Icon = "swt:fluent--play-24-regular"
+    }
 ]
-
-let arcCreateKindSortOrder =
-    function
-    | ArcExplorerNodeKind.Study -> 10
-    | ArcExplorerNodeKind.Assay -> 20
-    | ArcExplorerNodeKind.Workflow -> 30
-    | ArcExplorerNodeKind.Run -> 40
-    | _ -> 1000
-
-let arcCreateKindDefaultIdentifier =
-    function
-    | ArcExplorerNodeKind.Study -> "New Study"
-    | ArcExplorerNodeKind.Assay -> "New Assay"
-    | ArcExplorerNodeKind.Workflow -> "New Workflow"
-    | ArcExplorerNodeKind.Run -> "New Run"
-    | kind -> failwithf "ARC node kind '%s' cannot be created from the file explorer." (ArcExplorerNodeKind.label kind)
 
 let isArcCreateIdentifierValid (identifier: string) =
     let identifier = identifier.Trim()
@@ -207,42 +187,34 @@ let isArcCreateIdentifierValid (identifier: string) =
 let arcCreateIdentifierError =
     "Identifier is required and may only contain letters, digits, spaces, underscores, or dashes."
 
-let tryCreateArcFile kind identifier =
-    match kind with
-    | ArcExplorerNodeKind.Study -> ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Study identifier |> Ok
-    | ArcExplorerNodeKind.Assay -> ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Assay identifier |> Ok
-    | ArcExplorerNodeKind.Workflow ->
-        ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Workflow identifier
-        |> Ok
-    | ArcExplorerNodeKind.Run -> ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Run identifier |> Ok
-    | kind -> Error $"Creating {ArcExplorerNodeKind.label kind} files is not supported from the file explorer."
-
 let tryGetInlineArcCreateKind (rootPath: string) (item: FileItem) =
     if not item.IsDirectory then
         None
     else
         match item.Path with
         | Some path when getPathDepth path = getPathDepth rootPath + 1 ->
-            match PathHelpers.getNameFromPath path |> fun name -> name.ToLowerInvariant() with
-            | "studies" -> Some ArcExplorerNodeKind.Study
-            | "assays" -> Some ArcExplorerNodeKind.Assay
-            | "workflows" -> Some ArcExplorerNodeKind.Workflow
-            | "runs" -> Some ArcExplorerNodeKind.Run
-            | _ -> None
+            let folderName = PathHelpers.getNameFromPath path
+
+            arcCreateKinds
+            |> List.tryFind (fun config ->
+                config.FolderName.Equals(folderName, System.StringComparison.OrdinalIgnoreCase)
+            )
+            |> Option.map _.Kind
         | _ -> None
 
 let tryBuildArcCreateDraft kind (identifier: string) (existingPaths: string seq) =
     let identifier = identifier.Trim()
-    let label = ArcExplorerNodeKind.label kind
 
     if isArcCreateIdentifierValid identifier |> not then
         Error arcCreateIdentifierError
     else
-        match tryCreateArcFile kind identifier with
-        | Error errorMessage -> Error errorMessage
-        | Ok arcFile ->
+        match arcCreateKinds |> List.tryFind (fun config -> config.Kind = kind) with
+        | None -> Error $"Creating {kind} files is not supported from the file explorer."
+        | Some config ->
+            let arcFile = ArcFileDefaults.createDefaultArcFile kind identifier
+
             match FileContentDTO.fromArcFile arcFile with
-            | None -> Error $"Creating {label} files is not supported in Electron yet."
+            | None -> Error $"Creating {config.Label} files is not supported in Electron yet."
             | Some request ->
                 let requestedPath = PathHelpers.normalizePath request.path
 
@@ -251,7 +223,7 @@ let tryBuildArcCreateDraft kind (identifier: string) (existingPaths: string seq)
                     |> Seq.exists (fun path -> PathHelpers.pathsEqual (PathHelpers.normalizePath path) requestedPath)
 
                 if alreadyExists then
-                    Error $"{label} '{identifier}' already exists."
+                    Error $"{config.Label} '{identifier}' already exists."
                 else
                     Ok {
                         ArcFile = arcFile

@@ -7,25 +7,6 @@ open Swate.Components.Primitive.Actionbar.Types
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
 
-module private FileExplorerHelper =
-
-    let copyArcPathToClipboard (onError: exn -> unit) =
-        fun (path: string) -> promise {
-            try
-                do! navigator.clipboard.writeText path
-            with ex ->
-                onError ex
-        }
-
-    let openArcFolderInFileExplorer (onError: exn -> unit) =
-        fun () -> promise {
-            match! Api.ipcArcVaultApi.openArcFolderInFileExplorer () with
-            | Ok() -> ()
-            | Error exn -> onError exn
-        }
-
-open FileExplorerHelper
-
 [<Erase; Mangle(false)>]
 type Main =
 
@@ -111,21 +92,27 @@ type Main =
         let errorModalCtx = useErrorModalCtx ()
         let arcNameContextMenuRef = React.useElementRef ()
 
-        let copyArcPathToClipboard =
-            copyArcPathToClipboard (fun ex ->
-                errorModalCtx.enqueue (
-                    ErrorModalRequest.create ($"Failed to copy path: {ex.Message}", title = "Copy path failed")
-                )
-            )
-            >> Promise.start
+        let copyArcPathToClipboard path =
+            promise {
+                try
+                    do! navigator.clipboard.writeText path
+                with ex ->
+                    errorModalCtx.enqueue (
+                        ErrorModalRequest.create ($"Failed to copy path: {ex.Message}", title = "Copy path failed")
+                    )
+            }
+            |> Promise.start
 
-        let openArcFolderInFileExplorer =
-            openArcFolderInFileExplorer (fun ex ->
-                errorModalCtx.enqueue (
-                    ErrorModalRequest.create ($"Failed to open folder: {ex.Message}", title = "Open folder failed")
-                )
-            )
-            >> Promise.start
+        let openArcFolderInFileExplorer () =
+            promise {
+                match! Api.ipcArcVaultApi.openArcFolderInFileExplorer () with
+                | Ok() -> ()
+                | Error exn ->
+                    errorModalCtx.enqueue (
+                        ErrorModalRequest.create ($"Failed to open folder: {exn.Message}", title = "Open folder failed")
+                    )
+            }
+            |> Promise.start
 
         match appStateCtx with
         | Some path ->
