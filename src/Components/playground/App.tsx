@@ -25,6 +25,7 @@ import {Entry as ARCSelectorEntry} from '../src/Composite/ArcSelector/ArcSelecto
 import {Entry as ArcFileEditor} from '../src/Page/ArcFileEditor/ArcFileEditor.fs.ts';
 import {Entry as SettingsPage} from '../src/Page/SettingsPage/SettingsPage.fs.ts';
 import WorkspaceEntry from '../src/Composite/Workspace/Workspace.fixture.fs.ts';
+import ValidationPackageSelectorFixture from '../src/Composite/ValidationPackageSelector/ValidationPackageSelector.fixture.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -216,9 +217,17 @@ function WorkspaceContainer() {
   );
 }
 
+function ValidationPackageSelectorFixtureContainer() {
+  return (
+    <div className='swt:flex swt:flex-col swt:h-screen swt:w-screen swt:overflow-hidden'>
+      <ValidationPackageSelectorFixture.Main />
+    </div>
+  );
+}
+
 const App = () => {
     return (
-        <TableContainer />
+        <ValidationPackageSelectorFixtureContainer />
     );
 };
 
