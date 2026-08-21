@@ -1,9 +1,11 @@
 module Swate.Components.Shared.Cwl.Adapters.ArCtrlDecode
 
 open System
+open System.Collections
 open System.Globalization
 open DynamicObj
 open ARCtrl.CWL
+open YAMLicious.YAMLiciousTypes
 open Swate.Components.Shared.Cwl.RequirementMutations
 open Swate.Components.Shared.Cwl.WorkflowMutations
 open Swate.Components.Shared.Cwl.Documents.Common
@@ -48,23 +50,125 @@ let private invariantText (value: obj) =
     | :? float as number -> Some(number.ToString(CultureInfo.InvariantCulture))
     | _ -> None
 
-let private metadataFromDynamicObj (excludedKeys: string seq) (source: obj) =
-    match source with
-    | :? DynamicObj as dynamicObj ->
-        let excluded =
-            excludedKeys |> Seq.map (fun key -> key.ToLowerInvariant()) |> Set.ofSeq
+let rec private metadataValueFromYamlElement element =
+    match element with
+    | YAMLElement.Value value ->
+        let scalar = value.Value
 
-        dynamicObj.GetProperties(false)
-        |> Seq.choose (fun kvp ->
-            let normalizedKey = kvp.Key.ToLowerInvariant()
-
-            if excluded.Contains normalizedKey then
-                None
-            else
-                invariantText kvp.Value |> Option.map (fun value -> kvp.Key, value)
+        match Boolean.TryParse scalar with
+        | true, flag -> Some(MetadataBool flag)
+        | _ ->
+            match Int64.TryParse(scalar, NumberStyles.Integer, CultureInfo.InvariantCulture) with
+            | true, number -> Some(MetadataInt number)
+            | _ ->
+                match Double.TryParse(scalar, NumberStyles.Float, CultureInfo.InvariantCulture) with
+                | true, number -> Some(MetadataFloat number)
+                | _ -> Some(MetadataString scalar)
+    | YAMLElement.Sequence values ->
+        values
+        |> Seq.choose metadataValueFromYamlElement
+        |> Seq.toList
+        |> MetadataArray
+        |> Some
+    | YAMLElement.Object values when
+        values
+        |> List.forall (
+            function
+            | YAMLElement.Mapping _ -> true
+            | _ -> false
+        )
+        ->
+        values
+        |> Seq.choose (
+            function
+            | YAMLElement.Mapping(key, value) ->
+                metadataValueFromYamlElement value
+                |> Option.map (fun metadata -> key.Value, metadata)
+            | _ -> None
         )
         |> Map.ofSeq
-    | _ -> emptyStringMap
+        |> MetadataObject
+        |> Some
+    | YAMLElement.Object [ single ] -> metadataValueFromYamlElement single
+    | YAMLElement.Mapping _
+    | _ -> None
+
+let rec private metadataValueFromObj (value: obj) =
+    match value with
+    | null -> None
+    | :? string as text -> Some(MetadataString text)
+    | :? bool as flag -> Some(MetadataBool flag)
+    | :? int as number -> Some(MetadataInt(int64 number))
+    | :? int64 as number -> Some(MetadataInt number)
+    | :? float as number -> Some(MetadataFloat number)
+    | :? float32 as number -> Some(MetadataFloat(float number))
+    | :? decimal as number -> Some(MetadataFloat(float number))
+    | :? YAMLElement as element -> metadataValueFromYamlElement element
+    | :? DynamicObj as dynamicObj ->
+        dynamicObj.GetProperties(false)
+        |> Seq.choose (fun kvp -> metadataValueFromObj kvp.Value |> Option.map (fun metadata -> kvp.Key, metadata))
+        |> Map.ofSeq
+        |> MetadataObject
+        |> Some
+    | :? IDictionary as dictionary ->
+        dictionary
+        |> Seq.cast<DictionaryEntry>
+        |> Seq.choose (fun entry ->
+            match entry.Key with
+            | :? string as key -> metadataValueFromObj entry.Value |> Option.map (fun metadata -> key, metadata)
+            | _ -> None
+        )
+        |> Map.ofSeq
+        |> MetadataObject
+        |> Some
+    | :? IEnumerable as items ->
+        items
+        |> Seq.cast<obj>
+        |> Seq.choose metadataValueFromObj
+        |> Seq.toList
+        |> MetadataArray
+        |> Some
+    | _ -> invariantText value |> Option.map MetadataString
+
+let private metadataFromMetadataProperty (source: obj) =
+    let metadata =
+        match source with
+        | :? CWLToolDescription as tool -> tool.Metadata
+        | :? CWLWorkflowDescription as workflow -> workflow.Metadata
+        | :? CWLExpressionToolDescription as expressionTool -> expressionTool.Metadata
+        | :? CWLOperationDescription as operation -> operation.Metadata
+        | _ -> None
+
+    metadata
+    |> Option.map (fun dynamicObj ->
+        dynamicObj.GetProperties(false)
+        |> Seq.choose (fun kvp -> metadataValueFromObj kvp.Value |> Option.map (fun value -> kvp.Key, value))
+        |> Map.ofSeq
+    )
+    |> Option.defaultValue emptyMetadataMap
+
+let private metadataFromDynamicObj (excludedKeys: string seq) (source: obj) =
+    let propertyMetadata = metadataFromMetadataProperty source
+
+    let dynamicMetadata =
+        match source with
+        | :? DynamicObj as dynamicObj ->
+            let excluded =
+                excludedKeys |> Seq.map (fun key -> key.ToLowerInvariant()) |> Set.ofSeq
+
+            dynamicObj.GetProperties(false)
+            |> Seq.choose (fun kvp ->
+                let normalizedKey = kvp.Key.ToLowerInvariant()
+
+                if excluded.Contains normalizedKey then
+                    None
+                else
+                    metadataValueFromObj kvp.Value |> Option.map (fun value -> kvp.Key, value)
+            )
+            |> Map.ofSeq
+        | _ -> emptyMetadataMap
+
+    Map.fold (fun state key value -> Map.add key value state) propertyMetadata dynamicMetadata
 
 let private addField key value fields =
     if String.IsNullOrWhiteSpace value then
@@ -462,7 +566,7 @@ and private decodeWorkflowStep (step: WorkflowStep) = {
             Id = newStepInputId ()
             Name = input.Id
             Sources = input.Source |> Option.defaultValue (ResizeArray()) |> Seq.toList
-            Metadata = Map.empty
+            Metadata = emptyMetadataMap
         })
         |> Seq.toList
     Outputs =
@@ -470,7 +574,7 @@ and private decodeWorkflowStep (step: WorkflowStep) = {
         |> Seq.map (fun output -> {
             Id = newStepOutputId ()
             Name = stepOutputId output
-            Metadata = Map.empty
+            Metadata = emptyMetadataMap
         })
         |> Seq.toList
     Metadata = metadataFromDynamicObj [ "id"; "run"; "in"; "out" ] step

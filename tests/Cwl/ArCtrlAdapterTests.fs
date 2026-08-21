@@ -8,6 +8,7 @@ open Swate.Tests.Cwl.TestFixtures
 open Swate.Components.Shared.Cwl.Adapters.ArCtrlDecode
 open Swate.Components.Shared.Cwl.Adapters.ArCtrlEncode
 open Swate.Components.Shared.Cwl.Adapters.ValidationAdapter
+open Swate.Components.Shared.Cwl.Documents.Common
 open Swate.Components.Shared.Cwl.Documents.Types
 open Swate.Components.Shared.Cwl.Validation.ValidationContext
 
@@ -101,6 +102,44 @@ let adapterRoundtripTests =
                 "Requirements should survive adapter encode"
 
             Expect.isTrue (encodedYaml.Contains "DockerRequirement") "Hints should survive adapter encode"
+        }
+
+        test "adapter roundtrip preserves nested custom metadata" {
+            let processingUnit = Decode.decodeCWLProcessingUnit toolWithNestedMetadataYaml
+            let document = fromProcessingUnit processingUnit
+            let encodedYaml = document |> toProcessingUnit |> Encode.encodeProcessingUnit
+            let roundtripped = Decode.decodeCWLProcessingUnit encodedYaml
+
+            match fromProcessingUnit roundtripped with
+            | CommandLineToolDoc tool ->
+                let expectedMetadata =
+                    Map.ofList [
+                        "customMetadata",
+                        MetadataObject(
+                            Map.ofList [
+                                "nested",
+                                MetadataObject(
+                                    Map.ofList [
+                                        "enabled", MetadataBool true
+                                        "thresholds", MetadataArray [ MetadataInt 1L; MetadataFloat 2.5 ]
+                                        "labels",
+                                        MetadataObject(
+                                            Map.ofList [
+                                                "primary", MetadataString "alpha"
+                                                "secondary", MetadataString "beta"
+                                            ]
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
+                    ]
+
+                Expect.equal
+                    tool.Metadata
+                    expectedMetadata
+                    "Nested metadata should survive decode/encode/decode adapter roundtrip"
+            | _ -> failtest "Expected CommandLineTool processing unit"
         }
     ]
 

@@ -42,6 +42,9 @@ let workflowWithExternalRunYaml =
 let toolWithRequirementsAndHintsYaml =
     readFixture [ "command-line-tool-with-requirements-hints.cwl" ]
 
+let toolWithNestedMetadataYaml =
+    readFixture [ "command-line-tool-with-nested-metadata.cwl" ]
+
 // ---------------------------------------------------------------------------
 // Roundtrip helpers
 // ---------------------------------------------------------------------------

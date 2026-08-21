@@ -25,9 +25,44 @@ let private cwlTypeFromKey (value: string option) =
         | "directory" -> Some(CWLType.directory ())
         | _ -> None
 
-let private setMetadata (metadata: StringMap) (target: obj) =
+let rec private metadataValueToObj value : obj =
+    match value with
+    | MetadataString text -> box text
+    | MetadataBool flag -> box flag
+    | MetadataInt number -> box number
+    | MetadataFloat number -> box number
+    | MetadataObject metadata ->
+        let dynamicObj = DynamicObj()
+
+        metadata
+        |> Map.iter (fun key item -> dynamicObj.SetProperty(key, metadataValueToObj item))
+
+        box dynamicObj
+    | MetadataArray values -> values |> List.map metadataValueToObj |> ResizeArray<obj> |> box
+
+let private populateDynamicObj (metadata: MetadataMap) =
+    let dynamicObj = DynamicObj()
+
+    metadata
+    |> Map.iter (fun key value -> dynamicObj.SetProperty(key, metadataValueToObj value))
+
+    dynamicObj
+
+let private metadataOption (metadata: MetadataMap) =
+    if Map.isEmpty metadata then
+        None
+    else
+        Some(populateDynamicObj metadata)
+
+let private setMetadata (metadata: MetadataMap) (target: obj) =
     match target with
-    | :? DynamicObj as dynamicObj -> metadata |> Map.iter (fun key value -> dynamicObj.SetProperty(key, value))
+    | :? CWLToolDescription as tool -> tool.Metadata <- metadataOption metadata
+    | :? CWLWorkflowDescription as workflow -> workflow.Metadata <- metadataOption metadata
+    | :? CWLExpressionToolDescription as expressionTool -> expressionTool.Metadata <- metadataOption metadata
+    | :? CWLOperationDescription as operation -> operation.Metadata <- metadataOption metadata
+    | :? DynamicObj as dynamicObj ->
+        metadata
+        |> Map.iter (fun key value -> dynamicObj.SetProperty(key, metadataValueToObj value))
     | _ -> ()
 
 let private asResizeArray<'T> (values: 'T seq) = ResizeArray<'T>(values)
@@ -203,13 +238,18 @@ let private encodeRequirements nodes =
 let private encodeHints nodes =
     encodeRequirementCollection toggleHint setHintFieldByKey nodes
 
+let private tryMetadataString key (metadata: MetadataMap) =
+    match metadata |> Map.tryFind key with
+    | Some(MetadataString value) when String.IsNullOrWhiteSpace value |> not -> Some value
+    | _ -> None
+
 let private setWorkflowStepExternalRunMetadataFromModel (stepModel: WorkflowStepModel) (step: WorkflowStep) =
     stepModel.Metadata
-    |> Map.tryFind WorkflowStepOriginalRunStringKey
+    |> tryMetadataString WorkflowStepOriginalRunStringKey
     |> Option.iter (fun value -> step.SetProperty(WorkflowStepOriginalRunStringKey, value))
 
     stepModel.Metadata
-    |> Map.tryFind WorkflowStepExternalRunAbsolutePathKey
+    |> tryMetadataString WorkflowStepExternalRunAbsolutePathKey
     |> Option.iter (fun value -> step.SetProperty(WorkflowStepExternalRunAbsolutePathKey, value))
 
 let rec private encodeCommandLineTool (model: CommandLineToolModel) =

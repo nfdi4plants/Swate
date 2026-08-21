@@ -21,7 +21,7 @@ type InputModel = {
     CwlType: string option
     Optional: bool
     InputBinding: InputBindingModel option
-    Metadata: StringMap
+    Metadata: MetadataMap
 }
 
 type OutputModel = {
@@ -30,20 +30,20 @@ type OutputModel = {
     CwlType: string option
     OutputBinding: OutputBindingModel option
     OutputSource: string list
-    Metadata: StringMap
+    Metadata: MetadataMap
 }
 
 type StepInputModel = {
     Id: StepInputId
     Name: string
     Sources: string list
-    Metadata: StringMap
+    Metadata: MetadataMap
 }
 
 type StepOutputModel = {
     Id: StepOutputId
     Name: string
-    Metadata: StringMap
+    Metadata: MetadataMap
 }
 
 type CommandLineToolModel = {
@@ -54,7 +54,7 @@ type CommandLineToolModel = {
     Outputs: OutputModel list
     Requirements: RequirementNode list
     Hints: RequirementNode list
-    Metadata: StringMap
+    Metadata: MetadataMap
 }
 
 type WorkflowModel = {
@@ -65,7 +65,7 @@ type WorkflowModel = {
     Steps: WorkflowStepModel list
     Requirements: RequirementNode list
     Hints: RequirementNode list
-    Metadata: StringMap
+    Metadata: MetadataMap
 }
 
 and ExpressionToolModel = {
@@ -76,7 +76,7 @@ and ExpressionToolModel = {
     Outputs: OutputModel list
     Requirements: RequirementNode list
     Hints: RequirementNode list
-    Metadata: StringMap
+    Metadata: MetadataMap
 }
 
 and OperationModel = {
@@ -86,7 +86,7 @@ and OperationModel = {
     Outputs: OutputModel list
     Requirements: RequirementNode list
     Hints: RequirementNode list
-    Metadata: StringMap
+    Metadata: MetadataMap
 }
 
 and WorkflowRunModel =
@@ -102,7 +102,7 @@ and WorkflowStepModel = {
     Run: WorkflowRunModel
     Inputs: StepInputModel list
     Outputs: StepOutputModel list
-    Metadata: StringMap
+    Metadata: MetadataMap
 }
 
 type EditorDocument =
@@ -123,7 +123,7 @@ let createInput name = {
     CwlType = None
     Optional = false
     InputBinding = None
-    Metadata = emptyStringMap
+    Metadata = emptyMetadataMap
 }
 
 let createOutput name = {
@@ -132,20 +132,20 @@ let createOutput name = {
     CwlType = None
     OutputBinding = None
     OutputSource = []
-    Metadata = emptyStringMap
+    Metadata = emptyMetadataMap
 }
 
 let createStepInput name = {
     Id = newStepInputId ()
     Name = name
     Sources = []
-    Metadata = emptyStringMap
+    Metadata = emptyMetadataMap
 }
 
 let createStepOutput name = {
     Id = newStepOutputId ()
     Name = name
-    Metadata = emptyStringMap
+    Metadata = emptyMetadataMap
 }
 
 let createWorkflowStep name run = {
@@ -154,7 +154,7 @@ let createWorkflowStep name run = {
     Run = run
     Inputs = []
     Outputs = []
-    Metadata = emptyStringMap
+    Metadata = emptyMetadataMap
 }
 
 let createCommandLineToolModel cwlVersion = {
@@ -165,7 +165,7 @@ let createCommandLineToolModel cwlVersion = {
     Outputs = []
     Requirements = []
     Hints = []
-    Metadata = emptyStringMap
+    Metadata = emptyMetadataMap
 }
 
 let createWorkflowModel cwlVersion = {
@@ -176,7 +176,7 @@ let createWorkflowModel cwlVersion = {
     Steps = []
     Requirements = []
     Hints = []
-    Metadata = emptyStringMap
+    Metadata = emptyMetadataMap
 }
 
 let createExpressionToolModel cwlVersion expression = {
@@ -187,7 +187,7 @@ let createExpressionToolModel cwlVersion expression = {
     Outputs = []
     Requirements = []
     Hints = []
-    Metadata = emptyStringMap
+    Metadata = emptyMetadataMap
 }
 
 let createOperationModel cwlVersion = {
@@ -197,5 +197,5 @@ let createOperationModel cwlVersion = {
     Outputs = []
     Requirements = []
     Hints = []
-    Metadata = emptyStringMap
+    Metadata = emptyMetadataMap
 }

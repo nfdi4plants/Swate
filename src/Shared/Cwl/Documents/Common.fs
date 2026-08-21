@@ -12,8 +12,18 @@ type StepOutputId = StepOutputId of Guid
 type RequirementNodeId = RequirementNodeId of Guid
 
 type StringMap = Map<string, string>
+type MetadataMap = Map<string, MetadataValue>
+
+and MetadataValue =
+    | MetadataString of string
+    | MetadataBool of bool
+    | MetadataInt of int64
+    | MetadataFloat of float
+    | MetadataObject of MetadataMap
+    | MetadataArray of MetadataValue list
 
 let emptyStringMap: StringMap = Map.empty
+let emptyMetadataMap: MetadataMap = Map.empty
 
 let newDocumentId () = DocumentId(Guid.NewGuid())
 let newRevision value = Revision value
