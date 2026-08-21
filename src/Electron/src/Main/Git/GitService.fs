@@ -51,8 +51,27 @@ let private gitLfsDefaultThresholdMb = 1
 let private gitLfsMaximumThresholdMb = 100
 let private gitLfsDefaultDownloadLargeFiles = false
 
-let private pushCancellationRequests =
-    System.Collections.Generic.Dictionary<string, bool>()
+/// Tracks one in-flight cancellable git operation for a repository (or clone target) path.
+/// CancelCheck is polled by spawned git/git-lfs processes; abort signals kill simple-git tasks.
+type GitCancellationScope = {
+    mutable CancelRequested: bool
+    Controllers: ResizeArray<IAbortController>
+} with
+
+    member this.CancelCheck() = this.CancelRequested
+
+    /// Creates an abort signal tied to this scope. Signals created after cancellation abort immediately.
+    member this.CreateAbortSignal() : IAbortSignal =
+        let controller = AbortController.create ()
+
+        if this.CancelRequested then
+            controller.abort ()
+
+        this.Controllers.Add controller
+        controller.signal
+
+let private cancellationScopes =
+    System.Collections.Generic.Dictionary<string, GitCancellationScope>()
 
 let private normalizeOptionalGitRef (value: string option) =
     value
@@ -60,36 +79,63 @@ let private normalizeOptionalGitRef (value: string option) =
     |> Option.map _.Trim()
     |> Option.filter (fun item -> not (String.IsNullOrWhiteSpace item))
 
-let private pushCancellationKey (arcPath: string) =
+let private cancellationKey (path: string) =
     let raw =
         try
-            resolve [| arcPath |]
+            resolve [| path |]
         with _ ->
-            arcPath
+            path
 
     raw.Trim().TrimEnd([| '/'; '\\' |]).ToLowerInvariant()
 
-let private startPushCancellationScope (arcPath: string) =
-    let key = pushCancellationKey arcPath
-    pushCancellationRequests.[key] <- false
+/// Registers a cancellation scope for the given repository or clone target path.
+/// The scope replaces any previous scope for the same path and must be cleared with clearCancellationScope.
+let startCancellationScope (path: string) : string * GitCancellationScope =
+    let key = cancellationKey path
 
-    let cancelCheck () =
-        match pushCancellationRequests.TryGetValue key with
-        | true, value -> value
-        | _ -> false
+    let scope = {
+        CancelRequested = false
+        Controllers = ResizeArray()
+    }
 
-    key, cancelCheck
+    cancellationScopes.[key] <- scope
+    key, scope
 
-let private clearPushCancellationScope key =
-    pushCancellationRequests.Remove key |> ignore
+let clearCancellationScope (key: string) (scope: GitCancellationScope) =
+    match cancellationScopes.TryGetValue key with
+    | true, current when obj.ReferenceEquals(current, scope) -> cancellationScopes.Remove key |> ignore
+    | _ -> ()
 
-let cancelPush (arcPath: string) : GitResult<unit> =
-    let key = pushCancellationKey arcPath
+/// Disposable wrapper so promise-heavy match bodies can clear their cancellation scope on every exit path.
+let deferScopeCleanup (cleanup: unit -> unit) =
+    { new IDisposable with
+        member _.Dispose() = cleanup ()
+    }
 
-    if pushCancellationRequests.ContainsKey key then
-        pushCancellationRequests.[key] <- true
+/// Requests cancellation of the in-flight git operation registered for the given path.
+/// Kills simple-git tasks through their abort signals and flags spawned processes for termination.
+let cancelOperation (path: string) : GitResult<unit> =
+    match cancellationScopes.TryGetValue(cancellationKey path) with
+    | true, scope ->
+        scope.CancelRequested <- true
+
+        for controller in scope.Controllers do
+            controller.abort ()
+    | _ -> ()
 
     Ok()
+
+/// A failure that surfaces while the operation's scope has a pending cancel request is reported
+/// as a cancellation with the exact shared message, so classification never depends on whatever
+/// error text the killed git process happened to emit.
+let private markCanceledIfRequested (scope: GitCancellationScope) (result: Result<'T, GitFailure>) =
+    match result with
+    | Error _ when scope.CancelRequested ->
+        Error {
+            Kind = GitFailureKind.Canceled
+            Message = GitOperationCancelledMessage
+        }
+    | _ -> result
 
 let private lfsInstallRequiredTokens = [|
     "git lfs is required for files larger than"
@@ -137,7 +183,10 @@ let classifyFailureKind (message: string) =
         |]
     then
         GitFailureKind.RemoteProjectAlreadyExists
-    elif containsAny [| "abort"; "cancelled"; "canceled"; "aborterror" |] then
+    // Cancellation is primarily reported through the cancellation scope (markCanceledIfRequested);
+    // these tokens only cover explicit cancel markers. A bare "abort" would misclassify genuine git
+    // errors such as the "Aborting" printed when local changes would be overwritten by merge.
+    elif containsAny [| "cancelled"; "canceled"; "aborterror" |] then
         GitFailureKind.Canceled
     elif containsAny [| "timed out"; "timeout"; "time out" |] then
         GitFailureKind.Timeout
@@ -1032,11 +1081,12 @@ let private hydratePulledLfsContent
     (progressCallback: GitProgressCallback option)
     (repoPath: string)
     (commandAuth: GitCommandAuthentication)
+    (cancelCheck: (unit -> bool) option)
     : JS.Promise<GitResult<unit>> =
     promise {
         reportPhase progressCallback "lfs" "Downloading Git LFS files"
 
-        match! GitLfsService.pullAll repoPath commandAuth None with
+        match! GitLfsService.pullAll repoPath commandAuth cancelCheck with
         | Ok() -> return Ok()
         | Error error -> return errorResult error
     }
@@ -1108,8 +1158,9 @@ type private AuthenticatedGitSession = {
     CommandAuth: GitAuthAdapter.GitCommandAuthentication
 }
 
-let private createLocalGitSession arcPath progressCallback =
-    let options = createOptions arcPath syncTimeout progressCallback
+let private createLocalGitSession arcPath progressCallback (abortSignal: IAbortSignal option) =
+    let options =
+        createOptionsWithAbort arcPath syncTimeout progressCallback abortSignal
 
     {
         Git = createGit options |> withGitOutputProgress progressCallback
@@ -1126,6 +1177,7 @@ let private createAuthenticatedGitSession
     (arcPath: string)
     (remoteName: string)
     (progressCallback: GitProgressCallback option)
+    (abortSignal: IAbortSignal option)
     : JS.Promise<GitResult<AuthenticatedGitSession>> =
     promise {
         let probeOptions = createOptions arcPath standardTimeout None
@@ -1156,7 +1208,7 @@ let private createAuthenticatedGitSession
 
                         try
                             let operationOptions =
-                                createOptions arcPath syncTimeout progressCallback
+                                createOptionsWithAbort arcPath syncTimeout progressCallback abortSignal
                                 |> withConfigEntries commitIdentityEntries
 
                             let git =
@@ -1185,6 +1237,7 @@ let private createAuthenticatedGitSession
 let private createOriginLfsRemoteSession
     (arcPath: string)
     (progressCallback: GitProgressCallback option)
+    (abortSignal: IAbortSignal option)
     : JS.Promise<GitResult<AuthenticatedGitSession>> =
     promise {
         let remoteName = "origin"
@@ -1204,22 +1257,23 @@ let private createOriginLfsRemoteSession
         | Ok remoteUrl ->
             match ensureAllowedRemoteUrl remoteUrl with
             | Ok _ ->
-                let! sessionResult = createAuthenticatedGitSession arcPath remoteName progressCallback
+                let! sessionResult = createAuthenticatedGitSession arcPath remoteName progressCallback abortSignal
                 return sessionResult
             | Error _ when
                 remoteUrl.StartsWith("file://", StringComparison.OrdinalIgnoreCase)
                 || isAbsolute remoteUrl
                 ->
-                return Ok(createLocalGitSession arcPath progressCallback)
+                return Ok(createLocalGitSession arcPath progressCallback abortSignal)
             | Error validationError -> return errorResult validationError
     }
 
 let private createOriginLfsRemoteGit
     (arcPath: string)
     (progressCallback: GitProgressCallback option)
+    (abortSignal: IAbortSignal option)
     : JS.Promise<GitResult<ISimpleGit>> =
     promise {
-        let! sessionResult = createOriginLfsRemoteSession arcPath progressCallback
+        let! sessionResult = createOriginLfsRemoteSession arcPath progressCallback abortSignal
         return sessionResult |> Result.map _.Git
     }
 
@@ -1401,10 +1455,11 @@ let private withAuthenticatedGit
     (arcPath: string)
     (remoteName: string)
     (progressCallback: GitProgressCallback option)
+    (abortSignal: IAbortSignal option)
     (operation: ISimpleGit -> JS.Promise<'T>)
     =
     promise {
-        let! gitResult = createAuthenticatedGitSession arcPath remoteName progressCallback
+        let! gitResult = createAuthenticatedGitSession arcPath remoteName progressCallback abortSignal
 
         match gitResult with
         | Error failure -> return Error failure
@@ -1706,22 +1761,28 @@ let fetch
             match validateOptionalBranchName branchName with
             | Error branchError -> return errorResult branchError
             | Ok safeBranchName ->
-                let! result =
-                    withAuthenticatedGit
-                        arcPath
-                        safeRemoteName
-                        progressCallback
-                        (fun git -> promise {
-                            match safeBranchName with
-                            | None ->
-                                let! _ = git.fetch (safeRemoteName)
-                                return ()
-                            | Some safeBranch ->
-                                let! _ = git.fetch (safeRemoteName, safeBranch)
-                                return ()
-                        })
+                let cancellationKey, cancellationScope = startCancellationScope arcPath
 
-                return result
+                try
+                    let! result =
+                        withAuthenticatedGit
+                            arcPath
+                            safeRemoteName
+                            progressCallback
+                            (Some(cancellationScope.CreateAbortSignal()))
+                            (fun git -> promise {
+                                match safeBranchName with
+                                | None ->
+                                    let! _ = git.fetch (safeRemoteName)
+                                    return ()
+                                | Some safeBranch ->
+                                    let! _ = git.fetch (safeRemoteName, safeBranch)
+                                    return ()
+                            })
+
+                    return markCanceledIfRequested cancellationScope result
+                finally
+                    clearCancellationScope cancellationKey cancellationScope
     }
 
 /// Fetches and runs a merge-tree preflight to classify whether pull is likely safe or requires merge resolution.
@@ -1768,68 +1829,103 @@ let previewPull
                                     Message = Some "No upstream tracking branch is configured for the current branch."
                                 }
                         | Some resolvedUpstreamRef ->
-                            return!
-                                withAuthenticatedGit
-                                    arcPath
-                                    safeRemoteName
-                                    progressCallback
-                                    (fun git -> promise {
-                                        match safeBranchName with
-                                        | None ->
-                                            let! _ = git.fetch safeRemoteName
-                                            ()
-                                        | Some safeBranch ->
-                                            let! _ = git.fetch (safeRemoteName, safeBranch)
-                                            ()
+                            let cancellationKey, cancellationScope = startCancellationScope arcPath
 
-                                        let! mergeTreeResult =
-                                            runGitCapturedWithOutput progressCallback {
-                                                WorkingDirectory = Some arcPath
-                                                Arguments = [|
-                                                    "merge-tree"
-                                                    "--write-tree"
-                                                    "HEAD"
-                                                    resolvedUpstreamRef
-                                                |]
-                                                Environment = None
-                                                StandardInput = None
-                                                CancelCheck = None
-                                                TimeoutMs = Some 30000
-                                            }
+                            try
+                                let! preflightResult =
+                                    withAuthenticatedGit
+                                        arcPath
+                                        safeRemoteName
+                                        progressCallback
+                                        (Some(cancellationScope.CreateAbortSignal()))
+                                        (fun git -> promise {
+                                            match safeBranchName with
+                                            | None ->
+                                                let! _ = git.fetch safeRemoteName
+                                                ()
+                                            | Some safeBranch ->
+                                                let! _ = git.fetch (safeRemoteName, safeBranch)
+                                                ()
 
-                                        if mergeTreeResult.ExitCode = 0 then
-                                            return {
-                                                Status = GitPullPreflightStatus.SafeToPull
-                                                Message = None
-                                            }
-                                        else
-                                            let diagnosticText =
-                                                $"{mergeTreeResult.StdoutText}\n{mergeTreeResult.StderrText}"
+                                            let! mergeTreeResult =
+                                                runGitCapturedWithOutput progressCallback {
+                                                    WorkingDirectory = Some arcPath
+                                                    Arguments = [|
+                                                        "merge-tree"
+                                                        "--write-tree"
+                                                        "HEAD"
+                                                        resolvedUpstreamRef
+                                                    |]
+                                                    Environment = None
+                                                    StandardInput = None
+                                                    CancelCheck = Some cancellationScope.CancelCheck
+                                                    TimeoutMs = Some 30000
+                                                }
 
-                                            let normalizedDiagnostic = diagnosticText.ToLowerInvariant()
-
-                                            if
-                                                normalizedDiagnostic.Contains("conflict")
-                                                || normalizedDiagnostic.Contains("merge conflict")
-                                            then
+                                            if mergeTreeResult.ExitCode = 0 then
                                                 return {
-                                                    Status = GitPullPreflightStatus.WouldRequireMergeResolution
-                                                    Message = Some "Pulling would require merge resolution."
+                                                    Status = GitPullPreflightStatus.SafeToPull
+                                                    Message = None
                                                 }
                                             else
-                                                let trimmedDiagnostic = diagnosticText.Trim()
+                                                let diagnosticText =
+                                                    $"{mergeTreeResult.StdoutText}\n{mergeTreeResult.StderrText}"
 
-                                                return {
-                                                    Status = GitPullPreflightStatus.Indeterminate
-                                                    Message =
-                                                        if String.IsNullOrWhiteSpace trimmedDiagnostic then
-                                                            Some "Git pull preflight could not be classified safely."
-                                                        else
-                                                            Some
-                                                                $"Git pull preflight could not be classified safely: {trimmedDiagnostic}"
-                                                }
-                                    })
+                                                let normalizedDiagnostic = diagnosticText.ToLowerInvariant()
+
+                                                if
+                                                    normalizedDiagnostic.Contains("conflict")
+                                                    || normalizedDiagnostic.Contains("merge conflict")
+                                                then
+                                                    return {
+                                                        Status = GitPullPreflightStatus.WouldRequireMergeResolution
+                                                        Message = Some "Pulling would require merge resolution."
+                                                    }
+                                                else
+                                                    let trimmedDiagnostic = diagnosticText.Trim()
+
+                                                    return {
+                                                        Status = GitPullPreflightStatus.Indeterminate
+                                                        Message =
+                                                            if String.IsNullOrWhiteSpace trimmedDiagnostic then
+                                                                Some
+                                                                    "Git pull preflight could not be classified safely."
+                                                            else
+                                                                Some
+                                                                    $"Git pull preflight could not be classified safely: {trimmedDiagnostic}"
+                                                    }
+                                        })
+
+                                return markCanceledIfRequested cancellationScope preflightResult
+                            finally
+                                clearCancellationScope cancellationKey cancellationScope
     }
+
+/// Restores a clean repository state after a git process was killed by a cancelled pull.
+/// Removes the stale index lock left by the killed process, then aborts any half-applied merge or rebase.
+let private cleanupAfterCancelledPull (arcPath: string) : JS.Promise<unit> = promise {
+    let indexLockPath = resolve [| arcPath; ".git"; "index.lock" |]
+
+    try
+        if existsSync indexLockPath then
+            unlinkSync indexLockPath
+    with _ ->
+        ()
+
+    let cleanupGit = createOptions arcPath standardTimeout None |> createGit
+
+    if isMergeInProgress arcPath then
+        let! _ = runSimpleGit (fun git -> git.raw [| "merge"; "--abort" |]) cleanupGit
+        ()
+
+    let rebaseInProgress =
+        existsSync (resolve [| arcPath; ".git"; "rebase-merge" |])
+        || existsSync (resolve [| arcPath; ".git"; "rebase-apply" |])
+
+    if rebaseInProgress then
+        let! _ = runSimpleGit (fun git -> git.raw [| "rebase"; "--abort" |]) cleanupGit
+        ()
+}
 
 /// Pulls from a validated remote using token-backed auth and the repository LFS download preference.
 /// When large-file download is enabled, LFS content is hydrated after the git pull.
@@ -1846,41 +1942,70 @@ let pull
             match validateOptionalBranchName branchName with
             | Error branchError -> return errorResult branchError
             | Ok safeBranchName ->
-                let! sessionResult = createAuthenticatedGitSession arcPath safeRemoteName progressCallback
+                let cancellationKey, cancellationScope = startCancellationScope arcPath
 
-                match sessionResult with
-                | Error failure -> return Error failure
-                | Ok session ->
-                    let! result =
-                        runSimpleGit
-                            (fun git -> promise {
-                                let! downloadLargeFiles = getConfiguredLfsDownloadLargeFiles git
-                                let effectiveGit = applyLfsSkipSmudge git
+                try
+                    let! sessionResult =
+                        createAuthenticatedGitSession
+                            arcPath
+                            safeRemoteName
+                            progressCallback
+                            (Some(cancellationScope.CreateAbortSignal()))
 
-                                match safeBranchName with
-                                | None ->
-                                    do! ensureDefaultTrackingBranchForPull safeRemoteName effectiveGit
-                                    let! _ = effectiveGit.pull (safeRemoteName)
-                                    ()
-                                | Some safeBranch ->
-                                    let! _ = effectiveGit.pull (safeRemoteName, safeBranch)
-                                    ()
+                    match sessionResult with
+                    | Error failure -> return Error failure
+                    | Ok session ->
+                        let! result =
+                            runSimpleGit
+                                (fun git -> promise {
+                                    let! downloadLargeFiles = getConfiguredLfsDownloadLargeFiles git
+                                    let effectiveGit = applyLfsSkipSmudge git
 
-                                if downloadLargeFiles then
-                                    let! lfsPullResult =
-                                        hydratePulledLfsContent progressCallback arcPath session.CommandAuth
+                                    match safeBranchName with
+                                    | None ->
+                                        do! ensureDefaultTrackingBranchForPull safeRemoteName effectiveGit
+                                        let! _ = effectiveGit.pull (safeRemoteName)
+                                        ()
+                                    | Some safeBranch ->
+                                        let! _ = effectiveGit.pull (safeRemoteName, safeBranch)
+                                        ()
 
-                                    match lfsPullResult with
-                                    | Ok() -> return { Warning = None }
-                                    | Error failure ->
-                                        let hydrationFailure = createPullHydrationFailure failure
-                                        return abortGitPromise hydrationFailure.Message
-                                else
-                                    return { Warning = None }
-                            })
-                            session.Git
+                                    if downloadLargeFiles then
+                                        let! lfsPullResult =
+                                            hydratePulledLfsContent
+                                                progressCallback
+                                                arcPath
+                                                session.CommandAuth
+                                                (Some cancellationScope.CancelCheck)
 
-                    return result
+                                        match lfsPullResult with
+                                        | Ok() -> return { Warning = None }
+                                        | Error _ when cancellationScope.CancelRequested ->
+                                            // The pull itself already landed, so a cancelled hydration is a
+                                            // successful pull with pointers left behind — not a failure, and
+                                            // never a rollback. The warning tells the user exactly that.
+                                            return {
+                                                Warning =
+                                                    Some {
+                                                        Kind = GitFailureKind.Canceled
+                                                        Message =
+                                                            "Git pull completed, but the Git LFS download was cancelled. Large files stay as pointers until the next update."
+                                                    }
+                                            }
+                                        | Error failure ->
+                                            let hydrationFailure = createPullHydrationFailure failure
+                                            return abortGitPromise hydrationFailure.Message
+                                    else
+                                        return { Warning = None }
+                                })
+                                session.Git
+
+                        if cancellationScope.CancelRequested then
+                            do! cleanupAfterCancelledPull arcPath
+
+                        return markCanceledIfRequested cancellationScope result
+                finally
+                    clearCancellationScope cancellationKey cancellationScope
     }
 
 /// Coordinates LFS upload planning, optional LFS upload, and the final git push.
@@ -1932,20 +2057,31 @@ let push
                 match remoteConfigResult with
                 | Error failure -> return Error failure
                 | Ok() ->
-                    let! gitResult = createAuthenticatedGitSession arcPath safeRemoteName progressCallback
+                    let cancellationKey, cancellationScope = startCancellationScope arcPath
+
+                    let! gitResult =
+                        createAuthenticatedGitSession
+                            arcPath
+                            safeRemoteName
+                            progressCallback
+                            (Some(cancellationScope.CreateAbortSignal()))
 
                     match gitResult with
-                    | Error failure -> return Error failure
+                    | Error failure ->
+                        clearCancellationScope cancellationKey cancellationScope
+                        // Session creation can be killed through the scope's abort signal, so a
+                        // cancel arriving this early must still classify as a cancellation.
+                        return markCanceledIfRequested cancellationScope (Error failure)
                     | Ok session ->
                         let git = session.Git
                         let runGitCapturedForProgress = runGitCapturedWithOutput progressCallback
-                        let cancellationKey, cancelCheck = startPushCancellationScope arcPath
+                        let cancelCheck = cancellationScope.CancelCheck
 
                         try
                             let! pushStatusResult = runSimpleGit (fun currentGit -> currentGit.status ()) git
 
                             match pushStatusResult with
-                            | Error failure -> return Error failure
+                            | Error failure -> return markCanceledIfRequested cancellationScope (Error failure)
                             | Ok pushStatus ->
                                 let pushTarget =
                                     resolvePushTarget
@@ -1954,7 +2090,7 @@ let push
                                         pushStatus.tracking
                                         pushStatus.detached
 
-                                return!
+                                let! pushResult =
                                     executePushWorkflow
                                         pushTarget
                                         (fun () ->
@@ -2025,8 +2161,10 @@ let push
                                                 safeRemoteName
                                                 git
                                         )
+
+                                return markCanceledIfRequested cancellationScope pushResult
                         finally
-                            clearPushCancellationScope cancellationKey
+                            clearCancellationScope cancellationKey cancellationScope
     }
 
 /// Persists Git workflow LFS settings in local repository config.
@@ -2079,7 +2217,13 @@ let pruneLfsCacheWithProgress
         match localValidationResult with
         | Error failure -> return Error failure
         | Ok() ->
-            let! gitResult = createOriginLfsRemoteGit arcPath progressCallback
+            let cancellationKey, cancellationScope = startCancellationScope arcPath
+
+            use _ =
+                deferScopeCleanup (fun () -> clearCancellationScope cancellationKey cancellationScope)
+
+            let! gitResult =
+                createOriginLfsRemoteGit arcPath progressCallback (Some(cancellationScope.CreateAbortSignal()))
 
             match gitResult with
             | Error failure -> return Error failure
@@ -2255,23 +2399,39 @@ let private requireDownloadedLfsFile
                     return ()
     }
 
-let private downloadMissingLfsFile arcPath safePath absolutePath listing : JS.Promise<GitResult<unit>> = promise {
-    match! createOriginLfsRemoteSession arcPath None with
-    | Error failure -> return Error failure
-    | Ok session ->
-        match! GitLfsService.downloadObjectFromListing arcPath session.CommandAuth safePath listing with
-        | Error error -> return errorResult error
-        | Ok() ->
-            let! checkoutResult = runLfsRaw (GitLfsService.buildCheckoutArgs safePath) session.Git
+let private downloadMissingLfsFile
+    arcPath
+    safePath
+    absolutePath
+    listing
+    (cancellationScope: GitCancellationScope)
+    : JS.Promise<GitResult<unit>> =
+    promise {
+        match! createOriginLfsRemoteSession arcPath None (Some(cancellationScope.CreateAbortSignal())) with
+        | Error failure -> return Error failure
+        | Ok session ->
+            match!
+                GitLfsService.downloadObjectFromListing
+                    arcPath
+                    session.CommandAuth
+                    safePath
+                    listing
+                    (Some cancellationScope.CancelCheck)
+            with
+            | Error error -> return errorResult error
+            | Ok() ->
+                let! checkoutResult = runLfsRaw (GitLfsService.buildCheckoutArgs safePath) session.Git
 
-            match checkoutResult with
-            | Error failure -> return Error failure
-            | Ok _ ->
-                return!
-                    runSimpleGit
-                        (fun currentGit -> requireDownloadedLfsFile arcPath safePath absolutePath listing currentGit)
-                        session.Git
-}
+                match checkoutResult with
+                | Error failure -> return Error failure
+                | Ok _ ->
+                    return!
+                        runSimpleGit
+                            (fun currentGit ->
+                                requireDownloadedLfsFile arcPath safePath absolutePath listing currentGit
+                            )
+                            session.Git
+    }
 
 let freeLocalLfsCopy (arcPath: string) (requestedPath: string) : JS.Promise<GitResult<unit>> = promise {
     let! lfsFileResult =
@@ -2288,10 +2448,21 @@ let freeLocalLfsCopy (arcPath: string) (requestedPath: string) : JS.Promise<GitR
     | Ok(safePath, _, _) when not (isTrackedByAttributes arcPath safePath) ->
         return errorResult (createMissingLfsAttributesFailure safePath "freeing the local LFS copy")
     | Ok(safePath, absolutePath, listing) ->
-        match! createOriginLfsRemoteSession arcPath None with
+        let cancellationKey, cancellationScope = startCancellationScope arcPath
+
+        use _ =
+            deferScopeCleanup (fun () -> clearCancellationScope cancellationKey cancellationScope)
+
+        match! createOriginLfsRemoteSession arcPath None (Some(cancellationScope.CreateAbortSignal())) with
         | Error failure -> return Error failure
         | Ok session ->
-            match! GitLfsService.fetchRefetchForPath arcPath session.CommandAuth safePath None with
+            match!
+                GitLfsService.fetchRefetchForPath
+                    arcPath
+                    session.CommandAuth
+                    safePath
+                    (Some cancellationScope.CancelCheck)
+            with
             | Error error -> return errorResult error
             | Ok() ->
                 let git = session.Git
@@ -2356,7 +2527,13 @@ let downloadLfsFile (arcPath: string) (requestedPath: string) : JS.Promise<GitRe
     match lfsFileResult with
     | Error failure -> return Error failure
     | Ok(_, _, listing) when listing.checkout -> return Ok()
-    | Ok(safePath, absolutePath, listing) -> return! downloadMissingLfsFile arcPath safePath absolutePath listing
+    | Ok(safePath, absolutePath, listing) ->
+        let cancellationKey, cancellationScope = startCancellationScope arcPath
+
+        try
+            return! downloadMissingLfsFile arcPath safePath absolutePath listing cancellationScope
+        finally
+            clearCancellationScope cancellationKey cancellationScope
 }
 
 /// Discards validated pathspecs by restoring tracked paths from HEAD and cleaning selected untracked files.

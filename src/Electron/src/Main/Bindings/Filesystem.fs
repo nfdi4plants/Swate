@@ -7,9 +7,11 @@ type MkdirOptions(?recursive: bool) =
     member val recursive: bool option = recursive with get, set
 
 [<JS.PojoAttribute>]
-type RmOptions(?recursive: bool, ?force: bool) =
+type RmOptions(?recursive: bool, ?force: bool, ?maxRetries: int, ?retryDelay: int) =
     member val recursive: bool option = recursive with get, set
     member val force: bool option = force with get, set
+    member val maxRetries: int option = maxRetries with get, set
+    member val retryDelay: int option = retryDelay with get, set
 
 [<JS.PojoAttribute>]
 type ReaddirOptions(?withFileTypes: bool) =
