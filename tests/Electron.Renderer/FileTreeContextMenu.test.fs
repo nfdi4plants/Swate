@@ -262,12 +262,12 @@ Vitest.describe (
             "supported ARC owner folders expose Add or Delete DataMap based on current content",
             fun () ->
                 let owner = createFolderItem "AssayA" (Some "assays/AssayA")
-                let mutable requestedItem = None
+                let mutable requestedParentInfo = None
                 let mutable requestedDeleteItem = None
 
                 let config = {
                     createContextMenuConfig () with
-                        createDataMap = fun item -> requestedItem <- Some item
+                        createDataMap = fun parentInfo -> requestedParentInfo <- Some parentInfo
                         requestDeleteItem = fun item -> requestedDeleteItem <- Some item
                 }
 
@@ -276,7 +276,9 @@ Vitest.describe (
                     |> List.find (fun item -> item.Label = "Add DataMap")
 
                 addDataMap.OnClick()
-                Vitest.expect(requestedItem |> Option.map _.Path).toEqual (Some owner.Path)
+                Vitest
+                    .expect(requestedParentInfo)
+                    .toEqual (Some(DatamapParentInfo.create "AssayA" DataMapParent.Assay))
 
                 let dataMapItem =
                     createFileItem DatamapParentInfo.DatamapFileName (Some "assays/AssayA/isa.datamap.xlsx")

@@ -1,8 +1,7 @@
 namespace Renderer.Components.LeftSidebar.FileExplorer
 
+open Renderer.Components.Helper
 open Renderer.Components.Helper.ArcViewHelper
-open Renderer.Components.Helper
-open Renderer.Components.Helper
 open Renderer.Components.LeftSidebar.FileExplorer.Modals
 open Swate.Components
 open Swate.Components.Page.FileExplorer.Types
@@ -400,23 +399,14 @@ type FileTree =
         let renameContextMenuItems =
             FileTreeContextMenu.renameContextMenuItems requestRenameItem
 
-        let createDataMap (item: FileItem) =
-            let parentInfo =
-                if item.IsDirectory then
-                    item.Path |> Option.bind DatamapParentInfo.tryFromFolderPath
-                else
-                    None
-
-            match parentInfo with
-            | None -> ()
-            | Some parentInfo ->
-                promise {
-                    match! ArcFileApiHelper.addArcFile (ArcFiles.DataMap(Some parentInfo, DataMap.init ())) with
-                    | Error exn -> applyCreateError exn.Message
-                    | Ok _ -> ()
-                }
-                |> Promise.catch (fun exn -> applyCreateError exn.Message)
-                |> Promise.start
+        let createDataMap (parentInfo: DatamapParentInfo) =
+            promise {
+                match! ArcFileApiHelper.addArcFile (ArcFiles.DataMap(Some parentInfo, DataMap.init ())) with
+                | Error exn -> applyCreateError exn.Message
+                | Ok _ -> ()
+            }
+            |> Promise.catch (fun exn -> applyCreateError exn.Message)
+            |> Promise.start
 
         let tryFindDataMapItemByPath path =
             fileStateCtx.state.FileTree

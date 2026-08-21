@@ -21,7 +21,7 @@ type ContextMenuConfig = {
     openItem: FileItem -> unit
     arcRootPath: string option
     openCreateModal: ArcExplorerNodeKind -> unit
-    createDataMap: FileItem -> unit
+    createDataMap: DatamapParentInfo -> unit
     tryFindDataMapItemByPath: string -> FileItem option
     openFileSystemCreateModal: FileSystemItemKind -> FileItem -> unit
     requestRenameItem: FileItem -> unit
@@ -157,7 +157,7 @@ let arcCreateContextMenuItems (openCreateModal: ArcExplorerNodeKind -> unit) (it
         []
 
 let dataMapContextMenuItems
-    (createDataMap: FileItem -> unit)
+    (createDataMap: DatamapParentInfo -> unit)
     (requestDeleteItem: FileItem -> unit)
     (tryFindDataMapItemByPath: string -> FileItem option)
     (item: FileItem)
@@ -182,8 +182,11 @@ let dataMapContextMenuItems
         )
 
     match parentInfo, dataMapItem with
-    | Some _, None -> [
-        ContextMenuItem.create "Add DataMap" "swt:fluent--database-arrow-up-20-regular" (fun () -> createDataMap item)
+    | Some parentInfo, None -> [
+        ContextMenuItem.create
+            "Add DataMap"
+            "swt:fluent--database-arrow-up-20-regular"
+            (fun () -> createDataMap parentInfo)
       ]
     | Some _, Some dataMap -> [
         ContextMenuItem.styled
