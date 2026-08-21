@@ -33,6 +33,7 @@ module FileExplorerDeleteHelper =
 
     let tryGetDataMapMismatchReload (fileTree: FileEntry[]) (pageState: PageState option) =
         match pageState with
+        | Some(PageState.ArcFilePage(ArcFiles.DataMap _, _)) -> None
         | Some(PageState.ArcFilePage(arcFile, requestedView)) ->
             match arcFile.TryGetDataMapParentInfo() with
             | Some parentInfo ->

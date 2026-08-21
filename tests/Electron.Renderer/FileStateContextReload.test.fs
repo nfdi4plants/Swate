@@ -243,6 +243,21 @@ Vitest.describe (
                 Vitest
                     .expect(FileExplorerDeleteHelper.tryGetDataMapMismatchReload fileTreeWithDataMap pageState)
                     .toEqual (Some("assays/DataMapAssay/isa.assay.xlsx", Some ActiveView.DataMap))
+
+                let standaloneDataMapPage =
+                    Some(
+                        RendererPageState.ArcFilePage(
+                            ArcFiles.DataMap(
+                                Some(DatamapParentInfo.create "DataMapAssay" DataMapParent.Assay),
+                                DataMap.init ()
+                            ),
+                            Some ActiveView.DataMap
+                        )
+                    )
+
+                Vitest
+                    .expect(FileExplorerDeleteHelper.tryGetDataMapMismatchReload fileTree standaloneDataMapPage)
+                    .toEqual (None)
         )
 
         Vitest.test (

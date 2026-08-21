@@ -208,10 +208,12 @@ module ArcVaultExtensions =
                                 this.fileWatcherPendingEvents.Clear()
                                 this.fileWatcherPendingArcMergeEvents.Clear()
 
-                                do! this.ApplyWatcherFileTreeEvents pendingEvents
-
+                                // FileTree updates are renderer-visible and can trigger an immediate openFile call.
+                                // Merge first so that call reads the same ARC state represented by the published tree.
                                 if not pendingArcMergeEvents.IsEmpty && not this.isBusyWriting then
                                     do! this.TriggerArcInMemoryMergeOnFileWatcherEvents pendingArcMergeEvents
+
+                                do! this.ApplyWatcherFileTreeEvents pendingEvents
 
                                 this.fileWatcherReloadArcTimeout <- None
                                 sendMsgApi.IsLoadingChanges false
