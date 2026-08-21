@@ -2,7 +2,6 @@ module Main.IPC.Delete
 
 open Fable.Core
 open ARCtrl
-open ARCtrl.Contract
 open Main.ARCtrlExtensions
 open Main.ArcMerge
 open Swate.Components.Shared

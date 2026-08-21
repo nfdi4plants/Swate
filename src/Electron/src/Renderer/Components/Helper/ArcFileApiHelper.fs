@@ -1,4 +1,4 @@
-module Renderer.Components.MainContent.Helper
+module Renderer.Components.Helper.ArcFileApiHelper
 
 
 open Fable.Core
@@ -21,6 +21,18 @@ let private withArcFileRequest
         | Ok request -> return! execute request
     }
 
+let addArcFile (arcFile: ArcFiles) : JS.Promise<Result<unit, exn>> =
+    withArcFileRequest arcFile Api.ipcArcVaultApi.addArcFile
+
+let addArcFileAndOpen (arcFile: ArcFiles) : JS.Promise<Result<FileContentDTO, exn>> =
+    withArcFileRequest
+        arcFile
+        (fun request -> promise {
+            match! Api.ipcArcVaultApi.addArcFile request with
+            | Error exn -> return Error exn
+            | Ok() -> return! Api.ipcArcVaultApi.openFile request.path
+        })
+
 let saveArcFile (arcFile: ArcFiles) : JS.Promise<Result<unit, exn>> =
     withArcFileRequest
         arcFile
@@ -34,16 +46,3 @@ let saveArcFile (arcFile: ArcFiles) : JS.Promise<Result<unit, exn>> =
 
 let setArcFileInMemory (arcFile: ArcFiles) : JS.Promise<Result<unit, exn>> =
     withArcFileRequest arcFile Api.ipcArcVaultApi.setArcFileInMemory
-
-let saveArcFileAndOpen (arcFile: ArcFiles) =
-    withArcFileRequest
-        arcFile
-        (fun request -> promise {
-            let! saveResult = Api.ipcArcVaultApi.addArcFile request
-
-            match saveResult with
-            | Error exn -> return Error exn
-            | Ok() ->
-                let! openResult = Api.ipcArcVaultApi.openFile request.path
-                return openResult
-        })

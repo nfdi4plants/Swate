@@ -3,6 +3,7 @@ module Renderer.Components.MainContent.ArcFilePreviewTarget
 open Feliz
 open Renderer.Components.MainContent
 open Renderer.Components.MainContent.ArcFilePreviewTargetHelper
+open Renderer.Components.Helper
 open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Composite.Widgets.JsonImport.Types
 open Swate.Components
@@ -20,7 +21,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
 
     let setArcFileInMemoryWithErrorModal (nextArcFile: ArcFiles) =
         promise {
-            match! Helper.setArcFileInMemory nextArcFile with
+            match! ArcFileApiHelper.setArcFileInMemory nextArcFile with
             | Ok() -> ()
             | Error exn ->
                 errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not update ARC in memory"))
@@ -30,6 +31,29 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
     let setArcFile nextArcFile =
         setArcFilePageState requestedView nextArcFile
         setArcFileInMemoryWithErrorModal nextArcFile
+
+    let runDataMapMutation (errorTitle: string) (operation: Fable.Core.JS.Promise<Result<unit, exn>>) =
+        promise {
+            match! operation with
+            | Ok() -> ()
+            | Error exn -> errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = errorTitle))
+        }
+        |> Promise.catch (fun exn -> errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = errorTitle)))
+        |> Promise.start
+
+    let addDataMap () =
+        match arcFile.TryGetDataMapParentInfo() with
+        | None -> ()
+        | Some parentInfo ->
+            ArcFileApiHelper.addArcFile (ArcFiles.DataMap(Some parentInfo, ARCtrl.DataMap.init ()))
+            |> runDataMapMutation "Could not add DataMap"
+
+    let deleteDataMap () =
+        match arcFile.TryGetDataMapParentInfo() |> Option.map DatamapParentInfo.toPath with
+        | None -> ()
+        | Some path ->
+            Api.ipcArcVaultApi.deletePath path
+            |> runDataMapMutation "Could not delete DataMap"
 
     let pickFilePaths =
         React.useCallback (
@@ -53,7 +77,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
                         arcFile
                         request
                         (setArcFilePageState requestedView)
-                        Helper.setArcFileInMemory
+                        ArcFileApiHelper.setArcFileInMemory
             }),
             [| box arcFile; box pageStateCtx |]
         )
@@ -66,6 +90,8 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
                 arcFile,
                 setArcFile,
                 pickFilePaths,
+                addDataMap,
+                deleteDataMap,
                 startingActiveView = (requestedView |> Option.defaultValue ActiveView.Metadata),
                 onImportJson = importJson,
                 onError =

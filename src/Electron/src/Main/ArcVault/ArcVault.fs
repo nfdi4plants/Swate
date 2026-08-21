@@ -15,6 +15,7 @@ open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
+open ARCtrl.Contract
 
 /// <summary>
 /// Represents a vault window in the application, optionally associated with a file path.
@@ -207,10 +208,12 @@ module ArcVaultExtensions =
                                 this.fileWatcherPendingEvents.Clear()
                                 this.fileWatcherPendingArcMergeEvents.Clear()
 
-                                do! this.ApplyWatcherFileTreeEvents pendingEvents
-
+                                // FileTree updates are renderer-visible and can trigger an immediate openFile call.
+                                // Merge first so that call reads the same ARC state represented by the published tree.
                                 if not pendingArcMergeEvents.IsEmpty && not this.isBusyWriting then
                                     do! this.TriggerArcInMemoryMergeOnFileWatcherEvents pendingArcMergeEvents
+
+                                do! this.ApplyWatcherFileTreeEvents pendingEvents
 
                                 this.fileWatcherReloadArcTimeout <- None
                                 sendMsgApi.IsLoadingChanges false
@@ -261,6 +264,39 @@ module ArcVaultExtensions =
             | _ -> return Error(exn "ARC is not loaded.")
         }
 
+        member this.DeleteDataMap(parentInfo: DatamapParentInfo) : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
+            match this.path, this.arc with
+            | Some arcPath, Some arc ->
+                let contractAndRemove =
+                    arc.TryGetDataMapParentArcFile parentInfo
+                    |> Option.bind (fun parentArcFile ->
+                        parentArcFile.TryGetDataMap()
+                        |> Option.map (fun dataMap ->
+                            let contract = DataMapContracts.deleteForParent parentInfo dataMap
+
+                            contract, fun () -> parentArcFile.TrySetParentDataMap None |> ignore
+                        )
+                    )
+
+                match contractAndRemove with
+                | None -> return Error(exn $"ARC does not contain a DataMap for '{parentInfo.ParentId}'.")
+                | Some(deleteContract, removeDataMap) ->
+                    this.isBusyWriting <- true
+
+                    try
+                        match! fullFillContractBatchAsync arcPath [| deleteContract |] with
+                        | Error errors ->
+                            return Error(exn $"Could not delete DataMap: {PathHelpers.formatContractErrors errors}")
+                        | Ok _ ->
+                            removeDataMap ()
+                            arc.UpdateFileSystem()
+                            this.RefreshHasUnsavedArcChangesFlag()
+                            return Ok()
+                    finally
+                        this.isBusyWriting <- false
+            | _ -> return Error(exn "ARC is not loaded.")
+        }
+
         /// Adds a new ARC entity through ARCtrl's scoped add path.
         /// Watcher ARC merges are suppressed during the disk write; static hashes are resynced from disk afterwards.
         member this.AddArcFile(request: FileContentDTO) : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
@@ -285,6 +321,12 @@ module ArcVaultExtensions =
                                 syncAddedArcFileFromPersisted persistedArc arcLocal arcFile
                                 syncArcStaticHashes persistedArc arcLocal
                                 this.RefreshHasUnsavedArcChangesFlag()
+
+                                match arcFile with
+                                | ArcFiles.DataMap(Some parentInfo, _) ->
+                                    do! this.RefreshFileTreeEntry(DatamapParentInfo.toPath parentInfo)
+                                | _ -> ()
+
                                 return Ok()
                             | Error loadErrors ->
                                 this.RefreshHasUnsavedArcChangesFlag()
@@ -325,6 +367,16 @@ module ArcVaultExtensions =
                     this.fileTree <- createFileEntryTree fileEntries
 
                 return toRendererFileTree arcPath this.fileTree.Values
+        }
+
+        /// Refresh one known file without rescanning the ARC directory.
+        member this.RefreshFileTreeEntry(relativePath: string) = promise {
+            match this.path with
+            | Some arcPath ->
+                let absolutePath = Main.Bindings.Path.join [| arcPath; relativePath |]
+                let! entry = getFileEntry absolutePath
+                this.SetFileTree(upsertFileEntry entry this.fileTree)
+            | None -> ()
         }
 
         member this.LoadArc() = promise {

@@ -81,7 +81,18 @@ module ArcAddExtensions =
                 (fun () -> ArcFileCreateContracts.createContracts true (ArcFiles.Workflow workflowCopy))
                 includeUpdateContractsFlag
         | ArcFiles.Investigation _ -> failwith "Adding investigation files is not supported."
-        | ArcFiles.DataMap _ -> failwith "Adding datamap files is not supported."
+        | ArcFiles.DataMap(None, _) -> failwith "Adding a DataMap requires parent information."
+        | ArcFiles.DataMap(Some parentInfo, dataMap) ->
+            let workingArc = copyArcPreservingStaticHashes sourceArc
+
+            match workingArc.TryGetDataMapParentArcFile parentInfo with
+            | None -> failwith $"ARC parent '{parentInfo.ParentId}' does not exist."
+            | Some parentArcFile when parentArcFile.TryGetDataMap().IsSome ->
+                failwith $"ARC parent '{parentInfo.ParentId}' already has a DataMap."
+            | Some parentArcFile ->
+                parentArcFile.TrySetParentDataMap(Some dataMap) |> ignore
+                workingArc.UpdateFileSystem()
+                workingArc, ArcFileCreateContracts.createContracts false arcFile
         | ArcFiles.Template _ -> failwith "Adding template files is not supported."
 
     let private commitAddedArcFile (targetArc: ARC) (workingArc: ARC) (arcFile: ArcFiles) =
@@ -98,6 +109,15 @@ module ArcAddExtensions =
         | ArcFiles.Workflow workflow ->
             workingArc.TryGetWorkflow workflow.Identifier
             |> Option.iter (fun sourceWorkflow -> targetArc.AddWorkflow(sourceWorkflow.Copy()))
+        | ArcFiles.DataMap(Some parentInfo, _) ->
+            workingArc.TryGetDataMapParentArcFile parentInfo
+            |> Option.bind _.TryGetDataMap()
+            |> Option.iter (fun dataMap ->
+                dataMap.StaticHash <- cleanDataMapStaticHash dataMap
+
+                targetArc.TryGetDataMapParentArcFile parentInfo
+                |> Option.iter (fun parentArcFile -> parentArcFile.TrySetParentDataMap(Some dataMap) |> ignore)
+            )
         | _ -> ()
 
         targetArc.UpdateFileSystem()

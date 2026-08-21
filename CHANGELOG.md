@@ -20,6 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -   Allow canceling in-flight Git network operations (ARC download/clone, fetch, update preview, pull, push, and Git LFS transfers) from the Git sidebar and the DataHub download view. Cancellation kills the underlying git process and restores a clean repository state: a canceled pull aborts any half-applied merge or rebase, and a canceled ARC download removes the partially cloned folder #1306.
 
+### 🔄 Changed
+
+-   Route DataMap creation through the shared ARC add pipeline used by assays, studies, runs, and workflows instead of a dedicated `ArcVault.AddDataMap` path.
+
+### 🐛 Fixed
+
+-   Keep open ARC editors synchronized when DataMaps are added or deleted through the File Explorer or by external filesystem changes.
+-   Show **Delete DataMap**, rather than **Add DataMap**, in the context menu of a collapsed ARC entity folder that already contains a DataMap.
+-   Preserve the disk-derived DataMap static-hash baseline when synchronizing a newly added DataMap back into the in-memory ARC.
+
 ## 2.1.0 - 2026-08-19
 
 ### ✨ Added
@@ -28,9 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Keep expanded FileTree parent folders visible while scrolling through nested content #1231.
 -   Add annotation-table actions for assigning a unit to a cell and removing a unit while retaining its value #1229.
 -   Enforce the DataHub Git LFS tracking ruleset: `isa.*.xlsx` metadata files are never tracked with Git LFS (skipped by automatic tracking, exempt from the commit size policy, and blocked from manual marking), while files inside a `dataset` folder or larger than 25 MB can no longer be unmarked #1316.
+-   Add an editor button and a File Explorer action for adding DataMaps to assays, studies, runs, and workflows. The button remains visible but disabled when a DataMap cannot be added.
+-   Add the ability to remove DataMaps from their editor-tab context menu or through the File Explorer delete action.
 
 ### 🔄 Changed
 
+-   Write DataMap additions and deletions to the ARC on disk immediately. Newly created DataMaps are loaded into the FileTree before their editor tab becomes available, while the currently selected editor tab remains active.
 -   Simplify Electron FileTree navigation so ARC editors initialize the requested Metadata, table, or DataMap view directly, and show the DataHub download action only in the sidebar.
 -   Consolidate Electron ARC editor page state, safely resolve canonical entity workbooks, and reuse shared path normalization for ARC-root-relative references.
 -   Harden canonical entity path resolution for Electron rename and delete operations, and document the behavior of the shared path-normalization helpers.

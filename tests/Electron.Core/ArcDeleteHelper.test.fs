@@ -5,6 +5,7 @@ open Main.ArcVault
 open Main.Bindings.Path
 open Main.IPC.Delete
 open ARCtrl
+open Swate.Components.Shared
 open Vitest
 
 let private expectSome (value: 'T option) (message: string) : 'T =
@@ -53,6 +54,36 @@ Vitest.describe (
                                 arcPath
                                 [| "assays"; "DeleteAssay" |]
                                 (fun arc -> arc.ContainsAssay("DeleteAssay"))
+                    })
+        )
+
+        Vitest.test (
+            "deletes an assay DataMap through a contract",
+            fun () ->
+                withTempArc
+                    (fun arc ->
+                        let assay = ArcAssay("DataMapAssay")
+                        assay.DataMap <- Some(DataMap.init ())
+                        arc.AddAssay assay
+                    )
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+
+                        let parentInfo = DatamapParentInfo.create "DataMapAssay" DataMapParent.Assay
+                        let vault = ArcVault(testWindow ())
+                        vault.path <- Some arcPath
+                        vault.SetArc arc
+
+                        match! vault.DeleteDataMap parentInfo with
+                        | Error error -> failwith error.Message
+                        | Ok() ->
+                            let deletedArc = vault.arc |> expectSome <| "Expected vault ARC."
+                            Vitest.expect(deletedArc.GetAssay("DataMapAssay").DataMap.IsNone).toBe (true)
+
+                            let! dataMapExists =
+                                pathExistsAsync (join [| arcPath; "assays"; "DataMapAssay"; "isa.datamap.xlsx" |])
+
+                            Vitest.expect(dataMapExists).toBe (false)
                     })
         )
 
