@@ -36,14 +36,7 @@ let LandingDraftTarget () =
                         Error = None
                 }
 
-                let! saveResult =
-                    Helper.withArcFileRequest
-                        payload.ArcFile
-                        (fun request -> promise {
-                            match! Api.ipcArcVaultApi.addArcFile request with
-                            | Error exn -> return Error exn
-                            | Ok() -> return! Api.ipcArcVaultApi.openFile request.path
-                        })
+                let! saveResult = Helper.addArcFileAndOpen payload.ArcFile
 
                 match saveResult with
                 | Result.Error message ->

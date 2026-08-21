@@ -9,17 +9,6 @@ open Swate.Components.Shared
 [<AutoOpen>]
 module ArcAddExtensions =
 
-    type ARC with
-
-        member this.TryGetDataMapParentArcFile(parentInfo: DatamapParentInfo) =
-            match parentInfo.Parent with
-            | DataMapParent.Assay -> this.TryGetAssay parentInfo.ParentId |> Option.map ArcFiles.Assay
-            | DataMapParent.Study ->
-                this.TryGetStudy parentInfo.ParentId
-                |> Option.map (fun study -> ArcFiles.Study(study, []))
-            | DataMapParent.Run -> this.TryGetRun parentInfo.ParentId |> Option.map ArcFiles.Run
-            | DataMapParent.Workflow -> this.TryGetWorkflow parentInfo.ParentId |> Option.map ArcFiles.Workflow
-
     let private failIfEntityExists (entityKind: string) (identifier: string) (exists: bool) =
         if exists then
             failwith $"ARC already contains {entityKind} with identifier '{identifier}'."

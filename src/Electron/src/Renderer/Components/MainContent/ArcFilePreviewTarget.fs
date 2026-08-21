@@ -31,69 +31,30 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
         setArcFilePageState requestedView nextArcFile
         setArcFileInMemoryWithErrorModal nextArcFile
 
+    let runDataMapMutation (errorTitle: string) (operation: Fable.Core.JS.Promise<Result<unit, exn>>) =
+        promise {
+            match! operation with
+            | Ok() -> ()
+            | Error exn -> errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = errorTitle))
+        }
+        |> Promise.catch (fun exn -> errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = errorTitle)))
+        |> Promise.start
+
     let addDataMap () =
         match arcFile.TryGetDataMapParentInfo() with
         | None -> ()
         | Some parentInfo ->
-            let dataMap = ARCtrl.DataMap.init ()
-
-            promise {
-                match!
-                    Helper.withArcFileRequest (ArcFiles.DataMap(Some parentInfo, dataMap)) Api.ipcArcVaultApi.addArcFile
-                with
-                | Ok() ->
-                    match arcFile.TryGetRelativePath() with
-                    | None ->
-                        errorModal.enqueue (
-                            ErrorModalRequest.create (
-                                "Could not resolve the parent ARC file path.",
-                                title = "Could not open created DataMap"
-                            )
-                        )
-                    | Some parentPath ->
-                        match! Api.ipcArcVaultApi.openFile parentPath with
-                        | Ok parentDto ->
-                            match Swate.Electron.Shared.FileIOHelper.FileContentDTO.toArcFile parentDto with
-                            | Some nextArcFile -> setArcFilePageState requestedView nextArcFile
-                            | None ->
-                                errorModal.enqueue (
-                                    ErrorModalRequest.create (
-                                        "Could not read the reloaded parent ARC file.",
-                                        title = "Could not open created DataMap"
-                                    )
-                                )
-                        | Error exn ->
-                            errorModal.enqueue (
-                                ErrorModalRequest.create (exn.Message, title = "Could not open created DataMap")
-                            )
-                | Error exn ->
-                    errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not add DataMap"))
-            }
-            |> Promise.catch (fun exn ->
-                errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not add DataMap"))
-            )
-            |> Promise.start
+            Helper.withArcFileRequest
+                (ArcFiles.DataMap(Some parentInfo, ARCtrl.DataMap.init ()))
+                Api.ipcArcVaultApi.addArcFile
+            |> runDataMapMutation "Could not add DataMap"
 
     let deleteDataMap () =
         match arcFile.TryGetDataMapParentInfo() |> Option.map DatamapParentInfo.toPath with
         | None -> ()
         | Some path ->
-            promise {
-                match! Api.ipcArcVaultApi.deletePath path with
-                | Ok() ->
-                    let nextArcFile = ArcFiles.refreshRef arcFile
-
-                    if nextArcFile.TrySetParentDataMap None then
-                        setArcFilePageState (Some ActiveView.Metadata) nextArcFile
-                    else
-                        pageStateCtx.setState None
-                | Error exn ->
-                    errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not delete DataMap"))
-            }
-            |> Promise.catch (fun exn ->
-                errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not delete DataMap"))
-            )
-            |> Promise.start
+            Api.ipcArcVaultApi.deletePath path
+            |> runDataMapMutation "Could not delete DataMap"
 
     let pickFilePaths =
         React.useCallback (

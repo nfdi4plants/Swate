@@ -11,7 +11,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Main
 open Main.ARCtrlExtensions
-open Main.ArcMerge
 open Main.Bindings
 open Node.Api
 open Swate.Electron.Shared.RenamePathRules

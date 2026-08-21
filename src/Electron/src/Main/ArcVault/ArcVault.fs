@@ -272,12 +272,7 @@ module ArcVaultExtensions =
                     |> Option.bind (fun parentArcFile ->
                         parentArcFile.TryGetDataMap()
                         |> Option.map (fun dataMap ->
-                            let contract =
-                                match parentInfo.Parent with
-                                | DataMapParent.Assay -> dataMap.ToDeleteContractForAssay(parentInfo.ParentId)
-                                | DataMapParent.Study -> dataMap.ToDeleteContractForStudy(parentInfo.ParentId)
-                                | DataMapParent.Run -> dataMap.ToDeleteContractForRun(parentInfo.ParentId)
-                                | DataMapParent.Workflow -> dataMap.ToDeleteContractForWorkflow(parentInfo.ParentId)
+                            let contract = DataMapContracts.deleteForParent parentInfo dataMap
 
                             contract, fun () -> parentArcFile.TrySetParentDataMap None |> ignore
                         )

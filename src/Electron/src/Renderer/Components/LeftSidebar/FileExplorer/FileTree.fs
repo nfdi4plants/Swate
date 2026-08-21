@@ -326,14 +326,7 @@ type FileTree =
                     setIsDialogBusy true
 
                     promise {
-                        let! createResult =
-                            Renderer.Components.MainContent.Helper.withArcFileRequest
-                                draft.ArcFile
-                                (fun request -> promise {
-                                    match! Api.ipcArcVaultApi.addArcFile request with
-                                    | Error exn -> return Error exn
-                                    | Ok() -> return! Api.ipcArcVaultApi.openFile request.path
-                                })
+                        let! createResult = Renderer.Components.MainContent.Helper.addArcFileAndOpen draft.ArcFile
 
                         match createResult with
                         | Error exn ->

@@ -537,13 +537,6 @@ type Main =
             loadTemplates,
             React.Fragment [
                 ColumnCountTestDisplay()
-                Main.ArcFileEditor(
-                    arcFile,
-                    setArcFile,
-                    pickPathsMockFn,
-                    ignore,
-                    ignore,
-                    startingActiveView = ActiveView.Table 0
-                )
+                Main.ArcFileEditor(arcFile, setArcFile, pickPathsMockFn, startingActiveView = ActiveView.Table 0)
             ]
         )
