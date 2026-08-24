@@ -190,7 +190,8 @@ type Select =
             ?triggerRenderFn: {| isOpen: bool |} -> ReactElement,
             ?optionRenderFn: SelectItemRender<'a> -> ReactElement,
             ?dropdownPlacement: FloatingUI.Placement,
-            ?middleware: FloatingUI.IMiddleware[]
+            ?middleware: FloatingUI.IMiddleware[],
+            ?showSelectAll: bool
         ) =
 
         let mkLabel (indices: int seq) =
@@ -340,7 +341,8 @@ type Select =
                                                         ]
                                                         prop.children [
 
-                                                            Select.SelectAll(setSelectedIndices, key = "select-all")
+                                                            if defaultArg showSelectAll true then
+                                                                Select.SelectAll(setSelectedIndices, key = "select-all")
 
                                                             for i in 0 .. options.Length - 1 do
                                                                 let option = options.[i]

@@ -55,31 +55,33 @@ type ValidationPackageDTO = {
     PatchVersion: int
     PreReleaseVersionSuffix: string
     BuildMetadataVersionSuffix: string
-    PackageContent: byte []
+    PackageContent: byte[]
     ReleaseDate: System.DateTime
-    Tags: OntologyAnnotationDTO []
+    Tags: OntologyAnnotationDTO[]
     ReleaseNotes: string
     CQCHookEndpoint: string
-    Authors: AuthorDTO []
+    Authors: AuthorDTO[]
     ProgrammingLanguage: string
-} with 
-    static member Create(
-        name: string,
-        summary: string,
-        description: string,
-        majorVersion: int,
-        minorVersion: int,
-        patchVersion: int,
-        preReleaseVersionSuffix: string,
-        buildMetadataVersionSuffix: string,
-        packageContent: byte [],
-        releaseDate: System.DateTime,
-        tags: OntologyAnnotationDTO [],
-        releaseNotes: string,
-        cqcHookEndpoint: string,
-        authors: AuthorDTO [],
-        programmingLanguage: string
-    ) : ValidationPackageDTO =
+} with
+
+    static member Create
+        (
+            name: string,
+            summary: string,
+            description: string,
+            majorVersion: int,
+            minorVersion: int,
+            patchVersion: int,
+            preReleaseVersionSuffix: string,
+            buildMetadataVersionSuffix: string,
+            packageContent: byte[],
+            releaseDate: System.DateTime,
+            tags: OntologyAnnotationDTO[],
+            releaseNotes: string,
+            cqcHookEndpoint: string,
+            authors: AuthorDTO[],
+            programmingLanguage: string
+        ) : ValidationPackageDTO =
         {
             Name = name
             Summary = summary
@@ -97,3 +99,24 @@ type ValidationPackageDTO = {
             Authors = authors
             ProgrammingLanguage = programmingLanguage
         }
+
+[<RequireQualifiedAccess>]
+type SelectorState =
+    | Idle
+    | Loading
+    | Loaded of ValidationPackageDTO[]
+    | Error of exn
+
+[<RequireQualifiedAccess>]
+type PackageRowState =
+    | Unchecked
+    | Checked
+    | HasOlderVersion
+
+[<System.Flags>]
+type SearchFields =
+    | Name = 1
+    | Summary = 2
+    | Description = 4
+    | Tags = 8
+    | Authors = 16

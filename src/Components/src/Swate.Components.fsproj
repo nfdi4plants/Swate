@@ -229,6 +229,12 @@
     <Compile Include="Composite\Workspace\Workspace.fs" />
     <Compile Include="Composite\Workspace\Workspace.fixture.fs" />
     <Compile Include="Composite\ValidationPackageSelector\Types.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\Helper.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\Context.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\SearchField.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\PackageTable.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\PackagePagination.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\PackageRow.fs" />
     <Compile Include="Composite\ValidationPackageSelector\ValidationPackageSelector.fs" />
     <Compile Include="Composite\ValidationPackageSelector\ValidationPackageSelector.fixture.fs" />
     

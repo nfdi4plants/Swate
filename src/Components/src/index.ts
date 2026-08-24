@@ -54,6 +54,7 @@ export { default as TermSearchConfigProvider } from './dist/Composite/TermSearch
 export { default as ThemeProvider } from './dist/Composite/ThemeSelector/ThemeProvider.fs';
 export { default as ThemeSelector } from './dist/Composite/ThemeSelector/ThemeSelector.fs';
 export { default as TutorialOverlay } from './dist/Composite/TutorialOverlay/TutorialOverlay.fs';
+export { default as ValidationPackageSelector } from './dist/Composite/ValidationPackageSelector/ValidationPackageSelector.fs';
 
 export { Main as NoteSearch, SearchSuggestion } from './dist/Composite/Notes/NoteSearch/NoteSearch.fs';
 export { WidgetController, Entry as WidgetEntry } from './dist/Composite/Widgets/Widgets.fs';
