@@ -5,6 +5,12 @@ open Fable.Core
 [<Literal>]
 let GitLfsSkipSmudgeEnvKey = "GIT_LFS_SKIP_SMUDGE"
 
+/// Exact message the main process reports for operations that failed because the user requested
+/// cancellation. The renderer compares against this verbatim, so genuine git errors that merely
+/// contain words like "abort" or "cancel" are never mistaken for a user cancellation.
+[<Literal>]
+let GitOperationCancelledMessage = "Git operation was cancelled."
+
 // GIT LFS Types
 type GitLfsCommand =
     | Pull
@@ -120,6 +126,11 @@ type GitRemoteOperationRequest = {
     Remote: string option
     Branch: string option
 }
+
+/// Cancels the in-flight git operation. TargetPath is only needed for operations without an
+/// active ARC window (cloning), where it must match the clone target path; otherwise the
+/// current vault's ARC path is used.
+type GitCancelOperationRequest = { TargetPath: string option }
 
 [<RequireQualifiedAccess>]
 type GitPullPreflightStatus =

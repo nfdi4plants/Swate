@@ -78,35 +78,37 @@ let internal standardTimeout =
 let internal syncTimeout =
     SimpleGitTimeoutOptions(block = 120000, stdOut = true, stdErr = true)
 
-/// Creates the standard simple-git options used by Main Git services.
+/// Creates the standard simple-git options used by Main Git services, optionally wired to an abort
+/// signal so in-flight tasks can be killed on cancellation.
+/// The signal must be passed through the constructor: SimpleGitOptions is a ParamObject, so its
+/// property setters write to a mangled backing field that simple-git never reads.
 /// maxConcurrentProcesses is intentionally one to serialize commands for a repository-scoped instance.
-let internal createOptions
+let internal createOptionsWithAbort
     (baseDir: string)
     (timeout: SimpleGitTimeoutOptions)
     (progressCallback: GitProgressCallback option)
+    (abortSignal: IAbortSignal option)
     =
     let progressHandler =
         progressCallback
         |> Option.map (fun progress -> progressFromSimpleGit >> progress)
 
-    match progressHandler with
-    | Some handler ->
-        SimpleGitOptions(
-            baseDir = baseDir,
-            binary = U3.Case1 "git",
-            maxConcurrentProcesses = 1,
-            timeout = timeout,
-            ``unsafe`` = unsafeOptions,
-            progress = handler
-        )
-    | None ->
-        SimpleGitOptions(
-            baseDir = baseDir,
-            binary = U3.Case1 "git",
-            maxConcurrentProcesses = 1,
-            timeout = timeout,
-            ``unsafe`` = unsafeOptions
-        )
+    SimpleGitOptions(
+        baseDir = baseDir,
+        binary = U3.Case1 "git",
+        maxConcurrentProcesses = 1,
+        timeout = timeout,
+        ``unsafe`` = unsafeOptions,
+        ?progress = progressHandler,
+        ?abort = abortSignal
+    )
+
+let internal createOptions
+    (baseDir: string)
+    (timeout: SimpleGitTimeoutOptions)
+    (progressCallback: GitProgressCallback option)
+    =
+    createOptionsWithAbort baseDir timeout progressCallback None
 
 /// Creates a simple-git instance with non-interactive prompt suppression applied.
 let internal createGit (options: SimpleGitOptions) : ISimpleGit =
