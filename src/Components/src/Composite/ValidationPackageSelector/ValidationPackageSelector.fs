@@ -12,16 +12,32 @@ module private ValidationPackageSelectorModel =
     let createLatestPackage (dto: ValidationPackageDTO) =
         ValidationPackage(dto.Name, ?version = Some(Helper.toVersionString dto))
 
+    let createNextConfig
+        (currentConfig: ValidationPackagesConfig)
+        (packages: ValidationPackageDTO[])
+        (edits: Map<string, option<ValidationPackage>>)
+        (removedUnlisted: Set<string>)
+        =
+        let newPackages =
+            Helper.computeNewPackages currentConfig packages edits removedUnlisted
+
+        ValidationPackagesConfig.make (ResizeArray newPackages) currentConfig.ARCSpecification
+
+
 [<Erase; Mangle(false)>]
 type ValidationPackageSelector =
 
     [<ReactComponent>]
-    static member private UnlistedBanner() =
-        let ctx = useValidationPackageSelectorCtx ()
+    static member private UnlistedBanner
+        (unlistedNames: string[], setRemovedUnlisted: (Set<string> -> Set<string>) -> unit)
+        =
 
         let expanded, setExpanded = React.useState false
 
-        if Array.isEmpty ctx.UnlistedNames then
+        let removeUnlisted (name: string) =
+            setRemovedUnlisted (fun set -> Set.add name set)
+
+        if Array.isEmpty unlistedNames then
             Html.none
         else
             Html.div [
@@ -40,7 +56,7 @@ type ValidationPackageSelector =
                                     Html.span (
                                         sprintf
                                             "%d Packages in current config not available online"
-                                            ctx.UnlistedNames.Length
+                                            unlistedNames.Length
                                     )
                                     Html.button [
                                         prop.type' "button"
@@ -53,7 +69,7 @@ type ValidationPackageSelector =
                             if expanded then
                                 Html.ul [
                                     prop.children [
-                                        for name in ctx.UnlistedNames do
+                                        for name in unlistedNames do
                                             Html.li [
                                                 prop.className "swt:flex swt:items-center swt:gap-2 swt:py-1"
                                                 prop.children [
@@ -65,7 +81,7 @@ type ValidationPackageSelector =
                                                         )
                                                         prop.className "swt:btn swt:btn-xs swt:btn-error"
                                                         prop.text "Remove"
-                                                        prop.onClick (fun _ -> ctx.RemoveUnlisted name)
+                                                        prop.onClick (fun _ -> removeUnlisted name)
                                                     ]
                                                 ]
                                             ]
@@ -77,13 +93,12 @@ type ValidationPackageSelector =
             ]
 
     [<ReactComponent>]
-    static member private SubmitBar() =
-        let ctx = useValidationPackageSelectorCtx ()
+    static member private SubmitBar(isSubmitting: bool, isDirty: bool, submit: unit -> unit) =
 
         Html.div [
             prop.className "swt:flex swt:justify-end swt:items-center swt:gap-2 swt:p-2 swt:border-t"
             prop.children [
-                if ctx.Submitting then
+                if isSubmitting then
                     Html.span [
                         prop.key "submitting-spinner"
                         prop.className "swt:loading swt:loading-spinner swt:loading-sm"
@@ -93,8 +108,8 @@ type ValidationPackageSelector =
                     prop.type' "button"
                     prop.testId "validation-package-selector-submit"
                     prop.className "swt:btn swt:btn-primary"
-                    prop.disabled (not ctx.Dirty || ctx.Submitting)
-                    prop.onClick (fun _ -> ctx.Submit())
+                    prop.disabled (not isDirty || isSubmitting)
+                    prop.onClick (fun _ -> submit ())
                     prop.text "Submit"
                 ]
             ]
@@ -111,8 +126,14 @@ type ValidationPackageSelector =
         ) =
         let state, setState = React.useState (fun () -> SelectorState.Idle)
         let edits, setEdits = React.useState Map.empty<string, ValidationPackage option>
-        let removedUnlisted, setRemovedUnlisted = React.useState Set.empty<string>
+
+        let removedUnlisted, setRemovedUnlisted =
+            React.useStateWithUpdater Set.empty<string>
+
         let submitting, setSubmitting = React.useState false
+
+        /// This config state is used to compare with the current config state to determine if there are any changes that need to be submitted. It is initialized with the initial config and will only update after the incoming config changes (for example after ``writeConfig``).
+        let config_old = React.useMemo ((fun () -> config), [| box config |])
 
         React.useEffectOnce (fun () ->
             setState SelectorState.Loading
@@ -131,6 +152,18 @@ type ValidationPackageSelector =
             match state with
             | SelectorState.Loaded packages -> packages
             | _ -> [||]
+
+        let isDirty =
+            React.useMemo (
+                (fun () ->
+
+                    let newConfig =
+                        ValidationPackageSelectorModel.createNextConfig config packages edits removedUnlisted
+
+                    newConfig <> config_old
+                ),
+                [| box edits; box removedUnlisted |]
+            )
 
         let rowStateOf (dto: ValidationPackageDTO) =
             match Map.tryFind dto.Name edits with
@@ -153,9 +186,6 @@ type ValidationPackageSelector =
         let updateToLatest (dto: ValidationPackageDTO) =
             setEdits (Map.add dto.Name (Some(ValidationPackageSelectorModel.createLatestPackage dto)) edits)
 
-        let removeUnlisted (name: string) =
-            setRemovedUnlisted (Set.add name removedUnlisted)
-
         let unlistedNames =
             React.useMemo (
                 (fun () ->
@@ -165,23 +195,19 @@ type ValidationPackageSelector =
                 [| box config; box packages; box removedUnlisted |]
             )
 
-        let dirty = not edits.IsEmpty || not removedUnlisted.IsEmpty
-
         let submit () =
-            if dirty && not submitting then
+            if isDirty && not submitting then
                 setSubmitting true
 
-                let newPackages = Helper.computeNewPackages config packages edits removedUnlisted
-
                 let newConfig =
-                    ValidationPackagesConfig.make (ResizeArray newPackages) config.ARCSpecification
+                    ValidationPackageSelectorModel.createNextConfig config packages edits removedUnlisted
 
                 writeConfig newConfig
                 |> Promise.map (fun result ->
                     match result with
                     | Ok() ->
                         setEdits Map.empty
-                        setRemovedUnlisted Set.empty
+                        setRemovedUnlisted (fun _ -> Set.empty)
                         setSubmitting false
                     | Error ex ->
                         setSubmitting false
@@ -201,20 +227,8 @@ type ValidationPackageSelector =
                     RowStateOf = rowStateOf
                     Toggle = toggle
                     UpdateToLatest = updateToLatest
-                    UnlistedNames = unlistedNames
-                    RemoveUnlisted = removeUnlisted
-                    Dirty = dirty
-                    Submitting = submitting
-                    Submit = submit
                 }),
-                [|
-                    box state
-                    box packages
-                    box edits
-                    box removedUnlisted
-                    box submitting
-                    box config
-                |]
+                [| box state; box packages; box edits; box config |]
             )
 
         ValidationPackageSelectorCtx.Provider(
@@ -228,7 +242,8 @@ type ValidationPackageSelector =
                             prop.text "Validation Packages"
                         ]
                         match state with
-                        | SelectorState.Loaded _ -> ValidationPackageSelector.UnlistedBanner()
+                        | SelectorState.Loaded _ ->
+                            ValidationPackageSelector.UnlistedBanner(unlistedNames, setRemovedUnlisted)
                         | _ -> Html.none
                         SearchField.SearchField(fun searchFiltered ->
                             PackageTable.PackageTable(
@@ -248,7 +263,11 @@ type ValidationPackageSelector =
                                     )
                             )
                         )
-                        ValidationPackageSelector.SubmitBar()
+                        ValidationPackageSelector.SubmitBar(
+                            isSubmitting = submitting,
+                            isDirty = isDirty,
+                            submit = submit
+                        )
                     ]
                 ]
             ]

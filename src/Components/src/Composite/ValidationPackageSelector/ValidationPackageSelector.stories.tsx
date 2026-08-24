@@ -91,10 +91,12 @@ export const TagFilterNarrowsRows: Story = {
     await loadedPackage(canvas);
     await userEvent.click(canvas.getByTestId("validation-package-selector-tag-filter"));
     await selectDropdownOption("Invenio");
-    expect(canvas.getByTestId("validation-package-selector-checkbox-Invenio")).toBeInTheDocument();
-    expect(canvas.queryByTestId("validation-package-selector-checkbox-Package00")).not.toBeInTheDocument();
-    expect(canvas.getByTestId("validation-package-selector-page-indicator")).toHaveTextContent("Page 1 of 1");
-  },
+    await waitFor(() => {
+      expect(canvas.getByTestId("validation-package-selector-checkbox-Invenio")).toBeInTheDocument();
+      expect(canvas.queryByTestId("validation-package-selector-checkbox-Package00")).not.toBeInTheDocument();
+      expect(canvas.getByTestId("validation-package-selector-page-indicator")).toHaveTextContent("Page 1 of 1");
+    }, { timeout: 10_000 });
+  }
 };
 
 export const FilterChangeResetsPage: Story = {
