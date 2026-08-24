@@ -38,7 +38,8 @@ type PackageTable =
                         prop.testId testId
                         prop.className [
                             "swt:flex swt:items-center swt:gap-1 swt:text-xs swt:font-medium swt:uppercase"
-                            if selected.IsSome then "swt:text-accent"
+                            if selected.IsSome then
+                                "swt:text-accent"
                         ]
                         prop.children [
                             Html.span [ prop.text label ]
@@ -127,7 +128,8 @@ type PackageTable =
                                     )
                                     prop.className [
                                         "swt:btn swt:btn-xs swt:btn-ghost swt:shrink-0"
-                                        if checkedSort <> CheckedSort.None then "swt:text-accent"
+                                        if checkedSort <> CheckedSort.None then
+                                            "swt:text-accent"
                                     ]
                                     prop.onClick (fun _ -> setCheckedSort (Helper.nextCheckedSort checkedSort))
                                     prop.children [
@@ -136,8 +138,10 @@ type PackageTable =
                                                 "swt:iconify"
                                                 match checkedSort with
                                                 | CheckedSort.None -> "swt:fluent--filter-20-regular"
-                                                | CheckedSort.CheckedFirst -> "swt:fluent--arrow-sort-up-lines-16-regular swt:size-4"
-                                                | CheckedSort.CheckedLast -> "swt:fluent--arrow-sort-down-lines-16-regular swt:size-4"
+                                                | CheckedSort.CheckedFirst ->
+                                                    "swt:fluent--arrow-sort-up-lines-16-regular swt:size-4"
+                                                | CheckedSort.CheckedLast ->
+                                                    "swt:fluent--arrow-sort-down-lines-16-regular swt:size-4"
                                             ]
                                         ]
                                     ]
@@ -145,10 +149,7 @@ type PackageTable =
                             ]
                         ]
                         Html.th "Name"
-                        Html.th [
-                            prop.className "swt:max-md:hidden"
-                            prop.text "Summary"
-                        ]
+                        Html.th [ prop.className "swt:max-md:hidden"; prop.text "Summary" ]
                         Html.th "Version"
                         Html.th [
                             PackageTable.HeaderSelect(
@@ -168,10 +169,7 @@ type PackageTable =
                                 "validation-package-selector-author-filter"
                             )
                         ]
-                        Html.th [
-                            prop.className "swt:max-md:hidden"
-                            prop.text "Released"
-                        ]
+                        Html.th [ prop.className "swt:max-md:hidden"; prop.text "Released" ]
                         Html.th "Info"
                     ]
                 ]
@@ -201,10 +199,7 @@ type PackageTable =
                                 prop.text "Error loading packages :("
                             ]
                             Html.details [
-                                prop.children [
-                                    Html.summary "Details"
-                                    Html.pre [ prop.text e.Message ]
-                                ]
+                                prop.children [ Html.summary "Details"; Html.pre [ prop.text e.Message ] ]
                             ]
                         ]
                     ]

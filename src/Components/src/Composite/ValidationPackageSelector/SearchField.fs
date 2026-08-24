@@ -51,11 +51,11 @@ type SearchField =
                         prop.value query
                         prop.onChange (fun (value: string) -> setQuery value)
                     ]
-                    Popover.Popover (
+                    Popover.Popover(
                         returnFocus = false,
                         children =
                             React.Fragment [
-                                Popover.Trigger (
+                                Popover.Trigger(
                                     Html.button [
                                         prop.type' "button"
                                         prop.className "swt:btn swt:btn-outline swt:btn-sm swt:shrink-0"
@@ -67,7 +67,7 @@ type SearchField =
                                         ]
                                     ]
                                 )
-                                Popover.Content (
+                                Popover.Content(
                                     React.Fragment [
                                         for field in Helper.allSearchFields do
                                             SearchField.ScopeCheckbox(
@@ -83,8 +83,6 @@ type SearchField =
             ]
             Html.div [
                 prop.className "swt:overflow-y-auto swt:grow"
-                prop.children [
-                    renderResults filtered
-                ]
+                prop.children [ renderResults filtered ]
             ]
         ]

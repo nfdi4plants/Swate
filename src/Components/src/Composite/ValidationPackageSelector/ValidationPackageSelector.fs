@@ -119,7 +119,7 @@ type ValidationPackageSelector =
             fetchValidationPackages ()
             |> Promise.map (fun packages -> setState (SelectorState.Loaded packages))
             |> Promise.catch (fun ex ->
-                console.error("Error fetching validation packages:", ex)
+                console.error ("Error fetching validation packages:", ex)
                 setState (SelectorState.Error ex)
                 onError |> Option.iter (fun f -> f ex)
             )

@@ -121,12 +121,8 @@ let sortByChecked
     =
     match sort with
     | CheckedSort.None -> packages
-    | CheckedSort.CheckedFirst ->
-        packages
-        |> Array.sortBy (fun dto -> dto |> rowStateOf |> checkedRank)
-    | CheckedSort.CheckedLast ->
-        packages
-        |> Array.sortByDescending (fun dto -> dto |> rowStateOf |> checkedRank)
+    | CheckedSort.CheckedFirst -> packages |> Array.sortBy (fun dto -> dto |> rowStateOf |> checkedRank)
+    | CheckedSort.CheckedLast -> packages |> Array.sortByDescending (fun dto -> dto |> rowStateOf |> checkedRank)
 
 let nextCheckedSort (sort: CheckedSort) =
     match sort with

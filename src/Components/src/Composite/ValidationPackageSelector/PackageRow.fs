@@ -86,7 +86,7 @@ type PackageRow =
         let isChecked = rowState = PackageRowState.Checked
         let isIndeterminate = rowState = PackageRowState.HasOlderVersion
 
-        let infoButtonRef = React.useButtonRef()
+        let infoButtonRef = React.useButtonRef ()
 
         let handleCheckboxChange (_: Browser.Types.Event) =
             if isIndeterminate then
@@ -95,9 +95,7 @@ type PackageRow =
                 ctx.Toggle pkg
 
         let authorsTxt =
-            pkg.Authors
-            |> Array.choose (fun a -> a.FullName)
-            |> String.concat ", "
+            pkg.Authors |> Array.choose (fun a -> a.FullName) |> String.concat ", "
 
         Html.tr [
             prop.className ""

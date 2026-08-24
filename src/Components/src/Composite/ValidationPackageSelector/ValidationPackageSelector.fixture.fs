@@ -38,9 +38,7 @@ module private Fixtures =
 
     let randomSubset (items: 'T array) =
         let count = random.Next(items.Length + 1)
-        items
-        |> Array.sortBy (fun _ -> random.Next())
-        |> Array.take count
+        items |> Array.sortBy (fun _ -> random.Next()) |> Array.take count
 
     let mkPackage (index: int) =
         let name = sprintf "Package%02d" index
