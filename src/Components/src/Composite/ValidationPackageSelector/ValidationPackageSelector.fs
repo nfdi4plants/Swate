@@ -105,6 +105,7 @@ type ValidationPackageSelector =
         (
             config: ValidationPackagesConfig,
             writeConfig: ValidationPackagesConfig -> JS.Promise<Result<unit, exn>>,
+            // https://avpr.nfdi4plants.org/swagger/index.html#/Validation%20Packages/GetAllPackages
             fetchValidationPackages: unit -> JS.Promise<ValidationPackageDTO[]>,
             ?onError: exn -> unit
         ) =
