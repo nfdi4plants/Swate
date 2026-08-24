@@ -141,6 +141,31 @@ export const UpdateToLatestChangesVersion: Story = {
   },
 };
 
+export const SortByCheckedState: Story = {
+  render: () => <ValidationPackageSelectorFixture />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await loadedPackage(canvas);
+    const sortBtn = canvas.getByTestId("validation-package-selector-sort-checked");
+    const firstCheckbox = () => canvas.getAllByTestId(/^validation-package-selector-checkbox-/)[0].dataset.testid;
+
+    await userEvent.click(canvas.getByTestId("validation-package-selector-checkbox-Package00"));
+
+    await userEvent.click(sortBtn);
+    expect(firstCheckbox()).toBe("validation-package-selector-checkbox-Package00");
+    expect(canvas.getAllByTestId(/^validation-package-selector-checkbox-/)[1].dataset.testid).toBe(
+      "validation-package-selector-checkbox-Invenio"
+    );
+
+    await userEvent.click(sortBtn);
+    expect(firstCheckbox()).toBe("validation-package-selector-checkbox-Package01");
+    expect(canvas.queryByTestId("validation-package-selector-checkbox-Package00")).not.toBeInTheDocument();
+
+    await userEvent.click(sortBtn);
+    expect(firstCheckbox()).toBe("validation-package-selector-checkbox-Package00");
+  },
+};
+
 export const UnlistedBannerCanRemovePackages: Story = {
   render: () => <ValidationPackageSelectorFixture />,
   play: async ({ canvasElement }) => {

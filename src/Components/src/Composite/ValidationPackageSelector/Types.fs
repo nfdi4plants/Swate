@@ -113,6 +113,12 @@ type PackageRowState =
     | Checked
     | HasOlderVersion
 
+[<RequireQualifiedAccess>]
+type CheckedSort =
+    | None
+    | CheckedFirst
+    | CheckedLast
+
 [<System.Flags>]
 type SearchFields =
     | Name = 1

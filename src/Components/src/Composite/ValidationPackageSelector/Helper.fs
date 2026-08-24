@@ -108,6 +108,32 @@ let filterByAuthor (author: string option) (packages: ValidationPackageDTO[]) =
         packages
         |> Array.filter (fun dto -> dto.Authors |> Array.exists (fun a -> a.FullName = Some author))
 
+let private checkedRank (state: PackageRowState) =
+    match state with
+    | PackageRowState.Checked -> 0
+    | PackageRowState.HasOlderVersion -> 1
+    | PackageRowState.Unchecked -> 2
+
+let sortByChecked
+    (sort: CheckedSort)
+    (rowStateOf: ValidationPackageDTO -> PackageRowState)
+    (packages: ValidationPackageDTO[])
+    =
+    match sort with
+    | CheckedSort.None -> packages
+    | CheckedSort.CheckedFirst ->
+        packages
+        |> Array.sortBy (fun dto -> dto |> rowStateOf |> checkedRank)
+    | CheckedSort.CheckedLast ->
+        packages
+        |> Array.sortByDescending (fun dto -> dto |> rowStateOf |> checkedRank)
+
+let nextCheckedSort (sort: CheckedSort) =
+    match sort with
+    | CheckedSort.None -> CheckedSort.CheckedFirst
+    | CheckedSort.CheckedFirst -> CheckedSort.CheckedLast
+    | CheckedSort.CheckedLast -> CheckedSort.None
+
 let distinctTags (packages: ValidationPackageDTO[]) =
     packages
     |> Array.collect (fun dto -> dto.Tags |> Array.choose (fun t -> t.Name))

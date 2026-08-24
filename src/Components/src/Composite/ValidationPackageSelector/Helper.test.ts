@@ -7,13 +7,22 @@ import {
   filterBySearch,
   filterByTag,
   filterByAuthor,
+  sortByChecked,
   pageCount,
   slicePage,
   unlistedNames,
   computeNewPackages,
 } from './Helper.fs.ts';
-import { ValidationPackageDTO_Create_Z1A22E2B7 as createDto } from './Types.fs.ts';
-import type { ValidationPackageDTO } from './Types.fs.ts';
+import {
+  ValidationPackageDTO_Create_Z1A22E2B7 as createDto,
+  CheckedSort_None,
+  CheckedSort_CheckedFirst,
+  CheckedSort_CheckedLast,
+  PackageRowState_Unchecked,
+  PackageRowState_Checked,
+  PackageRowState_HasOlderVersion,
+} from './Types.fs.ts';
+import type { ValidationPackageDTO, PackageRowState_$union } from './Types.fs.ts';
 import { ValidationPackage } from '../../fable_modules/ARCtrl.ValidationPackages.3.0.0-beta.12/ValidationPackage.fs.js';
 import { ValidationPackagesConfig } from '../../fable_modules/ARCtrl.ValidationPackages.3.0.0-beta.12/ValidationPackagesConfig.fs.js';
 import { ofArray as mapOfArray } from '../../fable_modules/fable-library-ts.5.0.0-alpha.21/Map.ts';
@@ -145,6 +154,63 @@ describe('filterByTag / filterByAuthor', () => {
   it('filters by exact tag and author', () => {
     expect(filterByTag('X' as any, pkgs).map((p) => p.Name)).toEqual(['A']);
     expect(filterByAuthor('Ben' as any, pkgs).map((p) => p.Name)).toEqual(['B']);
+  });
+});
+
+describe('sortByChecked', () => {
+  const stateOf = (name: string): PackageRowState_$union => {
+    if (name === 'CheckedB') return PackageRowState_Checked();
+    if (name === 'Old') return PackageRowState_HasOlderVersion();
+    return PackageRowState_Unchecked();
+  };
+  const rowStateOf = (dto: ValidationPackageDTO) => stateOf(dto.Name);
+
+  it('returns packages in original order for None', () => {
+    const pkgs = [mkDto({ Name: 'U1' }), mkDto({ Name: 'CheckedB' }), mkDto({ Name: 'U2' })];
+    expect(sortByChecked(CheckedSort_None(), rowStateOf, pkgs).map((p) => p.Name)).toEqual([
+      'U1',
+      'CheckedB',
+      'U2',
+    ]);
+  });
+
+  it('puts checked rows first for CheckedFirst', () => {
+    const pkgs = [mkDto({ Name: 'U1' }), mkDto({ Name: 'CheckedB' }), mkDto({ Name: 'U2' })];
+    expect(sortByChecked(CheckedSort_CheckedFirst(), rowStateOf, pkgs).map((p) => p.Name)).toEqual([
+      'CheckedB',
+      'U1',
+      'U2',
+    ]);
+  });
+
+  it('puts checked rows last for CheckedLast', () => {
+    const pkgs = [mkDto({ Name: 'U1' }), mkDto({ Name: 'CheckedB' }), mkDto({ Name: 'U2' })];
+    expect(sortByChecked(CheckedSort_CheckedLast(), rowStateOf, pkgs).map((p) => p.Name)).toEqual([
+      'U1',
+      'U2',
+      'CheckedB',
+    ]);
+  });
+
+  it('groups Checked before HasOlderVersion before Unchecked and keeps stable order', () => {
+    const pkgs = [
+      mkDto({ Name: 'U1' }),
+      mkDto({ Name: 'Old' }),
+      mkDto({ Name: 'CheckedB' }),
+      mkDto({ Name: 'U2' }),
+    ];
+    expect(sortByChecked(CheckedSort_CheckedFirst(), rowStateOf, pkgs).map((p) => p.Name)).toEqual([
+      'CheckedB',
+      'Old',
+      'U1',
+      'U2',
+    ]);
+    expect(sortByChecked(CheckedSort_CheckedLast(), rowStateOf, pkgs).map((p) => p.Name)).toEqual([
+      'U1',
+      'U2',
+      'Old',
+      'CheckedB',
+    ]);
   });
 });
 

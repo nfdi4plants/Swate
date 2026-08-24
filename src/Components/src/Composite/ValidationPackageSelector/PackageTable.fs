@@ -63,6 +63,7 @@ type PackageTable =
 
         let selectedTags, setSelectedTags = React.useStateWithUpdater Set.empty<int>
         let selectedAuthors, setSelectedAuthors = React.useStateWithUpdater Set.empty<int>
+        let checkedSort, setCheckedSort = React.useState CheckedSort.None
 
         // Constrain Select (multi-select) to at most one selected index.
         let setSingleSelection (setter: (Set<int> -> Set<int>) -> unit) (next: Set<int>) =
@@ -96,8 +97,15 @@ type PackageTable =
                     items
                     |> Helper.filterByTag tagFilterName
                     |> Helper.filterByAuthor authorFilterName
+                    |> Helper.sortByChecked checkedSort ctx.RowStateOf
                 ),
-                [| box items; box tagFilterName; box authorFilterName |]
+                [|
+                    box items
+                    box tagFilterName
+                    box authorFilterName
+                    box checkedSort
+                    box ctx.RowStateOf
+                |]
             )
 
         Html.table [
@@ -105,7 +113,37 @@ type PackageTable =
             prop.children [
                 Html.thead [
                     Html.tr [
-                        Html.th [ prop.className "swt:w-12" ]
+                        Html.th [
+                            prop.className "swt:w-12"
+                            prop.children [
+                                Html.button [
+                                    prop.type' "button"
+                                    prop.testId "validation-package-selector-sort-checked"
+                                    prop.title (
+                                        match checkedSort with
+                                        | CheckedSort.None -> "Sort: checked state"
+                                        | CheckedSort.CheckedFirst -> "Sort: checked first"
+                                        | CheckedSort.CheckedLast -> "Sort: checked last"
+                                    )
+                                    prop.className [
+                                        "swt:btn swt:btn-xs swt:btn-ghost swt:shrink-0"
+                                        if checkedSort <> CheckedSort.None then "swt:text-accent"
+                                    ]
+                                    prop.onClick (fun _ -> setCheckedSort (Helper.nextCheckedSort checkedSort))
+                                    prop.children [
+                                        Html.i [
+                                            prop.className [
+                                                "swt:iconify"
+                                                match checkedSort with
+                                                | CheckedSort.None -> "swt:fluent--filter-20-regular"
+                                                | CheckedSort.CheckedFirst -> "swt:fluent--arrow-sort-up-lines-16-regular swt:size-4"
+                                                | CheckedSort.CheckedLast -> "swt:fluent--arrow-sort-down-lines-16-regular swt:size-4"
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
                         Html.th "Name"
                         Html.th [
                             prop.className "swt:max-md:hidden"
