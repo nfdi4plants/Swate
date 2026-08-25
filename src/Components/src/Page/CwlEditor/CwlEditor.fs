@@ -13,7 +13,6 @@ open Swate.Components.Shared.Cwl.Documents.Mutations
 open Swate.Components.Shared.Cwl.Documents.Types
 open Swate.Components.Shared.Cwl.CwlService
 open Swate.Components.Shared.Cwl.EditorTypes
-open Swate.Components.Shared.Cwl.ExpressionToolMutations
 open Swate.Components.Shared.Cwl.Features.InputsFeature
 open Swate.Components.Shared.Cwl.Features.OutputsFeature
 open Swate.Components.Shared.Cwl.HostTypes
