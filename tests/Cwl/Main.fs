@@ -10,6 +10,7 @@ let main args =
             Swate.Tests.Cwl.ValidationEngineTests.allTests
             Swate.Tests.Cwl.StateReducerTests.allTests
             Swate.Tests.Cwl.EffectRunnerTests.allTests
+            Swate.Tests.Cwl.EditorShellFeatureTests.allTests
             Swate.Tests.Cwl.ArCtrlAdapterTests.allTests
             Swate.Tests.Cwl.EditorControllerLogicTests.allTests
         ]
