@@ -130,6 +130,70 @@ let reducerTests =
             Expect.hasLength effects 1 "Save should emit one dialog effect"
             Expect.isTrue nextState.Async.IsSaving "Save should set IsSaving"
         }
+
+        test "document update clears selection ids that no longer exist" {
+            let input = createInput "reads"
+            let step = createWorkflowStep "qc" (ExternalRun "qc.cwl")
+
+            let document =
+                WorkflowDoc {
+                    createWorkflowModel "v1.2" with
+                        Inputs = [ input ]
+                        Steps = [ step ]
+                }
+
+            let state, _ = update (CreateNewRequested Workflow) emptyState
+
+            let selectedState, _ =
+                update
+                    (SelectionChanged {
+                        emptySelection with
+                            ActiveInputId = Some input.Id
+                            ActiveStepId = Some step.Id
+                    })
+                    { state with Document = Some document }
+
+            let nextState, _ =
+                update (DocumentUpdated(WorkflowDoc(createWorkflowModel "v1.2"))) selectedState
+
+            Expect.equal nextState.Selection.ActiveInputId None "Removed input selection should be cleared"
+            Expect.equal nextState.Selection.ActiveStepId None "Removed step selection should be cleared"
+        }
+
+        test "document update preserves selection ids that still exist" {
+            let input = createInput "reads"
+            let step = createWorkflowStep "qc" (ExternalRun "qc.cwl")
+
+            let document =
+                WorkflowDoc {
+                    createWorkflowModel "v1.2" with
+                        Inputs = [ input ]
+                        Steps = [ step ]
+                }
+
+            let state, _ = update (CreateNewRequested Workflow) emptyState
+
+            let selectedState, _ =
+                update
+                    (SelectionChanged {
+                        emptySelection with
+                            ActiveInputId = Some input.Id
+                            ActiveStepId = Some step.Id
+                    })
+                    { state with Document = Some document }
+
+            let nextState, _ = update (DocumentUpdated document) selectedState
+
+            Expect.equal
+                nextState.Selection.ActiveInputId
+                (Some input.Id)
+                "Existing input selection should remain selected"
+
+            Expect.equal
+                nextState.Selection.ActiveStepId
+                (Some step.Id)
+                "Existing step selection should remain selected"
+        }
     ]
 
 [<Tests>]

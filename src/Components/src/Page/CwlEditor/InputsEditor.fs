@@ -154,7 +154,6 @@ type InputsEditor =
                                     prop.onClick (fun _ ->
                                         onInteract |> Option.iter (fun callback -> callback ())
                                         onAddInput ()
-                                        setActiveIndex (Some inputs.Length)
                                     )
                                 ]
                                 Html.button [
@@ -171,7 +170,7 @@ type InputsEditor =
                                                 match activeIndex with
                                                 | Some _ when inputs.Length <= 1 -> None
                                                 | Some index when index >= inputs.Length - 1 -> Some(inputs.Length - 2)
-                                                | Some index -> Some index
+                                                | Some index -> Some(index + 1)
                                                 | None -> None
 
                                             onInteract |> Option.iter (fun callback -> callback ())
@@ -219,7 +218,7 @@ type InputsEditor =
                                 match activeIndex |> Option.bind (fun index -> inputs |> List.tryItem index) with
                                 | Some input ->
                                     onMoveInputUp input.Id
-                                    setActiveIndex (activeIndex |> Option.map (fun index -> max 0 (index - 1)))
+                                    setActiveIndex activeIndex
                                 | None -> ()
                             )
                         ]
@@ -232,10 +231,7 @@ type InputsEditor =
                                 match activeIndex |> Option.bind (fun index -> inputs |> List.tryItem index) with
                                 | Some input ->
                                     onMoveInputDown input.Id
-
-                                    setActiveIndex (
-                                        activeIndex |> Option.map (fun index -> min (inputs.Length - 1) (index + 1))
-                                    )
+                                    setActiveIndex activeIndex
                                 | None -> ()
                             )
                         ]

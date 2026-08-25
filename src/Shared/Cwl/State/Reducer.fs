@@ -43,6 +43,86 @@ let private clearEditorState (state: AppState) = {
         PendingEffects = []
 }
 
+let private keepIfExists exists value =
+    value |> Option.bind (fun id -> if exists id then Some id else None)
+
+let private documentInputs document =
+    match document with
+    | CommandLineToolDoc model -> model.Inputs
+    | WorkflowDoc model -> model.Inputs
+    | ExpressionToolDoc model -> model.Inputs
+    | OperationDoc model -> model.Inputs
+
+let private documentOutputs document =
+    match document with
+    | CommandLineToolDoc model -> model.Outputs
+    | WorkflowDoc model -> model.Outputs
+    | ExpressionToolDoc model -> model.Outputs
+    | OperationDoc model -> model.Outputs
+
+let private documentRequirementNodes document =
+    match document with
+    | CommandLineToolDoc model -> model.Requirements @ model.Hints
+    | WorkflowDoc model -> model.Requirements @ model.Hints
+    | ExpressionToolDoc model -> model.Requirements @ model.Hints
+    | OperationDoc model -> model.Requirements @ model.Hints
+
+let private tryFindStep stepId document =
+    match document with
+    | WorkflowDoc model -> model.Steps |> List.tryFind (fun step -> step.Id = stepId)
+    | _ -> None
+
+let private normalizeSelectionForDocument document selection =
+    let activeInputId =
+        selection.ActiveInputId
+        |> keepIfExists (fun inputId -> documentInputs document |> List.exists (fun input -> input.Id = inputId))
+
+    let activeOutputId =
+        selection.ActiveOutputId
+        |> keepIfExists (fun outputId -> documentOutputs document |> List.exists (fun output -> output.Id = outputId))
+
+    let activeStepId =
+        selection.ActiveStepId
+        |> keepIfExists (fun stepId -> tryFindStep stepId document |> Option.isSome)
+
+    let activeStep =
+        activeStepId |> Option.bind (fun stepId -> tryFindStep stepId document)
+
+    let activeStepInputId =
+        selection.ActiveStepInputId
+        |> keepIfExists (fun stepInputId ->
+            activeStep
+            |> Option.exists (fun step -> step.Inputs |> List.exists (fun input -> input.Id = stepInputId))
+        )
+
+    let activeStepOutputId =
+        selection.ActiveStepOutputId
+        |> keepIfExists (fun stepOutputId ->
+            activeStep
+            |> Option.exists (fun step -> step.Outputs |> List.exists (fun output -> output.Id = stepOutputId))
+        )
+
+    let focusedRequirementId =
+        selection.FocusedRequirementId
+        |> keepIfExists (fun requirementNodeId ->
+            documentRequirementNodes document
+            |> List.exists (fun node -> node.Id = requirementNodeId)
+        )
+
+    {
+        ActiveInputId = activeInputId
+        ActiveOutputId = activeOutputId
+        ActiveStepId = activeStepId
+        ActiveStepInputId = activeStepInputId
+        ActiveStepOutputId = activeStepOutputId
+        FocusedRequirementId = focusedRequirementId
+    }
+
+let private normalizeSelection document selection =
+    document
+    |> Option.map (fun currentDocument -> normalizeSelectionForDocument currentDocument selection)
+    |> Option.defaultValue emptySelection
+
 let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
     match action with
     | CreateNewRequested kind ->
@@ -52,7 +132,7 @@ let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
             state with
                 Document = Some document
                 Meta = Some(newMeta None)
-                Selection = emptySelection
+                Selection = normalizeSelection (Some document) state.Selection
                 Overlay = NoOverlay
                 Notifications = emptyNotifications
                 Async = emptyAsync
@@ -85,6 +165,7 @@ let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
             state with
                 Document = Some document
                 Meta = nextMeta
+                Selection = normalizeSelection (Some document) state.Selection
                 Notifications = {
                     state.Notifications with
                         InfoMessage = None
@@ -92,7 +173,12 @@ let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
         }
         |> withEffects []
 
-    | SelectionChanged selection -> { state with Selection = selection } |> withEffects []
+    | SelectionChanged selection ->
+        {
+            state with
+                Selection = normalizeSelection state.Document selection
+        }
+        |> withEffects []
 
     | PreviewOpened yaml ->
         {

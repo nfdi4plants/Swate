@@ -41,6 +41,36 @@ module private CwlEditorHelpers =
         | _ when count > 0 -> Some 0
         | _ -> None
 
+    let activeIndexById selectedId items getId =
+        match selectedId with
+        | Some id ->
+            items
+            |> List.tryFindIndex (fun item -> getId item = id)
+            |> Option.orElseWith (fun () -> clampIndex None (List.length items))
+        | None -> clampIndex None (List.length items)
+
+    let idAtIndex selectedIndex items getId =
+        selectedIndex
+        |> Option.bind (fun index -> items |> List.tryItem index |> Option.map getId)
+
+    let lastInputId document =
+        match document with
+        | CommandLineToolDoc model -> model.Inputs
+        | WorkflowDoc model -> model.Inputs
+        | ExpressionToolDoc model -> model.Inputs
+        | OperationDoc model -> model.Inputs
+        |> List.tryLast
+        |> Option.map (fun input -> input.Id)
+
+    let lastOutputId document =
+        match document with
+        | CommandLineToolDoc model -> model.Outputs
+        | WorkflowDoc model -> model.Outputs
+        | ExpressionToolDoc model -> model.Outputs
+        | OperationDoc model -> model.Outputs
+        |> List.tryLast
+        |> Option.map (fun output -> output.Id)
+
     let eventTargetValue (ev: Browser.Types.FocusEvent) =
         let target = ev.target :?> Browser.Types.HTMLInputElement
         if isNull target then "" else target.value
@@ -98,33 +128,11 @@ type CwlEditor =
         let state, dispatch =
             React.useReducer ((fun currentState action -> update action currentState |> fst), initialState)
 
-        let selectedInputIndex, setSelectedInputIndex = React.useState<int option> None
-        let selectedOutputIndex, setSelectedOutputIndex = React.useState<int option> None
-        let selectedStepIndex, setSelectedStepIndex = React.useState<int option> None
-
         let host =
             Context.useCwlEditorHostCtx ()
             |> Option.defaultWith (fun () -> failwith "CwlEditor requires a CwlEditorHost context.")
 
         let isDirty = isDirty state
-
-        let resetEditorSelection =
-            React.useCallback (
-                (fun () ->
-                    setSelectedInputIndex None
-                    setSelectedOutputIndex None
-                    setSelectedStepIndex None
-                ),
-                [||]
-            )
-
-        React.useEffect (
-            (fun () ->
-                resetEditorSelection ()
-                fun () -> ()
-            ),
-            [| box state.SessionId |]
-        )
 
         React.useEffect (
             (fun () ->
@@ -279,6 +287,34 @@ type CwlEditor =
         let updateCurrentDocument updater =
             state.Document |> Option.map updater |> Option.iter updateDocument
 
+        let addInputAndSelect () =
+            state.Document
+            |> Option.iter (fun document ->
+                let nextDocument = InputsFeature.addInput document
+                dispatch (DocumentUpdated nextDocument)
+
+                dispatch (
+                    SelectionChanged {
+                        state.Selection with
+                            ActiveInputId = lastInputId nextDocument
+                    }
+                )
+            )
+
+        let addOutputAndSelect () =
+            state.Document
+            |> Option.iter (fun document ->
+                let nextDocument = OutputsFeature.addOutput document
+                dispatch (DocumentUpdated nextDocument)
+
+                dispatch (
+                    SelectionChanged {
+                        state.Selection with
+                            ActiveOutputId = lastOutputId nextDocument
+                    }
+                )
+            )
+
         let saveCurrent () =
             match processingUnit, state.Document with
             | Some currentProcessingUnit, Some document ->
@@ -323,8 +359,6 @@ type CwlEditor =
                     state.Async.IsLoading,
                     (fun () -> dispatch (ErrorNotificationSet None)),
                     (fun kind ->
-                        resetEditorSelection ()
-
                         CwlEditorPorts.liveTimerPort.SetTimeout 0 (fun () -> dispatch (CreateNewRequested kind))
                         |> ignore
                     ),
@@ -349,8 +383,27 @@ type CwlEditor =
                         |> Option.bind (fun commands -> if commands.Count > 0 then Some commands.[0] else None)
                         |> Option.defaultValue ""
 
-                    let activeInputIndex = clampIndex selectedInputIndex model.Inputs.Length
-                    let activeOutputIndex = clampIndex selectedOutputIndex model.Outputs.Length
+                    let activeInputIndex =
+                        activeIndexById state.Selection.ActiveInputId model.Inputs (fun input -> input.Id)
+
+                    let activeOutputIndex =
+                        activeIndexById state.Selection.ActiveOutputId model.Outputs (fun output -> output.Id)
+
+                    let setActiveInputIndex selectedIndex =
+                        dispatch (
+                            SelectionChanged {
+                                state.Selection with
+                                    ActiveInputId = idAtIndex selectedIndex model.Inputs (fun input -> input.Id)
+                            }
+                        )
+
+                    let setActiveOutputIndex selectedIndex =
+                        dispatch (
+                            SelectionChanged {
+                                state.Selection with
+                                    ActiveOutputId = idAtIndex selectedIndex model.Outputs (fun output -> output.Id)
+                            }
+                        )
 
                     CommandLineToolEditor.CommandLineToolEditor(
                         version,
@@ -372,8 +425,8 @@ type CwlEditor =
                         tool.Hints,
                         validationResult,
                         commitMutation,
-                        setSelectedInputIndex,
-                        setSelectedOutputIndex,
+                        setActiveInputIndex,
+                        setActiveOutputIndex,
                         (fun () -> dispatch PreviewRequested),
                         saveCurrent,
                         (fun () -> dispatch LeaveEditorRequested),
@@ -398,14 +451,14 @@ type CwlEditor =
                         (fun inputId isOptional ->
                             updateCurrentDocument (InputsFeature.setInputOptional inputId isOptional)
                         ),
-                        (fun () -> updateCurrentDocument InputsFeature.addInput),
+                        addInputAndSelect,
                         (fun inputId -> updateCurrentDocument (InputsFeature.removeInput inputId)),
                         (fun inputId -> updateCurrentDocument (InputsFeature.moveInputUp inputId)),
                         (fun inputId -> updateCurrentDocument (InputsFeature.moveInputDown inputId)),
                         (fun outputId name -> updateCurrentDocument (OutputsFeature.renameOutput outputId name)),
                         (fun outputId cwlType -> updateCurrentDocument (OutputsFeature.setOutputType outputId cwlType)),
                         (fun outputId glob -> updateCurrentDocument (OutputsFeature.setOutputGlob outputId glob)),
-                        (fun () -> updateCurrentDocument OutputsFeature.addOutput),
+                        addOutputAndSelect,
                         (fun outputId -> updateCurrentDocument (OutputsFeature.removeOutput outputId)),
                         (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputUp outputId)),
                         (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputDown outputId)),
@@ -422,10 +475,40 @@ type CwlEditor =
                         | WorkflowDoc model -> model
                         | _ -> failwith "Expected WorkflowDoc"
 
-                    let steps = workflow.Steps
-                    let activeInputIndex = clampIndex selectedInputIndex model.Inputs.Length
-                    let activeOutputIndex = clampIndex selectedOutputIndex model.Outputs.Length
-                    let activeStepIndex = clampIndex selectedStepIndex steps.Count
+                    let activeInputIndex =
+                        activeIndexById state.Selection.ActiveInputId model.Inputs (fun input -> input.Id)
+
+                    let activeOutputIndex =
+                        activeIndexById state.Selection.ActiveOutputId model.Outputs (fun output -> output.Id)
+
+                    let activeStepIndex =
+                        activeIndexById state.Selection.ActiveStepId model.Steps (fun step -> step.Id)
+
+                    let setActiveInputIndex selectedIndex =
+                        dispatch (
+                            SelectionChanged {
+                                state.Selection with
+                                    ActiveInputId = idAtIndex selectedIndex model.Inputs (fun input -> input.Id)
+                            }
+                        )
+
+                    let setActiveOutputIndex selectedIndex =
+                        dispatch (
+                            SelectionChanged {
+                                state.Selection with
+                                    ActiveOutputId = idAtIndex selectedIndex model.Outputs (fun output -> output.Id)
+                            }
+                        )
+
+                    let setActiveStepIndex selectedIndex =
+                        dispatch (
+                            SelectionChanged {
+                                state.Selection with
+                                    ActiveStepId = idAtIndex selectedIndex model.Steps (fun step -> step.Id)
+                                    ActiveStepInputId = None
+                                    ActiveStepOutputId = None
+                            }
+                        )
 
                     WorkflowEditor.WorkflowEditor(
                         version,
@@ -449,9 +532,9 @@ type CwlEditor =
                         workflow.Hints,
                         validationResult,
                         commitMutation,
-                        setSelectedInputIndex,
-                        setSelectedOutputIndex,
-                        setSelectedStepIndex,
+                        setActiveInputIndex,
+                        setActiveOutputIndex,
+                        setActiveStepIndex,
                         (fun () -> dispatch PreviewRequested),
                         saveCurrent,
                         (fun () -> dispatch LeaveEditorRequested),
@@ -468,14 +551,14 @@ type CwlEditor =
                         (fun inputId isOptional ->
                             updateCurrentDocument (InputsFeature.setInputOptional inputId isOptional)
                         ),
-                        (fun () -> updateCurrentDocument InputsFeature.addInput),
+                        addInputAndSelect,
                         (fun inputId -> updateCurrentDocument (InputsFeature.removeInput inputId)),
                         (fun inputId -> updateCurrentDocument (InputsFeature.moveInputUp inputId)),
                         (fun inputId -> updateCurrentDocument (InputsFeature.moveInputDown inputId)),
                         (fun outputId name -> updateCurrentDocument (OutputsFeature.renameOutput outputId name)),
                         (fun outputId cwlType -> updateCurrentDocument (OutputsFeature.setOutputType outputId cwlType)),
                         (fun outputId glob -> updateCurrentDocument (OutputsFeature.setOutputGlob outputId glob)),
-                        (fun () -> updateCurrentDocument OutputsFeature.addOutput),
+                        addOutputAndSelect,
                         (fun outputId -> updateCurrentDocument (OutputsFeature.removeOutput outputId)),
                         (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputUp outputId)),
                         (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputDown outputId)),
@@ -501,8 +584,27 @@ type CwlEditor =
                         | ExpressionToolDoc model -> model
                         | _ -> failwith "Expected ExpressionToolDoc"
 
-                    let activeInputIndex = clampIndex selectedInputIndex model.Inputs.Length
-                    let activeOutputIndex = clampIndex selectedOutputIndex model.Outputs.Length
+                    let activeInputIndex =
+                        activeIndexById state.Selection.ActiveInputId model.Inputs (fun input -> input.Id)
+
+                    let activeOutputIndex =
+                        activeIndexById state.Selection.ActiveOutputId model.Outputs (fun output -> output.Id)
+
+                    let setActiveInputIndex selectedIndex =
+                        dispatch (
+                            SelectionChanged {
+                                state.Selection with
+                                    ActiveInputId = idAtIndex selectedIndex model.Inputs (fun input -> input.Id)
+                            }
+                        )
+
+                    let setActiveOutputIndex selectedIndex =
+                        dispatch (
+                            SelectionChanged {
+                                state.Selection with
+                                    ActiveOutputId = idAtIndex selectedIndex model.Outputs (fun output -> output.Id)
+                            }
+                        )
 
                     ExpressionToolEditor.ExpressionToolEditor(
                         version,
@@ -524,8 +626,8 @@ type CwlEditor =
                         model.Hints,
                         validationResult,
                         commitMutation,
-                        setSelectedInputIndex,
-                        setSelectedOutputIndex,
+                        setActiveInputIndex,
+                        setActiveOutputIndex,
                         (fun () -> dispatch PreviewRequested),
                         saveCurrent,
                         (fun () -> dispatch LeaveEditorRequested),
@@ -543,14 +645,14 @@ type CwlEditor =
                         (fun inputId isOptional ->
                             updateCurrentDocument (InputsFeature.setInputOptional inputId isOptional)
                         ),
-                        (fun () -> updateCurrentDocument InputsFeature.addInput),
+                        addInputAndSelect,
                         (fun inputId -> updateCurrentDocument (InputsFeature.removeInput inputId)),
                         (fun inputId -> updateCurrentDocument (InputsFeature.moveInputUp inputId)),
                         (fun inputId -> updateCurrentDocument (InputsFeature.moveInputDown inputId)),
                         (fun outputId name -> updateCurrentDocument (OutputsFeature.renameOutput outputId name)),
                         (fun outputId cwlType -> updateCurrentDocument (OutputsFeature.setOutputType outputId cwlType)),
                         (fun outputId glob -> updateCurrentDocument (OutputsFeature.setOutputGlob outputId glob)),
-                        (fun () -> updateCurrentDocument OutputsFeature.addOutput),
+                        addOutputAndSelect,
                         (fun outputId -> updateCurrentDocument (OutputsFeature.removeOutput outputId)),
                         (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputUp outputId)),
                         (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputDown outputId)),

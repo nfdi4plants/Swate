@@ -123,7 +123,6 @@ type OutputsEditor =
                                     prop.onClick (fun _ ->
                                         onInteract |> Option.iter (fun callback -> callback ())
                                         onAddOutput ()
-                                        setActiveIndex (Some outputs.Length)
                                     )
                                 ]
                                 Html.button [
@@ -141,7 +140,7 @@ type OutputsEditor =
                                                 | Some _ when outputs.Length <= 1 -> None
                                                 | Some index when index >= outputs.Length - 1 ->
                                                     Some(outputs.Length - 2)
-                                                | Some index -> Some index
+                                                | Some index -> Some(index + 1)
                                                 | None -> None
 
                                             onInteract |> Option.iter (fun callback -> callback ())
@@ -189,7 +188,7 @@ type OutputsEditor =
                                 match activeIndex |> Option.bind (fun index -> outputs |> List.tryItem index) with
                                 | Some output ->
                                     onMoveOutputUp output.Id
-                                    setActiveIndex (activeIndex |> Option.map (fun index -> max 0 (index - 1)))
+                                    setActiveIndex activeIndex
                                 | None -> ()
                             )
                         ]
@@ -202,10 +201,7 @@ type OutputsEditor =
                                 match activeIndex |> Option.bind (fun index -> outputs |> List.tryItem index) with
                                 | Some output ->
                                     onMoveOutputDown output.Id
-
-                                    setActiveIndex (
-                                        activeIndex |> Option.map (fun index -> min (outputs.Length - 1) (index + 1))
-                                    )
+                                    setActiveIndex activeIndex
                                 | None -> ()
                             )
                         ]
