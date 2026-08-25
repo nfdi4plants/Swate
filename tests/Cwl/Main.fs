@@ -15,7 +15,6 @@ let main args =
             Swate.Tests.Cwl.ExpressionToolFeatureTests.allTests
             Swate.Tests.Cwl.WorkflowFeatureTests.allTests
             Swate.Tests.Cwl.ArCtrlAdapterTests.allTests
-            Swate.Tests.Cwl.EditorControllerLogicTests.allTests
         ]
 
     runTestsWithCLIArgs [] args allTests

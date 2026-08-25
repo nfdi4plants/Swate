@@ -54,7 +54,6 @@
     <Compile Include="Cwl\Validation\ValidationEngine.fs" />
     <Compile Include="Cwl\CwlService.fs" />
     <Compile Include="Cwl\HostTypes.fs" />
-    <Compile Include="Cwl\EditorControllerLogic.fs" />
     <Compile Include="Cwl\Documents\Common.fs" />
     <Compile Include="Cwl\Documents\Types.fs" />
     <Compile Include="Cwl\Documents\Selectors.fs" />

@@ -66,6 +66,61 @@ let workflowFeatureTests =
                 "second-renamed"
                 "Rename should apply to the selected step id even after reorder"
         }
+
+        test "adding and editing a workflow step input uses stable ids" {
+            let step = createWorkflowStep "qc" (ExternalRun "qc.cwl")
+
+            let workflow = {
+                createWorkflowModel "v1.2" with
+                    Steps = [ step ]
+            }
+
+            let nextWorkflow, addedInputId =
+                Swate.Components.Shared.Cwl.Documents.Workflow.addStepInput step.Id workflow
+
+            let updatedWorkflow =
+                nextWorkflow
+                |> Swate.Components.Shared.Cwl.Documents.Workflow.renameStepInput step.Id addedInputId "reads"
+                |> Swate.Components.Shared.Cwl.Documents.Workflow.setStepInputSourceText
+                    step.Id
+                    addedInputId
+                    "raw_reads, reference"
+
+            let updatedStep = updatedWorkflow.Steps |> List.find (fun item -> item.Id = step.Id)
+
+            let updatedInput =
+                updatedStep.Inputs |> List.find (fun item -> item.Id = addedInputId)
+
+            Expect.equal updatedInput.Name "reads" "Step input rename should target the added input id"
+
+            Expect.equal
+                updatedInput.Sources
+                [ "raw_reads"; "reference" ]
+                "Step input sources should parse comma-separated text"
+        }
+
+        test "adding and editing a workflow step output uses stable ids" {
+            let step = createWorkflowStep "qc" (ExternalRun "qc.cwl")
+
+            let workflow = {
+                createWorkflowModel "v1.2" with
+                    Steps = [ step ]
+            }
+
+            let nextWorkflow, addedOutputId =
+                Swate.Components.Shared.Cwl.Documents.Workflow.addStepOutput step.Id workflow
+
+            let updatedWorkflow =
+                nextWorkflow
+                |> Swate.Components.Shared.Cwl.Documents.Workflow.renameStepOutput step.Id addedOutputId "report"
+
+            let updatedStep = updatedWorkflow.Steps |> List.find (fun item -> item.Id = step.Id)
+
+            let updatedOutput =
+                updatedStep.Outputs |> List.find (fun item -> item.Id = addedOutputId)
+
+            Expect.equal updatedOutput.Name "report" "Step output rename should target the added output id"
+        }
     ]
 
 [<Tests>]

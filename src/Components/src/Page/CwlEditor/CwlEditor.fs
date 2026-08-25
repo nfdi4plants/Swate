@@ -1,5 +1,6 @@
 namespace Swate.Components.Page.CwlEditor
 
+open System
 open Browser.Dom
 open Fable.Core
 open Feliz
@@ -11,7 +12,7 @@ open Swate.Components.Shared.Cwl.CommandLineToolMutations
 open Swate.Components.Shared.Cwl.Documents.Common
 open Swate.Components.Shared.Cwl.Documents.ExpressionTool
 open Swate.Components.Shared.Cwl.Documents.Types
-open Swate.Components.Shared.Cwl.EditorControllerLogic
+open Swate.Components.Shared.Cwl.CwlService
 open Swate.Components.Shared.Cwl.EditorTypes
 open Swate.Components.Shared.Cwl.ExpressionToolMutations
 open Swate.Components.Shared.Cwl.Features.InputsFeature
@@ -86,10 +87,44 @@ module private CwlEditorHelpers =
         | Swate.Components.Shared.Cwl.Documents.Types.ExpressionToolDoc model -> model.CwlVersion
         | Swate.Components.Shared.Cwl.Documents.Types.OperationDoc model -> model.CwlVersion
 
+    let private formatInitialLoadError (message: string) =
+        let prefix = "Failed to decode CWL:"
+
+        if String.IsNullOrWhiteSpace message then
+            "Failed to decode CWL."
+        elif message.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) then
+            message
+        else
+            sprintf "%s %s" prefix message
+
+    let private tryCreateInitialEditorState (fileResult: LoadCwlResponse) =
+        if not fileResult.Success then
+            let errorText = fileResult.Error |> Option.defaultValue "unknown error"
+            Result.Error(sprintf "Load failed: %s" errorText)
+        else
+            match fileResult.Yaml with
+            | Some yaml ->
+                tryLoadToEditorWithResolved yaml fileResult.ResolvedYaml fileResult.FilePath
+                |> Result.mapError formatInitialLoadError
+            | None -> Result.Error "Load failed: missing YAML payload."
+
+    let formatBlockedSaveMessage (validation: Swate.Components.Shared.Cwl.Validation.ValidationTypes.ValidationResult) =
+        let ruleIdText (Swate.Components.Shared.Cwl.Validation.ValidationTypes.RuleId value) = value
+
+        let firstDetail =
+            validation.Errors
+            |> List.tryHead
+            |> Option.map (fun issue ->
+                sprintf " First issue (%s at %s): %s" (ruleIdText issue.RuleId) issue.Path issue.Message
+            )
+            |> Option.defaultValue ""
+
+        sprintf "Save blocked: %d validation error(s).%s" validation.Errors.Length firstDetail
+
     let initialAppState (initialFile: LoadCwlResponse option) =
         match initialFile with
         | Some fileResult ->
-            match tryCreateLoadedState fileResult with
+            match tryCreateInitialEditorState fileResult with
             | Ok loadedState ->
                 {
                     emptyState with
@@ -317,24 +352,18 @@ type CwlEditor =
 
         let saveCurrent () =
             match processingUnit, state.Document with
-            | Some currentProcessingUnit, Some document ->
+            | Some _, Some document ->
                 dispatch (ErrorNotificationSet None)
                 dispatch (InfoNotificationSet None)
 
-                let legacyState = {
-                    ProcessingUnit = currentProcessingUnit
-                    Version = currentVersionNumber state
-                    FilePath = currentFilePath state
-                    IsDirty = isDirty
-                    CwlVersion = currentCwlVersion document
-                }
+                let validation = validateDocument OnSave document
 
-                match ensureCanSave legacyState with
-                | Ok() ->
+                if validation.IsValid then
                     match host.pickSavePath, currentFilePath state with
                     | None, None -> dispatch (ErrorNotificationSet(Some "Cannot save: no file path is available."))
                     | _ -> dispatch SaveRequested
-                | Error message -> dispatch (ErrorNotificationSet(Some message))
+                else
+                    dispatch (ErrorNotificationSet(Some(formatBlockedSaveMessage validation)))
             | _ -> ()
 
         let wrapEditorView (editorView: ReactElement) =
