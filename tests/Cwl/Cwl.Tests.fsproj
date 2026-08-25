@@ -12,6 +12,7 @@
         <Compile Include="EditorShellFeatureTests.fs" />
         <Compile Include="CommandLineToolFeatureTests.fs" />
         <Compile Include="ExpressionToolFeatureTests.fs" />
+        <Compile Include="WorkflowFeatureTests.fs" />
         <Compile Include="ArCtrlAdapterTests.fs" />
         <Compile Include="EditorControllerLogicTests.fs" />
         <Compile Include="Main.fs" />

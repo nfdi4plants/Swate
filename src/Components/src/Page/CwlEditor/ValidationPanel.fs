@@ -17,6 +17,8 @@ type ValidationPanel =
 
     [<ReactComponent>]
     static member ValidationPanel(version: int, result: ValidationResult) : ReactElement =
+        let issues = result.Issues |> List.toArray
+
         Html.section [
             prop.className "swt:card swt:bg-base-200 swt:p-4"
             prop.children [
@@ -38,7 +40,7 @@ type ValidationPanel =
                             "Document contains blocking errors."
                     )
                 ]
-                if result.Issues.IsEmpty then
+                if Array.isEmpty issues then
                     Html.p [
                         prop.className "swt:text-base-content/60 swt:italic swt:p-4 swt:text-center"
                         prop.text "No validation messages."
@@ -47,7 +49,7 @@ type ValidationPanel =
                     Html.ul [
                         prop.className "swt:flex swt:flex-col swt:gap-1"
                         prop.children [
-                            for issue in result.Issues do
+                            for issue in issues do
                                 let (RuleId ruleIdText) = issue.RuleId
 
                                 Html.li [
