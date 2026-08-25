@@ -132,7 +132,7 @@ let update (action: AppAction) (state: AppState) : AppState * AppEffect list =
             state with
                 Document = Some document
                 Meta = Some(newMeta None)
-                Selection = normalizeSelection (Some document) state.Selection
+                Selection = emptySelection
                 Overlay = NoOverlay
                 Notifications = emptyNotifications
                 Async = emptyAsync
