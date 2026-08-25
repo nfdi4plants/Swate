@@ -14,16 +14,9 @@ type PackageTable =
 
     [<ReactComponent>]
     static member private HeaderSelect
-        (
-            label: string,
-            optionNames: string[],
-            selectedIndex: int option,
-            setSelectedIndex: int option -> unit,
-            testId: string
-        ) =
-        let selected =
-            selectedIndex
-            |> Option.map (fun i -> optionNames.[i])
+        (label: string, optionNames: string[], selectedIndex: int option, setSelectedIndex: int option -> unit)
+        =
+        let selected = selectedIndex |> Option.map (fun i -> optionNames.[i])
 
         SingleSelect.SingleSelect(
             optionNames |> Array.map (fun name -> {| item = name; label = name |}),
@@ -32,7 +25,7 @@ type PackageTable =
             triggerRenderFn =
                 (fun (_: {| isOpen: bool |}) ->
                     Html.div [
-                        prop.testId testId
+                        prop.testId $"validation-package-selector-{label.ToLower()}-filter"
                         prop.className [
                             "swt:flex swt:items-center swt:gap-1 swt:text-xs swt:font-medium swt:uppercase"
                             if selected.IsSome then
@@ -56,7 +49,13 @@ type PackageTable =
         )
 
     [<ReactComponent(true)>]
-    static member PackageTable(items: ValidationPackageDTO[], renderBody: ValidationPackageDTO[] -> ReactElement) =
+    static member PackageTable(
+        items: ValidationPackageDTO[], 
+        renderBody: ValidationPackageDTO[] -> ReactElement, 
+        // https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes
+        ?key: string
+    )
+        =
         let ctx = useValidationPackageSelectorCtx ()
 
         let selectedTag, setSelectedTag = React.useState (None: int option)
@@ -69,13 +68,9 @@ type PackageTable =
         let authorOptions =
             React.useMemo ((fun () -> Helper.distinctAuthors items), [| box items |])
 
-        let tagFilterName =
-            selectedTag
-            |> Option.map (fun i -> tagOptions.[i])
+        let tagFilterName = selectedTag |> Option.map (fun i -> tagOptions.[i])
 
-        let authorFilterName =
-            selectedAuthor
-            |> Option.map (fun i -> authorOptions.[i])
+        let authorFilterName = selectedAuthor |> Option.map (fun i -> authorOptions.[i])
 
         let filtered =
             React.useMemo (
@@ -137,22 +132,10 @@ type PackageTable =
                         Html.th [ prop.className "swt:max-md:hidden"; prop.text "Summary" ]
                         Html.th "Version"
                         Html.th [
-                            PackageTable.HeaderSelect(
-                                "Tags",
-                                tagOptions,
-                                selectedTag,
-                                setSelectedTag,
-                                "validation-package-selector-tag-filter"
-                            )
+                            PackageTable.HeaderSelect("Tags", tagOptions, selectedTag, setSelectedTag)
                         ]
                         Html.th [
-                            PackageTable.HeaderSelect(
-                                "Authors",
-                                authorOptions,
-                                selectedAuthor,
-                                setSelectedAuthor,
-                                "validation-package-selector-author-filter"
-                            )
+                            PackageTable.HeaderSelect("Authors", authorOptions, selectedAuthor, setSelectedAuthor)
                         ]
                         Html.th [ prop.className "swt:max-md:hidden"; prop.text "Released" ]
                         Html.th "Info"

@@ -89,7 +89,7 @@ export const TagFilterNarrowsRows: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await loadedPackage(canvas);
-    await userEvent.click(canvas.getByTestId("validation-package-selector-tag-filter"));
+    await userEvent.click(canvas.getByTestId("validation-package-selector-tags-filter"));
     await selectDropdownOption("Invenio");
     await waitFor(() => {
       expect(canvas.getByTestId("validation-package-selector-checkbox-Invenio")).toBeInTheDocument();

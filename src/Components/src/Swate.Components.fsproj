@@ -92,6 +92,9 @@
     <Compile Include="Api\SwateApi.fs" />
     <Compile Include="Api\GitLabApi.fs" />
     <Compile Include="Api\TIBApi.fs" />
+
+    <Compile Include="Hooks\useResettableState\useResettableState.fs" />
+    <Compile Include="Hooks\useResettableState\useResettableState.sample.fs" />
    
     <Compile Include="Primitive\Types.fs" />
     <Compile Include="Primitive\Icons.fs" />

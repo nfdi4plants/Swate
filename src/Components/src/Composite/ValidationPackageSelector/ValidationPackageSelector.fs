@@ -231,6 +231,14 @@ type ValidationPackageSelector =
                 [| box state; box packages; box edits; box config |]
             )
 
+        let tagsString = 
+            match state with
+            | SelectorState.Loaded packages ->
+                packages
+                |> Helper.distinctTags
+                |> String.concat ", "
+            | _ -> ""
+
         ValidationPackageSelectorCtx.Provider(
             ctxValue,
             React.Fragment [
@@ -260,7 +268,8 @@ type ValidationPackageSelector =
                                                     ]
                                                 )
                                         )
-                                    )
+                                    ),
+                                key = tagsString
                             )
                         )
                         ValidationPackageSelector.SubmitBar(
