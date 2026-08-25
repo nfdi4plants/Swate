@@ -27,17 +27,9 @@ type SearchField =
         ]
 
     [<ReactComponent(true)>]
-    static member SearchField(renderResults: ValidationPackageDTO[] -> ReactElement) =
-        let ctx = useValidationPackageSelectorCtx ()
-
-        let query, setQuery = React.useState ""
-        let fields, setFields = React.useState SearchFields.Name
-
-        let filtered =
-            React.useMemo (
-                (fun () -> Helper.filterBySearch fields query ctx.Packages),
-                [| box fields; box query; box ctx.Packages |]
-            )
+    static member SearchField
+        (query: string, setQuery: string -> unit, fields: SearchFields, setFields: SearchFields -> unit)
+        =
 
         React.Fragment [
             Html.div [
@@ -80,9 +72,5 @@ type SearchField =
                             ]
                     )
                 ]
-            ]
-            Html.div [
-                prop.className "swt:overflow-y-auto swt:grow"
-                prop.children [ renderResults filtered ]
             ]
         ]

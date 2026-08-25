@@ -49,139 +49,126 @@ type PackageTable =
                 )
         )
 
-    [<ReactComponent(true)>]
-    static member PackageTable(items: ValidationPackageDTO[], renderBody: ValidationPackageDTO[] -> ReactElement) =
-        let ctx = useValidationPackageSelectorCtx ()
+    [<ReactComponent>]
+    static member PackageTableHeader
+        (
+            authors: string[],
+            tags: string[],
+            selectedAuthor: string option,
+            setSelectedAuthor: string option -> unit,
+            selectedTag: string option,
+            setSelectedTag: string option -> unit,
+            checkedSort: CheckedSort,
+            setCheckedSort: CheckedSort -> unit
+        ) =
 
-        let authorOptions = Helper.distinctAuthors items
+        let tagIndex =
+            match selectedTag with
+            | Some tag -> tags |> Array.tryFindIndex (fun t -> t = tag)
+            | None -> None
 
-        let authorKey =
-            authorOptions |> String.concat ","
+        let setSelectedTag (index: int option) =
+            match index with
+            | Some i -> setSelectedTag (tags |> Array.tryItem i)
+            | None -> setSelectedTag None
 
-        let selectedAuthor, setSelectedAuthor =
-            React.useKeyedState<int option, string> (None, authorKey)
+        let authorIndex =
+            match selectedAuthor with
+            | Some author -> authors |> Array.tryFindIndex (fun a -> a = author)
+            | None -> None
 
-        let authorFilterName = selectedAuthor |> Option.map (fun i -> authorOptions.[i])
+        let setSelectedAuthor (index: int option) =
+            match index with
+            | Some i -> setSelectedAuthor (authors |> Array.tryItem i)
+            | None -> setSelectedAuthor None
 
-        let tagOptions = Helper.distinctTags items
-        let tagsKey = tagOptions |> String.concat ","
-
-        let selectedTag, setSelectedTag =
-            React.useKeyedState<int option, string> (None, tagsKey)
-
-        let tagFilterName = selectedTag |> Option.map (fun i -> tagOptions.[i])
-
-        let checkedSort, setCheckedSort = React.useState CheckedSort.None
-
-        let filtered =
-            React.useMemo (
-                (fun () ->
-                    items
-                    |> Helper.filterByTag tagFilterName
-                    |> Helper.filterByAuthor authorFilterName
-                    |> Helper.sortByChecked checkedSort ctx.RowStateOf
-                ),
-                [|
-                    box items
-                    box tagFilterName
-                    box authorFilterName
-                    box checkedSort
-                    box ctx.RowStateOf
-                |]
-            )
-
-        Html.table [
-            prop.className "swt:table swt:md:table-fixed swt:w-full swt:table-pin-rows"
-            prop.children [
-                Html.thead [
-                    Html.tr [
-                        Html.th [
-                            prop.className "swt:w-12"
+        Html.thead [
+            Html.tr [
+                Html.th [
+                    prop.className "swt:w-12"
+                    prop.children [
+                        Html.button [
+                            prop.type' "button"
+                            prop.testId "validation-package-selector-sort-checked"
+                            prop.title (
+                                match checkedSort with
+                                | CheckedSort.None -> "Sort: checked state"
+                                | CheckedSort.CheckedFirst -> "Sort: checked first"
+                                | CheckedSort.CheckedLast -> "Sort: checked last"
+                            )
+                            prop.className [
+                                "swt:btn swt:btn-xs swt:btn-ghost swt:shrink-0"
+                                if checkedSort <> CheckedSort.None then
+                                    "swt:text-accent"
+                            ]
+                            prop.onClick (fun _ -> setCheckedSort (Helper.nextCheckedSort checkedSort))
                             prop.children [
-                                Html.button [
-                                    prop.type' "button"
-                                    prop.testId "validation-package-selector-sort-checked"
-                                    prop.title (
-                                        match checkedSort with
-                                        | CheckedSort.None -> "Sort: checked state"
-                                        | CheckedSort.CheckedFirst -> "Sort: checked first"
-                                        | CheckedSort.CheckedLast -> "Sort: checked last"
-                                    )
+                                Html.i [
                                     prop.className [
-                                        "swt:btn swt:btn-xs swt:btn-ghost swt:shrink-0"
-                                        if checkedSort <> CheckedSort.None then
-                                            "swt:text-accent"
-                                    ]
-                                    prop.onClick (fun _ -> setCheckedSort (Helper.nextCheckedSort checkedSort))
-                                    prop.children [
-                                        Html.i [
-                                            prop.className [
-                                                "swt:iconify"
-                                                match checkedSort with
-                                                | CheckedSort.None -> "swt:fluent--filter-20-regular"
-                                                | CheckedSort.CheckedFirst ->
-                                                    "swt:fluent--arrow-sort-up-lines-16-regular swt:size-4"
-                                                | CheckedSort.CheckedLast ->
-                                                    "swt:fluent--arrow-sort-down-lines-16-regular swt:size-4"
-                                            ]
-                                        ]
+                                        "swt:iconify"
+                                        match checkedSort with
+                                        | CheckedSort.None -> "swt:fluent--filter-20-regular"
+                                        | CheckedSort.CheckedFirst ->
+                                            "swt:fluent--arrow-sort-up-lines-16-regular swt:size-4"
+                                        | CheckedSort.CheckedLast ->
+                                            "swt:fluent--arrow-sort-down-lines-16-regular swt:size-4"
                                     ]
                                 ]
                             ]
                         ]
-                        Html.th "Name"
-                        Html.th [ prop.className "swt:max-md:hidden"; prop.text "Summary" ]
-                        Html.th "Version"
-                        Html.th [
-                            PackageTable.HeaderSelect("Tags", tagOptions, selectedTag, setSelectedTag)
-                        ]
-                        Html.th [
-                            PackageTable.HeaderSelect("Authors", authorOptions, selectedAuthor, setSelectedAuthor)
-                        ]
-                        Html.th [ prop.className "swt:max-md:hidden"; prop.text "Released" ]
-                        Html.th "Info"
                     ]
                 ]
-                match ctx.FetchState with
-                | SelectorState.Loading
-                | SelectorState.Idle ->
-                    Html.tbody [
-                        Html.tr [
-                            Html.td [
-                                prop.colSpan 8
-                                prop.style [ style.textAlign.center ]
-                                prop.children [
-                                    LoadingSpinner.LoadingSpinner(
-                                        "Loading validation packages...",
-                                        size = DaisyuiSize.XL
-                                    )
-                                ]
-                            ]
-                        ]
-                    ]
-                | SelectorState.Error e ->
-                    Html.tbody [
-                        Html.tr [
-                            Html.td [
-                                prop.colSpan 8
-                                prop.style [ style.textAlign.center ]
-                                prop.text "Error loading packages :("
-                            ]
-                            Html.details [
-                                prop.children [ Html.summary "Details"; Html.pre [ prop.text e.Message ] ]
-                            ]
-                        ]
-                    ]
-                | SelectorState.Loaded _ when Array.isEmpty filtered ->
-                    Html.tbody [
-                        Html.tr [
-                            Html.td [
-                                prop.colSpan 8
-                                prop.style [ style.textAlign.center ]
-                                prop.text "No packages found."
-                            ]
-                        ]
-                    ]
-                | SelectorState.Loaded _ -> renderBody filtered
+                Html.th "Name"
+                Html.th [ prop.className "swt:max-md:hidden"; prop.text "Summary" ]
+                Html.th "Version"
+                Html.th [
+                    PackageTable.HeaderSelect("Tags", tags, tagIndex, setSelectedTag)
+                ]
+                Html.th [
+                    PackageTable.HeaderSelect("Authors", authors, authorIndex, setSelectedAuthor)
+                ]
+                Html.th [ prop.className "swt:max-md:hidden"; prop.text "Released" ]
+                Html.th "Info"
             ]
         ]
+
+    [<ReactComponent>]
+    static member PackageTableBody(state: SelectorState, filteredPackages: ValidationPackageDTO[]) =
+        match state with
+        | SelectorState.Loading
+        | SelectorState.Idle ->
+            Html.tbody [
+                Html.tr [
+                    Html.td [
+                        prop.colSpan 8
+                        prop.style [ style.textAlign.center ]
+                        prop.children [
+                            LoadingSpinner.LoadingSpinner("Loading validation packages...", size = DaisyuiSize.XL)
+                        ]
+                    ]
+                ]
+            ]
+        | SelectorState.Error e ->
+            Html.tbody [
+                Html.tr [
+                    Html.td [
+                        prop.colSpan 8
+                        prop.style [ style.textAlign.center ]
+                        prop.text "Error loading packages :("
+                    ]
+                    Html.details [
+                        prop.children [ Html.summary "Details"; Html.pre [ prop.text e.Message ] ]
+                    ]
+                ]
+            ]
+        | SelectorState.Loaded _ when Array.isEmpty filteredPackages ->
+            Html.tbody [
+                Html.tr [
+                    Html.td [
+                        prop.colSpan 8
+                        prop.style [ style.textAlign.center ]
+                        prop.text "No packages found."
+                    ]
+                ]
+            ]
+        | SelectorState.Loaded _ -> PackagePagination.PackagePagination(filteredPackages)

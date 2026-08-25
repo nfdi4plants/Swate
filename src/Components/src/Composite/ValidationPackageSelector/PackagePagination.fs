@@ -9,7 +9,7 @@ open Types
 type PackagePagination =
 
     [<ReactComponent(true)>]
-    static member PackagePagination(items: ValidationPackageDTO[], renderPage: ValidationPackageDTO[] -> ReactElement) =
+    static member PackagePagination(items: ValidationPackageDTO[]) =
         let page, setPage = React.useState 0
         let prevItems, setPrevItems = React.useState items
 
@@ -25,7 +25,10 @@ type PackagePagination =
         let totalPages = Helper.pageCount items
 
         React.Fragment [
-            Html.tbody [ renderPage pageItems ]
+            Html.tbody [
+                for pkg in pageItems do
+                    PackageRow.PackageRow(pkg, key = pkg.Name)
+            ]
             Html.tfoot [
                 Html.tr [
                     Html.td [

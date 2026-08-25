@@ -4,8 +4,6 @@ open Feliz
 open Types
 
 type ValidationPackageSelectorContext = {
-    FetchState: SelectorState
-    Packages: ValidationPackageDTO[]
     RowStateOf: ValidationPackageDTO -> PackageRowState
     Toggle: ValidationPackageDTO -> unit
     UpdateToLatest: ValidationPackageDTO -> unit
@@ -14,8 +12,6 @@ type ValidationPackageSelectorContext = {
 let ValidationPackageSelectorCtx =
     React.createContext<ValidationPackageSelectorContext> (
         {
-            FetchState = SelectorState.Idle
-            Packages = [||]
             RowStateOf = fun _ -> PackageRowState.Unchecked
             Toggle = ignore
             UpdateToLatest = ignore

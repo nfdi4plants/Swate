@@ -6,6 +6,8 @@ open ARCtrl.ValidationPackages
 open Swate.Components
 open Swate.Components.Composite.ValidationPackageSelector.Context
 open Types
+open Swate.Components.Primitive.Types
+open Swate.Components.Primitive.LoadingSpinner
 
 module private ValidationPackageSelectorModel =
 
@@ -126,6 +128,19 @@ type ValidationPackageSelector =
         ) =
         let state, setState = React.useState (fun () -> SelectorState.Idle)
         let edits, setEdits = React.useState Map.empty<string, ValidationPackage option>
+        // ---------------------------------------------------------------------
+        // These are all available filter options. They are required to compute the filtered packages.
+        // Moving them into their specific sub component/a context created a lot of code complexity. This is the most simple approach.
+        // combining them into a single state is possible but requires a lot of "useCallback" and "useMemo" to avoid unnecessary re-renders. This is the most simple approach.
+        let searchQuery, setSearchQuery = React.useState ""
+        let searchFields, setSearchFields = React.useState SearchFields.Name
+
+        let selectedAuthorFilter, setSelectedAuthorFilter =
+            React.useState (None: string option)
+
+        let selectedTagFilter, setSelectedTagFilter = React.useState (None: string option)
+        let checkedSort, setCheckedSort = React.useState CheckedSort.None
+        // ---------------------------------------------------------------------
 
         let removedUnlisted, setRemovedUnlisted =
             React.useStateWithUpdater Set.empty<string>
@@ -149,9 +164,49 @@ type ValidationPackageSelector =
         )
 
         let packages =
-            match state with
-            | SelectorState.Loaded packages -> packages
-            | _ -> [||]
+            React.useMemo (
+                (fun () ->
+                    match state with
+                    | SelectorState.Loaded packages -> packages
+                    | _ -> [||]
+                ),
+                [| box state |]
+            )
+
+        let authorOptions =
+            React.useMemo ((fun () -> Helper.distinctAuthors packages), [| box packages |])
+
+        let tagOptions =
+            React.useMemo ((fun () -> Helper.distinctTags packages), [| box packages |])
+
+        let rowStateOf (dto: ValidationPackageDTO) =
+            match Map.tryFind dto.Name edits with
+            | Some None -> PackageRowState.Unchecked
+            | Some(Some p) ->
+                if p.Version = Some(Helper.toVersionString dto) then
+                    PackageRowState.Checked
+                else
+                    PackageRowState.HasOlderVersion
+            | None -> Helper.rowState config dto
+
+        let filteredPackages =
+            React.useMemo (
+                (fun () ->
+                    packages
+                    |> Helper.filterBySearch searchFields searchQuery
+                    |> Helper.filterByTag selectedTagFilter
+                    |> Helper.filterByAuthor selectedAuthorFilter
+                    |> Helper.sortByChecked checkedSort rowStateOf
+                ),
+                [|
+                    box packages
+                    box searchFields
+                    box searchQuery
+                    box selectedTagFilter
+                    box selectedAuthorFilter
+                    box checkedSort
+                |]
+            )
 
         let isDirty =
             React.useMemo (
@@ -164,16 +219,6 @@ type ValidationPackageSelector =
                 ),
                 [| box edits; box removedUnlisted |]
             )
-
-        let rowStateOf (dto: ValidationPackageDTO) =
-            match Map.tryFind dto.Name edits with
-            | Some None -> PackageRowState.Unchecked
-            | Some(Some p) ->
-                if p.Version = Some(Helper.toVersionString dto) then
-                    PackageRowState.Checked
-                else
-                    PackageRowState.HasOlderVersion
-            | None -> Helper.rowState config dto
 
         let toggle (dto: ValidationPackageDTO) =
             let latest = ValidationPackageSelectorModel.createLatestPackage dto
@@ -222,13 +267,11 @@ type ValidationPackageSelector =
         let ctxValue =
             React.useMemo (
                 (fun () -> {
-                    FetchState = state
-                    Packages = packages
                     RowStateOf = rowStateOf
                     Toggle = toggle
                     UpdateToLatest = updateToLatest
                 }),
-                [| box state; box packages; box edits; box config |]
+                [| box edits; box config |]
             )
 
         ValidationPackageSelectorCtx.Provider(
@@ -245,24 +288,28 @@ type ValidationPackageSelector =
                         | SelectorState.Loaded _ ->
                             ValidationPackageSelector.UnlistedBanner(unlistedNames, setRemovedUnlisted)
                         | _ -> Html.none
-                        SearchField.SearchField(fun searchFiltered ->
-                            PackageTable.PackageTable(
-                                searchFiltered,
-                                renderBody =
-                                    (fun filtered ->
-                                        PackagePagination.PackagePagination(
-                                            filtered,
-                                            renderPage =
-                                                (fun pageItems ->
-                                                    React.Fragment [
-                                                        for pkg in pageItems do
-                                                            PackageRow.PackageRow(pkg, key = pkg.Name)
-                                                    ]
-                                                )
+                        SearchField.SearchField(searchQuery, setSearchQuery, searchFields, setSearchFields)
+                        Html.div [
+                            prop.className "swt:overflow-y-auto swt:grow"
+                            prop.children [
+                                Html.table [
+                                    prop.className "swt:table swt:md:table-fixed swt:w-full swt:table-pin-rows"
+                                    prop.children [
+                                        PackageTable.PackageTableHeader(
+                                            authors = authorOptions,
+                                            tags = tagOptions,
+                                            selectedAuthor = selectedAuthorFilter,
+                                            setSelectedAuthor = setSelectedAuthorFilter,
+                                            selectedTag = selectedTagFilter,
+                                            setSelectedTag = setSelectedTagFilter,
+                                            checkedSort = checkedSort,
+                                            setCheckedSort = setCheckedSort
                                         )
-                                    )
-                            )
-                        )
+                                        PackageTable.PackageTableBody(state, filteredPackages)
+                                    ]
+                                ]
+                            ]
+                        ]
                         ValidationPackageSelector.SubmitBar(
                             isSubmitting = submitting,
                             isDirty = isDirty,
