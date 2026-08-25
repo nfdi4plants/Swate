@@ -48,6 +48,30 @@ let workflowFeatureTests =
                 "Workflow canvas feature should roundtrip connect and disconnect operations immutably"
         }
 
+        test "connecting a canvas edge to a step input updates immutable step input sources" {
+            let stepInput = createStepInput "reads"
+
+            let step = {
+                createWorkflowStep "qc" (ExternalRun "qc.cwl") with
+                    Inputs = [ stepInput ]
+            }
+
+            let workflow = {
+                createWorkflowModel "v1.2" with
+                    Steps = [ step ]
+            }
+
+            let nextWorkflow =
+                connectStepInputSource "in:workflow" "raw_reads" "step:qc" "reads" workflow
+
+            let updatedInput = nextWorkflow.Steps.Head.Inputs.Head
+
+            Expect.equal
+                updatedInput.Sources
+                [ "raw_reads" ]
+                "Workflow input source should be written to the target step input"
+        }
+
         test "renaming one step after reordering does not edit another step's draft" {
             let firstStep = createWorkflowStep "first" (ExternalRun "a.cwl")
             let secondStep = createWorkflowStep "second" (ExternalRun "b.cwl")

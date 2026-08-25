@@ -15,6 +15,16 @@ let toCanvasGraph (model: WorkflowModel) =
     |> encodeWorkflowModel
     |> Swate.Components.Shared.Cwl.WorkflowCanvasAdapter.toCanvasGraph
 
+let sourcePorts (model: WorkflowModel) =
+    model
+    |> encodeWorkflowModel
+    |> Swate.Components.Shared.Cwl.WorkflowCanvasAdapter.sourcePorts
+
+let targetPorts (model: WorkflowModel) =
+    model
+    |> encodeWorkflowModel
+    |> Swate.Components.Shared.Cwl.WorkflowCanvasAdapter.targetPorts
+
 let buildWorkflowGraphReadModel
     (model: WorkflowModel)
     (workflowPath: string option)

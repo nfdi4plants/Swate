@@ -4,7 +4,6 @@ open System
 open Browser.Dom
 open Fable.Core
 open Feliz
-open ARCtrl.CWL
 open Swate.Components.Shared.Cwl.Adapters.ArCtrlDecode
 open Swate.Components.Shared.Cwl.Adapters.ArCtrlEncode
 open Swate.Components.Shared.Cwl.Adapters.ValidationAdapter
@@ -309,15 +308,6 @@ type CwlEditor =
                 ]
             | _ -> Html.none
 
-        let processingUnit = state.Document |> Option.map toProcessingUnit
-
-        let commitMutation (mutate: unit -> unit) =
-            match processingUnit with
-            | Some currentProcessingUnit ->
-                mutate ()
-                currentProcessingUnit |> fromProcessingUnit |> DocumentUpdated |> dispatch
-            | None -> ()
-
         let updateDocument nextDocument = dispatch (DocumentUpdated nextDocument)
 
         let updateCurrentDocument updater =
@@ -352,8 +342,8 @@ type CwlEditor =
             )
 
         let saveCurrent () =
-            match processingUnit, state.Document with
-            | Some _, Some document ->
+            match state.Document with
+            | Some document ->
                 dispatch (ErrorNotificationSet None)
                 dispatch (InfoNotificationSet None)
 
@@ -381,8 +371,8 @@ type CwlEditor =
                 prop.text message
             ]
         | None ->
-            match state.Document, processingUnit with
-            | None, _ ->
+            match state.Document with
+            | None ->
                 StartScreen.StartScreen(
                     currentVersionNumber state,
                     state.Notifications.ErrorMessage,
@@ -394,24 +384,16 @@ type CwlEditor =
                     ),
                     (fun () -> dispatch LoadExistingRequested)
                 )
-            | Some document, Some processingUnit ->
+            | Some document ->
                 let validationResult = validateDocument Live document
                 let kindLabel = currentKindLabel state |> Option.defaultValue "Unknown"
                 let fileLabel = currentFilePath state |> Option.defaultValue "unsaved.cwl"
                 let version = currentVersionNumber state
                 let stateCwlVersion = currentCwlVersion document
 
-                match processingUnit with
-                | CWLProcessingUnit.CommandLineTool tool ->
-                    let model =
-                        match document with
-                        | CommandLineToolDoc model -> model
-                        | _ -> failwith "Expected CommandLineToolDoc"
-
-                    let baseCommandValue =
-                        tool.BaseCommand
-                        |> Option.bind (fun commands -> if commands.Count > 0 then Some commands.[0] else None)
-                        |> Option.defaultValue ""
+                match document with
+                | CommandLineToolDoc model ->
+                    let baseCommandValue = model.BaseCommand |> List.tryHead |> Option.defaultValue ""
 
                     let activeInputIndex =
                         activeIndexById state.Selection.ActiveInputId model.Inputs (fun input -> input.Id)
@@ -513,20 +495,12 @@ type CwlEditor =
                     )
                     |> wrapEditorView
 
-                | CWLProcessingUnit.Workflow workflow ->
-                    let model =
-                        match document with
-                        | WorkflowDoc model -> model
-                        | _ -> failwith "Expected WorkflowDoc"
-
+                | WorkflowDoc model ->
                     let activeInputIndex =
                         activeIndexById state.Selection.ActiveInputId model.Inputs (fun input -> input.Id)
 
                     let activeOutputIndex =
                         activeIndexById state.Selection.ActiveOutputId model.Outputs (fun output -> output.Id)
-
-                    let activeStepIndex =
-                        activeIndexById state.Selection.ActiveStepId model.Steps (fun step -> step.Id)
 
                     let setActiveInputIndex selectedIndex =
                         dispatch (
@@ -541,16 +515,6 @@ type CwlEditor =
                             SelectionChanged {
                                 state.Selection with
                                     ActiveOutputId = idAtIndex selectedIndex model.Outputs (fun output -> output.Id)
-                            }
-                        )
-
-                    let setActiveStepIndex selectedIndex =
-                        dispatch (
-                            SelectionChanged {
-                                state.Selection with
-                                    ActiveStepId = idAtIndex selectedIndex model.Steps (fun step -> step.Id)
-                                    ActiveStepInputId = None
-                                    ActiveStepOutputId = None
                             }
                         )
 
@@ -592,23 +556,19 @@ type CwlEditor =
                         state.Notifications.InfoMessage,
                         stateCwlVersion,
                         intentListText model.Intent,
-                        workflow,
                         model,
                         model.Inputs,
                         model.Outputs,
                         activeInputIndex,
                         activeOutputIndex,
-                        activeStepIndex,
                         state.Selection.ActiveStepId,
                         state.Selection.ActiveStepInputId,
                         state.Selection.ActiveStepOutputId,
                         model.Requirements,
                         model.Hints,
                         validationResult,
-                        commitMutation,
                         setActiveInputIndex,
                         setActiveOutputIndex,
-                        setActiveStepIndex,
                         setActiveStepId,
                         setActiveStepInputId,
                         setActiveStepOutputId,
@@ -666,12 +626,7 @@ type CwlEditor =
                     )
                     |> wrapEditorView
 
-                | CWLProcessingUnit.ExpressionTool tool ->
-                    let model =
-                        match document with
-                        | ExpressionToolDoc model -> model
-                        | _ -> failwith "Expected ExpressionToolDoc"
-
+                | ExpressionToolDoc model ->
                     let activeInputIndex =
                         activeIndexById state.Selection.ActiveInputId model.Inputs (fun input -> input.Id)
 
@@ -704,7 +659,7 @@ type CwlEditor =
                         state.Notifications.InfoMessage,
                         stateCwlVersion,
                         intentListText model.Intent,
-                        tool.Expression,
+                        model.Expression,
                         model.Inputs,
                         model.Outputs,
                         activeInputIndex,
@@ -765,12 +720,7 @@ type CwlEditor =
                     )
                     |> wrapEditorView
 
-                | CWLProcessingUnit.Operation _ ->
-                    let model =
-                        match document with
-                        | OperationDoc model -> model
-                        | _ -> failwith "Expected OperationDoc"
-
+                | OperationDoc model ->
                     Html.div [
                         prop.testId "cwl-operation-editor"
                         prop.className "swt:flex swt:flex-col swt:h-full swt:min-h-0"
@@ -852,7 +802,6 @@ type CwlEditor =
                             discardOverlay
                         ]
                     ]
-            | Some _, None -> Html.none
 
     [<ReactComponent(true)>]
     static member CwlEditor

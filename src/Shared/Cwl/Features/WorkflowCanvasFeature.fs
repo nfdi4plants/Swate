@@ -1,6 +1,7 @@
 module Swate.Components.Shared.Cwl.Features.WorkflowCanvasFeature
 
 open System
+open Swate.Components.Shared.Cwl.Documents.Mutations
 open Swate.Components.Shared.Cwl.Documents.Types
 
 let private outputNameFromTargetNode (targetNodeId: string) (targetPortId: string) =
@@ -51,6 +52,48 @@ let connectOutputSource
             ]
 
     { model with Outputs = updatedOutputs }
+
+let connectStepInputSource
+    (sourceNodeId: string)
+    (sourcePortId: string)
+    (targetNodeId: string)
+    (targetPortId: string)
+    (model: WorkflowModel)
+    =
+    let sourceReference = sourceReferenceFromNode sourceNodeId sourcePortId
+
+    if targetNodeId.StartsWith("step:", StringComparison.Ordinal) |> not then
+        model
+    else
+        let targetStepName = targetNodeId.Substring("step:".Length)
+
+        model.Steps
+        |> List.tryFind (fun step -> step.Name = targetStepName)
+        |> Option.bind (fun step ->
+            step.Inputs
+            |> List.tryFind (fun input -> input.Name = targetPortId)
+            |> Option.map (fun input -> step.Id, input.Id)
+        )
+        |> Option.map (fun (stepId, stepInputId) ->
+            updateWorkflowStep
+                stepId
+                (fun step -> {
+                    step with
+                        Inputs =
+                            step.Inputs
+                            |> List.map (fun input ->
+                                if input.Id = stepInputId then
+                                    {
+                                        input with
+                                            Sources = [ sourceReference ]
+                                    }
+                                else
+                                    input
+                            )
+                })
+                model
+        )
+        |> Option.defaultValue model
 
 let disconnectEdge (edgeId: string) (model: WorkflowModel) =
     let prefix = "edge:"

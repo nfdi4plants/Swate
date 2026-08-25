@@ -2,7 +2,6 @@ namespace Swate.Components.Page.CwlEditor
 
 open Fable.Core
 open Feliz
-open ARCtrl.CWL
 open Swate.Components.Shared.Cwl.CwlDefaults
 open Swate.Components.Shared.Cwl.Documents.Common
 open Swate.Components.Shared.Cwl.Documents.Types
@@ -32,23 +31,19 @@ type WorkflowEditor =
             infoMessage: string option,
             stateCwlVersion: string,
             intentValue: string,
-            workflow: CWLWorkflowDescription,
             workflowModel: WorkflowModel,
             inputs: InputModel list,
             outputs: OutputModel list,
             activeInputIndex: int option,
             activeOutputIndex: int option,
-            activeStepIndex: int option,
             activeStepId: StepId option,
             activeStepInputId: StepInputId option,
             activeStepOutputId: StepOutputId option,
             requirements: RequirementNode list,
             hints: RequirementNode list,
             validationResult: ValidationResult,
-            commitMutation: (unit -> unit) -> unit,
             setActiveInputIndex: int option -> unit,
             setActiveOutputIndex: int option -> unit,
-            setActiveStepIndex: int option -> unit,
             setActiveStepId: StepId option -> unit,
             setActiveStepInputId: StepInputId option -> unit,
             setActiveStepOutputId: StepOutputId option -> unit,
@@ -234,12 +229,12 @@ type WorkflowEditor =
                                         WorkflowCanvas.WorkflowCanvas(
                                             version,
                                             editorSessionId,
-                                            workflow,
+                                            workflowModel,
                                             workflowFilePath,
-                                            activeStepIndex,
-                                            setActiveStepIndex,
+                                            activeStepId,
+                                            setActiveStepId,
                                             (fun () -> setActiveOutputIndex None),
-                                            commitMutation
+                                            onWorkflowChanged
                                         )
                                     ]
                                 ]

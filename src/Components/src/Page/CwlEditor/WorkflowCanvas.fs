@@ -4,13 +4,16 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open ARCtrl.CWL
 open Swate.Components.JsBindings
 open Swate.Components.JsBindings.XyFlow
 open Swate.Components.Page.CwlEditor.LayoutEngine
+open Swate.Components.Shared.Cwl.Documents.Common
+open Swate.Components.Shared.Cwl.Documents.Types
 open Swate.Components.Shared.Cwl.WorkflowCanvasAdapter
 open Swate.Components.Shared.Cwl.WorkflowLayout
-open Swate.Components.Shared.Cwl.WorkflowMutations
+
+module GraphAdapter = Swate.Components.Shared.Cwl.Adapters.WorkflowGraphAdapter
+module WorkflowCanvasFeature = Swate.Components.Shared.Cwl.Features.WorkflowCanvasFeature
 
 type private EdgeContextMenu = { EdgeId: string; X: float; Y: float }
 
@@ -20,15 +23,27 @@ module private WorkflowCanvasHelpers =
     [<Literal>]
     let addWorkflowOutputHandleId = "__add_workflow_output__"
 
-    let trySelectStepByNodeId
-        (workflow: CWLWorkflowDescription)
-        (setActiveStepIndex: int option -> unit)
-        (nodeId: string)
-        =
+    let trySelectStepByNodeId (workflow: WorkflowModel) (setActiveStepId: StepId option -> unit) (nodeId: string) =
         if nodeId.StartsWith("step:", StringComparison.Ordinal) then
-            let stepId = nodeId.Substring("step:".Length)
-            let stepIndex = workflow.Steps |> Seq.tryFindIndex (fun step -> step.Id = stepId)
-            setActiveStepIndex stepIndex
+            let stepName = nodeId.Substring("step:".Length)
+
+            workflow.Steps
+            |> List.tryFind (fun step -> step.Name = stepName)
+            |> Option.map (fun step -> step.Id)
+            |> setActiveStepId
+
+    let nextOutputName (workflow: WorkflowModel) =
+        let existing =
+            workflow.Outputs |> List.map (fun output -> output.Name) |> Set.ofList
+
+        let mutable index = 1
+        let mutable candidate = sprintf "output_%d" index
+
+        while existing.Contains candidate do
+            index <- index + 1
+            candidate <- sprintf "output_%d" index
+
+        candidate
 
     let portHandlePercent (index: int) (count: int) =
         if count <= 1 then
@@ -269,14 +284,14 @@ type WorkflowCanvas =
         (
             version: int,
             editorSessionId: int,
-            workflow: CWLWorkflowDescription,
+            workflow: WorkflowModel,
             workflowFilePath: string option,
-            activeStepIndex: int option,
-            setActiveStepIndex: int option -> unit,
+            activeStepId: StepId option,
+            setActiveStepId: StepId option -> unit,
             clearActiveOutputSelection: unit -> unit,
-            commitMutation: (unit -> unit) -> unit
+            onWorkflowChanged: WorkflowModel -> unit
         ) : ReactElement =
-        ignore activeStepIndex
+        ignore activeStepId
 
         let nodePositionOverrides, setNodePositionOverrides =
             React.useState<Map<string, float * float>> (Map.empty)
@@ -301,7 +316,7 @@ type WorkflowCanvas =
         let resetActiveLayout () = setNodePositionOverrides Map.empty
 
         let applyAutoLayout () =
-            let graphForLayout = toCanvasGraph workflow
+            let graphForLayout = GraphAdapter.toCanvasGraph workflow
 
             let layoutNodes =
                 graphForLayout.Nodes
@@ -332,17 +347,17 @@ type WorkflowCanvas =
 
         let workflowGraphReadModel =
             React.useMemo (
-                (fun () -> buildWorkflowGraphReadModel workflow workflowFilePath None),
+                (fun () -> GraphAdapter.buildWorkflowGraphReadModel workflow workflowFilePath None),
                 [| box version; box workflow; box workflowFilePath |]
             )
 
         let graph, nodeLabelById, sourcePortLookup, targetPortLookup =
             React.useMemo (
                 (fun () ->
-                    let graph = toCanvasGraph workflow
+                    let graph = GraphAdapter.toCanvasGraph workflow
 
                     let sourcePortLookup =
-                        sourcePorts workflow
+                        GraphAdapter.sourcePorts workflow
                         |> Seq.groupBy (fun port -> port.NodeId)
                         |> Seq.map (fun (nodeId, ports) ->
                             nodeId, (ports |> Seq.map (fun port -> port.PortId) |> Array.ofSeq)
@@ -350,7 +365,7 @@ type WorkflowCanvas =
                         |> Map.ofSeq
 
                     let targetPortLookup =
-                        targetPorts workflow
+                        GraphAdapter.targetPorts workflow
                         |> Seq.groupBy (fun port -> port.NodeId)
                         |> Seq.map (fun (nodeId, ports) ->
                             nodeId, (ports |> Seq.map (fun port -> port.PortId) |> Array.ofSeq)
@@ -398,7 +413,7 @@ type WorkflowCanvas =
                     let stepNodes =
                         workflow.Steps
                         |> Seq.mapi (fun index step ->
-                            let nodeId = $"step:{step.Id}"
+                            let nodeId = $"step:{step.Name}"
 
                             let inputPorts = targetPortLookup |> Map.tryFind nodeId |> Option.defaultValue [||]
 
@@ -407,7 +422,7 @@ type WorkflowCanvas =
                             let x, y =
                                 resolveNodePosition nodeId stepColumnX (stepRowStartY + float index * stepRowSpacing)
 
-                            createFlowNode nodeId "workflowStep" x y step.Id inputPorts outputPorts
+                            createFlowNode nodeId "workflowStep" x y step.Name inputPorts outputPorts
                         )
 
                     let outputNodes =
@@ -472,7 +487,7 @@ type WorkflowCanvas =
                 setEdgeContextMenu None
 
                 match tryStringValue node.id with
-                | Some nodeId -> trySelectStepByNodeId workflow setActiveStepIndex nodeId
+                | Some nodeId -> trySelectStepByNodeId workflow setActiveStepId nodeId
                 | None -> ()
             )
 
@@ -491,61 +506,41 @@ type WorkflowCanvas =
                             targetNodeId = WorkflowOutputSinkNodeId
                             && targetPortId = addWorkflowOutputHandleId
                         then
-                            commitMutation (fun () ->
-                                let newOutputIndex = addWorkflowOutput workflow
-                                let newOutputPortId = workflow.Outputs.[newOutputIndex].Name
-                                let nextGraph = toCanvasGraph workflow
+                            let newOutputPortId = nextOutputName workflow
 
-                                if
-                                    addConnection
-                                        nextGraph
+                            workflow
+                            |> WorkflowCanvasFeature.connectOutputSource
+                                sourceNodeId
+                                sourcePortId
+                                WorkflowOutputSinkNodeId
+                                newOutputPortId
+                            |> onWorkflowChanged
+                        else
+                            let nextWorkflow =
+                                if targetNodeId.StartsWith("step:", StringComparison.Ordinal) then
+                                    workflow
+                                    |> WorkflowCanvasFeature.connectStepInputSource
                                         sourceNodeId
                                         sourcePortId
-                                        WorkflowOutputSinkNodeId
-                                        newOutputPortId
-                                then
-                                    applyConnections nextGraph workflow
-                            )
-                        else
-                            let nextGraph = toCanvasGraph workflow
+                                        targetNodeId
+                                        targetPortId
+                                else
+                                    workflow
+                                    |> WorkflowCanvasFeature.connectOutputSource
+                                        sourceNodeId
+                                        sourcePortId
+                                        targetNodeId
+                                        targetPortId
 
-                            if addConnection nextGraph sourceNodeId sourcePortId targetNodeId targetPortId then
-                                commitMutation (fun () -> applyConnections nextGraph workflow)
+                            onWorkflowChanged nextWorkflow
                     | _ -> ()
                 | _ -> ()
             )
 
-        let removeDisconnectedWorkflowOutputs (workflow: CWLWorkflowDescription) (graph: WorkflowCanvasGraph) =
-            let initialCount = workflow.Outputs.Count
-
-            let connectedOutputPorts =
-                graph.Edges
-                |> Seq.filter (fun edge ->
-                    edge.TargetNodeId = WorkflowOutputSinkNodeId
-                    && (edge.Kind = StepToOutput || edge.Kind = InputToOutput)
-                )
-                |> Seq.map (fun edge -> edge.TargetPortId)
-                |> Set.ofSeq
-
-            for index = workflow.Outputs.Count - 1 downto 0 do
-                let outputName = workflow.Outputs.[index].Name
-
-                if connectedOutputPorts.Contains outputName |> not then
-                    workflow.Outputs.RemoveAt(index)
-
-            workflow.Outputs.Count < initialCount
-
         let removeEdgeById (edgeId: string) =
-            let nextGraph = toCanvasGraph workflow
+            workflow |> WorkflowCanvasFeature.disconnectEdge edgeId |> onWorkflowChanged
 
-            if removeConnection nextGraph edgeId then
-                commitMutation (fun () ->
-                    applyConnections nextGraph workflow
-                    let removedOutputs = removeDisconnectedWorkflowOutputs workflow nextGraph
-
-                    if removedOutputs then
-                        clearActiveOutputSelection ()
-                )
+            clearActiveOutputSelection ()
 
         let onEdgesDelete =
             Func<XyFlow.Edge array, unit>(fun removedEdgesObj ->
@@ -553,20 +548,14 @@ type WorkflowCanvas =
                 let removedIds = deletedEdgeIds removedEdgesObj
 
                 if removedIds.Length > 0 then
-                    let nextGraph = toCanvasGraph workflow
-
-                    let removedAny =
+                    let nextWorkflow =
                         removedIds
-                        |> Array.fold (fun anyRemoved edgeId -> removeConnection nextGraph edgeId || anyRemoved) false
+                        |> Array.fold
+                            (fun currentWorkflow edgeId -> WorkflowCanvasFeature.disconnectEdge edgeId currentWorkflow)
+                            workflow
 
-                    if removedAny then
-                        commitMutation (fun () ->
-                            applyConnections nextGraph workflow
-                            let removedOutputs = removeDisconnectedWorkflowOutputs workflow nextGraph
-
-                            if removedOutputs then
-                                clearActiveOutputSelection ()
-                        )
+                    onWorkflowChanged nextWorkflow
+                    clearActiveOutputSelection ()
             )
 
         let onPaneClick = Func<obj, unit>(fun _ -> setEdgeContextMenu None)
@@ -624,9 +613,9 @@ type WorkflowCanvas =
             if sourceNodeId.StartsWith("in:", StringComparison.Ordinal) then
                 0
             elif sourceNodeId.StartsWith("step:", StringComparison.Ordinal) then
-                let stepId = sourceNodeId.Substring("step:".Length)
+                let stepName = sourceNodeId.Substring("step:".Length)
 
-                match workflow.Steps |> Seq.tryFindIndex (fun step -> step.Id = stepId) with
+                match workflow.Steps |> Seq.tryFindIndex (fun step -> step.Name = stepName) with
                 | Some index -> index + 1
                 | None -> Int32.MaxValue - 1
             else
