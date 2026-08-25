@@ -36,6 +36,36 @@ let private updateBinding update (input: InputModel) =
             InputBinding = current |> update |> normalizeBinding
     }
 
+let private documentInputs document =
+    match document with
+    | CommandLineToolDoc model -> model.Inputs
+    | WorkflowDoc model -> model.Inputs
+    | ExpressionToolDoc model -> model.Inputs
+    | OperationDoc model -> model.Inputs
+
+let private updateInputs update document =
+    match document with
+    | CommandLineToolDoc model ->
+        CommandLineToolDoc {
+            model with
+                Inputs = update model.Inputs
+        }
+    | WorkflowDoc model ->
+        WorkflowDoc {
+            model with
+                Inputs = update model.Inputs
+        }
+    | ExpressionToolDoc model ->
+        ExpressionToolDoc {
+            model with
+                Inputs = update model.Inputs
+        }
+    | OperationDoc model ->
+        OperationDoc {
+            model with
+                Inputs = update model.Inputs
+        }
+
 let private moveInputUpInList (inputId: InputId) (inputs: InputModel list) =
     match inputs |> List.tryFindIndex (fun input -> input.Id = inputId) with
     | Some index when index > 0 ->
@@ -63,7 +93,7 @@ let renameInput (inputId: InputId) (name: string) (document: EditorDocument) =
         document
     else
         document
-        |> updateDocumentInputs (updateInput inputId (fun input -> { input with Name = trimmed }))
+        |> updateInputs (updateInput inputId (fun input -> { input with Name = trimmed }))
 
 let setInputType (inputId: InputId) (cwlType: string option) (document: EditorDocument) =
     let normalized =
@@ -71,7 +101,7 @@ let setInputType (inputId: InputId) (cwlType: string option) (document: EditorDo
         |> Option.bind (fun value -> if String.IsNullOrWhiteSpace value then None else Some value)
 
     document
-    |> updateDocumentInputs (updateInput inputId (fun input -> { input with CwlType = normalized }))
+    |> updateInputs (updateInput inputId (fun input -> { input with CwlType = normalized }))
 
 let setInputPrefix (inputId: InputId) (prefix: string) (document: EditorDocument) =
     let normalized =
@@ -81,11 +111,11 @@ let setInputPrefix (inputId: InputId) (prefix: string) (document: EditorDocument
             Some prefix
 
     document
-    |> updateDocumentInputs (updateInput inputId (updateBinding (fun binding -> { binding with Prefix = normalized })))
+    |> updateInputs (updateInput inputId (updateBinding (fun binding -> { binding with Prefix = normalized })))
 
 let setInputPosition (inputId: InputId) (position: string) (document: EditorDocument) =
     document
-    |> updateDocumentInputs (
+    |> updateInputs (
         updateInput
             inputId
             (updateBinding (fun binding -> {
@@ -96,28 +126,23 @@ let setInputPosition (inputId: InputId) (position: string) (document: EditorDocu
 
 let setInputOptional (inputId: InputId) (isOptional: bool) (document: EditorDocument) =
     document
-    |> updateDocumentInputs (updateInput inputId (fun input -> { input with Optional = isOptional }))
+    |> updateInputs (updateInput inputId (fun input -> { input with Optional = isOptional }))
 
 let addInput (document: EditorDocument) =
-    let currentInputs =
-        match document with
-        | CommandLineToolDoc model -> model.Inputs
-        | WorkflowDoc model -> model.Inputs
-        | ExpressionToolDoc model -> model.Inputs
-        | OperationDoc model -> model.Inputs
+    let currentInputs = documentInputs document
 
     let input = {
         createInput (nextName "input" (currentInputs |> List.map (fun item -> item.Name))) with
             CwlType = Some "string"
     }
 
-    document |> updateDocumentInputs (addInput input)
+    document |> updateInputs (addInput input)
 
 let removeInput (inputId: InputId) (document: EditorDocument) =
-    document |> updateDocumentInputs (removeInput inputId)
+    document |> updateInputs (removeInput inputId)
 
 let moveInputUp (inputId: InputId) (document: EditorDocument) =
-    document |> updateDocumentInputs (moveInputUpInList inputId)
+    document |> updateInputs (moveInputUpInList inputId)
 
 let moveInputDown (inputId: InputId) (document: EditorDocument) =
-    document |> updateDocumentInputs (moveInputDownInList inputId)
+    document |> updateInputs (moveInputDownInList inputId)

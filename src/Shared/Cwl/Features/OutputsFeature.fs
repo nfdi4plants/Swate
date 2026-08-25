@@ -27,6 +27,36 @@ let private updateBinding update (output: OutputModel) =
             OutputBinding = current |> update |> normalizeBinding
     }
 
+let private documentOutputs document =
+    match document with
+    | CommandLineToolDoc model -> model.Outputs
+    | WorkflowDoc model -> model.Outputs
+    | ExpressionToolDoc model -> model.Outputs
+    | OperationDoc model -> model.Outputs
+
+let private updateOutputs update document =
+    match document with
+    | CommandLineToolDoc model ->
+        CommandLineToolDoc {
+            model with
+                Outputs = update model.Outputs
+        }
+    | WorkflowDoc model ->
+        WorkflowDoc {
+            model with
+                Outputs = update model.Outputs
+        }
+    | ExpressionToolDoc model ->
+        ExpressionToolDoc {
+            model with
+                Outputs = update model.Outputs
+        }
+    | OperationDoc model ->
+        OperationDoc {
+            model with
+                Outputs = update model.Outputs
+        }
+
 let private moveOutputUpInList (outputId: OutputId) (outputs: OutputModel list) =
     match outputs |> List.tryFindIndex (fun output -> output.Id = outputId) with
     | Some index when index > 0 ->
@@ -54,7 +84,7 @@ let renameOutput (outputId: OutputId) (name: string) (document: EditorDocument) 
         document
     else
         document
-        |> updateDocumentOutputs (updateOutput outputId (fun output -> { output with Name = trimmed }))
+        |> updateOutputs (updateOutput outputId (fun output -> { output with Name = trimmed }))
 
 let setOutputType (outputId: OutputId) (cwlType: string option) (document: EditorDocument) =
     let normalized =
@@ -62,34 +92,29 @@ let setOutputType (outputId: OutputId) (cwlType: string option) (document: Edito
         |> Option.bind (fun value -> if String.IsNullOrWhiteSpace value then None else Some value)
 
     document
-    |> updateDocumentOutputs (updateOutput outputId (fun output -> { output with CwlType = normalized }))
+    |> updateOutputs (updateOutput outputId (fun output -> { output with CwlType = normalized }))
 
 let setOutputGlob (outputId: OutputId) (glob: string) (document: EditorDocument) =
     let normalized = if String.IsNullOrWhiteSpace glob then None else Some glob
 
     document
-    |> updateDocumentOutputs (updateOutput outputId (updateBinding (fun binding -> { binding with Glob = normalized })))
+    |> updateOutputs (updateOutput outputId (updateBinding (fun binding -> { binding with Glob = normalized })))
 
 let addOutput (document: EditorDocument) =
-    let currentOutputs =
-        match document with
-        | CommandLineToolDoc model -> model.Outputs
-        | WorkflowDoc model -> model.Outputs
-        | ExpressionToolDoc model -> model.Outputs
-        | OperationDoc model -> model.Outputs
+    let currentOutputs = documentOutputs document
 
     let output = {
         createOutput (nextName "output" (currentOutputs |> List.map (fun item -> item.Name))) with
             CwlType = Some "file"
     }
 
-    document |> updateDocumentOutputs (addOutput output)
+    document |> updateOutputs (addOutput output)
 
 let removeOutput (outputId: OutputId) (document: EditorDocument) =
-    document |> updateDocumentOutputs (removeOutput outputId)
+    document |> updateOutputs (removeOutput outputId)
 
 let moveOutputUp (outputId: OutputId) (document: EditorDocument) =
-    document |> updateDocumentOutputs (moveOutputUpInList outputId)
+    document |> updateOutputs (moveOutputUpInList outputId)
 
 let moveOutputDown (outputId: OutputId) (document: EditorDocument) =
-    document |> updateDocumentOutputs (moveOutputDownInList outputId)
+    document |> updateOutputs (moveOutputDownInList outputId)
