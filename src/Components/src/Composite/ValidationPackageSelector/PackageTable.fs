@@ -56,7 +56,7 @@ type PackageTable =
         let authorOptions = Helper.distinctAuthors items
 
         let authorKey =
-            authorOptions |> Array.map (fun a -> a.ToLower()) |> String.concat ","
+            authorOptions |> String.concat ","
 
         let selectedAuthor, setSelectedAuthor =
             React.useKeyedState<int option, string> (None, authorKey)
@@ -64,7 +64,7 @@ type PackageTable =
         let authorFilterName = selectedAuthor |> Option.map (fun i -> authorOptions.[i])
 
         let tagOptions = Helper.distinctTags items
-        let tagsKey = tagOptions |> Array.map (fun t -> t.ToLower()) |> String.concat ","
+        let tagsKey = tagOptions |> String.concat ","
 
         let selectedTag, setSelectedTag =
             React.useKeyedState<int option, string> (None, tagsKey)
