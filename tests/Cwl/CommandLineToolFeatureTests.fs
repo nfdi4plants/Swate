@@ -58,6 +58,25 @@ let commandLineToolFeatureTests =
             Expect.stringContains preview "class: CommandLineTool" "Preview should encode the command line tool kind"
             Expect.stringContains preview "baseCommand: [echo]" "Preview should encode the current reducer base command"
         }
+
+        test "document base helpers update cwl version and intent immutably" {
+            let document = CommandLineToolDoc(createCommandLineToolModel "v1.2")
+
+            let updated =
+                document
+                |> Swate.Components.Shared.Cwl.Documents.Mutations.setDocumentCwlVersion "v1.1"
+                |> Swate.Components.Shared.Cwl.Documents.Mutations.setDocumentIntentText "analysis, quality-control"
+
+            match updated with
+            | CommandLineToolDoc model ->
+                Expect.equal model.CwlVersion "v1.1" "CWL version should update on the immutable document"
+
+                Expect.equal
+                    model.Intent
+                    [ "analysis"; "quality-control" ]
+                    "Intent text should parse into a trimmed list"
+            | _ -> failtest "Expected command line tool document"
+        }
     ]
 
 [<Tests>]

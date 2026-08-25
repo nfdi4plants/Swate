@@ -8,9 +8,9 @@ open ARCtrl.CWL
 open Swate.Components.Shared.Cwl.Adapters.ArCtrlDecode
 open Swate.Components.Shared.Cwl.Adapters.ArCtrlEncode
 open Swate.Components.Shared.Cwl.Adapters.ValidationAdapter
-open Swate.Components.Shared.Cwl.CommandLineToolMutations
 open Swate.Components.Shared.Cwl.Documents.Common
 open Swate.Components.Shared.Cwl.Documents.ExpressionTool
+open Swate.Components.Shared.Cwl.Documents.Mutations
 open Swate.Components.Shared.Cwl.Documents.Types
 open Swate.Components.Shared.Cwl.CwlService
 open Swate.Components.Shared.Cwl.EditorTypes
@@ -85,6 +85,8 @@ module private CwlEditorHelpers =
         | Swate.Components.Shared.Cwl.Documents.Types.WorkflowDoc model -> model.CwlVersion
         | Swate.Components.Shared.Cwl.Documents.Types.ExpressionToolDoc model -> model.CwlVersion
         | Swate.Components.Shared.Cwl.Documents.Types.OperationDoc model -> model.CwlVersion
+
+    let intentListText (intent: string list) = intent |> String.concat ", "
 
     let private formatInitialLoadError (message: string) =
         let prefix = "Failed to decode CWL:"
@@ -442,7 +444,7 @@ type CwlEditor =
                         state.Notifications.ErrorMessage,
                         state.Notifications.InfoMessage,
                         stateCwlVersion,
-                        intentText tool.Intent,
+                        intentListText model.Intent,
                         baseCommandValue,
                         model.Inputs,
                         model.Outputs,
@@ -456,10 +458,8 @@ type CwlEditor =
                         (fun () -> dispatch PreviewRequested),
                         saveCurrent,
                         (fun () -> dispatch LeaveEditorRequested),
-                        (fun nextVersion ->
-                            commitMutation (fun () -> setProcessingUnitVersion nextVersion processingUnit)
-                        ),
-                        (fun value -> commitMutation (fun () -> tool.Intent <- parseIntentText value)),
+                        (fun nextVersion -> updateCurrentDocument (setDocumentCwlVersion nextVersion)),
+                        (fun value -> updateCurrentDocument (setDocumentIntentText value)),
                         (fun command ->
                             updateCurrentDocument (fun currentDocument ->
                                 match currentDocument with
@@ -565,7 +565,7 @@ type CwlEditor =
                         state.Notifications.ErrorMessage,
                         state.Notifications.InfoMessage,
                         stateCwlVersion,
-                        intentText workflow.Intent,
+                        intentListText model.Intent,
                         workflow,
                         model.Inputs,
                         model.Outputs,
@@ -582,10 +582,8 @@ type CwlEditor =
                         (fun () -> dispatch PreviewRequested),
                         saveCurrent,
                         (fun () -> dispatch LeaveEditorRequested),
-                        (fun nextVersion ->
-                            commitMutation (fun () -> setProcessingUnitVersion nextVersion processingUnit)
-                        ),
-                        (fun value -> commitMutation (fun () -> workflow.Intent <- parseIntentText value)),
+                        (fun nextVersion -> updateCurrentDocument (setDocumentCwlVersion nextVersion)),
+                        (fun value -> updateCurrentDocument (setDocumentIntentText value)),
                         (fun inputId name -> updateCurrentDocument (InputsFeature.renameInput inputId name)),
                         (fun inputId cwlType -> updateCurrentDocument (InputsFeature.setInputType inputId cwlType)),
                         (fun inputId prefix -> updateCurrentDocument (InputsFeature.setInputPrefix inputId prefix)),
@@ -671,7 +669,7 @@ type CwlEditor =
                         state.Notifications.ErrorMessage,
                         state.Notifications.InfoMessage,
                         stateCwlVersion,
-                        intentText tool.Intent,
+                        intentListText model.Intent,
                         tool.Expression,
                         model.Inputs,
                         model.Outputs,
@@ -685,10 +683,8 @@ type CwlEditor =
                         (fun () -> dispatch PreviewRequested),
                         saveCurrent,
                         (fun () -> dispatch LeaveEditorRequested),
-                        (fun nextVersion ->
-                            commitMutation (fun () -> setProcessingUnitVersion nextVersion processingUnit)
-                        ),
-                        (fun value -> commitMutation (fun () -> tool.Intent <- parseIntentText value)),
+                        (fun nextVersion -> updateCurrentDocument (setDocumentCwlVersion nextVersion)),
+                        (fun value -> updateCurrentDocument (setDocumentIntentText value)),
                         (fun expression -> updateCurrentDocument (setExpression expression)),
                         (fun inputId name -> updateCurrentDocument (InputsFeature.renameInput inputId name)),
                         (fun inputId cwlType -> updateCurrentDocument (InputsFeature.setInputType inputId cwlType)),
@@ -735,7 +731,12 @@ type CwlEditor =
                     )
                     |> wrapEditorView
 
-                | CWLProcessingUnit.Operation operation ->
+                | CWLProcessingUnit.Operation _ ->
+                    let model =
+                        match document with
+                        | OperationDoc model -> model
+                        | _ -> failwith "Expected OperationDoc"
+
                     Html.div [
                         prop.testId "cwl-operation-editor"
                         prop.className "swt:flex swt:flex-col swt:h-full swt:min-h-0"
@@ -761,9 +762,7 @@ type CwlEditor =
                                                     ]
                                                     Html.p [
                                                         prop.className "swt:text-base-content"
-                                                        prop.text (
-                                                            sprintf "Current cwlVersion: %s" operation.CWLVersion
-                                                        )
+                                                        prop.text (sprintf "Current cwlVersion: %s" model.CwlVersion)
                                                     ]
                                                     Html.label [
                                                         prop.className
@@ -776,12 +775,11 @@ type CwlEditor =
                                                             Html.input [
                                                                 prop.testId "cwl-operation-intent"
                                                                 prop.className "swt:input swt:input-sm swt:w-full"
-                                                                prop.defaultValue (intentText operation.Intent)
+                                                                prop.defaultValue (intentListText model.Intent)
                                                                 prop.placeholder "service, orchestration"
                                                                 prop.onBlur (fun ev ->
-                                                                    commitMutation (fun () ->
-                                                                        operation.Intent <-
-                                                                            parseIntentText (eventTargetValue ev)
+                                                                    updateCurrentDocument (
+                                                                        setDocumentIntentText (eventTargetValue ev)
                                                                     )
                                                                 )
                                                             ]

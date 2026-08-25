@@ -1,5 +1,6 @@
 module Swate.Components.Shared.Cwl.Documents.Mutations
 
+open System
 open Swate.Components.Shared.Cwl.Documents.Common
 open Swate.Components.Shared.Cwl.Documents.Types
 
@@ -32,6 +33,28 @@ let updateRequirementNode (requirementNodeId: RequirementNodeId) update (nodes: 
 let removeRequirementNode (requirementNodeId: RequirementNodeId) (nodes: RequirementNode list) =
     nodes
     |> List.filter (fun (node: RequirementNode) -> node.Id <> requirementNodeId)
+
+let parseIntentText (value: string) =
+    value.Split([| ',' |], StringSplitOptions.RemoveEmptyEntries)
+    |> Array.map (fun item -> item.Trim())
+    |> Array.filter (String.IsNullOrWhiteSpace >> not)
+    |> Array.toList
+
+let setDocumentCwlVersion (cwlVersion: string) (document: EditorDocument) =
+    match document with
+    | CommandLineToolDoc model -> CommandLineToolDoc { model with CwlVersion = cwlVersion }
+    | WorkflowDoc model -> WorkflowDoc { model with CwlVersion = cwlVersion }
+    | ExpressionToolDoc model -> ExpressionToolDoc { model with CwlVersion = cwlVersion }
+    | OperationDoc model -> OperationDoc { model with CwlVersion = cwlVersion }
+
+let setDocumentIntentText (intentText: string) (document: EditorDocument) =
+    let intent = parseIntentText intentText
+
+    match document with
+    | CommandLineToolDoc model -> CommandLineToolDoc { model with Intent = intent }
+    | WorkflowDoc model -> WorkflowDoc { model with Intent = intent }
+    | ExpressionToolDoc model -> ExpressionToolDoc { model with Intent = intent }
+    | OperationDoc model -> OperationDoc { model with Intent = intent }
 
 let addWorkflowStep (step: WorkflowStepModel) (model: WorkflowModel) = {
     model with
