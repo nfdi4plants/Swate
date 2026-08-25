@@ -2,11 +2,9 @@ namespace Swate.Components.Page.CwlEditor
 
 open Fable.Core
 open Feliz
-open ARCtrl.CWL
 open Swate.Components.Shared.Cwl.CwlDefaults
 open Swate.Components.Shared.Cwl.Documents.Common
 open Swate.Components.Shared.Cwl.Documents.Types
-open Swate.Components.Shared.Cwl.ExpressionToolMutations
 open Swate.Components.Shared.Cwl.Validation.ValidationTypes
 
 [<AutoOpen>]
@@ -32,7 +30,6 @@ type ExpressionToolEditor =
             stateCwlVersion: string,
             intentValue: string,
             expressionValue: string,
-            tool: CWLExpressionToolDescription,
             inputs: InputModel list,
             outputs: OutputModel list,
             activeInputIndex: int option,
@@ -40,7 +37,6 @@ type ExpressionToolEditor =
             requirements: RequirementNode list,
             hints: RequirementNode list,
             validationResult: ValidationResult,
-            commitMutation: (unit -> unit) -> unit,
             setActiveInputIndex: int option -> unit,
             setActiveOutputIndex: int option -> unit,
             onPreview: unit -> unit,
@@ -65,8 +61,8 @@ type ExpressionToolEditor =
             onRemoveOutput: OutputId -> unit,
             onMoveOutputUp: OutputId -> unit,
             onMoveOutputDown: OutputId -> unit,
-            onSetRequirementEnabled: string -> bool -> unit,
-            onSetHintEnabled: string -> bool -> unit,
+            onSetRequirementEnabled: string -> bool -> RequirementNodeId option -> unit,
+            onSetHintEnabled: string -> bool -> RequirementNodeId option -> unit,
             onSetRequirementField: RequirementNodeId -> string -> string -> unit,
             onSetHintField: RequirementNodeId -> string -> string -> unit
         ) : ReactElement =
@@ -75,10 +71,10 @@ type ExpressionToolEditor =
 
         let clearFocusedRequirement () = setFocusedRequirementId None
 
-        let setEnabled bucket key isEnabled =
+        let setEnabled bucket key isEnabled requirementNodeId =
             match bucket with
-            | RequirementBucket -> onSetRequirementEnabled key isEnabled
-            | HintBucket -> onSetHintEnabled key isEnabled
+            | RequirementBucket -> onSetRequirementEnabled key isEnabled requirementNodeId
+            | HintBucket -> onSetHintEnabled key isEnabled requirementNodeId
 
         let setField bucket requirementNodeId fieldKey value =
             match bucket with
@@ -174,6 +170,7 @@ type ExpressionToolEditor =
                                     ]
                                 ]
                                 RequirementPicker.RequirementNodeSidebarPanel {
+                                    Version = version
                                     RequirementItems = requirements
                                     HintItems = hints
                                     FocusedId = focusedRequirementId

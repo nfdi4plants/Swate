@@ -38,11 +38,12 @@ type MainProps = {
 }
 
 type NodeSidebarProps = {
+    Version: int
     RequirementItems: RequirementNode list
     HintItems: RequirementNode list
     FocusedId: RequirementNodeId option
     OnFocus: RequirementNodeId option -> unit
-    OnSetEnabled: RequirementBucket -> string -> bool -> unit
+    OnSetEnabled: RequirementBucket -> string -> bool -> RequirementNodeId option -> unit
     OnSetField: RequirementBucket -> RequirementNodeId -> string -> string -> unit
 }
 
@@ -51,7 +52,7 @@ type NodeMainProps = {
     HintItems: RequirementNode list
     FocusedId: RequirementNodeId option
     OnFocus: RequirementNodeId option -> unit
-    OnSetEnabled: RequirementBucket -> string -> bool -> unit
+    OnSetEnabled: RequirementBucket -> string -> bool -> RequirementNodeId option -> unit
 }
 
 [<AutoOpen>]
@@ -1342,50 +1343,82 @@ type RequirementPicker =
         ]
 
     [<ReactComponent>]
+    static member private NodeDetailForm
+        (props: NodeSidebarProps, bucket: RequirementBucket, node: RequirementNode)
+        : ReactElement =
+        match requirementTemplates |> List.tryFind (fun template -> template.Key = node.Key) with
+        | Some template ->
+            let requirementItems = ResizeArray<Requirement>()
+            requirementItems.Add(template.Create())
+
+            for KeyValue(fieldKey, fieldValue) in node.Fields do
+                setRequirementFieldByKey (Some requirementItems) node.Key fieldKey fieldValue
+
+            let focused = { Bucket = bucket; Key = node.Key }
+
+            let detailProps = {
+                Requirements = None
+                Hints = None
+                Focused = Some focused
+                OnFocus = fun _ -> props.OnFocus None
+                OnSetEnabled = fun nextBucket key enabled -> props.OnSetEnabled nextBucket key enabled None
+                OnSetField = fun nextBucket _ fieldKey value -> props.OnSetField nextBucket node.Id fieldKey value
+            }
+
+            RequirementPicker.DetailForm(props.Version, detailProps, focused, requirementItems.[0])
+        | None ->
+            Html.div [
+                prop.text (sprintf "%s: %s" (bucketLabel bucket) (requirementTemplateLabel node.Key))
+            ]
+
+    [<ReactComponent>]
     static member RequirementNodeSidebarPanel(props: NodeSidebarProps) : ReactElement =
         let focusedEditor =
             match tryGetFocusedNode props with
             | Some(bucket, node) ->
-                Html.div [
-                    prop.className "swt:mt-4 swt:flex swt:flex-col swt:gap-3"
-                    prop.children [
-                        Html.h4 [
-                            prop.className "swt:font-semibold swt:text-base-content"
-                            prop.text (sprintf "%s: %s" (bucketLabel bucket) (requirementTemplateLabel node.Key))
-                        ]
-                        if Map.isEmpty node.Fields then
-                            Html.p [
-                                prop.className "swt:text-base-content/60 swt:italic"
-                                prop.text "No specialized fields are available for this requirement yet."
+                match requirementTemplates |> List.tryFind (fun template -> template.Key = node.Key) with
+                | Some _ -> RequirementPicker.NodeDetailForm(props, bucket, node)
+                | None ->
+                    Html.div [
+                        prop.className "swt:mt-4 swt:flex swt:flex-col swt:gap-3"
+                        prop.children [
+                            Html.h4 [
+                                prop.className "swt:font-semibold swt:text-base-content"
+                                prop.text (sprintf "%s: %s" (bucketLabel bucket) (requirementTemplateLabel node.Key))
                             ]
-                        else
-                            for KeyValue(fieldKey, fieldValue) in node.Fields do
-                                Html.label [
-                                    prop.className "swt:label swt:flex-col swt:items-start swt:gap-1"
-                                    prop.children [
-                                        Html.span [ prop.className "swt:text-sm"; prop.text fieldKey ]
-                                        Html.input [
-                                            prop.testId (sprintf "cwl-requirement-field-%s" (fieldTestId fieldKey))
-                                            prop.key (sprintf "%A:%O:%s" bucket node.Id fieldKey)
-                                            prop.className "swt:input swt:input-sm swt:w-full"
-                                            prop.defaultValue fieldValue
-                                            prop.onBlur (fun ev ->
-                                                props.OnSetField bucket node.Id fieldKey (eventTargetValue ev)
-                                            )
+                            if Map.isEmpty node.Fields then
+                                Html.p [
+                                    prop.className "swt:text-base-content/60 swt:italic"
+                                    prop.text "No specialized fields are available for this requirement yet."
+                                ]
+                            else
+                                for KeyValue(fieldKey, fieldValue) in node.Fields do
+                                    Html.label [
+                                        prop.className "swt:label swt:flex-col swt:items-start swt:gap-1"
+                                        prop.children [
+                                            Html.span [ prop.className "swt:text-sm"; prop.text fieldKey ]
+                                            Html.input [
+                                                prop.testId (sprintf "cwl-requirement-field-%s" (fieldTestId fieldKey))
+                                                prop.key (sprintf "%A:%O:%s" bucket node.Id fieldKey)
+                                                prop.className "swt:input swt:input-sm swt:w-full"
+                                                prop.defaultValue fieldValue
+                                                prop.onBlur (fun ev ->
+                                                    props.OnSetField bucket node.Id fieldKey (eventTargetValue ev)
+                                                )
+                                            ]
                                         ]
                                     ]
-                                ]
-                        Html.button [
-                            prop.testId "cwl-requirement-remove"
-                            prop.className "swt:btn swt:btn-sm swt:btn-error"
-                            prop.text (sprintf "Remove %s" (bucketLabel bucket))
-                            prop.onClick (fun _ ->
-                                props.OnSetEnabled bucket node.Key false
-                                props.OnFocus None
-                            )
+                            Html.button [
+                                prop.testId "cwl-requirement-remove"
+                                prop.className "swt:btn swt:btn-sm swt:btn-error"
+                                prop.text (sprintf "Remove %s" (bucketLabel bucket))
+                                prop.onClick (fun _ ->
+                                    props.OnSetEnabled bucket node.Key false None
+                                    props.OnFocus None
+                                )
+                            ]
                         ]
                     ]
-                ]
             | None ->
                 Html.p [
                     prop.className "swt:text-base-content/60 swt:italic swt:p-4 swt:text-center"
@@ -1432,7 +1465,7 @@ type RequirementPicker =
             items: RequirementNode list,
             focusedId: RequirementNodeId option,
             onFocus: RequirementNodeId option -> unit,
-            onSetEnabled: RequirementBucket -> string -> bool -> unit
+            onSetEnabled: RequirementBucket -> string -> bool -> RequirementNodeId option -> unit
         ) : ReactElement =
         let isDragActive, setIsDragActive = React.useState (false)
 
@@ -1466,7 +1499,9 @@ type RequirementPicker =
                         let key = e.dataTransfer.getData dragPayloadType
 
                         if System.String.IsNullOrWhiteSpace key |> not then
-                            onSetEnabled bucket key true
+                            let nodeId = newRequirementNodeId ()
+                            onSetEnabled bucket key true (Some nodeId)
+                            onFocus (Some nodeId)
                     )
                     prop.children [
                         if List.isEmpty items then

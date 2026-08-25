@@ -26,7 +26,6 @@ open Swate.Components.Shared.Cwl.State.Selectors
 open Swate.Components.Shared.Cwl.State.Types
 open Swate.Components.Shared.Cwl.Validation.ValidationContext
 open Swate.Components.Shared.Cwl.Validation.ValidationEngine
-open Swate.Components.Shared.Cwl.WorkflowMutations
 
 module InputsFeature = Swate.Components.Shared.Cwl.Features.InputsFeature
 module OutputsFeature = Swate.Components.Shared.Cwl.Features.OutputsFeature
@@ -445,15 +444,13 @@ type CwlEditor =
                         stateCwlVersion,
                         intentText tool.Intent,
                         baseCommandValue,
-                        tool,
                         model.Inputs,
                         model.Outputs,
                         activeInputIndex,
                         activeOutputIndex,
-                        tool.Requirements,
-                        tool.Hints,
+                        model.Requirements,
+                        model.Hints,
                         validationResult,
-                        commitMutation,
                         setActiveInputIndex,
                         setActiveOutputIndex,
                         (fun () -> dispatch PreviewRequested),
@@ -491,10 +488,28 @@ type CwlEditor =
                         (fun outputId -> updateCurrentDocument (OutputsFeature.removeOutput outputId)),
                         (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputUp outputId)),
                         (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputDown outputId)),
-                        (fun key isChecked -> commitMutation (fun () -> setRequirementEnabled tool key isChecked)),
-                        (fun key isChecked -> commitMutation (fun () -> setHintEnabled tool key isChecked)),
-                        (fun key field value -> commitMutation (fun () -> setRequirementField tool key field value)),
-                        (fun key field value -> commitMutation (fun () -> setHintField tool key field value))
+                        (fun key isChecked requirementNodeId ->
+                            match requirementNodeId with
+                            | Some nodeId ->
+                                updateCurrentDocument (
+                                    RequirementsFeature.setRequirementEnabledWithId nodeId key isChecked
+                                )
+                            | None -> updateCurrentDocument (RequirementsFeature.setRequirementEnabled key isChecked)
+                        ),
+                        (fun key isChecked requirementNodeId ->
+                            match requirementNodeId with
+                            | Some nodeId ->
+                                updateCurrentDocument (RequirementsFeature.setHintEnabledWithId nodeId key isChecked)
+                            | None -> updateCurrentDocument (RequirementsFeature.setHintEnabled key isChecked)
+                        ),
+                        (fun requirementNodeId field value ->
+                            updateCurrentDocument (
+                                RequirementsFeature.setRequirementField requirementNodeId field value
+                            )
+                        ),
+                        (fun requirementNodeId field value ->
+                            updateCurrentDocument (RequirementsFeature.setHintField requirementNodeId field value)
+                        )
                     )
                     |> wrapEditorView
 
@@ -557,8 +572,8 @@ type CwlEditor =
                         activeInputIndex,
                         activeOutputIndex,
                         activeStepIndex,
-                        workflow.Requirements,
-                        workflow.Hints,
+                        model.Requirements,
+                        model.Hints,
                         validationResult,
                         commitMutation,
                         setActiveInputIndex,
@@ -591,15 +606,27 @@ type CwlEditor =
                         (fun outputId -> updateCurrentDocument (OutputsFeature.removeOutput outputId)),
                         (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputUp outputId)),
                         (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputDown outputId)),
-                        (fun key isChecked ->
-                            commitMutation (fun () -> setWorkflowRequirementEnabled workflow key isChecked)
+                        (fun key isChecked requirementNodeId ->
+                            match requirementNodeId with
+                            | Some nodeId ->
+                                updateCurrentDocument (
+                                    RequirementsFeature.setRequirementEnabledWithId nodeId key isChecked
+                                )
+                            | None -> updateCurrentDocument (RequirementsFeature.setRequirementEnabled key isChecked)
                         ),
-                        (fun key isChecked -> commitMutation (fun () -> setWorkflowHintEnabled workflow key isChecked)),
-                        (fun key field value ->
-                            commitMutation (fun () -> setWorkflowRequirementField workflow key field value)
+                        (fun key isChecked requirementNodeId ->
+                            match requirementNodeId with
+                            | Some nodeId ->
+                                updateCurrentDocument (RequirementsFeature.setHintEnabledWithId nodeId key isChecked)
+                            | None -> updateCurrentDocument (RequirementsFeature.setHintEnabled key isChecked)
                         ),
-                        (fun key field value ->
-                            commitMutation (fun () -> setWorkflowHintField workflow key field value)
+                        (fun requirementNodeId field value ->
+                            updateCurrentDocument (
+                                RequirementsFeature.setRequirementField requirementNodeId field value
+                            )
+                        ),
+                        (fun requirementNodeId field value ->
+                            updateCurrentDocument (RequirementsFeature.setHintField requirementNodeId field value)
                         ),
                         (fun yaml -> dispatch (PreviewOpened yaml)),
                         (fun message -> dispatch (InfoNotificationSet message)),
@@ -646,7 +673,6 @@ type CwlEditor =
                         stateCwlVersion,
                         intentText tool.Intent,
                         tool.Expression,
-                        tool,
                         model.Inputs,
                         model.Outputs,
                         activeInputIndex,
@@ -654,7 +680,6 @@ type CwlEditor =
                         model.Requirements,
                         model.Hints,
                         validationResult,
-                        commitMutation,
                         setActiveInputIndex,
                         setActiveOutputIndex,
                         (fun () -> dispatch PreviewRequested),
@@ -685,10 +710,20 @@ type CwlEditor =
                         (fun outputId -> updateCurrentDocument (OutputsFeature.removeOutput outputId)),
                         (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputUp outputId)),
                         (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputDown outputId)),
-                        (fun key isChecked ->
-                            updateCurrentDocument (RequirementsFeature.setRequirementEnabled key isChecked)
+                        (fun key isChecked requirementNodeId ->
+                            match requirementNodeId with
+                            | Some nodeId ->
+                                updateCurrentDocument (
+                                    RequirementsFeature.setRequirementEnabledWithId nodeId key isChecked
+                                )
+                            | None -> updateCurrentDocument (RequirementsFeature.setRequirementEnabled key isChecked)
                         ),
-                        (fun key isChecked -> updateCurrentDocument (RequirementsFeature.setHintEnabled key isChecked)),
+                        (fun key isChecked requirementNodeId ->
+                            match requirementNodeId with
+                            | Some nodeId ->
+                                updateCurrentDocument (RequirementsFeature.setHintEnabledWithId nodeId key isChecked)
+                            | None -> updateCurrentDocument (RequirementsFeature.setHintEnabled key isChecked)
+                        ),
                         (fun requirementNodeId field value ->
                             updateCurrentDocument (
                                 RequirementsFeature.setRequirementField requirementNodeId field value

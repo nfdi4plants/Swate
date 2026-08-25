@@ -40,6 +40,44 @@ let expressionToolFeatureTests =
                 (Some reqB.Id)
                 "Requirement feature props should track the selected requirement by id"
         }
+
+        test "requirement helpers update command line tool documents immutably" {
+            let document = CommandLineToolDoc(createCommandLineToolModel "v1.2")
+            let enabled = setRequirementEnabled "docker" true document
+
+            match enabled with
+            | CommandLineToolDoc model ->
+                let docker = model.Requirements |> List.exactlyOne
+                let updated = setRequirementField docker.Id "dockerPull" "ubuntu:24.04" enabled
+
+                match updated with
+                | CommandLineToolDoc updatedModel ->
+                    Expect.equal
+                        updatedModel.Requirements.Head.Fields.["dockerPull"]
+                        "ubuntu:24.04"
+                        "Requirement field should be stored on the target node"
+                | _ -> failtest "Expected command line tool document"
+            | _ -> failtest "Expected command line tool document"
+        }
+
+        test "requirement helpers update workflow documents immutably" {
+            let document = WorkflowDoc(createWorkflowModel "v1.2")
+            let enabled = setHintEnabled "docker" true document
+
+            match enabled with
+            | WorkflowDoc model ->
+                let docker = model.Hints |> List.exactlyOne
+                let updated = setHintField docker.Id "dockerPull" "ubuntu:24.04" enabled
+
+                match updated with
+                | WorkflowDoc updatedModel ->
+                    Expect.equal
+                        updatedModel.Hints.Head.Fields.["dockerPull"]
+                        "ubuntu:24.04"
+                        "Hint field should be stored on the target node"
+                | _ -> failtest "Expected workflow document"
+            | _ -> failtest "Expected workflow document"
+        }
     ]
 
 [<Tests>]

@@ -2,8 +2,6 @@ namespace Swate.Components.Page.CwlEditor
 
 open Fable.Core
 open Feliz
-open ARCtrl.CWL
-open Swate.Components.Shared.Cwl.CommandLineToolMutations
 open Swate.Components.Shared.Cwl.CwlDefaults
 open Swate.Components.Shared.Cwl.Documents.Common
 open Swate.Components.Shared.Cwl.Documents.Types
@@ -32,15 +30,13 @@ type CommandLineToolEditor =
             stateCwlVersion: string,
             intentValue: string,
             baseCommandValue: string,
-            tool: CWLToolDescription,
             inputs: InputModel list,
             outputs: OutputModel list,
             activeInputIndex: int option,
             activeOutputIndex: int option,
-            requirements: ResizeArray<Requirement> option,
-            hints: ResizeArray<HintEntry> option,
+            requirements: RequirementNode list,
+            hints: RequirementNode list,
             validationResult: ValidationResult,
-            commitMutation: (unit -> unit) -> unit,
             setActiveInputIndex: int option -> unit,
             setActiveOutputIndex: int option -> unit,
             onPreview: unit -> unit,
@@ -65,25 +61,25 @@ type CommandLineToolEditor =
             onRemoveOutput: OutputId -> unit,
             onMoveOutputUp: OutputId -> unit,
             onMoveOutputDown: OutputId -> unit,
-            onSetRequirementEnabled: string -> bool -> unit,
-            onSetHintEnabled: string -> bool -> unit,
-            onSetRequirementField: string -> string -> string -> unit,
-            onSetHintField: string -> string -> string -> unit
+            onSetRequirementEnabled: string -> bool -> RequirementNodeId option -> unit,
+            onSetHintEnabled: string -> bool -> RequirementNodeId option -> unit,
+            onSetRequirementField: RequirementNodeId -> string -> string -> unit,
+            onSetHintField: RequirementNodeId -> string -> string -> unit
         ) : ReactElement =
-        let focusedRequirement, setFocusedRequirement =
-            React.useState<RequirementFocus option> (None)
+        let focusedRequirementId, setFocusedRequirementId =
+            React.useState<RequirementNodeId option> (None)
 
-        let clearFocusedRequirement () = setFocusedRequirement None
+        let clearFocusedRequirement () = setFocusedRequirementId None
 
-        let setEnabled bucket key isEnabled =
+        let setEnabled bucket key isEnabled requirementNodeId =
             match bucket with
-            | RequirementBucket -> onSetRequirementEnabled key isEnabled
-            | HintBucket -> onSetHintEnabled key isEnabled
+            | RequirementBucket -> onSetRequirementEnabled key isEnabled requirementNodeId
+            | HintBucket -> onSetHintEnabled key isEnabled requirementNodeId
 
-        let setField bucket key fieldKey value =
+        let setField bucket requirementNodeId fieldKey value =
             match bucket with
-            | RequirementBucket -> onSetRequirementField key fieldKey value
-            | HintBucket -> onSetHintField key fieldKey value
+            | RequirementBucket -> onSetRequirementField requirementNodeId fieldKey value
+            | HintBucket -> onSetHintField requirementNodeId fieldKey value
 
         Html.div [
             prop.testId "cwl-command-line-tool-editor"
@@ -172,17 +168,15 @@ type CommandLineToolEditor =
                                         ]
                                     ]
                                 ]
-                                RequirementPicker.RequirementSidebarPanel(
-                                    version,
-                                    {
-                                        Requirements = requirements
-                                        Hints = hints
-                                        Focused = focusedRequirement
-                                        OnFocus = setFocusedRequirement
-                                        OnSetEnabled = setEnabled
-                                        OnSetField = setField
-                                    }
-                                )
+                                RequirementPicker.RequirementNodeSidebarPanel {
+                                    Version = version
+                                    RequirementItems = requirements
+                                    HintItems = hints
+                                    FocusedId = focusedRequirementId
+                                    OnFocus = setFocusedRequirementId
+                                    OnSetEnabled = setEnabled
+                                    OnSetField = setField
+                                }
                                 ValidationPanel.ValidationPanel(version, validationResult)
                             ]
                         ]
@@ -205,16 +199,13 @@ type CommandLineToolEditor =
                                     onMoveInputDown,
                                     onInteract = clearFocusedRequirement
                                 )
-                                RequirementPicker.RequirementMainPanel(
-                                    version,
-                                    {
-                                        Requirements = requirements
-                                        Hints = hints
-                                        Focused = focusedRequirement
-                                        OnFocus = setFocusedRequirement
-                                        OnSetEnabled = setEnabled
-                                    }
-                                )
+                                RequirementPicker.RequirementNodeMainPanel {
+                                    RequirementItems = requirements
+                                    HintItems = hints
+                                    FocusedId = focusedRequirementId
+                                    OnFocus = setFocusedRequirementId
+                                    OnSetEnabled = setEnabled
+                                }
                                 OutputsEditor.OutputsEditor(
                                     version,
                                     outputs,
