@@ -1,4 +1,4 @@
-namespace Swate.Components.Composite.ValidationPackageSelector
+module internal Swate.Components.Composite.ValidationPackageSelector.Sample
 
 open Fable.Core
 open Feliz
@@ -107,57 +107,54 @@ module private Fixtures =
             )
     |]
 
-[<Erase; Mangle(false)>]
-type ValidationPackageSelectorFixture =
+[<ReactComponent(true)>]
+let Main() =
 
-    [<ReactComponent(true)>]
-    static member Main() =
+    let currentConfig, setCurrentConfig =
+        React.useState (fun () ->
+            ValidationPackagesConfig.make
+                (ResizeArray [
+                    ValidationPackage("Invenio", ?version = Some "0.9.0")
+                    ValidationPackage("LegacyPackage", ?version = Some "1.0.0")
+                ])
+                None
+        )
 
-        let currentConfig, setCurrentConfig =
-            React.useState (fun () ->
-                ValidationPackagesConfig.make
-                    (ResizeArray [
-                        ValidationPackage("Invenio", ?version = Some "0.9.0")
-                        ValidationPackage("LegacyPackage", ?version = Some "1.0.0")
-                    ])
-                    None
-            )
+    let fetch () : JS.Promise<ValidationPackageDTO[]> = promise {
+        do! Promise.sleep 500
+        return Fixtures.packages
+    }
 
-        let fetch () : JS.Promise<ValidationPackageDTO[]> = promise {
-            do! Promise.sleep 500
-            return Fixtures.packages
-        }
+    let write (config: ValidationPackagesConfig) =
+        Promise.lift (
+            try
+                setCurrentConfig config
+                Ok()
+            with ex ->
+                Error ex
+        )
 
-        let write (config: ValidationPackagesConfig) =
-            Promise.lift (
-                try
-                    setCurrentConfig config
-                    Ok()
-                with ex ->
-                    Error ex
-            )
-
-        React.Fragment [
-            Html.div [
-                prop.className "swt:border-b-2 swt:p-2 swt:mb-2"
-                prop.children [
-                    Html.div [
-                        prop.className "swt:p-2 swt:border swt:rounded"
-                        prop.children [
-                            Html.h1 "Current Config"
-                            Html.textarea [
-                                prop.testId "validation-package-selector-config"
-                                prop.className "swt:w-full swt:h-32"
-                                prop.value (currentConfig.ToString())
-                                prop.readOnly true
-                            ]
+    React.Fragment [
+        Html.div [
+            prop.className "swt:border-b-2 swt:p-2 swt:mb-2"
+            prop.children [
+                Html.div [
+                    prop.className "swt:p-2 swt:border swt:rounded"
+                    prop.children [
+                        Html.h1 "Current Config"
+                        Html.textarea [
+                            prop.testId "validation-package-selector-config"
+                            prop.className "swt:w-full swt:h-32"
+                            prop.value (currentConfig.ToString())
+                            prop.readOnly true
                         ]
                     ]
                 ]
             ]
-            ValidationPackageSelector.ValidationPackageSelector(
-                config = currentConfig,
-                writeConfig = write,
-                fetchValidationPackages = fetch
-            )
         ]
+        ValidationPackageSelector.ValidationPackageSelector(
+            config = currentConfig,
+            writeConfig = write,
+            fetchValidationPackages = fetch
+        )
+    ]

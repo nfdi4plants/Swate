@@ -113,7 +113,7 @@ type TermSearchConfigSetter =
             renderer {|
                 title = "Configure TIB search"
                 settingElement =
-                    Select.Select<string>(
+                    MultiSelect.MultiSelect<string>(
                         selectItems,
                         selectedIndices,
                         setSelectedIndices,

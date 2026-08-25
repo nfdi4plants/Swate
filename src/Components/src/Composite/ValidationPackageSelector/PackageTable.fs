@@ -17,21 +17,18 @@ type PackageTable =
         (
             label: string,
             optionNames: string[],
-            selectedIndices: Set<int>,
-            setSelectedIndices: Set<int> -> unit,
+            selectedIndex: int option,
+            setSelectedIndex: int option -> unit,
             testId: string
         ) =
         let selected =
-            selectedIndices
-            |> Set.toList
-            |> List.tryHead
+            selectedIndex
             |> Option.map (fun i -> optionNames.[i])
 
-        Select.Select(
+        SingleSelect.SingleSelect(
             optionNames |> Array.map (fun name -> {| item = name; label = name |}),
-            selectedIndices,
-            setSelectedIndices,
-            showSelectAll = false,
+            selectedIndex,
+            setSelectedIndex,
             triggerRenderFn =
                 (fun (_: {| isOpen: bool |}) ->
                     Html.div [
@@ -62,17 +59,9 @@ type PackageTable =
     static member PackageTable(items: ValidationPackageDTO[], renderBody: ValidationPackageDTO[] -> ReactElement) =
         let ctx = useValidationPackageSelectorCtx ()
 
-        let selectedTags, setSelectedTags = React.useStateWithUpdater Set.empty<int>
-        let selectedAuthors, setSelectedAuthors = React.useStateWithUpdater Set.empty<int>
+        let selectedTag, setSelectedTag = React.useState (None: int option)
+        let selectedAuthor, setSelectedAuthor = React.useState (None: int option)
         let checkedSort, setCheckedSort = React.useState CheckedSort.None
-
-        // Constrain Select (multi-select) to at most one selected index.
-        let setSingleSelection (setter: (Set<int> -> Set<int>) -> unit) (next: Set<int>) =
-            setter (fun prev ->
-                let added = Set.difference next prev
-
-                if Set.isEmpty added then next else added
-            )
 
         let tagOptions =
             React.useMemo ((fun () -> Helper.distinctTags items), [| box items |])
@@ -81,15 +70,11 @@ type PackageTable =
             React.useMemo ((fun () -> Helper.distinctAuthors items), [| box items |])
 
         let tagFilterName =
-            selectedTags
-            |> Set.toList
-            |> List.tryHead
+            selectedTag
             |> Option.map (fun i -> tagOptions.[i])
 
         let authorFilterName =
-            selectedAuthors
-            |> Set.toList
-            |> List.tryHead
+            selectedAuthor
             |> Option.map (fun i -> authorOptions.[i])
 
         let filtered =
@@ -155,8 +140,8 @@ type PackageTable =
                             PackageTable.HeaderSelect(
                                 "Tags",
                                 tagOptions,
-                                selectedTags,
-                                setSingleSelection setSelectedTags,
+                                selectedTag,
+                                setSelectedTag,
                                 "validation-package-selector-tag-filter"
                             )
                         ]
@@ -164,8 +149,8 @@ type PackageTable =
                             PackageTable.HeaderSelect(
                                 "Authors",
                                 authorOptions,
-                                selectedAuthors,
-                                setSingleSelection setSelectedAuthors,
+                                selectedAuthor,
+                                setSelectedAuthor,
                                 "validation-package-selector-author-filter"
                             )
                         ]

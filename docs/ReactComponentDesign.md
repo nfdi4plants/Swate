@@ -4,33 +4,40 @@ Components in `src/Components` are expected to be reusable and application-agnos
 
 # File Rules
 
-- **Component folder**: Each component should be placed in a folder named after the component.
-    - e.g. `src/Components/src/TermSearch` contains `TermSearch.tsx`, `TermSearchConfigProvider.fs` and `TermSearchConfigSetter.fs`
-    - e.g. `src/Components/src/Authentication` contains `Authentication.fs`, `AccountManager.fs`, `Helper.fs` and `Types.fs`
-    - e.g. higher level nested components MAY be placed in subfolders and add the subfolder name to the namespace, e.g. `/Notes/NoteSearch/NoteSearchComponent.fs` with namespace `namespace Swate.Components.Notes.NoteSearch`.
-- **PascalCase file names**: `MyComponent.tsx` for the component "MyComponent" and `MyComponent.stories.tsx` for its Storybook tests.
+- **Primitive, Composite, Page Level**: Components should be placed in the appropriate folder based on their complexity and reusability.
+    - `Primitive`: Components that are simple and reusable across multiple applications. They should have no dependencies on other components in `src/Components`.
+    - `Composite`: Components that are composed of multiple primitive components. They may have dependencies on other components in `src/Components`.
+    - `Page`: Components that are specific to a single application and may have dependencies on other components in `src/Components`. These components are designed for a specific purpose and should be includable directly into a page or view of an application. Of course the components can still require some input argument, such as data or fetch calls.
+- **Component folder**: Each component should be placed in a folder named after the component and sorted into the appropriate level folder (`Primitive`, `Composite`, `Page`).
+    - e.g. `src/Components/src/Composite/TermSearch` contains `TermSearch.tsx`, `TermSearchConfigProvider.fs` and `TermSearchConfigSetter.fs`
+    - e.g. `src/Components/src/Composite/Authentication` contains `Authentication.fs`, `AccountManager.fs`, `Helper.fs` and `Types.fs`
+    - e.g. higher level nested components MAY be placed in subfolders and add the subfolder name to the namespace, e.g. `Composite/Notes/NoteSearch/NoteSearchComponent.fs` with namespace `namespace Swate.Components.Composite.Notes.NoteSearch`.
+- **PascalCase file names**: `MyComponent.tsx` for the component "MyComponent".
 - **File namespace**: Component files MUST have a namespace that follows the folder structure and use a `type <FileName> =` declaration. Non-component files MUST follow folder structure down to the file and use module declaration.
 
     For example:
 
-    -  `src/Components/src/Authentication/Authentication.fs` is a component file and should have:
+    -  `src/Components/src/Composite/Authentication/Authentication.fs` is a component file and should have:
 
         ```fsharp
-        namespace Swate.Components.Authentication
+        namespace Swate.Components.Composite.Authentication
 
         [<Erase; Mangle(false)>]
         type Authentication =
             // ...
         ```
 
-    - `src/Components/src/Authentication/Types.fs` is NOT a component file and should have:
+    - `src/Components/src/Composite/Authentication/Types.fs` is NOT a component file and should have:
 
         ```fsharp
-        module Swate.Components.Authentication.Types
+        module Swate.Components.Composite.Authentication.Types
 
         // ...
         ```
-- **Colocated stories**: Storybook files must be colocated with the component and named `<Component>.stories.tsx`.
+- **Colocated stories**: 
+    - Storybook files must be colocated with the component and named `<Component>.stories.tsx`.
+    - Files with sample data for stories must be named `<Component>.sample.fs` and colocated with the component. (`sample` is used to place the file between the main file (`.fs`) and the `.stories` file in the alphabetic order)
+        - This file should use the namespace `Swate.Components.<level>.<Component>Sample` and be marked as `internal`.
 - **Types**
     - Types used by multiple files MUST be placed in a separate file `Types.fs`. 
     - Types only used inside a single file can MUST be placed inside a private `module <FileName>Types` in the same file. 

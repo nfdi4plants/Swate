@@ -11,18 +11,14 @@ type ValidationPackageSelectorContext = {
     UpdateToLatest: ValidationPackageDTO -> unit
 }
 
-module ValidationPackageSelectorContextHelper =
-
-    let initial: ValidationPackageSelectorContext = {
+let ValidationPackageSelectorCtx =
+    React.createContext<ValidationPackageSelectorContext> ({
         FetchState = SelectorState.Idle
         Packages = [||]
         RowStateOf = fun _ -> PackageRowState.Unchecked
         Toggle = ignore
         UpdateToLatest = ignore
-    }
-
-let ValidationPackageSelectorCtx =
-    React.createContext<ValidationPackageSelectorContext> (ValidationPackageSelectorContextHelper.initial)
+    })
 
 [<Hook>]
 let useValidationPackageSelectorCtx () =

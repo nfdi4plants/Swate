@@ -6,11 +6,12 @@ open Swate.Components
 open Swate.Components.Primitive.Select.Context
 open Swate.Components.Primitive.Select.Types
 
+
 [<Erase; Mangle(false)>]
-type Select =
+type GenericSelect =
 
     [<ReactComponent>]
-    static member private InnerBaseOptionRender
+    static member InnerBaseOptionRender
         (label: string, isSelected: bool, ?ref: IRefValue<option<Browser.Types.HTMLInputElement>>)
         =
         React.Fragment [
@@ -33,7 +34,7 @@ type Select =
         ]
 
     [<ReactComponent>]
-    static member private OuterBaseOptionRender
+    static member OuterBaseOptionRender
         (
             isActive: bool,
             isSelected: bool,
@@ -56,7 +57,7 @@ type Select =
             prop.className [
                 "swt:list-row swt:rounded-none swt:p-1 swt:border-l-4 swt:border-transparent swt:focus-within:outline-none swt:cursor-pointer"
                 if isActive then
-                    "swt:!border-primary swt:bg-base-content/10"
+                    "swt:border-primary! swt:bg-base-content/10"
                 if isSelected then
                     "swt:border-accent"
             ]
@@ -77,53 +78,13 @@ type Select =
         ]
 
     [<ReactComponent>]
-    static member private SelectAll(setSelectIndices: Set<int> -> unit, key: string) =
-        let selectContext = useSelectCtx ()
-        let listItem = FloatingUI.useListItem ()
-        let allIndices: Set<int> = Set(List.init selectContext.optionCount id)
-
-        let isActive = selectContext.activeIndex = Some listItem.index
-        let isSelected = selectContext.selectedIndices = allIndices
-
-        let checkboxRef = React.useInputRef ()
-
-        React.useEffect (
-            (fun () ->
-                if selectContext.selectedIndices.IsEmpty then
-                    checkboxRef.current |> Option.iter (fun x -> x.indeterminate <- false)
-                elif not isSelected && selectContext.selectedIndices.IsSubsetOf allIndices then
-                    checkboxRef.current |> Option.iter (fun x -> x.indeterminate <- true)
-                else
-                    checkboxRef.current |> Option.iter (fun x -> x.indeterminate <- false)
-            ),
-            [| box selectContext.selectedIndices |]
-        )
-
-        let toggleSelect =
-            fun (_) ->
-                if isSelected then
-                    setSelectIndices (Set.empty)
-                else
-                    setSelectIndices (allIndices)
-
-        Select.OuterBaseOptionRender(
-            isActive,
-            isSelected,
-            key,
-            listItem,
-            selectContext,
-            toggleSelect,
-            Select.InnerBaseOptionRender("Select all", isSelected, ref = checkboxRef)
-        )
-
-    [<ReactComponent>]
     static member SelectItem<'a>
         (option: SelectItem<'a>, key: int, ?optionRenderFn: SelectItemRender<'a> -> ReactElement)
         =
         let OptionRender =
             optionRenderFn
             |> Option.defaultValue (fun (props: SelectItemRender<'a>) ->
-                Select.InnerBaseOptionRender(props.item.label, props.isSelected)
+                GenericSelect.InnerBaseOptionRender(props.item.label, props.isSelected)
             )
 
         let index = key
@@ -136,7 +97,7 @@ type Select =
 
         let toggleSelect = fun (_) -> selectContext.handleSelect (Some index)
 
-        Select.OuterBaseOptionRender(
+        GenericSelect.OuterBaseOptionRender(
             isActive,
             isSelected,
             key,
@@ -149,49 +110,20 @@ type Select =
                 item = option
             |}
         )
-    // Html.li [
-    //     prop.key key
-    //     prop.ref listItem.ref
-    //     prop.role.option
-    //     prop.ariaSelected (isActive && isSelected)
-    //     prop.tabIndex 0
-    //     prop.className [
-    //         "swt:list-row swt:rounded-none swt:p-1 swt:border-l-4 swt:border-transparent swt:focus-within:outline-none swt:cursor-pointer"
-    //         if isActive then
-    //             "swt:!border-primary swt:bg-base-content/10"
-    //         if isSelected then
-    //             "swt:border-accent"
-    //     ]
-    //     yield!
-    //         prop.spread
-    //         <| selectContext.getItemProps (
-    //             {|
-    //                 onClick = fun () -> toggleSelect isSelected
-    //                 onKeyDown =
-    //                     fun (e: Browser.Types.KeyboardEvent) ->
-    //                         if e.code = kbdEventCode.enter then
-    //                             e.stopPropagation ()
-    //                             e.preventDefault ()
-    //                             toggleSelect isSelected
-    //             |}
-    //         )
-    //     prop.children (
-    //
-    //     )
-    // ]
 
     [<ReactComponent(true)>]
-    static member Select<'a>
+    static member GenericSelect<'a, 'selection>
         (
             options: SelectItem<'a>[],
-            selectedIndices: Set<int>,
-            setSelectedIndices: Set<int> -> unit,
+            selected: 'selection,
+            setSelected: 'selection -> unit,
+            behavior: SelectBehavior<'selection>,
             ?onSelect: int option -> unit,
             ?triggerRenderFn: {| isOpen: bool |} -> ReactElement,
             ?optionRenderFn: SelectItemRender<'a> -> ReactElement,
             ?dropdownPlacement: FloatingUI.Placement,
             ?middleware: FloatingUI.IMiddleware[],
-            ?showSelectAll: bool
+            ?leadingListItem: ReactElement
         ) =
 
         let mkLabel (indices: int seq) =
@@ -213,18 +145,20 @@ type Select =
 
         let labelsRef = React.useRef<string option[]> ([||])
 
+        let selectedIndices = 
+            React.useMemo ((fun () -> behavior.selectedIndices selected), [| box selected |])
+
         let handleSelect =
             (fun (index: int option) ->
                 onSelect |> Option.iter (fun f -> f index)
 
                 if index.IsSome then
-                    let nextIndices =
-                        if selectedIndices.Contains index.Value then
-                            selectedIndices.Remove index.Value
+                    let next = 
+                        if behavior.isSelected selected index.Value then
+                            behavior.deselect selected index.Value
                         else
-                            selectedIndices.Add index.Value
-
-                    setSelectedIndices (nextIndices)
+                            behavior.select selected index.Value
+                    setSelected (next)
             )
 
         let handleTypeaheadMatch =
@@ -341,13 +275,16 @@ type Select =
                                                         ]
                                                         prop.children [
 
-                                                            if defaultArg showSelectAll true then
-                                                                Select.SelectAll(setSelectedIndices, key = "select-all")
+                                                            // if showSelectAll then
+                                                            //     Select.SelectAll(setSelected, key = "select-all")
+                                                            match leadingListItem with
+                                                            | Some item -> item
+                                                            | None -> Html.none
 
                                                             for i in 0 .. options.Length - 1 do
                                                                 let option = options.[i]
 
-                                                                Select.SelectItem(
+                                                                GenericSelect.SelectItem(
                                                                     option,
                                                                     key = i,
                                                                     ?optionRenderFn = optionRenderFn
@@ -362,64 +299,3 @@ type Select =
                 ]
             )
         ]
-
-
-
-    [<ReactComponent>]
-    static member Entry() =
-
-        let options: SelectItem<{| givenName: string; age: int |}>[] = [|
-            {|
-                label = "Kevin Frey"
-                item = {| givenName = "Kevin Frey"; age = 30 |}
-            |}
-            {|
-                label = "John Doe"
-                item = {| givenName = "John Doe"; age = 25 |}
-            |}
-            {|
-                label = "Jane Smith"
-                item = {| givenName = "Jane Smith"; age = 28 |}
-            |}
-            {|
-                label = "Alice Johnson"
-                item = {|
-                    givenName = "Alice Johnson"
-                    age = 22
-                |}
-            |}
-            {|
-                label = "Bob Brown"
-                item = {| givenName = "Bob Brown"; age = 35 |}
-            |}
-            {|
-                label = "Charlie White"
-                item = {|
-                    givenName = "Charlie White"
-                    age = 40
-                |}
-            |}
-            {|
-                label = "Diana Green"
-                item = {|
-                    givenName = "Diana Green"
-                    age = 32
-                |}
-            |}
-            {|
-                label = "Ethan Black"
-                item = {|
-                    givenName = "Ethan Black"
-                    age = 29
-                |}
-            |}
-            {|
-                label = "Fiona Blue"
-                item = {| givenName = "Fiona Blue"; age = 27 |}
-            |}
-        // Shoutout to my ai for the mock data
-        |]
-
-        let selectedIndices, setSelectedIndices = React.useState (Set.empty: Set<int>)
-
-        Select.Select(options, selectedIndices, setSelectedIndices)

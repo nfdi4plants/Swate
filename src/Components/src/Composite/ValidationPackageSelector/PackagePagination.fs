@@ -36,7 +36,7 @@ type PackagePagination =
                                 prop.className "swt:flex swt:items-center swt:justify-center swt:gap-6 swt:py-2"
                                 prop.children [
                                     Html.button [
-                                        prop.type' "button"
+                                        prop.type'.button
                                         prop.testId "validation-package-selector-prev"
                                         prop.className "swt:btn swt:btn-xs"
                                         prop.text "Prev"
@@ -49,7 +49,7 @@ type PackagePagination =
                                         prop.text $"Page {page + 1} of {totalPages}"
                                     ]
                                     Html.button [
-                                        prop.type' "button"
+                                        prop.type'.button
                                         prop.testId "validation-package-selector-next"
                                         prop.className "swt:btn swt:btn-xs"
                                         prop.text "Next"

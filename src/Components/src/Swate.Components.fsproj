@@ -103,7 +103,10 @@
     <Compile Include="Primitive\Popover\Popover.fs" />
     <Compile Include="Primitive\Select\Types.fs" />
     <Compile Include="Primitive\Select\Context.fs" />
-    <Compile Include="Primitive\Select\Select.fs" />
+    <Compile Include="Primitive\Select\GenericSelect.fs" />
+    <Compile Include="Primitive\Select\SingleSelect.fs" />
+    <Compile Include="Primitive\Select\MultiSelect.fs" />
+    <Compile Include="Primitive\Select\MultiSelect.sample.fs" />
     <Compile Include="Primitive\BaseModal\Context.fs" />
     <Compile Include="Primitive\BaseModal\BaseModal.fs" />
     <Compile Include="Primitive\Dialog\Dialog.fs" />
@@ -236,7 +239,7 @@
     <Compile Include="Composite\ValidationPackageSelector\PackagePagination.fs" />
     <Compile Include="Composite\ValidationPackageSelector\PackageRow.fs" />
     <Compile Include="Composite\ValidationPackageSelector\ValidationPackageSelector.fs" />
-    <Compile Include="Composite\ValidationPackageSelector\ValidationPackageSelector.fixture.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\ValidationPackageSelector.sample.fs" />
     
     <Compile Include="Page\ProvenanceGrouping\Types.fs" />
     <Compile Include="Page\ProvenanceGrouping\State.fs" />
