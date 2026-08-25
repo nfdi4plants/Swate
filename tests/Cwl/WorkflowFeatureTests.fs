@@ -48,6 +48,33 @@ let workflowFeatureTests =
                 "Workflow canvas feature should roundtrip connect and disconnect operations immutably"
         }
 
+        test "disconnecting a canvas edge to a step input removes that source" {
+            let stepInput = {
+                createStepInput "reads" with
+                    Sources = [ "raw_reads"; "reference" ]
+            }
+
+            let step = {
+                createWorkflowStep "qc" (ExternalRun "qc.cwl") with
+                    Inputs = [ stepInput ]
+            }
+
+            let workflow = {
+                createWorkflowModel "v1.2" with
+                    Steps = [ step ]
+            }
+
+            let nextWorkflow =
+                disconnectEdge "edge:in:workflow/raw_reads->step:qc/reads" workflow
+
+            let updatedInput = nextWorkflow.Steps.Head.Inputs.Head
+
+            Expect.equal
+                updatedInput.Sources
+                [ "reference" ]
+                "Disconnect should remove only the source represented by the canvas edge"
+        }
+
         test "connecting a canvas edge to a step input updates immutable step input sources" {
             let stepInput = createStepInput "reads"
 
