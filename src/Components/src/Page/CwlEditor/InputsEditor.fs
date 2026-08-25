@@ -2,14 +2,14 @@ namespace Swate.Components.Page.CwlEditor
 
 open Fable.Core
 open Feliz
-open ARCtrl.CWL
 open Swate.Components.Page.CwlEditor.UiHelpers
-open Swate.Components.Shared.Cwl.CommandLineToolMutations
+open Swate.Components.Shared.Cwl.Documents.Common
+open Swate.Components.Shared.Cwl.Documents.Types
 
 [<AutoOpen>]
 module private InputsEditorHelpers =
 
-    let eventTargetValue (ev: Browser.Types.Event) =
+    let eventTargetValue (ev: Browser.Types.FocusEvent) =
         let target = ev.target :?> Browser.Types.HTMLInputElement
         if isNull target then "" else target.value
 
@@ -20,40 +20,45 @@ type InputsEditor =
     static member InputsEditor
         (
             version: int,
-            inputs: ResizeArray<CWLInput>,
+            inputs: InputModel list,
             activeIndex: int option,
             setActiveIndex: int option -> unit,
-            commitMutation: (unit -> unit) -> unit,
-            addInput: unit -> int,
+            onRenameInput: InputId -> string -> unit,
+            onSetInputType: InputId -> string option -> unit,
+            onSetInputPrefix: InputId -> string -> unit,
+            onSetInputPosition: InputId -> string -> unit,
+            onSetInputOptional: InputId -> bool -> unit,
+            onAddInput: unit -> unit,
+            onRemoveInput: InputId -> unit,
+            onMoveInputUp: InputId -> unit,
+            onMoveInputDown: InputId -> unit,
             ?onInteract: unit -> unit
         ) : ReactElement =
         let inputEditor =
-            match activeIndex with
-            | Some index ->
-                let input = inputs.[index]
-                let binding = input.InputBinding |> Option.defaultValue (InputBinding.create ())
+            match activeIndex |> Option.bind (fun index -> inputs |> List.tryItem index) with
+            | Some input ->
+                let index = inputs |> List.findIndex (fun item -> item.Id = input.Id)
+
+                let binding =
+                    input.InputBinding |> Option.defaultValue { Prefix = None; Position = None }
 
                 Html.div [
                     prop.className "swt:flex swt:flex-col swt:gap-2"
                     prop.children [
                         Html.h4 [
                             prop.className "swt:font-semibold swt:text-base-content"
-                            prop.text (sprintf "Input %d details" (index + 1))
+                            prop.text (sprintf "Input %s details" input.Name)
                         ]
                         Html.label [
                             prop.className "swt:label swt:flex-col swt:items-start swt:gap-1"
                             prop.children [
                                 Html.span [ prop.text "Name" ]
-                                Html.input [
-                                    prop.testId (sprintf "cwl-input-name-%d" index)
-                                    prop.key (sprintf "input-name-%d" index)
-                                    prop.className "swt:input swt:input-sm swt:w-full"
-                                    prop.defaultValue input.Name
-                                    prop.onBlur (fun (ev: Browser.Types.FocusEvent) ->
-                                        let value = eventTargetValue ev
-                                        commitMutation (fun () -> renameInputAt inputs index value)
-                                    )
-                                ]
+                                DraftTextField.DraftTextField(
+                                    string input.Id,
+                                    input.Name,
+                                    (fun nextName -> onRenameInput input.Id nextName),
+                                    testId = sprintf "cwl-input-name-%d" index
+                                )
                             ]
                         ]
                         Html.label [
@@ -63,11 +68,14 @@ type InputsEditor =
                                 Html.select [
                                     prop.testId (sprintf "cwl-input-type-%d" index)
                                     prop.className "swt:select swt:select-sm swt:w-full"
-                                    prop.value (cwlTypeToKey input.Type_)
+                                    prop.value (input.CwlType |> Option.defaultValue "")
                                     prop.onChange (fun selectedType ->
-                                        commitMutation (fun () ->
-                                            setInputTypeAt inputs index (cwlTypeFromKey selectedType)
-                                        )
+                                        onSetInputType
+                                            input.Id
+                                            (if System.String.IsNullOrWhiteSpace selectedType then
+                                                 None
+                                             else
+                                                 Some selectedType)
                                     )
                                     prop.children [
                                         for value, label in cwlTypeSelectOptions do
@@ -82,14 +90,11 @@ type InputsEditor =
                                 Html.span [ prop.text "Prefix" ]
                                 Html.input [
                                     prop.testId (sprintf "cwl-input-prefix-%d" index)
-                                    prop.key (sprintf "input-prefix-%d" index)
+                                    prop.key (sprintf "input-prefix-%O" input.Id)
                                     prop.className "swt:input swt:input-sm swt:w-full"
                                     prop.defaultValue (binding.Prefix |> Option.defaultValue "")
                                     prop.placeholder "--input"
-                                    prop.onBlur (fun (ev: Browser.Types.FocusEvent) ->
-                                        let value = eventTargetValue ev
-                                        commitMutation (fun () -> setInputPrefixAt inputs index value)
-                                    )
+                                    prop.onBlur (fun ev -> onSetInputPrefix input.Id (eventTargetValue ev))
                                 ]
                             ]
                         ]
@@ -99,14 +104,11 @@ type InputsEditor =
                                 Html.span [ prop.text "Position" ]
                                 Html.input [
                                     prop.testId (sprintf "cwl-input-position-%d" index)
-                                    prop.key (sprintf "input-position-%d" index)
+                                    prop.key (sprintf "input-position-%O" input.Id)
                                     prop.className "swt:input swt:input-sm swt:w-full"
                                     prop.defaultValue (binding.Position |> Option.map string |> Option.defaultValue "")
                                     prop.placeholder "1"
-                                    prop.onBlur (fun (ev: Browser.Types.FocusEvent) ->
-                                        let value = eventTargetValue ev
-                                        commitMutation (fun () -> setInputPositionAt inputs index value)
-                                    )
+                                    prop.onBlur (fun ev -> onSetInputPosition input.Id (eventTargetValue ev))
                                 ]
                             ]
                         ]
@@ -117,10 +119,8 @@ type InputsEditor =
                                 Html.input [
                                     prop.type'.checkbox
                                     prop.className "swt:checkbox swt:checkbox-sm"
-                                    prop.isChecked (input.Optional |> Option.defaultValue false)
-                                    prop.onChange (fun isChecked ->
-                                        commitMutation (fun () -> setInputOptionalAt inputs index isChecked)
-                                    )
+                                    prop.isChecked input.Optional
+                                    prop.onChange (onSetInputOptional input.Id)
                                 ]
                                 Html.span [ prop.text "Optional input" ]
                             ]
@@ -152,10 +152,9 @@ type InputsEditor =
                                     prop.className "swt:btn swt:btn-sm swt:btn-primary"
                                     prop.text "Add"
                                     prop.onClick (fun _ ->
-                                        commitMutation (fun () ->
-                                            let nextIndex = addInput ()
-                                            setActiveIndex (Some nextIndex)
-                                        )
+                                        onInteract |> Option.iter (fun callback -> callback ())
+                                        onAddInput ()
+                                        setActiveIndex (Some inputs.Length)
                                     )
                                 ]
                                 Html.button [
@@ -164,10 +163,21 @@ type InputsEditor =
                                     prop.text "Remove"
                                     prop.disabled activeIndex.IsNone
                                     prop.onClick (fun _ ->
-                                        commitMutation (fun () ->
-                                            let nextIndex = removeInput activeIndex inputs
+                                        match
+                                            activeIndex |> Option.bind (fun index -> inputs |> List.tryItem index)
+                                        with
+                                        | Some input ->
+                                            let nextIndex =
+                                                match activeIndex with
+                                                | Some _ when inputs.Length <= 1 -> None
+                                                | Some index when index >= inputs.Length - 1 -> Some(inputs.Length - 2)
+                                                | Some index -> Some index
+                                                | None -> None
+
+                                            onInteract |> Option.iter (fun callback -> callback ())
+                                            onRemoveInput input.Id
                                             setActiveIndex nextIndex
-                                        )
+                                        | None -> ()
                                     )
                                 ]
                             ]
@@ -177,18 +187,21 @@ type InputsEditor =
                 Html.ul [
                     prop.className "swt:menu swt:bg-base-100 swt:rounded-box"
                     prop.children [
-                        for index, input in inputs |> Seq.indexed do
+                        for index, input in inputs |> List.indexed do
                             Html.li [
                                 prop.testId (sprintf "cwl-input-item-%d" index)
-                                prop.key input.Name
+                                prop.key (string input.Id)
                                 prop.className [
                                     if activeIndex = Some index then
                                         "swt:menu-active"
                                 ]
-                                prop.onClick (fun _ -> setActiveIndex (Some index))
+                                prop.onClick (fun _ ->
+                                    onInteract |> Option.iter (fun callback -> callback ())
+                                    setActiveIndex (Some index)
+                                )
                                 prop.text (
-                                    match input.Type_ with
-                                    | Some cwlType -> sprintf "%s : %s" input.Name (cwlTypeToKey (Some cwlType))
+                                    match input.CwlType with
+                                    | Some cwlType -> sprintf "%s : %s" input.Name cwlType
                                     | None -> sprintf "%s : (unset)" input.Name
                                 )
                             ]
@@ -203,22 +216,27 @@ type InputsEditor =
                             prop.text "Move up"
                             prop.disabled (activeIndex.IsNone || activeIndex = Some 0)
                             prop.onClick (fun _ ->
-                                commitMutation (fun () ->
-                                    let nextIndex = moveInputUp activeIndex inputs
-                                    setActiveIndex nextIndex
-                                )
+                                match activeIndex |> Option.bind (fun index -> inputs |> List.tryItem index) with
+                                | Some input ->
+                                    onMoveInputUp input.Id
+                                    setActiveIndex (activeIndex |> Option.map (fun index -> max 0 (index - 1)))
+                                | None -> ()
                             )
                         ]
                         Html.button [
                             prop.testId "cwl-input-move-down"
                             prop.className "swt:btn swt:btn-sm swt:btn-ghost"
                             prop.text "Move down"
-                            prop.disabled (activeIndex.IsNone || activeIndex = Some(inputs.Count - 1))
+                            prop.disabled (activeIndex.IsNone || activeIndex = Some(inputs.Length - 1))
                             prop.onClick (fun _ ->
-                                commitMutation (fun () ->
-                                    let nextIndex = moveInputDown activeIndex inputs
-                                    setActiveIndex nextIndex
-                                )
+                                match activeIndex |> Option.bind (fun index -> inputs |> List.tryItem index) with
+                                | Some input ->
+                                    onMoveInputDown input.Id
+
+                                    setActiveIndex (
+                                        activeIndex |> Option.map (fun index -> min (inputs.Length - 1) (index + 1))
+                                    )
+                                | None -> ()
                             )
                         ]
                     ]

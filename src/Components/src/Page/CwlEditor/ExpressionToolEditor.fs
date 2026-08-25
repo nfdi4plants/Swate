@@ -4,6 +4,8 @@ open Fable.Core
 open Feliz
 open ARCtrl.CWL
 open Swate.Components.Shared.Cwl.CwlDefaults
+open Swate.Components.Shared.Cwl.Documents.Common
+open Swate.Components.Shared.Cwl.Documents.Types
 open Swate.Components.Shared.Cwl.ExpressionToolMutations
 open Swate.Components.Shared.Cwl.Validation.ValidationTypes
 
@@ -31,8 +33,8 @@ type ExpressionToolEditor =
             intentValue: string,
             expressionValue: string,
             tool: CWLExpressionToolDescription,
-            inputs: ResizeArray<CWLInput>,
-            outputs: ResizeArray<CWLOutput>,
+            inputs: InputModel list,
+            outputs: OutputModel list,
             activeInputIndex: int option,
             activeOutputIndex: int option,
             requirements: ResizeArray<Requirement> option,
@@ -47,6 +49,22 @@ type ExpressionToolEditor =
             onSetVersion: string -> unit,
             onSetIntent: string -> unit,
             onSetExpression: string -> unit,
+            onRenameInput: InputId -> string -> unit,
+            onSetInputType: InputId -> string option -> unit,
+            onSetInputPrefix: InputId -> string -> unit,
+            onSetInputPosition: InputId -> string -> unit,
+            onSetInputOptional: InputId -> bool -> unit,
+            onAddInput: unit -> unit,
+            onRemoveInput: InputId -> unit,
+            onMoveInputUp: InputId -> unit,
+            onMoveInputDown: InputId -> unit,
+            onRenameOutput: OutputId -> string -> unit,
+            onSetOutputType: OutputId -> string option -> unit,
+            onSetOutputGlob: OutputId -> string -> unit,
+            onAddOutput: unit -> unit,
+            onRemoveOutput: OutputId -> unit,
+            onMoveOutputUp: OutputId -> unit,
+            onMoveOutputDown: OutputId -> unit,
             onSetRequirementEnabled: string -> bool -> unit,
             onSetHintEnabled: string -> bool -> unit,
             onSetRequirementField: string -> string -> string -> unit,
@@ -177,8 +195,15 @@ type ExpressionToolEditor =
                                     inputs,
                                     activeInputIndex,
                                     setActiveInputIndex,
-                                    commitMutation,
-                                    (fun () -> addExpressionInput tool),
+                                    onRenameInput,
+                                    onSetInputType,
+                                    onSetInputPrefix,
+                                    onSetInputPosition,
+                                    onSetInputOptional,
+                                    onAddInput,
+                                    onRemoveInput,
+                                    onMoveInputUp,
+                                    onMoveInputDown,
                                     onInteract = clearFocusedRequirement
                                 )
                                 RequirementPicker.RequirementMainPanel(
@@ -196,8 +221,13 @@ type ExpressionToolEditor =
                                     outputs,
                                     activeOutputIndex,
                                     setActiveOutputIndex,
-                                    commitMutation,
-                                    (fun () -> addExpressionOutput tool),
+                                    onRenameOutput,
+                                    onSetOutputType,
+                                    onSetOutputGlob,
+                                    onAddOutput,
+                                    onRemoveOutput,
+                                    onMoveOutputUp,
+                                    onMoveOutputDown,
                                     onInteract = clearFocusedRequirement
                                 )
                             ]

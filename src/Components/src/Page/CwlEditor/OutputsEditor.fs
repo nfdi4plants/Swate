@@ -2,14 +2,14 @@ namespace Swate.Components.Page.CwlEditor
 
 open Fable.Core
 open Feliz
-open ARCtrl.CWL
 open Swate.Components.Page.CwlEditor.UiHelpers
-open Swate.Components.Shared.Cwl.CommandLineToolMutations
+open Swate.Components.Shared.Cwl.Documents.Common
+open Swate.Components.Shared.Cwl.Documents.Types
 
 [<AutoOpen>]
 module private OutputsEditorHelpers =
 
-    let eventTargetValue (ev: Browser.Types.Event) =
+    let eventTargetValue (ev: Browser.Types.FocusEvent) =
         let target = ev.target :?> Browser.Types.HTMLInputElement
         if isNull target then "" else target.value
 
@@ -20,40 +20,41 @@ type OutputsEditor =
     static member OutputsEditor
         (
             version: int,
-            outputs: ResizeArray<CWLOutput>,
+            outputs: OutputModel list,
             activeIndex: int option,
             setActiveIndex: int option -> unit,
-            commitMutation: (unit -> unit) -> unit,
-            addOutput: unit -> int,
+            onRenameOutput: OutputId -> string -> unit,
+            onSetOutputType: OutputId -> string option -> unit,
+            onSetOutputGlob: OutputId -> string -> unit,
+            onAddOutput: unit -> unit,
+            onRemoveOutput: OutputId -> unit,
+            onMoveOutputUp: OutputId -> unit,
+            onMoveOutputDown: OutputId -> unit,
             ?onInteract: unit -> unit
         ) : ReactElement =
         let outputEditor =
-            match activeIndex with
-            | Some index ->
-                let output = outputs.[index]
-                let binding = output.OutputBinding |> Option.defaultValue (OutputBinding.create ())
+            match activeIndex |> Option.bind (fun index -> outputs |> List.tryItem index) with
+            | Some output ->
+                let index = outputs |> List.findIndex (fun item -> item.Id = output.Id)
+                let binding = output.OutputBinding |> Option.defaultValue { Glob = None }
 
                 Html.div [
                     prop.className "swt:flex swt:flex-col swt:gap-2"
                     prop.children [
                         Html.h4 [
                             prop.className "swt:font-semibold swt:text-base-content"
-                            prop.text (sprintf "Output %d details" (index + 1))
+                            prop.text (sprintf "Output %s details" output.Name)
                         ]
                         Html.label [
                             prop.className "swt:label swt:flex-col swt:items-start swt:gap-1"
                             prop.children [
                                 Html.span [ prop.text "Name" ]
-                                Html.input [
-                                    prop.testId (sprintf "cwl-output-name-%d" index)
-                                    prop.key (sprintf "output-name-%d" index)
-                                    prop.className "swt:input swt:input-sm swt:w-full"
-                                    prop.defaultValue output.Name
-                                    prop.onBlur (fun (ev: Browser.Types.FocusEvent) ->
-                                        let value = eventTargetValue ev
-                                        commitMutation (fun () -> renameOutputAt outputs index value)
-                                    )
-                                ]
+                                DraftTextField.DraftTextField(
+                                    string output.Id,
+                                    output.Name,
+                                    (fun nextName -> onRenameOutput output.Id nextName),
+                                    testId = sprintf "cwl-output-name-%d" index
+                                )
                             ]
                         ]
                         Html.label [
@@ -63,11 +64,14 @@ type OutputsEditor =
                                 Html.select [
                                     prop.testId (sprintf "cwl-output-type-%d" index)
                                     prop.className "swt:select swt:select-sm swt:w-full"
-                                    prop.value (cwlTypeToKey output.Type_)
+                                    prop.value (output.CwlType |> Option.defaultValue "")
                                     prop.onChange (fun selectedType ->
-                                        commitMutation (fun () ->
-                                            setOutputTypeAt outputs index (cwlTypeFromKey selectedType)
-                                        )
+                                        onSetOutputType
+                                            output.Id
+                                            (if System.String.IsNullOrWhiteSpace selectedType then
+                                                 None
+                                             else
+                                                 Some selectedType)
                                     )
                                     prop.children [
                                         for value, label in cwlTypeSelectOptions do
@@ -82,14 +86,11 @@ type OutputsEditor =
                                 Html.span [ prop.text "Glob" ]
                                 Html.input [
                                     prop.testId (sprintf "cwl-output-glob-%d" index)
-                                    prop.key (sprintf "output-glob-%d" index)
+                                    prop.key (sprintf "output-glob-%O" output.Id)
                                     prop.className "swt:input swt:input-sm swt:w-full"
                                     prop.defaultValue (binding.Glob |> Option.defaultValue "")
                                     prop.placeholder "*.txt"
-                                    prop.onBlur (fun (ev: Browser.Types.FocusEvent) ->
-                                        let value = eventTargetValue ev
-                                        commitMutation (fun () -> setOutputGlobAt outputs index value)
-                                    )
+                                    prop.onBlur (fun ev -> onSetOutputGlob output.Id (eventTargetValue ev))
                                 ]
                             ]
                         ]
@@ -120,10 +121,9 @@ type OutputsEditor =
                                     prop.className "swt:btn swt:btn-sm swt:btn-primary"
                                     prop.text "Add"
                                     prop.onClick (fun _ ->
-                                        commitMutation (fun () ->
-                                            let nextIndex = addOutput ()
-                                            setActiveIndex (Some nextIndex)
-                                        )
+                                        onInteract |> Option.iter (fun callback -> callback ())
+                                        onAddOutput ()
+                                        setActiveIndex (Some outputs.Length)
                                     )
                                 ]
                                 Html.button [
@@ -132,10 +132,22 @@ type OutputsEditor =
                                     prop.text "Remove"
                                     prop.disabled activeIndex.IsNone
                                     prop.onClick (fun _ ->
-                                        commitMutation (fun () ->
-                                            let nextIndex = removeOutput activeIndex outputs
+                                        match
+                                            activeIndex |> Option.bind (fun index -> outputs |> List.tryItem index)
+                                        with
+                                        | Some output ->
+                                            let nextIndex =
+                                                match activeIndex with
+                                                | Some _ when outputs.Length <= 1 -> None
+                                                | Some index when index >= outputs.Length - 1 ->
+                                                    Some(outputs.Length - 2)
+                                                | Some index -> Some index
+                                                | None -> None
+
+                                            onInteract |> Option.iter (fun callback -> callback ())
+                                            onRemoveOutput output.Id
                                             setActiveIndex nextIndex
-                                        )
+                                        | None -> ()
                                     )
                                 ]
                             ]
@@ -145,18 +157,21 @@ type OutputsEditor =
                 Html.ul [
                     prop.className "swt:menu swt:bg-base-100 swt:rounded-box"
                     prop.children [
-                        for index, output in outputs |> Seq.indexed do
+                        for index, output in outputs |> List.indexed do
                             Html.li [
                                 prop.testId (sprintf "cwl-output-item-%d" index)
-                                prop.key output.Name
+                                prop.key (string output.Id)
                                 prop.className [
                                     if activeIndex = Some index then
                                         "swt:menu-active"
                                 ]
-                                prop.onClick (fun _ -> setActiveIndex (Some index))
+                                prop.onClick (fun _ ->
+                                    onInteract |> Option.iter (fun callback -> callback ())
+                                    setActiveIndex (Some index)
+                                )
                                 prop.text (
-                                    match output.Type_ with
-                                    | Some cwlType -> sprintf "%s : %s" output.Name (cwlTypeToKey (Some cwlType))
+                                    match output.CwlType with
+                                    | Some cwlType -> sprintf "%s : %s" output.Name cwlType
                                     | None -> sprintf "%s : (unset)" output.Name
                                 )
                             ]
@@ -171,22 +186,27 @@ type OutputsEditor =
                             prop.text "Move up"
                             prop.disabled (activeIndex.IsNone || activeIndex = Some 0)
                             prop.onClick (fun _ ->
-                                commitMutation (fun () ->
-                                    let nextIndex = moveOutputUp activeIndex outputs
-                                    setActiveIndex nextIndex
-                                )
+                                match activeIndex |> Option.bind (fun index -> outputs |> List.tryItem index) with
+                                | Some output ->
+                                    onMoveOutputUp output.Id
+                                    setActiveIndex (activeIndex |> Option.map (fun index -> max 0 (index - 1)))
+                                | None -> ()
                             )
                         ]
                         Html.button [
                             prop.testId "cwl-output-move-down"
                             prop.className "swt:btn swt:btn-sm swt:btn-ghost"
                             prop.text "Move down"
-                            prop.disabled (activeIndex.IsNone || activeIndex = Some(outputs.Count - 1))
+                            prop.disabled (activeIndex.IsNone || activeIndex = Some(outputs.Length - 1))
                             prop.onClick (fun _ ->
-                                commitMutation (fun () ->
-                                    let nextIndex = moveOutputDown activeIndex outputs
-                                    setActiveIndex nextIndex
-                                )
+                                match activeIndex |> Option.bind (fun index -> outputs |> List.tryItem index) with
+                                | Some output ->
+                                    onMoveOutputDown output.Id
+
+                                    setActiveIndex (
+                                        activeIndex |> Option.map (fun index -> min (outputs.Length - 1) (index + 1))
+                                    )
+                                | None -> ()
                             )
                         ]
                     ]

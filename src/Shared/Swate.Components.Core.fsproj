@@ -77,6 +77,9 @@
     <Compile Include="Cwl\State\EffectRunner.fs" />
     <Compile Include="Cwl\Features\StartScreenFeature.fs" />
     <Compile Include="Cwl\Features\EditorShellFeature.fs" />
+    <Compile Include="Cwl\Features\InputsFeature.fs" />
+    <Compile Include="Cwl\Features\OutputsFeature.fs" />
+    <Compile Include="Cwl\Features\PreviewFeature.fs" />
     <Compile Include="ArcExplorerNode.fs" />
     <Compile Include="Shared.fs" />
   </ItemGroup>

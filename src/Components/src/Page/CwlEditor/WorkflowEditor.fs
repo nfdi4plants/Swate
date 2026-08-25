@@ -4,6 +4,8 @@ open Fable.Core
 open Feliz
 open ARCtrl.CWL
 open Swate.Components.Shared.Cwl.CwlDefaults
+open Swate.Components.Shared.Cwl.Documents.Common
+open Swate.Components.Shared.Cwl.Documents.Types
 open Swate.Components.Shared.Cwl.Validation.ValidationTypes
 open Swate.Components.Shared.Cwl.WorkflowMutations
 
@@ -32,8 +34,8 @@ type WorkflowEditor =
             stateCwlVersion: string,
             intentValue: string,
             workflow: CWLWorkflowDescription,
-            inputs: ResizeArray<CWLInput>,
-            outputs: ResizeArray<CWLOutput>,
+            inputs: InputModel list,
+            outputs: OutputModel list,
             activeInputIndex: int option,
             activeOutputIndex: int option,
             activeStepIndex: int option,
@@ -49,6 +51,22 @@ type WorkflowEditor =
             onBackToStart: unit -> unit,
             onSetVersion: string -> unit,
             onSetIntent: string -> unit,
+            onRenameInput: InputId -> string -> unit,
+            onSetInputType: InputId -> string option -> unit,
+            onSetInputPrefix: InputId -> string -> unit,
+            onSetInputPosition: InputId -> string -> unit,
+            onSetInputOptional: InputId -> bool -> unit,
+            onAddInput: unit -> unit,
+            onRemoveInput: InputId -> unit,
+            onMoveInputUp: InputId -> unit,
+            onMoveInputDown: InputId -> unit,
+            onRenameOutput: OutputId -> string -> unit,
+            onSetOutputType: OutputId -> string option -> unit,
+            onSetOutputGlob: OutputId -> string -> unit,
+            onAddOutput: unit -> unit,
+            onRemoveOutput: OutputId -> unit,
+            onMoveOutputUp: OutputId -> unit,
+            onMoveOutputDown: OutputId -> unit,
             onSetRequirementEnabled: string -> bool -> unit,
             onSetHintEnabled: string -> bool -> unit,
             onSetRequirementField: string -> string -> string -> unit,
@@ -173,8 +191,15 @@ type WorkflowEditor =
                                     inputs,
                                     activeInputIndex,
                                     setActiveInputIndex,
-                                    commitMutation,
-                                    (fun () -> addWorkflowInput workflow),
+                                    onRenameInput,
+                                    onSetInputType,
+                                    onSetInputPrefix,
+                                    onSetInputPosition,
+                                    onSetInputOptional,
+                                    onAddInput,
+                                    onRemoveInput,
+                                    onMoveInputUp,
+                                    onMoveInputDown,
                                     onInteract = clearFocusedRequirement
                                 )
                                 RequirementPicker.RequirementMainPanel(
@@ -192,8 +217,13 @@ type WorkflowEditor =
                                     outputs,
                                     activeOutputIndex,
                                     setActiveOutputIndex,
-                                    commitMutation,
-                                    (fun () -> addWorkflowOutput workflow),
+                                    onRenameOutput,
+                                    onSetOutputType,
+                                    onSetOutputGlob,
+                                    onAddOutput,
+                                    onRemoveOutput,
+                                    onMoveOutputUp,
+                                    onMoveOutputDown,
                                     onInteract = clearFocusedRequirement
                                 )
                                 Html.div [

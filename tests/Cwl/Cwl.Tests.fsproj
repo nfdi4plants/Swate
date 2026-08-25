@@ -10,6 +10,7 @@
         <Compile Include="StateReducerTests.fs" />
         <Compile Include="EffectRunnerTests.fs" />
         <Compile Include="EditorShellFeatureTests.fs" />
+        <Compile Include="CommandLineToolFeatureTests.fs" />
         <Compile Include="ArCtrlAdapterTests.fs" />
         <Compile Include="EditorControllerLogicTests.fs" />
         <Compile Include="Main.fs" />

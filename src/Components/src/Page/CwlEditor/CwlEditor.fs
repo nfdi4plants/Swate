@@ -9,9 +9,12 @@ open Swate.Components.Shared.Cwl.Adapters.ArCtrlEncode
 open Swate.Components.Shared.Cwl.Adapters.ValidationAdapter
 open Swate.Components.Shared.Cwl.CommandLineToolMutations
 open Swate.Components.Shared.Cwl.Documents.Common
+open Swate.Components.Shared.Cwl.Documents.Types
 open Swate.Components.Shared.Cwl.EditorControllerLogic
 open Swate.Components.Shared.Cwl.EditorTypes
 open Swate.Components.Shared.Cwl.ExpressionToolMutations
+open Swate.Components.Shared.Cwl.Features.InputsFeature
+open Swate.Components.Shared.Cwl.Features.OutputsFeature
 open Swate.Components.Shared.Cwl.HostTypes
 open Swate.Components.Shared.Cwl.State.Actions
 open Swate.Components.Shared.Cwl.State.EffectRunner
@@ -22,6 +25,10 @@ open Swate.Components.Shared.Cwl.State.Types
 open Swate.Components.Shared.Cwl.Validation.ValidationContext
 open Swate.Components.Shared.Cwl.Validation.ValidationEngine
 open Swate.Components.Shared.Cwl.WorkflowMutations
+
+module InputsFeature = Swate.Components.Shared.Cwl.Features.InputsFeature
+module OutputsFeature = Swate.Components.Shared.Cwl.Features.OutputsFeature
+module CommandLineToolDocument = Swate.Components.Shared.Cwl.Documents.CommandLineTool
 
 [<AutoOpen>]
 module private CwlEditorHelpers =
@@ -265,6 +272,11 @@ type CwlEditor =
                 currentProcessingUnit |> fromProcessingUnit |> DocumentUpdated |> dispatch
             | None -> ()
 
+        let updateDocument nextDocument = dispatch (DocumentUpdated nextDocument)
+
+        let updateCurrentDocument updater =
+            state.Document |> Option.map updater |> Option.iter updateDocument
+
         let saveCurrent () =
             match processingUnit, state.Document with
             | Some currentProcessingUnit, Some document ->
@@ -325,15 +337,18 @@ type CwlEditor =
 
                 match processingUnit with
                 | CWLProcessingUnit.CommandLineTool tool ->
+                    let model =
+                        match document with
+                        | CommandLineToolDoc model -> model
+                        | _ -> failwith "Expected CommandLineToolDoc"
+
                     let baseCommandValue =
                         tool.BaseCommand
                         |> Option.bind (fun commands -> if commands.Count > 0 then Some commands.[0] else None)
                         |> Option.defaultValue ""
 
-                    let inputs = CWLToolDescription.getInputsOrEmpty tool
-                    let outputs = tool.Outputs
-                    let activeInputIndex = clampIndex selectedInputIndex inputs.Count
-                    let activeOutputIndex = clampIndex selectedOutputIndex outputs.Count
+                    let activeInputIndex = clampIndex selectedInputIndex model.Inputs.Length
+                    let activeOutputIndex = clampIndex selectedOutputIndex model.Outputs.Length
 
                     CommandLineToolEditor.CommandLineToolEditor(
                         version,
@@ -347,8 +362,8 @@ type CwlEditor =
                         intentText tool.Intent,
                         baseCommandValue,
                         tool,
-                        inputs,
-                        outputs,
+                        model.Inputs,
+                        model.Outputs,
                         activeInputIndex,
                         activeOutputIndex,
                         tool.Requirements,
@@ -364,7 +379,34 @@ type CwlEditor =
                             commitMutation (fun () -> setProcessingUnitVersion nextVersion processingUnit)
                         ),
                         (fun value -> commitMutation (fun () -> tool.Intent <- parseIntentText value)),
-                        (fun command -> commitMutation (fun () -> setBaseCommand tool command)),
+                        (fun command ->
+                            updateCurrentDocument (fun currentDocument ->
+                                match currentDocument with
+                                | CommandLineToolDoc currentModel ->
+                                    CommandLineToolDoc(CommandLineToolDocument.setBaseCommand command currentModel)
+                                | _ -> currentDocument
+                            )
+                        ),
+                        (fun inputId name -> updateCurrentDocument (InputsFeature.renameInput inputId name)),
+                        (fun inputId cwlType -> updateCurrentDocument (InputsFeature.setInputType inputId cwlType)),
+                        (fun inputId prefix -> updateCurrentDocument (InputsFeature.setInputPrefix inputId prefix)),
+                        (fun inputId position ->
+                            updateCurrentDocument (InputsFeature.setInputPosition inputId position)
+                        ),
+                        (fun inputId isOptional ->
+                            updateCurrentDocument (InputsFeature.setInputOptional inputId isOptional)
+                        ),
+                        (fun () -> updateCurrentDocument InputsFeature.addInput),
+                        (fun inputId -> updateCurrentDocument (InputsFeature.removeInput inputId)),
+                        (fun inputId -> updateCurrentDocument (InputsFeature.moveInputUp inputId)),
+                        (fun inputId -> updateCurrentDocument (InputsFeature.moveInputDown inputId)),
+                        (fun outputId name -> updateCurrentDocument (OutputsFeature.renameOutput outputId name)),
+                        (fun outputId cwlType -> updateCurrentDocument (OutputsFeature.setOutputType outputId cwlType)),
+                        (fun outputId glob -> updateCurrentDocument (OutputsFeature.setOutputGlob outputId glob)),
+                        (fun () -> updateCurrentDocument OutputsFeature.addOutput),
+                        (fun outputId -> updateCurrentDocument (OutputsFeature.removeOutput outputId)),
+                        (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputUp outputId)),
+                        (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputDown outputId)),
                         (fun key isChecked -> commitMutation (fun () -> setRequirementEnabled tool key isChecked)),
                         (fun key isChecked -> commitMutation (fun () -> setHintEnabled tool key isChecked)),
                         (fun key field value -> commitMutation (fun () -> setRequirementField tool key field value)),
@@ -373,11 +415,14 @@ type CwlEditor =
                     |> wrapEditorView
 
                 | CWLProcessingUnit.Workflow workflow ->
-                    let inputs = workflow.Inputs
-                    let outputs = workflow.Outputs
+                    let model =
+                        match document with
+                        | WorkflowDoc model -> model
+                        | _ -> failwith "Expected WorkflowDoc"
+
                     let steps = workflow.Steps
-                    let activeInputIndex = clampIndex selectedInputIndex inputs.Count
-                    let activeOutputIndex = clampIndex selectedOutputIndex outputs.Count
+                    let activeInputIndex = clampIndex selectedInputIndex model.Inputs.Length
+                    let activeOutputIndex = clampIndex selectedOutputIndex model.Outputs.Length
                     let activeStepIndex = clampIndex selectedStepIndex steps.Count
 
                     WorkflowEditor.WorkflowEditor(
@@ -393,8 +438,8 @@ type CwlEditor =
                         stateCwlVersion,
                         intentText workflow.Intent,
                         workflow,
-                        inputs,
-                        outputs,
+                        model.Inputs,
+                        model.Outputs,
                         activeInputIndex,
                         activeOutputIndex,
                         activeStepIndex,
@@ -412,6 +457,26 @@ type CwlEditor =
                             commitMutation (fun () -> setProcessingUnitVersion nextVersion processingUnit)
                         ),
                         (fun value -> commitMutation (fun () -> workflow.Intent <- parseIntentText value)),
+                        (fun inputId name -> updateCurrentDocument (InputsFeature.renameInput inputId name)),
+                        (fun inputId cwlType -> updateCurrentDocument (InputsFeature.setInputType inputId cwlType)),
+                        (fun inputId prefix -> updateCurrentDocument (InputsFeature.setInputPrefix inputId prefix)),
+                        (fun inputId position ->
+                            updateCurrentDocument (InputsFeature.setInputPosition inputId position)
+                        ),
+                        (fun inputId isOptional ->
+                            updateCurrentDocument (InputsFeature.setInputOptional inputId isOptional)
+                        ),
+                        (fun () -> updateCurrentDocument InputsFeature.addInput),
+                        (fun inputId -> updateCurrentDocument (InputsFeature.removeInput inputId)),
+                        (fun inputId -> updateCurrentDocument (InputsFeature.moveInputUp inputId)),
+                        (fun inputId -> updateCurrentDocument (InputsFeature.moveInputDown inputId)),
+                        (fun outputId name -> updateCurrentDocument (OutputsFeature.renameOutput outputId name)),
+                        (fun outputId cwlType -> updateCurrentDocument (OutputsFeature.setOutputType outputId cwlType)),
+                        (fun outputId glob -> updateCurrentDocument (OutputsFeature.setOutputGlob outputId glob)),
+                        (fun () -> updateCurrentDocument OutputsFeature.addOutput),
+                        (fun outputId -> updateCurrentDocument (OutputsFeature.removeOutput outputId)),
+                        (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputUp outputId)),
+                        (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputDown outputId)),
                         (fun key isChecked ->
                             commitMutation (fun () -> setWorkflowRequirementEnabled workflow key isChecked)
                         ),
@@ -429,10 +494,13 @@ type CwlEditor =
                     |> wrapEditorView
 
                 | CWLProcessingUnit.ExpressionTool tool ->
-                    let inputs = CWLExpressionToolDescription.getInputsOrEmpty tool
-                    let outputs = tool.Outputs
-                    let activeInputIndex = clampIndex selectedInputIndex inputs.Count
-                    let activeOutputIndex = clampIndex selectedOutputIndex outputs.Count
+                    let model =
+                        match document with
+                        | ExpressionToolDoc model -> model
+                        | _ -> failwith "Expected ExpressionToolDoc"
+
+                    let activeInputIndex = clampIndex selectedInputIndex model.Inputs.Length
+                    let activeOutputIndex = clampIndex selectedOutputIndex model.Outputs.Length
 
                     ExpressionToolEditor.ExpressionToolEditor(
                         version,
@@ -446,8 +514,8 @@ type CwlEditor =
                         intentText tool.Intent,
                         tool.Expression,
                         tool,
-                        inputs,
-                        outputs,
+                        model.Inputs,
+                        model.Outputs,
                         activeInputIndex,
                         activeOutputIndex,
                         tool.Requirements,
@@ -464,6 +532,26 @@ type CwlEditor =
                         ),
                         (fun value -> commitMutation (fun () -> tool.Intent <- parseIntentText value)),
                         (fun expression -> commitMutation (fun () -> setExpressionText tool expression)),
+                        (fun inputId name -> updateCurrentDocument (InputsFeature.renameInput inputId name)),
+                        (fun inputId cwlType -> updateCurrentDocument (InputsFeature.setInputType inputId cwlType)),
+                        (fun inputId prefix -> updateCurrentDocument (InputsFeature.setInputPrefix inputId prefix)),
+                        (fun inputId position ->
+                            updateCurrentDocument (InputsFeature.setInputPosition inputId position)
+                        ),
+                        (fun inputId isOptional ->
+                            updateCurrentDocument (InputsFeature.setInputOptional inputId isOptional)
+                        ),
+                        (fun () -> updateCurrentDocument InputsFeature.addInput),
+                        (fun inputId -> updateCurrentDocument (InputsFeature.removeInput inputId)),
+                        (fun inputId -> updateCurrentDocument (InputsFeature.moveInputUp inputId)),
+                        (fun inputId -> updateCurrentDocument (InputsFeature.moveInputDown inputId)),
+                        (fun outputId name -> updateCurrentDocument (OutputsFeature.renameOutput outputId name)),
+                        (fun outputId cwlType -> updateCurrentDocument (OutputsFeature.setOutputType outputId cwlType)),
+                        (fun outputId glob -> updateCurrentDocument (OutputsFeature.setOutputGlob outputId glob)),
+                        (fun () -> updateCurrentDocument OutputsFeature.addOutput),
+                        (fun outputId -> updateCurrentDocument (OutputsFeature.removeOutput outputId)),
+                        (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputUp outputId)),
+                        (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputDown outputId)),
                         (fun key isChecked ->
                             commitMutation (fun () -> setExpressionRequirementEnabled tool key isChecked)
                         ),
