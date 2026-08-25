@@ -5,6 +5,14 @@ open Swate.Components.Shared.Cwl.Documents.Common
 open Swate.Components.Shared.Cwl.Documents.Types
 
 module Mutations = Swate.Components.Shared.Cwl.Documents.Mutations
+module LegacyWorkflowMutations = Swate.Components.Shared.Cwl.WorkflowMutations
+
+type WorkflowStepRunKind =
+    | ExternalRunKind
+    | CommandLineToolRunKind
+    | InlineWorkflowRunKind
+    | ExpressionToolRunKind
+    | OperationRunKind
 
 let private nextName (prefix: string) (existing: seq<string>) =
     let existingSet = existing |> Set.ofSeq
@@ -34,6 +42,38 @@ let private parseSourceText (text: string) =
 let tryFindStep (stepId: StepId) (model: WorkflowModel) =
     model.Steps |> List.tryFind (fun step -> step.Id = stepId)
 
+let stepInputSourceText (stepInput: StepInputModel) = stepInput.Sources |> String.concat ", "
+
+let stepRunDisplay (step: WorkflowStepModel) =
+    match step.Run with
+    | ExternalRun relativePath -> relativePath
+    | InlineCommandLineTool _ -> "[inline CommandLineTool]"
+    | InlineWorkflow _ -> "[inline Workflow]"
+    | InlineExpressionTool _ -> "[inline ExpressionTool]"
+    | InlineOperation _ -> "[inline Operation]"
+
+let stepRunKind (step: WorkflowStepModel) =
+    match step.Run with
+    | ExternalRun _ -> ExternalRunKind
+    | InlineCommandLineTool _ -> CommandLineToolRunKind
+    | InlineWorkflow _ -> InlineWorkflowRunKind
+    | InlineExpressionTool _ -> ExpressionToolRunKind
+    | InlineOperation _ -> OperationRunKind
+
+let isStepRunEditable (step: WorkflowStepModel) =
+    match step.Run with
+    | ExternalRun _ -> true
+    | _ -> false
+
+let tryGetWorkflowStepExternalRunAbsolutePath (step: WorkflowStepModel) =
+    step.Metadata
+    |> Map.tryFind LegacyWorkflowMutations.WorkflowStepExternalRunAbsolutePathKey
+    |> Option.bind (
+        function
+        | MetadataString value when String.IsNullOrWhiteSpace value |> not -> Some value
+        | _ -> None
+    )
+
 let renameStep (stepId: StepId) (name: string) (model: WorkflowModel) =
     let trimmed = name.Trim()
 
@@ -51,6 +91,40 @@ let renameStep (stepId: StepId) (name: string) (model: WorkflowModel) =
                             step
                     )
         }
+
+let setStepRunTarget (stepId: StepId) (runTarget: string) (model: WorkflowModel) =
+    match nonEmptyTrimmed runTarget with
+    | Some trimmed ->
+        Mutations.updateWorkflowStep
+            stepId
+            (fun step ->
+                match step.Run with
+                | ExternalRun _ -> { step with Run = ExternalRun trimmed }
+                | _ -> step
+            )
+            model
+    | None -> model
+
+let setStepRunKind (stepId: StepId) (runKind: WorkflowStepRunKind) (model: WorkflowModel) =
+    Mutations.updateWorkflowStep
+        stepId
+        (fun step ->
+            let currentRunTarget =
+                match step.Run with
+                | ExternalRun path when String.IsNullOrWhiteSpace path |> not -> path
+                | _ -> "tool.cwl"
+
+            let nextRun =
+                match runKind with
+                | ExternalRunKind -> ExternalRun currentRunTarget
+                | CommandLineToolRunKind -> InlineCommandLineTool(createCommandLineToolModel model.CwlVersion)
+                | InlineWorkflowRunKind -> InlineWorkflow(createWorkflowModel model.CwlVersion)
+                | ExpressionToolRunKind -> InlineExpressionTool(createExpressionToolModel model.CwlVersion "")
+                | OperationRunKind -> InlineOperation(createOperationModel model.CwlVersion)
+
+            { step with Run = nextRun }
+        )
+        model
 
 let moveStepDown (stepId: StepId) (model: WorkflowModel) =
     let steps = model.Steps |> List.toArray
@@ -107,6 +181,44 @@ let setStepInputSourceText (stepId: StepId) (stepInputId: StepInputId) (sourceTe
 let removeStepInput (stepId: StepId) (stepInputId: StepInputId) (model: WorkflowModel) =
     Mutations.removeStepInput stepId stepInputId model
 
+let moveStepInputUp (stepId: StepId) (stepInputId: StepInputId) (model: WorkflowModel) =
+    Mutations.updateWorkflowStep
+        stepId
+        (fun step ->
+            match step.Inputs |> List.tryFindIndex (fun input -> input.Id = stepInputId) with
+            | Some index when index > 0 ->
+                let items = step.Inputs |> List.toArray
+                let previous = items.[index - 1]
+                items.[index - 1] <- items.[index]
+                items.[index] <- previous
+
+                {
+                    step with
+                        Inputs = items |> Array.toList
+                }
+            | _ -> step
+        )
+        model
+
+let moveStepInputDown (stepId: StepId) (stepInputId: StepInputId) (model: WorkflowModel) =
+    Mutations.updateWorkflowStep
+        stepId
+        (fun step ->
+            match step.Inputs |> List.tryFindIndex (fun input -> input.Id = stepInputId) with
+            | Some index when index < step.Inputs.Length - 1 ->
+                let items = step.Inputs |> List.toArray
+                let next = items.[index + 1]
+                items.[index + 1] <- items.[index]
+                items.[index] <- next
+
+                {
+                    step with
+                        Inputs = items |> Array.toList
+                }
+            | _ -> step
+        )
+        model
+
 let addStepOutput (stepId: StepId) (model: WorkflowModel) =
     match tryFindStep stepId model with
     | Some step ->
@@ -124,6 +236,44 @@ let renameStepOutput (stepId: StepId) (stepOutputId: StepOutputId) (name: string
 
 let removeStepOutput (stepId: StepId) (stepOutputId: StepOutputId) (model: WorkflowModel) =
     Mutations.removeStepOutput stepId stepOutputId model
+
+let moveStepOutputUp (stepId: StepId) (stepOutputId: StepOutputId) (model: WorkflowModel) =
+    Mutations.updateWorkflowStep
+        stepId
+        (fun step ->
+            match step.Outputs |> List.tryFindIndex (fun output -> output.Id = stepOutputId) with
+            | Some index when index > 0 ->
+                let items = step.Outputs |> List.toArray
+                let previous = items.[index - 1]
+                items.[index - 1] <- items.[index]
+                items.[index] <- previous
+
+                {
+                    step with
+                        Outputs = items |> Array.toList
+                }
+            | _ -> step
+        )
+        model
+
+let moveStepOutputDown (stepId: StepId) (stepOutputId: StepOutputId) (model: WorkflowModel) =
+    Mutations.updateWorkflowStep
+        stepId
+        (fun step ->
+            match step.Outputs |> List.tryFindIndex (fun output -> output.Id = stepOutputId) with
+            | Some index when index < step.Outputs.Length - 1 ->
+                let items = step.Outputs |> List.toArray
+                let next = items.[index + 1]
+                items.[index + 1] <- items.[index]
+                items.[index] <- next
+
+                {
+                    step with
+                        Outputs = items |> Array.toList
+                }
+            | _ -> step
+        )
+        model
 
 let moveStepUp (stepId: StepId) (model: WorkflowModel) =
     let steps = model.Steps |> List.toArray

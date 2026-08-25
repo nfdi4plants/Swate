@@ -3,32 +3,58 @@ namespace Swate.Components.Page.CwlEditor
 open System
 open Fable.Core
 open Feliz
-open ARCtrl.CWL
 open Swate.Components.Page.CwlEditor.Types
-open Swate.Components.Shared.Cwl.WorkflowMutations
+open Swate.Components.Shared.Cwl.Adapters.ArCtrlEncode
+open Swate.Components.Shared.Cwl.Documents.Common
+open Swate.Components.Shared.Cwl.Documents.Types
+open Swate.Components.Shared.Cwl.Documents.Workflow
 
 [<AutoOpen>]
 module private WorkflowStepsHelpers =
 
     let runKindToValue runKind =
         match runKind with
-        | RunStringKind -> "string"
-        | RunCommandLineToolKind -> "command-line-tool"
-        | RunWorkflowKind -> "workflow"
-        | RunExpressionToolKind -> "expression-tool"
-        | RunOperationKind -> "operation"
+        | ExternalRunKind -> "string"
+        | CommandLineToolRunKind -> "command-line-tool"
+        | InlineWorkflowRunKind -> "workflow"
+        | ExpressionToolRunKind -> "expression-tool"
+        | OperationRunKind -> "operation"
 
     let runKindFromValue value =
         match value with
-        | "command-line-tool" -> RunCommandLineToolKind
-        | "workflow" -> RunWorkflowKind
-        | "expression-tool" -> RunExpressionToolKind
-        | "operation" -> RunOperationKind
-        | _ -> RunStringKind
+        | "command-line-tool" -> CommandLineToolRunKind
+        | "workflow" -> InlineWorkflowRunKind
+        | "expression-tool" -> ExpressionToolRunKind
+        | "operation" -> OperationRunKind
+        | _ -> ExternalRunKind
 
     let eventTargetValue (ev: Browser.Types.FocusEvent) =
         let target = ev.target :?> Browser.Types.HTMLInputElement
         if isNull target then "" else target.value
+
+    let tryEncodeWorkflowStepRunYaml (step: WorkflowStepModel) =
+        match step.Run with
+        | ExternalRun _ -> None
+        | InlineCommandLineTool tool ->
+            CommandLineToolDoc tool
+            |> toProcessingUnit
+            |> ARCtrl.CWL.Encode.encodeProcessingUnit
+            |> Some
+        | InlineWorkflow workflow ->
+            WorkflowDoc workflow
+            |> toProcessingUnit
+            |> ARCtrl.CWL.Encode.encodeProcessingUnit
+            |> Some
+        | InlineExpressionTool tool ->
+            ExpressionToolDoc tool
+            |> toProcessingUnit
+            |> ARCtrl.CWL.Encode.encodeProcessingUnit
+            |> Some
+        | InlineOperation operation ->
+            OperationDoc operation
+            |> toProcessingUnit
+            |> ARCtrl.CWL.Encode.encodeProcessingUnit
+            |> Some
 
 [<Erase; Mangle(false)>]
 type WorkflowSteps =
@@ -36,12 +62,14 @@ type WorkflowSteps =
     [<ReactComponent>]
     static member WorkflowSteps
         (
-            version: int,
-            workflow: CWLWorkflowDescription,
-            workflowFilePath: string option,
-            activeStepIndex: int option,
-            setActiveStepIndex: int option -> unit,
-            commitMutation: (unit -> unit) -> unit,
+            workflow: WorkflowModel,
+            activeStepId: StepId option,
+            activeStepInputId: StepInputId option,
+            activeStepOutputId: StepOutputId option,
+            setActiveStepId: StepId option -> unit,
+            setActiveStepInputId: StepInputId option -> unit,
+            setActiveStepOutputId: StepOutputId option -> unit,
+            onWorkflowChanged: WorkflowModel -> unit,
             onPreviewYaml: string -> unit,
             setInfoMessage: string option -> unit,
             setErrorMessage: string option -> unit
@@ -50,21 +78,43 @@ type WorkflowSteps =
             Context.useCwlEditorHostCtx ()
             |> Option.defaultWith (fun () -> failwith "WorkflowSteps requires a CwlEditorHost context.")
 
-        let selectedStepInputIndex, setSelectedStepInputIndex =
-            React.useState<int option> (None)
+        let activeStep =
+            activeStepId
+            |> Option.bind (fun stepId -> workflow.Steps |> List.tryFind (fun step -> step.Id = stepId))
+            |> Option.orElseWith (fun () -> workflow.Steps |> List.tryHead)
 
-        let selectedStepOutputIndex, setSelectedStepOutputIndex =
-            React.useState<int option> (None)
+        let activeStepId = activeStep |> Option.map (fun step -> step.Id)
 
-        let steps = workflow.Steps
+        let updateWorkflow nextWorkflow = onWorkflowChanged nextWorkflow
+
+        let activeStepIndex =
+            activeStepId
+            |> Option.bind (fun stepId -> workflow.Steps |> List.tryFindIndex (fun step -> step.Id = stepId))
+            |> Option.defaultValue 0
 
         let stepDetails =
-            match activeStepIndex with
-            | Some stepIndex when stepIndex >= 0 && stepIndex < steps.Count ->
-                let step = steps.[stepIndex]
-                let currentRunKind = stepRunKind step
-                let canEditRunTarget = isStepRunEditable step
-                let runDetails = tryGetWorkflowStepRunDetails step
+            match activeStep with
+            | Some step ->
+                let activeStepInput =
+                    activeStepInputId
+                    |> Option.bind (fun inputId -> step.Inputs |> List.tryFind (fun input -> input.Id = inputId))
+                    |> Option.orElseWith (fun () -> step.Inputs |> List.tryHead)
+
+                let activeStepOutput =
+                    activeStepOutputId
+                    |> Option.bind (fun outputId -> step.Outputs |> List.tryFind (fun output -> output.Id = outputId))
+                    |> Option.orElseWith (fun () -> step.Outputs |> List.tryHead)
+
+                let activeStepInputIndex =
+                    activeStepInput
+                    |> Option.bind (fun input -> step.Inputs |> List.tryFindIndex (fun item -> item.Id = input.Id))
+                    |> Option.defaultValue 0
+
+                let activeStepOutputIndex =
+                    activeStepOutput
+                    |> Option.bind (fun output -> step.Outputs |> List.tryFindIndex (fun item -> item.Id = output.Id))
+                    |> Option.defaultValue 0
+
                 let externalRunPath = tryGetWorkflowStepExternalRunAbsolutePath step
 
                 let saveStepRunToPath (targetPath: string) =
@@ -126,37 +176,24 @@ type WorkflowSteps =
                         onPreviewYaml yaml
                     | None -> setErrorMessage (Some "Step run preview is only available for resolved inline content.")
 
-                let activeStepInputIndex =
-                    match selectedStepInputIndex with
-                    | Some index when index >= 0 && index < step.In.Count -> Some index
-                    | _ when step.In.Count > 0 -> Some 0
-                    | _ -> None
-
-                let activeStepOutputIndex =
-                    match selectedStepOutputIndex with
-                    | Some index when index >= 0 && index < step.Out.Count -> Some index
-                    | _ when step.Out.Count > 0 -> Some 0
-                    | _ -> None
-
                 Html.div [
                     prop.className "swt:flex swt:flex-col swt:gap-2"
                     prop.children [
                         Html.h4 [
                             prop.className "swt:font-semibold swt:text-base-content"
-                            prop.text (sprintf "Step %d details" (stepIndex + 1))
+                            prop.text (sprintf "Step %s details" step.Name)
                         ]
                         Html.label [
                             prop.className "swt:label swt:flex-col swt:items-start swt:gap-1"
                             prop.children [
                                 Html.span [ prop.text "Step id" ]
                                 Html.input [
-                                    prop.testId (sprintf "cwl-workflow-step-id-%d" stepIndex)
-                                    prop.key (sprintf "step-id-%d" stepIndex)
+                                    prop.testId (sprintf "cwl-workflow-step-id-%d" activeStepIndex)
+                                    prop.key (sprintf "step-id-%O" step.Id)
                                     prop.className "swt:input swt:input-sm swt:w-full"
-                                    prop.defaultValue step.Id
+                                    prop.defaultValue step.Name
                                     prop.onBlur (fun ev ->
-                                        let value = eventTargetValue ev
-                                        commitMutation (fun () -> setWorkflowStepIdAt steps stepIndex value)
+                                        updateWorkflow (renameStep step.Id (eventTargetValue ev) workflow)
                                     )
                                 ]
                             ]
@@ -166,12 +203,11 @@ type WorkflowSteps =
                             prop.children [
                                 Html.span [ prop.text "Run kind" ]
                                 Html.select [
-                                    prop.testId (sprintf "cwl-workflow-step-run-kind-%d" stepIndex)
+                                    prop.testId (sprintf "cwl-workflow-step-run-kind-%d" activeStepIndex)
                                     prop.className "swt:select swt:select-sm swt:w-full"
-                                    prop.value (runKindToValue currentRunKind)
-                                    prop.onChange (fun runKindValue ->
-                                        let nextKind = runKindFromValue runKindValue
-                                        commitMutation (fun () -> setWorkflowStepRunKindAt steps stepIndex nextKind)
+                                    prop.value (stepRunKind step |> runKindToValue)
+                                    prop.onChange (fun value ->
+                                        updateWorkflow (setStepRunKind step.Id (runKindFromValue value) workflow)
                                     )
                                     prop.children [
                                         Html.option [
@@ -197,49 +233,31 @@ type WorkflowSteps =
                             prop.children [
                                 Html.span [ prop.text "Run target" ]
                                 Html.input [
-                                    prop.testId (sprintf "cwl-workflow-step-run-%d" stepIndex)
-                                    prop.key (sprintf "step-run-%d-%A" stepIndex currentRunKind)
+                                    prop.testId (sprintf "cwl-workflow-step-run-%d" activeStepIndex)
+                                    prop.key (
+                                        sprintf "step-run-%d-%s" activeStepIndex (stepRunKind step |> runKindToValue)
+                                    )
                                     prop.className "swt:input swt:input-sm swt:w-full"
                                     prop.defaultValue (stepRunDisplay step)
                                     prop.placeholder "tool.cwl"
-                                    prop.disabled (not canEditRunTarget)
+                                    prop.disabled (not (isStepRunEditable step))
                                     prop.onBlur (fun ev ->
-                                        let value = eventTargetValue ev
-                                        commitMutation (fun () -> setWorkflowStepRunAt steps stepIndex value)
+                                        updateWorkflow (setStepRunTarget step.Id (eventTargetValue ev) workflow)
                                     )
                                 ]
                             ]
                         ]
-                        match runDetails with
-                        | Some details ->
-                            Html.div [
-                                prop.className "swt:alert"
-                                prop.text (
-                                    sprintf
-                                        "Resolved run type: %s | Inputs: %s | Outputs: %s"
-                                        details.KindLabel
-                                        (if details.InputIds.Length = 0 then
-                                             "(none)"
-                                         else
-                                             String.concat ", " details.InputIds)
-                                        (if details.OutputIds.Length = 0 then
-                                             "(none)"
-                                         else
-                                             String.concat ", " details.OutputIds)
-                                )
-                            ]
-                        | None -> Html.none
                         Html.div [
                             prop.className "swt:flex swt:gap-2"
                             prop.children [
                                 Html.button [
-                                    prop.testId (sprintf "cwl-workflow-step-preview-run-%d" stepIndex)
+                                    prop.testId (sprintf "cwl-workflow-step-preview-run-%d" activeStepIndex)
                                     prop.className "swt:btn swt:btn-sm swt:btn-ghost"
                                     prop.text "Preview run"
                                     prop.onClick (fun _ -> previewStepRun ())
                                 ]
                                 Html.button [
-                                    prop.testId (sprintf "cwl-workflow-step-save-run-%d" stepIndex)
+                                    prop.testId (sprintf "cwl-workflow-step-save-run-%d" activeStepIndex)
                                     prop.className "swt:btn swt:btn-sm swt:btn-primary"
                                     prop.text "Save run"
                                     prop.disabled externalRunPath.IsNone
@@ -252,7 +270,7 @@ type WorkflowSteps =
                                 match host.pickSavePath with
                                 | Some _ ->
                                     Html.button [
-                                        prop.testId (sprintf "cwl-workflow-step-save-run-as-copy-%d" stepIndex)
+                                        prop.testId (sprintf "cwl-workflow-step-save-run-as-copy-%d" activeStepIndex)
                                         prop.className "swt:btn swt:btn-sm swt:btn-ghost"
                                         prop.text "Save run as copy"
                                         prop.onClick (fun _ -> saveStepRunAsCopy ())
@@ -267,7 +285,7 @@ type WorkflowSteps =
                                 prop.text (sprintf "External run file: %s" path)
                             ]
                         | None -> Html.none
-                        if not canEditRunTarget then
+                        if not (isStepRunEditable step) then
                             Html.div [
                                 prop.className "swt:alert"
                                 prop.text
@@ -287,30 +305,29 @@ type WorkflowSteps =
                                             prop.className "swt:flex swt:gap-2"
                                             prop.children [
                                                 Html.button [
-                                                    prop.testId (sprintf "cwl-workflow-step-input-add-%d" stepIndex)
+                                                    prop.testId (
+                                                        sprintf "cwl-workflow-step-input-add-%d" activeStepIndex
+                                                    )
                                                     prop.className "swt:btn swt:btn-sm swt:btn-primary"
                                                     prop.text "Add"
                                                     prop.onClick (fun _ ->
-                                                        commitMutation (fun () ->
-                                                            let nextIndex = addWorkflowStepInputAt steps stepIndex
-                                                            setSelectedStepInputIndex nextIndex
-                                                        )
+                                                        let nextWorkflow, nextInputId = addStepInput step.Id workflow
+                                                        updateWorkflow nextWorkflow
+                                                        setActiveStepInputId (Some nextInputId)
                                                     )
                                                 ]
                                                 Html.button [
-                                                    prop.testId (sprintf "cwl-workflow-step-input-remove-%d" stepIndex)
+                                                    prop.testId (
+                                                        sprintf "cwl-workflow-step-input-remove-%d" activeStepIndex
+                                                    )
                                                     prop.className "swt:btn swt:btn-sm swt:btn-error"
                                                     prop.text "Remove"
-                                                    prop.disabled activeStepInputIndex.IsNone
+                                                    prop.disabled activeStepInput.IsNone
                                                     prop.onClick (fun _ ->
-                                                        commitMutation (fun () ->
-                                                            let nextIndex =
-                                                                removeWorkflowStepInputAt
-                                                                    steps
-                                                                    stepIndex
-                                                                    activeStepInputIndex
-
-                                                            setSelectedStepInputIndex nextIndex
+                                                        activeStepInput
+                                                        |> Option.iter (fun input ->
+                                                            updateWorkflow (removeStepInput step.Id input.Id workflow)
+                                                            setActiveStepInputId None
                                                         )
                                                     )
                                                 ]
@@ -321,25 +338,28 @@ type WorkflowSteps =
                                 Html.ul [
                                     prop.className "swt:menu swt:bg-base-100 swt:rounded-box"
                                     prop.children [
-                                        for index, stepInput in step.In |> Seq.indexed do
-                                            let sourceText = stepInputSourceText stepInput
+                                        for index, input in step.Inputs |> List.indexed do
+                                            let sourceText = stepInputSourceText input
 
                                             let labelText =
                                                 if sourceText = "" then
-                                                    stepInput.Id
+                                                    input.Name
                                                 else
-                                                    sprintf "%s <- %s" stepInput.Id sourceText
+                                                    sprintf "%s <- %s" input.Name sourceText
 
                                             Html.li [
                                                 prop.testId (
-                                                    sprintf "cwl-workflow-step-input-item-%d-%d" stepIndex index
+                                                    sprintf "cwl-workflow-step-input-item-%d-%d" activeStepIndex index
                                                 )
-                                                prop.key stepInput.Id
+                                                prop.key (sprintf "%O" input.Id)
                                                 prop.className [
-                                                    if activeStepInputIndex = Some index then
+                                                    if
+                                                        activeStepInput |> Option.map (fun item -> item.Id) = Some
+                                                            input.Id
+                                                    then
                                                         "swt:menu-active"
                                                 ]
-                                                prop.onClick (fun _ -> setSelectedStepInputIndex (Some index))
+                                                prop.onClick (fun _ -> setActiveStepInputId (Some input.Id))
                                                 prop.text labelText
                                             ]
                                     ]
@@ -348,42 +368,35 @@ type WorkflowSteps =
                                     prop.className "swt:flex swt:gap-2"
                                     prop.children [
                                         Html.button [
-                                            prop.testId (sprintf "cwl-workflow-step-input-move-up-%d" stepIndex)
+                                            prop.testId (sprintf "cwl-workflow-step-input-move-up-%d" activeStepIndex)
                                             prop.className "swt:btn swt:btn-sm swt:btn-ghost"
                                             prop.text "Move up"
-                                            prop.disabled (activeStepInputIndex.IsNone || activeStepInputIndex = Some 0)
+                                            prop.disabled (activeStepInput.IsNone || activeStepInputIndex = 0)
                                             prop.onClick (fun _ ->
-                                                commitMutation (fun () ->
-                                                    let nextIndex =
-                                                        moveWorkflowStepInputUp steps stepIndex activeStepInputIndex
-
-                                                    setSelectedStepInputIndex nextIndex
+                                                activeStepInput
+                                                |> Option.iter (fun input ->
+                                                    updateWorkflow (moveStepInputUp step.Id input.Id workflow)
                                                 )
                                             )
                                         ]
                                         Html.button [
-                                            prop.testId (sprintf "cwl-workflow-step-input-move-down-%d" stepIndex)
+                                            prop.testId (sprintf "cwl-workflow-step-input-move-down-%d" activeStepIndex)
                                             prop.className "swt:btn swt:btn-sm swt:btn-ghost"
                                             prop.text "Move down"
                                             prop.disabled (
-                                                activeStepInputIndex.IsNone
-                                                || activeStepInputIndex = Some(step.In.Count - 1)
+                                                activeStepInput.IsNone || activeStepInputIndex = step.Inputs.Length - 1
                                             )
                                             prop.onClick (fun _ ->
-                                                commitMutation (fun () ->
-                                                    let nextIndex =
-                                                        moveWorkflowStepInputDown steps stepIndex activeStepInputIndex
-
-                                                    setSelectedStepInputIndex nextIndex
+                                                activeStepInput
+                                                |> Option.iter (fun input ->
+                                                    updateWorkflow (moveStepInputDown step.Id input.Id workflow)
                                                 )
                                             )
                                         ]
                                     ]
                                 ]
-                                match activeStepInputIndex with
-                                | Some inputIndex ->
-                                    let stepInput = step.In.[inputIndex]
-
+                                match activeStepInput with
+                                | Some input ->
                                     Html.div [
                                         prop.className "swt:flex swt:flex-col swt:gap-2"
                                         prop.children [
@@ -395,21 +408,19 @@ type WorkflowSteps =
                                                         prop.testId (
                                                             sprintf
                                                                 "cwl-workflow-step-input-id-%d-%d"
-                                                                stepIndex
-                                                                inputIndex
+                                                                activeStepIndex
+                                                                activeStepInputIndex
                                                         )
-                                                        prop.key (sprintf "step-input-id-%d-%d" stepIndex inputIndex)
+                                                        prop.key (sprintf "step-input-id-%O" input.Id)
                                                         prop.className "swt:input swt:input-sm swt:w-full"
-                                                        prop.defaultValue stepInput.Id
+                                                        prop.defaultValue input.Name
                                                         prop.onBlur (fun ev ->
-                                                            let value = eventTargetValue ev
-
-                                                            commitMutation (fun () ->
-                                                                setWorkflowStepInputIdAt
-                                                                    steps
-                                                                    stepIndex
-                                                                    inputIndex
-                                                                    value
+                                                            updateWorkflow (
+                                                                renameStepInput
+                                                                    step.Id
+                                                                    input.Id
+                                                                    (eventTargetValue ev)
+                                                                    workflow
                                                             )
                                                         )
                                                     ]
@@ -423,24 +434,20 @@ type WorkflowSteps =
                                                         prop.testId (
                                                             sprintf
                                                                 "cwl-workflow-step-input-source-%d-%d"
-                                                                stepIndex
-                                                                inputIndex
+                                                                activeStepIndex
+                                                                activeStepInputIndex
                                                         )
-                                                        prop.key (
-                                                            sprintf "step-input-source-%d-%d" stepIndex inputIndex
-                                                        )
+                                                        prop.key (sprintf "step-input-source-%O" input.Id)
                                                         prop.className "swt:input swt:input-sm swt:w-full"
-                                                        prop.defaultValue (stepInputSourceText stepInput)
+                                                        prop.defaultValue (stepInputSourceText input)
                                                         prop.placeholder "workflow_input, previous_step/out"
                                                         prop.onBlur (fun ev ->
-                                                            let value = eventTargetValue ev
-
-                                                            commitMutation (fun () ->
-                                                                setWorkflowStepInputSourceAt
-                                                                    steps
-                                                                    stepIndex
-                                                                    inputIndex
-                                                                    value
+                                                            updateWorkflow (
+                                                                setStepInputSourceText
+                                                                    step.Id
+                                                                    input.Id
+                                                                    (eventTargetValue ev)
+                                                                    workflow
                                                             )
                                                         )
                                                     ]
@@ -469,30 +476,32 @@ type WorkflowSteps =
                                             prop.className "swt:flex swt:gap-2"
                                             prop.children [
                                                 Html.button [
-                                                    prop.testId (sprintf "cwl-workflow-step-output-add-%d" stepIndex)
+                                                    prop.testId (
+                                                        sprintf "cwl-workflow-step-output-add-%d" activeStepIndex
+                                                    )
                                                     prop.className "swt:btn swt:btn-sm swt:btn-primary"
                                                     prop.text "Add"
                                                     prop.onClick (fun _ ->
-                                                        commitMutation (fun () ->
-                                                            let nextIndex = addWorkflowStepOutputAt steps stepIndex
-                                                            setSelectedStepOutputIndex nextIndex
-                                                        )
+                                                        let nextWorkflow, nextOutputId = addStepOutput step.Id workflow
+                                                        updateWorkflow nextWorkflow
+                                                        setActiveStepOutputId (Some nextOutputId)
                                                     )
                                                 ]
                                                 Html.button [
-                                                    prop.testId (sprintf "cwl-workflow-step-output-remove-%d" stepIndex)
+                                                    prop.testId (
+                                                        sprintf "cwl-workflow-step-output-remove-%d" activeStepIndex
+                                                    )
                                                     prop.className "swt:btn swt:btn-sm swt:btn-error"
                                                     prop.text "Remove"
-                                                    prop.disabled activeStepOutputIndex.IsNone
+                                                    prop.disabled activeStepOutput.IsNone
                                                     prop.onClick (fun _ ->
-                                                        commitMutation (fun () ->
-                                                            let nextIndex =
-                                                                removeWorkflowStepOutputAt
-                                                                    steps
-                                                                    stepIndex
-                                                                    activeStepOutputIndex
+                                                        activeStepOutput
+                                                        |> Option.iter (fun output ->
+                                                            updateWorkflow (
+                                                                removeStepOutput step.Id output.Id workflow
+                                                            )
 
-                                                            setSelectedStepOutputIndex nextIndex
+                                                            setActiveStepOutputId None
                                                         )
                                                     )
                                                 ]
@@ -503,18 +512,21 @@ type WorkflowSteps =
                                 Html.ul [
                                     prop.className "swt:menu swt:bg-base-100 swt:rounded-box"
                                     prop.children [
-                                        for index, stepOutput in step.Out |> Seq.indexed do
+                                        for index, output in step.Outputs |> List.indexed do
                                             Html.li [
                                                 prop.testId (
-                                                    sprintf "cwl-workflow-step-output-item-%d-%d" stepIndex index
+                                                    sprintf "cwl-workflow-step-output-item-%d-%d" activeStepIndex index
                                                 )
-                                                prop.key (stepOutputId stepOutput)
+                                                prop.key (sprintf "%O" output.Id)
                                                 prop.className [
-                                                    if activeStepOutputIndex = Some index then
+                                                    if
+                                                        activeStepOutput |> Option.map (fun item -> item.Id) = Some
+                                                            output.Id
+                                                    then
                                                         "swt:menu-active"
                                                 ]
-                                                prop.onClick (fun _ -> setSelectedStepOutputIndex (Some index))
-                                                prop.text (stepOutputId stepOutput)
+                                                prop.onClick (fun _ -> setActiveStepOutputId (Some output.Id))
+                                                prop.text output.Name
                                             ]
                                     ]
                                 ]
@@ -522,61 +534,59 @@ type WorkflowSteps =
                                     prop.className "swt:flex swt:gap-2"
                                     prop.children [
                                         Html.button [
-                                            prop.testId (sprintf "cwl-workflow-step-output-move-up-%d" stepIndex)
+                                            prop.testId (sprintf "cwl-workflow-step-output-move-up-%d" activeStepIndex)
                                             prop.className "swt:btn swt:btn-sm swt:btn-ghost"
                                             prop.text "Move up"
-                                            prop.disabled (
-                                                activeStepOutputIndex.IsNone || activeStepOutputIndex = Some 0
-                                            )
+                                            prop.disabled (activeStepOutput.IsNone || activeStepOutputIndex = 0)
                                             prop.onClick (fun _ ->
-                                                commitMutation (fun () ->
-                                                    let nextIndex =
-                                                        moveWorkflowStepOutputUp steps stepIndex activeStepOutputIndex
-
-                                                    setSelectedStepOutputIndex nextIndex
+                                                activeStepOutput
+                                                |> Option.iter (fun output ->
+                                                    updateWorkflow (moveStepOutputUp step.Id output.Id workflow)
                                                 )
                                             )
                                         ]
                                         Html.button [
-                                            prop.testId (sprintf "cwl-workflow-step-output-move-down-%d" stepIndex)
+                                            prop.testId (
+                                                sprintf "cwl-workflow-step-output-move-down-%d" activeStepIndex
+                                            )
                                             prop.className "swt:btn swt:btn-sm swt:btn-ghost"
                                             prop.text "Move down"
                                             prop.disabled (
-                                                activeStepOutputIndex.IsNone
-                                                || activeStepOutputIndex = Some(step.Out.Count - 1)
+                                                activeStepOutput.IsNone
+                                                || activeStepOutputIndex = step.Outputs.Length - 1
                                             )
                                             prop.onClick (fun _ ->
-                                                commitMutation (fun () ->
-                                                    let nextIndex =
-                                                        moveWorkflowStepOutputDown
-                                                            steps
-                                                            stepIndex
-                                                            activeStepOutputIndex
-
-                                                    setSelectedStepOutputIndex nextIndex
+                                                activeStepOutput
+                                                |> Option.iter (fun output ->
+                                                    updateWorkflow (moveStepOutputDown step.Id output.Id workflow)
                                                 )
                                             )
                                         ]
                                     ]
                                 ]
-                                match activeStepOutputIndex with
-                                | Some outputIndex ->
+                                match activeStepOutput with
+                                | Some output ->
                                     Html.label [
                                         prop.className "swt:label swt:flex-col swt:items-start swt:gap-1"
                                         prop.children [
                                             Html.span [ prop.text "Output id" ]
                                             Html.input [
                                                 prop.testId (
-                                                    sprintf "cwl-workflow-step-output-id-%d-%d" stepIndex outputIndex
+                                                    sprintf
+                                                        "cwl-workflow-step-output-id-%d-%d"
+                                                        activeStepIndex
+                                                        activeStepOutputIndex
                                                 )
-                                                prop.key (sprintf "step-output-id-%d-%d" stepIndex outputIndex)
+                                                prop.key (sprintf "step-output-id-%O" output.Id)
                                                 prop.className "swt:input swt:input-sm swt:w-full"
-                                                prop.defaultValue (stepOutputId step.Out.[outputIndex])
+                                                prop.defaultValue output.Name
                                                 prop.onBlur (fun ev ->
-                                                    let value = eventTargetValue ev
-
-                                                    commitMutation (fun () ->
-                                                        setWorkflowStepOutputIdAt steps stepIndex outputIndex value
+                                                    updateWorkflow (
+                                                        renameStepOutput
+                                                            step.Id
+                                                            output.Id
+                                                            (eventTargetValue ev)
+                                                            workflow
                                                     )
                                                 )
                                             ]
@@ -591,7 +601,7 @@ type WorkflowSteps =
                         ]
                     ]
                 ]
-            | _ ->
+            | None ->
                 Html.p [
                     prop.className "swt:text-base-content/60 swt:italic swt:p-4 swt:text-center"
                     prop.text "Select a step to edit details."
@@ -616,25 +626,25 @@ type WorkflowSteps =
                                     prop.className "swt:btn swt:btn-sm swt:btn-primary"
                                     prop.text "Add"
                                     prop.onClick (fun _ ->
-                                        commitMutation (fun () ->
-                                            let nextIndex = addWorkflowStep workflow
-                                            setActiveStepIndex (Some nextIndex)
-                                            setSelectedStepInputIndex None
-                                            setSelectedStepOutputIndex None
-                                        )
+                                        let nextWorkflow, nextStepId = addStep workflow
+                                        updateWorkflow nextWorkflow
+                                        setActiveStepId (Some nextStepId)
+                                        setActiveStepInputId None
+                                        setActiveStepOutputId None
                                     )
                                 ]
                                 Html.button [
                                     prop.testId "cwl-workflow-step-remove"
                                     prop.className "swt:btn swt:btn-sm swt:btn-error"
                                     prop.text "Remove"
-                                    prop.disabled activeStepIndex.IsNone
+                                    prop.disabled activeStepId.IsNone
                                     prop.onClick (fun _ ->
-                                        commitMutation (fun () ->
-                                            let nextIndex = removeWorkflowStep activeStepIndex steps
-                                            setActiveStepIndex nextIndex
-                                            setSelectedStepInputIndex None
-                                            setSelectedStepOutputIndex None
+                                        activeStepId
+                                        |> Option.iter (fun stepId ->
+                                            updateWorkflow (removeStep stepId workflow)
+                                            setActiveStepId None
+                                            setActiveStepInputId None
+                                            setActiveStepOutputId None
                                         )
                                     )
                                 ]
@@ -645,16 +655,20 @@ type WorkflowSteps =
                 Html.ul [
                     prop.className "swt:menu swt:bg-base-100 swt:rounded-box"
                     prop.children [
-                        for index, step in steps |> Seq.indexed do
+                        for index, step in workflow.Steps |> List.indexed do
                             Html.li [
                                 prop.testId (sprintf "cwl-workflow-step-item-%d" index)
-                                prop.key step.Id
+                                prop.key (sprintf "%O" step.Id)
                                 prop.className [
-                                    if activeStepIndex = Some index then
+                                    if activeStepId = Some step.Id then
                                         "swt:menu-active"
                                 ]
-                                prop.onClick (fun _ -> setActiveStepIndex (Some index))
-                                prop.text (sprintf "%s -> %s" step.Id (stepRunDisplay step))
+                                prop.onClick (fun _ ->
+                                    setActiveStepId (Some step.Id)
+                                    setActiveStepInputId None
+                                    setActiveStepOutputId None
+                                )
+                                prop.text (sprintf "%s -> %s" step.Name (stepRunDisplay step))
                             ]
                     ]
                 ]
@@ -665,24 +679,20 @@ type WorkflowSteps =
                             prop.testId "cwl-workflow-step-move-up"
                             prop.className "swt:btn swt:btn-sm swt:btn-ghost"
                             prop.text "Move up"
-                            prop.disabled (activeStepIndex.IsNone || activeStepIndex = Some 0)
+                            prop.disabled activeStepId.IsNone
                             prop.onClick (fun _ ->
-                                commitMutation (fun () ->
-                                    let nextIndex = moveWorkflowStepUp activeStepIndex steps
-                                    setActiveStepIndex nextIndex
-                                )
+                                activeStepId
+                                |> Option.iter (fun stepId -> updateWorkflow (moveStepUp stepId workflow))
                             )
                         ]
                         Html.button [
                             prop.testId "cwl-workflow-step-move-down"
                             prop.className "swt:btn swt:btn-sm swt:btn-ghost"
                             prop.text "Move down"
-                            prop.disabled (activeStepIndex.IsNone || activeStepIndex = Some(steps.Count - 1))
+                            prop.disabled activeStepId.IsNone
                             prop.onClick (fun _ ->
-                                commitMutation (fun () ->
-                                    let nextIndex = moveWorkflowStepDown activeStepIndex steps
-                                    setActiveStepIndex nextIndex
-                                )
+                                activeStepId
+                                |> Option.iter (fun stepId -> updateWorkflow (moveStepDown stepId workflow))
                             )
                         ]
                     ]

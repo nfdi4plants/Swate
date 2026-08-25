@@ -5,6 +5,8 @@ open Swate.Components.Shared.Cwl.Documents.Types
 open Swate.Components.Shared.Cwl.Features.WorkflowCanvasFeature
 open Swate.Components.Shared.Cwl.State.Init
 
+module WorkflowDocument = Swate.Components.Shared.Cwl.Documents.Workflow
+
 let workflowFeatureTests =
     testList "Workflow feature helpers" [
         test "workflow selection uses StepId and StepInputId, not indexes" {
@@ -120,6 +122,71 @@ let workflowFeatureTests =
                 updatedStep.Outputs |> List.find (fun item -> item.Id = addedOutputId)
 
             Expect.equal updatedOutput.Name "report" "Step output rename should target the added output id"
+        }
+
+        test "workflow step run helpers update immutable state" {
+            let step = createWorkflowStep "qc" (ExternalRun "qc.cwl")
+
+            let workflow = {
+                createWorkflowModel "v1.2" with
+                    Steps = [ step ]
+            }
+
+            let inlineWorkflow =
+                WorkflowDocument.setStepRunKind step.Id WorkflowDocument.CommandLineToolRunKind workflow
+
+            let inlineStep = inlineWorkflow.Steps.Head
+
+            Expect.equal
+                (WorkflowDocument.stepRunKind inlineStep)
+                WorkflowDocument.CommandLineToolRunKind
+                "Changing run kind should update the selected immutable step"
+
+            Expect.isFalse
+                (WorkflowDocument.isStepRunEditable inlineStep)
+                "Inline step runs should not expose an editable external target"
+
+            let externalWorkflow =
+                WorkflowDocument.setStepRunKind step.Id WorkflowDocument.ExternalRunKind inlineWorkflow
+                |> WorkflowDocument.setStepRunTarget step.Id "  renamed.cwl  "
+
+            Expect.equal
+                (externalWorkflow.Steps.Head.Run)
+                (ExternalRun "renamed.cwl")
+                "External run target updates should trim and preserve immutable state"
+        }
+
+        test "workflow step input and output ordering uses stable ids" {
+            let step = {
+                createWorkflowStep "qc" (ExternalRun "qc.cwl") with
+                    Inputs = [ createStepInput "first"; createStepInput "second" ]
+                    Outputs = [ createStepOutput "first"; createStepOutput "second" ]
+            }
+
+            let workflow = {
+                createWorkflowModel "v1.2" with
+                    Steps = [ step ]
+            }
+
+            let inputId = step.Inputs.[1].Id
+            let outputId = step.Outputs.[0].Id
+
+            let reordered =
+                workflow
+                |> WorkflowDocument.moveStepInputUp step.Id inputId
+                |> WorkflowDocument.moveStepOutputDown step.Id outputId
+
+            let reorderedStep = reordered.Steps.Head
+
+            Expect.equal
+                (reorderedStep.Inputs |> List.map (fun input -> input.Name))
+                [ "second"; "first" ]
+                "Input reordering should target the selected StepInputId"
+
+            Expect.equal
+                (reorderedStep.Outputs |> List.map (fun output -> output.Name))
+                [ "second"; "first" ]
+                "Output reordering should target the selected StepOutputId"
         }
     ]
 

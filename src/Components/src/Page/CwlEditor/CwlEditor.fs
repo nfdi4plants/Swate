@@ -554,6 +554,32 @@ type CwlEditor =
                             }
                         )
 
+                    let setActiveStepId selectedId =
+                        dispatch (
+                            SelectionChanged {
+                                state.Selection with
+                                    ActiveStepId = selectedId
+                                    ActiveStepInputId = None
+                                    ActiveStepOutputId = None
+                            }
+                        )
+
+                    let setActiveStepInputId selectedId =
+                        dispatch (
+                            SelectionChanged {
+                                state.Selection with
+                                    ActiveStepInputId = selectedId
+                            }
+                        )
+
+                    let setActiveStepOutputId selectedId =
+                        dispatch (
+                            SelectionChanged {
+                                state.Selection with
+                                    ActiveStepOutputId = selectedId
+                            }
+                        )
+
                     WorkflowEditor.WorkflowEditor(
                         version,
                         state.SessionId,
@@ -567,11 +593,15 @@ type CwlEditor =
                         stateCwlVersion,
                         intentListText model.Intent,
                         workflow,
+                        model,
                         model.Inputs,
                         model.Outputs,
                         activeInputIndex,
                         activeOutputIndex,
                         activeStepIndex,
+                        state.Selection.ActiveStepId,
+                        state.Selection.ActiveStepInputId,
+                        state.Selection.ActiveStepOutputId,
                         model.Requirements,
                         model.Hints,
                         validationResult,
@@ -579,6 +609,10 @@ type CwlEditor =
                         setActiveInputIndex,
                         setActiveOutputIndex,
                         setActiveStepIndex,
+                        setActiveStepId,
+                        setActiveStepInputId,
+                        setActiveStepOutputId,
+                        (fun workflowModel -> updateDocument (WorkflowDoc workflowModel)),
                         (fun () -> dispatch PreviewRequested),
                         saveCurrent,
                         (fun () -> dispatch LeaveEditorRequested),
