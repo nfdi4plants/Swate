@@ -108,7 +108,7 @@ module private Fixtures =
     |]
 
 [<ReactComponent(true)>]
-let Main() =
+let Main () =
 
     let currentConfig, setCurrentConfig =
         React.useState (fun () ->

@@ -145,7 +145,7 @@ type GenericSelect =
 
         let labelsRef = React.useRef<string option[]> ([||])
 
-        let selectedIndices = 
+        let selectedIndices =
             React.useMemo ((fun () -> behavior.selectedIndices selected), [| box selected |])
 
         let handleSelect =
@@ -153,11 +153,12 @@ type GenericSelect =
                 onSelect |> Option.iter (fun f -> f index)
 
                 if index.IsSome then
-                    let next = 
+                    let next =
                         if behavior.isSelected selected index.Value then
                             behavior.deselect selected index.Value
                         else
                             behavior.select selected index.Value
+
                     setSelected (next)
             )
 

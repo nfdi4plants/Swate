@@ -12,13 +12,15 @@ type ValidationPackageSelectorContext = {
 }
 
 let ValidationPackageSelectorCtx =
-    React.createContext<ValidationPackageSelectorContext> ({
-        FetchState = SelectorState.Idle
-        Packages = [||]
-        RowStateOf = fun _ -> PackageRowState.Unchecked
-        Toggle = ignore
-        UpdateToLatest = ignore
-    })
+    React.createContext<ValidationPackageSelectorContext> (
+        {
+            FetchState = SelectorState.Idle
+            Packages = [||]
+            RowStateOf = fun _ -> PackageRowState.Unchecked
+            Toggle = ignore
+            UpdateToLatest = ignore
+        }
+    )
 
 [<Hook>]
 let useValidationPackageSelectorCtx () =

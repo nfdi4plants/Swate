@@ -33,16 +33,11 @@ type React with
     [<Hook>]
 
     static member useKeyedState<'value, 'key when 'key: equality>(initialValue: 'value, key: 'key) =
-        let state, setState = React.useState (KeyedState.init(initialValue, key))
+        let state, setState = React.useState (KeyedState.init (initialValue, key))
 
-        let value =
-            if state.key = key then
-                state.state
-            else
-                initialValue
+        let value = if state.key = key then state.state else initialValue
 
-        let setValue (value: 'value) =
-            setState (KeyedState.init(value, key))
+        let setValue (value: 'value) = setState (KeyedState.init (value, key))
 
         let setValueStable = React.useCallback (setValue, [| key |])
 

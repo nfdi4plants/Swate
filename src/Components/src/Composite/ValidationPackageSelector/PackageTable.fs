@@ -50,23 +50,25 @@ type PackageTable =
         )
 
     [<ReactComponent(true)>]
-    static member PackageTable(
-        items: ValidationPackageDTO[], 
-        renderBody: ValidationPackageDTO[] -> ReactElement
-    )
-        =
+    static member PackageTable(items: ValidationPackageDTO[], renderBody: ValidationPackageDTO[] -> ReactElement) =
         let ctx = useValidationPackageSelectorCtx ()
 
         let authorOptions = Helper.distinctAuthors items
-        let authorKey = authorOptions |> Array.map (fun a -> a.ToLower()) |> String.concat ","
-        // We use a KeyedState to reset the selected author when the list of authors changes (e.g. due to using the searchbar). This is a minimal implementation to avoid more complex patterns.
-        let selectedAuthor, setSelectedAuthor = React.useKeyedState<int option, string> (None, authorKey)
+
+        let authorKey =
+            authorOptions |> Array.map (fun a -> a.ToLower()) |> String.concat ","
+
+        let selectedAuthor, setSelectedAuthor =
+            React.useKeyedState<int option, string> (None, authorKey)
+
         let authorFilterName = selectedAuthor |> Option.map (fun i -> authorOptions.[i])
-    
+
         let tagOptions = Helper.distinctTags items
         let tagsKey = tagOptions |> Array.map (fun t -> t.ToLower()) |> String.concat ","
-        // We use a KeyedState to reset the selected tag when the list of tags changes (e.g. due to using the searchbar). This is a minimal implementation to avoid more complex patterns.
-        let selectedTag, setSelectedTag = React.useKeyedState<int option, string> (None, tagsKey)
+
+        let selectedTag, setSelectedTag =
+            React.useKeyedState<int option, string> (None, tagsKey)
+
         let tagFilterName = selectedTag |> Option.map (fun i -> tagOptions.[i])
 
         let checkedSort, setCheckedSort = React.useState CheckedSort.None

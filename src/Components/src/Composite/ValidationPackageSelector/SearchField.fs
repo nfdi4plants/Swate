@@ -16,7 +16,7 @@ type SearchField =
             prop.className "swt:flex swt:items-center swt:gap-2 swt:cursor-pointer swt:p-1"
             prop.children [
                 Html.input [
-                    prop.type' "checkbox"
+                    prop.type'.checkbox
                     prop.className "swt:checkbox swt:checkbox-xs"
                     prop.isChecked isChecked
                     prop.testId ("validation-package-selector-scope-" + Helper.searchFieldLabel field)
@@ -44,7 +44,7 @@ type SearchField =
                 prop.className "swt:flex swt:items-center swt:gap-2"
                 prop.children [
                     Html.input [
-                        prop.type' "text"
+                        prop.type'.text
                         prop.className "swt:input swt:input-bordered swt:w-full"
                         prop.placeholder "Search validation packages..."
                         prop.testId "validation-package-selector-search"

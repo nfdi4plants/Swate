@@ -7,7 +7,7 @@ open Swate.Components
 open Swate.Components.Primitive.Select.Context
 
 [<ReactComponent(true)>]
-let Sample() =
+let Sample () =
 
     let options: SelectItem<{| givenName: string; age: int |}>[] = [|
         {|

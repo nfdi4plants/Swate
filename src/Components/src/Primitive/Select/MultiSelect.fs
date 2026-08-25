@@ -8,19 +8,15 @@ open Swate.Components.Primitive.Select.Context
 
 module private MultiSelectHelper =
 
-    let multiSelectBehavior: SelectBehavior<Set<int>> =
-        {
-            isSelected = fun selected index ->
-                selected.Contains index
+    let multiSelectBehavior: SelectBehavior<Set<int>> = {
+        isSelected = fun selected index -> selected.Contains index
 
-            select = fun selected index ->
-                selected.Add index
+        select = fun selected index -> selected.Add index
 
-            deselect = fun selected index ->
-                selected.Remove index
+        deselect = fun selected index -> selected.Remove index
 
-            selectedIndices = id
-        }
+        selectedIndices = id
+    }
 
 [<Erase; Mangle(false)>]
 type MultiSelect =
@@ -66,21 +62,23 @@ type MultiSelect =
         )
 
     [<ReactComponent(true)>]
-    static member MultiSelect<'a>(
-        options: SelectItem<'a>[],
-        selectedIndices: Set<int>,
-        setSelectedIndices: Set<int> -> unit,
-        ?onSelect: int option -> unit,
-        ?triggerRenderFn: {| isOpen: bool |} -> ReactElement,
-        ?optionRenderFn: SelectItemRender<'a> -> ReactElement,
-        ?dropdownPlacement: FloatingUI.Placement,
-        ?middleware: FloatingUI.IMiddleware[],
-        ?showSelectAll: bool
-    ) = 
-        let leadingItem = 
+    static member MultiSelect<'a>
+        (
+            options: SelectItem<'a>[],
+            selectedIndices: Set<int>,
+            setSelectedIndices: Set<int> -> unit,
+            ?onSelect: int option -> unit,
+            ?triggerRenderFn: {| isOpen: bool |} -> ReactElement,
+            ?optionRenderFn: SelectItemRender<'a> -> ReactElement,
+            ?dropdownPlacement: FloatingUI.Placement,
+            ?middleware: FloatingUI.IMiddleware[],
+            ?showSelectAll: bool
+        ) =
+        let leadingItem =
             match showSelectAll with
-            | Some true -> Some (MultiSelect.SelectAll(setSelectedIndices, "multi-select-select-all"))
+            | Some true -> Some(MultiSelect.SelectAll(setSelectedIndices, "multi-select-select-all"))
             | _ -> None
+
         GenericSelect.GenericSelect<'a, Set<int>>(
             options,
             selectedIndices,
