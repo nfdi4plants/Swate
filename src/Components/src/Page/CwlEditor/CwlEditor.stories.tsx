@@ -42,6 +42,35 @@ steps:
     out: [output]
 `;
 
+const workflowWithSequenceIoYaml = `cwlVersion: v1.2
+class: Workflow
+
+inputs:
+# Top-level comments between a key and its sequence are valid CWL YAML.
+- id: sample_id
+  type: string
+- id: reads
+  type: File
+
+outputs:
+# Keep this anonymized fixture shaped like real workflow files with section comments.
+- id: report
+  type: File
+  outputSource: qc/report
+
+steps:
+# External runs should remain editable after loading.
+- id: qc
+  run: tools/qc.cwl
+  in:
+  - id: sample_id
+    source: sample_id
+  - id: reads
+    source: reads
+  out:
+  - id: report
+`;
+
 const invalidExpressionToolYaml = "cwlVersion: v1.2\nclass: ExpressionTool\nrequirements:\n  - class: InlineJavascriptRequirement\ninputs:\n  input_val:\n    type: int\noutputs:\n  output_val:\n    type: int\nexpression: ''\n";
 
 const warningCommandLineToolYaml = `cwlVersion: v1.2
@@ -62,6 +91,7 @@ const toLoadResponse = (yaml: string, filePath: string): LoadCwlResponse => ({
 type MockHostOptions = {
   openFilePath?: string;
   loadYaml?: string;
+  loadFromSavedFiles?: boolean;
   saveFilePath?: string;
 };
 
@@ -74,7 +104,12 @@ const createMockHost = (options: MockHostOptions = {}) => {
       FilePath: options.openFilePath ?? 'minimal-command-line-tool.cwl',
     }),
     loadCwlFile: async (filePath: string) =>
-      toLoadResponse(options.loadYaml ?? minimalCommandLineToolYaml, filePath),
+      toLoadResponse(
+        options.loadFromSavedFiles
+          ? files.get(filePath) ?? options.loadYaml ?? minimalCommandLineToolYaml
+          : options.loadYaml ?? minimalCommandLineToolYaml,
+        filePath
+      ),
     pickSavePath: async () => ({
       Canceled: false,
       FilePath: options.saveFilePath ?? 'minimal-command-line-tool.cwl',
@@ -219,6 +254,60 @@ export const CommandLineToolFlow: Story = {
   },
 };
 
+export const CommandLineToolSaveReload: Story = {
+  render: renderCwlEditor,
+  args: (() => {
+    const host = createMockHost({
+      openFilePath: 'roundtrip-command-line-tool.cwl',
+      saveFilePath: 'roundtrip-command-line-tool.cwl',
+      loadFromSavedFiles: true,
+    });
+
+    return { host };
+  })(),
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const host = args.host as ReturnType<typeof createMockHost>;
+
+    await userEvent.click(canvas.getByTestId('cwl-new-command-line-tool'));
+    await waitFor(() =>
+      expect(canvas.getByTestId('cwl-command-line-tool-editor')).toBeInTheDocument()
+    );
+
+    const baseCommand = canvas.getByTestId('cwl-editor-base-command');
+    await userEvent.clear(baseCommand);
+    await userEvent.type(baseCommand, 'echo');
+    await userEvent.tab();
+
+    await userEvent.click(canvas.getByTestId('cwl-editor-save'));
+    await waitFor(() => {
+      expect(canvas.getByTestId('cwl-editor-info')).toHaveTextContent(
+        /^Saved to roundtrip-command-line-tool\.cwl$/
+      );
+      expect(host.savedFiles.has('roundtrip-command-line-tool.cwl')).toBe(true);
+    });
+
+    await userEvent.click(canvas.getByTestId('cwl-editor-back-to-start'));
+    await waitFor(() =>
+      expect(canvas.getByTestId('cwl-load-existing')).toBeInTheDocument()
+    );
+
+    await userEvent.click(canvas.getByTestId('cwl-load-existing'));
+    await waitFor(() =>
+      expect(canvas.getByTestId('cwl-command-line-tool-editor')).toBeInTheDocument()
+    );
+
+    await userEvent.click(canvas.getByTestId('cwl-editor-preview'));
+    await waitFor(() =>
+      expect(canvas.getByTestId('cwl-preview-close')).toBeInTheDocument()
+    );
+
+    const previewText = canvasElement.querySelector('pre');
+    expect(previewText).not.toBeNull();
+    expect(previewText).toHaveTextContent(/baseCommand:\s*\[echo\]/);
+  },
+};
+
 export const LoadedWorkflow: Story = {
   render: renderCwlEditor,
   args: {
@@ -264,6 +353,205 @@ export const NewWorkflowFlow: Story = {
     await waitFor(() =>
       expect(canvas.getByTestId('cwl-workflow-editor')).toBeInTheDocument()
     );
+  },
+};
+
+export const WorkflowPreview: Story = {
+  render: renderCwlEditor,
+  args: {
+    host: createMockHost(),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByTestId('cwl-new-workflow'));
+    await waitFor(() =>
+      expect(canvas.getByTestId('cwl-workflow-editor')).toBeInTheDocument()
+    );
+
+    await userEvent.click(canvas.getByTestId('cwl-editor-preview'));
+    await waitFor(() =>
+      expect(canvas.getByTestId('cwl-preview-close')).toBeInTheDocument()
+    );
+
+    const previewText = canvasElement.querySelector('pre');
+    expect(previewText).not.toBeNull();
+    expect(previewText).toHaveTextContent(/class:\s*Workflow/);
+  },
+};
+
+export const WorkflowStepEditingConnections: Story = {
+  render: renderCwlEditor,
+  args: {
+    host: createMockHost(),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByTestId('cwl-new-workflow'));
+    await waitFor(() =>
+      expect(canvas.getByTestId('cwl-workflow-editor')).toBeInTheDocument()
+    );
+
+    await userEvent.click(canvas.getByTestId('cwl-input-add'));
+    await waitFor(() =>
+      expect(canvas.getByTestId('cwl-input-item-0')).toHaveTextContent(
+        'input_1 : string'
+      )
+    );
+
+    const workflowInputName = canvas.getByTestId('cwl-input-name-0');
+    await userEvent.clear(workflowInputName);
+    await userEvent.type(workflowInputName, 'reads');
+    await userEvent.tab();
+    await waitFor(() =>
+      expect(canvas.getByTestId('cwl-input-item-0')).toHaveTextContent(
+        'reads : string'
+      )
+    );
+
+    await userEvent.click(canvas.getByTestId('cwl-workflow-step-add'));
+    await waitFor(() =>
+      expect(canvas.getByTestId('cwl-workflow-step-item-0')).toBeInTheDocument()
+    );
+
+    const stepId = canvas.getByTestId('cwl-workflow-step-id-0');
+    await userEvent.clear(stepId);
+    await userEvent.type(stepId, 'qc');
+    await userEvent.tab();
+    await waitFor(() =>
+      expect(canvas.getByTestId('cwl-workflow-step-item-0')).toHaveTextContent(
+        'qc'
+      )
+    );
+
+    const runTarget = canvas.getByTestId('cwl-workflow-step-run-0');
+    await userEvent.clear(runTarget);
+    await userEvent.type(runTarget, 'tools/qc.cwl');
+    await userEvent.tab();
+
+    await userEvent.click(canvas.getByTestId('cwl-workflow-step-input-add-0'));
+    await waitFor(() =>
+      expect(canvas.getByTestId('cwl-workflow-step-input-item-0-0')).toBeInTheDocument()
+    );
+
+    const stepInputId = canvas.getByTestId('cwl-workflow-step-input-id-0-0');
+    await userEvent.clear(stepInputId);
+    await userEvent.type(stepInputId, 'reads');
+    await userEvent.tab();
+
+    const stepInputSource = canvas.getByTestId('cwl-workflow-step-input-source-0-0');
+    await userEvent.clear(stepInputSource);
+    await userEvent.type(stepInputSource, 'reads');
+    await userEvent.tab();
+    await waitFor(() =>
+      expect(canvas.getByTestId('cwl-workflow-step-input-item-0-0')).toHaveTextContent(
+        'reads <- reads'
+      )
+    );
+
+    await userEvent.click(canvas.getByTestId('cwl-workflow-step-output-add-0'));
+    await waitFor(() =>
+      expect(canvas.getByTestId('cwl-workflow-step-output-item-0-0')).toBeInTheDocument()
+    );
+
+    const stepOutputId = canvas.getByTestId('cwl-workflow-step-output-id-0-0');
+    await userEvent.clear(stepOutputId);
+    await userEvent.type(stepOutputId, 'report');
+    await userEvent.tab();
+
+    const connectionsToggle = canvas.getByTestId(
+      'cwl-workflow-canvas-connections-toggle'
+    );
+    await userEvent.click(connectionsToggle);
+    await waitFor(() =>
+      expect(canvas.getByTestId(/^cwl-workflow-canvas-disconnect-/)).toBeVisible()
+    );
+
+    const disconnectButton = canvas.getByTestId(/^cwl-workflow-canvas-disconnect-/);
+    expect(disconnectButton.parentElement).toHaveTextContent(
+      'workflow inputs/reads -> qc/reads'
+    );
+    await userEvent.click(disconnectButton);
+    await waitFor(() =>
+      expect(
+        canvas.queryByTestId(/^cwl-workflow-canvas-disconnect-/)
+      ).not.toBeInTheDocument()
+    );
+
+    await userEvent.click(canvas.getByTestId('cwl-editor-preview'));
+    await waitFor(() =>
+      expect(canvas.getByTestId('cwl-preview-close')).toBeInTheDocument()
+    );
+
+    const previewText = canvasElement.querySelector('pre');
+    expect(previewText).not.toBeNull();
+    expect(previewText).toHaveTextContent(/class:\s*Workflow/);
+    expect(previewText).toHaveTextContent(/qc:/);
+    expect(previewText).toHaveTextContent(/run:\s*tools\/qc\.cwl/);
+    expect(previewText).toHaveTextContent(/out:\s*\[report\]/);
+  },
+};
+
+export const WorkflowSequenceIoLoad: Story = {
+  render: renderCwlEditor,
+  args: {
+    host: createMockHost({
+      openFilePath: 'workflow-with-sequence-io/main.cwl',
+      loadYaml: workflowWithSequenceIoYaml,
+    }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const pageErrors: string[] = [];
+    const onWindowError = (event: ErrorEvent) => pageErrors.push(event.message);
+
+    window.addEventListener('error', onWindowError);
+
+    try {
+      await userEvent.click(canvas.getByTestId('cwl-load-existing'));
+      await waitFor(() =>
+        expect(canvas.getByTestId('cwl-workflow-editor')).toBeInTheDocument()
+      );
+
+      await waitFor(() => {
+        expect(canvas.getByTestId('cwl-input-item-0')).toHaveTextContent(
+          'sample_id : string'
+        );
+        expect(canvas.getByTestId('cwl-input-item-1')).toHaveTextContent(
+          'reads : file'
+        );
+        expect(canvas.getByTestId('cwl-output-item-0')).toHaveTextContent(
+          'report : file'
+        );
+        expect(canvas.getByTestId('cwl-workflow-step-item-0')).toHaveTextContent(
+          'qc -> tools/qc.cwl'
+        );
+      });
+
+      await userEvent.click(canvas.getByTestId('cwl-workflow-step-item-0'));
+      const runTarget = canvas.getByTestId('cwl-workflow-step-run-0');
+      await userEvent.clear(runTarget);
+      await userEvent.type(runTarget, 'tools/qc-v2.cwl');
+      await userEvent.tab();
+      await waitFor(() =>
+        expect(canvas.getByTestId('cwl-workflow-step-run-0')).toHaveValue(
+          'tools/qc-v2.cwl'
+        )
+      );
+
+      await userEvent.click(canvas.getByTestId('cwl-editor-preview'));
+      await waitFor(() =>
+        expect(canvas.getByTestId('cwl-preview-close')).toBeInTheDocument()
+      );
+
+      const previewText = canvasElement.querySelector('pre');
+      expect(previewText).not.toBeNull();
+      expect(previewText).toHaveTextContent(/run:\s*tools\/qc-v2\.cwl/);
+      expect(pageErrors).toEqual([]);
+    } finally {
+      window.removeEventListener('error', onWindowError);
+    }
   },
 };
 
@@ -703,6 +991,44 @@ export const ExpressionToolEditing: Story = {
     const previewText = canvasElement.querySelector('pre');
     expect(previewText).not.toBeNull();
     expect(previewText).toHaveTextContent(/expression[\s\S]*return 42/);
+  },
+};
+
+export const ExpressionToolJavascriptValidation: Story = {
+  render: renderCwlEditor,
+  args: {
+    host: createMockHost(),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByTestId('cwl-new-expression-tool'));
+    await waitFor(() =>
+      expect(canvas.getByTestId('cwl-expression-tool-editor')).toBeInTheDocument()
+    );
+
+    const expression = canvas.getByTestId('cwl-editor-expression');
+    await userEvent.clear(expression);
+    fireEvent.change(expression, {
+      target: { value: '${ return { out: 1 }; }' },
+    });
+    fireEvent.blur(expression);
+    await waitFor(() =>
+      expect(
+        canvas.getByText(
+          '[EXP.002] ExpressionTool uses JavaScript but lacks InlineJavascriptRequirement.'
+        )
+      ).toBeVisible()
+    );
+
+    await userEvent.click(canvas.getByTestId('cwl-editor-preview'));
+    await waitFor(() =>
+      expect(canvas.getByTestId('cwl-preview-close')).toBeInTheDocument()
+    );
+
+    const previewText = canvasElement.querySelector('pre');
+    expect(previewText).not.toBeNull();
+    expect(previewText).toHaveTextContent(/class:\s*ExpressionTool/);
   },
 };
 
