@@ -1,9 +1,9 @@
-module internal Swate.Components.Hooks.UseResettableStateSample
+module internal Swate.Components.Hooks.UseKeyedStateSample
 
 open Fable.Core
 open Feliz
 open Swate.Components
-open Swate.Components.Hooks.UseResettableState
+open Swate.Components.Hooks.UseKeyedState
 
 let private rnd = System.Random()
 
@@ -34,14 +34,14 @@ let private fruitPool = [|
     "Zucchini"
 |]
 
-// Overload 1: (initialValue, key) — a paginated list. Whenever the dataset is
-// replaced (new random list of random length), pagination resets to page 1.
+// Keyed on the whole dataset: whenever the dataset is replaced (new random list
+// of random length), pagination resets to page 1.
 [<ReactComponent>]
 let SamplePaginated() =
 
     let pageSize = 3
     let items, setItems = React.useState(fruitPool)
-    let page, setPage = React.useResettableState(0, items)
+    let page, setPage = React.useKeyedState(0, items)
 
     let pageCount = max 1 ((items.Length + pageSize - 1) / pageSize)
     let safePage = min page (pageCount - 1)
@@ -95,14 +95,13 @@ let SamplePaginated() =
 
 type DataSet = {| id: int; name: string; gen: int; rows: string[] |}
 
-// Overload 2: (initialValue, dependency, compareFn) — a dataset selector.
-// The dataset object is recreated on every interaction, but row selection
-// only resets when the dataset id actually changes.
+// Keyed on the dataset id: the dataset object is recreated on every interaction,
+// but row selection only resets when the id actually changes.
 [<ReactComponent>]
 let SampleDatasetSelector() =
 
     let dataset, setDataset = React.useState<DataSet>({| id = 1; name = "Dataset A"; gen = 0; rows = [| "Alpha"; "Beta"; "Gamma" |] |})
-    let selectedRow, setSelectedRow = React.useResettableState<string option, DataSet>(None, dataset, fun a b -> a.id = b.id)
+    let selectedRow, setSelectedRow = React.useKeyedState<string option, int>(None, dataset.id)
 
     Html.div [
         Html.div [ prop.testid "dataset-name"; prop.text $"Dataset {dataset.name} (v{dataset.gen})" ]
@@ -113,7 +112,7 @@ let SampleDatasetSelector() =
                     prop.className [
                         "swt:btn swt:btn-sm"
                         if Some row = selectedRow then "swt:btn-primary"
-                    ] 
+                    ]
                     prop.text row
                     prop.onClick (fun _ -> setSelectedRow(Some row))
                 ]

@@ -34,7 +34,7 @@ module private Fixtures =
         mkAuthor "Lukas Weil"
     |]
 
-    let random = System.Random()
+    let random = System.Random(42)
 
     let randomSubset (items: 'T array) =
         let count = random.Next(items.Length + 1)

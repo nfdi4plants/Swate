@@ -1,14 +1,14 @@
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { within, expect, userEvent, waitFor } from "storybook/test";
-import ValidationPackageSelectorFixture from "./ValidationPackageSelector.fixture.fs.js";
+import ValidationPackageSelectorFixture from "./ValidationPackageSelector.sample.fs.js";
 
 const meta: Meta = {
   title: "Composite Components/ValidationPackageSelector",
   component: ValidationPackageSelectorFixture,
   tags: ["autodocs"],
   parameters: {
-    layout: "centered",
+    layout: "fullscreen",
   },
   decorators: [
     (Story) => (

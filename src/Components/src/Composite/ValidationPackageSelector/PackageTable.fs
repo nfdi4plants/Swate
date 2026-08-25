@@ -8,6 +8,7 @@ open Swate.Components.Primitive
 open Swate.Components.Primitive.LoadingSpinner
 open Swate.Components.Primitive.Select
 open Types
+open Swate.Components.Hooks.UseKeyedState
 
 [<Erase; Mangle(false)>]
 type PackageTable =
@@ -51,26 +52,24 @@ type PackageTable =
     [<ReactComponent(true)>]
     static member PackageTable(
         items: ValidationPackageDTO[], 
-        renderBody: ValidationPackageDTO[] -> ReactElement, 
-        // https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes
-        ?key: string
+        renderBody: ValidationPackageDTO[] -> ReactElement
     )
         =
         let ctx = useValidationPackageSelectorCtx ()
 
-        let selectedTag, setSelectedTag = React.useState (None: int option)
-        let selectedAuthor, setSelectedAuthor = React.useState (None: int option)
-        let checkedSort, setCheckedSort = React.useState CheckedSort.None
-
-        let tagOptions =
-            React.useMemo ((fun () -> Helper.distinctTags items), [| box items |])
-
-        let authorOptions =
-            React.useMemo ((fun () -> Helper.distinctAuthors items), [| box items |])
-
+        let authorOptions = Helper.distinctAuthors items
+        let authorKey = authorOptions |> Array.map (fun a -> a.ToLower()) |> String.concat ","
+        // We use a KeyedState to reset the selected author when the list of authors changes (e.g. due to using the searchbar). This is a minimal implementation to avoid more complex patterns.
+        let selectedAuthor, setSelectedAuthor = React.useKeyedState<int option, string> (None, authorKey)
+        let authorFilterName = selectedAuthor |> Option.map (fun i -> authorOptions.[i])
+    
+        let tagOptions = Helper.distinctTags items
+        let tagsKey = tagOptions |> Array.map (fun t -> t.ToLower()) |> String.concat ","
+        // We use a KeyedState to reset the selected tag when the list of tags changes (e.g. due to using the searchbar). This is a minimal implementation to avoid more complex patterns.
+        let selectedTag, setSelectedTag = React.useKeyedState<int option, string> (None, tagsKey)
         let tagFilterName = selectedTag |> Option.map (fun i -> tagOptions.[i])
 
-        let authorFilterName = selectedAuthor |> Option.map (fun i -> authorOptions.[i])
+        let checkedSort, setCheckedSort = React.useState CheckedSort.None
 
         let filtered =
             React.useMemo (

@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, within } from 'storybook/test';
-import { SamplePaginated, SampleDatasetSelector } from './useResettableState.sample.fs.js';
+import { SamplePaginated, SampleDatasetSelector } from './useKeyedState.sample.fs.js';
 
 const meta = {
-    title: 'Hooks/useResettableState',
+    title: 'Hooks/useKeyedState',
     parameters: {
         layout: 'centered',
     },
@@ -14,8 +14,8 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-// Overload 1: (initialValue, key) — pagination resets whenever the dataset
-// (a randomly generated list with random length) is replaced.
+// Key overload: pagination resets whenever the dataset (a randomly generated
+// list with random length) is replaced.
 export const PaginatedListReset: Story = {
     render: () => <SamplePaginated />,
     play: async ({ canvasElement }) => {
@@ -34,9 +34,9 @@ export const PaginatedListReset: Story = {
     },
 };
 
-// Overload 2: (initialValue, dependency, compareFn) — row selection resets
-// when the dataset id changes, but survives a reload of the same dataset
-// (a new object instance with the same id).
+// Key overload with a projected key: row selection resets when the dataset id
+// changes, but survives a reload of the same dataset (a new object instance
+// with the same id).
 export const DatasetSelectionReset: Story = {
     render: () => <SampleDatasetSelector />,
     play: async ({ canvasElement }) => {
@@ -54,7 +54,7 @@ export const DatasetSelectionReset: Story = {
         expect(canvas.getByTestId('dataset-name')).toHaveTextContent('Dataset A (v1)');
         expect(selectedRow()).toHaveTextContent('Gamma');
 
-        // Different dataset id -> selection resets to the first row.
+        // Different dataset id -> selection resets to the initial value.
         await userEvent.click(canvas.getByRole('button', { name: 'Load Dataset B' }));
         expect(canvas.getByTestId('dataset-name')).toHaveTextContent('Dataset B (v0)');
         expect(selectedRow()).toHaveTextContent('undefined');

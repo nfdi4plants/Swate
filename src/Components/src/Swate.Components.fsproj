@@ -64,6 +64,7 @@
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="swate-components.css" Pack="true" PackagePath="fable/" />
+    <Compile Include="Types\KeyedState.fs" />
     <Compile Include="Types\StateContext.fs" />
     <Compile Include="Types\CellCoordinate.fs" />
     <Compile Include="Util\Download.fs" />
@@ -93,8 +94,8 @@
     <Compile Include="Api\GitLabApi.fs" />
     <Compile Include="Api\TIBApi.fs" />
 
-    <Compile Include="Hooks\useResettableState\useResettableState.fs" />
-    <Compile Include="Hooks\useResettableState\useResettableState.sample.fs" />
+    <Compile Include="Hooks\useKeyedState\useKeyedState.fs" />
+    <Compile Include="Hooks\useKeyedState\useKeyedState.sample.fs" />
    
     <Compile Include="Primitive\Types.fs" />
     <Compile Include="Primitive\Icons.fs" />
