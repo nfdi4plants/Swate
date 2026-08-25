@@ -9,6 +9,7 @@ open Swate.Components.Shared.Cwl.Adapters.ArCtrlEncode
 open Swate.Components.Shared.Cwl.Adapters.ValidationAdapter
 open Swate.Components.Shared.Cwl.CommandLineToolMutations
 open Swate.Components.Shared.Cwl.Documents.Common
+open Swate.Components.Shared.Cwl.Documents.ExpressionTool
 open Swate.Components.Shared.Cwl.Documents.Types
 open Swate.Components.Shared.Cwl.EditorControllerLogic
 open Swate.Components.Shared.Cwl.EditorTypes
@@ -28,6 +29,7 @@ open Swate.Components.Shared.Cwl.WorkflowMutations
 
 module InputsFeature = Swate.Components.Shared.Cwl.Features.InputsFeature
 module OutputsFeature = Swate.Components.Shared.Cwl.Features.OutputsFeature
+module RequirementsFeature = Swate.Components.Shared.Cwl.Features.RequirementsFeature
 module CommandLineToolDocument = Swate.Components.Shared.Cwl.Documents.CommandLineTool
 
 [<AutoOpen>]
@@ -518,8 +520,8 @@ type CwlEditor =
                         model.Outputs,
                         activeInputIndex,
                         activeOutputIndex,
-                        tool.Requirements,
-                        tool.Hints,
+                        model.Requirements,
+                        model.Hints,
                         validationResult,
                         commitMutation,
                         setSelectedInputIndex,
@@ -531,7 +533,7 @@ type CwlEditor =
                             commitMutation (fun () -> setProcessingUnitVersion nextVersion processingUnit)
                         ),
                         (fun value -> commitMutation (fun () -> tool.Intent <- parseIntentText value)),
-                        (fun expression -> commitMutation (fun () -> setExpressionText tool expression)),
+                        (fun expression -> updateCurrentDocument (setExpression expression)),
                         (fun inputId name -> updateCurrentDocument (InputsFeature.renameInput inputId name)),
                         (fun inputId cwlType -> updateCurrentDocument (InputsFeature.setInputType inputId cwlType)),
                         (fun inputId prefix -> updateCurrentDocument (InputsFeature.setInputPrefix inputId prefix)),
@@ -553,13 +555,17 @@ type CwlEditor =
                         (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputUp outputId)),
                         (fun outputId -> updateCurrentDocument (OutputsFeature.moveOutputDown outputId)),
                         (fun key isChecked ->
-                            commitMutation (fun () -> setExpressionRequirementEnabled tool key isChecked)
+                            updateCurrentDocument (RequirementsFeature.setRequirementEnabled key isChecked)
                         ),
-                        (fun key isChecked -> commitMutation (fun () -> setExpressionHintEnabled tool key isChecked)),
-                        (fun key field value ->
-                            commitMutation (fun () -> setExpressionRequirementField tool key field value)
+                        (fun key isChecked -> updateCurrentDocument (RequirementsFeature.setHintEnabled key isChecked)),
+                        (fun requirementNodeId field value ->
+                            updateCurrentDocument (
+                                RequirementsFeature.setRequirementField requirementNodeId field value
+                            )
                         ),
-                        (fun key field value -> commitMutation (fun () -> setExpressionHintField tool key field value))
+                        (fun requirementNodeId field value ->
+                            updateCurrentDocument (RequirementsFeature.setHintField requirementNodeId field value)
+                        )
                     )
                     |> wrapEditorView
 

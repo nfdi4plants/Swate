@@ -7,6 +7,8 @@ open Fable.Core.JsInterop
 open Feliz
 open ARCtrl.CWL
 open Swate.Components.Page.CwlEditor.UiHelpers
+open Swate.Components.Shared.Cwl.Documents.Common
+open Swate.Components.Shared.Cwl.Documents.Types
 open Swate.Components.Shared.Cwl.RequirementMutations
 
 type RequirementBucket =
@@ -35,6 +37,23 @@ type MainProps = {
     OnSetEnabled: RequirementBucket -> string -> bool -> unit
 }
 
+type NodeSidebarProps = {
+    RequirementItems: RequirementNode list
+    HintItems: RequirementNode list
+    FocusedId: RequirementNodeId option
+    OnFocus: RequirementNodeId option -> unit
+    OnSetEnabled: RequirementBucket -> string -> bool -> unit
+    OnSetField: RequirementBucket -> RequirementNodeId -> string -> string -> unit
+}
+
+type NodeMainProps = {
+    RequirementItems: RequirementNode list
+    HintItems: RequirementNode list
+    FocusedId: RequirementNodeId option
+    OnFocus: RequirementNodeId option -> unit
+    OnSetEnabled: RequirementBucket -> string -> bool -> unit
+}
+
 [<AutoOpen>]
 module private RequirementPickerHelpers =
 
@@ -45,10 +64,21 @@ module private RequirementPickerHelpers =
         | RequirementBucket -> "Requirement"
         | HintBucket -> "Hint"
 
+    let requirementTemplateLabel key =
+        requirementTemplates
+        |> List.tryFind (fun template -> template.Key = key)
+        |> Option.map (fun template -> template.Label)
+        |> Option.defaultValue key
+
     let bucketKey bucket =
         match bucket with
         | RequirementBucket -> "requirement"
         | HintBucket -> "hint"
+
+    let bucketListTestId bucket =
+        match bucket with
+        | RequirementBucket -> "cwl-requirement-list-requirement"
+        | HintBucket -> "cwl-requirement-hints-list"
 
     let tryGetRequirementByKeyFromItems key (items: ResizeArray<Requirement> option) =
         items
@@ -144,6 +174,19 @@ module private RequirementPickerHelpers =
         value |> Option.defaultValue (ResizeArray()) |> Seq.toList |> String.concat "\n"
 
     let schemaDefTypeKey (schemaType: SchemaDefRequirementType) = cwlTypeToKey (Some schemaType.Type_)
+
+    let tryGetFocusedNode (props: NodeSidebarProps) : (RequirementBucket * RequirementNode) option =
+        match props.FocusedId with
+        | Some focusedId ->
+            props.RequirementItems
+            |> List.tryFind (fun (node: RequirementNode) -> node.Id = focusedId)
+            |> Option.map (fun node -> RequirementBucket, node)
+            |> Option.orElseWith (fun () ->
+                props.HintItems
+                |> List.tryFind (fun (node: RequirementNode) -> node.Id = focusedId)
+                |> Option.map (fun node -> HintBucket, node)
+            )
+        | None -> None
 
     let direntWritableValue (value: bool option) =
         match value with
@@ -1292,6 +1335,196 @@ type RequirementPicker =
                     "Hints",
                     props.Hints,
                     props.Focused,
+                    props.OnFocus,
+                    props.OnSetEnabled
+                )
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member RequirementNodeSidebarPanel(props: NodeSidebarProps) : ReactElement =
+        let focusedEditor =
+            match tryGetFocusedNode props with
+            | Some(bucket, node) ->
+                Html.div [
+                    prop.className "swt:mt-4 swt:flex swt:flex-col swt:gap-3"
+                    prop.children [
+                        Html.h4 [
+                            prop.className "swt:font-semibold swt:text-base-content"
+                            prop.text (sprintf "%s: %s" (bucketLabel bucket) (requirementTemplateLabel node.Key))
+                        ]
+                        if Map.isEmpty node.Fields then
+                            Html.p [
+                                prop.className "swt:text-base-content/60 swt:italic"
+                                prop.text "No specialized fields are available for this requirement yet."
+                            ]
+                        else
+                            for KeyValue(fieldKey, fieldValue) in node.Fields do
+                                Html.label [
+                                    prop.className "swt:label swt:flex-col swt:items-start swt:gap-1"
+                                    prop.children [
+                                        Html.span [ prop.className "swt:text-sm"; prop.text fieldKey ]
+                                        Html.input [
+                                            prop.testId (sprintf "cwl-requirement-field-%s" (fieldTestId fieldKey))
+                                            prop.key (sprintf "%A:%O:%s" bucket node.Id fieldKey)
+                                            prop.className "swt:input swt:input-sm swt:w-full"
+                                            prop.defaultValue fieldValue
+                                            prop.onBlur (fun ev ->
+                                                props.OnSetField bucket node.Id fieldKey (eventTargetValue ev)
+                                            )
+                                        ]
+                                    ]
+                                ]
+                        Html.button [
+                            prop.testId "cwl-requirement-remove"
+                            prop.className "swt:btn swt:btn-sm swt:btn-error"
+                            prop.text (sprintf "Remove %s" (bucketLabel bucket))
+                            prop.onClick (fun _ ->
+                                props.OnSetEnabled bucket node.Key false
+                                props.OnFocus None
+                            )
+                        ]
+                    ]
+                ]
+            | None ->
+                Html.p [
+                    prop.className "swt:text-base-content/60 swt:italic swt:p-4 swt:text-center"
+                    prop.text "Select a requirement or hint from the main section to edit fields."
+                ]
+
+        Html.section [
+            prop.testId "cwl-requirement-sidebar-panel"
+            prop.className "swt:card swt:bg-base-200 swt:p-4"
+            prop.children [
+                Html.h3 [
+                    prop.className "swt:font-semibold swt:text-base-content"
+                    prop.text "Requirements & Hints"
+                ]
+                Html.p [
+                    prop.className "swt:text-base-content/60 swt:italic swt:p-4 swt:text-center"
+                    prop.text "Drag a requirement type into either Requirements or Hints on the right."
+                ]
+                Html.ul [
+                    prop.className "swt:menu swt:bg-base-100 swt:rounded-box"
+                    prop.children [
+                        for template in requirementTemplates do
+                            Html.li [
+                                prop.testId (sprintf "cwl-requirement-template-%s" template.Key)
+                                prop.key template.Key
+                                prop.draggable true
+                                prop.onDragStart (fun e ->
+                                    e.dataTransfer.setData (dragPayloadType, template.Key) |> ignore
+                                    e.dataTransfer.setData ("text/plain", template.Key) |> ignore
+                                )
+                                prop.text template.Label
+                            ]
+                    ]
+                ]
+                focusedEditor
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member private RequirementNodeList
+        (
+            bucket: RequirementBucket,
+            title: string,
+            items: RequirementNode list,
+            focusedId: RequirementNodeId option,
+            onFocus: RequirementNodeId option -> unit,
+            onSetEnabled: RequirementBucket -> string -> bool -> unit
+        ) : ReactElement =
+        let isDragActive, setIsDragActive = React.useState (false)
+
+        Html.div [
+            prop.testId (bucketListTestId bucket)
+            prop.className "swt:card swt:bg-base-200 swt:p-4"
+            prop.children [
+                Html.h4 [
+                    prop.className "swt:font-semibold swt:text-base-content"
+                    prop.text title
+                ]
+                Html.ul [
+                    prop.testId (sprintf "cwl-requirement-dropzone-%s" (bucketKey bucket))
+                    prop.className [
+                        "swt:menu swt:bg-base-100 swt:rounded-box"
+                        if isDragActive then
+                            "swt:ring-2 swt:ring-primary"
+                    ]
+                    prop.onDragEnter (fun e ->
+                        e.preventDefault ()
+                        setIsDragActive true
+                    )
+                    prop.onDragOver (fun e ->
+                        e.preventDefault ()
+                        setIsDragActive true
+                    )
+                    prop.onDragLeave (fun _ -> setIsDragActive false)
+                    prop.onDrop (fun e ->
+                        e.preventDefault ()
+                        setIsDragActive false
+                        let key = e.dataTransfer.getData dragPayloadType
+
+                        if System.String.IsNullOrWhiteSpace key |> not then
+                            onSetEnabled bucket key true
+                    )
+                    prop.children [
+                        if List.isEmpty items then
+                            Html.li [
+                                prop.testId (sprintf "cwl-requirement-empty-%s" (bucketKey bucket))
+                                prop.className "swt:text-base-content/60 swt:italic swt:p-4 swt:text-center"
+                                prop.text "Drop a requirement type here."
+                            ]
+                        else
+                            for index, node in items |> List.indexed do
+                                Html.li [
+                                    prop.testId (
+                                        if bucket = RequirementBucket then
+                                            sprintf "cwl-requirement-item-requirement-%d" index
+                                        else
+                                            sprintf "cwl-requirement-hint-item-%d" index
+                                    )
+                                    prop.key (sprintf "%A-%d-%O" bucket index node.Id)
+                                    prop.className [
+                                        if focusedId = Some node.Id then
+                                            "swt:menu-active"
+                                    ]
+                                    prop.onClick (fun _ -> onFocus (Some node.Id))
+                                    prop.text (requirementTemplateLabel node.Key)
+                                ]
+                    ]
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member RequirementNodeMainPanel(props: NodeMainProps) : ReactElement =
+        Html.section [
+            prop.testId "cwl-requirement-main-panel"
+            prop.className "swt:card swt:bg-base-200 swt:p-4"
+            prop.children [
+                Html.div [
+                    prop.className "swt:mb-2"
+                    prop.children [
+                        Html.h3 [
+                            prop.className "swt:font-semibold swt:text-base-content"
+                            prop.text "Requirements & Hints"
+                        ]
+                    ]
+                ]
+                RequirementPicker.RequirementNodeList(
+                    RequirementBucket,
+                    "Requirements",
+                    props.RequirementItems,
+                    props.FocusedId,
+                    props.OnFocus,
+                    props.OnSetEnabled
+                )
+                RequirementPicker.RequirementNodeList(
+                    HintBucket,
+                    "Hints",
+                    props.HintItems,
+                    props.FocusedId,
                     props.OnFocus,
                     props.OnSetEnabled
                 )

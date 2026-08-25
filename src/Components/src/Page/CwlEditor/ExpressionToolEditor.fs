@@ -37,8 +37,8 @@ type ExpressionToolEditor =
             outputs: OutputModel list,
             activeInputIndex: int option,
             activeOutputIndex: int option,
-            requirements: ResizeArray<Requirement> option,
-            hints: ResizeArray<HintEntry> option,
+            requirements: RequirementNode list,
+            hints: RequirementNode list,
             validationResult: ValidationResult,
             commitMutation: (unit -> unit) -> unit,
             setActiveInputIndex: int option -> unit,
@@ -67,23 +67,23 @@ type ExpressionToolEditor =
             onMoveOutputDown: OutputId -> unit,
             onSetRequirementEnabled: string -> bool -> unit,
             onSetHintEnabled: string -> bool -> unit,
-            onSetRequirementField: string -> string -> string -> unit,
-            onSetHintField: string -> string -> string -> unit
+            onSetRequirementField: RequirementNodeId -> string -> string -> unit,
+            onSetHintField: RequirementNodeId -> string -> string -> unit
         ) : ReactElement =
-        let focusedRequirement, setFocusedRequirement =
-            React.useState<RequirementFocus option> (None)
+        let focusedRequirementId, setFocusedRequirementId =
+            React.useState<RequirementNodeId option> (None)
 
-        let clearFocusedRequirement () = setFocusedRequirement None
+        let clearFocusedRequirement () = setFocusedRequirementId None
 
         let setEnabled bucket key isEnabled =
             match bucket with
             | RequirementBucket -> onSetRequirementEnabled key isEnabled
             | HintBucket -> onSetHintEnabled key isEnabled
 
-        let setField bucket key fieldKey value =
+        let setField bucket requirementNodeId fieldKey value =
             match bucket with
-            | RequirementBucket -> onSetRequirementField key fieldKey value
-            | HintBucket -> onSetHintField key fieldKey value
+            | RequirementBucket -> onSetRequirementField requirementNodeId fieldKey value
+            | HintBucket -> onSetHintField requirementNodeId fieldKey value
 
         Html.div [
             prop.testId "cwl-expression-tool-editor"
@@ -173,17 +173,14 @@ type ExpressionToolEditor =
                                         ]
                                     ]
                                 ]
-                                RequirementPicker.RequirementSidebarPanel(
-                                    version,
-                                    {
-                                        Requirements = requirements
-                                        Hints = hints
-                                        Focused = focusedRequirement
-                                        OnFocus = setFocusedRequirement
-                                        OnSetEnabled = setEnabled
-                                        OnSetField = setField
-                                    }
-                                )
+                                RequirementPicker.RequirementNodeSidebarPanel {
+                                    RequirementItems = requirements
+                                    HintItems = hints
+                                    FocusedId = focusedRequirementId
+                                    OnFocus = setFocusedRequirementId
+                                    OnSetEnabled = setEnabled
+                                    OnSetField = setField
+                                }
                                 ValidationPanel.ValidationPanel(version, validationResult)
                             ]
                         ]
@@ -206,16 +203,13 @@ type ExpressionToolEditor =
                                     onMoveInputDown,
                                     onInteract = clearFocusedRequirement
                                 )
-                                RequirementPicker.RequirementMainPanel(
-                                    version,
-                                    {
-                                        Requirements = requirements
-                                        Hints = hints
-                                        Focused = focusedRequirement
-                                        OnFocus = setFocusedRequirement
-                                        OnSetEnabled = setEnabled
-                                    }
-                                )
+                                RequirementPicker.RequirementNodeMainPanel {
+                                    RequirementItems = requirements
+                                    HintItems = hints
+                                    FocusedId = focusedRequirementId
+                                    OnFocus = setFocusedRequirementId
+                                    OnSetEnabled = setEnabled
+                                }
                                 OutputsEditor.OutputsEditor(
                                     version,
                                     outputs,
