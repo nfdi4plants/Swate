@@ -34,15 +34,18 @@ let run (ports: Ports) (dispatch: AppAction -> unit) (effect: AppEffect) =
             (fun response ->
                 match response.Success, response.Yaml with
                 | true, Some yaml ->
-                    let document = yaml |> Decode.decodeCWLProcessingUnit |> fromProcessingUnit
+                    try
+                        let document = yaml |> Decode.decodeCWLProcessingUnit |> fromProcessingUnit
 
-                    let loadedFilePath =
-                        if String.IsNullOrWhiteSpace response.FilePath then
-                            filePath
-                        else
-                            response.FilePath
+                        let loadedFilePath =
+                            if String.IsNullOrWhiteSpace response.FilePath then
+                                filePath
+                            else
+                                response.FilePath
 
-                    dispatch (LoadSucceeded(requestId, document, loadedFilePath))
+                        dispatch (LoadSucceeded(requestId, document, loadedFilePath))
+                    with ex ->
+                        dispatch (LoadFailed(requestId, $"Failed to decode CWL: {ex.Message}"))
                 | _ -> dispatch (LoadFailed(requestId, response.Error |> Option.defaultValue "Load failed"))
             )
             (fun error -> dispatch (LoadFailed(requestId, string error)))
