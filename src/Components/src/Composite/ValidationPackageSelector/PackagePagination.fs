@@ -4,14 +4,22 @@ open Fable.Core
 open Feliz
 open Swate.Components
 open Types
+open Context
 
 [<Erase; Mangle(false)>]
 type PackagePagination =
+
+    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
+    static member MemoizedPackageRow
+        (pkg: ValidationPackageDTO, rowState: PackageRowState, updateToLatest, toggle, ?key: obj)
+        =
+        PackageRow.PackageRow(pkg, rowState, updateToLatest, toggle, ?key = key)
 
     [<ReactComponent(true)>]
     static member PackagePagination(items: ValidationPackageDTO[]) =
         let page, setPage = React.useState 0
         let prevItems, setPrevItems = React.useState items
+        let ctx = useValidationPackageSelectorCtx ()
 
         // Render-time state adjustment: reset page whenever the filtered
         // items array changes identity (i.e. any filter changed). No useEffect.
@@ -27,7 +35,12 @@ type PackagePagination =
         React.Fragment [
             Html.tbody [
                 for pkg in pageItems do
-                    PackageRow.PackageRow(pkg, key = pkg.Name)
+                    let rowState =
+                        ctx.RowStateMap
+                        |> Map.tryFind pkg.Name
+                        |> Option.defaultValue PackageRowState.Unchecked
+
+                    PackagePagination.MemoizedPackageRow(pkg, rowState, ctx.UpdateToLatest, ctx.Toggle, key = pkg.Name)
             ]
             Html.tfoot [
                 Html.tr [

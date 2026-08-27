@@ -112,6 +112,7 @@ type PackageRowState =
     | Unchecked
     | Checked
     | HasOlderVersion
+    | InvalidVersion
 
 [<RequireQualifiedAccess>]
 type CheckedSort =

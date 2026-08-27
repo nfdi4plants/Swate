@@ -153,11 +153,18 @@ type PackageTable =
                 Html.tr [
                     Html.td [
                         prop.colSpan 8
-                        prop.style [ style.textAlign.center ]
-                        prop.text "Error loading packages :("
-                    ]
-                    Html.details [
-                        prop.children [ Html.summary "Details"; Html.pre [ prop.text e.Message ] ]
+                        prop.children [
+                            Html.div [
+                                prop.className
+                                    "swt:text-error swt:text-sm swt:font-semibold swt:flex swt:flex-col swt:gap-2"
+                                prop.children [
+                                    Html.h1 "Error loading packages :("
+                                    Html.details [
+                                        prop.children [ Html.summary "Details"; Html.pre [ prop.text e.Message ] ]
+                                    ]
+                                ]
+                            ]
+                        ]
                     ]
                 ]
             ]

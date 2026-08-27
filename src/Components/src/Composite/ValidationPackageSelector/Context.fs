@@ -4,7 +4,7 @@ open Feliz
 open Types
 
 type ValidationPackageSelectorContext = {
-    RowStateOf: ValidationPackageDTO -> PackageRowState
+    RowStateMap: Map<string, PackageRowState>
     Toggle: ValidationPackageDTO -> unit
     UpdateToLatest: ValidationPackageDTO -> unit
 }
@@ -12,7 +12,7 @@ type ValidationPackageSelectorContext = {
 let ValidationPackageSelectorCtx =
     React.createContext<ValidationPackageSelectorContext> (
         {
-            RowStateOf = fun _ -> PackageRowState.Unchecked
+            RowStateMap = Map.empty
             Toggle = ignore
             UpdateToLatest = ignore
         }

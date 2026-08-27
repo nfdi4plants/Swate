@@ -78,10 +78,8 @@ type PackageRow =
         ]
 
     [<ReactComponent(true)>]
-    static member PackageRow(pkg: ValidationPackageDTO, ?key: obj) =
-        let ctx = useValidationPackageSelectorCtx ()
+    static member PackageRow(pkg: ValidationPackageDTO, rowState: PackageRowState, updateToLatest, toggle, ?key: obj) =
 
-        let rowState = ctx.RowStateOf pkg
 
         let isChecked = rowState = PackageRowState.Checked
         let isIndeterminate = rowState = PackageRowState.HasOlderVersion
@@ -89,10 +87,7 @@ type PackageRow =
         let infoButtonRef = React.useButtonRef ()
 
         let handleCheckboxChange (_: Browser.Types.Event) =
-            if isIndeterminate then
-                ctx.UpdateToLatest pkg
-            else
-                ctx.Toggle pkg
+            if isIndeterminate then updateToLatest pkg else toggle pkg
 
         let authorsTxt =
             pkg.Authors |> Array.choose (fun a -> a.FullName) |> String.concat ", "
@@ -131,7 +126,7 @@ type PackageRow =
                                     prop.type' "button"
                                     prop.className "swt:btn swt:btn-xs swt:btn-warning"
                                     prop.testId ("validation-package-selector-update-" + pkg.Name)
-                                    prop.onClick (fun _ -> ctx.UpdateToLatest pkg)
+                                    prop.onClick (fun _ -> updateToLatest pkg)
                                     prop.text "Update"
                                 ]
                         ]

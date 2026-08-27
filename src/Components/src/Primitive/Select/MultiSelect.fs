@@ -76,8 +76,9 @@ type MultiSelect =
         ) =
         let leadingItem =
             match showSelectAll with
+            | None
             | Some true -> Some(MultiSelect.SelectAll(setSelectedIndices, "multi-select-select-all"))
-            | _ -> None
+            | Some false -> None
 
         GenericSelect.GenericSelect<'a, Set<int>>(
             options,

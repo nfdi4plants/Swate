@@ -34,6 +34,7 @@
     <PackageReference Include="Feliz" />
     <PackageReference Include="Feliz.UseElmish" />
     <PackageReference Include="Fable.Browser.Dom" />
+    <PackageReference Include="Vitest" />
   </ItemGroup>
 
   <ItemGroup>
@@ -237,6 +238,7 @@
     <Compile Include="Composite\Workspace\Workspace.fixture.fs" />
     <Compile Include="Composite\ValidationPackageSelector\Types.fs" />
     <Compile Include="Composite\ValidationPackageSelector\Helper.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\Helper.test.fs" />
     <Compile Include="Composite\ValidationPackageSelector\Context.fs" />
     <Compile Include="Composite\ValidationPackageSelector\SearchField.fs" />
     <Compile Include="Composite\ValidationPackageSelector\PackageRow.fs" />

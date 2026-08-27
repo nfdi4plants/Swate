@@ -127,7 +127,9 @@ type ValidationPackageSelector =
             ?onError: exn -> unit
         ) =
         let state, setState = React.useState (fun () -> SelectorState.Idle)
-        let edits, setEdits = React.useState Map.empty<string, ValidationPackage option>
+
+        let edits, setEdits =
+            React.useStateWithUpdater Map.empty<string, ValidationPackage option>
         // ---------------------------------------------------------------------
         // These are all available filter options. They are required to compute the filtered packages.
         // Moving them into their specific sub component/a context created a lot of code complexity. This is the most simple approach.
@@ -189,6 +191,12 @@ type ValidationPackageSelector =
                     PackageRowState.HasOlderVersion
             | None -> Helper.rowState config dto
 
+        let RowStateMap =
+            React.useMemo (
+                (fun () -> packages |> Array.map (fun dto -> dto.Name, rowStateOf dto) |> Map.ofArray),
+                [| box packages; box edits; box config |]
+            )
+
         let filteredPackages =
             React.useMemo (
                 (fun () ->
@@ -196,7 +204,7 @@ type ValidationPackageSelector =
                     |> Helper.filterBySearch searchFields searchQuery
                     |> Helper.filterByTag selectedTagFilter
                     |> Helper.filterByAuthor selectedAuthorFilter
-                    |> Helper.sortByChecked checkedSort rowStateOf
+                    |> Helper.sortByChecked checkedSort RowStateMap
                 ),
                 [|
                     box packages
@@ -205,6 +213,7 @@ type ValidationPackageSelector =
                     box selectedTagFilter
                     box selectedAuthorFilter
                     box checkedSort
+                    box RowStateMap
                 |]
             )
 
@@ -225,11 +234,14 @@ type ValidationPackageSelector =
 
             match rowStateOf dto with
             | PackageRowState.Unchecked
-            | PackageRowState.HasOlderVersion -> setEdits (Map.add dto.Name (Some latest) edits)
-            | PackageRowState.Checked -> setEdits (Map.add dto.Name None edits)
+            | PackageRowState.HasOlderVersion -> setEdits (fun edits -> Map.add dto.Name (Some latest) edits)
+            | PackageRowState.InvalidVersion -> setEdits (fun edits -> Map.add dto.Name (Some latest) edits)
+            | PackageRowState.Checked -> setEdits (fun edits -> Map.add dto.Name None edits)
 
         let updateToLatest (dto: ValidationPackageDTO) =
-            setEdits (Map.add dto.Name (Some(ValidationPackageSelectorModel.createLatestPackage dto)) edits)
+            setEdits (fun edits ->
+                Map.add dto.Name (Some(ValidationPackageSelectorModel.createLatestPackage dto)) edits
+            )
 
         let unlistedNames =
             React.useMemo (
@@ -251,7 +263,7 @@ type ValidationPackageSelector =
                 |> Promise.map (fun result ->
                     match result with
                     | Ok() ->
-                        setEdits Map.empty
+                        setEdits (fun _ -> Map.empty)
                         setRemovedUnlisted (fun _ -> Set.empty)
                         setSubmitting false
                     | Error ex ->
@@ -267,11 +279,11 @@ type ValidationPackageSelector =
         let ctxValue =
             React.useMemo (
                 (fun () -> {
-                    RowStateOf = rowStateOf
+                    RowStateMap = RowStateMap
                     Toggle = toggle
                     UpdateToLatest = updateToLatest
                 }),
-                [| box edits; box config |]
+                [| box RowStateMap |]
             )
 
         ValidationPackageSelectorCtx.Provider(
