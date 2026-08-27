@@ -20,7 +20,7 @@ type SemVer with
             let pre1Parts = pre1.Split('.')
             let pre2Parts = pre2.Split('.')
 
-            let rec compareParts parts1 parts2 =
+            let rec compareParts (parts1: string list) (parts2: string list) =
                 match parts1, parts2 with
                 | [], [] -> 0
                 | [], _ -> -1
