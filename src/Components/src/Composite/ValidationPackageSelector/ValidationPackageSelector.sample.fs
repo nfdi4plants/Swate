@@ -122,7 +122,6 @@ let Main () =
 
     let fetch () : JS.Promise<ValidationPackageDTO[]> = promise {
         do! Promise.sleep 500
-        failwith "Simulated fetch error"
         return Fixtures.packages
     }
 
