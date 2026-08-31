@@ -94,9 +94,6 @@
     <Compile Include="Api\SwateApi.fs" />
     <Compile Include="Api\GitLabApi.fs" />
     <Compile Include="Api\TIBApi.fs" />
-
-    <Compile Include="Hooks\useKeyedState\useKeyedState.fs" />
-    <Compile Include="Hooks\useKeyedState\useKeyedState.sample.fs" />
    
     <Compile Include="Primitive\Types.fs" />
     <Compile Include="Primitive\Icons.fs" />

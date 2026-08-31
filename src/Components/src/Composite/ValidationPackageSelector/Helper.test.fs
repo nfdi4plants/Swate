@@ -178,6 +178,13 @@ Vitest.describe (
                 Vitest.expect(rowState (mkConfig [| "A", None |]) (ValidationPackageDTO.mkDefault (name = "A"))).toEqual
                     PackageRowState.Checked
         )
+
+        Vitest.test (
+            "is Invalid when config version is higher than package version",
+            fun () ->
+                Vitest.expect(rowState (mkConfig [| "A", Some "99.0.0" |]) (ValidationPackageDTO.mkDefault (name = "A"))).toEqual
+                    PackageRowState.InvalidVersion
+        )
 )
 
 Vitest.describe (

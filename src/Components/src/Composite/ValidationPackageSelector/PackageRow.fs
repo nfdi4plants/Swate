@@ -82,7 +82,7 @@ type PackageRow =
 
 
         let isChecked = rowState = PackageRowState.Checked
-        let isIndeterminate = rowState = PackageRowState.HasOlderVersion
+        let isIndeterminate = rowState = PackageRowState.HasOlderVersion || rowState = PackageRowState.InvalidVersion
 
         let infoButtonRef = React.useButtonRef ()
 
@@ -123,11 +123,12 @@ type PackageRow =
                             Html.span [ prop.text (Helper.toVersionString pkg) ]
                             if isIndeterminate then
                                 Html.button [
-                                    prop.type' "button"
+                                    prop.type'.button
                                     prop.className "swt:btn swt:btn-xs swt:btn-warning"
                                     prop.testId ("validation-package-selector-update-" + pkg.Name)
                                     prop.onClick (fun _ -> updateToLatest pkg)
                                     prop.text "Update"
+                                    prop.title $"Current version: {Helper.toVersionString pkg} - Click to update to latest version"
                                 ]
                         ]
                     ]
