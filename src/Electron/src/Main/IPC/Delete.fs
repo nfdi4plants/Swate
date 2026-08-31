@@ -19,13 +19,23 @@ module ArcDeleteHelper =
         : JS.Promise<Result<unit, exn>> =
         promise {
             match arc.TryGetDataMap parentInfo with
-            | None -> return Error(exn $"ARC does not contain a DataMap for '{parentInfo.ParentId}'.")
+            | None ->
+                let parentDescription = DatamapParentInfo.describeParent parentInfo
+
+                return
+                    Error(
+                        exn
+                            $"The {parentDescription} does not have a DataMap to delete. Refresh the File Explorer and try again."
+                    )
             | Some dataMap ->
                 let deleteContract = DataMapContracts.deleteForParent parentInfo dataMap
 
                 match! fullFillContractBatchAsync arcPath [| deleteContract |] with
                 | Error errors ->
-                    return Error(exn $"Could not delete DataMap: {PathHelpers.formatContractErrors errors}")
+                    return
+                        Error(
+                            exn $"The DataMap could not be deleted from disk. {PathHelpers.formatContractErrors errors}"
+                        )
                 | Ok _ ->
                     arc.TrySetDataMap(parentInfo, None) |> ignore
                     arc.UpdateFileSystem()

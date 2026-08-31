@@ -270,7 +270,10 @@ Vitest.describe (
 
                         match! secondAdd with
                         | Ok() -> failwith "Expected the concurrent DataMap add to be rejected."
-                        | Error error -> Vitest.expect(error.Message).toContain ("busy writing")
+                        | Error error ->
+                            Vitest
+                                .expect(error.Message)
+                                .toBe ("Swate is still saving another change. Please wait a moment and try again.")
 
                         match! firstAdd with
                         | Error error -> failwith error.Message
@@ -385,6 +388,49 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "explains which ARC entity prevents a DataMap from being added",
+            fun () ->
+                withTempArc
+                    (fun arc ->
+                        let assay = ArcAssay("ExistingAssay")
+                        assay.DataMap <- Some(DataMap.init ())
+                        arc.AddAssay assay
+                    )
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+
+                        let duplicateParent = DatamapParentInfo.create "ExistingAssay" DataMapParent.Assay
+
+                        let! duplicateResult =
+                            arc.TryAddArcFileAsync(arcPath, ArcFiles.DataMap(Some duplicateParent, DataMap.init ()))
+
+                        match duplicateResult with
+                        | Ok _ -> failwith "Expected duplicate DataMap add to fail."
+                        | Error errors ->
+                            Vitest
+                                .expect(errors.[0])
+                                .toBe (
+                                    "The assay 'ExistingAssay' already has a DataMap. Delete the existing DataMap before adding a new one."
+                                )
+
+                        let missingParent =
+                            DatamapParentInfo.create "MissingWorkflow" DataMapParent.Workflow
+
+                        let! missingResult =
+                            arc.TryAddArcFileAsync(arcPath, ArcFiles.DataMap(Some missingParent, DataMap.init ()))
+
+                        match missingResult with
+                        | Ok _ -> failwith "Expected DataMap add for a missing workflow to fail."
+                        | Error errors ->
+                            Vitest
+                                .expect(errors.[0])
+                                .toBe (
+                                    "Could not add the DataMap because the workflow 'MissingWorkflow' was not found in the current ARC. Refresh the File Explorer and try again."
+                                )
+                    })
+        )
+
+        Vitest.test (
             "rejects unsupported ARC file kinds",
             fun () ->
                 withTempArc
@@ -394,7 +440,7 @@ Vitest.describe (
 
                         let unsupportedArcFiles = [|
                             ArcFiles.Investigation(ArcInvestigation("Investigation")), "investigation"
-                            ArcFiles.DataMap(None, DataMap.init ()), "parent information"
+                            ArcFiles.DataMap(None, DataMap.init ()), "which assay, study, run, or workflow"
                             ArcFiles.Template(Template.init "Template"), "template"
                         |]
 

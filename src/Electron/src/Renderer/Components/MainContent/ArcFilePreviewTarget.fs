@@ -46,14 +46,14 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
         | None -> ()
         | Some parentInfo ->
             ArcFileApiHelper.addArcFile (ArcFiles.DataMap(Some parentInfo, ARCtrl.DataMap.init ()))
-            |> runDataMapMutation "Could not add DataMap"
+            |> runDataMapMutation "DataMap could not be added"
 
     let deleteDataMap () =
         match arcFile.TryGetDataMapParentInfo() |> Option.map DatamapParentInfo.toPath with
         | None -> ()
         | Some path ->
             Api.ipcArcVaultApi.deletePath path
-            |> runDataMapMutation "Could not delete DataMap"
+            |> runDataMapMutation "DataMap could not be deleted"
 
     let pickFilePaths =
         React.useCallback (

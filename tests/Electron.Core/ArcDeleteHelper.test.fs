@@ -84,6 +84,27 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "explains which ARC entity has no DataMap to delete",
+            fun () ->
+                withTempArc
+                    (fun arc -> arc.AddStudy(ArcStudy("StudyWithoutDataMap")))
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+
+                        let parentInfo = DatamapParentInfo.create "StudyWithoutDataMap" DataMapParent.Study
+
+                        match! ArcDeleteHelper.deleteDataMapAsync arcPath parentInfo arc with
+                        | Ok() -> failwith "Expected deleting a missing DataMap to fail."
+                        | Error error ->
+                            Vitest
+                                .expect(error.Message)
+                                .toBe (
+                                    "The study 'StudyWithoutDataMap' does not have a DataMap to delete. Refresh the File Explorer and try again."
+                                )
+                    })
+        )
+
+        Vitest.test (
             "deletes a study DataMap through a contract",
             fun () ->
                 withTempArc

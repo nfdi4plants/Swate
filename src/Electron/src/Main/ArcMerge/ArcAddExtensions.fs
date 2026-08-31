@@ -81,15 +81,20 @@ module ArcAddExtensions =
                 (fun () -> ArcFileCreateContracts.createContracts true (ArcFiles.Workflow workflowCopy))
                 includeUpdateContractsFlag
         | ArcFiles.Investigation _ -> failwith "Adding investigation files is not supported."
-        | ArcFiles.DataMap(None, _) -> failwith "Adding a DataMap requires parent information."
+        | ArcFiles.DataMap(None, _) ->
+            failwith "Swate could not determine which assay, study, run, or workflow this DataMap belongs to."
         | ArcFiles.DataMap(Some parentInfo, dataMap) ->
             let workingArc = copyArcPreservingStaticHashes sourceArc
+            let parentDescription = DatamapParentInfo.describeParent parentInfo
 
             match workingArc.TryGetDataMap parentInfo with
-            | Some _ -> failwith $"ARC parent '{parentInfo.ParentId}' already has a DataMap."
+            | Some _ ->
+                failwith
+                    $"The {parentDescription} already has a DataMap. Delete the existing DataMap before adding a new one."
             | None ->
                 if not (workingArc.TrySetDataMap(parentInfo, Some dataMap)) then
-                    failwith $"ARC parent '{parentInfo.ParentId}' does not exist."
+                    failwith
+                        $"Could not add the DataMap because the {parentDescription} was not found in the current ARC. Refresh the File Explorer and try again."
 
                 workingArc.UpdateFileSystem()
                 workingArc, ArcFileCreateContracts.createContracts false arcFile

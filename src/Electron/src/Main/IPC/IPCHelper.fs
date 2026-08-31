@@ -7,6 +7,9 @@ open Main
 
 [<AutoOpen>]
 module IPCHelper =
+    let arcNotOpenError () =
+        exn "No ARC is open. Open an ARC and try again."
+
     let windowFromIpcEvent (event: IpcMainInvokeEvent) =
         BrowserWindow.fromWebContents (event.sender)
 
@@ -28,7 +31,7 @@ module IPCHelper =
         | Some vault ->
             match vault.path with
             | Some arcPath -> Ok(vault, arcPath)
-            | None -> Error(exn "ARC is not loaded.")
+            | None -> Error(arcNotOpenError ())
 
     let withBusyWriting
         (vault: ArcVault)

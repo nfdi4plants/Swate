@@ -189,21 +189,20 @@ type FileTree =
             |> Promise.start
 
         let reloadPreviewAfterFileTreeUpdate path transformPageState =
+            let applyReloadError details =
+                pageStateCtx.setState (
+                    Some(
+                        Renderer.Types.PageState.ErrorPage
+                            $"The preview could not be refreshed after the File Explorer changed. Select the file again. Details: {details}"
+                    )
+                )
+
             promise {
                 match! openView path with
                 | Ok pageState -> pageStateCtx.setState (Some(transformPageState pageState))
-                | Error errorMessage ->
-                    pageStateCtx.setState (
-                        Some(
-                            Renderer.Types.PageState.ErrorPage $"Could not reload preview for '{path}': {errorMessage}"
-                        )
-                    )
+                | Error errorMessage -> applyReloadError errorMessage
             }
-            |> Promise.catch (fun exn ->
-                pageStateCtx.setState (
-                    Some(Renderer.Types.PageState.ErrorPage $"Could not reload preview for '{path}': {exn.Message}")
-                )
-            )
+            |> Promise.catch (fun exn -> applyReloadError exn.Message)
             |> Promise.start
 
         React.useEffect (

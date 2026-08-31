@@ -73,6 +73,16 @@ module ARCtrlHelper =
             Parent = parent
         |}
 
+        let parentTypeName (dmpi: DatamapParentInfo) =
+            match dmpi.Parent with
+            | DataMapParent.Assay -> "assay"
+            | DataMapParent.Study -> "study"
+            | DataMapParent.Run -> "run"
+            | DataMapParent.Workflow -> "workflow"
+
+        let describeParent (dmpi: DatamapParentInfo) =
+            $"{parentTypeName dmpi} '{dmpi.ParentId}'"
+
         let tryFromPath (path: string) =
             let segments = split path
 

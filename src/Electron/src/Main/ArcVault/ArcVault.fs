@@ -267,7 +267,8 @@ module ArcVaultExtensions =
         /// Watcher ARC merges are suppressed during the disk write; static hashes are resynced from disk afterwards.
         member this.AddArcFile(request: FileContentDTO) : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
             match this.isBusyWriting, this.path, this.arc with
-            | true, _, _ -> return Error(exn "The ARC is currently busy writing changes to disk.")
+            | true, _, _ ->
+                return Error(exn "Swate is still saving another change. Please wait a moment and try again.")
             | false, Some arcPath, Some arcLocal ->
                 let normalizedRequest =
                     Swate.Electron.Shared.FileIOHelper.FileContentDTO.normalizeArcFileRequestPath request
