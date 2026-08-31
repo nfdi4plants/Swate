@@ -42,6 +42,7 @@ type ContextMenu =
             childInfo: obj -> ContextMenuItem list,
             ref: IRefValue<HTMLElement option>,
             ?onSpawn: Browser.Types.MouseEvent -> obj option,
+            ?portalRootRef: IRefValue<HTMLElement option>,
             ?debug: bool
         ) =
 
@@ -300,7 +301,8 @@ type ContextMenu =
                                     ]
                                 ]
                         )
-                )
+                ),
+                ?root = (portalRootRef |> Option.bind _.current |> Option.map box)
             )
         else
             Html.none

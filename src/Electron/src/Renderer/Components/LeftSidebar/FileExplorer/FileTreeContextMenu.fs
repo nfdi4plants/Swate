@@ -11,26 +11,6 @@ open Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameHelper
 open Renderer.Components.LeftSidebar.FileExplorer.Helper
 open Renderer.Components.LeftSidebar.FileExplorer.Types
 
-type PathActionConfig = {
-    openPathInFileExplorer: string -> JS.Promise<Result<unit, exn>>
-    openPathWithDefaultApplication: string -> JS.Promise<Result<unit, exn>>
-    enqueueError: ErrorModalRequest -> unit
-}
-
-type ContextMenuConfig = {
-    openItem: FileItem -> unit
-    arcRootPath: string option
-    openCreateModal: ArcExplorerNodeKind -> unit
-    openFileSystemCreateModal: FileSystemItemKind -> FileItem -> unit
-    requestRenameItem: FileItem -> unit
-    requestDeleteItem: FileItem -> unit
-    pathActionConfig: PathActionConfig
-    enqueueError: ErrorModalRequest -> unit
-    runToggleLfsMark: string -> bool -> JS.Promise<Result<unit, string>>
-    runDownloadLfsFile: string -> JS.Promise<Result<unit, string>>
-    runFreeLocalLfsCopy: string -> JS.Promise<Result<unit, string>>
-}
-
 let private withDividers (groups: ContextMenuItem list list) =
     groups
     |> List.filter (List.isEmpty >> not)
@@ -133,23 +113,20 @@ let copyPathContextMenuItems (arcRootPath: string option) (item: FileItem) = [
     | None -> ()
 ]
 
-let arcCreateContextMenuItems (openCreateModal: ArcExplorerNodeKind -> unit) (item: FileItem) =
+let arcCreateContextMenuItems
+    (openCreateModal: ArcFilesDiscriminate -> unit)
+    (openNoteDraft: unit -> unit)
+    (item: FileItem)
+    =
     if item.IsDirectory then
         [
             yield!
                 arcCreateKinds
-                |> List.sortBy arcCreateKindSortOrder
-                |> List.map (fun kind ->
-                    ContextMenuItem.create
-                        $"Add {ArcExplorerNodeKind.label kind}"
-                        (arcCreateKindIcon kind)
-                        (fun () -> openCreateModal kind)
+                |> List.map (fun config ->
+                    ContextMenuItem.create $"Add {config.Label}" config.Icon (fun () -> openCreateModal config.Kind)
                 )
 
-            ContextMenuItem.create
-                "Add Note"
-                "swt:fluent--note-add-24-regular"
-                (fun () -> openCreateModal ArcExplorerNodeKind.Note)
+            ContextMenuItem.create "Add Note" "swt:fluent--note-add-24-regular" openNoteDraft
         ]
     else
         []
@@ -158,7 +135,15 @@ let fileSystemCreateContextMenuItems
     (openFileSystemCreateModal: FileSystemItemKind -> FileItem -> unit)
     (item: FileItem)
     =
-    if canCreateFileSystemItemIn item then
+    if
+        item.IsDirectory
+        && (item.Path
+            |> Option.map PathHelpers.normalizeCanonicalRelativePath
+            |> Option.exists (fun path ->
+                String.IsNullOrWhiteSpace path
+                || ArcEntityPathRules.isGenericFileSystemParentAllowed path
+            ))
+    then
         fileSystemCreateKinds
         |> List.map (fun kind ->
             ContextMenuItem.create
@@ -172,11 +157,15 @@ let fileSystemCreateContextMenuItems
 let rootContextMenuItems (config: ContextMenuConfig) (rootItem: FileItem) =
     withDividers [
         fileSystemCreateContextMenuItems config.openFileSystemCreateModal rootItem
-        arcCreateContextMenuItems config.openCreateModal rootItem
+        arcCreateContextMenuItems config.openCreateModal config.openNoteDraft rootItem
     ]
 
 let renameContextMenuItems (requestRenameItem: FileItem -> unit) (item: FileItem) =
-    if canRenameItem item then
+    if
+        item.Path
+        |> Option.map PathHelpers.normalizeCanonicalRelativePath
+        |> Option.exists ArcEntityPathRules.isRenamePathAllowed
+    then
         [
             ContextMenuItem.create "Rename" "swt:fluent--edit-24-regular" (fun () -> requestRenameItem item)
         ]
@@ -184,7 +173,11 @@ let renameContextMenuItems (requestRenameItem: FileItem -> unit) (item: FileItem
         []
 
 let deleteContextMenuItems (requestDeleteItem: FileItem -> unit) (item: FileItem) =
-    if canDeleteItem item then
+    if
+        item.Path
+        |> Option.map PathHelpers.normalizeCanonicalRelativePath
+        |> Option.exists ArcEntityPathRules.isDeletePathAllowed
+    then
         [
             ContextMenuItem.styled
                 "Delete"
@@ -226,6 +219,6 @@ let createContextMenuItems (config: ContextMenuConfig) arcScopeId =
                 toggleLfsMark
                 (Some downloadLfsFile)
                 (Some freeLocalLfsCopy)
-            arcCreateContextMenuItems config.openCreateModal item
+            arcCreateContextMenuItems config.openCreateModal config.openNoteDraft item
             arcDeleteAndRenameContextMenuItems config item
         ]

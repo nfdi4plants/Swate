@@ -23,6 +23,7 @@ type Actionbar =
             tooltipPosition: DaisyuiTooltipPosition,
             ?buttonClassName: string,
             ?buttonTestId: string,
+            ?onActionInvoked: unit -> unit,
             ?debug: bool
         ) =
 
@@ -58,7 +59,10 @@ type Actionbar =
                 prop.children [
                     Html.i [ prop.className [ "swt:iconify " + buttonInfo.icon ] ]
                 ]
-                prop.onClick (fun e -> buttonInfo.onClick e)
+                prop.onClick (fun e ->
+                    buttonInfo.onClick e
+                    onActionInvoked |> Option.iter (fun callback -> callback ())
+                )
             ]
 
         match buttonInfo.toolTip with
@@ -84,14 +88,21 @@ type Actionbar =
         ]
 
     [<ReactComponent>]
-    static member ContextMenu(containerRef, buttons: ButtonInfo[], ?debug) =
+    static member ContextMenu
+        (containerRef, buttons: ButtonInfo[], ?onActionInvoked: unit -> unit, ?portalRootRef, ?debug)
+        =
 
         let buttonElements =
             buttons
             |> Array.map (fun (button: ButtonInfo) ->
                 ContextMenuItem(
                     Html.li [ prop.text (Option.defaultValue "" button.toolTip) ],
-                    Actionbar.MaterialIcon(button.icon)
+                    Actionbar.MaterialIcon(button.icon),
+                    onClick =
+                        (fun event ->
+                            button.onClick event.buttonEvent
+                            onActionInvoked |> Option.iter (fun callback -> callback ())
+                        )
                 )
             )
             |> List.ofArray
@@ -104,6 +115,7 @@ type Actionbar =
                     let target = e.target :?> Browser.Types.HTMLElement
                     Some target
                 ),
+            ?portalRootRef = portalRootRef,
             ?debug = debug
         )
 
@@ -112,8 +124,16 @@ type Actionbar =
 
     [<ReactComponent>]
     static member RestElement
-        (buttons: ButtonInfo[], maxNumber, buttonSize, tooltipPosition, ?buttonClassName, ?debug: bool)
-        =
+        (
+            buttons: ButtonInfo[],
+            maxNumber,
+            buttonSize,
+            tooltipPosition,
+            ?buttonClassName,
+            ?onActionInvoked: unit -> unit,
+            ?keepContextMenuPortalLocal: bool,
+            ?debug: bool
+        ) =
 
         let debug = defaultArg debug false
 
@@ -162,7 +182,17 @@ type Actionbar =
 
                     let restButtons = buttons.[maxNumber..] |> Array.map (fun button -> button)
 
-                    Actionbar.ContextMenu(containerRef, restButtons, debug = debug)
+                    Actionbar.ContextMenu(
+                        containerRef,
+                        restButtons,
+                        ?onActionInvoked = onActionInvoked,
+                        ?portalRootRef =
+                            (if defaultArg keepContextMenuPortalLocal false then
+                                 Some containerRef
+                             else
+                                 None),
+                        debug = debug
+                    )
                 ]
             ]
 
@@ -175,7 +205,9 @@ type Actionbar =
             ?barClassName: string,
             ?buttonSize: DaisyuiSize,
             ?tooltipPosition: DaisyuiTooltipPosition,
-            ?buttonClassName: string
+            ?buttonClassName: string,
+            ?onActionInvoked: unit -> unit,
+            ?keepContextMenuPortalLocal: bool
         ) =
 
         let debug = defaultArg debug false
@@ -195,7 +227,8 @@ type Actionbar =
                             debug = debug,
                             buttonSize = buttonSize,
                             tooltipPosition = tooltipPosition,
-                            ?buttonClassName = buttonClassName
+                            ?buttonClassName = buttonClassName,
+                            ?onActionInvoked = onActionInvoked
                         )
                     )
                 ),
@@ -205,6 +238,7 @@ type Actionbar =
                     tooltipPosition
                     buttonClassName
                     maxNumber
+                    onActionInvoked
                 |]
             )
 
@@ -217,6 +251,8 @@ type Actionbar =
                         buttonSize,
                         tooltipPosition,
                         ?buttonClassName = buttonClassName,
+                        ?onActionInvoked = onActionInvoked,
+                        ?keepContextMenuPortalLocal = keepContextMenuPortalLocal,
                         debug = debug
                     )
                 ),
@@ -226,6 +262,8 @@ type Actionbar =
                     tooltipPosition
                     buttonClassName
                     maxNumber
+                    onActionInvoked
+                    keepContextMenuPortalLocal
                 |]
             )
 

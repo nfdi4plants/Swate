@@ -8,6 +8,7 @@ open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.RenamePathRules
 open Renderer.Components.LeftSidebar.FileExplorer.Types
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameHelper
+open Renderer.Components.LeftSidebar.FileExplorer.FileTreeDialogWorkflow
 open Renderer
 
 module FileTreeRenameWorkflow =
@@ -24,12 +25,6 @@ module FileTreeRenameWorkflow =
         renamePath: RenamePathRequest -> JS.Promise<Result<unit, exn>>
         enqueueError: ErrorModalRequest -> unit
     }
-
-    let private enqueueRenameError (enqueueError: ErrorModalRequest -> unit) (errorMessage: string) =
-        enqueueError (ErrorModalRequest.create (errorMessage, title = "Could not rename item"))
-
-    let private applyRenameError (config: ConfirmRenameConfig) (errorMessage: string) =
-        enqueueRenameError config.enqueueError errorMessage
 
     let private tryRemapActiveArcFilePath
         (sourcePath: string)
@@ -49,52 +44,54 @@ module FileTreeRenameWorkflow =
         =
         match tryBuildRenameDraft item with
         | Ok renameDraft -> setPendingRenameDraft (Some renameDraft)
-        | Error validationError -> enqueueRenameError enqueueError validationError
+        | Error validationError ->
+            enqueueError (ErrorModalRequest.create (validationError, title = "Could not rename item"))
 
     let confirmRenameItem (config: ConfirmRenameConfig) (newName: string) =
+        let applyError message =
+            config.enqueueError (ErrorModalRequest.create (message, title = "Could not rename item"))
+
         match config.pendingRenameDraft with
         | None -> config.closeRenameModal ()
         | Some renameDraft ->
             match validateRenameName newName with
-            | Error validationError -> applyRenameError config validationError
+            | Error validationError -> applyError validationError
             | Ok normalizedNewName ->
                 let targetPath = buildRenamedSiblingPath renameDraft.SourcePath normalizedNewName
 
                 if PathHelpers.pathsEqual targetPath renameDraft.SourcePath then
                     config.closeRenameModal ()
                 else
-                    config.setIsRenaming true
+                    run
+                        config.setIsRenaming
+                        applyError
+                        (fun () -> promise {
+                            let! renameResult =
+                                config.renamePath {
+                                    relativePath = renameDraft.SourcePath
+                                    newName = normalizedNewName
+                                }
 
-                    promise {
-                        let! renameResult =
-                            config.renamePath {
-                                relativePath = renameDraft.SourcePath
-                                newName = normalizedNewName
-                            }
+                            match renameResult with
+                            | Error renameError -> return Error renameError.Message
+                            | Ok() ->
+                                tryRemapSelectionPath renameDraft.SourcePath targetPath config.selectedTreePath
+                                |> Option.iter (fun remappedSelectionPath ->
+                                    config.setSelection (ArcSelection.forTreePath (Some remappedSelectionPath))
+                                )
 
-                        match renameResult with
-                        | Ok() ->
-                            tryRemapSelectionPath renameDraft.SourcePath targetPath config.selectedTreePath
-                            |> Option.iter (fun remappedSelectionPath ->
-                                config.setSelection (ArcSelection.forTreePath (Some remappedSelectionPath))
-                            )
+                                match tryRemapActiveArcFilePath renameDraft.SourcePath targetPath config.pageState with
+                                | Some remappedArcFilePath ->
+                                    let! reloadResult = config.reloadPreviewByPath remappedArcFilePath
 
-                            match tryRemapActiveArcFilePath renameDraft.SourcePath targetPath config.pageState with
-                            | Some remappedArcFilePath ->
-                                let! reloadResult = config.reloadPreviewByPath remappedArcFilePath
+                                    match reloadResult with
+                                    | Ok() -> ()
+                                    | Error reloadError ->
+                                        applyError
+                                            $"Renamed item, but could not refresh the open ARC file preview: {reloadError}"
+                                | None -> ()
 
-                                match reloadResult with
-                                | Ok() -> ()
-                                | Error reloadError ->
-                                    applyRenameError
-                                        config
-                                        $"Renamed item, but could not refresh the open ARC file preview: {reloadError}"
-                            | None -> ()
-
-                            config.refreshGitStatus ()
-                            config.closeRenameModal ()
-                        | Error renameError -> applyRenameError config renameError.Message
-                    }
-                    |> Promise.catch (fun promiseError -> applyRenameError config promiseError.Message)
-                    |> Promise.map (fun _ -> config.setIsRenaming false)
-                    |> Promise.start
+                                config.refreshGitStatus ()
+                                config.closeRenameModal ()
+                                return Ok()
+                        })

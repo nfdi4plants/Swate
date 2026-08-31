@@ -226,7 +226,7 @@ let Main () =
                                                 children =
                                                     React.Fragment [|
                                                         children
-                                                        CloseWindowController.CloseWindowController.Subscription()
+                                                        CloseWindowController.CloseWindowController()
                                                     |],
                                                 navbar = Renderer.Components.Navbar.Main(),
                                                 ?leftSidebar = leftSidebar,

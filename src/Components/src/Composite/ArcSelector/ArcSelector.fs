@@ -4,12 +4,11 @@ open Feliz
 open Fable.Core
 
 open Swate.Components
-open Swate.Components.Primitive.Actionbar
-open Swate.Components.Primitive.Actionbar.Types
-open Swate.Components.Primitive.Dropdown
 open Swate.Components.Shared
+open Swate.Components.Primitive.Dropdown
+open Swate.Components.Primitive.Actionbar
 
-module SelectorHelper =
+module private ArcSelectorHelper =
 
     let normalizePath = PathHelpers.normalizePath
 
@@ -20,7 +19,7 @@ module SelectorHelper =
 type ArcSelector =
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
-    static member SelectorItem
+    static member private SelectorItem
         (
             arcPointer: ARCPointer,
             onClick: ARCPointer -> unit,
@@ -97,24 +96,23 @@ type ArcSelector =
         (
             recentARCs: ARCPointer[],
             onClick: ARCPointer -> unit,
+            isOpen: bool,
+            setIsOpen: bool -> unit,
             ?rmvRecentArc: ARCPointer -> unit,
             ?actionbar: ReactElement,
             ?potMaxWidth: int,
             ?onOpenChange: bool -> unit,
             ?debug: bool,
             ?isLoading: bool,
-            ?currentlyOpenArcPath: string,
-            ?controlRef: IRefValue<SelectorRef>
+            ?currentlyOpenArcPath: string
         ) =
 
         let debug = defaultArg debug false
 
-        let isOpen, setIsOpen = React.useState (false)
-
         let currentlyOpenArcName =
             currentlyOpenArcPath
             |> Option.map (fun path ->
-                let normalized = SelectorHelper.normalizePath path
+                let normalized = ArcSelectorHelper.normalizePath path
 
                 let name =
                     normalized.Split([| "/" |], System.StringSplitOptions.RemoveEmptyEntries)
@@ -128,25 +126,17 @@ type ArcSelector =
                 onOpenChange |> Option.iter (fun f -> f b)
                 setIsOpen b
 
-        React.useImperativeHandle (
-            (unbox controlRef),
-            (fun () -> {
-                toggle = fun () -> setIsOpen (not isOpen)
-            }),
-            [| box isOpen |]
-        )
-
         let onClick =
             fun (arcPointer: ARCPointer) ->
                 onClick arcPointer
                 setIsOpen false
 
-        let RecentARCItems =
+        let recentARCItems =
             recentARCs
             |> Array.mapi (fun i arcPointer ->
                 let isCurrentlyOpenArcPath =
                     currentlyOpenArcPath
-                    |> Option.exists (fun path -> SelectorHelper.comparePaths path arcPointer.path)
+                    |> Option.exists (fun path -> ArcSelectorHelper.comparePaths path arcPointer.path)
 
                 let testId = if debug then Some $"selector-arc-item-{i}" else None
 
@@ -159,11 +149,11 @@ type ArcSelector =
                 )
             )
 
-        let Toggle =
+        let toggle =
             match isLoading with
             | Some true ->
                 Html.button [
-                    prop.className "swt:btn swt:btn-sm swt:btn-outline swt:flex-nowrap swt:cursor-not-allowed"
+                    prop.className "swt:btn swt:btn-sm swt:btn-outline swt:w-48 swt:flex-nowrap swt:cursor-not-allowed"
                     prop.disabled true
                     prop.children [
                         Html.span [
@@ -176,25 +166,30 @@ type ArcSelector =
                 Html.button [
                     prop.onClick (fun _ -> setIsOpen (not isOpen))
                     prop.role.button
-                    prop.className "swt:btn swt:btn-sm swt:btn-outline swt:flex-nowrap"
+                    prop.className "swt:btn swt:btn-sm swt:btn-outline swt:w-48 swt:flex-nowrap"
                     if debug then
                         prop.testId "selector-test"
                     prop.children [
                         Html.div [
+                            prop.className "swt:min-w-0 swt:flex-1 swt:truncate swt:text-left"
+                            if debug then
+                                prop.testId "selector-current-arc-name"
                             match currentlyOpenArcName with
-                            | Some name -> prop.text name
+                            | Some name ->
+                                prop.text name
+                                prop.title name
                             | None -> prop.text "Select an ARC"
                         ]
-                        Actionbar.MaterialIcon "swt:fluent--arrow-fit-height-24-regular swt:size-5"
+                        Actionbar.MaterialIcon "swt:fluent--arrow-fit-height-24-regular swt:size-5 swt:shrink-0"
                     ]
                 ]
 
-        let Content =
+        let content =
             React.Fragment [
                 Html.div [
                     if debug then
                         prop.testId "selector-dropdown-content"
-                    match RecentARCItems with
+                    match recentARCItems with
                     | [||] ->
                         prop.children [
                             Html.li [
@@ -202,7 +197,7 @@ type ArcSelector =
                                 prop.text "No recent ARCs"
                             ]
                         ]
-                    | _ -> prop.children RecentARCItems
+                    | _ -> prop.children recentARCItems
                 ]
                 match actionbar with
                 | Some actionbar ->
@@ -225,81 +220,9 @@ type ArcSelector =
         Dropdown.Main(
             isOpen,
             setIsOpen,
-            Toggle,
-            Content,
+            toggle,
+            content,
             contentClassName =
                 "swt:w-max swt:max-w-none swt:menu swt:bg-base-200 swt:rounded-box swt:z-99 swt:p-2 swt:shadow-sm swt:top-110% swt:menu-sm",
             closeOnClick = false
-        )
-
-    [<ReactComponent>]
-    static member Entry(?maxNumberActionbar, ?debug: bool) =
-
-        let maxNumberActionbar = defaultArg maxNumberActionbar 3
-        let selectorController = React.useRef ({ toggle = fun _ -> () }: SelectorRef)
-
-        let currentlyOpenArcPath, setCurrentlyOpenArcPath =
-            React.useState (None: string option)
-
-        let testRecentARCs = [|
-            ARCPointer.create ("Test 1", "/Here/Test 1", false)
-            ARCPointer.create ("Test 2", "/Here/Test 2", false)
-            ARCPointer.create ("Test 3", "/Here/Test 3", false)
-            ARCPointer.create (
-                "Test jfcesjföisjyfnwjtiewhroiajlkfnnalkfjwarkoiewfanflkndslkfjwiajofkcmscnskjfafdölmsalknoisjfamlkcnkj<ycwaklfnewjföosajö",
-                "/Here/Here/Here/Here",
-                false
-            )
-        |]
-
-        let recentARCs, setRecentARCs = React.useState (testRecentARCs)
-
-        let closeDropdown =
-            fun (_: Browser.Types.MouseEvent) -> selectorController.current.toggle ()
-
-        let actionbarButtons = [|
-            ButtonInfo.create ("swt:fluent--document-add-24-regular swt:size-5", "Create a new ARC", closeDropdown)
-            ButtonInfo.create (
-                "swt:fluent--folder-arrow-up-24-regular swt:size-5",
-                "Open an existing ARC",
-                closeDropdown
-            )
-        |]
-
-        let actionbar = Actionbar.Main(actionbarButtons, maxNumberActionbar, ?debug = debug)
-
-        let onClick (arcPointer: ARCPointer) =
-            let newRecentARCs =
-                recentARCs
-                |> Array.map (fun arc ->
-                    if arc.path = arcPointer.path then
-                        { arc with isActive = true }
-                    else
-                        { arc with isActive = false }
-                )
-
-            selectorController.current.toggle ()
-            setRecentARCs newRecentARCs
-            setCurrentlyOpenArcPath (Some arcPointer.path)
-
-            console.log ($"Clicked on: {arcPointer.path}")
-
-        let rmvRecentArc (arcPointer: ARCPointer) =
-            let newRecentARCs =
-                recentARCs |> Array.filter (fun arc -> arc.path <> arcPointer.path)
-
-            setRecentARCs newRecentARCs
-
-            if currentlyOpenArcPath = Some arcPointer.path then
-                setCurrentlyOpenArcPath None
-
-        ArcSelector.Main(
-            recentARCs,
-            onClick,
-            rmvRecentArc,
-            potMaxWidth = 48,
-            actionbar = actionbar,
-            ?currentlyOpenArcPath = currentlyOpenArcPath,
-            ?debug = debug,
-            controlRef = selectorController
         )

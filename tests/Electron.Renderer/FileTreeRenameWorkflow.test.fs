@@ -93,6 +93,7 @@ Vitest.describe (
 
                 Vitest.expect(remapped).toEqual (Some "assays/NewAssay/notes/protocol.md")
         )
+
 )
 
 let private getRenameMenuItems (item: FileItem) =
