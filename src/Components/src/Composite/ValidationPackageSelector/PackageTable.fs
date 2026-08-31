@@ -8,7 +8,6 @@ open Swate.Components.Primitive
 open Swate.Components.Primitive.LoadingSpinner
 open Swate.Components.Primitive.Select
 open Types
-open Swate.Components.Hooks.UseKeyedState
 
 [<Erase; Mangle(false)>]
 type PackageTable =
