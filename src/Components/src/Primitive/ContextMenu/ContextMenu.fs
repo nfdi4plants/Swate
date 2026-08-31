@@ -42,6 +42,7 @@ type ContextMenu =
             childInfo: obj -> ContextMenuItem list,
             ref: IRefValue<HTMLElement option>,
             ?onSpawn: Browser.Types.MouseEvent -> obj option,
+            ?portalRootRef: IRefValue<HTMLElement option>,
             ?debug: bool
         ) =
 
@@ -301,9 +302,7 @@ type ContextMenu =
                                 ]
                         )
                 ),
-                // Keep the portal within the owning element's DOM scope so parent
-                // click-away listeners do not treat menu interaction as external.
-                root = ref.current.Value
+                ?root = (portalRootRef |> Option.bind _.current |> Option.map box)
             )
         else
             Html.none

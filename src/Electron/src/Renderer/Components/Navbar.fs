@@ -34,7 +34,8 @@ type private Selector =
                 )
             |],
             2,
-            onActionInvoked = onActionInvoked
+            onActionInvoked = onActionInvoked,
+            keepContextMenuPortalLocal = true
         )
 
     [<ReactComponent>]

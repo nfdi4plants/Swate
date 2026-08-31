@@ -46,6 +46,7 @@ function ArcSelectorStory({ debug = true }: { debug?: boolean }) {
             maxNumber={1}
             debug={debug}
             onActionInvoked={() => setIsOpen(false)}
+            keepContextMenuPortalLocal
           />
         )}
       />

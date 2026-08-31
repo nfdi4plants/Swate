@@ -31,3 +31,40 @@ export const Basic: Story = {
     });
   },
 };
+
+export const EscapesClippingOwner: Story = {
+  render: () => <ContextMenuExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const cell = canvas.getByRole('button', { name: /example table cell/i });
+    const owner = cell.parentElement!;
+
+    owner.style.width = '12rem';
+    owner.style.height = '5rem';
+    owner.style.overflow = 'hidden';
+
+    const ownerRect = owner.getBoundingClientRect();
+    fireEvent.contextMenu(cell, {
+      clientX: ownerRect.right - 4,
+      clientY: ownerRect.bottom - 4,
+      bubbles: true,
+    });
+
+    const firstItem = await screen.findByRole('button', { name: /item 0/i });
+    const menu = firstItem.parentElement!;
+    const menuRect = menu.getBoundingClientRect();
+    const candidatePoints = [
+      [menuRect.left + 2, menuRect.top + 2],
+      [menuRect.right - 2, menuRect.top + 2],
+      [menuRect.left + 2, menuRect.bottom - 2],
+      [menuRect.right - 2, menuRect.bottom - 2],
+    ];
+    const pointOutsideOwner = candidatePoints.find(([x, y]) => (
+      x < ownerRect.left || x > ownerRect.right || y < ownerRect.top || y > ownerRect.bottom
+    ));
+
+    expect(pointOutsideOwner).toBeDefined();
+    const [x, y] = pointOutsideOwner!;
+    expect(document.elementFromPoint(x, y)?.closest('[role="menu"]')).toBe(menu);
+  },
+};
