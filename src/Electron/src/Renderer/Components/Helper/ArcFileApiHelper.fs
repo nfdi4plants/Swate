@@ -6,7 +6,7 @@ open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 
-let private withArcFileRequest
+let withArcFileRequest
     (arcFile: ArcFiles)
     (execute: FileContentDTO -> JS.Promise<Result<'T, exn>>)
     : JS.Promise<Result<'T, exn>> =
