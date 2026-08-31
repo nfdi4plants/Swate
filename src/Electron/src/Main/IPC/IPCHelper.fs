@@ -7,9 +7,6 @@ open Main
 
 [<AutoOpen>]
 module IPCHelper =
-    let arcNotOpenError () =
-        exn "No ARC is open. Open an ARC and try again."
-
     let windowFromIpcEvent (event: IpcMainInvokeEvent) =
         BrowserWindow.fromWebContents (event.sender)
 

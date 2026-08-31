@@ -231,7 +231,7 @@ module ArcVaultExtensions =
         /// Applies an ARC content DTO to the in-memory ARC and marks the vault dirty.
         member this.UpdateArcByFileContentDTO(request: FileContentDTO) : Result<unit, exn> =
             match this.arc with
-            | None -> Error(exn "ARC is not loaded.")
+            | None -> Error(arcNotOpenError ())
             | Some arc ->
                 let normalizedRequest =
                     Swate.Electron.Shared.FileIOHelper.FileContentDTO.normalizeArcFileRequestPath request
@@ -260,7 +260,7 @@ module ArcVaultExtensions =
                         return Error(exn $"Failed to persist ARC to disk: {e.Message}")
                 finally
                     this.isBusyWriting <- false
-            | _ -> return Error(exn "ARC is not loaded.")
+            | _ -> return Error(arcNotOpenError ())
         }
 
         /// Adds a new ARC entity through ARCtrl's scoped add path.
@@ -311,7 +311,7 @@ module ArcVaultExtensions =
                                     )
                     finally
                         this.isBusyWriting <- wasBusyWriting
-            | _ -> return Error(exn "ARC is not loaded.")
+            | _ -> return Error(arcNotOpenError ())
         }
 
         member this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
@@ -445,7 +445,7 @@ module ArcVaultExtensions =
 
         member this.RenameOpenArcRoot(newName: string) : Fable.Core.JS.Promise<Result<string, exn>> = promise {
             match this.path with
-            | None -> return Error(exn "ARC is not loaded.")
+            | None -> return Error(arcNotOpenError ())
             | Some currentPath ->
                 let hadWatcher = this.watcher.IsSome
 
