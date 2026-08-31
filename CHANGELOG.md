@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Consolidate Electron ARC editor page state, safely resolve canonical entity workbooks, and reuse shared path normalization for ARC-root-relative references.
 -   Harden canonical entity path resolution for Electron rename and delete operations, and document the behavior of the shared path-normalization helpers.
 -   Keep table deletion in the existing footer-tab context menu instead of exposing a second, inconsistent navbar action.
+-   Isolate requested ARC view selection from eager Electron IPC proxy initialization as a temporary testability workaround; a follow-up should inject the file-opening dependency and keep `openView` as a thin Electron adapter.
 
 ### 🐛 Fixed
 
@@ -97,6 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Enable Add Rows and File Picker insertion in DataMap views.
 -   Store File Picker and Data Annotator references relative to the ARC root for assay, study, run, and workflow DataMaps, and rerender immediately after insertion.
 -   Migrate the outdated `isa_datamap` file to `isa.datamap.xlsx` during ARC loading, while preserving an existing canonical workbook.
+-   Fix the DataMap delete-row regression test to use the strongly typed `CellCoordinate` API.
 
 ## 2.0.4 - 2026-07-20
 
@@ -201,6 +203,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -   Added missing field for "Data Format" for Data cells.
 
+## 1.0.0 - 2025-10-29
+
+### 🐛 Fixed
+
+-   Added missing version update to docker release pipeline step.
+
 ## 1.0.0-rc.12 - 2025-10-28
 
 ### Fixed
@@ -216,6 +224,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 
 -   Remove datamap tab on assays, studies.
+
+### Fixed
+
+-   Release process for npm had a hard exit on check if package exists, which is now removed.
 
 ## 1.0.0-rc.10 - 2025-10-27
 
