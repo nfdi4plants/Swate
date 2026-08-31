@@ -51,7 +51,7 @@ module Main =
                     ]
                 ]
 
-        Select.Select(
+        MultiSelect.MultiSelect(
             filterFields,
             selectedIndices,
             setSelectedIndices,
