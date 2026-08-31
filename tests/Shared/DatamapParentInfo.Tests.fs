@@ -7,6 +7,7 @@ open Expecto
 #endif
 
 open Swate.Components.Shared
+open ARCtrl
 
 let tests =
     testList "DatamapParentInfo" [
@@ -39,5 +40,36 @@ let tests =
                 Expect.isNone
                     (DatamapParentInfo.tryFromFolderPath path)
                     $"Expected {path} not to identify a DataMap parent"
+            )
+
+        testCase "gets, sets, and removes DataMaps for every supported parent type"
+        <| fun _ ->
+            let cases = [
+                DataMapParent.Assay, (fun (arc: ARC) -> arc.AddAssay(ArcAssay("parent")))
+                DataMapParent.Study, (fun arc -> arc.AddStudy(ArcStudy("parent")))
+                DataMapParent.Run, (fun arc -> arc.AddRun(ArcRun("parent")))
+                DataMapParent.Workflow, (fun arc -> arc.AddWorkflow(ArcWorkflow("parent")))
+            ]
+
+            cases
+            |> List.iter (fun (parentType, addParent) ->
+                let arc = ARC("test-arc")
+                let parentInfo = DatamapParentInfo.create "parent" parentType
+                let dataMap = DataMap.init ()
+
+                Expect.isFalse
+                    (arc.TrySetDataMap(parentInfo, Some dataMap))
+                    $"Expected setting a DataMap on a missing {parentType} to fail"
+
+                addParent arc
+                Expect.isNone (arc.TryGetDataMap parentInfo) $"Expected the {parentType} to start without a DataMap"
+
+                Expect.isTrue
+                    (arc.TrySetDataMap(parentInfo, Some dataMap))
+                    $"Expected setting the {parentType} DataMap"
+
+                Expect.isSome (arc.TryGetDataMap parentInfo) $"Expected to retrieve the {parentType} DataMap"
+                Expect.isTrue (arc.TrySetDataMap(parentInfo, None)) $"Expected removing the {parentType} DataMap"
+                Expect.isNone (arc.TryGetDataMap parentInfo) $"Expected the {parentType} DataMap to be removed"
             )
     ]

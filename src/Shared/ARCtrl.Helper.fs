@@ -213,22 +213,6 @@ module ARCtrlHelper =
             | ArcFiles.DataMap(parentInfo, _) -> parentInfo
             | _ -> None
 
-        member this.TrySetParentDataMap(dataMap: DataMap option) =
-            match this with
-            | ArcFiles.Assay assay ->
-                assay.DataMap <- dataMap
-                true
-            | ArcFiles.Study(study, _) ->
-                study.DataMap <- dataMap
-                true
-            | ArcFiles.Run run ->
-                run.DataMap <- dataMap
-                true
-            | ArcFiles.Workflow workflow ->
-                workflow.DataMap <- dataMap
-                true
-            | _ -> false
-
         member this.CanRenderDataMapView() = this.TryGetDataMap() |> Option.isSome
 
         /// React only refreshes if the reference changes, but when we update the ArcFile, we usually mutate the existing object. This function creates a new reference with the same content, which can be used to force React to re-render.
@@ -248,6 +232,31 @@ module ARCtrlHelper =
             | _ -> ()
 
             copy
+
+    type ARC with
+
+        member this.TryGetDataMap(parentInfo: DatamapParentInfo) =
+            match parentInfo.Parent with
+            | DataMapParent.Assay -> this.TryGetAssay parentInfo.ParentId |> Option.bind _.DataMap
+            | DataMapParent.Study -> this.TryGetStudy parentInfo.ParentId |> Option.bind _.DataMap
+            | DataMapParent.Run -> this.TryGetRun parentInfo.ParentId |> Option.bind _.DataMap
+            | DataMapParent.Workflow -> this.TryGetWorkflow parentInfo.ParentId |> Option.bind _.DataMap
+
+        member this.TrySetDataMap(parentInfo: DatamapParentInfo, dataMap: DataMap option) =
+            match parentInfo.Parent with
+            | DataMapParent.Assay ->
+                this.TryGetAssay parentInfo.ParentId
+                |> Option.map (fun assay -> assay.DataMap <- dataMap)
+            | DataMapParent.Study ->
+                this.TryGetStudy parentInfo.ParentId
+                |> Option.map (fun study -> study.DataMap <- dataMap)
+            | DataMapParent.Run ->
+                this.TryGetRun parentInfo.ParentId
+                |> Option.map (fun run -> run.DataMap <- dataMap)
+            | DataMapParent.Workflow ->
+                this.TryGetWorkflow parentInfo.ParentId
+                |> Option.map (fun workflow -> workflow.DataMap <- dataMap)
+            |> Option.isSome
 
     /// Single source of truth for file paths stored relative to the ARC root.
     let toArcRootRelativeFilePath (arcFile: ArcFiles) (filePath: string) =

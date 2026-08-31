@@ -248,6 +248,41 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "vault rejects a concurrent DataMap add while the first add is pending",
+            fun () ->
+                withTempArc
+                    (fun arc -> arc.AddAssay(ArcAssay("DataMapAssay")))
+                    (fun arcPath -> promise {
+                        let! loadedArc = loadArcAsync arcPath
+                        let vault = ArcVault(testWindow ())
+                        vault.path <- Some arcPath
+                        vault.SetArc loadedArc
+
+                        let parentInfo = DatamapParentInfo.create "DataMapAssay" DataMapParent.Assay
+
+                        let request () =
+                            FileContentDTO.fromArcFile (ArcFiles.DataMap(Some parentInfo, DataMap.init ()))
+                            |> expectSome
+                            <| "Expected DataMap DTO."
+
+                        let firstAdd = vault.AddArcFile(request ())
+                        let secondAdd = vault.AddArcFile(request ())
+
+                        match! secondAdd with
+                        | Ok() -> failwith "Expected the concurrent DataMap add to be rejected."
+                        | Error error -> Vitest.expect(error.Message).toContain ("busy writing")
+
+                        match! firstAdd with
+                        | Error error -> failwith error.Message
+                        | Ok() -> ()
+
+                        let! reloadedArc = loadArcAsync arcPath
+                        Vitest.expect(reloadedArc.GetAssay("DataMapAssay").DataMap.IsSome).toBe (true)
+                        Vitest.expect(vault.isBusyWriting).toBe (false)
+                    })
+        )
+
+        Vitest.test (
             "adds a study and creates the canonical study file",
             fun () ->
                 withTempArc

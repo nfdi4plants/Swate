@@ -15,7 +15,6 @@ open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
-open ARCtrl.Contract
 
 /// <summary>
 /// Represents a vault window in the application, optionally associated with a file path.
@@ -264,44 +263,12 @@ module ArcVaultExtensions =
             | _ -> return Error(exn "ARC is not loaded.")
         }
 
-        member this.DeleteDataMap(parentInfo: DatamapParentInfo) : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
-            match this.path, this.arc with
-            | Some arcPath, Some arc ->
-                let contractAndRemove =
-                    arc.TryGetDataMapParentArcFile parentInfo
-                    |> Option.bind (fun parentArcFile ->
-                        parentArcFile.TryGetDataMap()
-                        |> Option.map (fun dataMap ->
-                            let contract = DataMapContracts.deleteForParent parentInfo dataMap
-
-                            contract, fun () -> parentArcFile.TrySetParentDataMap None |> ignore
-                        )
-                    )
-
-                match contractAndRemove with
-                | None -> return Error(exn $"ARC does not contain a DataMap for '{parentInfo.ParentId}'.")
-                | Some(deleteContract, removeDataMap) ->
-                    this.isBusyWriting <- true
-
-                    try
-                        match! fullFillContractBatchAsync arcPath [| deleteContract |] with
-                        | Error errors ->
-                            return Error(exn $"Could not delete DataMap: {PathHelpers.formatContractErrors errors}")
-                        | Ok _ ->
-                            removeDataMap ()
-                            arc.UpdateFileSystem()
-                            this.RefreshHasUnsavedArcChangesFlag()
-                            return Ok()
-                    finally
-                        this.isBusyWriting <- false
-            | _ -> return Error(exn "ARC is not loaded.")
-        }
-
         /// Adds a new ARC entity through ARCtrl's scoped add path.
         /// Watcher ARC merges are suppressed during the disk write; static hashes are resynced from disk afterwards.
         member this.AddArcFile(request: FileContentDTO) : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
-            match this.path, this.arc with
-            | Some arcPath, Some arcLocal ->
+            match this.isBusyWriting, this.path, this.arc with
+            | true, _, _ -> return Error(exn "The ARC is currently busy writing changes to disk.")
+            | false, Some arcPath, Some arcLocal ->
                 let normalizedRequest =
                     Swate.Electron.Shared.FileIOHelper.FileContentDTO.normalizeArcFileRequestPath request
 
@@ -324,7 +291,10 @@ module ArcVaultExtensions =
 
                                 match arcFile with
                                 | ArcFiles.DataMap(Some parentInfo, _) ->
-                                    do! this.RefreshFileTreeEntry(DatamapParentInfo.toPath parentInfo)
+                                    let! refreshedFileTree =
+                                        refreshFileTreeEntry arcPath (DatamapParentInfo.toPath parentInfo) this.fileTree
+
+                                    this.SetFileTree refreshedFileTree
                                 | _ -> ()
 
                                 return Ok()
@@ -363,20 +333,10 @@ module ArcVaultExtensions =
             | None -> return Dictionary<string, FileEntry>()
             | Some arcPath ->
                 if this.fileTree.Count = 0 then
-                    let! fileEntries = getFileEntries arcPath
-                    this.fileTree <- createFileEntryTree fileEntries
+                    let! fileTree = getFileTree arcPath
+                    this.fileTree <- fileTree
 
                 return toRendererFileTree arcPath this.fileTree.Values
-        }
-
-        /// Refresh one known file without rescanning the ARC directory.
-        member this.RefreshFileTreeEntry(relativePath: string) = promise {
-            match this.path with
-            | Some arcPath ->
-                let absolutePath = Main.Bindings.Path.join [| arcPath; relativePath |]
-                let! entry = getFileEntry absolutePath
-                this.SetFileTree(upsertFileEntry entry this.fileTree)
-            | None -> ()
         }
 
         member this.LoadArc() = promise {
@@ -482,16 +442,6 @@ module ArcVaultExtensions =
                 sendMsg.pathChange (Some normalizedPath)
         }
 
-        /// Load file entries from disk and push the file tree to the renderer.
-        member this.RefreshFileTree() = promise {
-            match this.path with
-            | Some arcPath ->
-                let! fileEntries = getFileEntries arcPath
-                let fileTree = createFileEntryTree fileEntries
-                this.SetFileTree(fileTree)
-            | None -> ()
-        }
-
         member this.RenameOpenArcRoot(newName: string) : Fable.Core.JS.Promise<Result<string, exn>> = promise {
             match this.path with
             | None -> return Error(exn "ARC is not loaded.")
@@ -535,7 +485,7 @@ module ArcVaultExtensions =
                                 watcherError.Message
 
                     try
-                        do! this.RefreshFileTree()
+                        do! refreshFileTree renamedPath this.SetFileTree
                     with refreshError ->
                         swatelogfn
                             this.window.id
@@ -777,14 +727,14 @@ type ArcVaults() =
             match this.TryGetVault callingWindowId with
             | Some vault when vault.path.IsNone ->
                 do! vault.OpenARC(normalizedArcPath)
-                do! vault.RefreshFileTree()
+                do! refreshFileTree normalizedArcPath vault.SetFileTree
                 this.TrackRecentAndBroadcast(normalizedArcPath)
                 return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
             | _ ->
                 let! newWindowId = this.RegisterVaultWithArc(normalizedArcPath)
 
                 match this.TryGetVault newWindowId with
-                | Some newVault -> do! newVault.RefreshFileTree()
+                | Some newVault -> do! refreshFileTree normalizedArcPath newVault.SetFileTree
                 | None -> ()
 
                 this.TrackRecentAndBroadcast(normalizedArcPath)
@@ -805,14 +755,14 @@ type ArcVaults() =
             match this.TryGetVault callingWindowId with
             | Some vault when vault.path.IsNone ->
                 do! vault.CreateARC(normalizedArcPath, identifier)
-                do! vault.RefreshFileTree()
+                do! refreshFileTree normalizedArcPath vault.SetFileTree
                 this.TrackRecentAndBroadcast(normalizedArcPath)
                 return ArcOpenDisposition.CreatedInCurrent normalizedArcPath
             | _ ->
                 let! newWindowId = this.RegisterVaultWithNewArc(normalizedArcPath, identifier)
 
                 match this.TryGetVault newWindowId with
-                | Some newVault -> do! newVault.RefreshFileTree()
+                | Some newVault -> do! refreshFileTree normalizedArcPath newVault.SetFileTree
                 | None -> ()
 
                 this.TrackRecentAndBroadcast(normalizedArcPath)

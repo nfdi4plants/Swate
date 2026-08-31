@@ -20,17 +20,3 @@ module DataMapContracts =
         | DataMapParent.Study -> dataMap.ToDeleteContractForStudy(parentInfo.ParentId)
         | DataMapParent.Run -> dataMap.ToDeleteContractForRun(parentInfo.ParentId)
         | DataMapParent.Workflow -> dataMap.ToDeleteContractForWorkflow(parentInfo.ParentId)
-
-[<AutoOpen>]
-module DataMapExtensions =
-
-    type ARC with
-
-        member this.TryGetDataMapParentArcFile(parentInfo: DatamapParentInfo) =
-            match parentInfo.Parent with
-            | DataMapParent.Assay -> this.TryGetAssay parentInfo.ParentId |> Option.map ArcFiles.Assay
-            | DataMapParent.Study ->
-                this.TryGetStudy parentInfo.ParentId
-                |> Option.map (fun study -> ArcFiles.Study(study, []))
-            | DataMapParent.Run -> this.TryGetRun parentInfo.ParentId |> Option.map ArcFiles.Run
-            | DataMapParent.Workflow -> this.TryGetWorkflow parentInfo.ParentId |> Option.map ArcFiles.Workflow

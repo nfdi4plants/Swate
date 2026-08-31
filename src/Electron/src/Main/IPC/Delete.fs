@@ -2,6 +2,7 @@ module Main.IPC.Delete
 
 open Fable.Core
 open ARCtrl
+open ARCtrl.Contract
 open Main.ARCtrlExtensions
 open Main.ArcMerge
 open Swate.Components.Shared
@@ -9,6 +10,27 @@ open ARC
 
 [<RequireQualifiedAccess>]
 module ArcDeleteHelper =
+
+    /// Deletes a DataMap through its parent-specific ARCtrl contract and updates the in-memory ARC after success.
+    let deleteDataMapAsync
+        (arcPath: string)
+        (parentInfo: DatamapParentInfo)
+        (arc: ARC)
+        : JS.Promise<Result<unit, exn>> =
+        promise {
+            match arc.TryGetDataMap parentInfo with
+            | None -> return Error(exn $"ARC does not contain a DataMap for '{parentInfo.ParentId}'.")
+            | Some dataMap ->
+                let deleteContract = DataMapContracts.deleteForParent parentInfo dataMap
+
+                match! fullFillContractBatchAsync arcPath [| deleteContract |] with
+                | Error errors ->
+                    return Error(exn $"Could not delete DataMap: {PathHelpers.formatContractErrors errors}")
+                | Ok _ ->
+                    arc.TrySetDataMap(parentInfo, None) |> ignore
+                    arc.UpdateFileSystem()
+                    return Ok()
+        }
 
     let arcFileTypeForZone =
         function

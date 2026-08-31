@@ -22,15 +22,13 @@ let private pathDynamic: obj = importAll "path"
 /// It also ensures that the static hash is preserved to avoid unnecessary changes to the ARC when saving a datamap.
 let private setDataMapByParentInfo (arc: ARC) (dmpi: DatamapParentInfo) (dm: DataMap) : Result<unit, exn> =
     try
-        arc.TryGetDataMapParentArcFile dmpi
-        |> Option.iter (fun parentArcFile ->
-            parentArcFile.TryGetDataMap()
-            |> Option.iter (fun currentDataMap -> dm.StaticHash <- currentDataMap.StaticHash)
+        arc.TryGetDataMap dmpi
+        |> Option.iter (fun currentDataMap -> dm.StaticHash <- currentDataMap.StaticHash)
 
-            parentArcFile.TrySetParentDataMap(Some dm) |> ignore
-        )
-
-        Ok()
+        if arc.TrySetDataMap(dmpi, Some dm) then
+            Ok()
+        else
+            Error(exn $"Could not find DataMap parent '{dmpi.ParentId}'.")
     with e ->
         Error(exn $"Failed to set datamap on ARC: {e.Message}")
 
@@ -51,12 +49,8 @@ let syncAddedArcFileFromPersisted (source: ARC) (target: ARC) (arcFile: ArcFiles
         source.TryGetRun run.Identifier
         |> Option.iter (fun sourceRun -> target.SetRun(run.Identifier, sourceRun))
     | ArcFiles.DataMap(Some parentInfo, _) ->
-        source.TryGetDataMapParentArcFile parentInfo
-        |> Option.bind _.TryGetDataMap()
-        |> Option.iter (fun persistedDataMap ->
-            target.TryGetDataMapParentArcFile parentInfo
-            |> Option.iter (fun parentArcFile -> parentArcFile.TrySetParentDataMap(Some persistedDataMap) |> ignore)
-        )
+        source.TryGetDataMap parentInfo
+        |> Option.iter (fun persistedDataMap -> target.TrySetDataMap(parentInfo, Some persistedDataMap) |> ignore)
     | _ -> ()
 
 /// This function should only be used for partial updates to an ARC based on a file content DTO.

@@ -457,8 +457,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             match! vault.WriteArc() with
                             | Error saveError -> return Error saveError
                             | Ok() ->
-                                do! vault.RefreshFileTree()
-                                return Ok()
+                                match vault.path with
+                                | None -> return Error(exn "ARC is not loaded.")
+                                | Some arcPath ->
+                                    do! refreshFileTree arcPath vault.SetFileTree
+                                    return Ok()
                         })
             with e ->
                 return Error e
@@ -543,7 +546,18 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 match vault.arc, DatamapParentInfo.tryFromPath normalizedDataMapPath with
                                 | None, _ -> return Error(exn "ARC is not loaded.")
                                 | _, None -> return Error(exn "Could not determine the DataMap parent from its path.")
-                                | Some _, Some parentInfo -> return! vault.DeleteDataMap parentInfo
+                                | Some arc, Some parentInfo ->
+                                    let wasBusyWriting = vault.isBusyWriting
+                                    vault.isBusyWriting <- true
+
+                                    try
+                                        match! ArcDeleteHelper.deleteDataMapAsync arcPath parentInfo arc with
+                                        | Error deleteError -> return Error deleteError
+                                        | Ok() ->
+                                            vault.RefreshHasUnsavedArcChangesFlag()
+                                            return Ok()
+                                    finally
+                                        vault.isBusyWriting <- wasBusyWriting
                             | ArcEntityPathRules.DeletePathClassification.GenericTarget normalizedGenericPath
                             | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget(_,
                                                                                                   normalizedGenericPath) ->
@@ -664,7 +678,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                     let directoryPath = path.dirname absolutePath
                                     do! ARCtrl.FileSystemHelper.createDirectoryAsync directoryPath
                                     do! ARCtrl.FileSystemHelper.writeFileTextAsync absolutePath request.content
-                                    do! vault.RefreshFileTree()
+                                    do! refreshFileTree arcPath vault.SetFileTree
                                     return Ok()
                                 | FileContentType.CLI ->
                                     return Error(exn "Direct writing of CLI files is not supported.")
@@ -735,7 +749,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         | Ok successResult ->
                             match enforcedRequest.Command with
                             | Track
-                            | Untrack -> do! vault.RefreshFileTree()
+                            | Untrack -> do! refreshFileTree arcPath vault.SetFileTree
                             | _ -> ()
 
                             return Ok successResult

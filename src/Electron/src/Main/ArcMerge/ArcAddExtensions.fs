@@ -85,12 +85,12 @@ module ArcAddExtensions =
         | ArcFiles.DataMap(Some parentInfo, dataMap) ->
             let workingArc = copyArcPreservingStaticHashes sourceArc
 
-            match workingArc.TryGetDataMapParentArcFile parentInfo with
-            | None -> failwith $"ARC parent '{parentInfo.ParentId}' does not exist."
-            | Some parentArcFile when parentArcFile.TryGetDataMap().IsSome ->
-                failwith $"ARC parent '{parentInfo.ParentId}' already has a DataMap."
-            | Some parentArcFile ->
-                parentArcFile.TrySetParentDataMap(Some dataMap) |> ignore
+            match workingArc.TryGetDataMap parentInfo with
+            | Some _ -> failwith $"ARC parent '{parentInfo.ParentId}' already has a DataMap."
+            | None ->
+                if not (workingArc.TrySetDataMap(parentInfo, Some dataMap)) then
+                    failwith $"ARC parent '{parentInfo.ParentId}' does not exist."
+
                 workingArc.UpdateFileSystem()
                 workingArc, ArcFileCreateContracts.createContracts false arcFile
         | ArcFiles.Template _ -> failwith "Adding template files is not supported."
@@ -110,13 +110,11 @@ module ArcAddExtensions =
             workingArc.TryGetWorkflow workflow.Identifier
             |> Option.iter (fun sourceWorkflow -> targetArc.AddWorkflow(sourceWorkflow.Copy()))
         | ArcFiles.DataMap(Some parentInfo, _) ->
-            workingArc.TryGetDataMapParentArcFile parentInfo
-            |> Option.bind _.TryGetDataMap()
+            workingArc.TryGetDataMap parentInfo
             |> Option.iter (fun dataMap ->
                 dataMap.StaticHash <- cleanDataMapStaticHash dataMap
 
-                targetArc.TryGetDataMapParentArcFile parentInfo
-                |> Option.iter (fun parentArcFile -> parentArcFile.TrySetParentDataMap(Some dataMap) |> ignore)
+                targetArc.TrySetDataMap(parentInfo, Some dataMap) |> ignore
             )
         | _ -> ()
 
