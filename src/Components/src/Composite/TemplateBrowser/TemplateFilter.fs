@@ -506,7 +506,7 @@ type TemplateFilter =
                     ]
                 ]
 
-        Select.Select(
+        MultiSelect.MultiSelect(
             communities,
             selectedIndices,
             setSelectedIndices,
