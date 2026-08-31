@@ -562,6 +562,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             vault.SetFileTree(
                                                 removePathAndDescendants absoluteDataMapPath vault.fileTree
                                             )
+
                                             return Ok()
                                     finally
                                         vault.isBusyWriting <- wasBusyWriting
