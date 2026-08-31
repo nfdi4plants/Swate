@@ -34,6 +34,7 @@
     <PackageReference Include="Feliz" />
     <PackageReference Include="Feliz.UseElmish" />
     <PackageReference Include="Fable.Browser.Dom" />
+    <PackageReference Include="Vitest" />
   </ItemGroup>
 
   <ItemGroup>
@@ -64,6 +65,7 @@
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="swate-components.css" Pack="true" PackagePath="fable/" />
+    <Compile Include="Types\KeyedState.fs" />
     <Compile Include="Types\StateContext.fs" />
     <Compile Include="Types\CellCoordinate.fs" />
     <Compile Include="Util\Download.fs" />
@@ -103,7 +105,10 @@
     <Compile Include="Primitive\Popover\Popover.fs" />
     <Compile Include="Primitive\Select\Types.fs" />
     <Compile Include="Primitive\Select\Context.fs" />
-    <Compile Include="Primitive\Select\Select.fs" />
+    <Compile Include="Primitive\Select\GenericSelect.fs" />
+    <Compile Include="Primitive\Select\SingleSelect.fs" />
+    <Compile Include="Primitive\Select\MultiSelect.fs" />
+    <Compile Include="Primitive\Select\MultiSelect.sample.fs" />
     <Compile Include="Primitive\BaseModal\Context.fs" />
     <Compile Include="Primitive\BaseModal\BaseModal.fs" />
     <Compile Include="Primitive\Dialog\Dialog.fs" />
@@ -228,6 +233,16 @@
     <Compile Include="Composite\Workspace\DropOverlay.fs" />
     <Compile Include="Composite\Workspace\Workspace.fs" />
     <Compile Include="Composite\Workspace\Workspace.fixture.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\Types.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\Helper.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\Helper.test.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\Context.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\SearchField.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\PackageRow.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\PackagePagination.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\PackageTable.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\ValidationPackageSelector.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\ValidationPackageSelector.sample.fs" />
     
     <Compile Include="Page\ProvenanceGrouping\Types.fs" />
     <Compile Include="Page\ProvenanceGrouping\State.fs" />
