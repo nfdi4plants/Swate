@@ -248,7 +248,8 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
                         vault
                         (fun () -> promise {
                             let! result = GitService.pull arcPath request.Remote request.Branch (Some progressReporter)
-                            do! refreshFileTree arcPath vault.SetFileTree
+                            let! fileTree = getFileTree arcPath
+                            vault.SetFileTree fileTree
 
                             return
                                 toGitOperationResult
@@ -335,7 +336,8 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
                             let! result = GitService.stagePaths arcPath request.Pathspecs
 
                             if Result.isOk result then
-                                do! refreshFileTree arcPath vault.SetFileTree
+                                let! fileTree = getFileTree arcPath
+                                vault.SetFileTree fileTree
 
                             return toGitOperationResult (fun () -> Some "Files staged.") None None result
                         })
@@ -365,7 +367,8 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
                             let! result = GitService.discardPaths arcPath request.Pathspecs
 
                             if Result.isOk result then
-                                do! refreshFileTree arcPath vault.SetFileTree
+                                let! fileTree = getFileTree arcPath
+                                vault.SetFileTree fileTree
 
                             return toGitOperationResult (fun () -> Some "Files discarded.") None None result
                         })
@@ -431,7 +434,8 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
                             let! result = GitService.downloadLfsFile arcPath request.Path
 
                             if Result.isOk result then
-                                do! refreshFileTree arcPath vault.SetFileTree
+                                let! fileTree = getFileTree arcPath
+                                vault.SetFileTree fileTree
 
                             return
                                 toGitOperationResult
@@ -474,7 +478,8 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
                             let! result = GitService.freeLocalLfsCopy arcPath request.Path
 
                             if Result.isOk result then
-                                do! refreshFileTree arcPath vault.SetFileTree
+                                let! fileTree = getFileTree arcPath
+                                vault.SetFileTree fileTree
 
                             return
                                 toGitOperationResult
@@ -494,7 +499,8 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
                         vault
                         (fun () -> promise {
                             let! result = GitService.createBranch arcPath request.Name request.StartPoint
-                            do! refreshFileTree arcPath vault.SetFileTree
+                            let! fileTree = getFileTree arcPath
+                            vault.SetFileTree fileTree
 
                             return
                                 toGitOperationResult
@@ -514,7 +520,8 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
                         vault
                         (fun () -> promise {
                             let! result = GitService.checkoutBranch arcPath request
-                            do! refreshFileTree arcPath vault.SetFileTree
+                            let! fileTree = getFileTree arcPath
+                            vault.SetFileTree fileTree
 
                             return
                                 toGitOperationResult
@@ -543,7 +550,8 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
 
                             match result with
                             | Ok payload ->
-                                do! refreshFileTree arcPath vault.SetFileTree
+                                let! fileTree = getFileTree arcPath
+                                vault.SetFileTree fileTree
                                 return Ok payload
                             | Error failure ->
                                 return

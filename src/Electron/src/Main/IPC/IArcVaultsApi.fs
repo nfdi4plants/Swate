@@ -460,7 +460,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 match vault.path with
                                 | None -> return Error(exn "ARC is not loaded.")
                                 | Some arcPath ->
-                                    do! refreshFileTree arcPath vault.SetFileTree
+                                    let! fileTree = getFileTree arcPath
+                                    vault.SetFileTree fileTree
                                     return Ok()
                         })
             with e ->
@@ -686,7 +687,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                     let directoryPath = path.dirname absolutePath
                                     do! ARCtrl.FileSystemHelper.createDirectoryAsync directoryPath
                                     do! ARCtrl.FileSystemHelper.writeFileTextAsync absolutePath request.content
-                                    do! refreshFileTree arcPath vault.SetFileTree
+                                    let! fileTree = getFileTree arcPath
+                                    vault.SetFileTree fileTree
                                     return Ok()
                                 | FileContentType.CLI ->
                                     return Error(exn "Direct writing of CLI files is not supported.")
@@ -757,7 +759,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         | Ok successResult ->
                             match enforcedRequest.Command with
                             | Track
-                            | Untrack -> do! refreshFileTree arcPath vault.SetFileTree
+                            | Untrack ->
+                                let! fileTree = getFileTree arcPath
+                                vault.SetFileTree fileTree
                             | _ -> ()
 
                             return Ok successResult

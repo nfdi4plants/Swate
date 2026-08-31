@@ -485,7 +485,8 @@ module ArcVaultExtensions =
                                 watcherError.Message
 
                     try
-                        do! refreshFileTree renamedPath this.SetFileTree
+                        let! fileTree = getFileTree renamedPath
+                        this.SetFileTree fileTree
                     with refreshError ->
                         swatelogfn
                             this.window.id
@@ -727,14 +728,17 @@ type ArcVaults() =
             match this.TryGetVault callingWindowId with
             | Some vault when vault.path.IsNone ->
                 do! vault.OpenARC(normalizedArcPath)
-                do! refreshFileTree normalizedArcPath vault.SetFileTree
+                let! fileTree = getFileTree normalizedArcPath
+                vault.SetFileTree fileTree
                 this.TrackRecentAndBroadcast(normalizedArcPath)
                 return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
             | _ ->
                 let! newWindowId = this.RegisterVaultWithArc(normalizedArcPath)
 
                 match this.TryGetVault newWindowId with
-                | Some newVault -> do! refreshFileTree normalizedArcPath newVault.SetFileTree
+                | Some newVault ->
+                    let! fileTree = getFileTree normalizedArcPath
+                    newVault.SetFileTree fileTree
                 | None -> ()
 
                 this.TrackRecentAndBroadcast(normalizedArcPath)
@@ -755,14 +759,17 @@ type ArcVaults() =
             match this.TryGetVault callingWindowId with
             | Some vault when vault.path.IsNone ->
                 do! vault.CreateARC(normalizedArcPath, identifier)
-                do! refreshFileTree normalizedArcPath vault.SetFileTree
+                let! fileTree = getFileTree normalizedArcPath
+                vault.SetFileTree fileTree
                 this.TrackRecentAndBroadcast(normalizedArcPath)
                 return ArcOpenDisposition.CreatedInCurrent normalizedArcPath
             | _ ->
                 let! newWindowId = this.RegisterVaultWithNewArc(normalizedArcPath, identifier)
 
                 match this.TryGetVault newWindowId with
-                | Some newVault -> do! refreshFileTree normalizedArcPath newVault.SetFileTree
+                | Some newVault ->
+                    let! fileTree = getFileTree normalizedArcPath
+                    newVault.SetFileTree fileTree
                 | None -> ()
 
                 this.TrackRecentAndBroadcast(normalizedArcPath)

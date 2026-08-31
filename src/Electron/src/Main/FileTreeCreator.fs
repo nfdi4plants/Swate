@@ -166,9 +166,3 @@ let getFileTree (path: string) : Fable.Core.JS.Promise<Dictionary<string, FileEn
     let! fileEntries = getFileEntries path
     return createFileEntryTree fileEntries
 }
-
-/// Reloads a file tree from disk and publishes the resulting snapshot.
-let refreshFileTree (path: string) (publish: Dictionary<string, FileEntry> -> unit) : Fable.Core.JS.Promise<unit> = promise {
-    let! fileTree = getFileTree path
-    publish fileTree
-}
