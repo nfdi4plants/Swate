@@ -555,6 +555,13 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                         | Error deleteError -> return Error deleteError
                                         | Ok() ->
                                             vault.RefreshHasUnsavedArcChangesFlag()
+
+                                            let absoluteDataMapPath =
+                                                Main.Bindings.Path.join [| arcPath; normalizedDataMapPath |]
+
+                                            vault.SetFileTree(
+                                                removePathAndDescendants absoluteDataMapPath vault.fileTree
+                                            )
                                             return Ok()
                                     finally
                                         vault.isBusyWriting <- wasBusyWriting
