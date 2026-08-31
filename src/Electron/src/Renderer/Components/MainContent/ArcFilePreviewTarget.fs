@@ -21,7 +21,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
 
     let setArcFileInMemoryWithErrorModal (nextArcFile: ArcFiles) =
         promise {
-            match! ArcFileApiHelper.setArcFileInMemory nextArcFile with
+            match! ArcFileApiHelper.withArcFileRequest nextArcFile Api.ipcArcVaultApi.setArcFileInMemory with
             | Ok() -> ()
             | Error exn ->
                 errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not update ARC in memory"))
@@ -45,7 +45,9 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
         match arcFile.TryGetDataMapParentInfo() with
         | None -> ()
         | Some parentInfo ->
-            ArcFileApiHelper.addArcFile (ArcFiles.DataMap(Some parentInfo, ARCtrl.DataMap.init ()))
+            ArcFileApiHelper.withArcFileRequest
+                (ArcFiles.DataMap(Some parentInfo, ARCtrl.DataMap.init ()))
+                Api.ipcArcVaultApi.addArcFile
             |> runDataMapMutation "DataMap could not be added"
 
     let deleteDataMap () =
@@ -77,7 +79,9 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
                         arcFile
                         request
                         (setArcFilePageState requestedView)
-                        ArcFileApiHelper.setArcFileInMemory
+                        (fun arcfile ->
+                            ArcFileApiHelper.withArcFileRequest arcfile Api.ipcArcVaultApi.setArcFileInMemory
+                        )
             }),
             [| box arcFile; box pageStateCtx |]
         )

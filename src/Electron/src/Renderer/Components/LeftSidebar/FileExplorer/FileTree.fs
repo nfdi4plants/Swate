@@ -400,7 +400,11 @@ type FileTree =
 
         let createDataMap (parentInfo: DatamapParentInfo) =
             promise {
-                match! ArcFileApiHelper.addArcFile (ArcFiles.DataMap(Some parentInfo, DataMap.init ())) with
+                match!
+                    ArcFileApiHelper.withArcFileRequest
+                        (ArcFiles.DataMap(Some parentInfo, DataMap.init ()))
+                        Api.ipcArcVaultApi.addArcFile
+                with
                 | Error exn -> applyCreateError exn.Message
                 | Ok _ -> ()
             }

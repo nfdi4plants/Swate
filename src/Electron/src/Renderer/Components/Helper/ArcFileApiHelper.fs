@@ -6,23 +6,15 @@ open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 
-let private tryCreateArcFileSaveRequest (arcFile: ArcFiles) : Result<FileContentDTO, exn> =
-    match FileContentDTO.fromArcFile arcFile with
-    | Some request -> Ok request
-    | None -> Error(exn "Saving this file type is not supported in Electron yet.")
-
 let private withArcFileRequest
     (arcFile: ArcFiles)
     (execute: FileContentDTO -> JS.Promise<Result<'T, exn>>)
     : JS.Promise<Result<'T, exn>> =
     promise {
-        match tryCreateArcFileSaveRequest arcFile with
-        | Error saveError -> return Error saveError
-        | Ok request -> return! execute request
+        match FileContentDTO.fromArcFile arcFile with
+        | None -> return Error(exn "Saving this file type is not supported in Electron yet.")
+        | Some request -> return! execute request
     }
-
-let addArcFile (arcFile: ArcFiles) : JS.Promise<Result<unit, exn>> =
-    withArcFileRequest arcFile Api.ipcArcVaultApi.addArcFile
 
 let addArcFileAndOpen (arcFile: ArcFiles) : JS.Promise<Result<FileContentDTO, exn>> =
     withArcFileRequest
@@ -43,6 +35,3 @@ let saveArcFile (arcFile: ArcFiles) : JS.Promise<Result<unit, exn>> =
             | Error exn -> return Error exn
             | Ok() -> return! Api.ipcArcVaultApi.saveArcFile ()
         })
-
-let setArcFileInMemory (arcFile: ArcFiles) : JS.Promise<Result<unit, exn>> =
-    withArcFileRequest arcFile Api.ipcArcVaultApi.setArcFileInMemory

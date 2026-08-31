@@ -255,7 +255,6 @@ Vitest.describe (
                 Vitest.expect(updatedTree.ContainsKey("C:/arc/assays/AB")).toBe (true)
                 Vitest.expect(updatedTree.ContainsKey("C:/arc/assays/AB/isa.assay.xlsx")).toBe (true)
         )
-
 )
 
 Vitest.describe (
