@@ -205,39 +205,162 @@ let mapRenameDiskError (sourcePath: string) (targetPath: string) (renameError: e
 [<RequireQualifiedAccess>]
 module ArcFileSystemHelper =
 
+    exception private ImportCancelledException
+
+    type private ExternalFileImportEntry = { SourcePath: string; FileName: string }
+
+    type private ExternalFileImportPlan = {
+        TargetDirectory: string
+        StagingDirectory: string
+        Entries: ExternalFileImportEntry[]
+    }
+
+    let private resolveImportTargetDirectory arcPath targetRelativePath = promise {
+        let normalizedTargetPath =
+            PathHelpers.normalizeCanonicalRelativePath targetRelativePath
+
+        let targetDirectoryResult =
+            if String.IsNullOrWhiteSpace normalizedTargetPath then
+                Ok(resolveAbsolutePath arcPath)
+            else
+                tryResolveArcRelativePath arcPath normalizedTargetPath
+
+        match targetDirectoryResult with
+        | Error pathError -> return Error pathError
+        | Ok targetDirectory ->
+            let! targetIsDirectory = ARCtrl.FileSystemHelper.directoryExistsAsync targetDirectory
+
+            if targetIsDirectory then
+                return Ok targetDirectory
+            else
+                return Error(exn $"Cannot import because '{targetRelativePath}' is not a folder.")
+    }
+
+    let private createExternalFileImportPlan targetDirectory sourcePaths = promise {
+        let entries =
+            sourcePaths
+            |> Array.map (fun sourcePath ->
+                let absolutePath = resolveAbsolutePath sourcePath
+
+                {
+                    SourcePath = absolutePath
+                    FileName = basename absolutePath
+                }
+            )
+
+        let duplicateName =
+            entries
+            |> Array.groupBy (fun entry -> entry.FileName.ToLowerInvariant())
+            |> Array.tryFind (fun (_, duplicates) -> duplicates.Length > 1)
+
+        match duplicateName with
+        | Some(_, duplicates) -> raise (exn $"Cannot import multiple files named '{duplicates.[0].FileName}'.")
+        | None -> ()
+
+        for entry in entries do
+            let destinationPath = join [| targetDirectory; entry.FileName |]
+            let! destinationExists = pathExistsAsync destinationPath
+
+            if destinationExists then
+                raise (exn $"Cannot import '{entry.FileName}' because a file with that name already exists.")
+
+        return {
+            TargetDirectory = targetDirectory
+            StagingDirectory = join [| targetDirectory; $".swate-import-{Guid.NewGuid():N}" |]
+            Entries = entries
+        }
+    }
+
+    let private stageExternalFiles plan onProgress isCancellationRequested = promise {
+        do! mkdirAsync plan.StagingDirectory
+        onProgress 0.0
+
+        for sourceIndex, entry in plan.Entries |> Array.indexed do
+            if isCancellationRequested () then
+                raise ImportCancelledException
+
+            let stagedPath = join [| plan.StagingDirectory; entry.FileName |]
+            do! copyFileAsync entry.SourcePath stagedPath
+            onProgress (float (sourceIndex + 1) / float plan.Entries.Length)
+    }
+
+    let private commitStagedFiles
+        (plan: ExternalFileImportPlan)
+        (committedPaths: ResizeArray<string>)
+        isCancellationRequested
+        =
+        promise {
+            for entry in plan.Entries do
+                if isCancellationRequested () then
+                    raise ImportCancelledException
+
+                let stagedPath = join [| plan.StagingDirectory; entry.FileName |]
+                let destinationPath = join [| plan.TargetDirectory; entry.FileName |]
+                // A hard link publishes atomically and fails instead of overwriting a path
+                // created after validation. Both paths are on the same filesystem.
+                do! linkAsync stagedPath destinationPath
+                committedPaths.Add destinationPath
+        }
+
+    let private cleanupExternalFileImport stagingDirectory (committedPaths: ResizeArray<string>) = promise {
+        let cleanupErrors = ResizeArray<string>()
+
+        for committedPath in committedPaths |> Seq.rev do
+            try
+                do! rmAsync committedPath (RmOptions(force = true))
+            with cleanupError ->
+                cleanupErrors.Add($"Could not remove '{committedPath}': {cleanupError.Message}")
+
+        try
+            do! rmAsync stagingDirectory (RmOptions(recursive = true, force = true))
+        with cleanupError ->
+            cleanupErrors.Add($"Could not remove staging directory '{stagingDirectory}': {cleanupError.Message}")
+
+        return cleanupErrors |> Seq.toArray
+    }
+
+    let private externalFileImportFailureResult
+        stagingDirectory
+        (committedPaths: ResizeArray<string>)
+        (importError: exn)
+        =
+        promise {
+            let! cleanupErrors = cleanupExternalFileImport stagingDirectory committedPaths
+
+            if cleanupErrors.Length > 0 then
+                let cleanupMessage = String.concat " " cleanupErrors
+                return Error(exn $"Import failed: {importError.Message} Cleanup also failed: {cleanupMessage}")
+            elif importError :? ImportCancelledException then
+                return Ok ImportExternalFilesResult.Cancelled
+            else
+                return Error importError
+        }
+
     let importExternalFilesOnDisk
         (arcPath: string)
         (targetRelativePath: string)
         (sourcePaths: string[])
         (onProgress: float -> unit)
-        : JS.Promise<Result<unit, exn>> =
+        (isCancellationRequested: unit -> bool)
+        : JS.Promise<Result<ImportExternalFilesResult, exn>> =
         promise {
-            let normalizedTargetPath =
-                PathHelpers.normalizeCanonicalRelativePath targetRelativePath
-
-            let targetDirectoryResult =
-                if String.IsNullOrWhiteSpace normalizedTargetPath then
-                    Ok(resolveAbsolutePath arcPath)
-                else
-                    tryResolveArcRelativePath arcPath normalizedTargetPath
-
-            match targetDirectoryResult with
+            match! resolveImportTargetDirectory arcPath targetRelativePath with
             | Error pathError -> return Error pathError
             | Ok targetDirectory ->
-                let! targetIsDirectory = ARCtrl.FileSystemHelper.directoryExistsAsync targetDirectory
+                let committedPaths = ResizeArray<string>()
+                let mutable stagingDirectory = None
 
-                if not targetIsDirectory then
-                    return Error(exn $"Cannot import because '{targetRelativePath}' is not a folder.")
-                else
-                    onProgress 0.0
-
-                    for sourceIndex, sourcePath in sourcePaths |> Array.indexed do
-                        let sourceAbsolutePath = resolveAbsolutePath sourcePath
-                        let targetAbsolutePath = join [| targetDirectory; basename sourceAbsolutePath |]
-                        do! copyFileAsync sourceAbsolutePath targetAbsolutePath
-                        onProgress (float (sourceIndex + 1) / float sourcePaths.Length)
-
-                    return Ok()
+                try
+                    let! plan = createExternalFileImportPlan targetDirectory sourcePaths
+                    stagingDirectory <- Some plan.StagingDirectory
+                    do! stageExternalFiles plan onProgress isCancellationRequested
+                    do! commitStagedFiles plan committedPaths isCancellationRequested
+                    do! rmAsync plan.StagingDirectory (RmOptions(recursive = true, force = true))
+                    return Ok ImportExternalFilesResult.Completed
+                with importError ->
+                    match stagingDirectory with
+                    | Some path -> return! externalFileImportFailureResult path committedPaths importError
+                    | None -> return Error importError
         }
 
     type CreateFileSystemItemPlan = {

@@ -24,6 +24,11 @@ open Main.IPC.FileSystemIO
 let ensureNotesFolderAtArcPath =
     Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath
 
+let private importCancellations =
+    System.Collections.Generic.Dictionary<string, bool>()
+
+let private importCancellationKey (windowId: int) (requestId: string) = $"{windowId}:{requestId}"
+
 let private withLoadedArcVault<'T>
     (event: IpcMainInvokeEvent)
     (operation: ArcVault -> JS.Promise<Result<'T, exn>>)
@@ -381,10 +386,21 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
     tryImportExternalFiles =
         fun (request: ImportExternalFilesRequest) -> promise {
             try
+                if String.IsNullOrWhiteSpace request.requestId then
+                    raise (exn "Import request ID must not be empty.")
+
                 return!
                     withLoadedArcVault
                         event
                         (fun vault -> promise {
+                            let windowId = windowIdFromIpcEvent event
+                            let cancellationKey = importCancellationKey windowId request.requestId
+
+                            if importCancellations.ContainsKey cancellationKey then
+                                raise (exn $"Import request '{request.requestId}' is already running.")
+
+                            importCancellations.[cancellationKey] <- false
+
                             let reportImportProgress progress =
                                 if progress <= 0.0 then
                                     vault.window.setProgressBar (
@@ -402,22 +418,35 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                     )
 
                             try
-                                match!
+                                let! result =
                                     ArcFileSystemHelper.importExternalFilesOnDisk
                                         vault.path.Value
                                         request.targetRelativePath
                                         request.sourceAbsolutePaths
                                         reportImportProgress
-                                with
-                                | Error exn -> return Error exn
-                                | Ok() ->
-                                    do! vault.RefreshFileTree()
-                                    return Ok()
+                                        (fun () ->
+                                            match importCancellations.TryGetValue cancellationKey with
+                                            | true, isCancelled -> isCancelled
+                                            | _ -> false
+                                        )
+
+                                do! vault.RefreshFileTree()
+                                return result
                             finally
                                 vault.window.setProgressBar -1.0
+                                importCancellations.Remove cancellationKey |> ignore
                         })
             with e ->
                 return Error(exn $"Could not import files: {e.Message}")
+        }
+    cancelImportExternalFiles =
+        fun requestId -> promise {
+            let cancellationKey = importCancellationKey (windowIdFromIpcEvent event) requestId
+
+            if importCancellations.ContainsKey cancellationKey then
+                importCancellations.[cancellationKey] <- true
+
+            return Ok()
         }
     getFileTree =
         fun () -> promise {

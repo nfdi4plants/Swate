@@ -172,9 +172,11 @@ Vitest.describe (
                             "assays/AssayA"
                             [| sourcePath |]
                             progress.Add
+                            (fun () -> false)
                     with
                     | Error error -> failwith error.Message
-                    | Ok() ->
+                    | Ok ImportExternalFilesResult.Cancelled -> failwith "Expected import to complete."
+                    | Ok ImportExternalFilesResult.Completed ->
                         let importedPath = absoluteArcPath arcPath "assays/AssayA/external.txt"
 
                         let! importedContent =
@@ -184,6 +186,107 @@ Vitest.describe (
                         Vitest.expect(progress.Count).toBe (2)
                         Vitest.expect(progress.[0]).toBe (0.0)
                         Vitest.expect(progress.[1]).toBe (1.0)
+                })
+        )
+
+        Vitest.test (
+            "cancels an import without leaving staged or published files",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let sourceDirectory = dirname arcPath
+                    let firstName = $"cancel-first-{Guid.NewGuid():N}.txt"
+                    let secondName = $"cancel-second-{Guid.NewGuid():N}.txt"
+                    do! writeRelativeFileAsync sourceDirectory firstName "first"
+                    do! writeRelativeFileAsync sourceDirectory secondName "second"
+
+                    let mutable cancelRequested = false
+
+                    let onProgress progress =
+                        if progress > 0.0 then
+                            cancelRequested <- true
+
+                    match!
+                        ArcFileSystemHelper.importExternalFilesOnDisk
+                            arcPath
+                            "assays/AssayA"
+                            [|
+                                join [| sourceDirectory; firstName |]
+                                join [| sourceDirectory; secondName |]
+                            |]
+                            onProgress
+                            (fun () -> cancelRequested)
+                    with
+                    | Error error -> failwith error.Message
+                    | Ok ImportExternalFilesResult.Completed -> failwith "Expected import cancellation."
+                    | Ok ImportExternalFilesResult.Cancelled ->
+                        let targetDirectory = absoluteArcPath arcPath "assays/AssayA"
+                        let! firstExists = pathExistsAsync (join [| targetDirectory; firstName |])
+                        let! secondExists = pathExistsAsync (join [| targetDirectory; secondName |])
+                        let! entries = fsPromisesDynamic?readdir targetDirectory |> unbox<JS.Promise<string[]>>
+
+                        Vitest.expect(firstExists).toBe (false)
+                        Vitest.expect(secondExists).toBe (false)
+                        Vitest.expect(entries |> Array.exists _.StartsWith(".swate-import-")).toBe (false)
+                })
+        )
+
+        Vitest.test (
+            "cleans staged files when a source copy fails",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let sourceDirectory = dirname arcPath
+                    let firstName = $"error-first-{Guid.NewGuid():N}.txt"
+                    let missingName = $"missing-{Guid.NewGuid():N}.txt"
+                    do! writeRelativeFileAsync sourceDirectory firstName "first"
+
+                    match!
+                        ArcFileSystemHelper.importExternalFilesOnDisk
+                            arcPath
+                            "assays/AssayA"
+                            [|
+                                join [| sourceDirectory; firstName |]
+                                join [| sourceDirectory; missingName |]
+                            |]
+                            ignore
+                            (fun () -> false)
+                    with
+                    | Ok outcome -> failwith $"Expected import failure, got {outcome}."
+                    | Error _ ->
+                        let targetDirectory = absoluteArcPath arcPath "assays/AssayA"
+                        let! firstExists = pathExistsAsync (join [| targetDirectory; firstName |])
+                        let! entries = fsPromisesDynamic?readdir targetDirectory |> unbox<JS.Promise<string[]>>
+
+                        Vitest.expect(firstExists).toBe (false)
+                        Vitest.expect(entries |> Array.exists _.StartsWith(".swate-import-")).toBe (false)
+                })
+        )
+
+        Vitest.test (
+            "does not overwrite an existing destination file",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let fileName = $"existing-{Guid.NewGuid():N}.txt"
+                    let sourceDirectory = dirname arcPath
+                    do! writeRelativeFileAsync sourceDirectory fileName "new content"
+                    do! writeRelativeFileAsync arcPath $"assays/AssayA/{fileName}" "original content"
+
+                    match!
+                        ArcFileSystemHelper.importExternalFilesOnDisk
+                            arcPath
+                            "assays/AssayA"
+                            [| join [| sourceDirectory; fileName |] |]
+                            ignore
+                            (fun () -> false)
+                    with
+                    | Ok outcome -> failwith $"Expected destination conflict, got {outcome}."
+                    | Error _ ->
+                        let destinationPath = absoluteArcPath arcPath $"assays/AssayA/{fileName}"
+
+                        let! content =
+                            fsPromisesDynamic?readFile (destinationPath, "utf8")
+                            |> unbox<JS.Promise<string>>
+
+                        Vitest.expect(content).toBe ("original content")
                 })
         )
 

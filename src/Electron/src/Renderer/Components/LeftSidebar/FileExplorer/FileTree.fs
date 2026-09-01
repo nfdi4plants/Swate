@@ -68,7 +68,11 @@ type FileTree =
 
         let activeDialog, setActiveDialog = React.useState<FileTreeDialog option> None
         let isDialogBusy, setIsDialogBusy = React.useState false
-        let isImportingFiles, setIsImportingFiles = React.useState false
+
+        let activeImportRequestId, setActiveImportRequestId =
+            React.useState<string option> None
+
+        let isCancellingImport, setIsCancellingImport = React.useState false
         // The file watcher emits the initial tree too; only later tree updates should refresh open previews.
         let hasObservedFileTreeUpdateRef = React.useRef false
 
@@ -425,16 +429,24 @@ type FileTree =
                         | Error exn -> return Error exn
                         | Ok [||] -> return Ok()
                         | Ok sourceAbsolutePaths ->
-                            setIsImportingFiles true
+                            let requestId = System.Guid.NewGuid().ToString()
+                            setActiveImportRequestId (Some requestId)
+                            setIsCancellingImport false
 
                             try
-                                return!
+                                match!
                                     Api.ipcArcVaultApi.tryImportExternalFiles {
+                                        requestId = requestId
                                         targetRelativePath = targetRelativePath
                                         sourceAbsolutePaths = sourceAbsolutePaths
                                     }
+                                with
+                                | Error exn -> return Error exn
+                                | Ok ImportExternalFilesResult.Completed
+                                | Ok ImportExternalFilesResult.Cancelled -> return Ok()
                             finally
-                                setIsImportingFiles false
+                                setActiveImportRequestId None
+                                setIsCancellingImport false
                     }
                 enqueueError = errorModal.enqueue
             }
@@ -533,8 +545,28 @@ type FileTree =
                 isRenaming = isDialogBusy
             )
 
+        let cancelImport requestId () =
+            setIsCancellingImport true
+
+            promise {
+                match! Api.ipcArcVaultApi.cancelImportExternalFiles requestId with
+                | Ok() -> ()
+                | Error cancelError ->
+                    setIsCancellingImport false
+
+                    errorModal.enqueue (
+                        ErrorModalRequest.create (cancelError.Message, title = "Could not cancel import")
+                    )
+            }
+            |> Promise.catch (fun cancelError ->
+                setIsCancellingImport false
+                errorModal.enqueue (ErrorModalRequest.create (cancelError.Message, title = "Could not cancel import"))
+            )
+            |> Promise.start
+
         let importStatusNotice =
-            if isImportingFiles then
+            match activeImportRequestId with
+            | Some requestId ->
                 Html.div [
                     prop.className
                         "swt:fixed swt:inset-0 swt:z-50 swt:flex swt:items-center swt:justify-center swt:pointer-events-none"
@@ -546,14 +578,21 @@ type FileTree =
                                 "swt:alert swt:alert-info swt:w-fit swt:max-w-md swt:shadow-lg swt:pointer-events-auto"
                             prop.children [
                                 Swate.Components.Primitive.LoadingSpinner.LoadingSpinner.LoadingSpinner(
-                                    text = "Importing files..."
+                                    text =
+                                        if isCancellingImport then
+                                            "Cancelling import..."
+                                        else
+                                            "Importing files..."
                                 )
+                                if not isCancellingImport then
+                                    Swate.Components.Composite.AnnotationTable.FooterButtons.Cancel(
+                                        cancelImport requestId
+                                    )
                             ]
                         ]
                     ]
                 ]
-            else
-                Html.none
+            | None -> Html.none
 
         match fileItem with
         | Some rootItem ->
