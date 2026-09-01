@@ -71,7 +71,7 @@ Vitest.describe (
 
                         let parentInfo = DatamapParentInfo.create "DataMapAssay" DataMapParent.Assay
 
-                        match! ArcDeleteHelper.deleteDataMapAsync arcPath parentInfo arc with
+                        match! arc.TryDeleteDataMapAsync(arcPath, parentInfo) with
                         | Error error -> failwith error.Message
                         | Ok() ->
                             Vitest.expect(arc.GetAssay("DataMapAssay").DataMap.IsNone).toBe (true)
@@ -93,7 +93,7 @@ Vitest.describe (
 
                         let parentInfo = DatamapParentInfo.create "StudyWithoutDataMap" DataMapParent.Study
 
-                        match! ArcDeleteHelper.deleteDataMapAsync arcPath parentInfo arc with
+                        match! arc.TryDeleteDataMapAsync(arcPath, parentInfo) with
                         | Ok() -> failwith "Expected deleting a missing DataMap to fail."
                         | Error error ->
                             Vitest
@@ -118,7 +118,7 @@ Vitest.describe (
 
                         let parentInfo = DatamapParentInfo.create "DataMapStudy" DataMapParent.Study
 
-                        match! ArcDeleteHelper.deleteDataMapAsync arcPath parentInfo arc with
+                        match! arc.TryDeleteDataMapAsync(arcPath, parentInfo) with
                         | Error error -> failwith error.Message
                         | Ok() ->
                             Vitest.expect(arc.GetStudy("DataMapStudy").DataMap.IsNone).toBe (true)
@@ -144,7 +144,7 @@ Vitest.describe (
 
                         let parentInfo = DatamapParentInfo.create "DataMapWorkflow" DataMapParent.Workflow
 
-                        match! ArcDeleteHelper.deleteDataMapAsync arcPath parentInfo arc with
+                        match! arc.TryDeleteDataMapAsync(arcPath, parentInfo) with
                         | Error error -> failwith error.Message
                         | Ok() ->
                             Vitest.expect(arc.GetWorkflow("DataMapWorkflow").DataMap.IsNone).toBe (true)
@@ -177,7 +177,7 @@ Vitest.describe (
 
                         let parentInfo = DatamapParentInfo.create "DataMapRun" DataMapParent.Run
 
-                        match! ArcDeleteHelper.deleteDataMapAsync arcPath parentInfo arc with
+                        match! arc.TryDeleteDataMapAsync(arcPath, parentInfo) with
                         | Error error -> failwith error.Message
                         | Ok() ->
                             Vitest.expect(arc.GetRun("DataMapRun").DataMap.IsNone).toBe (true)
