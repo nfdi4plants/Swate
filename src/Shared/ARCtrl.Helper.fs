@@ -243,7 +243,7 @@ module ARCtrlHelper =
 
             copy
 
-    type ARC with
+    type ArcInvestigation with
 
         member this.TryGetDataMap(parentInfo: DatamapParentInfo) =
             match parentInfo.Parent with

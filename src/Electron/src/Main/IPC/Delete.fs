@@ -11,37 +11,6 @@ open ARC
 [<RequireQualifiedAccess>]
 module ArcDeleteHelper =
 
-    /// Deletes a DataMap through its parent-specific ARCtrl contract and updates the in-memory ARC after success.
-    let deleteDataMapAsync
-        (arcPath: string)
-        (parentInfo: DatamapParentInfo)
-        (arc: ARC)
-        : JS.Promise<Result<unit, exn>> =
-        promise {
-            match arc.TryGetDataMap parentInfo with
-            | None ->
-                let parentDescription = DatamapParentInfo.describeParent parentInfo
-
-                return
-                    Error(
-                        exn
-                            $"The {parentDescription} does not have a DataMap to delete. Refresh the File Explorer and try again."
-                    )
-            | Some dataMap ->
-                let deleteContract = DataMapContracts.deleteForParent parentInfo dataMap
-
-                match! fullFillContractBatchAsync arcPath [| deleteContract |] with
-                | Error errors ->
-                    return
-                        Error(
-                            exn $"The DataMap could not be deleted from disk. {PathHelpers.formatContractErrors errors}"
-                        )
-                | Ok _ ->
-                    arc.TrySetDataMap(parentInfo, None) |> ignore
-                    arc.UpdateFileSystem()
-                    return Ok()
-        }
-
     let arcFileTypeForZone =
         function
         | ArcEntityPathRules.AddZone.Assays -> ArcFilesDiscriminate.Assay

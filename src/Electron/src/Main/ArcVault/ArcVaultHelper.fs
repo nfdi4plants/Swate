@@ -15,6 +15,9 @@ open Main.Bindings
 open Node.Api
 open Swate.Electron.Shared.RenamePathRules
 
+let arcNotOpenError () =
+    exn "No ARC is open. Open an ARC and try again."
+
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"
 

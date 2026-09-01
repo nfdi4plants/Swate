@@ -39,7 +39,6 @@
 
   <ItemGroup>
     <PackageReference Include="ARCtrl.Core" />
-    <PackageReference Include="ARCtrl.Javascript" />
     <PackageReference Include="ARCtrl.Spreadsheet" />
     <PackageReference Include="Fable.Core" />
   </ItemGroup>

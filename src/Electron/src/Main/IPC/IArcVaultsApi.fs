@@ -15,6 +15,8 @@ open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.DTOs.NoteSearchDto
 open Node.Api
 open Main
+open Main.ARCtrlExtensions
+open Main.ArcVaultHelper
 open Main.IPC.Delete
 open Main.IPC.Rename
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
@@ -557,7 +559,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                     vault.isBusyWriting <- true
 
                                     try
-                                        match! ArcDeleteHelper.deleteDataMapAsync arcPath parentInfo arc with
+                                        match! arc.TryDeleteDataMapAsync(arcPath, parentInfo) with
                                         | Error deleteError -> return Error deleteError
                                         | Ok() ->
                                             vault.RefreshHasUnsavedArcChangesFlag()

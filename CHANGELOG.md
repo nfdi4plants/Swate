@@ -19,12 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### ✨ Added
 
 -   Allow canceling in-flight Git network operations (ARC download/clone, fetch, update preview, pull, push, and Git LFS transfers) from the Git sidebar and the DataHub download view. Cancellation kills the underlying git process and restores a clean repository state: a canceled pull aborts any half-applied merge or rebase, and a canceled ARC download removes the partially cloned folder #1306.
-
-### 🐛 Fixed
-
 -   Keep open ARC editors synchronized when DataMaps are added or deleted through the File Explorer or by external filesystem changes.
 -   Show **Delete DataMap**, rather than **Add DataMap**, in the context menu of a collapsed ARC entity folder that already contains a DataMap.
--   Preserve the disk-derived DataMap static-hash baseline when synchronizing a newly added DataMap back into the in-memory ARC.
+-   Prevent newly added DataMaps from incorrectly appearing as unsaved after they have been written to disk.
 
 ## 2.1.0 - 2026-08-19
 
