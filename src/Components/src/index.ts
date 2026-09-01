@@ -16,7 +16,8 @@ export { default as ErrorModalProvider } from './dist/Primitive/ErrorModal/Provi
 export { default as LoadingSpinner } from './dist/Primitive/LoadingSpinner/LoadingSpinner.fs';
 export { default as Navbar } from './dist/Primitive/Navbar/Navbar.fs';
 export { default as Popover } from './dist/Primitive/Popover/Popover.fs';
-export { default as Select } from './dist/Primitive/Select/Select.fs';
+export { default as MultiSelect } from './dist/Primitive/Select/MultiSelect.fs';
+export { default as SingleSelect } from './dist/Primitive/Select/SingleSelect.fs';
 export * as Icons from './dist/Primitive/Icons.fs';
 
 export { DeleteButton, CircularExitButton, CollapseButton, QuickAccessButton } from './dist/Primitive/Buttons/Buttons.fs';
@@ -54,6 +55,7 @@ export { default as TermSearchConfigProvider } from './dist/Composite/TermSearch
 export { default as ThemeProvider } from './dist/Composite/ThemeSelector/ThemeProvider.fs';
 export { default as ThemeSelector } from './dist/Composite/ThemeSelector/ThemeSelector.fs';
 export { default as TutorialOverlay } from './dist/Composite/TutorialOverlay/TutorialOverlay.fs';
+export { default as ValidationPackageSelector } from './dist/Composite/ValidationPackageSelector/ValidationPackageSelector.fs';
 
 export { Main as NoteSearch, SearchSuggestion } from './dist/Composite/Notes/NoteSearch/NoteSearch.fs';
 export { WidgetController, Entry as WidgetEntry } from './dist/Composite/Widgets/Widgets.fs';
@@ -63,9 +65,7 @@ export { WidgetController, Entry as WidgetEntry } from './dist/Composite/Widgets
 // ---------------------------------------------------------------------------
 
 export { default as ArcFileEditor } from './dist/Page/ArcFileEditor/ArcFileEditor.fs';
-export { default as ArcFileFooterTabs } from './dist/Page/ArcFileEditor/ArcFileFooterTabs.fs';
 export { default as EmptyTableView } from './dist/Page/ArcFileEditor/EmptyTableView/Main.fs';
-export { default as ARCObjectExplorer } from './dist/Page/ArcObjectExplorer/ARCObjectExplorer.fs';
 export { default as DataHubBrowser } from './dist/Page/DataHubBrowser/DataHubBrowser.fs';
 export { default as FileExplorer } from './dist/Page/FileExplorer/FileExplorer.fs';
 export { default as GitDiffViewer } from './dist/Page/GitComparison/GitDiffViewer.fs';

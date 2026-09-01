@@ -16,12 +16,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+### ✨ Added
+
+-   Allow canceling in-flight Git network operations (ARC download/clone, fetch, update preview, pull, push, and Git LFS transfers) from the Git sidebar and the DataHub download view. Cancellation kills the underlying git process and restores a clean repository state: a canceled pull aborts any half-applied merge or rebase, and a canceled ARC download removes the partially cloned folder #1306.
+
+## 2.1.0 - 2026-08-19
+
+### ✨ Added
 
 -   Add an Electron FileTree context-menu action for selecting external files and importing them into the chosen ARC folder.
+-   Add separate FileTree context-menu actions to open a selected folder and reveal a selected file or folder in its parent location #1228.
+-   Keep expanded FileTree parent folders visible while scrolling through nested content #1231.
+-   Add annotation-table actions for assigning a unit to a cell and removing a unit while retaining its value #1229.
 -   Enforce the DataHub Git LFS tracking ruleset: `isa.*.xlsx` metadata files are never tracked with Git LFS (skipped by automatic tracking, exempt from the commit size policy, and blocked from manual marking), while files inside a `dataset` folder or larger than 25 MB can no longer be unmarked #1316.
 
-### Changed
+### 🔄 Changed
 
 -   Simplify Electron FileTree navigation so ARC editors initialize the requested Metadata, table, or DataMap view directly, and show the DataHub download action only in the sidebar.
 -   Consolidate Electron ARC editor page state, safely resolve canonical entity workbooks, and reuse shared path normalization for ARC-root-relative references.
@@ -29,8 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Keep table deletion in the existing footer-tab context menu instead of exposing a second, inconsistent navbar action.
 -   Isolate requested ARC view selection from eager Electron IPC proxy initialization as a temporary testability workaround; a follow-up should inject the file-opening dependency and keep `openView` as a thin Electron adapter.
 
-### Fixed
+### 🐛 Fixed
 
+-   Preserve unit semantics when pasting multiple value-unit rows without headers into non-unit columns, and avoid inheriting metadata from the overwritten target cell for compact value-unit clipboard data #1227.
+-   Show immediate, consistently described navbar tooltips above tables, DataMaps, and sidebars #1289.
+-   Prevent simultaneous Swate Electron window shutdowns from sending recent-ARC updates to already destroyed windows.
+-   Show the error modal when a recently used ARC no longer exists at its saved path instead of opening an Electron system error.
 -   Prevent deleted ARC table tabs from reappearing by applying rename, delete, and add operations to a fresh copy of the current editor state without mutating refs during React rendering.
 -   Keep active-view ownership inside the reusable ARC editor, preserve valid table selections across immutable ARC updates, and remount it for Electron sidebar Metadata, table, and DataMap selections.
 -   Preserve stable table identifiers across rerenders and reorder operations, use one shared prefix for drag-ID generation and parsing, and normalize the active view after table deletion so drag-and-drop and tab state remain valid.
@@ -41,10 +54,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Sign commits created in Swate with the stored DataHub account matching the ARC's remote host (using the active account when no remote is configured yet, and leaving the user's own git config untouched for hubs without a stored account) instead of git's OS-derived fallback identity, so commits link to the account on the hub they are pushed to #1304.
 -   Report a missing git identity as its own failure with setup guidance instead of passing git's raw "Please tell me who you are" output to the user #1305.
 -   Respect GitLab's "use a private email in commits" setting by signing commits with the account's commit email instead of its primary email.
+-   Fix Template bug "You've hit dummy code" #1266, #1264 (by @Freymaurer) 
+-   Fix overscroll issue on last table column on smaller screens (by @Freymaurer)
 
 ## 2.0.7 - 2026-08-06
 
-### Added
+### ✨ Added
 
 -   Add an Electron ARC file editor navbar action for creating and immediately saving DataMaps on assays, studies, runs, and workflows. The action remains visible and is disabled when a DataMap already exists.
 

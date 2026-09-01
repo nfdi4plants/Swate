@@ -157,6 +157,10 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
 
                 match result with
                 | Ok preview -> return Ok preview
+                // Cancellations travel as the exact shared message so the renderer can recognize
+                // them by equality instead of substring-matching arbitrary git error text.
+                | Error failure when failure.Kind = GitFailureKind.Canceled ->
+                    return Error(exn GitOperationCancelledMessage)
                 | Error failure -> return Error(exn $"git pull preview failed ({failure.Kind}): {failure.Message}")
         }
     getGitDiffSummary =
@@ -264,13 +268,19 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
                 let! result = GitService.push arcPath request.Remote request.Branch (Some progressReporter)
                 return toGitOperationResult (fun () -> Some "Push completed.") None None result
         }
-    gitCancelPush =
-        fun () -> promise {
-            match tryGetVaultAndArcPath event with
-            | Error error -> return Error error
-            | Ok(_, arcPath) ->
-                let result = GitService.cancelPush arcPath
-                return toGitOperationResult (fun () -> Some "Push cancellation requested.") None None result
+    gitCancelOperation =
+        fun (request: GitCancelOperationRequest) -> promise {
+            match request.TargetPath with
+            | Some targetPath ->
+                // Clone cancellation carries its own target path because no vault window exists yet.
+                let result = GitService.cancelOperation targetPath
+                return toGitOperationResult (fun () -> Some "Cancellation requested.") None None result
+            | None ->
+                match tryGetVaultAndArcPath event with
+                | Error error -> return Error error
+                | Ok(_, arcPath) ->
+                    let result = GitService.cancelOperation arcPath
+                    return toGitOperationResult (fun () -> Some "Cancellation requested.") None None result
         }
     gitInitRepository =
         fun (targetPath: string) -> promise {

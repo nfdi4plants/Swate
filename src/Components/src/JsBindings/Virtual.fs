@@ -41,16 +41,17 @@ module Virtual =
         member this.getVirtualIndexes() : int[] = jsNative
         member this.getTotalSize() : int = jsNative
 
-        member this.scrollToIndex
-            (
-                index: int,
-                ?options:
-                    {|
-                        align: AlignOption option
-                        behavior: ScrollBehavior option
-                    |}
-            ) : unit =
-            jsNative
+        [<ParamObject(1)>]
+        member this.scrollToIndex(index: int, ?align: AlignOption, ?behavior: ScrollBehavior) : unit = jsNative
+
+        [<ParamObject>]
+        member this.scrollToEnd(?behavior: ScrollBehavior option) : unit = jsNative
+
+        [<ParamObject(1)>]
+        member this.scrollBy(delta: int, ?behavior: ScrollBehavior option) : unit = jsNative
+
+        [<ParamObject(1)>]
+        member this.scrollToOffset(offset: int, ?align: AlignOption, ?behavior: ScrollBehavior) : unit = jsNative
 
         member this.scrollRect: {| height: int; width: int |} = jsNative
         member this.scrollOffset: int = jsNative
@@ -82,6 +83,7 @@ type Virtual =
             ?paddingStart: int,
             ?paddingEnd: int,
             ?gap: int,
-            ?lanes: int
+            ?lanes: int,
+            ?scrollEndThreshold: int
         ) : Virtual.Virtualizer<obj, obj> =
         jsNative

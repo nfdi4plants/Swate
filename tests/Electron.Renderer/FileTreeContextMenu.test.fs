@@ -6,6 +6,8 @@ open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Vitest
+open Renderer.Components.LeftSidebar.FileExplorer.Types
+
 
 let private createConfig () : PathActionConfig = {
     openPathInFileExplorer = fun _ -> promise { return Ok() }

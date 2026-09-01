@@ -145,13 +145,13 @@ type internal ConvertState = {
 
 module internal TableLookup =
 
-    let getTable (location: ArcTableLocation) (arc: ARC) : ArcTable =
+    let getTable (location: ArcTableLocation) (arc: ArcInvestigation) : ArcTable =
         match location.Scope with
         | ArcTableScope.Study -> arc.GetStudy(location.ParentIdentifier).GetTable(location.TableName)
         | ArcTableScope.Assay -> arc.GetAssay(location.ParentIdentifier).GetTable(location.TableName)
         | ArcTableScope.Run -> arc.GetRun(location.ParentIdentifier).GetTable(location.TableName)
 
-    let allTables (arc: ARC) = [
+    let allTables (arc: ArcInvestigation) = [
         for study in arc.Studies do
             for table in study.Tables do
                 yield {
@@ -875,7 +875,7 @@ module internal PreviousContext =
         |> List.map (fun (name, sets) -> name, sets |> List.map fst |> Set.ofList)
         |> Map.ofList
 
-    let attach (loadedLocation: ArcTableLocation) (arc: ARC) (state: ConvertState) =
+    let attach (loadedLocation: ArcTableLocation) (arc: ArcInvestigation) (state: ConvertState) =
         if state.InputSets.IsEmpty then
             state
         else
@@ -955,7 +955,7 @@ module internal PreviousContext =
 
             walk (loadedInputFrontier state) Set.empty state
 
-let fromLoadedArc (options: ArcProvenanceConverterOptions) (arc: ARC) : ArcProvenanceConversionResult =
+let fromLoadedArc (options: ArcProvenanceConverterOptions) (arc: ArcInvestigation) : ArcProvenanceConversionResult =
     let loadedTable = TableLookup.getTable options.LoadedTable arc
     let state = LoadedTable.convert options.LoadedTable loadedTable
 

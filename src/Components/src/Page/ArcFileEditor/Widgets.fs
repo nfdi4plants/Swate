@@ -65,11 +65,9 @@ type Main =
 
         let label, icon = widgetInfo widgetType
 
-        let tooltip = if isOpen then $"Close {label}" else $"Open {label}"
-
         Buttons.QuickAccessButton(
             icon,
-            tooltip,
+            label,
             (fun _ -> toggle ()),
             classes = (if isOpen then "swt:!text-primary" else "")
         )

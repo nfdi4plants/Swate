@@ -281,7 +281,7 @@ let private defaultDependencies: GitDependencies = {
     gitFetch = fun _ -> unexpectedPromise "gitFetch"
     gitPull = fun _ -> unexpectedPromise "gitPull"
     gitPush = fun _ -> unexpectedPromise "gitPush"
-    gitCancelPush = fun () -> unexpectedPromise "gitCancelPush"
+    gitCancelOperation = fun _ -> unexpectedPromise "gitCancelOperation"
     gitCloneRepository = fun _ -> unexpectedPromise "gitCloneRepository"
     createBranch = fun _ -> unexpectedPromise "createBranch"
     checkoutBranch = fun _ -> unexpectedPromise "checkoutBranch"
@@ -978,15 +978,15 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "CancelCurrentOperationRequested requests push cancellation while pushing",
+            "CancelCurrentOperationRequested requests cancellation without a target path while pushing",
             fun () -> promise {
-                let mutable cancelCalls = 0
+                let mutable cancelRequests: GitCancelOperationRequest list = []
 
                 let deps = {
                     defaultDependencies with
-                        gitCancelPush =
-                            fun () -> promise {
-                                cancelCalls <- cancelCalls + 1
+                        gitCancelOperation =
+                            fun request -> promise {
+                                cancelRequests <- request :: cancelRequests
                                 return Ok okOperationResult
                             }
                 }
@@ -999,15 +999,49 @@ Vitest.describe (
 
                 let nextState, cmd = update deps ignore CancelCurrentOperationRequested state
 
-                Vitest.expect(nextState.WarningNotice).toEqual (Some "Canceling push...")
+                Vitest.expect(nextState.WarningNotice).toEqual (Some "Canceling operation...")
 
                 let! messages = collectMessages cmd
 
-                Vitest.expect(cancelCalls).toBe (1)
+                Vitest.expect(cancelRequests).toEqual ([ { TargetPath = None } ])
 
                 match messages with
                 | [| CancelCurrentOperationCompleted(Ok result) |] -> Vitest.expect(result.Success).toBe (true)
-                | _ -> failwith "Expected push cancellation completion message."
+                | _ -> failwith "Expected cancellation completion message."
+            }
+        )
+
+        Vitest.test (
+            "CancelCurrentOperationRequested sends the clone target path while cloning",
+            fun () -> promise {
+                let mutable cancelRequests: GitCancelOperationRequest list = []
+
+                let deps = {
+                    defaultDependencies with
+                        gitCancelOperation =
+                            fun request -> promise {
+                                cancelRequests <- request :: cancelRequests
+                                return Ok okOperationResult
+                            }
+                }
+
+                let state = {
+                    GitState.Empty with
+                        BusyOperation = Some(GitBusyOperation.CloningRepository "C:/clone-target")
+                        BusyNotice = Some "Cloning repository"
+                }
+
+                let nextState, cmd = update deps ignore CancelCurrentOperationRequested state
+
+                Vitest.expect(nextState.WarningNotice).toEqual (Some "Canceling operation...")
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(cancelRequests).toEqual ([ { TargetPath = Some "C:/clone-target" } ])
+
+                match messages with
+                | [| CancelCurrentOperationCompleted(Ok result) |] -> Vitest.expect(result.Success).toBe (true)
+                | _ -> failwith "Expected cancellation completion message."
             }
         )
 
@@ -1018,8 +1052,8 @@ Vitest.describe (
 
                 let deps = {
                     defaultDependencies with
-                        gitCancelPush =
-                            fun () -> promise {
+                        gitCancelOperation =
+                            fun _ -> promise {
                                 cancelCalls <- cancelCalls + 1
                                 return Ok okOperationResult
                             }
@@ -1030,12 +1064,170 @@ Vitest.describe (
 
                 let! messages = collectMessages cmd
 
-                Vitest.expect(nextState.WarningNotice).toEqual (Some "Canceling push...")
+                Vitest.expect(nextState.WarningNotice).toEqual (Some "Canceling operation...")
                 Vitest.expect(cancelCalls).toBe (1)
 
                 match messages with
                 | [| CancelCurrentOperationCompleted(Ok result) |] -> Vitest.expect(result.Success).toBe (true)
-                | _ -> failwith "Expected push cancellation completion message."
+                | _ -> failwith "Expected cancellation completion message."
+            }
+        )
+
+        Vitest.test (
+            "WriteCompleted with a cancellation failure shows a warning notice instead of an error",
+            fun () -> promise {
+                let mutable reportedErrors: GitErrorNotification list = []
+
+                let deps = {
+                    defaultDependencies with
+                        gitPull =
+                            fun _ -> promise {
+                                return
+                                    Ok {
+                                        okOperationResult with
+                                            Success = false
+                                            Message = Some GitOperationCancelledMessage
+                                            FailureKind = Some GitFailureKind.Canceled
+                                    }
+                            }
+                        reportError = fun notification -> reportedErrors <- notification :: reportedErrors
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested WriteRequest.Pull) state
+
+                let! requestMessages = collectMessages requestCmd
+
+                let nextState, finishCmd =
+                    match requestMessages with
+                    | [| WriteCompleted(_, WriteRequest.Pull, Ok(OperationCancelled _)) |] ->
+                        update deps ignore requestMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected the cancelled pull to classify as OperationCancelled."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(nextState.BusyOperation).toEqual (None)
+                Vitest.expect(nextState.WarningNotice).toEqual (Some "Git operation cancelled.")
+                Vitest.expect(nextState.ErrorNotice).toEqual (None)
+                Vitest.expect(List.isEmpty reportedErrors).toBe (true)
+            }
+        )
+
+        // Pins the string-only preview channel contract: the main process reports cancelled
+        // preflights with exactly GitOperationCancelledMessage, and the renderer recognizes
+        // them by equality with that shared constant.
+        Vitest.test (
+            "UpdatePreflightCompleted with the shared cancellation message shows a warning notice",
+            fun () -> promise {
+                let mutable reportedErrors: GitErrorNotification list = []
+
+                let deps = {
+                    defaultDependencies with
+                        reportError = fun notification -> reportedErrors <- notification :: reportedErrors
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        BusyOperation = Some GitBusyOperation.FetchingFromRemote
+                        BusyNotice = Some "Fetching from remote"
+                }
+
+                let nextState, cmd =
+                    update deps ignore (UpdatePreflightCompleted(0, Error GitOperationCancelledMessage)) state
+
+                let! _ = collectMessages cmd
+
+                Vitest.expect(nextState.BusyOperation).toEqual (None)
+                Vitest.expect(nextState.WarningNotice).toEqual (Some "Git operation cancelled.")
+                Vitest.expect(nextState.ErrorNotice).toEqual (None)
+                Vitest.expect(List.isEmpty reportedErrors).toBe (true)
+            }
+        )
+
+        // PR #1329 review: a genuine git failure whose message merely contains "abort"
+        // must surface as an error, not be reclassified as a user cancellation.
+        Vitest.test (
+            "WriteCompleted surfaces a genuine pull failure whose message ends in git's 'Aborting'",
+            fun () -> promise {
+                let mutable reportedErrors: GitErrorNotification list = []
+
+                let deps = {
+                    defaultDependencies with
+                        reportError = fun notification -> reportedErrors <- notification :: reportedErrors
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        BusyOperation = Some GitBusyOperation.PullingFromRemote
+                        BusyNotice = Some "Pulling from remote"
+                }
+
+                let overwrittenByMergeError =
+                    "error: Your local changes to the following files would be overwritten by merge:\n\tassays/measurements/dataset/data.csv\nPlease commit your changes or stash them before you merge.\nAborting"
+
+                let nextState, cmd =
+                    update deps ignore (WriteCompleted(0, WriteRequest.Pull, Error overwrittenByMergeError)) state
+
+                let! _ = collectMessages cmd
+
+                Vitest.expect(nextState.ErrorNotice).toEqual (Some overwrittenByMergeError)
+                Vitest.expect(nextState.WarningNotice).toEqual (None)
+                Vitest.expect(List.length reportedErrors).toBe (1)
+            }
+        )
+
+        // PR #1329 review: cancelling LFS hydration after the pull itself already landed must not
+        // hide that the repository moved to the new commits with large files still missing.
+        // The main process reports this as a successful pull carrying a Canceled warning.
+        Vitest.test (
+            "WriteCompleted keeps the pull-completed context when LFS hydration is cancelled",
+            fun () -> promise {
+                let hydrationCancelledWarning =
+                    "Git pull completed, but the Git LFS download was cancelled. Large files stay as pointers until the next update."
+
+                let deps = {
+                    defaultDependencies with
+                        gitPull =
+                            fun _ -> promise {
+                                return
+                                    Ok {
+                                        okOperationResult with
+                                            WarningMessage = Some hydrationCancelledWarning
+                                            WarningKind = Some GitFailureKind.Canceled
+                                    }
+                            }
+                        getGitStatus = fun () -> promise { return Ok(statusForBranch "main") }
+                        getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
+                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 9 true) }
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested WriteRequest.Pull) state
+
+                let! requestMessages = collectMessages requestCmd
+
+                let nextState, finishCmd =
+                    match requestMessages with
+                    | [| WriteCompleted(_, WriteRequest.Pull, Ok(Completed(UnitSuccess(_, _, _, Some _)))) |] ->
+                        update deps ignore requestMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected the pull to complete successfully with a hydration warning."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(nextState.ErrorNotice).toEqual (None)
+                Vitest.expect(nextState.WarningNotice).toEqual (Some hydrationCancelledWarning)
             }
         )
 
@@ -1226,7 +1418,10 @@ Vitest.describe (
 
                 let! _ = collectMessages finishCmd
 
-                Vitest.expect(stateAfterRequest.BusyOperation).toEqual (Some GitBusyOperation.CloningRepository)
+                Vitest
+                    .expect(stateAfterRequest.BusyOperation)
+                    .toEqual (Some(GitBusyOperation.CloningRepository "C:/clone-target"))
+
                 Vitest.expect(replyResult).toEqual (Some(Ok "C:/clone-target"))
             }
         )

@@ -34,6 +34,7 @@
     <PackageReference Include="Feliz" />
     <PackageReference Include="Feliz.UseElmish" />
     <PackageReference Include="Fable.Browser.Dom" />
+    <PackageReference Include="Vitest" />
   </ItemGroup>
 
   <ItemGroup>
@@ -64,6 +65,7 @@
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="swate-components.css" Pack="true" PackagePath="fable/" />
+    <Compile Include="Types\KeyedState.fs" />
     <Compile Include="Types\StateContext.fs" />
     <Compile Include="Types\CellCoordinate.fs" />
     <Compile Include="Util\Download.fs" />
@@ -76,6 +78,7 @@
     <Compile Include="ARCtrl\TermCollection.fs" />
     <Compile Include="ARCtrl\Helper.fs" />
     <Compile Include="ARCtrl\ArcIO.fs" />
+    <Compile Include="ARCtrl\Json.fs" />
     <Compile Include="ARCtrl\Types\CompositeCellDiscriminate.fs" />
     <Compile Include="ARCtrl\Types\CompositeHeaderDiscriminate.fs" />
     <Compile Include="ARCtrl\ArcTable.fs" />
@@ -102,7 +105,10 @@
     <Compile Include="Primitive\Popover\Popover.fs" />
     <Compile Include="Primitive\Select\Types.fs" />
     <Compile Include="Primitive\Select\Context.fs" />
-    <Compile Include="Primitive\Select\Select.fs" />
+    <Compile Include="Primitive\Select\GenericSelect.fs" />
+    <Compile Include="Primitive\Select\SingleSelect.fs" />
+    <Compile Include="Primitive\Select\MultiSelect.fs" />
+    <Compile Include="Primitive\Select\MultiSelect.sample.fs" />
     <Compile Include="Primitive\BaseModal\Context.fs" />
     <Compile Include="Primitive\BaseModal\BaseModal.fs" />
     <Compile Include="Primitive\Dialog\Dialog.fs" />
@@ -227,6 +233,16 @@
     <Compile Include="Composite\Workspace\DropOverlay.fs" />
     <Compile Include="Composite\Workspace\Workspace.fs" />
     <Compile Include="Composite\Workspace\Workspace.fixture.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\Types.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\Helper.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\Helper.test.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\Context.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\SearchField.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\PackageRow.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\PackagePagination.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\PackageTable.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\ValidationPackageSelector.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\ValidationPackageSelector.sample.fs" />
     
     <Compile Include="Page\ProvenanceGrouping\Types.fs" />
     <Compile Include="Page\ProvenanceGrouping\State.fs" />
@@ -302,24 +318,6 @@
     <Compile Include="Page\ArcFileEditor\Widgets.fs" />
     <Compile Include="Page\ArcFileEditor\ArcFileFooterTabs.fs" />
     <Compile Include="Page\ArcFileEditor\ArcFileEditor.fs" />
-    <Compile Include="Page\ArcObjectExplorer\GraphExplorer\Model.fs" />
-    <Compile Include="Page\ArcObjectExplorer\GraphExplorer\GraphExplorerNodes.fs" />
-    <Compile Include="Page\ArcObjectExplorer\ArcObjectDetailsLayout.fs" />
-    <Compile Include="Page\ArcObjectExplorer\GraphExplorer\GraphObjectDetails.fs" />
-    <Compile Include="Page\ArcObjectExplorer\ARCExplorer.fs" />
-    <Compile Include="Page\ArcObjectExplorer\ARCObjectPanel.fs" />
-    <Compile Include="Page\ArcObjectExplorer\KindFilter.fs" />
-    <Compile Include="Page\ArcObjectExplorer\Types.fs" />
-    <Compile Include="Page\ArcObjectExplorer\ARCObjectWidget.fs" />
-    <Compile Include="Page\ArcObjectExplorer\Model.fs" />
-    <Compile Include="Page\ArcObjectExplorer\ArcObjectExplorerContent.fs" />
-    <Compile Include="Page\ArcObjectExplorer\ARCObjectFixture.fs" />
-    <Compile Include="Page\ArcObjectExplorer\ARCObjectExplorer.fs" />
-    <Compile Include="Page\ArcObjectExplorer\GraphExplorer\GraphObjectFixture.fs" />
-    <Compile Include="Page\ArcObjectExplorer\GraphExplorer\GraphObjectExplorerTreeData.fs" />
-    <Compile Include="Page\ArcObjectExplorer\GraphExplorer\GraphObjectExplorerFilter.fs" />
-    <Compile Include="Page\ArcObjectExplorer\GraphExplorer\GraphObjectExplorer.fs" />
-    
 
     <Compile Include="Style.fs" />
   </ItemGroup>
