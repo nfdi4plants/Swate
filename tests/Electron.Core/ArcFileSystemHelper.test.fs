@@ -10,6 +10,7 @@ open Swate.Electron.Shared.FileIOTypes
 open Vitest
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
+let private fsDynamic: obj = importAll "fs"
 
 [<Emit("Object.assign(new Error($0), { code: $1 })")>]
 let private nodeError (message: string) (code: string) : exn = jsNative
@@ -190,7 +191,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "cancels an import without leaving staged or published files",
+            "cancels an import without leaving temporary or imported files",
             fun () ->
                 withAssayArc (fun arcPath -> promise {
                     let sourceDirectory = dirname arcPath
@@ -200,8 +201,24 @@ Vitest.describe (
                     do! writeRelativeFileAsync sourceDirectory secondName "second"
 
                     let mutable cancelRequested = false
+                    let mutable sawTemporaryImportInsideArc = false
+                    let mutable sawTemporaryImportNextToArc = false
 
                     let onProgress progress =
+                        let targetEntries =
+                            fsDynamic?readdirSync (absoluteArcPath arcPath "assays/AssayA")
+                            |> unbox<string[]>
+
+                        let arcParentEntries = fsDynamic?readdirSync (dirname arcPath) |> unbox<string[]>
+
+                        sawTemporaryImportInsideArc <-
+                            sawTemporaryImportInsideArc
+                            || (targetEntries |> Array.exists _.StartsWith(".swate-import-"))
+
+                        sawTemporaryImportNextToArc <-
+                            sawTemporaryImportNextToArc
+                            || (arcParentEntries |> Array.exists _.StartsWith(".swate-import-"))
+
                         if progress > 0.0 then
                             cancelRequested <- true
 
@@ -226,12 +243,14 @@ Vitest.describe (
 
                         Vitest.expect(firstExists).toBe (false)
                         Vitest.expect(secondExists).toBe (false)
+                        Vitest.expect(sawTemporaryImportInsideArc).toBe (false)
+                        Vitest.expect(sawTemporaryImportNextToArc).toBe (true)
                         Vitest.expect(entries |> Array.exists _.StartsWith(".swate-import-")).toBe (false)
                 })
         )
 
         Vitest.test (
-            "cleans staged files when a source copy fails",
+            "cleans temporary import files when a source copy fails",
             fun () ->
                 withAssayArc (fun arcPath -> promise {
                     let sourceDirectory = dirname arcPath

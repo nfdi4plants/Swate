@@ -24,10 +24,13 @@ open Main.IPC.FileSystemIO
 let ensureNotesFolderAtArcPath =
     Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath
 
-let private importCancellations =
-    System.Collections.Generic.Dictionary<string, bool>()
+type private ActiveFileImport = {
+    RequestId: string
+    mutable IsCancellationRequested: bool
+}
 
-let private importCancellationKey (windowId: int) (requestId: string) = $"{windowId}:{requestId}"
+let private activeFileImports =
+    System.Collections.Generic.Dictionary<int, ActiveFileImport>()
 
 let private withLoadedArcVault<'T>
     (event: IpcMainInvokeEvent)
@@ -399,12 +402,19 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         event
                         (fun vault -> promise {
                             let windowId = windowIdFromIpcEvent event
-                            let cancellationKey = importCancellationKey windowId request.requestId
+                            if activeFileImports.ContainsKey windowId then
+                                raise (exn "Another file import is already running in this window.")
 
-                            if importCancellations.ContainsKey cancellationKey then
-                                raise (exn $"Import request '{request.requestId}' is already running.")
+                            activeFileImports.[windowId] <- {
+                                RequestId = request.requestId
+                                IsCancellationRequested = false
+                            }
 
-                            importCancellations.[cancellationKey] <- false
+                            // Temporary import files live outside the watched ARC tree. Keep watcher ARC merges
+                            // suppressed as well while final files appear and rollback/cleanup may run;
+                            // restoring this flag starts the normal delayed own-write suppression window.
+                            let wasBusyWriting = vault.isBusyWriting
+                            vault.isBusyWriting <- true
 
                             let reportImportProgress progress =
                                 if progress <= 0.0 then
@@ -430,8 +440,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                         request.sourceAbsolutePaths
                                         reportImportProgress
                                         (fun () ->
-                                            match importCancellations.TryGetValue cancellationKey with
-                                            | true, isCancelled -> isCancelled
+                                            match activeFileImports.TryGetValue windowId with
+                                            | true, activeImport when activeImport.RequestId = request.requestId ->
+                                                activeImport.IsCancellationRequested
                                             | _ -> false
                                         )
 
@@ -439,17 +450,23 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 return result
                             finally
                                 vault.window.setProgressBar -1.0
-                                importCancellations.Remove cancellationKey |> ignore
+                                match activeFileImports.TryGetValue windowId with
+                                | true, activeImport when activeImport.RequestId = request.requestId ->
+                                    activeFileImports.Remove windowId |> ignore
+                                | _ -> ()
+                                vault.isBusyWriting <- wasBusyWriting
                         })
             with e ->
                 return Error(exn $"Could not import files: {e.Message}")
         }
     cancelImportExternalFiles =
         fun requestId -> promise {
-            let cancellationKey = importCancellationKey (windowIdFromIpcEvent event) requestId
+            let windowId = windowIdFromIpcEvent event
 
-            if importCancellations.ContainsKey cancellationKey then
-                importCancellations.[cancellationKey] <- true
+            match activeFileImports.TryGetValue windowId with
+            | true, activeImport when activeImport.RequestId = requestId ->
+                activeImport.IsCancellationRequested <- true
+            | _ -> ()
 
             return Ok()
         }

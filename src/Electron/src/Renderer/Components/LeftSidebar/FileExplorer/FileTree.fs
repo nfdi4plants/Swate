@@ -74,6 +74,7 @@ type FileTree =
         let activeImportRequestId, setActiveImportRequestId =
             React.useState<string option> None
 
+        let activeImportRequestIdRef = React.useRef<string option> None
         let isCancellingImport, setIsCancellingImport = React.useState false
         // The file watcher emits the initial tree too; only later tree updates should refresh open previews.
         let hasObservedFileTreeUpdateRef = React.useRef false
@@ -427,28 +428,34 @@ type FileTree =
                 openPathWithDefaultApplication = Api.ipcArcVaultApi.openPathWithDefaultApplication
                 importExternalFiles =
                     fun targetRelativePath -> promise {
-                        match! Api.ipcArcVaultApi.pickAbsolutePaths () with
-                        | Error exn -> return Error exn
-                        | Ok [||] -> return Ok()
-                        | Ok sourceAbsolutePaths ->
+                        match activeImportRequestIdRef.current with
+                        | Some _ -> return Ok()
+                        | None ->
                             let requestId = System.Guid.NewGuid().ToString()
+                            activeImportRequestIdRef.current <- Some requestId
                             setActiveImportRequestId (Some requestId)
                             setIsCancellingImport false
 
                             try
-                                match!
-                                    Api.ipcArcVaultApi.tryImportExternalFiles {
-                                        requestId = requestId
-                                        targetRelativePath = targetRelativePath
-                                        sourceAbsolutePaths = sourceAbsolutePaths
-                                    }
-                                with
+                                match! Api.ipcArcVaultApi.pickAbsolutePaths () with
                                 | Error exn -> return Error exn
-                                | Ok ImportExternalFilesResult.Completed
-                                | Ok ImportExternalFilesResult.Cancelled -> return Ok()
+                                | Ok [||] -> return Ok()
+                                | Ok sourceAbsolutePaths ->
+                                    match!
+                                        Api.ipcArcVaultApi.tryImportExternalFiles {
+                                            requestId = requestId
+                                            targetRelativePath = targetRelativePath
+                                            sourceAbsolutePaths = sourceAbsolutePaths
+                                        }
+                                    with
+                                    | Error exn -> return Error exn
+                                    | Ok ImportExternalFilesResult.Completed
+                                    | Ok ImportExternalFilesResult.Cancelled -> return Ok()
                             finally
-                                setActiveImportRequestId None
-                                setIsCancellingImport false
+                                if activeImportRequestIdRef.current = Some requestId then
+                                    activeImportRequestIdRef.current <- None
+                                    setActiveImportRequestId None
+                                    setIsCancellingImport false
                     }
                 enqueueError = errorModal.enqueue
             }
@@ -571,7 +578,7 @@ type FileTree =
             | Some requestId ->
                 Html.div [
                     prop.className
-                        "swt:fixed swt:inset-0 swt:z-50 swt:flex swt:items-center swt:justify-center swt:pointer-events-none"
+                        "swt:fixed swt:inset-0 swt:z-50 swt:flex swt:items-center swt:justify-center swt:bg-base-100/20"
                     prop.role "status"
                     prop.custom ("aria-live", "polite")
                     prop.children [

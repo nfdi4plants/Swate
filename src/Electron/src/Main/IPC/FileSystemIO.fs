@@ -211,7 +211,7 @@ module ArcFileSystemHelper =
 
     type private ExternalFileImportPlan = {
         TargetDirectory: string
-        StagingDirectory: string
+        TemporaryDirectory: string
         Entries: ExternalFileImportEntry[]
     }
 
@@ -236,7 +236,7 @@ module ArcFileSystemHelper =
                 return Error(exn $"Cannot import because '{targetRelativePath}' is not a folder.")
     }
 
-    let private createExternalFileImportPlan targetDirectory sourcePaths = promise {
+    let private createExternalFileImportPlan arcPath targetDirectory sourcePaths = promise {
         let entries =
             sourcePaths
             |> Array.map (fun sourcePath ->
@@ -266,27 +266,30 @@ module ArcFileSystemHelper =
 
         return {
             TargetDirectory = targetDirectory
-            StagingDirectory = join [| targetDirectory; $".swate-import-{Guid.NewGuid():N}" |]
+            // Keep temporary import files outside the watched ARC tree. Using the ARC's parent keeps
+            // them on the same filesystem, which is required when creating the final hard links.
+            TemporaryDirectory =
+                join [| dirname (resolveAbsolutePath arcPath); $".swate-import-{Guid.NewGuid():N}" |]
             Entries = entries
         }
     }
 
-    let private stageExternalFiles plan onProgress isCancellationRequested = promise {
-        do! mkdirAsync plan.StagingDirectory
+    let private copyExternalFilesToTemporaryDirectory plan onProgress isCancellationRequested = promise {
+        do! mkdirAsync plan.TemporaryDirectory
         onProgress 0.0
 
         for sourceIndex, entry in plan.Entries |> Array.indexed do
             if isCancellationRequested () then
                 raise ImportCancelledException
 
-            let stagedPath = join [| plan.StagingDirectory; entry.FileName |]
-            do! copyFileAsync entry.SourcePath stagedPath
+            let temporaryPath = join [| plan.TemporaryDirectory; entry.FileName |]
+            do! copyFileAsync entry.SourcePath temporaryPath
             onProgress (float (sourceIndex + 1) / float plan.Entries.Length)
     }
 
-    let private commitStagedFiles
+    let private linkTemporaryFilesIntoTarget
         (plan: ExternalFileImportPlan)
-        (committedPaths: ResizeArray<string>)
+        (createdTargetPaths: ResizeArray<string>)
         isCancellationRequested
         =
         promise {
@@ -294,38 +297,38 @@ module ArcFileSystemHelper =
                 if isCancellationRequested () then
                     raise ImportCancelledException
 
-                let stagedPath = join [| plan.StagingDirectory; entry.FileName |]
+                let temporaryPath = join [| plan.TemporaryDirectory; entry.FileName |]
                 let destinationPath = join [| plan.TargetDirectory; entry.FileName |]
                 // A hard link publishes atomically and fails instead of overwriting a path
                 // created after validation. Both paths are on the same filesystem.
-                do! linkAsync stagedPath destinationPath
-                committedPaths.Add destinationPath
+                do! linkAsync temporaryPath destinationPath
+                createdTargetPaths.Add destinationPath
         }
 
-    let private cleanupExternalFileImport stagingDirectory (committedPaths: ResizeArray<string>) = promise {
+    let private cleanupExternalFileImport temporaryDirectory (createdTargetPaths: ResizeArray<string>) = promise {
         let cleanupErrors = ResizeArray<string>()
 
-        for committedPath in committedPaths |> Seq.rev do
+        for createdTargetPath in createdTargetPaths |> Seq.rev do
             try
-                do! rmAsync committedPath (RmOptions(force = true))
+                do! rmAsync createdTargetPath (RmOptions(force = true))
             with cleanupError ->
-                cleanupErrors.Add($"Could not remove '{committedPath}': {cleanupError.Message}")
+                cleanupErrors.Add($"Could not remove '{createdTargetPath}': {cleanupError.Message}")
 
         try
-            do! rmAsync stagingDirectory (RmOptions(recursive = true, force = true))
+            do! rmAsync temporaryDirectory (RmOptions(recursive = true, force = true))
         with cleanupError ->
-            cleanupErrors.Add($"Could not remove staging directory '{stagingDirectory}': {cleanupError.Message}")
+            cleanupErrors.Add($"Could not remove temporary import directory '{temporaryDirectory}': {cleanupError.Message}")
 
         return cleanupErrors |> Seq.toArray
     }
 
     let private externalFileImportFailureResult
-        stagingDirectory
-        (committedPaths: ResizeArray<string>)
+        temporaryDirectory
+        (createdTargetPaths: ResizeArray<string>)
         (importError: exn)
         =
         promise {
-            let! cleanupErrors = cleanupExternalFileImport stagingDirectory committedPaths
+            let! cleanupErrors = cleanupExternalFileImport temporaryDirectory createdTargetPaths
 
             if cleanupErrors.Length > 0 then
                 let cleanupMessage = String.concat " " cleanupErrors
@@ -347,19 +350,19 @@ module ArcFileSystemHelper =
             match! resolveImportTargetDirectory arcPath targetRelativePath with
             | Error pathError -> return Error pathError
             | Ok targetDirectory ->
-                let committedPaths = ResizeArray<string>()
-                let mutable stagingDirectory = None
+                let createdTargetPaths = ResizeArray<string>()
+                let mutable temporaryDirectory = None
 
                 try
-                    let! plan = createExternalFileImportPlan targetDirectory sourcePaths
-                    stagingDirectory <- Some plan.StagingDirectory
-                    do! stageExternalFiles plan onProgress isCancellationRequested
-                    do! commitStagedFiles plan committedPaths isCancellationRequested
-                    do! rmAsync plan.StagingDirectory (RmOptions(recursive = true, force = true))
+                    let! plan = createExternalFileImportPlan arcPath targetDirectory sourcePaths
+                    temporaryDirectory <- Some plan.TemporaryDirectory
+                    do! copyExternalFilesToTemporaryDirectory plan onProgress isCancellationRequested
+                    do! linkTemporaryFilesIntoTarget plan createdTargetPaths isCancellationRequested
+                    do! rmAsync plan.TemporaryDirectory (RmOptions(recursive = true, force = true))
                     return Ok ImportExternalFilesResult.Completed
                 with importError ->
-                    match stagingDirectory with
-                    | Some path -> return! externalFileImportFailureResult path committedPaths importError
+                    match temporaryDirectory with
+                    | Some path -> return! externalFileImportFailureResult path createdTargetPaths importError
                     | None -> return Error importError
         }
 
