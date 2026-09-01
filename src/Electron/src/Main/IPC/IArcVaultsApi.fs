@@ -473,7 +473,12 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 match result with
                                 | Ok ImportExternalFilesResult.Completed ->
                                     let importedEvents = createImportedFileWatcherEvents vault.path.Value request
-                                    do! vault.TriggerArcInMemoryMergeOnFileWatcherEvents(importedEvents |> Array.toList)
+
+                                    do!
+                                        vault.TriggerArcInMemoryMergeOnFileWatcherEvents(
+                                            importedEvents |> Array.toList
+                                        )
+
                                     do! vault.RefreshFileTree()
                                 | Ok ImportExternalFilesResult.Cancelled
                                 | Error _ -> do! vault.RefreshFileTree()
