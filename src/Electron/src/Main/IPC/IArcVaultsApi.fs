@@ -434,11 +434,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 IsCancellationRequested = false
                             }
 
-                            // The watcher ignores temporary import directories. Suppress merge collection for
-                            // the final filesystem events because successful imports synchronously replay those
-                            // events below before exposing the refreshed file tree to the renderer.
-                            let wasBusyWriting = vault.isBusyWriting
-                            vault.isBusyWriting <- true
+                            // The watcher ignores temporary import directories, while final imported files and
+                            // unrelated external ARC changes remain eligible for normal watcher merges. Successful
+                            // imports also replay their own events synchronously before the refreshed tree is exposed.
 
                             let reportImportProgress progress =
                                 if progress <= 0.0 then
@@ -491,8 +489,6 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 | true, activeImport when activeImport.RequestId = request.requestId ->
                                     activeFileImports.Remove windowId |> ignore
                                 | _ -> ()
-
-                                vault.isBusyWriting <- wasBusyWriting
                         })
             with e ->
                 return Error(exn $"Could not import files: {e.Message}")
