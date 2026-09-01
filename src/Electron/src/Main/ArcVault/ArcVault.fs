@@ -23,6 +23,7 @@ open ARCtrl
 type ArcVault(window: BrowserWindow) =
 
     let fileWatcherOwnWriteArcMergeSuppressionMs = 500
+    let mutable arcMergeQueue = promise { return () }
 
     member val window: BrowserWindow = window with get
     member val path: string option = None with get, set
@@ -41,6 +42,22 @@ type ArcVault(window: BrowserWindow) =
     member val fileWatcherPendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
     member val private isBusyWritingValue: bool = false with get, set
     member val private fileWatcherOwnWriteArcMergeSuppressionTimeout: int option = None with get, set
+
+    /// Runs ARC merges sequentially so every operation observes the result of the preceding merge.
+    member internal this.EnqueueArcMerge(operation: unit -> Fable.Core.JS.Promise<unit>) =
+        let precedingMerge = arcMergeQueue
+
+        let queuedMerge = promise {
+            try
+                do! precedingMerge
+            with precedingError ->
+                swatelogfn this.window.id "A preceding ARC merge failed: %s" precedingError.Message
+
+            do! operation ()
+        }
+
+        arcMergeQueue <- queuedMerge
+        queuedMerge
 
     member private this.StartFileWatcherOwnWriteArcMergeSuppression() =
         this.fileWatcherOwnWriteArcMergeSuppressionTimeout
@@ -171,7 +188,7 @@ module ArcVaultExtensions =
 
         member this.TriggerArcInMemoryMergeOnFileWatcherEvents(events: ArcVaultFileSystemEvent list) = promise {
             let arcEvents = WatcherHelpers.toArcMergeEvents events
-            do! this.ApplyWatcherArcMerge arcEvents
+            do! this.EnqueueArcMerge(fun () -> this.ApplyWatcherArcMerge arcEvents)
         }
 
         member private this._FileEventController(sendMsgApi: IArcFileWatcherApi) =
