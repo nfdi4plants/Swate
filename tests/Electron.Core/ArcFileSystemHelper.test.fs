@@ -243,8 +243,8 @@ Vitest.describe (
 
                         Vitest.expect(firstExists).toBe (false)
                         Vitest.expect(secondExists).toBe (false)
-                        Vitest.expect(sawTemporaryImportInsideArc).toBe (false)
-                        Vitest.expect(sawTemporaryImportNextToArc).toBe (true)
+                        Vitest.expect(sawTemporaryImportInsideArc).toBe (true)
+                        Vitest.expect(sawTemporaryImportNextToArc).toBe (false)
                         Vitest.expect(entries |> Array.exists _.StartsWith(".swate-import-")).toBe (false)
                 })
         )

@@ -402,6 +402,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         event
                         (fun vault -> promise {
                             let windowId = windowIdFromIpcEvent event
+
                             if activeFileImports.ContainsKey windowId then
                                 raise (exn "Another file import is already running in this window.")
 
@@ -410,11 +411,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 IsCancellationRequested = false
                             }
 
-                            // Temporary import files live outside the watched ARC tree. Keep watcher ARC merges
-                            // suppressed as well while final files appear and rollback/cleanup may run;
-                            // restoring this flag starts the normal delayed own-write suppression window.
-                            let wasBusyWriting = vault.isBusyWriting
-                            vault.isBusyWriting <- true
+                            // The watcher ignores temporary import directories. Final files deliberately remain
+                            // eligible for normal watcher ARC merges so imported canonical metadata is
+                            // reconciled with the in-memory ARC.
 
                             let reportImportProgress progress =
                                 if progress <= 0.0 then
@@ -450,11 +449,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 return result
                             finally
                                 vault.window.setProgressBar -1.0
+
                                 match activeFileImports.TryGetValue windowId with
                                 | true, activeImport when activeImport.RequestId = request.requestId ->
                                     activeFileImports.Remove windowId |> ignore
                                 | _ -> ()
-                                vault.isBusyWriting <- wasBusyWriting
                         })
             with e ->
                 return Error(exn $"Could not import files: {e.Message}")
@@ -464,8 +463,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             let windowId = windowIdFromIpcEvent event
 
             match activeFileImports.TryGetValue windowId with
-            | true, activeImport when activeImport.RequestId = requestId ->
-                activeImport.IsCancellationRequested <- true
+            | true, activeImport when activeImport.RequestId = requestId -> activeImport.IsCancellationRequested <- true
             | _ -> ()
 
             return Ok()

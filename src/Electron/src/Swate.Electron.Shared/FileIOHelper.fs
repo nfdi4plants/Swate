@@ -6,7 +6,6 @@ open ARCtrl
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 
-
 let getNonEmptyPathParts (path: string) =
     PathHelpers.normalizePath path
     |> fun p -> p.Split('/', StringSplitOptions.RemoveEmptyEntries)

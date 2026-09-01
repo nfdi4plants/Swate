@@ -5,6 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.RenamePathRules
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
@@ -206,6 +207,7 @@ let mapRenameDiskError (sourcePath: string) (targetPath: string) (renameError: e
 module ArcFileSystemHelper =
 
     exception private ImportCancelledException
+    let private temporaryImportDirectoryPrefix = ".swate-import-"
 
     type private ExternalFileImportEntry = { SourcePath: string; FileName: string }
 
@@ -236,7 +238,7 @@ module ArcFileSystemHelper =
                 return Error(exn $"Cannot import because '{targetRelativePath}' is not a folder.")
     }
 
-    let private createExternalFileImportPlan arcPath targetDirectory sourcePaths = promise {
+    let private createExternalFileImportPlan targetDirectory sourcePaths = promise {
         let entries =
             sourcePaths
             |> Array.map (fun sourcePath ->
@@ -266,10 +268,12 @@ module ArcFileSystemHelper =
 
         return {
             TargetDirectory = targetDirectory
-            // Keep temporary import files outside the watched ARC tree. Using the ARC's parent keeps
-            // them on the same filesystem, which is required when creating the final hard links.
+            // The watcher explicitly ignores this operation-owned directory and its contents.
             TemporaryDirectory =
-                join [| dirname (resolveAbsolutePath arcPath); $".swate-import-{Guid.NewGuid():N}" |]
+                join [|
+                    targetDirectory
+                    $"{temporaryImportDirectoryPrefix}{Guid.NewGuid():N}"
+                |]
             Entries = entries
         }
     }
@@ -287,7 +291,16 @@ module ArcFileSystemHelper =
             onProgress (float (sourceIndex + 1) / float plan.Entries.Length)
     }
 
-    let private linkTemporaryFilesIntoTarget
+    let private copyTemporaryFileIntoTarget temporaryPath destinationPath = promise {
+        try
+            do! linkAsync temporaryPath destinationPath
+        with _ ->
+            // Hard links are an optional fast path. COPYFILE_EXCL provides a portable fallback
+            // while preserving the no-overwrite contract if linking is unavailable or denied.
+            do! copyFileWithModeAsync temporaryPath destinationPath fileSystemConstants.COPYFILE_EXCL
+    }
+
+    let private copyTemporaryFilesIntoTarget
         (plan: ExternalFileImportPlan)
         (createdTargetPaths: ResizeArray<string>)
         isCancellationRequested
@@ -299,9 +312,7 @@ module ArcFileSystemHelper =
 
                 let temporaryPath = join [| plan.TemporaryDirectory; entry.FileName |]
                 let destinationPath = join [| plan.TargetDirectory; entry.FileName |]
-                // A hard link publishes atomically and fails instead of overwriting a path
-                // created after validation. Both paths are on the same filesystem.
-                do! linkAsync temporaryPath destinationPath
+                do! copyTemporaryFileIntoTarget temporaryPath destinationPath
                 createdTargetPaths.Add destinationPath
         }
 
@@ -317,7 +328,9 @@ module ArcFileSystemHelper =
         try
             do! rmAsync temporaryDirectory (RmOptions(recursive = true, force = true))
         with cleanupError ->
-            cleanupErrors.Add($"Could not remove temporary import directory '{temporaryDirectory}': {cleanupError.Message}")
+            cleanupErrors.Add(
+                $"Could not remove temporary import directory '{temporaryDirectory}': {cleanupError.Message}"
+            )
 
         return cleanupErrors |> Seq.toArray
     }
@@ -354,10 +367,10 @@ module ArcFileSystemHelper =
                 let mutable temporaryDirectory = None
 
                 try
-                    let! plan = createExternalFileImportPlan arcPath targetDirectory sourcePaths
+                    let! plan = createExternalFileImportPlan targetDirectory sourcePaths
                     temporaryDirectory <- Some plan.TemporaryDirectory
                     do! copyExternalFilesToTemporaryDirectory plan onProgress isCancellationRequested
-                    do! linkTemporaryFilesIntoTarget plan createdTargetPaths isCancellationRequested
+                    do! copyTemporaryFilesIntoTarget plan createdTargetPaths isCancellationRequested
                     do! rmAsync plan.TemporaryDirectory (RmOptions(recursive = true, force = true))
                     return Ok ImportExternalFilesResult.Completed
                 with importError ->
