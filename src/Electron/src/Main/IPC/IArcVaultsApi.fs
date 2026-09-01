@@ -15,6 +15,7 @@ open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.DTOs.NoteSearchDto
 open Node.Api
 open Main
+open Main.Bindings
 open Main.IPC.Delete
 open Main.IPC.Rename
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
@@ -31,6 +32,28 @@ type private ActiveFileImport = {
 
 let private activeFileImports =
     System.Collections.Generic.Dictionary<int, ActiveFileImport>()
+
+let private createImportedFileWatcherEvents arcPath (request: ImportExternalFilesRequest) =
+    let targetRelativePath =
+        PathHelpers.normalizeCanonicalRelativePath request.targetRelativePath
+
+    request.sourceAbsolutePaths
+    |> Array.map (fun sourcePath ->
+        let fileName = path.basename sourcePath
+
+        let relativePath =
+            if String.IsNullOrWhiteSpace targetRelativePath then
+                fileName
+            else
+                $"{targetRelativePath}/{fileName}"
+            |> PathHelpers.normalizePath
+
+        {
+            EventName = Chokidar.Events.Add.ToString()
+            RelativePath = relativePath
+            AbsolutePath = Main.Bindings.Path.join [| arcPath; relativePath |]
+        }
+    )
 
 let private withLoadedArcVault<'T>
     (event: IpcMainInvokeEvent)
@@ -411,9 +434,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 IsCancellationRequested = false
                             }
 
-                            // The watcher ignores temporary import directories. Final files deliberately remain
-                            // eligible for normal watcher ARC merges so imported canonical metadata is
-                            // reconciled with the in-memory ARC.
+                            // The watcher ignores temporary import directories. Suppress merge collection for
+                            // the final filesystem events because successful imports synchronously replay those
+                            // events below before exposing the refreshed file tree to the renderer.
+                            let wasBusyWriting = vault.isBusyWriting
+                            vault.isBusyWriting <- true
 
                             let reportImportProgress progress =
                                 if progress <= 0.0 then
@@ -445,7 +470,14 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             | _ -> false
                                         )
 
-                                do! vault.RefreshFileTree()
+                                match result with
+                                | Ok ImportExternalFilesResult.Completed ->
+                                    let importedEvents = createImportedFileWatcherEvents vault.path.Value request
+                                    do! vault.TriggerArcInMemoryMergeOnFileWatcherEvents(importedEvents |> Array.toList)
+                                    do! vault.RefreshFileTree()
+                                | Ok ImportExternalFilesResult.Cancelled
+                                | Error _ -> do! vault.RefreshFileTree()
+
                                 return result
                             finally
                                 vault.window.setProgressBar -1.0
@@ -454,6 +486,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 | true, activeImport when activeImport.RequestId = request.requestId ->
                                     activeFileImports.Remove windowId |> ignore
                                 | _ -> ()
+
+                                vault.isBusyWriting <- wasBusyWriting
                         })
             with e ->
                 return Error(exn $"Could not import files: {e.Message}")

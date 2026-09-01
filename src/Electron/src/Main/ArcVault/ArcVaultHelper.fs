@@ -347,7 +347,7 @@ let createFileWatcher (path: string) (usePolling: bool option) =
         fun (path: string) ->
             let normalizedPath = PathHelpers.normalizeSeparators path
             let tempXlsxPattern = """\.~\$.*\.xlsx$"""
-            let temporaryImportPattern = """(^|/)\.swate-import-[^/]+(/|$)"""
+            let temporaryImportPattern = """(^|/)\.swate-import-[0-9a-fA-F]{32}(/|$)"""
 
             System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
             || isGitMetadataPath normalizedPath

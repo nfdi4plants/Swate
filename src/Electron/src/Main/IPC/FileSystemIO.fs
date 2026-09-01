@@ -314,6 +314,11 @@ module ArcFileSystemHelper =
                 let destinationPath = join [| plan.TargetDirectory; entry.FileName |]
                 do! copyTemporaryFileIntoTarget temporaryPath destinationPath
                 createdTargetPaths.Add destinationPath
+
+                // A fallback copy cannot be interrupted. Re-check immediately afterward so a
+                // cancellation requested during the copy rolls back the registered destination.
+                if isCancellationRequested () then
+                    raise ImportCancelledException
         }
 
     let private cleanupExternalFileImport temporaryDirectory (createdTargetPaths: ResizeArray<string>) = promise {
