@@ -15,6 +15,8 @@ open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.DTOs.NoteSearchDto
 open Node.Api
 open Main
+open Main.ARCtrlExtensions
+open Main.ArcVaultHelper
 open Main.IPC.Delete
 open Main.IPC.Rename
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
@@ -36,7 +38,7 @@ let private withLoadedArcVault<'T>
         | Some vault ->
             match vault.path, vault.arc with
             | Some _, Some _ -> return! operation vault
-            | _ -> return Error(exn "ARC is not loaded.")
+            | _ -> return Error(arcNotOpenError ())
     }
 
 let private tryResolveExistingArcRelativePath
@@ -236,7 +238,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 | None -> return Error(exn $"The ARC for window id {windowId} should exist")
                 | Some vault ->
                     match vault.path with
-                    | None -> return Error(exn "ARC is not loaded.")
+                    | None -> return Error(arcNotOpenError ())
                     | Some arcPath ->
                         let! shellOpenResult = shell.openPath arcPath
 
@@ -272,7 +274,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 | None -> return Error(exn $"The ARC for window id {windowId} should exist")
                 | Some vault ->
                     match vault.path with
-                    | None -> return Error(exn "ARC is not loaded.")
+                    | None -> return Error(arcNotOpenError ())
                     | Some arcPath ->
                         let properties = [|
                             Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
@@ -410,7 +412,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 | None -> return Error(exn $"The ARC for window id {windowId} should exist")
                 | Some vault ->
                     match vault.path with
-                    | None -> return Error(exn "ARC is not loaded.")
+                    | None -> return Error(arcNotOpenError ())
                     | Some arcPath ->
                         let! fileEntries =
                             if vault.fileTree.Count > 0 then
@@ -457,8 +459,12 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             match! vault.WriteArc() with
                             | Error saveError -> return Error saveError
                             | Ok() ->
-                                do! vault.RefreshFileTree()
-                                return Ok()
+                                match vault.path with
+                                | None -> return Error(arcNotOpenError ())
+                                | Some arcPath ->
+                                    let! fileTree = getFileTree arcPath
+                                    vault.SetFileTree fileTree
+                                    return Ok()
                         })
             with e ->
                 return Error e
@@ -519,7 +525,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.EntityFile _,
                                                                                               _) ->
                                 match vault.arc with
-                                | None -> return Error(exn "ARC is not loaded.")
+                                | None -> return Error(arcNotOpenError ())
                                 | Some arcLocal ->
                                     let wasBusyWriting = vault.isBusyWriting
                                     vault.isBusyWriting <- true
@@ -539,7 +545,35 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                     finally
                                         vault.isBusyWriting <- wasBusyWriting
                             | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile _,
-                                                                                              normalizedGenericPath)
+                                                                                              normalizedDataMapPath) ->
+                                match vault.arc, DatamapParentInfo.tryFromPath normalizedDataMapPath with
+                                | None, _ -> return Error(arcNotOpenError ())
+                                | _, None ->
+                                    return
+                                        Error(
+                                            exn
+                                                "Swate could not determine which assay, study, run, or workflow the selected DataMap belongs to. Refresh the File Explorer and try again."
+                                        )
+                                | Some arc, Some parentInfo ->
+                                    let wasBusyWriting = vault.isBusyWriting
+                                    vault.isBusyWriting <- true
+
+                                    try
+                                        match! arc.TryDeleteDataMapAsync(arcPath, parentInfo) with
+                                        | Error deleteError -> return Error deleteError
+                                        | Ok() ->
+                                            vault.RefreshHasUnsavedArcChangesFlag()
+
+                                            let absoluteDataMapPath =
+                                                Main.Bindings.Path.join [| arcPath; normalizedDataMapPath |]
+
+                                            vault.SetFileTree(
+                                                removePathAndDescendants absoluteDataMapPath vault.fileTree
+                                            )
+
+                                            return Ok()
+                                    finally
+                                        vault.isBusyWriting <- wasBusyWriting
                             | ArcEntityPathRules.DeletePathClassification.GenericTarget normalizedGenericPath
                             | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget(_,
                                                                                                   normalizedGenericPath) ->
@@ -587,7 +621,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 return! ArcFileSystemHelper.renameGenericFileSystemItemOnDisk arcPath request
                             | _ ->
                                 match vault.arc with
-                                | None -> return Error(exn "ARC is not loaded.")
+                                | None -> return Error(arcNotOpenError ())
                                 | Some arcLocal ->
                                     let wasBusyWriting = vault.isBusyWriting
                                     vault.isBusyWriting <- true
@@ -647,7 +681,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 | None -> return Error(exn $"The ARC for window id {windowId} should exist")
                 | Some vault ->
                     match vault.path with
-                    | None -> return Error(exn "ARC is not loaded.")
+                    | None -> return Error(arcNotOpenError ())
                     | Some arcPath ->
                         match tryResolveArcRelativePath arcPath request.path with
                         | Error pathError -> return Error pathError
@@ -660,7 +694,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                     let directoryPath = path.dirname absolutePath
                                     do! ARCtrl.FileSystemHelper.createDirectoryAsync directoryPath
                                     do! ARCtrl.FileSystemHelper.writeFileTextAsync absolutePath request.content
-                                    do! vault.RefreshFileTree()
+                                    let! fileTree = getFileTree arcPath
+                                    vault.SetFileTree fileTree
                                     return Ok()
                                 | FileContentType.CLI ->
                                     return Error(exn "Direct writing of CLI files is not supported.")
@@ -704,7 +739,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             return Ok dto
                     with e ->
                         return Error(exn $"Could not read file {relativePath}: {e.Message}")
-            | _ -> return Error(exn "ARC is not loaded.")
+            | _ -> return Error(arcNotOpenError ())
         }
     runGitLfs =
         fun (request: GitLfsRequest) -> promise {
@@ -714,7 +749,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             | None -> return Error(exn $"The ARC for window id {windowId} should exist")
             | Some vault ->
                 match vault.path with
-                | None -> return Error(exn "ARC is not loaded.")
+                | None -> return Error(arcNotOpenError ())
                 | Some arcPath ->
                     match Main.Git.GitLfsService.validateTrackingRulesetRequest request.Command request.FilePath with
                     | Error blockedReason -> return Error(exn blockedReason)
@@ -731,7 +766,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         | Ok successResult ->
                             match enforcedRequest.Command with
                             | Track
-                            | Untrack -> do! vault.RefreshFileTree()
+                            | Untrack ->
+                                let! fileTree = getFileTree arcPath
+                                vault.SetFileTree fileTree
                             | _ -> ()
 
                             return Ok successResult

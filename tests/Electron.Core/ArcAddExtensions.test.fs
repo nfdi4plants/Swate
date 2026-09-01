@@ -90,6 +90,83 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "adds a parent-backed DataMap",
+            fun () ->
+                withTempArc
+                    (fun arc -> arc.AddAssay(ArcAssay("DataMapAssay")))
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+                        let parentInfo = DatamapParentInfo.create "DataMapAssay" DataMapParent.Assay
+                        let vault = ArcVault(testWindow ())
+                        vault.path <- Some arcPath
+                        vault.SetArc arc
+
+                        let request =
+                            FileContentDTO.fromArcFile (ArcFiles.DataMap(Some parentInfo, DataMap.init ()))
+                            |> expectSome
+                            <| "Expected DataMap DTO."
+
+                        match! vault.AddArcFile request with
+                        | Error error -> failwith error.Message
+                        | Ok() -> ()
+
+                        Vitest.expect(arc.GetAssay("DataMapAssay").DataMap.IsSome).toBe (true)
+
+                        let dataMapPath = join [| arcPath; "assays"; "DataMapAssay"; "isa.datamap.xlsx" |]
+                        let! dataMapExists = pathExistsAsync dataMapPath
+                        Vitest.expect(dataMapExists).toBe (true)
+
+                        let dataMapIsLoadedInFileTree =
+                            vault.fileTree.Values
+                            |> Seq.exists (fun entry -> PathHelpers.pathsEqual entry.path dataMapPath)
+
+                        Vitest.expect(dataMapIsLoadedInFileTree).toBe (true)
+
+                        let! reloadedArc = loadArcAsync arcPath
+                        Vitest.expect(reloadedArc.GetAssay("DataMapAssay").DataMap.IsSome).toBe (true)
+                    })
+        )
+
+        Vitest.test (
+            "adding a DataMap does not persist unrelated dirty in-memory changes",
+            fun () ->
+                withTempArc
+                    (fun arc ->
+                        arc.AddAssay(ArcAssay("DataMapAssay"))
+                        arc.AddAssay(ArcAssay("DirtyAssay", title = "Persisted title"))
+                    )
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+                        arc.GetAssay("DirtyAssay").Title <- Some "Unsaved title"
+
+                        let vault = ArcVault(testWindow ())
+                        vault.path <- Some arcPath
+                        vault.SetArc arc
+                        vault.RefreshHasUnsavedArcChangesFlag()
+
+                        let parentInfo = DatamapParentInfo.create "DataMapAssay" DataMapParent.Assay
+
+                        let request =
+                            FileContentDTO.fromArcFile (ArcFiles.DataMap(Some parentInfo, DataMap.init ()))
+                            |> expectSome
+                            <| "Expected DataMap DTO."
+
+                        match! vault.AddArcFile request with
+                        | Error error -> failwith error.Message
+                        | Ok() -> ()
+
+                        let! reloadedArc = loadArcAsync arcPath
+                        Vitest.expect(reloadedArc.GetAssay("DataMapAssay").DataMap.IsSome).toBe (true)
+                        Vitest.expect(reloadedArc.GetAssay("DirtyAssay").Title).toEqual (Some "Persisted title")
+
+                        let inMemoryArc = vault.arc |> expectSome <| "Expected vault ARC."
+                        Vitest.expect(inMemoryArc.GetAssay("DataMapAssay").DataMap.IsSome).toBe (true)
+                        Vitest.expect(inMemoryArc.GetAssay("DirtyAssay").Title).toEqual (Some "Unsaved title")
+                        Vitest.expect(vault.hasUnsavedArcChanges).toBe (true)
+                    })
+        )
+
+        Vitest.test (
             "adds the file explorer default assay via vault add path",
             fun () ->
                 withTempArc
@@ -167,6 +244,44 @@ Vitest.describe (
                         | Error error ->
                             Vitest.expect(error.Message).toContain ("already contains assay")
                             Vitest.expect(vault.isBusyWriting).toBe (false)
+                    })
+        )
+
+        Vitest.test (
+            "vault rejects a concurrent DataMap add while the first add is pending",
+            fun () ->
+                withTempArc
+                    (fun arc -> arc.AddAssay(ArcAssay("DataMapAssay")))
+                    (fun arcPath -> promise {
+                        let! loadedArc = loadArcAsync arcPath
+                        let vault = ArcVault(testWindow ())
+                        vault.path <- Some arcPath
+                        vault.SetArc loadedArc
+
+                        let parentInfo = DatamapParentInfo.create "DataMapAssay" DataMapParent.Assay
+
+                        let request () =
+                            FileContentDTO.fromArcFile (ArcFiles.DataMap(Some parentInfo, DataMap.init ()))
+                            |> expectSome
+                            <| "Expected DataMap DTO."
+
+                        let firstAdd = vault.AddArcFile(request ())
+                        let secondAdd = vault.AddArcFile(request ())
+
+                        match! secondAdd with
+                        | Ok() -> failwith "Expected the concurrent DataMap add to be rejected."
+                        | Error error ->
+                            Vitest
+                                .expect(error.Message)
+                                .toBe ("Swate is still saving another change. Please wait a moment and try again.")
+
+                        match! firstAdd with
+                        | Error error -> failwith error.Message
+                        | Ok() -> ()
+
+                        let! reloadedArc = loadArcAsync arcPath
+                        Vitest.expect(reloadedArc.GetAssay("DataMapAssay").DataMap.IsSome).toBe (true)
+                        Vitest.expect(vault.isBusyWriting).toBe (false)
                     })
         )
 
@@ -273,6 +388,49 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "explains which ARC entity prevents a DataMap from being added",
+            fun () ->
+                withTempArc
+                    (fun arc ->
+                        let assay = ArcAssay("ExistingAssay")
+                        assay.DataMap <- Some(DataMap.init ())
+                        arc.AddAssay assay
+                    )
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+
+                        let duplicateParent = DatamapParentInfo.create "ExistingAssay" DataMapParent.Assay
+
+                        let! duplicateResult =
+                            arc.TryAddArcFileAsync(arcPath, ArcFiles.DataMap(Some duplicateParent, DataMap.init ()))
+
+                        match duplicateResult with
+                        | Ok _ -> failwith "Expected duplicate DataMap add to fail."
+                        | Error errors ->
+                            Vitest
+                                .expect(errors.[0])
+                                .toBe (
+                                    "The assay 'ExistingAssay' already has a DataMap. Delete the existing DataMap before adding a new one."
+                                )
+
+                        let missingParent =
+                            DatamapParentInfo.create "MissingWorkflow" DataMapParent.Workflow
+
+                        let! missingResult =
+                            arc.TryAddArcFileAsync(arcPath, ArcFiles.DataMap(Some missingParent, DataMap.init ()))
+
+                        match missingResult with
+                        | Ok _ -> failwith "Expected DataMap add for a missing workflow to fail."
+                        | Error errors ->
+                            Vitest
+                                .expect(errors.[0])
+                                .toBe (
+                                    "Could not add the DataMap because the workflow 'MissingWorkflow' was not found in the current ARC. Refresh the File Explorer and try again."
+                                )
+                    })
+        )
+
+        Vitest.test (
             "rejects unsupported ARC file kinds",
             fun () ->
                 withTempArc
@@ -282,7 +440,7 @@ Vitest.describe (
 
                         let unsupportedArcFiles = [|
                             ArcFiles.Investigation(ArcInvestigation("Investigation")), "investigation"
-                            ArcFiles.DataMap(None, DataMap.init ()), "datamap"
+                            ArcFiles.DataMap(None, DataMap.init ()), "which assay, study, run, or workflow"
                             ArcFiles.Template(Template.init "Template"), "template"
                         |]
 

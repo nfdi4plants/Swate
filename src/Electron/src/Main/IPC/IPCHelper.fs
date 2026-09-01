@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
 open Main
+open Main.ArcVaultHelper
 
 [<AutoOpen>]
 module IPCHelper =
@@ -28,7 +29,7 @@ module IPCHelper =
         | Some vault ->
             match vault.path with
             | Some arcPath -> Ok(vault, arcPath)
-            | None -> Error(exn "ARC is not loaded.")
+            | None -> Error(arcNotOpenError ())
 
     let withBusyWriting
         (vault: ArcVault)

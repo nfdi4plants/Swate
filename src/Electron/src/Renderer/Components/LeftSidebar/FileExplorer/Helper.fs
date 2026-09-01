@@ -242,7 +242,7 @@ let tryBuildArcCreateDraft kind (identifier: string) (existingPaths: string seq)
         | Error errorMessage -> Error errorMessage
         | Ok arcFile ->
             match FileContentDTO.fromArcFile arcFile with
-            | None -> Error $"Creating {label} files is not supported in Electron yet."
+            | None -> Error $"Creating {label} files is not supported in Swate yet."
             | Some request ->
                 let requestedPath = PathHelpers.normalizePath request.path
 

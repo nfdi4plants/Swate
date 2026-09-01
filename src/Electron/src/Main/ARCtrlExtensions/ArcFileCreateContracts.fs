@@ -12,4 +12,5 @@ module ArcFileCreateContracts =
         | ArcFiles.Study(study, _) -> study.ToCreateContract(withFolder)
         | ArcFiles.Workflow workflow -> workflow.ToCreateContract(withFolder)
         | ArcFiles.Run run -> run.ToCreateContract(withFolder)
+        | ArcFiles.DataMap(Some parentInfo, dataMap) -> dataMap.ToCreateContract(parentInfo) |> Array.singleton
         | unsupportedArcFile -> failwithf "Cannot create ARC file contracts for %A." unsupportedArcFile
