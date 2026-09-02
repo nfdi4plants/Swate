@@ -44,7 +44,7 @@ type ArcVault(window: BrowserWindow) =
     member val private fileWatcherOwnWriteArcMergeSuppressionTimeout: int option = None with get, set
 
     /// Runs ARC merges sequentially so every operation observes the result of the preceding merge.
-    member internal this.EnqueueArcMerge(operation: unit -> Fable.Core.JS.Promise<unit>) =
+    member this.EnqueueArcMerge(operation: unit -> Fable.Core.JS.Promise<unit>) =
         let precedingMerge = arcMergeQueue
 
         let queuedMerge = promise {
