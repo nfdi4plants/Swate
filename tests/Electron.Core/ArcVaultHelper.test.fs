@@ -1,6 +1,7 @@
 module ElectronCore.ArcVaultHelperTests
 
 open ARCtrl
+open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Electron.Main
 open Main.ARCtrlExtensions
@@ -12,6 +13,77 @@ open Main.Notes.NoteConstants
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Vitest
+
+Vitest.describe (
+    "ArcVault merge queue",
+    fun () ->
+        Vitest.test (
+            "runs overlapping merges sequentially so the second observes the first result",
+            fun () -> promise {
+                let vault = ArcVault(TestHelpers.testWindow ())
+                let executionOrder = ResizeArray<string>()
+                let mutable mergeResult = 0
+                let mutable releaseFirstMerge = ignore
+
+                let firstMergeGate =
+                    JS.Constructors.Promise.Create(fun resolve _ -> releaseFirstMerge <- fun () -> resolve ())
+
+                let firstMerge =
+                    vault.EnqueueArcMerge(fun () -> promise {
+                        executionOrder.Add "first-start"
+                        do! firstMergeGate
+                        mergeResult <- 1
+                        executionOrder.Add "first-end"
+                    })
+
+                let secondMerge =
+                    vault.EnqueueArcMerge(fun () -> promise {
+                        executionOrder.Add "second-start"
+                        Vitest.expect(mergeResult).toBe (1)
+                        mergeResult <- 2
+                        executionOrder.Add "second-end"
+                    })
+
+                releaseFirstMerge ()
+                do! firstMerge
+                do! secondMerge
+
+                Vitest
+                    .expect(executionOrder.ToArray())
+                    .toEqual (
+                        [|
+                            "first-start"
+                            "first-end"
+                            "second-start"
+                            "second-end"
+                        |]
+                    )
+
+                Vitest.expect(mergeResult).toBe (2)
+            }
+        )
+
+        Vitest.test (
+            "continues processing after a merge operation fails",
+            fun () -> promise {
+                let vault = ArcVault(TestHelpers.testWindow ())
+                let mutable continued = false
+
+                let failedMerge =
+                    vault.EnqueueArcMerge(fun () -> promise { return raise (exn "Expected merge failure") })
+
+                let followingMerge = vault.EnqueueArcMerge(fun () -> promise { continued <- true })
+
+                try
+                    do! failedMerge
+                with error ->
+                    Vitest.expect(error.Message).toContain ("Expected merge failure")
+
+                do! followingMerge
+                Vitest.expect(continued).toBe (true)
+            }
+        )
+)
 
 let private lifecycleTestWindow id isDestroyed onSend =
     // The remoting proxy calls webContents.send with channel and payload arguments.

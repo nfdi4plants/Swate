@@ -66,7 +66,7 @@ Vitest.describe (
                     let notesReadmePath =
                         pathDynamic?join (notesFolderPath, "README.md") |> unbox<string>
 
-                    let! ensureResult = ensureNotesFolderAtArcPath arcPath
+                    let! ensureResult = Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath arcPath
                     assertEnsureSucceeded ensureResult
 
                     let! hasNotesFolder = pathExistsAsync notesFolderPath
@@ -99,7 +99,7 @@ Vitest.describe (
                         fsPromisesDynamic?mkdir (notesFolderPath, createObj [ "recursive" ==> true ])
                         |> unbox<JS.Promise<obj>>
 
-                    let! ensureResult = ensureNotesFolderAtArcPath arcPath
+                    let! ensureResult = Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath arcPath
                     assertEnsureSucceeded ensureResult
 
                     let! hasNotesReadme = pathExistsAsync notesReadmePath
@@ -124,12 +124,12 @@ Vitest.describe (
 
                     let customContent = "custom readme content"
 
-                    let! firstEnsureResult = ensureNotesFolderAtArcPath arcPath
+                    let! firstEnsureResult = Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath arcPath
                     assertEnsureSucceeded firstEnsureResult
 
                     do! writeUtf8FileAsync notesReadmePath customContent
 
-                    let! secondEnsureResult = ensureNotesFolderAtArcPath arcPath
+                    let! secondEnsureResult = Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath arcPath
                     assertEnsureSucceeded secondEnsureResult
 
                     let! finalContent = readUtf8FileAsync notesReadmePath

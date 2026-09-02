@@ -347,10 +347,12 @@ let createFileWatcher (path: string) (usePolling: bool option) =
         fun (path: string) ->
             let normalizedPath = PathHelpers.normalizeSeparators path
             let tempXlsxPattern = """\.~\$.*\.xlsx$"""
+            let temporaryImportPattern = """(^|/)\.swate-import-[0-9a-fA-F]{32}(/|$)"""
 
             System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
             || isGitMetadataPath normalizedPath
             || isLegacyDataMapPath normalizedPath
+            || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryImportPattern)
 
     // Native Windows file events can keep handles that block app-initiated folder renames.
     let usePolling =

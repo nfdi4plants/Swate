@@ -5,7 +5,10 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.RenamePathRules
+open Main.Bindings.Filesystem
+open Main.Bindings.Path
 
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
@@ -202,6 +205,177 @@ let mapRenameDiskError (sourcePath: string) (targetPath: string) (renameError: e
 
 [<RequireQualifiedAccess>]
 module ArcFileSystemHelper =
+
+    exception private ImportCancelledException
+
+    type private ExternalFileImportEntry = { SourcePath: string; FileName: string }
+
+    type private ExternalFileImportPlan = {
+        TargetDirectory: string
+        TemporaryDirectory: string
+        Entries: ExternalFileImportEntry[]
+    }
+
+    let private resolveImportTargetDirectory arcPath targetRelativePath = promise {
+        let normalizedTargetPath =
+            PathHelpers.normalizeCanonicalRelativePath targetRelativePath
+
+        let targetDirectoryResult =
+            if String.IsNullOrWhiteSpace normalizedTargetPath then
+                Ok(resolveAbsolutePath arcPath)
+            else
+                tryResolveArcRelativePath arcPath normalizedTargetPath
+
+        match targetDirectoryResult with
+        | Error pathError -> return Error pathError
+        | Ok targetDirectory ->
+            let! targetIsDirectory = ARCtrl.FileSystemHelper.directoryExistsAsync targetDirectory
+
+            if targetIsDirectory then
+                return Ok targetDirectory
+            else
+                return Error(exn $"Cannot import because '{targetRelativePath}' is not a folder.")
+    }
+
+    let private createExternalFileImportPlan targetDirectory sourcePaths = promise {
+        let entries =
+            sourcePaths
+            |> Array.map (fun sourcePath ->
+                let absolutePath = resolveAbsolutePath sourcePath
+
+                {
+                    SourcePath = absolutePath
+                    FileName = basename absolutePath
+                }
+            )
+
+        let duplicateName =
+            entries
+            |> Array.groupBy (fun entry -> entry.FileName.ToLowerInvariant())
+            |> Array.tryFind (fun (_, duplicates) -> duplicates.Length > 1)
+
+        match duplicateName with
+        | Some(_, duplicates) -> raise (exn $"Cannot import multiple files named '{duplicates.[0].FileName}'.")
+        | None -> ()
+
+        for entry in entries do
+            let destinationPath = join [| targetDirectory; entry.FileName |]
+            let! destinationExists = pathExistsAsync destinationPath
+
+            if destinationExists then
+                raise (exn $"Cannot import '{entry.FileName}' because a file with that name already exists.")
+
+        return {
+            TargetDirectory = targetDirectory
+            // The watcher explicitly ignores this operation-owned directory and its contents.
+            TemporaryDirectory = join [| targetDirectory; $".swate-import-{Guid.NewGuid():N}" |]
+            Entries = entries
+        }
+    }
+
+    let private copyExternalFilesToTemporaryDirectory plan onProgress isCancellationRequested = promise {
+        do! mkdirAsync plan.TemporaryDirectory
+        onProgress 0.0
+
+        for sourceIndex, entry in plan.Entries |> Array.indexed do
+            if isCancellationRequested () then
+                raise ImportCancelledException
+
+            let temporaryPath = join [| plan.TemporaryDirectory; entry.FileName |]
+            do! copyFileAsync entry.SourcePath temporaryPath
+            onProgress (float (sourceIndex + 1) / float plan.Entries.Length)
+    }
+
+    let private copyTemporaryFilesIntoTarget
+        (plan: ExternalFileImportPlan)
+        (createdTargetPaths: ResizeArray<string>)
+        isCancellationRequested
+        =
+        promise {
+            for entry in plan.Entries do
+                if isCancellationRequested () then
+                    raise ImportCancelledException
+
+                let temporaryPath = join [| plan.TemporaryDirectory; entry.FileName |]
+                let destinationPath = join [| plan.TargetDirectory; entry.FileName |]
+
+                try
+                    do! linkAsync temporaryPath destinationPath
+                with _ ->
+                    // Hard links are an optional fast path. COPYFILE_EXCL provides a portable fallback
+                    // while preserving the no-overwrite contract if linking is unavailable or denied.
+                    do! copyFileWithFlagsAsync temporaryPath destinationPath fileSystemConstants.COPYFILE_EXCL
+
+                createdTargetPaths.Add destinationPath
+
+                // A fallback copy cannot be interrupted. Re-check immediately afterward so a
+                // cancellation requested during the copy rolls back the registered destination.
+                if isCancellationRequested () then
+                    raise ImportCancelledException
+        }
+
+    let private cleanupExternalFileImport temporaryDirectory (createdTargetPaths: ResizeArray<string>) = promise {
+        let cleanupErrors = ResizeArray<string>()
+
+        for createdTargetPath in createdTargetPaths |> Seq.rev do
+            try
+                do! rmAsync createdTargetPath (RmOptions(force = true))
+            with cleanupError ->
+                cleanupErrors.Add($"Could not remove '{createdTargetPath}': {cleanupError.Message}")
+
+        try
+            do! rmAsync temporaryDirectory (RmOptions(recursive = true, force = true))
+        with cleanupError ->
+            cleanupErrors.Add(
+                $"Could not remove temporary import directory '{temporaryDirectory}': {cleanupError.Message}"
+            )
+
+        return cleanupErrors |> Seq.toArray
+    }
+
+    let private externalFileImportFailureResult
+        temporaryDirectory
+        (createdTargetPaths: ResizeArray<string>)
+        (importError: exn)
+        =
+        promise {
+            let! cleanupErrors = cleanupExternalFileImport temporaryDirectory createdTargetPaths
+
+            if cleanupErrors.Length > 0 then
+                let cleanupMessage = String.concat " " cleanupErrors
+                return Error(exn $"Import failed: {importError.Message} Cleanup also failed: {cleanupMessage}")
+            elif importError :? ImportCancelledException then
+                return Ok ImportExternalFilesResult.Cancelled
+            else
+                return Error importError
+        }
+
+    let importExternalFilesOnDisk
+        (arcPath: string)
+        (targetRelativePath: string)
+        (sourcePaths: string[])
+        (onProgress: float -> unit)
+        (isCancellationRequested: unit -> bool)
+        : JS.Promise<Result<ImportExternalFilesResult, exn>> =
+        promise {
+            match! resolveImportTargetDirectory arcPath targetRelativePath with
+            | Error pathError -> return Error pathError
+            | Ok targetDirectory ->
+                let createdTargetPaths = ResizeArray<string>()
+                let mutable temporaryDirectory = None
+
+                try
+                    let! plan = createExternalFileImportPlan targetDirectory sourcePaths
+                    temporaryDirectory <- Some plan.TemporaryDirectory
+                    do! copyExternalFilesToTemporaryDirectory plan onProgress isCancellationRequested
+                    do! copyTemporaryFilesIntoTarget plan createdTargetPaths isCancellationRequested
+                    do! rmAsync plan.TemporaryDirectory (RmOptions(recursive = true, force = true))
+                    return Ok ImportExternalFilesResult.Completed
+                with importError ->
+                    match temporaryDirectory with
+                    | Some path -> return! externalFileImportFailureResult path createdTargetPaths importError
+                    | None -> return Error importError
+        }
 
     type CreateFileSystemItemPlan = {
         ParentPath: string

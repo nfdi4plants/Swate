@@ -15,14 +15,41 @@ open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.DTOs.NoteSearchDto
 open Node.Api
 open Main
+open Main.Bindings
 open Main.IPC.Delete
 open Main.IPC.Rename
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
 open Main.IPC.FileSystemIO
 
+type private ActiveFileImport = {
+    RequestId: string
+    mutable IsCancellationRequested: bool
+}
 
-let ensureNotesFolderAtArcPath =
-    Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath
+let private activeFileImports =
+    System.Collections.Generic.Dictionary<int, ActiveFileImport>()
+
+let private createImportedFileWatcherEvents arcPath (request: ImportExternalFilesRequest) =
+    let targetRelativePath =
+        PathHelpers.normalizeCanonicalRelativePath request.targetRelativePath
+
+    request.sourceAbsolutePaths
+    |> Array.map (fun sourcePath ->
+        let fileName = path.basename sourcePath
+
+        let relativePath =
+            if String.IsNullOrWhiteSpace targetRelativePath then
+                fileName
+            else
+                $"{targetRelativePath}/{fileName}"
+            |> PathHelpers.normalizePath
+
+        {
+            EventName = Chokidar.Events.Add.ToString()
+            RelativePath = relativePath
+            AbsolutePath = Main.Bindings.Path.join [| arcPath; relativePath |]
+        }
+    )
 
 let private withLoadedArcVault<'T>
     (event: IpcMainInvokeEvent)
@@ -92,6 +119,21 @@ let private runLoadedArcPathAction
         with e ->
             return Error e
     }
+
+let private pickAbsolutePaths (event: IpcMainInvokeEvent) = promise {
+    let properties = [|
+        Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
+        Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
+    |]
+
+    let window = dialogParentFromIpcEvent event
+    let! result = dialog.showOpenDialog (?window = window, properties = properties)
+
+    if result.canceled then
+        return Ok None
+    else
+        return Ok(Some result.filePaths)
+}
 
 let private initGitRepositoryForCreatedArcDisposition
     (initRepository: string -> JS.Promise<Main.Git.GitService.GitResult<string>>)
@@ -201,7 +243,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             try
                 match tryGetVaultAndArcPath event with
                 | Error error -> return Error error
-                | Ok(_, arcPath) -> return! ensureNotesFolderAtArcPath arcPath
+                | Ok(_, arcPath) -> return! Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath arcPath
             with error ->
                 return Error error
         }
@@ -333,11 +375,10 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 |]
 
                 let window = dialogParentFromIpcEvent event
-
                 let! result = dialog.showOpenDialog (?window = window, properties = properties)
 
                 if result.canceled then
-                    return Error(exn "Cancelled")
+                    return Ok [||]
                 else
                     return Ok result.filePaths
             with e ->
@@ -376,6 +417,95 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     return Ok(importedFiles.ToArray())
             with e ->
                 return Error(exn $"Could not import external text files: {e.Message}")
+        }
+    tryImportExternalFiles =
+        fun (request: ImportExternalFilesRequest) -> promise {
+            try
+                if String.IsNullOrWhiteSpace request.requestId then
+                    raise (exn "Import request ID must not be empty.")
+
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            let windowId = windowIdFromIpcEvent event
+
+                            if activeFileImports.ContainsKey windowId then
+                                raise (exn "Another file import is already running in this window.")
+
+                            activeFileImports.[windowId] <- {
+                                RequestId = request.requestId
+                                IsCancellationRequested = false
+                            }
+
+                            // The watcher ignores temporary import directories, while final imported files and
+                            // unrelated external ARC changes remain eligible for normal watcher merges. Successful
+                            // imports also replay their own events synchronously before the refreshed tree is exposed.
+
+                            let reportImportProgress progress =
+                                if progress <= 0.0 then
+                                    vault.window.setProgressBar (
+                                        0.0,
+                                        BrowserWindow.SetProgressBar.Options(
+                                            Enums.BrowserWindow.SetProgressBar.Options.Mode.Indeterminate
+                                        )
+                                    )
+                                else
+                                    vault.window.setProgressBar (
+                                        progress,
+                                        BrowserWindow.SetProgressBar.Options(
+                                            Enums.BrowserWindow.SetProgressBar.Options.Mode.Normal
+                                        )
+                                    )
+
+                            try
+                                let! result =
+                                    ArcFileSystemHelper.importExternalFilesOnDisk
+                                        vault.path.Value
+                                        request.targetRelativePath
+                                        request.sourceAbsolutePaths
+                                        reportImportProgress
+                                        (fun () ->
+                                            match activeFileImports.TryGetValue windowId with
+                                            | true, activeImport when activeImport.RequestId = request.requestId ->
+                                                activeImport.IsCancellationRequested
+                                            | _ -> false
+                                        )
+
+                                match result with
+                                | Ok ImportExternalFilesResult.Completed ->
+                                    let importedEvents = createImportedFileWatcherEvents vault.path.Value request
+
+                                    do!
+                                        vault.TriggerArcInMemoryMergeOnFileWatcherEvents(
+                                            importedEvents |> Array.toList
+                                        )
+
+                                    do! vault.RefreshFileTree()
+                                | Ok ImportExternalFilesResult.Cancelled
+                                | Error _ -> do! vault.RefreshFileTree()
+
+                                return result
+                            finally
+                                vault.window.setProgressBar -1.0
+
+                                match activeFileImports.TryGetValue windowId with
+                                | true, activeImport when activeImport.RequestId = request.requestId ->
+                                    activeFileImports.Remove windowId |> ignore
+                                | _ -> ()
+                        })
+            with e ->
+                return Error(exn $"Could not import files: {e.Message}")
+        }
+    cancelImportExternalFiles =
+        fun requestId -> promise {
+            let windowId = windowIdFromIpcEvent event
+
+            match activeFileImports.TryGetValue windowId with
+            | true, activeImport when activeImport.RequestId = requestId -> activeImport.IsCancellationRequested <- true
+            | _ -> ()
+
+            return Ok()
         }
     getFileTree =
         fun () -> promise {
