@@ -23,7 +23,9 @@ open ARCtrl
 type ArcVault(window: BrowserWindow) =
 
     let fileWatcherOwnWriteArcMergeSuppressionMs = 500
-    let mutable arcMergeQueue = promise { return () }
+
+    let mutable lastArcMerge: Fable.Core.JS.Promise<unit> =
+        Fable.Core.JS.Constructors.Promise.resolve ()
 
     member val window: BrowserWindow = window with get
     member val path: string option = None with get, set
@@ -45,7 +47,7 @@ type ArcVault(window: BrowserWindow) =
 
     /// Runs ARC merges sequentially so every operation observes the result of the preceding merge.
     member this.EnqueueArcMerge(operation: unit -> Fable.Core.JS.Promise<unit>) =
-        let precedingMerge = arcMergeQueue
+        let precedingMerge = lastArcMerge
 
         let queuedMerge = promise {
             try
@@ -56,7 +58,7 @@ type ArcVault(window: BrowserWindow) =
             do! operation ()
         }
 
-        arcMergeQueue <- queuedMerge
+        lastArcMerge <- queuedMerge
         queuedMerge
 
     member private this.StartFileWatcherOwnWriteArcMergeSuppression() =

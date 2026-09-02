@@ -207,7 +207,6 @@ let mapRenameDiskError (sourcePath: string) (targetPath: string) (renameError: e
 module ArcFileSystemHelper =
 
     exception private ImportCancelledException
-    let private temporaryImportDirectoryPrefix = ".swate-import-"
 
     type private ExternalFileImportEntry = { SourcePath: string; FileName: string }
 
@@ -269,11 +268,7 @@ module ArcFileSystemHelper =
         return {
             TargetDirectory = targetDirectory
             // The watcher explicitly ignores this operation-owned directory and its contents.
-            TemporaryDirectory =
-                join [|
-                    targetDirectory
-                    $"{temporaryImportDirectoryPrefix}{Guid.NewGuid():N}"
-                |]
+            TemporaryDirectory = join [| targetDirectory; $".swate-import-{Guid.NewGuid():N}" |]
             Entries = entries
         }
     }
@@ -291,15 +286,6 @@ module ArcFileSystemHelper =
             onProgress (float (sourceIndex + 1) / float plan.Entries.Length)
     }
 
-    let private copyTemporaryFileIntoTarget temporaryPath destinationPath = promise {
-        try
-            do! linkAsync temporaryPath destinationPath
-        with _ ->
-            // Hard links are an optional fast path. COPYFILE_EXCL provides a portable fallback
-            // while preserving the no-overwrite contract if linking is unavailable or denied.
-            do! copyFileWithModeAsync temporaryPath destinationPath fileSystemConstants.COPYFILE_EXCL
-    }
-
     let private copyTemporaryFilesIntoTarget
         (plan: ExternalFileImportPlan)
         (createdTargetPaths: ResizeArray<string>)
@@ -312,7 +298,14 @@ module ArcFileSystemHelper =
 
                 let temporaryPath = join [| plan.TemporaryDirectory; entry.FileName |]
                 let destinationPath = join [| plan.TargetDirectory; entry.FileName |]
-                do! copyTemporaryFileIntoTarget temporaryPath destinationPath
+
+                try
+                    do! linkAsync temporaryPath destinationPath
+                with _ ->
+                    // Hard links are an optional fast path. COPYFILE_EXCL provides a portable fallback
+                    // while preserving the no-overwrite contract if linking is unavailable or denied.
+                    do! copyFileWithFlagsAsync temporaryPath destinationPath fileSystemConstants.COPYFILE_EXCL
+
                 createdTargetPaths.Add destinationPath
 
                 // A fallback copy cannot be interrupted. Re-check immediately afterward so a

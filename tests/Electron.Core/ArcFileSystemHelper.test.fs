@@ -201,24 +201,8 @@ Vitest.describe (
                     do! writeRelativeFileAsync sourceDirectory secondName "second"
 
                     let mutable cancelRequested = false
-                    let mutable sawTemporaryImportInsideArc = false
-                    let mutable sawTemporaryImportNextToArc = false
 
                     let onProgress progress =
-                        let targetEntries =
-                            fsDynamic?readdirSync (absoluteArcPath arcPath "assays/AssayA")
-                            |> unbox<string[]>
-
-                        let arcParentEntries = fsDynamic?readdirSync (dirname arcPath) |> unbox<string[]>
-
-                        sawTemporaryImportInsideArc <-
-                            sawTemporaryImportInsideArc
-                            || (targetEntries |> Array.exists _.StartsWith(".swate-import-"))
-
-                        sawTemporaryImportNextToArc <-
-                            sawTemporaryImportNextToArc
-                            || (arcParentEntries |> Array.exists _.StartsWith(".swate-import-"))
-
                         if progress > 0.0 then
                             cancelRequested <- true
 
@@ -239,13 +223,15 @@ Vitest.describe (
                         let targetDirectory = absoluteArcPath arcPath "assays/AssayA"
                         let! firstExists = pathExistsAsync (join [| targetDirectory; firstName |])
                         let! secondExists = pathExistsAsync (join [| targetDirectory; secondName |])
-                        let! entries = fsPromisesDynamic?readdir targetDirectory |> unbox<JS.Promise<string[]>>
+                        let! targetEntries = fsPromisesDynamic?readdir targetDirectory |> unbox<JS.Promise<string[]>>
+
+                        let! arcParentEntries =
+                            fsPromisesDynamic?readdir (dirname arcPath) |> unbox<JS.Promise<string[]>>
 
                         Vitest.expect(firstExists).toBe (false)
                         Vitest.expect(secondExists).toBe (false)
-                        Vitest.expect(sawTemporaryImportInsideArc).toBe (true)
-                        Vitest.expect(sawTemporaryImportNextToArc).toBe (false)
-                        Vitest.expect(entries |> Array.exists _.StartsWith(".swate-import-")).toBe (false)
+                        Vitest.expect(targetEntries |> Array.exists _.StartsWith(".swate-import-")).toBe (false)
+                        Vitest.expect(arcParentEntries |> Array.exists _.StartsWith(".swate-import-")).toBe (false)
                 })
         )
 

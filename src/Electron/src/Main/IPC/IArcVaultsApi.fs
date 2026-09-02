@@ -21,10 +21,6 @@ open Main.IPC.Rename
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
 open Main.IPC.FileSystemIO
 
-
-let ensureNotesFolderAtArcPath =
-    Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath
-
 type private ActiveFileImport = {
     RequestId: string
     mutable IsCancellationRequested: bool
@@ -247,7 +243,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             try
                 match tryGetVaultAndArcPath event with
                 | Error error -> return Error error
-                | Ok(_, arcPath) -> return! ensureNotesFolderAtArcPath arcPath
+                | Ok(_, arcPath) -> return! Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath arcPath
             with error ->
                 return Error error
         }
@@ -373,10 +369,18 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
     pickAbsolutePaths =
         fun () -> promise {
             try
-                match! pickAbsolutePaths event with
-                | Error exn -> return Error exn
-                | Ok None -> return Ok [||]
-                | Ok(Some paths) -> return Ok paths
+                let properties = [|
+                    Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
+                    Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
+                |]
+
+                let window = dialogParentFromIpcEvent event
+                let! result = dialog.showOpenDialog (?window = window, properties = properties)
+
+                if result.canceled then
+                    return Ok [||]
+                else
+                    return Ok result.filePaths
             with e ->
                 return Error(exn $"Could not pick files: {e.Message}")
         }

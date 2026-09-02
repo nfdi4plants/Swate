@@ -81,7 +81,7 @@ let copyFileAsync (sourcePath: string) (targetPath: string) : JS.Promise<unit> =
 let fileSystemConstants: FileSystemConstants = jsNative
 
 [<Import("copyFile", "fs/promises")>]
-let copyFileWithModeAsync (sourcePath: string) (targetPath: string) (mode: int) : JS.Promise<unit> = jsNative
+let copyFileWithFlagsAsync (sourcePath: string) (targetPath: string) (flags: int) : JS.Promise<unit> = jsNative
 
 [<Import("link", "fs/promises")>]
 let linkAsync (existingPath: string) (newPath: string) : JS.Promise<unit> = jsNative

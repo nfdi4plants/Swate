@@ -23,11 +23,15 @@ Vitest.describe (
                 let vault = ArcVault(TestHelpers.testWindow ())
                 let executionOrder = ResizeArray<string>()
                 let mutable mergeResult = 0
+                let mutable releaseFirstMerge = ignore
+
+                let firstMergeGate =
+                    JS.Constructors.Promise.Create(fun resolve _ -> releaseFirstMerge <- fun () -> resolve ())
 
                 let firstMerge =
                     vault.EnqueueArcMerge(fun () -> promise {
                         executionOrder.Add "first-start"
-                        do! Promise.sleep 20
+                        do! firstMergeGate
                         mergeResult <- 1
                         executionOrder.Add "first-end"
                     })
@@ -40,6 +44,7 @@ Vitest.describe (
                         executionOrder.Add "second-end"
                     })
 
+                releaseFirstMerge ()
                 do! firstMerge
                 do! secondMerge
 
