@@ -14,7 +14,7 @@ let rootClasses styleFn =
 let shouldUseVirtualization enableVirtualization visibleCount =
     enableVirtualization && visibleCount > 0
 
-let nodeContainerClasses (row: TreeVisibleNode<'T>) canSelect canExpand isSelected isFocused styleFn =
+let nodeContainerClasses (row: TreeVisibleNode<'T>) canSelect canExpand isSelected isActive isFocused styleFn =
     let baseClasses = [|
         "swt:group swt:flex swt:min-h-8 swt:w-full swt:min-w-0 swt:items-center swt:gap-1 swt:rounded-md swt:px-1 swt:py-0.5 swt:text-sm swt:outline-none"
         if canSelect || canExpand then
@@ -23,9 +23,11 @@ let nodeContainerClasses (row: TreeVisibleNode<'T>) canSelect canExpand isSelect
             "swt:cursor-default swt:opacity-80"
         if isSelected then
             "swt:bg-primary swt:text-primary-content swt:hover:bg-primary"
-        elif isFocused then
+        elif isActive then
             "swt:bg-base-200"
-        yield! row.node.className |> Option.toArray
+        if isFocused then
+            "swt:ring-2 swt:ring-primary swt:ring-inset"
+        yield! (TreeItem.props row.node).className |> Option.toArray
     |]
 
     styleFn
@@ -39,6 +41,6 @@ let chevronIcon isExpanded =
         "swt:fluent--chevron-right-20-regular"
 
 let defaultIcon (node: TreeItem<'T>) =
-    match node.kind with
-    | TreeNodeKind.Branch -> "swt:fluent--folder-24-regular"
-    | TreeNodeKind.Leaf -> "swt:fluent--document-24-regular"
+    match node with
+    | TreeItem.Branch _ -> "swt:fluent--folder-24-regular"
+    | TreeItem.Leaf _ -> "swt:fluent--document-24-regular"

@@ -43,3 +43,9 @@ let originatesFromInteractiveDescendant (event: MouseEvent) =
     else
         let target = event.target :?> Element
         target.closest InteractiveElementSelector |> Option.isSome
+
+let focusMovedOutsideTree (event: FocusEvent) =
+    let tree: HTMLElement = unbox event.currentTarget
+    let related: HTMLElement = unbox event.relatedTarget
+
+    isNull (box related) || not (tree.contains related)

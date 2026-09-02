@@ -30,7 +30,6 @@ let private isLoadStillPending nodeId requestId loadedChildren =
 
 let loadBranchChildren
     (dataSource: TreeDataSource<'T> option)
-    enableLazyLoading
     (activeRequestIdsRef: IRefValue<Map<string, int>>)
     (loadRequestIdRef: IRefValue<int>)
     (loadedChildren: Map<string, TreeLoadState<'T>>)
@@ -40,25 +39,24 @@ let loadBranchChildren
     (node: TreeItem<'T>)
     =
     promise {
+        let nodeId = TreeItem.id node
+
         match
-            dataSource,
-            enableLazyLoading,
-            directChildren loadedChildren node,
-            isLoadActive activeRequestIdsRef node.id loadedChildren
+            dataSource, directChildren loadedChildren node, isLoadActive activeRequestIdsRef nodeId loadedChildren
         with
-        | Some source, true, None, false ->
+        | Some source, None, false ->
             let requestId = nextRequestId loadRequestIdRef
 
-            markLoadStarted activeRequestIdsRef node.id requestId
+            markLoadStarted activeRequestIdsRef nodeId requestId
 
             setLoadedChildren (fun current ->
                 if
-                    hasActiveOrLoadedChildren node.id current
+                    hasActiveOrLoadedChildren nodeId current
                     || directChildren current node |> Option.isSome
                 then
                     current
                 else
-                    withLoading node.id requestId current
+                    withLoading nodeId requestId current
             )
 
             try
@@ -66,30 +64,29 @@ let loadBranchChildren
                     let! children = source.getTreeItems (Some node)
 
                     setLoadedChildren (fun current ->
-                        if isLoadStillPending node.id requestId current then
-                            withLoaded node.id children current
+                        if isLoadStillPending nodeId requestId current then
+                            withLoaded nodeId children current
                         else
                             current
                     )
                 with ex ->
-                    if isRequestCurrent activeRequestIdsRef node.id requestId then
+                    if isRequestCurrent activeRequestIdsRef nodeId requestId then
                         setLoadedChildren (fun current ->
-                            if isLoadStillPending node.id requestId current then
-                                withLoadError node.id ex.Message current
+                            if isLoadStillPending nodeId requestId current then
+                                withLoadError nodeId ex.Message current
                             else
                                 current
                         )
 
-                        setExpandedIds (fun current -> current |> Set.remove node.id)
+                        setExpandedIds (fun current -> current |> Set.remove nodeId)
                         onError ex
             finally
-                markLoadFinished activeRequestIdsRef node.id requestId
+                markLoadFinished activeRequestIdsRef nodeId requestId
         | _ -> ()
     }
 
 let expandNode
     (dataSource: TreeDataSource<'T> option)
-    enableLazyLoading
     (activeRequestIdsRef: IRefValue<Map<string, int>>)
     (loadRequestIdRef: IRefValue<int>)
     (loadedChildren: Map<string, TreeLoadState<'T>>)
@@ -99,13 +96,13 @@ let expandNode
     (onError: exn -> unit)
     (node: TreeItem<'T>)
     =
-    if canExpand dataSource enableLazyLoading loadedChildren node then
-        setExpandedIds (toggleExpanded node.id)
+    if canExpand node then
+        let nodeId = TreeItem.id node
+        setExpandedIds (toggleExpanded nodeId)
 
-        if not (expandedIds |> Set.contains node.id) then
+        if not (expandedIds |> Set.contains nodeId) then
             loadBranchChildren
                 dataSource
-                enableLazyLoading
                 activeRequestIdsRef
                 loadRequestIdRef
                 loadedChildren
@@ -115,29 +112,47 @@ let expandNode
                 node
             |> Promise.start
 
-let selectNode
+let internal selectNode
     (selectionMode: TreeSelectionMode)
     isSelectionDisabled
     (isNodeSelectable: TreeItem<'T> -> bool)
+    (visibleNodes: TreeVisibleNode<'T>[])
+    (selectionAnchorId: string option)
+    (setActiveId: string option -> unit)
+    (setSelectionAnchorId: string option -> unit)
     (effectiveSelectedIds: Set<string>)
     (setSelection: Set<string> -> unit)
     (node: TreeItem<'T>)
-    extendSelection
+    intent
     =
+    let nodeId = TreeItem.id node
+    setActiveId (Some nodeId)
+
+    match intent with
+    | TreeSelectionIntent.Range when selectionAnchorId.IsSome -> ()
+    | _ -> setSelectionAnchorId (Some nodeId)
+
     if not isSelectionDisabled && isNodeSelectable node then
         let nextSelectedIds =
-            nextSelection selectionMode extendSelection node.id effectiveSelectedIds
+            match selectionMode, intent with
+            | TreeSelectionMode.Multiple, TreeSelectionIntent.Toggle ->
+                toggleSelection selectionMode nodeId effectiveSelectedIds
+            | TreeSelectionMode.Multiple, TreeSelectionIntent.Range ->
+                rangeSelection (selectionAnchorId |> Option.defaultValue nodeId) nodeId isNodeSelectable visibleNodes
+            | _ -> Set.singleton nodeId
 
         setSelection nextSelectedIds
 
 let focusNode (focusController: TreeFocusController<'T>) index nodeId =
+    focusController.SetActiveId(Some nodeId)
     focusController.SetFocusedId(Some nodeId)
+    focusController.SetSelectionAnchorId(Some nodeId)
     focusController.ScrollToIndex index
     focusController.FocusDom nodeId
 
 let tryFocusById (focusController: TreeFocusController<'T>) nodeId =
     focusController.Lookup.VisibleNodes
-    |> Array.tryFindIndex (fun row -> row.node.id = nodeId)
+    |> Array.tryFindIndex (fun row -> TreeItem.id row.node = nodeId)
     |> Option.iter (fun index -> focusNode focusController index nodeId)
 
 let focusByDelta focusController focusedId delta =
@@ -147,17 +162,17 @@ let focusByDelta focusController focusedId delta =
 let focusFirst focusController =
     focusController.Lookup.VisibleNodes
     |> Array.tryHead
-    |> Option.iter (fun row -> tryFocusById focusController row.node.id)
+    |> Option.iter (fun row -> tryFocusById focusController (TreeItem.id row.node))
 
 let focusLast focusController =
     focusController.Lookup.VisibleNodes
     |> Array.tryLast
-    |> Option.iter (fun row -> tryFocusById focusController row.node.id)
+    |> Option.iter (fun row -> tryFocusById focusController (TreeItem.id row.node))
 
 let focusFirstChild focusController nodeId =
     focusController.Lookup.VisibleNodes
     |> Array.tryFind (fun row -> row.parentId = Some nodeId)
-    |> Option.iter (fun row -> tryFocusById focusController row.node.id)
+    |> Option.iter (fun row -> tryFocusById focusController (TreeItem.id row.node))
 
 let collapseOrFocusParent focusController expandedIds setExpandedIds nodeId =
     if expandedIds |> Set.contains nodeId then

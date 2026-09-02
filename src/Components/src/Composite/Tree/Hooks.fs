@@ -43,7 +43,9 @@ let useTreeState
     let selectedIds, setSelectedIds =
         React.useStateWithUpdater (toSelectionSet selectionMode defaultSelectedIds)
 
+    let activeId, setActiveId = React.useState<string option> None
     let focusedId, setFocusedId = React.useState<string option> None
+    let selectionAnchorId, setSelectionAnchorId = React.useState<string option> None
 
     let loadedChildren, setLoadedChildren =
         React.useStateWithUpdater<Map<string, TreeLoadState<'T>>> (Map.empty)
@@ -53,8 +55,12 @@ let useTreeState
         SetExpandedIds = setExpandedIds
         SelectedIds = selectedIds
         SetSelectedIds = setSelectedIds
+        ActiveId = activeId
+        SetActiveId = setActiveId
         FocusedId = focusedId
         SetFocusedId = setFocusedId
+        SelectionAnchorId = selectionAnchorId
+        SetSelectionAnchorId = setSelectionAnchorId
         LoadedChildren = loadedChildren
         SetLoadedChildren = setLoadedChildren
     }
@@ -117,7 +123,7 @@ let useTreeApi
     )
 
 [<Hook>]
-let useTreeNodeActions
+let internal useTreeNodeActions
     (treeRef: IRefValue<HTMLElement option>)
     scrollToIndex
     (activeRequestIdsRef: IRefValue<Map<string, int>>)
@@ -149,7 +155,9 @@ let useTreeNodeActions
 
     let currentFocusController () : TreeFocusController<'T> = {
         Lookup = lookupRef.current
+        SetActiveId = treeStateRef.current.SetActiveId
         SetFocusedId = treeStateRef.current.SetFocusedId
+        SetSelectionAnchorId = treeStateRef.current.SetSelectionAnchorId
         ScrollToIndex = scrollToIndexRef.current
         FocusDom = focusNodeAfterRender treeRef
     }
@@ -160,7 +168,6 @@ let useTreeNodeActions
 
         TreeController.loadBranchChildren
             currentConfig.DataSource
-            currentConfig.EnableLazyLoading
             activeRequestIdsRef
             loadRequestIdRef
             currentTreeState.LoadedChildren
@@ -175,8 +182,8 @@ let useTreeNodeActions
             lookup.VisibleNodes
             |> Array.iter (fun row ->
                 if
-                    treeState.ExpandedIds.Contains row.node.id
-                    && canExpand config.DataSource config.EnableLazyLoading treeState.LoadedChildren row.node
+                    treeState.ExpandedIds.Contains(TreeItem.id row.node)
+                    && canExpand row.node
                     && (directChildren treeState.LoadedChildren row.node).IsNone
                 then
                     loadNode row.node
@@ -184,7 +191,6 @@ let useTreeNodeActions
         ),
         [|
             box config.DataSource
-            box config.EnableLazyLoading
             box treeState.ExpandedIds
             box treeState.LoadedChildren
             box lookup.VisibleNodes
@@ -197,7 +203,6 @@ let useTreeNodeActions
 
         TreeController.expandNode
             currentConfig.DataSource
-            currentConfig.EnableLazyLoading
             activeRequestIdsRef
             loadRequestIdRef
             currentTreeState.LoadedChildren
@@ -207,17 +212,22 @@ let useTreeNodeActions
             currentConfig.OnError
             node
 
-    let selectNode (node: TreeItem<'T>) extendSelection =
+    let selectNode (node: TreeItem<'T>) intent =
         let currentConfig = configRef.current
+        let currentTreeState = treeStateRef.current
 
         TreeController.selectNode
             selectionModeRef.current
             currentConfig.SelectionDisabled
             currentConfig.IsNodeSelectable
+            lookupRef.current.VisibleNodes
+            currentTreeState.SelectionAnchorId
+            currentTreeState.SetActiveId
+            currentTreeState.SetSelectionAnchorId
             effectiveSelectedIdsRef.current
             setSelectionRef.current
             node
-            extendSelection
+            intent
 
     let onNodeKeyDown (node: TreeItem<'T>) (event: KeyboardEvent) =
         if obj.ReferenceEquals(event.target, event.currentTarget) then
@@ -242,15 +252,9 @@ let useTreeNodeActions
             | kbdEventCode.arrowRight ->
                 event.preventDefault ()
 
-                if
-                    canExpand
-                        currentConfig.DataSource
-                        currentConfig.EnableLazyLoading
-                        currentTreeState.LoadedChildren
-                        node
-                then
-                    if currentTreeState.ExpandedIds.Contains node.id then
-                        TreeController.focusFirstChild focusController node.id
+                if canExpand node then
+                    if currentTreeState.ExpandedIds.Contains(TreeItem.id node) then
+                        TreeController.focusFirstChild focusController (TreeItem.id node)
                     else
                         expandNode node
             | kbdEventCode.arrowLeft ->
@@ -260,21 +264,20 @@ let useTreeNodeActions
                     focusController
                     currentTreeState.ExpandedIds
                     currentTreeState.SetExpandedIds
-                    node.id
+                    (TreeItem.id node)
             | kbdEventCode.enter
             | kbdEventCode.space ->
                 event.preventDefault ()
 
-                if
-                    canExpand
-                        currentConfig.DataSource
-                        currentConfig.EnableLazyLoading
-                        currentTreeState.LoadedChildren
-                        node
-                then
-                    expandNode node
+                let intent =
+                    if event.shiftKey then
+                        TreeSelectionIntent.Range
+                    elif event.ctrlKey || event.metaKey then
+                        TreeSelectionIntent.Toggle
+                    else
+                        TreeSelectionIntent.Replace
 
-                selectNode node (event.shiftKey || event.ctrlKey || event.metaKey)
+                selectNode node intent
             | _ -> ()
 
     {

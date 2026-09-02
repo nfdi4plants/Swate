@@ -51,26 +51,14 @@ let withLoadError nodeId message loadedChildren =
 let invalidateNode nodeId loadedChildren = loadedChildren |> Map.remove nodeId
 
 let directChildren (loadedChildren: Map<string, TreeLoadState<'T>>) (node: TreeItem<'T>) =
-    match node.kind with
-    | TreeNodeKind.Leaf -> None
-    | TreeNodeKind.Branch ->
-        match loadedChildren |> Map.tryFind node.id |> Option.bind _.Children with
+    match node with
+    | TreeItem.Leaf _ -> None
+    | TreeItem.Branch _ ->
+        match loadedChildren |> Map.tryFind (TreeItem.id node) |> Option.bind _.Children with
         | Some children -> Some children
-        | None -> node.children
+        | None -> TreeItem.children node
 
-let canExpand
-    (dataSource: TreeDataSource<'T> option)
-    enableLazyLoading
-    (loadedChildren: Map<string, TreeLoadState<'T>>)
-    (node: TreeItem<'T>)
-    =
-    if node.kind <> TreeNodeKind.Branch then
-        false
-    else
-        match directChildren loadedChildren node, dataSource with
-        | Some children, _ -> children.Length > 0
-        | None, Some source when enableLazyLoading -> source.getChildrenCount (Some node) <> 0
-        | None, _ -> false
+let canExpand (node: TreeItem<'T>) = TreeItem.isBranch node
 
 let flattenVisible loadedChildren expandedIds items =
     let nodes = ResizeArray<TreeVisibleNode<'T>>()
@@ -80,8 +68,9 @@ let flattenVisible loadedChildren expandedIds items =
     let rec loop ancestors parentId depth (items: TreeItem<'T>[]) =
         for index = 0 to items.Length - 1 do
             let item = items.[index]
+            let itemId = TreeItem.id item
 
-            if not (ancestors |> Set.contains item.id) then
+            if not (ancestors |> Set.contains itemId) then
                 nodes.Add {
                     node = item
                     depth = depth
@@ -90,12 +79,12 @@ let flattenVisible loadedChildren expandedIds items =
                     setSize = items.Length
                 }
 
-                nodeMap.Add(item.id, item)
-                parentId |> Option.iter (fun parentId -> parentMap.Add(item.id, parentId))
+                nodeMap.Add(itemId, item)
+                parentId |> Option.iter (fun parentId -> parentMap.Add(itemId, parentId))
 
-                if item.kind = TreeNodeKind.Branch && expandedIds |> Set.contains item.id then
+                if TreeItem.isBranch item && expandedIds |> Set.contains itemId then
                     match directChildren loadedChildren item with
-                    | Some children -> loop (ancestors |> Set.add item.id) (Some item.id) (depth + 1) children
+                    | Some children -> loop (ancestors |> Set.add itemId) (Some itemId) (depth + 1) children
                     | None -> ()
 
     loop Set.empty None 0 items
@@ -129,15 +118,37 @@ let toggleSelection mode nodeId selectedIds =
         else
             selectedIds |> Set.add nodeId
 
-let nextSelection mode extendSelection nodeId selectedIds =
-    match mode, extendSelection with
-    | TreeSelectionMode.Multiple, true -> toggleSelection mode nodeId selectedIds
-    | _ -> Set.singleton nodeId
+let rangeSelection anchorId targetId isNodeSelectable visibleNodes =
+    let tryIndex nodeId =
+        visibleNodes |> Array.tryFindIndex (fun row -> TreeItem.id row.node = nodeId)
 
-let focusedOrFirst focusedId visibleNodes =
+    match tryIndex anchorId, tryIndex targetId with
+    | Some anchorIndex, Some targetIndex ->
+        let firstIndex = min anchorIndex targetIndex
+        let lastIndex = max anchorIndex targetIndex
+
+        visibleNodes.[firstIndex..lastIndex]
+        |> Array.choose (fun row ->
+            if isNodeSelectable row.node then
+                Some(TreeItem.id row.node)
+            else
+                None
+        )
+        |> Set.ofArray
+    | _ -> Set.singleton targetId
+
+let activeOrFirst activeId selectedIds visibleNodes =
+    let isVisible id =
+        visibleNodes |> Array.exists (fun row -> TreeItem.id row.node = id)
+
+    activeId
+    |> Option.filter isVisible
+    |> Option.orElseWith (fun () -> selectedIds |> Seq.tryFind isVisible)
+    |> Option.orElseWith (fun () -> visibleNodes |> Array.tryHead |> Option.map (fun row -> TreeItem.id row.node))
+
+let visibleFocus focusedId visibleNodes =
     focusedId
-    |> Option.filter (fun id -> visibleNodes |> Array.exists (fun row -> row.node.id = id))
-    |> Option.orElse (visibleNodes |> Array.tryHead |> Option.map _.node.id)
+    |> Option.filter (fun id -> visibleNodes |> Array.exists (fun row -> TreeItem.id row.node = id))
 
 let moveFocus delta focusedId visibleNodes =
     if visibleNodes |> Array.isEmpty then
@@ -145,9 +156,9 @@ let moveFocus delta focusedId visibleNodes =
     else
         let currentIndex =
             focusedId
-            |> Option.bind (fun id -> visibleNodes |> Array.tryFindIndex (fun row -> row.node.id = id))
+            |> Option.bind (fun id -> visibleNodes |> Array.tryFindIndex (fun row -> TreeItem.id row.node = id))
             |> Option.defaultValue 0
 
         let nextIndex = currentIndex + delta |> max 0 |> min (visibleNodes.Length - 1)
 
-        Some visibleNodes.[nextIndex].node.id
+        Some(TreeItem.id visibleNodes.[nextIndex].node)

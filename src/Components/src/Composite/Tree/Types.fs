@@ -3,12 +3,7 @@ module Swate.Components.Composite.Tree.Types
 open Browser.Types
 open Fable.Core
 open Feliz
-
-/// Distinguishes expandable branch nodes from terminal leaf nodes.
-[<StringEnum(CaseRules.LowerFirst)>]
-type TreeNodeKind =
-    | Branch
-    | Leaf
+open Swate.Components.Primitive.ContextMenu.Types
 
 /// Defines whether the tree stores one selected node or a set of selected nodes.
 [<StringEnum(CaseRules.LowerFirst)>]
@@ -25,15 +20,13 @@ type TreeLazyLoadStatus =
     | Loaded
     | Error
 
-/// JavaScript-facing tree node model used by static and datasource-backed trees.
+/// JavaScript-facing properties shared by leaf and branch tree items.
 [<AllowNullLiteral; JS.Pojo>]
-type TreeItem<'T>
+type TreeItemProps<'T>
     (
         id: string,
         label: string,
-        kind: TreeNodeKind,
         ?data: 'T,
-        ?children: TreeItem<'T>[],
         ?icon: ReactElement,
         ?tooltip: string,
         ?leading: ReactElement,
@@ -42,14 +35,38 @@ type TreeItem<'T>
     ) =
     member val id = id with get, set
     member val label = label with get, set
-    member val kind = kind with get, set
     member val data: 'T option = data with get, set
-    member val children: TreeItem<'T>[] option = children with get, set
     member val icon: ReactElement option = icon with get, set
     member val tooltip: string option = tooltip with get, set
     member val leading: ReactElement option = leading with get, set
     member val trailing: ReactElement option = trailing with get, set
     member val className: string option = className with get, set
+
+/// JavaScript-facing tree node model that prevents leaves from carrying children.
+[<TypeScriptTaggedUnion("type")>]
+type TreeItem<'T> =
+    | Leaf of props: TreeItemProps<'T>
+    | Branch of props: TreeItemProps<'T> * children: TreeItem<'T>[] option
+
+[<RequireQualifiedAccess>]
+module internal TreeItem =
+
+    let props item =
+        match item with
+        | Leaf props
+        | Branch(props, _) -> props
+
+    let id item = (props item).id
+
+    let isBranch item =
+        match item with
+        | Branch _ -> true
+        | Leaf _ -> false
+
+    let children item =
+        match item with
+        | Leaf _ -> None
+        | Branch(_, children) -> children
 
 /// Runtime state passed to custom node renderers for content, leading, and trailing slots.
 [<JS.Pojo>]
@@ -59,6 +76,7 @@ type TreeRenderProps<'T>
         depth: int,
         isExpanded: bool,
         isSelected: bool,
+        isActive: bool,
         isFocused: bool,
         isLoading: bool,
         error: string option,
@@ -69,6 +87,7 @@ type TreeRenderProps<'T>
     member val depth = depth with get, set
     member val isExpanded = isExpanded with get, set
     member val isSelected = isSelected with get, set
+    member val isActive = isActive with get, set
     member val isFocused = isFocused with get, set
     member val isLoading = isLoading with get, set
     member val error = error with get, set
@@ -99,11 +118,9 @@ type TreeRowLookup<'T> = {
     VisibleNodes: TreeVisibleNode<'T>[]
 }
 
-/// Datasource adapter for lazy trees; unknown child counts are represented by negative values.
+/// Datasource adapter for lazy trees.
 [<JS.Pojo>]
-type TreeDataSource<'T>
-    (getChildrenCount: TreeItem<'T> option -> int, getTreeItems: TreeItem<'T> option -> JS.Promise<TreeItem<'T>[]>) =
-    member val getChildrenCount = getChildrenCount with get, set
+type TreeDataSource<'T>(getTreeItems: TreeItem<'T> option -> JS.Promise<TreeItem<'T>[]>) =
     member val getTreeItems = getTreeItems with get, set
 
 /// Imperative cache invalidation API exposed to consumers through apiRef.
@@ -115,15 +132,14 @@ type TreeApi(invalidateNode: string -> unit, invalidateAll: unit -> unit) =
 /// Allows consumers to extend or replace the generated CSS class list for tree rows.
 type TreeStyleFn<'T> = TreeItem<'T> option -> string[] -> string[]
 
-/// Exposes the browser context-menu event together with its node target, or None for the tree root.
-type TreeContextMenuEvent<'T> = delegate of MouseEvent * TreeItem<'T> option -> unit
+/// Builds context-menu entries for a tree node target, or for the tree root when no node is targeted.
+type TreeContextMenuEvent<'T> = delegate of MouseEvent * TreeItem<'T> option -> ContextMenuItem[]
 
 /// Context value shared by tree subcomponents that need access to tree-level configuration.
 type TreeContextValue<'T> = {
     DataSource: TreeDataSource<'T> option
     SelectionDisabled: bool
     IsNodeSelectable: TreeItem<'T> -> bool
-    EnableLazyLoading: bool
     EnableVirtualization: bool
     EstimateNodeHeight: int
     OnContextMenu: TreeContextMenuEvent<'T> option
@@ -143,8 +159,12 @@ type TreeState<'T> = {
     SetExpandedIds: (Set<string> -> Set<string>) -> unit
     SelectedIds: Set<string>
     SetSelectedIds: (Set<string> -> Set<string>) -> unit
+    ActiveId: string option
+    SetActiveId: string option -> unit
     FocusedId: string option
     SetFocusedId: string option -> unit
+    SelectionAnchorId: string option
+    SetSelectionAnchorId: string option -> unit
     LoadedChildren: Map<string, TreeLoadState<'T>>
     SetLoadedChildren: (Map<string, TreeLoadState<'T>> -> Map<string, TreeLoadState<'T>>) -> unit
 }
@@ -152,14 +172,22 @@ type TreeState<'T> = {
 /// Coordinates DOM focus, virtualized scrolling, and visible-row lookup for keyboard navigation.
 type TreeFocusController<'T> = {
     Lookup: TreeRowLookup<'T>
+    SetActiveId: string option -> unit
     SetFocusedId: string option -> unit
+    SetSelectionAnchorId: string option -> unit
     ScrollToIndex: int -> unit
     FocusDom: string -> unit
 }
 
+/// Describes how a user interaction changes the current selection.
+type internal TreeSelectionIntent =
+    | Replace
+    | Toggle
+    | Range
+
 /// Event handlers produced for tree rows by the controller hook.
-type TreeNodeActions<'T> = {
+type internal TreeNodeActions<'T> = {
     ExpandNode: TreeItem<'T> -> unit
-    SelectNode: TreeItem<'T> -> bool -> unit
+    SelectNode: TreeItem<'T> -> TreeSelectionIntent -> unit
     OnNodeKeyDown: TreeItem<'T> -> KeyboardEvent -> unit
 }

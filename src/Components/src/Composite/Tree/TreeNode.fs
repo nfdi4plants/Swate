@@ -17,6 +17,7 @@ type TreeNode =
             depth: int,
             isExpanded: bool,
             isSelected: bool,
+            isActive: bool,
             isFocused: bool,
             isLoading: bool,
             error: string option,
@@ -25,9 +26,21 @@ type TreeNode =
             onSelect: MouseEvent -> unit
         ) =
         let config = useTreeCtx<'T> ()
+        let nodeProps = TreeItem.props node
 
         let renderProps =
-            TreeRenderProps(node, depth, isExpanded, isSelected, isFocused, isLoading, error, onToggle, onSelect)
+            TreeRenderProps(
+                node,
+                depth,
+                isExpanded,
+                isSelected,
+                isActive,
+                isFocused,
+                isLoading,
+                error,
+                onToggle,
+                onSelect
+            )
 
         let expandButton =
             if canExpand then
@@ -37,9 +50,9 @@ type TreeNode =
                     prop.tabIndex -1
                     prop.ariaLabel (
                         if isExpanded then
-                            $"Collapse {node.label}"
+                            $"Collapse {nodeProps.label}"
                         else
-                            $"Expand {node.label}"
+                            $"Expand {nodeProps.label}"
                     )
                     prop.onClick (fun e ->
                         e.preventDefault ()
@@ -67,10 +80,10 @@ type TreeNode =
             match config.Leading with
             | Some leading -> leading renderProps
             | None ->
-                match node.leading with
+                match nodeProps.leading with
                 | Some leading -> leading
                 | None ->
-                    match node.icon with
+                    match nodeProps.icon with
                     | Some icon -> icon
                     | None ->
                         Html.i [
@@ -89,7 +102,7 @@ type TreeNode =
             | None ->
                 Html.span [
                     prop.className "swt:min-w-0 swt:flex-1 swt:truncate swt:text-left"
-                    prop.text node.label
+                    prop.text nodeProps.label
                 ]
 
         let errorContent =
@@ -106,7 +119,7 @@ type TreeNode =
             match config.Trailing with
             | Some trailing -> trailing renderProps
             | None ->
-                match node.trailing with
+                match nodeProps.trailing with
                 | Some trailing -> trailing
                 | None -> Html.none
 
@@ -114,7 +127,7 @@ type TreeNode =
             Html.div [
                 prop.className [
                     "swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:gap-2"
-                    if node.kind = TreeNodeKind.Branch then
+                    if TreeItem.isBranch node then
                         "swt:pl-4"
                 ]
                 prop.children [ leadingContent; nodeContent ]
@@ -132,6 +145,7 @@ type TreeNode =
             row: TreeVisibleNode<'T>,
             isExpanded: bool,
             isSelected: bool,
+            isActive: bool,
             isFocused: bool,
             isLoading: bool,
             error: string option,
@@ -143,6 +157,8 @@ type TreeNode =
         ) =
         let config = useTreeCtx<'T> ()
         let node = row.node
+        let nodeProps = TreeItem.props node
+        let nodeId = nodeProps.id
         let canSelect = not config.SelectionDisabled && config.IsNodeSelectable node
         let onToggle = defaultArg onToggle ignore
         let onSelect = defaultArg onSelect ignore
@@ -151,7 +167,7 @@ type TreeNode =
 
         Html.div [
             prop.role "treeitem"
-            prop.tabIndex (if isFocused then 0 else -1)
+            prop.tabIndex (if isActive then 0 else -1)
             if canSelect then
                 prop.custom ("aria-selected", isSelected)
             if not canSelect && not canExpand then
@@ -161,13 +177,17 @@ type TreeNode =
             prop.custom ("aria-setsize", row.setSize)
             if canExpand then
                 prop.custom ("aria-expanded", isExpanded)
-            prop.custom ("data-tree-node-id", node.id)
-            prop.custom ("data-tree-node-kind", string node.kind)
+            prop.custom ("data-tree-node-id", nodeId)
+            prop.custom ("data-tree-node-kind", if TreeItem.isBranch node then "branch" else "leaf")
+            prop.custom ("data-tree-active", isActive)
+            prop.custom ("data-tree-focused", isFocused)
             if config.Debug then
-                prop.testId $"tree-node-{node.id}"
-            prop.className (TreeHelper.nodeContainerClasses row canSelect canExpand isSelected isFocused config.StyleFn)
+                prop.testId $"tree-node-{nodeId}"
+            prop.className (
+                TreeHelper.nodeContainerClasses row canSelect canExpand isSelected isActive isFocused config.StyleFn
+            )
             prop.style [ style.paddingLeft (length.rem (float row.depth * 1.25)) ]
-            prop.title (node.tooltip |> Option.defaultValue node.label)
+            prop.title (nodeProps.tooltip |> Option.defaultValue nodeProps.label)
             prop.onClick (fun event ->
                 if not (originatesFromInteractiveDescendant event) then
                     onSelect event
@@ -180,6 +200,7 @@ type TreeNode =
                     row.depth,
                     isExpanded,
                     isSelected,
+                    isActive,
                     isFocused,
                     isLoading,
                     error,
