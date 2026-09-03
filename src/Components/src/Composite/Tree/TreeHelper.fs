@@ -1,0 +1,46 @@
+module Swate.Components.Composite.Tree.TreeHelper
+
+open Swate.Components.Composite.Tree.Types
+
+let rootClasses styleFn =
+    let baseClasses = [|
+        "swt:menu swt:w-full swt:min-w-0 swt:rounded-box swt:bg-base-100 swt:p-1"
+    |]
+
+    styleFn
+    |> Option.map (fun fn -> fn None baseClasses)
+    |> Option.defaultValue baseClasses
+
+let shouldUseVirtualization enableVirtualization visibleCount =
+    enableVirtualization && visibleCount > 0
+
+let nodeContainerClasses (row: TreeVisibleNode<'T>) canSelect canExpand isSelected isActive isFocused styleFn =
+    let baseClasses = [|
+        "swt:group swt:flex swt:min-h-8 swt:w-full swt:min-w-0 swt:items-center swt:gap-1 swt:rounded-md swt:px-1 swt:py-0.5 swt:text-sm swt:outline-none"
+        if canSelect || canExpand then
+            "swt:cursor-pointer swt:hover:bg-base-200"
+        else
+            "swt:cursor-default swt:opacity-80"
+        if isSelected then
+            "swt:bg-primary swt:text-primary-content swt:hover:bg-primary"
+        elif isActive then
+            "swt:bg-base-200"
+        if isFocused then
+            "swt:ring-2 swt:ring-primary swt:ring-inset"
+        yield! (TreeItem.props row.node).className |> Option.toArray
+    |]
+
+    styleFn
+    |> Option.map (fun styleFn -> styleFn (Some row.node) baseClasses)
+    |> Option.defaultValue baseClasses
+
+let chevronIcon isExpanded =
+    if isExpanded then
+        "swt:fluent--chevron-down-20-regular"
+    else
+        "swt:fluent--chevron-right-20-regular"
+
+let defaultIcon (node: TreeItem<'T>) =
+    match node with
+    | TreeItem.Branch _ -> "swt:fluent--folder-24-regular"
+    | TreeItem.Leaf _ -> "swt:fluent--document-24-regular"
