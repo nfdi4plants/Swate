@@ -7,6 +7,7 @@ open Elmish
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
+open Renderer.Context.ArcOpeningContext
 open Renderer.Context.GitWorkflow
 open Renderer.Types
 open Swate.Components.Api.GitLabApi
@@ -484,6 +485,41 @@ Vitest.describe (
                 finally
                     cleanupGitLabCreateProjectFetchSpy ()
             }
+        )
+)
+
+Vitest.describe (
+    "Git sidebar ARC opening",
+    fun () ->
+        Vitest.test (
+            "routes its open action through the shared ARC-opening controller",
+            fun () ->
+                let mutable openCalls = 0
+
+                let action =
+                    Renderer.Components.LeftSidebar.Git.Helper.createOpenArcAction {
+                        isOpeningArc = false
+                        openArc = fun () -> openCalls <- openCalls + 1
+                        openArcByPath = ignore
+                    }
+
+                action.OnClick()
+
+                Vitest.expect(openCalls).toBe (1)
+                Vitest.expect(action.Disabled).toBe (false)
+        )
+
+        Vitest.test (
+            "disables its open action while the shared ARC-opening controller is busy",
+            fun () ->
+                let action =
+                    Renderer.Components.LeftSidebar.Git.Helper.createOpenArcAction {
+                        isOpeningArc = true
+                        openArc = ignore
+                        openArcByPath = ignore
+                    }
+
+                Vitest.expect(action.Disabled).toBe (true)
         )
 )
 

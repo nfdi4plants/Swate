@@ -6,7 +6,6 @@ open Feliz
 open Renderer.Components.Helper
 open Renderer.Components.Helper.ArcVaultHelper
 open Swate.Components
-open Swate.Components.Composite.ArcOpening
 open Swate.Components.Primitive.BaseModal
 open Swate.Components.Primitive.CardGrid
 open Swate.Components.Primitive.ErrorModal.Context
@@ -111,22 +110,8 @@ type InitState =
     static member InitState() =
 
         let modalIsOpen, setModalIsOpen = React.useState (false)
-        let isOpeningArc, setIsOpeningArc = React.useState false
+        let arcOpening = Renderer.Context.ArcOpeningContext.useArcOpeningCtx ()
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
-        let errorModal = useErrorModalCtx ()
-        let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
-
-        let onOpenArcError =
-            createErrorModalCallback errorModal.enqueue "Could not open ARC" appStateCtx
-
-        let handleOpenArc () =
-            openArcWithProgress
-                isOpeningArc
-                Api.ipcArcVaultApi.pickDirectory
-                (openArcByPath onOpenArcError)
-                onOpenArcError
-                setIsOpeningArc
-            |> Promise.start
 
         React.Fragment [
             BaseModal.BaseModal(
@@ -134,7 +119,6 @@ type InitState =
                 setModalIsOpen,
                 InitState.CreateNewArcModalContent(fun () -> setModalIsOpen false)
             )
-            Modals.OpeningArc(isOpeningArc)
             CardGrid.CardGrid(
                 React.Fragment [
                     CardGrid.CardGridButton(
@@ -143,8 +127,8 @@ type InitState =
                         ],
                         "Open ARC",
                         "Open a locally existing ARC!",
-                        (fun _ -> handleOpenArc ()),
-                        disabled = isOpeningArc
+                        (fun _ -> arcOpening.openArc ()),
+                        disabled = arcOpening.isOpeningArc
                     )
                     CardGrid.CardGridButton(
                         Html.i [

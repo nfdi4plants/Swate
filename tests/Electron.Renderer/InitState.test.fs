@@ -1,8 +1,23 @@
 module ElectronRenderer.InitStateTests
 
-open Renderer.Components
-open Renderer.Components.Helper
+open Renderer.Components.Composite.ArcOpening
 open Vitest
+
+let private createRequestGate initiallyBusy =
+    let mutable isBusy = initiallyBusy
+
+    let gate: Helper.RequestGate = {
+        tryBegin =
+            fun () ->
+                if isBusy then
+                    false
+                else
+                    isBusy <- true
+                    true
+        finish = fun () -> isBusy <- false
+    }
+
+    gate
 
 Vitest.describe (
     "InitState ARC opening",
@@ -14,8 +29,8 @@ Vitest.describe (
                 let mutable openWasCalled = false
 
                 do!
-                    ArcVaultHelper.openArcWithProgress
-                        false
+                    Helper.openWithProgress
+                        (createRequestGate false)
                         (fun () -> promise { return Error(exn "Cancelled") })
                         (fun _ ->
                             openWasCalled <- true
@@ -35,8 +50,8 @@ Vitest.describe (
                 let busyStates = ResizeArray<bool>()
 
                 do!
-                    ArcVaultHelper.openArcWithProgress
-                        false
+                    Helper.openWithProgress
+                        (createRequestGate false)
                         (fun () -> promise {
                             Vitest.expect(busyStates.ToArray()).toEqual ([||])
                             return Ok "C:/selected-arc"
@@ -59,8 +74,8 @@ Vitest.describe (
                 let mutable pickerWasCalled = false
 
                 do!
-                    ArcVaultHelper.openArcWithProgress
-                        true
+                    Helper.openWithProgress
+                        (createRequestGate true)
                         (fun () ->
                             pickerWasCalled <- true
                             promise { return Ok "C:/other-arc" }
@@ -79,8 +94,8 @@ Vitest.describe (
                 let busyStates = ResizeArray<bool>()
 
                 do!
-                    ArcVaultHelper.openArcByPathWithProgress
-                        false
+                    Helper.openPathWithProgress
+                        (createRequestGate false)
                         "C:/recent-arc"
                         (fun selectedPath -> promise {
                             Vitest.expect(selectedPath).toBe ("C:/recent-arc")

@@ -12,6 +12,7 @@
     <Compile Include="MainSyncedState.fs" />
     <Compile Include="GitApiClient.fs" />
     <Compile Include="Context\AppStateContext.fs" />
+    <Compile Include="Context\ArcOpeningContext.fs" />
     <Compile Include="Context\PageStateContext.fs" />
     <Compile Include="Context\FileStateContext.fs" />
     <Compile Include="Context\AuthStateContext.fs" />
@@ -23,6 +24,8 @@
     <Compile Include="Components\Helper\ArcVaultHelper.fs" />
     <Compile Include="Components\Helper\FileSystemHelper.fs" />
     <Compile Include="Components\Helper\FileTargetConflictModal.fs" />
+    <Compile Include="Components\Composite\ArcOpening\Helper.fs" />
+    <Compile Include="Components\Composite\ArcOpening\Provider.fs" />
     <Compile Include="Components\InitState.fs" />
     <Compile Include="Components\FileExplorerLfs.fs" />
     <Compile Include="Components\FileExplorerDeleteHelper.fs" />
@@ -41,6 +44,7 @@
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTree.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Main.fs" />
     <Compile Include="Components\LeftSidebar\Git\Types.fs" />
+    <Compile Include="Components\LeftSidebar\Git\Helper.fs" />
     <Compile Include="Components\LeftSidebar\Git\GitSidebarEmptyState.fs" />
     <Compile Include="Components\LeftSidebar\Git\GitSidebarPanel.fs" />
     <Compile Include="Components\LeftSidebar\Main.fs" />

@@ -477,6 +477,29 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "OpenARC reloads edits made after separate validation",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-open-after-validation-"
+                    "ValidatedArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        match! loadArcFolder arcPath with
+                        | Error error -> return raise error
+                        | Ok validatedArc -> Vitest.expect(validatedArc.Title).toEqual (None)
+
+                        let! externalArc = TestHelpers.loadArcAsync arcPath
+                        externalArc.Title <- Some "External edit after validation"
+                        do! externalArc.UpdateAsync arcPath
+
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        do! vault.OpenARC arcPath
+
+                        Vitest.expect(vault.arc.Value.Title).toEqual (Some "External edit after validation")
+                    })
+        )
+
+        Vitest.test (
             "RenameOpenArcRoot moves the active ARC folder and updates the vault path",
             fun () ->
                 TestHelpers.withTempArcWith

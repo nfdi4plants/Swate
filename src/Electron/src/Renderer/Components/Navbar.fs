@@ -5,7 +5,6 @@ open Feliz
 open Renderer.Components.Helper
 open Renderer.Components.Helper.ArcVaultHelper
 open Swate.Components
-open Swate.Components.Composite.ArcOpening
 open Swate.Components.Shared
 open Swate.Components.Composite.Layout
 open Swate.Components.Composite.Authentication.Types
@@ -277,31 +276,18 @@ type Navbar =
 
         let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
         let newArcModalIsOpen, setNewArcModalIsOpen = React.useState false
-        let isOpeningArc, setIsOpeningArc = React.useState false
+        let arcOpening = Renderer.Context.ArcOpeningContext.useArcOpeningCtx ()
         let errorCtx = useErrorModalCtx ()
 
         let onArcError =
             createErrorModalCallback errorCtx.enqueue "ARC action failed" appStateCtx
-
-        let handleOpenArc () =
-            openArcWithProgress
-                isOpeningArc
-                Api.ipcArcVaultApi.pickDirectory
-                (openArcByPath onArcError)
-                onArcError
-                setIsOpeningArc
-            |> Promise.start
-
-        let handleOpenArcByPath arcPath =
-            openArcByPathWithProgress isOpeningArc arcPath (openArcByPath onArcError) setIsOpeningArc
-            |> Promise.start
 
         let left =
             Html.div [
                 prop.className "swt:flex swt:items-center swt:gap-2"
                 prop.children [
                     Navbar.SettingsButton()
-                    Selector.Main(onArcError, setNewArcModalIsOpen, handleOpenArc, handleOpenArcByPath)
+                    Selector.Main(onArcError, setNewArcModalIsOpen, arcOpening.openArc, arcOpening.openArcByPath)
                     Navbar.SaveArcButton()
                 ]
             ]
@@ -323,6 +309,5 @@ type Navbar =
                 setNewArcModalIsOpen,
                 Renderer.Components.InitState.CreateNewArcModalContent(fun () -> setNewArcModalIsOpen false)
             )
-            Modals.OpeningArc(isOpeningArc)
             Swate.Components.Primitive.Navbar.Navbar.Main(left = left, right = right)
         ]
