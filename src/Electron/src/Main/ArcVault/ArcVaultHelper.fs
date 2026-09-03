@@ -1,7 +1,7 @@
 module Main.ArcVaultHelper
 
-
 open System
+open System.Collections.Generic
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
@@ -163,6 +163,31 @@ let swatelogfn id fmt =
 
 let swatefailfn id fmt =
     Printf.kprintf (fun s -> failwith ("[Swate-" + string id + "] " + s)) fmt
+
+type LoadedArc = {
+    Arc: ARC
+    FileTree: Dictionary<string, FileEntry>
+}
+
+/// Loads all window-independent state required to open an ARC. No BrowserWindow or
+/// ArcVault is created or mutated unless this operation succeeds.
+let loadArcForOpening (arcPath: string) : JS.Promise<Result<LoadedArc, exn>> = promise {
+    let normalizedPath = PathHelpers.normalizePath arcPath
+
+    try
+        match! ARC.LoadAsyncSwateZeroByteRepair normalizedPath with
+        | Error errors -> return Error(exn $"Unable to load ARC: {PathHelpers.formatContractErrors errors}")
+        | Ok arc ->
+            let! fileEntries = getFileEntries normalizedPath
+
+            return
+                Ok {
+                    Arc = arc
+                    FileTree = createFileEntryTree fileEntries
+                }
+    with error ->
+        return Error error
+}
 
 type OpenArcRootRenamePlan = {
     SourcePath: string

@@ -449,6 +449,9 @@ Vitest.describe (
                     with error ->
                         Vitest.expect(error.Message).toContain ("Unable to load ARC")
                         Vitest.expect(vault.path.IsNone).toBe (true)
+                        Vitest.expect(vault.arc.IsNone).toBe (true)
+                        Vitest.expect(vault.watcher.IsNone).toBe (true)
+                        Vitest.expect(vault.fileTree.Count).toBe (0)
 
                     do! TestHelpers.removeDirectoryAsync rootPath
                 with error ->
