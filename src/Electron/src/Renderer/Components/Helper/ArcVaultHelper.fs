@@ -63,6 +63,42 @@ let openArcByPath (onError: string -> unit) (arcPath: string) : JS.Promise<bool>
         return true
 }
 
+/// Opens a selected ARC while reporting progress. Concurrent requests are ignored,
+/// and progress is cleared even when opening fails.
+let openArcByPathWithProgress
+    (isOpeningArc: bool)
+    (arcPath: string)
+    (openArcByPath: string -> JS.Promise<bool>)
+    (setIsOpeningArc: bool -> unit)
+    =
+    promise {
+        if not isOpeningArc then
+            setIsOpeningArc true
+
+            try
+                let! _ = openArcByPath arcPath
+                ()
+            finally
+                setIsOpeningArc false
+    }
+
+/// Selects an ARC directory before reporting progress, so cancelling the picker does
+/// not briefly show the opening modal. Concurrent requests are ignored.
+let openArcWithProgress
+    (isOpeningArc: bool)
+    (pickDirectory: unit -> JS.Promise<Result<string, exn>>)
+    (openArcByPath: string -> JS.Promise<bool>)
+    (onError: string -> unit)
+    (setIsOpeningArc: bool -> unit)
+    =
+    promise {
+        if not isOpeningArc then
+            match! pickDirectory () with
+            | Error error when error.Message = "Cancelled" -> ()
+            | Error error -> onError error.Message
+            | Ok arcPath -> do! openArcByPathWithProgress isOpeningArc arcPath openArcByPath setIsOpeningArc
+    }
+
 let createArc (onError: string -> unit) (identifier: string) (initGit: bool) : JS.Promise<string option> = promise {
     let request = {
         identifier = identifier

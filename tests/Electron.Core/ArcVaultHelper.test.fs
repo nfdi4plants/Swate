@@ -436,6 +436,47 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "OpenARC releases an invalid folder after loading fails",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-open-invalid-arc-"
+
+                try
+                    let vault = ArcVault(TestHelpers.testWindow ())
+
+                    try
+                        do! vault.OpenARC rootPath
+                        return failwith "Expected OpenARC to fail for an invalid ARC folder."
+                    with error ->
+                        Vitest.expect(error.Message).toContain ("Unable to load ARC")
+                        Vitest.expect(vault.path.IsNone).toBe (true)
+
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "loadArcFolder rejects an invalid ARC folder and reports its full path",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-validate-invalid-arc-"
+
+                try
+                    match! loadArcFolder rootPath with
+                    | Ok _ -> return failwith "Expected a non-ARC folder to be rejected."
+                    | Error error ->
+                        Vitest.expect(error.Message).toContain ("is not a valid ARC folder")
+                        Vitest.expect(error.Message).toContain (PathHelpers.normalizePath rootPath)
+
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
             "RenameOpenArcRoot moves the active ARC folder and updates the vault path",
             fun () ->
                 TestHelpers.withTempArcWith

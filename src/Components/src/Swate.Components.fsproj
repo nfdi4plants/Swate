@@ -165,6 +165,7 @@
     <Compile Include="Composite\Authentication\Helper.fs" />
     <Compile Include="Composite\Authentication\AccountManager.fs" />
     <Compile Include="Composite\Authentication\Authentication.fs" />
+    <Compile Include="Composite\ArcOpening\Modals.fs" />
     <Compile Include="Composite\ArcSelector\ArcSelector.fs" />
     <Compile Include="Composite\ArcVaultActions\ArcVaultActions.fs" />
     <Compile Include="Composite\MarkdownText\JsBindings\Mermaid.fs" />
