@@ -269,6 +269,9 @@ let internal useTreeNodeActions
             | kbdEventCode.space ->
                 event.preventDefault ()
 
+                if event.key = kbdEventCode.enter && canExpand node then
+                    expandNode node
+
                 let intent =
                     if event.shiftKey then
                         TreeSelectionIntent.Range

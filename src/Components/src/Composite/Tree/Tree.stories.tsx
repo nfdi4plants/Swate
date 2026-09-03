@@ -129,6 +129,107 @@ export const BasicExpansionAndSelection: Story = {
   },
 };
 
+const FolderSelectionTree = () => {
+  const [selected, setSelected] = React.useState<string[]>([]);
+
+  return (
+    <div className="swt:w-96 swt:space-y-2">
+      <Tree
+        items={baseItems}
+        defaultExpandedIds={["arc"]}
+        selectedIds={selected}
+        onSelectionChange={setSelected}
+        debug
+      />
+      <div data-testid="folder-selection">Selected: {selected.join("|") || "none"}</div>
+    </div>
+  );
+};
+
+export const SelectingAFolderDoesNotToggleExpansion: Story = {
+  render: () => <FolderSelectionTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const studiesNode = canvas.getByTestId("tree-node-arc/studies");
+
+    await expect(studiesNode).toHaveAttribute("aria-selected", "false");
+    await expect(studiesNode).toHaveAttribute("aria-expanded", "false");
+
+    await userEvent.click(canvas.getByText("studies"));
+    await expect(studiesNode).toHaveAttribute("aria-selected", "true");
+    await expect(studiesNode).toHaveAttribute("aria-expanded", "false");
+    await expect(canvas.getByTestId("folder-selection")).toHaveTextContent("Selected: arc/studies");
+    await expect(canvas.queryByText("Study 01")).not.toBeInTheDocument();
+
+    await userEvent.click(canvas.getByRole("button", { name: "Expand studies" }));
+    await expect(studiesNode).toHaveAttribute("aria-selected", "true");
+    await expect(studiesNode).toHaveAttribute("aria-expanded", "true");
+    await expect(canvas.getByText("Study 01")).toBeVisible();
+  },
+};
+
+export const EnterOpensAFolder: Story = {
+  render: () => <FolderSelectionTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const studiesNode = canvas.getByTestId("tree-node-arc/studies");
+
+    studiesNode.focus();
+    await expect(studiesNode).toHaveFocus();
+    await expect(studiesNode).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.keyDown(studiesNode, { key: "Enter" });
+    await waitFor(() => expect(studiesNode).toHaveAttribute("aria-expanded", "true"));
+    await expect(canvas.getByText("Study 01")).toBeVisible();
+    await expect(studiesNode).toHaveAttribute("aria-selected", "true");
+    await expect(canvas.getByTestId("folder-selection")).toHaveTextContent("Selected: arc/studies");
+  },
+};
+
+const SelectUntilTree = () => {
+  const [selected, setSelected] = React.useState<string[]>([]);
+  const items = React.useMemo(
+    () => [
+      leaf("alpha.txt", "alpha.txt"),
+      branch("beta", "beta", []),
+      leaf("gamma.txt", "gamma.txt"),
+      branch("delta", "delta", []),
+      leaf("epsilon.txt", "epsilon.txt"),
+    ],
+    [],
+  );
+
+  return (
+    <div className="swt:w-96 swt:space-y-2">
+      <Tree
+        items={items}
+        selectionMode={"multiple" as any}
+        selectedIds={selected}
+        onSelectionChange={setSelected}
+        debug
+      />
+      <div data-testid="select-until-selection">Selected: {selected.join("|") || "none"}</div>
+    </div>
+  );
+};
+
+export const ShiftSelectsUntilClickedNode: Story = {
+  render: () => <SelectUntilTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByText("beta"));
+    fireEvent.click(canvas.getByText("delta"), { shiftKey: true, bubbles: true });
+
+    await expect(canvas.getByTestId("tree-node-alpha.txt")).toHaveAttribute("aria-selected", "false");
+    await expect(canvas.getByTestId("tree-node-beta")).toHaveAttribute("aria-selected", "true");
+    await expect(canvas.getByTestId("tree-node-gamma.txt")).toHaveAttribute("aria-selected", "true");
+    await expect(canvas.getByTestId("tree-node-delta")).toHaveAttribute("aria-selected", "true");
+    await expect(canvas.getByTestId("tree-node-epsilon.txt")).toHaveAttribute("aria-selected", "false");
+    await expect(canvas.getByTestId("select-until-selection")).toHaveTextContent("beta|delta|gamma.txt");
+  },
+};
+
 const MultiSelectionTree = () => {
   const [selected, setSelected] = React.useState<string[]>([]);
 
@@ -342,6 +443,7 @@ const StaleFailureTree = () => {
   const apiRef = React.useRef<TreeApi | null>(null);
   const requestsRef = React.useRef<Deferred<DemoNode[]>[]>([]);
   const [requestCount, setRequestCount] = React.useState(0);
+  const [requestSettlements, setRequestSettlements] = React.useState<string[]>([]);
   const [errorCount, setErrorCount] = React.useState(0);
   const items = React.useMemo(() => [branch("arc/concurrent", "concurrent", undefined)], []);
 
@@ -351,8 +453,17 @@ const StaleFailureTree = () => {
         if (item?.props.id !== "arc/concurrent") return [];
         const request = createDeferred<DemoNode[]>();
         requestsRef.current.push(request);
-        setRequestCount(requestsRef.current.length);
-        return request.promise;
+        const requestNumber = requestsRef.current.length;
+        setRequestCount(requestNumber);
+
+        try {
+          const children = await request.promise;
+          setRequestSettlements((current) => [...current, `request-${requestNumber}:resolved`]);
+          return children;
+        } catch (error) {
+          setRequestSettlements((current) => [...current, `request-${requestNumber}:rejected`]);
+          throw error;
+        }
       },
     }),
     [],
@@ -381,6 +492,7 @@ const StaleFailureTree = () => {
         Reject first request
       </button>
       <div data-testid="stale-request-count">Requests: {requestCount}</div>
+      <div data-testid="stale-request-settlements">Settled: {requestSettlements.join("|") || "none"}</div>
       <div data-testid="stale-error-count">Errors: {errorCount}</div>
     </div>
   );
@@ -403,13 +515,19 @@ export const StaleLazyFailureDoesNotCollapseNewerResult: Story = {
 
     await userEvent.click(canvas.getByRole("button", { name: "Resolve second request" }));
     await expect(await canvas.findByText("fresh.txt")).toBeVisible();
+    await expect(canvas.getByTestId("stale-request-settlements")).toHaveTextContent("request-2:resolved");
     await expect(canvas.getByRole("button", { name: "Collapse concurrent" })).toBeVisible();
 
     await userEvent.click(canvas.getByRole("button", { name: "Reject first request" }));
-    await expect(canvas.getByText("fresh.txt")).toBeVisible();
-    await expect(canvas.getByRole("button", { name: "Collapse concurrent" })).toBeVisible();
-    await expect(canvas.getByTestId("stale-error-count")).toHaveTextContent("Errors: 0");
-    await expect(canvas.queryByText("Error")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(canvas.getByTestId("stale-request-settlements")).toHaveTextContent("request-1:rejected"),
+    );
+    await waitFor(() => {
+      expect(canvas.getByText("fresh.txt")).toBeVisible();
+      expect(canvas.getByRole("button", { name: "Collapse concurrent" })).toBeVisible();
+      expect(canvas.getByTestId("stale-error-count")).toHaveTextContent("Errors: 0");
+      expect(canvas.queryByText("Error")).not.toBeInTheDocument();
+    });
   },
 };
 
@@ -1146,8 +1264,11 @@ export const KeyboardNavigation: Story = {
     await waitFor(() => expect(canvas.getByTestId("tree-node-arc/studies/study_01")).toHaveFocus());
 
     fireEvent.keyDown(canvas.getByTestId("tree-node-arc/studies/study_01"), { key: "Enter" });
-    await expect(canvas.getByText("isa.study.xlsx")).toBeVisible();
+    await waitFor(() => expect(canvas.queryByText("isa.study.xlsx")).not.toBeInTheDocument());
     await expect(canvas.getByTestId("selected-node")).toHaveTextContent("arc/studies/study_01");
+
+    fireEvent.keyDown(canvas.getByTestId("tree-node-arc/studies/study_01"), { key: "Enter" });
+    await expect(await canvas.findByText("isa.study.xlsx")).toBeVisible();
 
     fireEvent.keyDown(canvas.getByTestId("tree-node-arc/studies/study_01"), { key: "ArrowLeft" });
     await waitFor(() => expect(canvas.queryByText("isa.study.xlsx")).not.toBeInTheDocument());
