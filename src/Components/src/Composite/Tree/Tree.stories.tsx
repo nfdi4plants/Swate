@@ -169,20 +169,32 @@ export const SelectingAFolderDoesNotToggleExpansion: Story = {
 };
 
 export const EnterOpensAFolder: Story = {
-  render: () => <FolderSelectionTree />,
+  render: () => (
+    <div className="swt:space-y-2">
+      <FolderSelectionTree />
+      <p className="swt:text-sm">The studies folder remains focused after the check. Press Enter to open it.</p>
+    </div>
+  ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const studiesNode = canvas.getByTestId("tree-node-arc/studies");
 
-    studiesNode.focus();
+    await userEvent.click(canvas.getByText("studies"));
     await expect(studiesNode).toHaveFocus();
+    await expect(studiesNode).toHaveAttribute("aria-selected", "true");
     await expect(studiesNode).toHaveAttribute("aria-expanded", "false");
 
-    fireEvent.keyDown(studiesNode, { key: "Enter" });
+    await userEvent.keyboard("{Enter}");
     await waitFor(() => expect(studiesNode).toHaveAttribute("aria-expanded", "true"));
     await expect(canvas.getByText("Study 01")).toBeVisible();
     await expect(studiesNode).toHaveAttribute("aria-selected", "true");
+    await expect(studiesNode).toHaveFocus();
     await expect(canvas.getByTestId("folder-selection")).toHaveTextContent("Selected: arc/studies");
+
+    await userEvent.keyboard("{Enter}");
+    await waitFor(() => expect(studiesNode).toHaveAttribute("aria-expanded", "false"));
+    await expect(canvas.queryByText("Study 01")).not.toBeInTheDocument();
+    await expect(studiesNode).toHaveFocus();
   },
 };
 
@@ -1263,11 +1275,12 @@ export const KeyboardNavigation: Story = {
     fireEvent.keyDown(canvas.getByTestId("tree-node-arc/studies/study_01/isa.study.xlsx"), { key: "ArrowLeft" });
     await waitFor(() => expect(canvas.getByTestId("tree-node-arc/studies/study_01")).toHaveFocus());
 
-    fireEvent.keyDown(canvas.getByTestId("tree-node-arc/studies/study_01"), { key: "Enter" });
+    await userEvent.keyboard("{Enter}");
     await waitFor(() => expect(canvas.queryByText("isa.study.xlsx")).not.toBeInTheDocument());
     await expect(canvas.getByTestId("selected-node")).toHaveTextContent("arc/studies/study_01");
+    await expect(canvas.getByTestId("tree-node-arc/studies/study_01")).toHaveFocus();
 
-    fireEvent.keyDown(canvas.getByTestId("tree-node-arc/studies/study_01"), { key: "Enter" });
+    await userEvent.keyboard("{Enter}");
     await expect(await canvas.findByText("isa.study.xlsx")).toBeVisible();
 
     fireEvent.keyDown(canvas.getByTestId("tree-node-arc/studies/study_01"), { key: "ArrowLeft" });
