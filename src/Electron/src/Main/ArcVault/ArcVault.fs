@@ -734,8 +734,9 @@ type ArcVaults() =
 
     /// Open an existing ARC at the given path.
     /// Decision: already-open → focus, calling window empty → open there, else → new window.
-    /// Focuses an existing vault for the path, or validates the ARC before binding the
-    /// caller's unused vault or creating a new window.
+    /// Focuses an existing vault for the path, or loads the ARC while binding the caller's
+    /// unused vault or creating a new window. OpenARC performs the validation and rolls its
+    /// binding back if loading fails.
     member this.OpenOrFocusArc(callingWindowId: int, arcPath: string) = promise {
         let normalizedArcPath = PathHelpers.normalizePath arcPath
 
@@ -745,24 +746,21 @@ type ArcVaults() =
             this.TrackRecentAndBroadcast(normalizedArcPath)
             return ArcOpenDisposition.FocusedExisting normalizedArcPath
         | None ->
-            match! loadArcFolder normalizedArcPath with
-            | Error validationError -> return raise validationError
-            | Ok _ ->
-                match this.TryGetVault callingWindowId with
-                | Some vault when vault.path.IsNone ->
-                    do! vault.OpenARC(normalizedArcPath)
-                    do! vault.RefreshFileTree()
-                    this.TrackRecentAndBroadcast(normalizedArcPath)
-                    return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
-                | _ ->
-                    let! newWindowId = this.RegisterVaultWithArc(normalizedArcPath)
+            match this.TryGetVault callingWindowId with
+            | Some vault when vault.path.IsNone ->
+                do! vault.OpenARC(normalizedArcPath)
+                do! vault.RefreshFileTree()
+                this.TrackRecentAndBroadcast(normalizedArcPath)
+                return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
+            | _ ->
+                let! newWindowId = this.RegisterVaultWithArc(normalizedArcPath)
 
-                    match this.TryGetVault newWindowId with
-                    | Some newVault -> do! newVault.RefreshFileTree()
-                    | None -> ()
+                match this.TryGetVault newWindowId with
+                | Some newVault -> do! newVault.RefreshFileTree()
+                | None -> ()
 
-                    this.TrackRecentAndBroadcast(normalizedArcPath)
-                    return ArcOpenDisposition.OpenedInNewWindow normalizedArcPath
+                this.TrackRecentAndBroadcast(normalizedArcPath)
+                return ArcOpenDisposition.OpenedInNewWindow normalizedArcPath
     }
 
     /// Create a new ARC at the given path with the given identifier.

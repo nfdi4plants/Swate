@@ -188,19 +188,6 @@ let private pathExistsAsync (absolutePath: string) : JS.Promise<bool> = promise 
         return! ARCtrl.FileSystemHelper.directoryExistsAsync absolutePath
 }
 
-/// Loads and validates an ARC folder, returning one user-facing validation error for
-/// parser and filesystem failures so callers do not expose implementation details.
-let loadArcFolder (arcPath: string) : JS.Promise<Result<ARC, exn>> = promise {
-    let normalizedPath = PathHelpers.normalizePath arcPath
-
-    try
-        match! ARC.LoadAsyncSwateZeroByteRepair normalizedPath with
-        | Ok arc -> return Ok arc
-        | Error _ -> return Error(exn $"The selected folder '{normalizedPath}' is not a valid ARC folder.")
-    with _ ->
-        return Error(exn $"The selected folder '{normalizedPath}' is not a valid ARC folder.")
-}
-
 let private renameWithRetriesAsync
     (sourceAbsolutePath: string)
     (targetAbsolutePath: string)

@@ -458,48 +458,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "loadArcFolder rejects an invalid ARC folder and reports its full path",
-            fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-validate-invalid-arc-"
-
-                try
-                    match! loadArcFolder rootPath with
-                    | Ok _ -> return failwith "Expected a non-ARC folder to be rejected."
-                    | Error error ->
-                        Vitest.expect(error.Message).toContain ("is not a valid ARC folder")
-                        Vitest.expect(error.Message).toContain (PathHelpers.normalizePath rootPath)
-
-                    do! TestHelpers.removeDirectoryAsync rootPath
-                with error ->
-                    do! TestHelpers.removeDirectoryAsync rootPath
-                    return raise error
-            }
-        )
-
-        Vitest.test (
-            "OpenARC reloads edits made after separate validation",
-            fun () ->
-                TestHelpers.withTempArcWith
-                    "swate-open-after-validation-"
-                    "ValidatedArc"
-                    ignore
-                    (fun arcPath -> promise {
-                        match! loadArcFolder arcPath with
-                        | Error error -> return raise error
-                        | Ok validatedArc -> Vitest.expect(validatedArc.Title).toEqual (None)
-
-                        let! externalArc = TestHelpers.loadArcAsync arcPath
-                        externalArc.Title <- Some "External edit after validation"
-                        do! externalArc.UpdateAsync arcPath
-
-                        let vault = ArcVault(TestHelpers.testWindow ())
-                        do! vault.OpenARC arcPath
-
-                        Vitest.expect(vault.arc.Value.Title).toEqual (Some "External edit after validation")
-                    })
-        )
-
-        Vitest.test (
             "RenameOpenArcRoot moves the active ARC folder and updates the vault path",
             fun () ->
                 TestHelpers.withTempArcWith
