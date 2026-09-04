@@ -373,13 +373,12 @@ module ArcVaultExtensions =
             this.ClearPendingFileWatcherState()
         }
 
-        /// Prepares the only fallible window resource before atomically adopting loaded ARC state.
+        /// Creates monitoring only after loading has completed, then adopts the loaded state.
         member private this.AdoptLoadedArc(path: string, loadedArc: LoadedArc) =
             let watcher = this.CreateFileWatcherForPath(path, None)
 
             this.path <- Some path
             this.SetArc(loadedArc.Arc)
-            this.fileTree <- loadedArc.FileTree
             this.watcher <- Some watcher
             this.window.title <- this.arc.Value.Identifier
 
@@ -398,7 +397,6 @@ module ArcVaultExtensions =
                 swatelogfn this.window.id "path: %s" normalizedPath
                 this.AdoptLoadedArc(normalizedPath, loadedArc)
                 sendMsg.pathChange (Some normalizedPath)
-                this.SetFileTree(this.fileTree)
         }
 
         /// Loads an ARC without mutating this vault, then binds it if loading succeeds.
@@ -441,7 +439,6 @@ module ArcVaultExtensions =
                 | Ok loadedArc -> this.AdoptLoadedArc(normalizedPath, loadedArc)
 
                 sendMsg.pathChange (Some normalizedPath)
-                this.SetFileTree(this.fileTree)
         }
 
         /// Load file entries from disk and push the file tree to the renderer.
@@ -551,6 +548,8 @@ module ArcOpenDisposition =
 
 
 type ArcVaults() =
+    let pendingArcOpens = Dictionary<string, Fable.Core.JS.Promise<Result<unit, exn>>>()
+
     /// Key is window.id
     member val Vaults = Dictionary<int, ArcVault>() with get
 
@@ -745,6 +744,7 @@ type ArcVaults() =
     /// binding back if loading fails.
     member this.OpenOrFocusArc(callingWindowId: int, arcPath: string) = promise {
         let normalizedArcPath = PathHelpers.normalizePath arcPath
+        let openKey = PathHelpers.normalizePathForFsComparison normalizedArcPath
 
         match this.TryGetVaultByPath normalizedArcPath with
         | Some vault ->
@@ -752,18 +752,47 @@ type ArcVaults() =
             this.TrackRecentAndBroadcast(normalizedArcPath)
             return ArcOpenDisposition.FocusedExisting normalizedArcPath
         | None ->
-            match! loadArcForOpening normalizedArcPath with
-            | Error error -> return raise error
-            | Ok loadedArc ->
-                match this.TryGetVault callingWindowId with
-                | Some vault when vault.path.IsNone ->
-                    do! vault.OpenLoadedARC(normalizedArcPath, loadedArc)
+            match pendingArcOpens.TryGetValue(openKey) with
+            | true, pendingOpen ->
+                match! pendingOpen with
+                | Error error -> return raise error
+                | Ok() ->
+                    match this.TryGetVaultByPath normalizedArcPath with
+                    | None -> return failwith $"ARC open completed without a vault for '{normalizedArcPath}'."
+                    | Some vault ->
+                        vault.window.focus ()
+                        this.TrackRecentAndBroadcast(normalizedArcPath)
+                        return ArcOpenDisposition.FocusedExisting normalizedArcPath
+            | false, _ ->
+                let mutable resolvePendingOpen: Result<unit, exn> -> unit = ignore
+
+                let pendingOpen =
+                    Promise.create (fun resolve _reject -> resolvePendingOpen <- resolve)
+
+                pendingArcOpens.Add(openKey, pendingOpen)
+
+                try
+                    let! disposition = promise {
+                        match! loadArcForOpening normalizedArcPath with
+                        | Error error -> return raise error
+                        | Ok loadedArc ->
+                            match this.TryGetVault callingWindowId with
+                            | Some vault when vault.path.IsNone ->
+                                do! vault.OpenLoadedARC(normalizedArcPath, loadedArc)
+                                return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
+                            | _ ->
+                                let! _ = this.RegisterVaultWithArc(normalizedArcPath, loadedArc)
+                                return ArcOpenDisposition.OpenedInNewWindow normalizedArcPath
+                    }
+
+                    resolvePendingOpen (Ok())
+                    pendingArcOpens.Remove(openKey) |> ignore
                     this.TrackRecentAndBroadcast(normalizedArcPath)
-                    return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
-                | _ ->
-                    let! newWindowId = this.RegisterVaultWithArc(normalizedArcPath, loadedArc)
-                    this.TrackRecentAndBroadcast(normalizedArcPath)
-                    return ArcOpenDisposition.OpenedInNewWindow normalizedArcPath
+                    return disposition
+                with error ->
+                    resolvePendingOpen (Error error)
+                    pendingArcOpens.Remove(openKey) |> ignore
+                    return raise error
     }
 
     /// Create a new ARC at the given path with the given identifier.

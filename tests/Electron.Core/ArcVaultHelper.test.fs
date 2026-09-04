@@ -1,6 +1,7 @@
 module ElectronCore.ArcVaultHelperTests
 
 open ARCtrl
+open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Electron.Main
 open Main.ARCtrlExtensions
@@ -22,7 +23,9 @@ let private lifecycleTestWindow id isDestroyed onSend =
     // fixture minimal avoids constructing a real Electron window in the Vitest environment.
     createObj [
         "id" ==> id
+        "title" ==> ""
         "isDestroyed" ==> (fun () -> isDestroyed)
+        "focus" ==> ignore
         "webContents" ==> createObj [ "send" ==> send ]
     ]
     |> unbox<BrowserWindow>
@@ -134,6 +137,44 @@ Vitest.describe (
                     do! TestHelpers.removeDirectoryAsync rootPath
                     return raise error
             }
+        )
+
+        Vitest.test (
+            "concurrent opens of the same ARC share one path reservation",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-concurrent-open-"
+                    "ConcurrentOpenArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let firstWindow = lifecycleTestWindow 101 false ignore
+                        let secondWindow = lifecycleTestWindow 102 false ignore
+                        let vaults = ArcVaults()
+                        vaults.Vaults.Add(firstWindow.id, ArcVault(firstWindow))
+                        vaults.Vaults.Add(secondWindow.id, ArcVault(secondWindow))
+
+                        let firstOpen = vaults.OpenOrFocusArc(firstWindow.id, arcPath)
+                        let secondOpen = vaults.OpenOrFocusArc(secondWindow.id, arcPath)
+
+                        // Both promises have already started; awaiting them separately preserves
+                        // concurrency without erasing their result type through Promise.all.
+                        let! firstDisposition = firstOpen
+                        let! secondDisposition = secondOpen
+
+                        match firstDisposition, secondDisposition with
+                        | ArcOpenDisposition.OpenedInCurrent _, ArcOpenDisposition.FocusedExisting _ -> ()
+                        | _ -> failwith "Unexpected concurrent open dispositions."
+
+                        let owners =
+                            vaults.Vaults.Values
+                            |> Seq.filter (fun vault ->
+                                vault.path |> Option.exists (fun path -> PathHelpers.pathsEqual path arcPath)
+                            )
+                            |> Seq.toArray
+
+                        Vitest.expect(owners.Length).toBe (1)
+                        do! owners.[0].StopFileWatcher()
+                    })
         )
 
         Vitest.test (
@@ -447,6 +488,8 @@ Vitest.describe (
                         do! vault.OpenARC rootPath
                         return failwith "Expected OpenARC to fail for an invalid ARC folder."
                     with error ->
+                        Vitest.expect(error.Message).toContain ("is not a valid ARC folder")
+                        Vitest.expect(error.Message).toContain (PathHelpers.normalizePath rootPath)
                         Vitest.expect(error.Message).toContain ("Unable to load ARC")
                         Vitest.expect(vault.path.IsNone).toBe (true)
                         Vitest.expect(vault.arc.IsNone).toBe (true)
