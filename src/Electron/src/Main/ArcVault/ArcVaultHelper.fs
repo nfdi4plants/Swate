@@ -405,18 +405,42 @@ let waitForFileWatcherReady (watcher: Chokidar.IWatcher) : JS.Promise<unit> =
     )
 
 let captureArcRevision (arcPath: string) = promise {
-    let! entries = getFileEntries arcPath
+    let normalizedPath = PathHelpers.normalizePath arcPath
+    let files = ResizeArray<string>()
 
-    let files =
-        entries
-        |> Array.filter (fun entry -> not entry.isDirectory)
-        |> Array.sortBy _.path
+    let investigationFile =
+        Main.Bindings.Path.join [| normalizedPath; "isa.investigation.xlsx" |]
+
+    if Main.Bindings.Filesystem.existsSync investigationFile then
+        files.Add investigationFile
+
+    let managedCollections = [|
+        "studies", "isa.study.xlsx"
+        "assays", "isa.assay.xlsx"
+        "runs", "isa.run.xlsx"
+        "workflows", "isa.workflow.xlsx"
+    |]
+
+    for collectionFolder, entityFileName in managedCollections do
+        let collectionPath = Main.Bindings.Path.join [| normalizedPath; collectionFolder |]
+
+        if Main.Bindings.Filesystem.existsSync collectionPath then
+            let! entityFolders = Main.Bindings.Filesystem.readdirAsync collectionPath
+
+            for entityFolder in entityFolders do
+                let entityPath = Main.Bindings.Path.join [| collectionPath; entityFolder |]
+
+                for fileName in [| entityFileName; "isa.datamap.xlsx" |] do
+                    let filePath = Main.Bindings.Path.join [| entityPath; fileName |]
+
+                    if Main.Bindings.Filesystem.existsSync filePath then
+                        files.Add filePath
 
     let revisions = ResizeArray<string>()
 
-    for file in files do
-        let! stats = Main.Bindings.Filesystem.statAsync file.path
-        revisions.Add($"{file.path}|{stats.size}|{stats.mtimeMs}")
+    for filePath in files |> Seq.sort do
+        let! stats = Main.Bindings.Filesystem.statAsync filePath
+        revisions.Add($"{PathHelpers.normalizePath filePath}|{stats.size}|{stats.mtimeMs}")
 
     return System.String.Join("\n", revisions)
 }
