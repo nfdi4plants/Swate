@@ -11,6 +11,22 @@ open Swate.Electron.Shared.FileIOHelper
 [<AutoOpen>]
 module ArcLoadExtensions =
 
+    // ARCtrl 3.0.0-beta.12 models these fields but its public read-contract classifier does not
+    // recognize their paths yet. Keep this compatibility clause isolated so it can disappear
+    // when the dependency is upgraded.
+    let private isReadContractMissingFromPinnedARCtrl (pathValue: string) =
+        match ArcPathHelper.split pathValue with
+        | [| ArcPathHelper.WorkflowsFolderName; _; "workflow.cwl" |]
+        | [| ArcPathHelper.RunsFolderName; _; "run.cwl" |]
+        | [| ArcPathHelper.RunsFolderName; _; "run.yml" |] -> true
+        | _ -> false
+
+    /// Uses ARCtrl's read-contract classifier as the source of truth, with compatibility for
+    /// contract inputs supported by the ARC model but omitted by the pinned ARCtrl version.
+    let isArcModelReadContractPath (pathValue: string) =
+        ARCtrl.Contract.ARC.tryISAReadContractFromPath pathValue |> Option.isSome
+        || isReadContractMissingFromPinnedARCtrl pathValue
+
     /// Returns true when a path addresses Git's private repository metadata.
     /// `.gitignore`, `.gitattributes`, and similarly named files remain ordinary ARC payload.
     let isGitMetadataPath (pathValue: string) =

@@ -408,33 +408,60 @@ let captureArcRevision (arcPath: string) = promise {
     let normalizedPath = PathHelpers.normalizePath arcPath
     let files = ResizeArray<string>()
 
-    let investigationFile =
-        Main.Bindings.Path.join [| normalizedPath; "isa.investigation.xlsx" |]
+    let addExistingReadContractPath (relativePath: string) =
+        if isArcModelReadContractPath relativePath then
+            let filePath = Main.Bindings.Path.join [| normalizedPath; relativePath |]
 
-    if Main.Bindings.Filesystem.existsSync investigationFile then
-        files.Add investigationFile
+            if Main.Bindings.Filesystem.existsSync filePath then
+                files.Add filePath
 
-    let managedCollections = [|
-        "studies", "isa.study.xlsx"
-        "assays", "isa.assay.xlsx"
-        "runs", "isa.run.xlsx"
-        "workflows", "isa.workflow.xlsx"
+    let rootContractFileNames = [|
+        ArcPathHelper.InvestigationFileName
+        ArcPathHelper.LICENSEFileName
+        yield! ArcPathHelper.alternativeLICENSEFileNames
     |]
 
-    for collectionFolder, entityFileName in managedCollections do
+    for fileName in rootContractFileNames do
+        addExistingReadContractPath fileName
+
+    let managedCollections = [|
+        ArcPathHelper.StudiesFolderName,
+        [|
+            ArcPathHelper.StudyFileName
+            ArcPathHelper.DataMapFileName
+        |]
+        ArcPathHelper.AssaysFolderName,
+        [|
+            ArcPathHelper.AssayFileName
+            ArcPathHelper.DataMapFileName
+        |]
+        ArcPathHelper.RunsFolderName,
+        [|
+            ArcPathHelper.RunFileName
+            "run.cwl"
+            "run.yml"
+            ArcPathHelper.DataMapFileName
+        |]
+        ArcPathHelper.WorkflowsFolderName,
+        [|
+            ArcPathHelper.WorkflowFileName
+            "workflow.cwl"
+            ArcPathHelper.DataMapFileName
+        |]
+    |]
+
+    for collectionFolder, contractFileNames in managedCollections do
         let collectionPath = Main.Bindings.Path.join [| normalizedPath; collectionFolder |]
 
         if Main.Bindings.Filesystem.existsSync collectionPath then
             let! entityFolders = Main.Bindings.Filesystem.readdirAsync collectionPath
 
             for entityFolder in entityFolders do
-                let entityPath = Main.Bindings.Path.join [| collectionPath; entityFolder |]
+                for fileName in contractFileNames do
+                    let relativePath =
+                        Main.Bindings.Path.join [| collectionFolder; entityFolder; fileName |]
 
-                for fileName in [| entityFileName; "isa.datamap.xlsx" |] do
-                    let filePath = Main.Bindings.Path.join [| entityPath; fileName |]
-
-                    if Main.Bindings.Filesystem.existsSync filePath then
-                        files.Add filePath
+                    addExistingReadContractPath relativePath
 
     let revisions = ResizeArray<string>()
 

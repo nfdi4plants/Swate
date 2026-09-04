@@ -93,6 +93,55 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "ARC model read-contract paths follow ARCtrl with pinned-version CWL and YAML compatibility",
+            fun () ->
+                Vitest.expect(isArcModelReadContractPath "isa.investigation.xlsx").toBe (true)
+                Vitest.expect(isArcModelReadContractPath "LICENSE").toBe (true)
+                Vitest.expect(isArcModelReadContractPath "assays/a/isa.assay.xlsx").toBe (true)
+                Vitest.expect(isArcModelReadContractPath "workflows/w/workflow.cwl").toBe (true)
+                Vitest.expect(isArcModelReadContractPath "runs/r/run.cwl").toBe (true)
+                Vitest.expect(isArcModelReadContractPath "runs/r/run.yml").toBe (true)
+                Vitest.expect(isArcModelReadContractPath "assays/a/dataset/payload.bin").toBe (false)
+        )
+
+        Vitest.test (
+            "ARC revision tracks every non-workbook contract input",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-contract-revision-"
+                let workflowFolder = join [| rootPath; "workflows"; "workflow_1" |]
+                let runFolder = join [| rootPath; "runs"; "run_1" |]
+
+                try
+                    do! mkdirRecursiveAsync workflowFolder
+                    do! mkdirRecursiveAsync runFolder
+
+                    let contractFiles = [|
+                        join [| rootPath; "LICENSE" |]
+                        join [| workflowFolder; "workflow.cwl" |]
+                        join [| runFolder; "run.cwl" |]
+                        join [| runFolder; "run.yml" |]
+                    |]
+
+                    for filePath in contractFiles do
+                        do! writeTextFileAsync filePath "initial"
+
+                    let! initialRevision = captureArcRevision rootPath
+                    let mutable previousRevision = initialRevision
+
+                    for index, filePath in contractFiles |> Array.indexed do
+                        do! writeTextFileAsync filePath $"changed-{index}-with-a-different-size"
+                        let! currentRevision = captureArcRevision rootPath
+                        Vitest.expect(currentRevision).not.toBe (previousRevision)
+                        previousRevision <- currentRevision
+
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
             "Git metadata path detection excludes only exact .git path segments",
             fun () ->
                 Vitest.expect(isGitMetadataPath ".git").toBe (true)
@@ -521,6 +570,36 @@ Vitest.describe (
                     do! TestHelpers.removeDirectoryAsync rootPath
                     return raise error
             }
+        )
+
+        Vitest.test (
+            "OpenLoadedARC reconciles LICENSE edits made after its initial load",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-open-license-race-"
+                    "OpenLicenseRaceArc"
+                    (fun arc -> arc.SetLicenseFulltext("initial license"))
+                    (fun arcPath -> promise {
+                        let! loadedResult = loadArcForOpening arcPath
+
+                        let loadedArc =
+                            match loadedResult with
+                            | Ok loadedArc -> loadedArc
+                            | Error error -> raise error
+
+                        do! writeTextFileAsync (join [| arcPath; "LICENSE" |]) "license changed while opening"
+
+                        let vault = ArcVault(TestHelpers.testWindow ())
+
+                        try
+                            do! vault.OpenLoadedARC(arcPath, loadedArc)
+                            Vitest.expect(vault.arc.Value.License.IsSome).toBe (true)
+                            Vitest.expect(vault.arc.Value.License.Value.Content).toBe ("license changed while opening")
+                            do! vault.StopFileWatcher()
+                        with error ->
+                            do! vault.StopFileWatcher()
+                            return raise error
+                    })
         )
 
         Vitest.test (
