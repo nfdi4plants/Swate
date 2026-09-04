@@ -50,17 +50,9 @@ let Main () =
 
     match gitStateCtx.state.CurrentArcPath with
     | None ->
-        Renderer.Components.LeftSidebar.Git.GitSidebarEmptyState.Main(
-            title = "Open an ARC to use Git features",
-            description = "Source control becomes available after you open or download an ARC.",
-            iconClassName = "swt:fluent--folder-open-24-regular",
-            primaryAction = Helper.createOpenArcAction arcOpening,
-            secondaryAction = {
-                Label = "Download ARC"
-                IconClassName = "swt:fluent--cloud-arrow-down-24-regular"
-                Disabled = false
-                OnClick = (fun () -> pageStateCtx.setState (Some Renderer.Types.PageState.DataHubBrowser))
-            }
+        Renderer.Components.LeftSidebar.Git.GitSidebarOpenArcEmptyState.Main(
+            arcOpening,
+            fun () -> pageStateCtx.setState (Some Renderer.Types.PageState.DataHubBrowser)
         )
     | Some _ when
         gitStateCtx.state.RepositoryAvailability = Renderer.Context.GitWorkflow.GitRepositoryAvailability.MissingRepository

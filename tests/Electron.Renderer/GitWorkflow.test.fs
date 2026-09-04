@@ -491,35 +491,47 @@ Vitest.describe (
 Vitest.describe (
     "Git sidebar ARC opening",
     fun () ->
+        let renderGitSidebarWithArcOpening controller =
+            renderToBody (Renderer.Components.LeftSidebar.Git.GitSidebarOpenArcEmptyState.Main(controller, ignore))
+
         Vitest.test (
-            "routes its open action through the shared ARC-opening controller",
-            fun () ->
+            "clicking Open ARC delegates to the shared ARC-opening controller",
+            fun () -> promise {
                 let mutable openCalls = 0
 
-                let action =
-                    Renderer.Components.LeftSidebar.Git.Helper.createOpenArcAction {
+                let! _, cleanup =
+                    renderGitSidebarWithArcOpening {
                         isOpeningArc = false
                         openArc = fun () -> openCalls <- openCalls + 1
                         openArcByPath = ignore
                     }
 
-                action.OnClick()
-
-                Vitest.expect(openCalls).toBe (1)
-                Vitest.expect(action.Disabled).toBe (false)
+                try
+                    let openButton = findBodyButtonContaining "Open ARC" |> Option.get
+                    openButton.click ()
+                    Vitest.expect(openCalls).toBe (1)
+                    Vitest.expect(openButton.disabled).toBe (false)
+                finally
+                    cleanup ()
+            }
         )
 
         Vitest.test (
-            "disables its open action while the shared ARC-opening controller is busy",
-            fun () ->
-                let action =
-                    Renderer.Components.LeftSidebar.Git.Helper.createOpenArcAction {
+            "Open ARC is disabled while the shared ARC-opening controller is busy",
+            fun () -> promise {
+                let! _, cleanup =
+                    renderGitSidebarWithArcOpening {
                         isOpeningArc = true
                         openArc = ignore
                         openArcByPath = ignore
                     }
 
-                Vitest.expect(action.Disabled).toBe (true)
+                try
+                    let openButton = findBodyButtonContaining "Open ARC" |> Option.get
+                    Vitest.expect(openButton.disabled).toBe (true)
+                finally
+                    cleanup ()
+            }
         )
 )
 

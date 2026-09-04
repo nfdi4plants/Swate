@@ -17,8 +17,6 @@ type Provider =
         let errorModal = useErrorModalCtx ()
         let appState = Renderer.Context.AppStateContext.useAppStateCtx ()
 
-        let setIsOpeningArc value = setIsOpeningArcState value
-
         let requestGate: Helper.RequestGate = {
             tryBegin =
                 fun () ->
@@ -39,11 +37,11 @@ type Provider =
                 Api.ipcArcVaultApi.pickDirectory
                 (openArcByPath onOpenArcError)
                 onOpenArcError
-                setIsOpeningArc
+                setIsOpeningArcState
             |> Promise.start
 
         let openArcByPathWithSharedProgress arcPath =
-            Helper.openPathWithProgress requestGate arcPath (openArcByPath onOpenArcError) setIsOpeningArc
+            Helper.openPathWithProgress requestGate arcPath (openArcByPath onOpenArcError) setIsOpeningArcState
             |> Promise.start
 
         let controller = {

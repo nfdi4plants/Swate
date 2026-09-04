@@ -476,8 +476,16 @@ let buildAndInstallInitialFileTree
     (releaseBufferedEvents: unit -> unit)
     =
     promise {
+        // The watcher is already active while this potentially expensive scan runs. Events raised
+        // during the scan are retained by the vault instead of being applied to its previous tree.
         let! fileEntries = loadFileEntries arcPath
+
+        // Install the scan result first. Releasing events before this assignment would allow a
+        // newer watcher update to be overwritten by the stale snapshot that was still in flight.
         installFileTree (createFileEntryTree fileEntries)
+
+        // The caller can now replay or schedule every event captured during the scan on top of
+        // the installed snapshot, preserving payload additions, removals, and renames.
         releaseBufferedEvents ()
     }
 
