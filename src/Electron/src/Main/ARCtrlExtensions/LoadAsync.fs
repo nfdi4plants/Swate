@@ -11,14 +11,25 @@ open Swate.Electron.Shared.FileIOHelper
 [<AutoOpen>]
 module ArcLoadExtensions =
 
+    module ArcModelPathCompatibility =
+        // Available as ArcPathHelper constants in newer ARCtrl releases.
+        [<Literal>]
+        let WorkflowCWLFileName = "workflow.cwl"
+
+        [<Literal>]
+        let RunCWLFileName = "run.cwl"
+
+        [<Literal>]
+        let RunYMLFileName = "run.yml"
+
     // ARCtrl 3.0.0-beta.12 models these fields but its public read-contract classifier does not
     // recognize their paths yet. Keep this compatibility clause isolated so it can disappear
     // when the dependency is upgraded.
     let private isReadContractMissingFromPinnedARCtrl (pathValue: string) =
         match ArcPathHelper.split pathValue with
-        | [| ArcPathHelper.WorkflowsFolderName; _; "workflow.cwl" |]
-        | [| ArcPathHelper.RunsFolderName; _; "run.cwl" |]
-        | [| ArcPathHelper.RunsFolderName; _; "run.yml" |] -> true
+        | [| ArcPathHelper.WorkflowsFolderName; _; ArcModelPathCompatibility.WorkflowCWLFileName |]
+        | [| ArcPathHelper.RunsFolderName; _; ArcModelPathCompatibility.RunCWLFileName |]
+        | [| ArcPathHelper.RunsFolderName; _; ArcModelPathCompatibility.RunYMLFileName |] -> true
         | _ -> false
 
     /// Uses ARCtrl's read-contract classifier as the source of truth, with compatibility for

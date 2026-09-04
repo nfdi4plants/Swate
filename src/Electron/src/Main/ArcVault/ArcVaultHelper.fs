@@ -164,11 +164,7 @@ let swatelogfn id fmt =
 let swatefailfn id fmt =
     Printf.kprintf (fun s -> failwith ("[Swate-" + string id + "] " + s)) fmt
 
-type LoadedArc = {
-    Arc: ARC
-    FileTree: Dictionary<string, FileEntry>
-    Revision: string
-}
+type LoadedArc = { Arc: ARC; Revision: string }
 
 type OpenArcRootRenamePlan = {
     SourcePath: string
@@ -438,14 +434,14 @@ let captureArcRevision (arcPath: string) = promise {
         ArcPathHelper.RunsFolderName,
         [|
             ArcPathHelper.RunFileName
-            "run.cwl"
-            "run.yml"
+            ArcModelPathCompatibility.RunCWLFileName
+            ArcModelPathCompatibility.RunYMLFileName
             ArcPathHelper.DataMapFileName
         |]
         ArcPathHelper.WorkflowsFolderName,
         [|
             ArcPathHelper.WorkflowFileName
-            "workflow.cwl"
+            ArcModelPathCompatibility.WorkflowCWLFileName
             ArcPathHelper.DataMapFileName
         |]
     |]
@@ -485,15 +481,7 @@ let loadArcForOpening (arcPath: string) : JS.Promise<Result<LoadedArc, exn>> = p
         match! ARC.LoadAsyncSwateZeroByteRepair normalizedPath with
         | Error errors ->
             return Error(exn $"{invalidArcMessage} Unable to load ARC: {PathHelpers.formatContractErrors errors}")
-        | Ok arc ->
-            let! fileEntries = getFileEntries normalizedPath
-
-            return
-                Ok {
-                    Arc = arc
-                    FileTree = createFileEntryTree fileEntries
-                    Revision = revision
-                }
+        | Ok arc -> return Ok { Arc = arc; Revision = revision }
     with error ->
         return Error(System.Exception($"{invalidArcMessage} Unable to load ARC: {error.Message}", error))
 }
