@@ -614,20 +614,13 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "OpenLoadedARC replays payload events buffered during the initial FileTree scan",
+            "initial FileTree pipeline replays payload events after installing the scanned snapshot",
             fun () ->
                 TestHelpers.withTempArcWith
                     "swate-open-filetree-race-"
                     "OpenFileTreeRaceArc"
                     ignore
                     (fun arcPath -> promise {
-                        let! loadedResult = loadArcForOpening arcPath
-
-                        let loadedArc =
-                            match loadedResult with
-                            | Ok loadedArc -> loadedArc
-                            | Error error -> raise error
-
                         let mutable releaseTreeScan: unit -> unit = ignore
 
                         let treeScanGate =
@@ -642,32 +635,43 @@ Vitest.describe (
                             return staleEntries
                         }
 
-                        let vault =
-                            ArcVault(TestHelpers.testWindow (), loadInitialFileEntries = pausedTreeLoader)
-
+                        let mutable installedTree = None
+                        let bufferedEntries = ResizeArray<Swate.Electron.Shared.FileIOTypes.FileEntry>()
                         let payloadPath = join [| arcPath; "payload-added-during-open.txt" |]
-                        let openPromise = vault.OpenLoadedARC(arcPath, loadedArc)
+
+                        let installTree tree = installedTree <- Some tree
+
+                        let replayBufferedEvents () =
+                            installedTree <-
+                                installedTree
+                                |> Option.map (fun tree ->
+                                    bufferedEntries
+                                    |> Seq.fold
+                                        (fun current entry -> Main.FileTreeCreator.upsertFileEntry entry current)
+                                        tree
+                                )
+
+                        let pipeline =
+                            buildAndInstallInitialFileTree pausedTreeLoader arcPath installTree replayBufferedEvents
 
                         try
                             do! waitUntil (fun () -> staleSnapshotCaptured) 500
                             do! writeTextFileAsync payloadPath "added while initial tree snapshot was paused"
-                            do! waitUntil (fun () -> vault.fileWatcherPendingEvents.Count > 0) 500
-                            Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (0)
+                            let! payloadEntry = Main.FileTreeCreator.getFileEntry payloadPath
+                            bufferedEntries.Add payloadEntry
                             releaseTreeScan ()
-                            do! openPromise
+                            do! pipeline
 
-                            do!
-                                waitUntil
-                                    (fun () ->
-                                        vault.fileTree.Values
-                                        |> Seq.exists (fun entry -> PathHelpers.pathsEqual entry.path payloadPath)
-                                    )
-                                    500
+                            Vitest.expect(installedTree.IsSome).toBe (true)
 
-                            do! vault.StopFileWatcher()
+                            Vitest
+                                .expect(
+                                    installedTree.Value.Values
+                                    |> Seq.exists (fun entry -> PathHelpers.pathsEqual entry.path payloadPath)
+                                )
+                                .toBe (true)
                         with error ->
                             releaseTreeScan ()
-                            do! vault.StopFileWatcher()
                             return raise error
                     })
         )

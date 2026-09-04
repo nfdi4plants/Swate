@@ -20,12 +20,11 @@ open ARCtrl
 /// Represents a vault window in the application, optionally associated with a file path.
 /// </summary>
 /// <param name="path">Can be None if not opened ARC.</param>
-type ArcVault(window: BrowserWindow, ?loadInitialFileEntries: string -> Fable.Core.JS.Promise<FileEntry[]>) =
+type ArcVault(window: BrowserWindow) =
 
     let fileWatcherOwnWriteArcMergeSuppressionMs = 500
 
     member val window: BrowserWindow = window with get
-    member val loadInitialFileEntries = defaultArg loadInitialFileEntries getFileEntries with get
     member val path: string option = None with get, set
     member val arc: ARC option = None with get, private set
     // This flag is intentionally coarse and can remain true even if later edits restore the previous logical state.
@@ -407,17 +406,22 @@ module ArcVaultExtensions =
                 // are expanded, and reconcile only materialized directories with watcher events.
                 // That requires coordinated IPC, renderer-state, selection, and watcher changes
                 // and is intentionally kept out of this opening-race fix.
-                let! fileEntries = this.loadInitialFileEntries path
-                this.SetFileTree(createFileEntryTree fileEntries)
-                this.isBuildingInitialFileTree <- false
+                do!
+                    buildAndInstallInitialFileTree
+                        getFileEntries
+                        path
+                        this.SetFileTree
+                        (fun () ->
+                            this.isBuildingInitialFileTree <- false
 
-                if this.fileWatcherPendingEvents.Count > 0 then
-                    let sendMsgApi =
-                        Remoting.createIpc ()
-                        |> Remoting.withWindow this.window
-                        |> Remoting.buildProxySender<IArcFileWatcherApi>
+                            if this.fileWatcherPendingEvents.Count > 0 then
+                                let sendMsgApi =
+                                    Remoting.createIpc ()
+                                    |> Remoting.withWindow this.window
+                                    |> Remoting.buildProxySender<IArcFileWatcherApi>
 
-                    this.SchedulePendingFileWatcherEvents(sendMsgApi)
+                                this.SchedulePendingFileWatcherEvents(sendMsgApi)
+                        )
 
                 this.window.title <- this.arc.Value.Identifier
             with error ->

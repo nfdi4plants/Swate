@@ -468,6 +468,19 @@ let captureArcRevision (arcPath: string) = promise {
     return System.String.Join("\n", revisions)
 }
 
+/// Builds and installs the initial FileTree before releasing watcher work buffered during the scan.
+let buildAndInstallInitialFileTree
+    (loadFileEntries: string -> JS.Promise<FileEntry[]>)
+    (arcPath: string)
+    (installFileTree: Dictionary<string, FileEntry> -> unit)
+    (releaseBufferedEvents: unit -> unit)
+    =
+    promise {
+        let! fileEntries = loadFileEntries arcPath
+        installFileTree (createFileEntryTree fileEntries)
+        releaseBufferedEvents ()
+    }
+
 /// Loads the ARC without creating a window or starting filesystem monitoring.
 let loadArcForOpening (arcPath: string) : JS.Promise<Result<LoadedArc, exn>> = promise {
     let normalizedPath = PathHelpers.normalizePath arcPath
