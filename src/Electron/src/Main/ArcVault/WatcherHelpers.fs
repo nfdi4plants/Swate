@@ -4,6 +4,7 @@ open System
 open Fable.Electron
 open Main.Bindings
 open Main.ArcMerge
+open Main.ARCtrlExtensions
 open Main.ArcVaultTypes
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
@@ -42,9 +43,27 @@ let buildWatcherEvent (arcPath: string) (eventName: string) (path: string) =
         AbsolutePath = absolutePath
     }
 
+/// True when a filesystem event can change the in-memory ARC model. Payload events still
+/// belong in the FileTree queue, but must not trigger an expensive ARC reload.
+let isArcMergeRelevant (event: ArcVaultFileSystemEvent) =
+    if
+        eventNameEquals Chokidar.Events.Add event.EventName
+        || eventNameEquals Chokidar.Events.Change event.EventName
+        || eventNameEquals Chokidar.Events.Unlink event.EventName
+    then
+        isArcModelReadContractPath event.RelativePath
+    elif eventNameEquals Chokidar.Events.UnlinkDir event.EventName then
+        event.RelativePath
+        |> ArcEntityPathRules.buildFallbackUnlinkPaths
+        |> List.isEmpty
+        |> not
+    else
+        false
+
 /// Converts raw filesystem events into ARC merge events; unlink-dir events expand to possible canonical files.
 let toArcMergeEvents (events: ArcVaultFileSystemEvent list) =
     events
+    |> List.filter isArcMergeRelevant
     |> List.collect (fun event ->
         if eventNameEquals Chokidar.Events.Add event.EventName then
             [

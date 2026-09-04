@@ -38,6 +38,16 @@ let private mkdirRecursiveAsync (directoryPath: string) = promise {
 let private writeTextFileAsync (filePath: string) (content: string) =
     writeFileAsync filePath content TextEncoding.Utf8
 
+let rec private waitUntil (predicate: unit -> bool) attempts = promise {
+    if predicate () then
+        return ()
+    elif attempts <= 0 then
+        return failwith "Timed out waiting for asynchronous test condition."
+    else
+        do! Promise.sleep 10
+        return! waitUntil predicate (attempts - 1)
+}
+
 let private arctrlDefaultGitignoreContent () =
     match ARCtrl.Contract.Git.gitignoreContract.DTO with
     | Some(ARCtrl.Contract.DTO.Text content) -> content
@@ -90,6 +100,37 @@ Vitest.describe (
                 Vitest.expect(shouldUsePollingByDefault "WIN32").toBe (true)
                 Vitest.expect(shouldUsePollingByDefault "linux").toBe (false)
                 Vitest.expect(shouldUsePollingByDefault "darwin").toBe (false)
+        )
+
+        Vitest.test (
+            "watcher ARC-merge relevance excludes payloads but retains ARC model paths and entity deletions",
+            fun () ->
+                let event eventName relativePath =
+                    Main.WatcherHelpers.buildWatcherEvent "C:/arc" eventName relativePath
+
+                let relevantCases = [|
+                    "change", "isa.investigation.xlsx"
+                    "change", "assays/a/isa.assay.xlsx"
+                    "change", "studies/s/isa.datamap.xlsx"
+                    "change", "LICENSE"
+                    "change", "workflows/w/workflow.cwl"
+                    "change", "runs/r/run.cwl"
+                    "change", "runs/r/run.yml"
+                    "unlinkDir", "assays/DeletedAssay"
+                |]
+
+                for eventName, relativePath in relevantCases do
+                    Vitest.expect(Main.WatcherHelpers.isArcMergeRelevant (event eventName relativePath)).toBe (true)
+
+                let payloadCases = [|
+                    "change", "assays/a/dataset/sample.fastq"
+                    "add", "notes/readme.md"
+                    "unlink", "workflows/w/results/output.csv"
+                    "unlinkDir", "assays/a/dataset"
+                |]
+
+                for eventName, relativePath in payloadCases do
+                    Vitest.expect(Main.WatcherHelpers.isArcMergeRelevant (event eventName relativePath)).toBe (false)
         )
 
         Vitest.test (
@@ -570,6 +611,65 @@ Vitest.describe (
                     do! TestHelpers.removeDirectoryAsync rootPath
                     return raise error
             }
+        )
+
+        Vitest.test (
+            "OpenLoadedARC replays payload events buffered during the initial FileTree scan",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-open-filetree-race-"
+                    "OpenFileTreeRaceArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let! loadedResult = loadArcForOpening arcPath
+
+                        let loadedArc =
+                            match loadedResult with
+                            | Ok loadedArc -> loadedArc
+                            | Error error -> raise error
+
+                        let mutable releaseTreeScan: unit -> unit = ignore
+
+                        let treeScanGate =
+                            Promise.create (fun resolve _reject -> releaseTreeScan <- resolve)
+
+                        let mutable staleSnapshotCaptured = false
+
+                        let pausedTreeLoader path = promise {
+                            let! staleEntries = Main.FileTreeCreator.getFileEntries path
+                            staleSnapshotCaptured <- true
+                            do! treeScanGate
+                            return staleEntries
+                        }
+
+                        let vault =
+                            ArcVault(TestHelpers.testWindow (), loadInitialFileEntries = pausedTreeLoader)
+
+                        let payloadPath = join [| arcPath; "payload-added-during-open.txt" |]
+                        let openPromise = vault.OpenLoadedARC(arcPath, loadedArc)
+
+                        try
+                            do! waitUntil (fun () -> staleSnapshotCaptured) 500
+                            do! writeTextFileAsync payloadPath "added while initial tree snapshot was paused"
+                            do! waitUntil (fun () -> vault.fileWatcherPendingEvents.Count > 0) 500
+                            Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (0)
+                            releaseTreeScan ()
+                            do! openPromise
+
+                            do!
+                                waitUntil
+                                    (fun () ->
+                                        vault.fileTree.Values
+                                        |> Seq.exists (fun entry -> PathHelpers.pathsEqual entry.path payloadPath)
+                                    )
+                                    500
+
+                            do! vault.StopFileWatcher()
+                        with error ->
+                            releaseTreeScan ()
+                            do! vault.StopFileWatcher()
+                            return raise error
+                    })
         )
 
         Vitest.test (

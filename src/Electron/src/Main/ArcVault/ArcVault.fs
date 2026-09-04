@@ -20,11 +20,12 @@ open ARCtrl
 /// Represents a vault window in the application, optionally associated with a file path.
 /// </summary>
 /// <param name="path">Can be None if not opened ARC.</param>
-type ArcVault(window: BrowserWindow) =
+type ArcVault(window: BrowserWindow, ?loadInitialFileEntries: string -> Fable.Core.JS.Promise<FileEntry[]>) =
 
     let fileWatcherOwnWriteArcMergeSuppressionMs = 500
 
     member val window: BrowserWindow = window with get
+    member val loadInitialFileEntries = defaultArg loadInitialFileEntries getFileEntries with get
     member val path: string option = None with get, set
     member val arc: ARC option = None with get, private set
     // This flag is intentionally coarse and can remain true even if later edits restore the previous logical state.
@@ -224,7 +225,7 @@ module ArcVaultExtensions =
                     let watcherEvent = WatcherHelpers.buildWatcherEvent arcPath eventName path
                     this.fileWatcherPendingEvents.Add watcherEvent
 
-                    if isArcMergeEligible then
+                    if isArcMergeEligible && WatcherHelpers.isArcMergeRelevant watcherEvent then
                         this.fileWatcherPendingArcMergeEvents.Add watcherEvent
                 )
 
@@ -406,7 +407,7 @@ module ArcVaultExtensions =
                 // are expanded, and reconcile only materialized directories with watcher events.
                 // That requires coordinated IPC, renderer-state, selection, and watcher changes
                 // and is intentionally kept out of this opening-race fix.
-                let! fileEntries = getFileEntries path
+                let! fileEntries = this.loadInitialFileEntries path
                 this.SetFileTree(createFileEntryTree fileEntries)
                 this.isBuildingInitialFileTree <- false
 
