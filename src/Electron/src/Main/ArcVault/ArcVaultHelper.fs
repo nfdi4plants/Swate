@@ -1,7 +1,7 @@
 module Main.ArcVaultHelper
 
-
 open System
+open System.Collections.Generic
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
@@ -163,6 +163,8 @@ let swatelogfn id fmt =
 
 let swatefailfn id fmt =
     Printf.kprintf (fun s -> failwith ("[Swate-" + string id + "] " + s)) fmt
+
+type LoadedArc = { Arc: ARC; Revision: string }
 
 type OpenArcRootRenamePlan = {
     SourcePath: string
@@ -373,6 +375,137 @@ let createFileWatcher (path: string) (usePolling: bool option) =
     let watcher = Chokidar.Chokidar.watch (path, watcherOptions)
 
     watcher
+
+let waitForFileWatcherReady (watcher: Chokidar.IWatcher) : JS.Promise<unit> =
+    Promise.create (fun resolve reject ->
+        let mutable completed = false
+
+        let timeoutId =
+            JS.setTimeout
+                (fun () ->
+                    if not completed then
+                        completed <- true
+                        reject (exn "Timed out while starting filesystem monitoring.")
+                )
+                10000
+
+        watcher.on (
+            Chokidar.Events.Ready,
+            fun () ->
+                if not completed then
+                    completed <- true
+                    JS.clearTimeout timeoutId
+                    resolve ()
+        )
+        |> ignore
+    )
+
+let captureArcRevision (arcPath: string) = promise {
+    let normalizedPath = PathHelpers.normalizePath arcPath
+    let files = ResizeArray<string>()
+
+    let addExistingReadContractPath (relativePath: string) =
+        if isArcModelReadContractPath relativePath then
+            let filePath = Main.Bindings.Path.join [| normalizedPath; relativePath |]
+
+            if Main.Bindings.Filesystem.existsSync filePath then
+                files.Add filePath
+
+    let rootContractFileNames = [|
+        ArcPathHelper.InvestigationFileName
+        ArcPathHelper.LICENSEFileName
+        yield! ArcPathHelper.alternativeLICENSEFileNames
+    |]
+
+    for fileName in rootContractFileNames do
+        addExistingReadContractPath fileName
+
+    let managedCollections = [|
+        ArcPathHelper.StudiesFolderName,
+        [|
+            ArcPathHelper.StudyFileName
+            ArcPathHelper.DataMapFileName
+        |]
+        ArcPathHelper.AssaysFolderName,
+        [|
+            ArcPathHelper.AssayFileName
+            ArcPathHelper.DataMapFileName
+        |]
+        ArcPathHelper.RunsFolderName,
+        [|
+            ArcPathHelper.RunFileName
+            ArcModelPathCompatibility.RunCWLFileName
+            ArcModelPathCompatibility.RunYMLFileName
+            ArcPathHelper.DataMapFileName
+        |]
+        ArcPathHelper.WorkflowsFolderName,
+        [|
+            ArcPathHelper.WorkflowFileName
+            ArcModelPathCompatibility.WorkflowCWLFileName
+            ArcPathHelper.DataMapFileName
+        |]
+    |]
+
+    for collectionFolder, contractFileNames in managedCollections do
+        let collectionPath = Main.Bindings.Path.join [| normalizedPath; collectionFolder |]
+
+        if Main.Bindings.Filesystem.existsSync collectionPath then
+            let! entityFolders = Main.Bindings.Filesystem.readdirAsync collectionPath
+
+            for entityFolder in entityFolders do
+                for fileName in contractFileNames do
+                    let relativePath =
+                        Main.Bindings.Path.join [| collectionFolder; entityFolder; fileName |]
+
+                    addExistingReadContractPath relativePath
+
+    let revisions = ResizeArray<string>()
+
+    for filePath in files |> Seq.sort do
+        let! stats = Main.Bindings.Filesystem.statAsync filePath
+        revisions.Add($"{PathHelpers.normalizePath filePath}|{stats.size}|{stats.mtimeMs}")
+
+    return System.String.Join("\n", revisions)
+}
+
+/// Builds and installs the initial FileTree before releasing watcher work buffered during the scan.
+let buildAndInstallInitialFileTree
+    (loadFileEntries: string -> JS.Promise<FileEntry[]>)
+    (arcPath: string)
+    (installFileTree: Dictionary<string, FileEntry> -> unit)
+    (releaseBufferedEvents: unit -> unit)
+    =
+    promise {
+        // The watcher is already active while this potentially expensive scan runs. Events raised
+        // during the scan are retained by the vault instead of being applied to its previous tree.
+        let! fileEntries = loadFileEntries arcPath
+
+        // Install the scan result first. Releasing events before this assignment would allow a
+        // newer watcher update to be overwritten by the stale snapshot that was still in flight.
+        installFileTree (createFileEntryTree fileEntries)
+
+        // The caller can now replay or schedule every event captured during the scan on top of
+        // the installed snapshot, preserving payload additions, removals, and renames.
+        releaseBufferedEvents ()
+    }
+
+/// Loads the ARC without creating a window or starting filesystem monitoring.
+let loadArcForOpening (arcPath: string) : JS.Promise<Result<LoadedArc, exn>> = promise {
+    let normalizedPath = PathHelpers.normalizePath arcPath
+
+    let invalidArcMessage =
+        $"The selected folder '{normalizedPath}' is not a valid ARC folder."
+
+    try
+        let! revision = captureArcRevision normalizedPath
+
+        match! ARC.LoadAsyncSwateZeroByteRepair normalizedPath with
+        | Error errors ->
+            return Error(exn $"{invalidArcMessage} Unable to load ARC: {PathHelpers.formatContractErrors errors}")
+        | Ok arc -> return Ok { Arc = arc; Revision = revision }
+    with error ->
+        return Error(System.Exception($"{invalidArcMessage} Unable to load ARC: {error.Message}", error))
+}
 
 open Fable.Electron.Remoting.Main
 

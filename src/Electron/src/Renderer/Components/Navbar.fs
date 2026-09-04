@@ -1,6 +1,8 @@
 namespace Renderer.Components
 
+open Fable.Core
 open Feliz
+open Renderer.Components.Helper
 open Renderer.Components.Helper.ArcVaultHelper
 open Swate.Components
 open Swate.Components.Shared
@@ -17,7 +19,7 @@ open Renderer.Types
 type private Selector =
 
     [<ReactComponent>]
-    static member Actionbar(setNewArcModalIsOpen: bool -> unit, onArcError: string -> unit) =
+    static member Actionbar(setNewArcModalIsOpen: bool -> unit, openArc: unit -> unit) =
         Actionbar.Main(
             [|
                 ButtonInfo.create (
@@ -28,14 +30,20 @@ type private Selector =
                 ButtonInfo.create (
                     "swt:fluent--folder-open-24-regular swt:size-5",
                     "Open an existing ARC",
-                    fun _ -> openArc onArcError |> Promise.start
+                    fun _ -> openArc ()
                 )
             |],
             2
         )
 
     [<ReactComponent>]
-    static member Main(onArcError: string -> unit, setNewArcModalIsOpen: bool -> unit) =
+    static member Main
+        (
+            onArcError: string -> unit,
+            setNewArcModalIsOpen: bool -> unit,
+            openArc: unit -> unit,
+            openArcByPath: string -> unit
+        ) =
 
         let recentArcs =
             Renderer.MainSyncedState.useMainSyncedState {
@@ -67,9 +75,9 @@ type private Selector =
 
         Swate.Components.Composite.ArcSelector.ArcSelector.Main(
             recentArcs.state,
-            (fun clickedARC -> openArcByPath onArcError clickedARC.path |> Promise.start),
+            (fun clickedARC -> openArcByPath clickedARC.path),
             rmvRecentArc = removeRecentArc,
-            actionbar = Selector.Actionbar(setNewArcModalIsOpen, onArcError),
+            actionbar = Selector.Actionbar(setNewArcModalIsOpen, openArc),
             onOpenChange = onOpen,
             isLoading = recentArcs.isLoading,
             controlRef = selectorControlRef,
@@ -161,6 +169,7 @@ module private Authentication =
             onRemoveAccount = onRemoveAccount
         )
 
+[<Erase; Mangle(false)>]
 type Navbar =
 
     [<ReactComponent>]
@@ -267,6 +276,7 @@ type Navbar =
 
         let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
         let newArcModalIsOpen, setNewArcModalIsOpen = React.useState false
+        let arcOpening = Renderer.Context.ArcOpeningContext.useArcOpeningCtx ()
         let errorCtx = useErrorModalCtx ()
 
         let onArcError =
@@ -277,7 +287,7 @@ type Navbar =
                 prop.className "swt:flex swt:items-center swt:gap-2"
                 prop.children [
                     Navbar.SettingsButton()
-                    Selector.Main(onArcError, setNewArcModalIsOpen)
+                    Selector.Main(onArcError, setNewArcModalIsOpen, arcOpening.openArc, arcOpening.openArcByPath)
                     Navbar.SaveArcButton()
                 ]
             ]

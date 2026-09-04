@@ -50,6 +50,7 @@ type IWatcher =
     abstract member add: paths: string[] -> unit
     abstract member unwatch: paths: string -> Promise<unit>
     abstract member unwatch: paths: string[] -> Promise<unit>
+    abstract member on: eventName: Events * callback: (unit -> unit) -> IWatcher
     abstract member on: eventName: Events * callback: (string -> unit) -> IWatcher
     abstract member on: eventName: Events * callback: (string -> string -> unit) -> IWatcher
     abstract member getWatched: unit -> IWatched

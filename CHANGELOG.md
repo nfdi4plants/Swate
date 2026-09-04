@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -   Allow canceling in-flight Git network operations (ARC download/clone, fetch, update preview, pull, push, and Git LFS transfers) from the Git sidebar and the DataHub download view. Cancellation kills the underlying git process and restores a clean repository state: a canceled pull aborts any half-applied merge or rebase, and a canceled ARC download removes the partially cloned folder #1306.
 
+### 🐛 Fixed
+
+-   Show a clear error with the selected folder path when opening a folder that is not a valid ARC in the Electron app, and display blocking progress feedback while the selected folder is being checked.
+
 ## 2.1.0 - 2026-08-19
 
 ### ✨ Added

@@ -39,6 +39,7 @@ type ArcVault(window: BrowserWindow) =
     member val fileWatcherReloadArcTimeout: int option = None with get, set
     member val fileWatcherPendingEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
     member val fileWatcherPendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
+    member val isBuildingInitialFileTree = false with get, set
     member val private isBusyWritingValue: bool = false with get, set
     member val private fileWatcherOwnWriteArcMergeSuppressionTimeout: int option = None with get, set
 
@@ -174,7 +175,43 @@ module ArcVaultExtensions =
             do! this.ApplyWatcherArcMerge arcEvents
         }
 
-        member private this._FileEventController(sendMsgApi: IArcFileWatcherApi) =
+        member private this.SchedulePendingFileWatcherEvents(sendMsgApi: IArcFileWatcherApi) =
+            match this.fileWatcherReloadArcTimeout with
+            | Some timeoutId ->
+                Fable.Core.JS.clearTimeout timeoutId
+                this.fileWatcherReloadArcTimeout <- None
+            | None -> sendMsgApi.IsLoadingChanges true
+
+            let timeoutId =
+                Fable.Core.JS.setTimeout
+                    (fun () ->
+                        promise {
+                            swatelogfn this.window.id "Scheduled ARC reload triggered by file watcher."
+                            let pendingEvents = this.fileWatcherPendingEvents |> Seq.toList
+                            let pendingArcMergeEvents = this.fileWatcherPendingArcMergeEvents |> Seq.toList
+                            this.fileWatcherPendingEvents.Clear()
+                            this.fileWatcherPendingArcMergeEvents.Clear()
+
+                            do! this.ApplyWatcherFileTreeEvents pendingEvents
+
+                            if not pendingArcMergeEvents.IsEmpty && not this.isBusyWriting then
+                                do! this.TriggerArcInMemoryMergeOnFileWatcherEvents pendingArcMergeEvents
+
+                            this.fileWatcherReloadArcTimeout <- None
+                            sendMsgApi.IsLoadingChanges false
+                        }
+                        |> Promise.catch (fun ex ->
+                            swatelogfn this.window.id "Scheduled ARC reload failed: %s" ex.Message
+                            sendMsgApi.IsLoadingChanges false
+                            this.fileWatcherReloadArcTimeout <- None
+                        )
+                        |> Promise.start
+                    )
+                    500
+
+            this.fileWatcherReloadArcTimeout <- Some timeoutId
+
+        member private this.FileEventController(sendMsgApi: IArcFileWatcherApi) =
 
             fun (eventName: string) (path: string) ->
 
@@ -187,44 +224,12 @@ module ArcVaultExtensions =
                     let watcherEvent = WatcherHelpers.buildWatcherEvent arcPath eventName path
                     this.fileWatcherPendingEvents.Add watcherEvent
 
-                    if isArcMergeEligible then
+                    if isArcMergeEligible && WatcherHelpers.isArcMergeRelevant watcherEvent then
                         this.fileWatcherPendingArcMergeEvents.Add watcherEvent
                 )
 
-                match this.fileWatcherReloadArcTimeout with
-                | Some timeoutId ->
-                    Fable.Core.JS.clearTimeout timeoutId
-                    this.fileWatcherReloadArcTimeout <- None
-                | None -> sendMsgApi.IsLoadingChanges true
-
-                let timeoutId =
-                    Fable.Core.JS.setTimeout
-                        (fun () ->
-                            promise {
-                                swatelogfn this.window.id "Scheduled ARC reload triggered by file watcher."
-                                let pendingEvents = this.fileWatcherPendingEvents |> Seq.toList
-                                let pendingArcMergeEvents = this.fileWatcherPendingArcMergeEvents |> Seq.toList
-                                this.fileWatcherPendingEvents.Clear()
-                                this.fileWatcherPendingArcMergeEvents.Clear()
-
-                                do! this.ApplyWatcherFileTreeEvents pendingEvents
-
-                                if not pendingArcMergeEvents.IsEmpty && not this.isBusyWriting then
-                                    do! this.TriggerArcInMemoryMergeOnFileWatcherEvents pendingArcMergeEvents
-
-                                this.fileWatcherReloadArcTimeout <- None
-                                sendMsgApi.IsLoadingChanges false
-                            }
-                            |> Promise.catch (fun ex ->
-                                swatelogfn this.window.id "Scheduled ARC reload failed: %s" ex.Message
-                                sendMsgApi.IsLoadingChanges false
-                                this.fileWatcherReloadArcTimeout <- None
-                            )
-                            |> Promise.start
-                        )
-                        500
-
-                this.fileWatcherReloadArcTimeout <- Some timeoutId
+                if not this.isBuildingInitialFileTree then
+                    this.SchedulePendingFileWatcherEvents(sendMsgApi)
 
         /// Applies an ARC content DTO to the in-memory ARC and marks the vault dirty.
         member this.UpdateArcByFileContentDTO(request: FileContentDTO) : Result<unit, exn> =
@@ -338,22 +343,21 @@ module ArcVaultExtensions =
                 swatefailfn this.window.id "No path set for StartFileWatcher."
         }
 
+        member private this.CreateFileWatcherForPath(path: string, usePolling: bool option) =
+            let sendMsgApi =
+                Remoting.createIpc ()
+                |> Remoting.withWindow this.window
+                |> Remoting.buildProxySender<IArcFileWatcherApi>
+
+            let watcher = createFileWatcher path usePolling
+            watcher.on (Chokidar.Events.All, this.FileEventController sendMsgApi) |> ignore
+            watcher
+
         member this.StartFileWatcher(?usePolling: bool) =
-            if this.path.IsSome then
-                match this.watcher with
-                | Some _ -> ()
-                | None ->
-                    let watcher = createFileWatcher this.path.Value usePolling
-
-                    let sendMsgApi =
-                        Remoting.createIpc ()
-                        |> Remoting.withWindow this.window
-                        |> Remoting.buildProxySender<IArcFileWatcherApi>
-
-                    watcher.on (Chokidar.Events.All, this._FileEventController sendMsgApi) |> ignore
-                    this.watcher <- Some watcher
-            else
-                swatefailfn this.window.id "No path set for StartFileWatcher."
+            match this.path, this.watcher with
+            | Some path, None -> this.watcher <- Some(this.CreateFileWatcherForPath(path, usePolling))
+            | Some _, Some _ -> ()
+            | None, _ -> swatefailfn this.window.id "No path set for StartFileWatcher."
 
         member this.ClearPendingFileWatcherState() =
             this.fileWatcherReloadArcTimeout |> Option.iter Fable.Core.JS.clearTimeout
@@ -374,14 +378,61 @@ module ArcVaultExtensions =
             this.ClearPendingFileWatcherState()
         }
 
-        /// This functions should be called once, when an vault is first started with a path
-        member this.Startup() = promise {
-            this.StartFileWatcher()
-            do! this.LoadArc()
-            this.window.title <- this.arc.Value.Identifier
+        /// Starts monitoring, reconciles changes made during loading, then adopts the loaded state.
+        member private this.AdoptLoadedArc(path: string, loadedArc: LoadedArc) = promise {
+            this.isBuildingInitialFileTree <- true
+            let watcher = this.CreateFileWatcherForPath(path, None)
+            this.path <- Some path
+            this.watcher <- Some watcher
+
+            try
+                do! waitForFileWatcherReady watcher
+                let! currentRevision = captureArcRevision path
+
+                let! reconciledArc = promise {
+                    if currentRevision = loadedArc.Revision then
+                        return loadedArc
+                    else
+                        match! loadArcForOpening path with
+                        | Ok reloadedArc -> return reloadedArc
+                        | Error error -> return raise error
+                }
+
+                this.SetArc(reconciledArc.Arc)
+                this.RefreshHasUnsavedArcChangesFlag()
+
+                // TODO: Reconsider this eager full-tree pipeline for very large ARCs. A scalable
+                // File Explorer should load root entries first, enumerate children when folders
+                // are expanded, and reconcile only materialized directories with watcher events.
+                // That requires coordinated IPC, renderer-state, selection, and watcher changes
+                // and is intentionally kept out of this opening-race fix.
+                do!
+                    buildAndInstallInitialFileTree
+                        getFileEntries
+                        path
+                        this.SetFileTree
+                        (fun () ->
+                            this.isBuildingInitialFileTree <- false
+
+                            if this.fileWatcherPendingEvents.Count > 0 then
+                                let sendMsgApi =
+                                    Remoting.createIpc ()
+                                    |> Remoting.withWindow this.window
+                                    |> Remoting.buildProxySender<IArcFileWatcherApi>
+
+                                this.SchedulePendingFileWatcherEvents(sendMsgApi)
+                        )
+
+                this.window.title <- this.arc.Value.Identifier
+            with error ->
+                this.isBuildingInitialFileTree <- false
+                do! this.StopFileWatcher()
+                this.path <- None
+                return raise error
         }
 
-        member this.OpenARC(path: string) = promise {
+        /// Binds an unused vault to an ARC path and rolls the binding back if startup fails.
+        member this.OpenLoadedARC(path: string, loadedArc: LoadedArc) = promise {
             match this.path with
             | Some _ -> swatefailfn this.window.id "Unable to open ARC in vault bound to ARC."
             | None ->
@@ -393,9 +444,15 @@ module ArcVaultExtensions =
                     |> Remoting.buildProxySender<IPathChangeRendererApi>
 
                 swatelogfn this.window.id "path: %s" normalizedPath
-                this.path <- Some normalizedPath
-                do! this.Startup()
+                do! this.AdoptLoadedArc(normalizedPath, loadedArc)
                 sendMsg.pathChange (Some normalizedPath)
+        }
+
+        /// Loads an ARC without mutating this vault, then binds it if loading succeeds.
+        member this.OpenARC(path: string) = promise {
+            match! loadArcForOpening path with
+            | Error error -> return raise error
+            | Ok loadedArc -> do! this.OpenLoadedARC(path, loadedArc)
         }
 
         member this.CreateARC(path: string, identifier: string) = promise {
@@ -426,7 +483,10 @@ module ArcVaultExtensions =
                 finally
                     this.isBusyWriting <- false
 
-                do! this.Startup()
+                match! loadArcForOpening normalizedPath with
+                | Error error -> return raise error
+                | Ok loadedArc -> do! this.AdoptLoadedArc(normalizedPath, loadedArc)
+
                 sendMsg.pathChange (Some normalizedPath)
         }
 
@@ -537,6 +597,8 @@ module ArcOpenDisposition =
 
 
 type ArcVaults() =
+    let pendingArcOpens = Dictionary<string, Fable.Core.JS.Promise<Result<unit, exn>>>()
+
     /// Key is window.id
     member val Vaults = Dictionary<int, ArcVault>() with get
 
@@ -651,19 +713,32 @@ type ArcVaults() =
         return id
     }
 
-    member this.RegisterVaultWithArc(path: string) = promise {
+    /// Creates a window-backed vault and opens the ARC at the supplied path.
+    member this.RegisterVaultWithArc(path: string, loadedArc: LoadedArc) = promise {
         let! window = createWindow ()
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
-        do! vault.OpenARC(path)
 
-        this.OnCloseWindow(window, vault, id)
+        try
+            do! vault.OpenLoadedARC(path, loadedArc)
 
-        window.focus ()
-        swatelogfn id "Register window"
+            this.OnCloseWindow(window, vault, id)
 
-        return id
+            window.focus ()
+            swatelogfn id "Register window"
+
+            return id
+        with error ->
+            this.Vaults.Remove(id) |> ignore
+
+            if not (window.isDestroyed ()) then
+                try
+                    window.close ()
+                with _ ->
+                    ()
+
+            return raise error
     }
 
     member this.RegisterVaultWithNewArc(path: string, newIdentifier: string) : Fable.Core.JS.Promise<int> = promise {
@@ -713,8 +788,12 @@ type ArcVaults() =
 
     /// Open an existing ARC at the given path.
     /// Decision: already-open → focus, calling window empty → open there, else → new window.
+    /// Focuses an existing vault for the path, or loads the ARC while binding the caller's
+    /// unused vault or creating a new window. OpenARC performs the validation and rolls its
+    /// binding back if loading fails.
     member this.OpenOrFocusArc(callingWindowId: int, arcPath: string) = promise {
         let normalizedArcPath = PathHelpers.normalizePath arcPath
+        let openKey = PathHelpers.normalizePathForFsComparison normalizedArcPath
 
         match this.TryGetVaultByPath normalizedArcPath with
         | Some vault ->
@@ -722,21 +801,47 @@ type ArcVaults() =
             this.TrackRecentAndBroadcast(normalizedArcPath)
             return ArcOpenDisposition.FocusedExisting normalizedArcPath
         | None ->
-            match this.TryGetVault callingWindowId with
-            | Some vault when vault.path.IsNone ->
-                do! vault.OpenARC(normalizedArcPath)
-                do! vault.RefreshFileTree()
-                this.TrackRecentAndBroadcast(normalizedArcPath)
-                return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
-            | _ ->
-                let! newWindowId = this.RegisterVaultWithArc(normalizedArcPath)
+            match pendingArcOpens.TryGetValue(openKey) with
+            | true, pendingOpen ->
+                match! pendingOpen with
+                | Error error -> return raise error
+                | Ok() ->
+                    match this.TryGetVaultByPath normalizedArcPath with
+                    | None -> return failwith $"ARC open completed without a vault for '{normalizedArcPath}'."
+                    | Some vault ->
+                        vault.window.focus ()
+                        this.TrackRecentAndBroadcast(normalizedArcPath)
+                        return ArcOpenDisposition.FocusedExisting normalizedArcPath
+            | false, _ ->
+                let mutable resolvePendingOpen: Result<unit, exn> -> unit = ignore
 
-                match this.TryGetVault newWindowId with
-                | Some newVault -> do! newVault.RefreshFileTree()
-                | None -> ()
+                let pendingOpen =
+                    Promise.create (fun resolve _reject -> resolvePendingOpen <- resolve)
 
-                this.TrackRecentAndBroadcast(normalizedArcPath)
-                return ArcOpenDisposition.OpenedInNewWindow normalizedArcPath
+                pendingArcOpens.Add(openKey, pendingOpen)
+
+                try
+                    let! disposition = promise {
+                        match! loadArcForOpening normalizedArcPath with
+                        | Error error -> return raise error
+                        | Ok loadedArc ->
+                            match this.TryGetVault callingWindowId with
+                            | Some vault when vault.path.IsNone ->
+                                do! vault.OpenLoadedARC(normalizedArcPath, loadedArc)
+                                return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
+                            | _ ->
+                                let! _ = this.RegisterVaultWithArc(normalizedArcPath, loadedArc)
+                                return ArcOpenDisposition.OpenedInNewWindow normalizedArcPath
+                    }
+
+                    resolvePendingOpen (Ok())
+                    pendingArcOpens.Remove(openKey) |> ignore
+                    this.TrackRecentAndBroadcast(normalizedArcPath)
+                    return disposition
+                with error ->
+                    resolvePendingOpen (Error error)
+                    pendingArcOpens.Remove(openKey) |> ignore
+                    return raise error
     }
 
     /// Create a new ARC at the given path with the given identifier.

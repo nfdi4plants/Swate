@@ -214,25 +214,27 @@ let Main () =
                     Renderer.Context.PageStateContext.PageStateCtx.Provider(
                         pageCtx,
                         ErrorModalProvider.ErrorModalProvider(
-                            Renderer.Context.AuthStateContext.Provider(
-                                Renderer.Context.GitStateContext.GitStateCtxProvider(
-                                    Swate
-                                        .Components
-                                        .Composite
-                                        .AnnotationTable
-                                        .AnnotationTableContextProvider
-                                        .AnnotationTableContextProvider(
-                                            Layout.Main(
-                                                children =
-                                                    React.Fragment [|
-                                                        children
-                                                        CloseWindowController.CloseWindowController.Subscription()
-                                                    |],
-                                                navbar = Renderer.Components.Navbar.Main(),
-                                                ?leftSidebar = leftSidebar,
-                                                ?leftActions = leftActions
+                            Renderer.Components.Composite.ArcOpening.Provider.Provider(
+                                Renderer.Context.AuthStateContext.Provider(
+                                    Renderer.Context.GitStateContext.GitStateCtxProvider(
+                                        Swate
+                                            .Components
+                                            .Composite
+                                            .AnnotationTable
+                                            .AnnotationTableContextProvider
+                                            .AnnotationTableContextProvider(
+                                                Layout.Main(
+                                                    children =
+                                                        React.Fragment [|
+                                                            children
+                                                            CloseWindowController.CloseWindowController.Subscription()
+                                                        |],
+                                                    navbar = Renderer.Components.Navbar.Main(),
+                                                    ?leftSidebar = leftSidebar,
+                                                    ?leftActions = leftActions
+                                                )
                                             )
-                                        )
+                                    )
                                 )
                             ),
                             ?scopeId = currentArcScopeId

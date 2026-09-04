@@ -1,6 +1,7 @@
 module ElectronCore.ArcVaultHelperTests
 
 open ARCtrl
+open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Electron.Main
 open Main.ARCtrlExtensions
@@ -22,7 +23,9 @@ let private lifecycleTestWindow id isDestroyed onSend =
     // fixture minimal avoids constructing a real Electron window in the Vitest environment.
     createObj [
         "id" ==> id
+        "title" ==> ""
         "isDestroyed" ==> (fun () -> isDestroyed)
+        "focus" ==> ignore
         "webContents" ==> createObj [ "send" ==> send ]
     ]
     |> unbox<BrowserWindow>
@@ -34,6 +37,16 @@ let private mkdirRecursiveAsync (directoryPath: string) = promise {
 
 let private writeTextFileAsync (filePath: string) (content: string) =
     writeFileAsync filePath content TextEncoding.Utf8
+
+let rec private waitUntil (predicate: unit -> bool) attempts = promise {
+    if predicate () then
+        return ()
+    elif attempts <= 0 then
+        return failwith "Timed out waiting for asynchronous test condition."
+    else
+        do! Promise.sleep 10
+        return! waitUntil predicate (attempts - 1)
+}
 
 let private arctrlDefaultGitignoreContent () =
     match ARCtrl.Contract.Git.gitignoreContract.DTO with
@@ -90,6 +103,86 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "watcher ARC-merge relevance excludes payloads but retains ARC model paths and entity deletions",
+            fun () ->
+                let event eventName relativePath =
+                    Main.WatcherHelpers.buildWatcherEvent "C:/arc" eventName relativePath
+
+                let relevantCases = [|
+                    "change", "isa.investigation.xlsx"
+                    "change", "assays/a/isa.assay.xlsx"
+                    "change", "studies/s/isa.datamap.xlsx"
+                    "change", "LICENSE"
+                    "change", "workflows/w/workflow.cwl"
+                    "change", "runs/r/run.cwl"
+                    "change", "runs/r/run.yml"
+                    "unlinkDir", "assays/DeletedAssay"
+                |]
+
+                for eventName, relativePath in relevantCases do
+                    Vitest.expect(Main.WatcherHelpers.isArcMergeRelevant (event eventName relativePath)).toBe (true)
+
+                let payloadCases = [|
+                    "change", "assays/a/dataset/sample.fastq"
+                    "add", "notes/readme.md"
+                    "unlink", "workflows/w/results/output.csv"
+                    "unlinkDir", "assays/a/dataset"
+                |]
+
+                for eventName, relativePath in payloadCases do
+                    Vitest.expect(Main.WatcherHelpers.isArcMergeRelevant (event eventName relativePath)).toBe (false)
+        )
+
+        Vitest.test (
+            "ARC model read-contract paths follow ARCtrl with pinned-version CWL and YAML compatibility",
+            fun () ->
+                Vitest.expect(isArcModelReadContractPath "isa.investigation.xlsx").toBe (true)
+                Vitest.expect(isArcModelReadContractPath "LICENSE").toBe (true)
+                Vitest.expect(isArcModelReadContractPath "assays/a/isa.assay.xlsx").toBe (true)
+                Vitest.expect(isArcModelReadContractPath "workflows/w/workflow.cwl").toBe (true)
+                Vitest.expect(isArcModelReadContractPath "runs/r/run.cwl").toBe (true)
+                Vitest.expect(isArcModelReadContractPath "runs/r/run.yml").toBe (true)
+                Vitest.expect(isArcModelReadContractPath "assays/a/dataset/payload.bin").toBe (false)
+        )
+
+        Vitest.test (
+            "ARC revision tracks every non-workbook contract input",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-contract-revision-"
+                let workflowFolder = join [| rootPath; "workflows"; "workflow_1" |]
+                let runFolder = join [| rootPath; "runs"; "run_1" |]
+
+                try
+                    do! mkdirRecursiveAsync workflowFolder
+                    do! mkdirRecursiveAsync runFolder
+
+                    let contractFiles = [|
+                        join [| rootPath; "LICENSE" |]
+                        join [| workflowFolder; "workflow.cwl" |]
+                        join [| runFolder; "run.cwl" |]
+                        join [| runFolder; "run.yml" |]
+                    |]
+
+                    for filePath in contractFiles do
+                        do! writeTextFileAsync filePath "initial"
+
+                    let! initialRevision = captureArcRevision rootPath
+                    let mutable previousRevision = initialRevision
+
+                    for index, filePath in contractFiles |> Array.indexed do
+                        do! writeTextFileAsync filePath $"changed-{index}-with-a-different-size"
+                        let! currentRevision = captureArcRevision rootPath
+                        Vitest.expect(currentRevision).not.toBe (previousRevision)
+                        previousRevision <- currentRevision
+
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
             "Git metadata path detection excludes only exact .git path segments",
             fun () ->
                 Vitest.expect(isGitMetadataPath ".git").toBe (true)
@@ -134,6 +227,45 @@ Vitest.describe (
                     do! TestHelpers.removeDirectoryAsync rootPath
                     return raise error
             }
+        )
+
+        Vitest.test (
+            "concurrent opens of the same ARC share one path reservation",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-concurrent-open-"
+                    "ConcurrentOpenArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let firstWindow = lifecycleTestWindow 101 false ignore
+                        let secondWindow = lifecycleTestWindow 102 false ignore
+                        let vaults = ArcVaults()
+                        vaults.Vaults.Add(firstWindow.id, ArcVault(firstWindow))
+                        vaults.Vaults.Add(secondWindow.id, ArcVault(secondWindow))
+
+                        let firstOpen = vaults.OpenOrFocusArc(firstWindow.id, arcPath)
+                        let secondOpen = vaults.OpenOrFocusArc(secondWindow.id, arcPath)
+
+                        // Both promises have already started; awaiting them separately preserves
+                        // concurrency without erasing their result type through Promise.all.
+                        let! firstDisposition = firstOpen
+                        let! secondDisposition = secondOpen
+
+                        match firstDisposition, secondDisposition with
+                        | ArcOpenDisposition.OpenedInCurrent _, ArcOpenDisposition.FocusedExisting _ -> ()
+                        | _ -> failwith "Unexpected concurrent open dispositions."
+
+                        let owners =
+                            vaults.Vaults.Values
+                            |> Seq.filter (fun vault ->
+                                vault.path |> Option.exists (fun path -> PathHelpers.pathsEqual path arcPath)
+                            )
+                            |> Seq.toArray
+
+                        Vitest.expect(owners.Length).toBe (1)
+                        Vitest.expect(owners.[0].fileTree.Count).toBeGreaterThan (0)
+                        do! owners.[0].StopFileWatcher()
+                    })
         )
 
         Vitest.test (
@@ -433,6 +565,176 @@ Vitest.describe (
                     do! TestHelpers.removeDirectoryAsync rootPath
                     return raise error
             }
+        )
+
+        Vitest.test (
+            "CreateARC adopts the persisted ARC as a clean baseline",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-create-clean-arc-"
+                let vault = ArcVault(TestHelpers.testWindow ())
+
+                try
+                    do! vault.CreateARC(rootPath, "CreatedCleanArc")
+                    Vitest.expect(vault.arc.IsSome).toBe (true)
+                    Vitest.expect(vault.hasUnsavedArcChanges).toBe (false)
+                    do! vault.StopFileWatcher()
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! vault.StopFileWatcher()
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "OpenARC releases an invalid folder after loading fails",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-open-invalid-arc-"
+
+                try
+                    let vault = ArcVault(TestHelpers.testWindow ())
+
+                    try
+                        do! vault.OpenARC rootPath
+                        return failwith "Expected OpenARC to fail for an invalid ARC folder."
+                    with error ->
+                        Vitest.expect(error.Message).toContain ("is not a valid ARC folder")
+                        Vitest.expect(error.Message).toContain (PathHelpers.normalizePath rootPath)
+                        Vitest.expect(error.Message).toContain ("Unable to load ARC")
+                        Vitest.expect(vault.path.IsNone).toBe (true)
+                        Vitest.expect(vault.arc.IsNone).toBe (true)
+                        Vitest.expect(vault.watcher.IsNone).toBe (true)
+                        Vitest.expect(vault.fileTree.Count).toBe (0)
+
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "initial FileTree pipeline replays payload events after installing the scanned snapshot",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-open-filetree-race-"
+                    "OpenFileTreeRaceArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let mutable releaseTreeScan: unit -> unit = ignore
+
+                        let treeScanGate =
+                            Promise.create (fun resolve _reject -> releaseTreeScan <- resolve)
+
+                        let mutable staleSnapshotCaptured = false
+
+                        let pausedTreeLoader path = promise {
+                            let! staleEntries = Main.FileTreeCreator.getFileEntries path
+                            staleSnapshotCaptured <- true
+                            do! treeScanGate
+                            return staleEntries
+                        }
+
+                        let mutable installedTree = None
+                        let bufferedEntries = ResizeArray<Swate.Electron.Shared.FileIOTypes.FileEntry>()
+                        let payloadPath = join [| arcPath; "payload-added-during-open.txt" |]
+
+                        let installTree tree = installedTree <- Some tree
+
+                        let replayBufferedEvents () =
+                            installedTree <-
+                                installedTree
+                                |> Option.map (fun tree ->
+                                    bufferedEntries
+                                    |> Seq.fold
+                                        (fun current entry -> Main.FileTreeCreator.upsertFileEntry entry current)
+                                        tree
+                                )
+
+                        let pipeline =
+                            buildAndInstallInitialFileTree pausedTreeLoader arcPath installTree replayBufferedEvents
+
+                        try
+                            do! waitUntil (fun () -> staleSnapshotCaptured) 500
+                            do! writeTextFileAsync payloadPath "added while initial tree snapshot was paused"
+                            let! payloadEntry = Main.FileTreeCreator.getFileEntry payloadPath
+                            bufferedEntries.Add payloadEntry
+                            releaseTreeScan ()
+                            do! pipeline
+
+                            Vitest.expect(installedTree.IsSome).toBe (true)
+
+                            Vitest
+                                .expect(
+                                    installedTree.Value.Values
+                                    |> Seq.exists (fun entry -> PathHelpers.pathsEqual entry.path payloadPath)
+                                )
+                                .toBe (true)
+                        with error ->
+                            releaseTreeScan ()
+                            return raise error
+                    })
+        )
+
+        Vitest.test (
+            "OpenLoadedARC reconciles LICENSE edits made after its initial load",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-open-license-race-"
+                    "OpenLicenseRaceArc"
+                    (fun arc -> arc.SetLicenseFulltext("initial license"))
+                    (fun arcPath -> promise {
+                        let! loadedResult = loadArcForOpening arcPath
+
+                        let loadedArc =
+                            match loadedResult with
+                            | Ok loadedArc -> loadedArc
+                            | Error error -> raise error
+
+                        do! writeTextFileAsync (join [| arcPath; "LICENSE" |]) "license changed while opening"
+
+                        let vault = ArcVault(TestHelpers.testWindow ())
+
+                        try
+                            do! vault.OpenLoadedARC(arcPath, loadedArc)
+                            Vitest.expect(vault.arc.Value.License.IsSome).toBe (true)
+                            Vitest.expect(vault.arc.Value.License.Value.Content).toBe ("license changed while opening")
+                            do! vault.StopFileWatcher()
+                        with error ->
+                            do! vault.StopFileWatcher()
+                            return raise error
+                    })
+        )
+
+        Vitest.test (
+            "OpenLoadedARC reconciles workbook edits made after its initial load",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-open-edit-race-"
+                    "OpenEditRaceArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let! loadedResult = loadArcForOpening arcPath
+
+                        let loadedArc =
+                            match loadedResult with
+                            | Ok loadedArc -> loadedArc
+                            | Error error -> raise error
+
+                        let! externalArc = TestHelpers.loadArcAsync arcPath
+                        externalArc.Title <- Some "Edit made while opening"
+                        do! externalArc.UpdateAsync arcPath
+
+                        let vault = ArcVault(TestHelpers.testWindow ())
+
+                        try
+                            do! vault.OpenLoadedARC(arcPath, loadedArc)
+                            Vitest.expect(vault.arc.Value.Title).toEqual (Some "Edit made while opening")
+                            do! vault.StopFileWatcher()
+                        with error ->
+                            do! vault.StopFileWatcher()
+                            return raise error
+                    })
         )
 
         Vitest.test (

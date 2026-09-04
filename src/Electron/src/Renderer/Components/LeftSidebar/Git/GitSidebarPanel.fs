@@ -2,7 +2,6 @@ module Renderer.Components.LeftSidebar.Git.GitSidebarPanel
 
 open Browser.Dom
 open Feliz
-open Renderer.Components.Helper.ArcVaultHelper
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
 
@@ -25,10 +24,7 @@ let Main () =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let runStatus = Renderer.Context.GitWorkflow.currentRunStatus gitStateCtx.state
     let errorCtx = useErrorModalCtx ()
-    let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
-
-    let onOpenArcError =
-        createErrorModalCallback errorCtx.enqueue "Error opening ARC" appStateCtx
+    let arcOpening = Renderer.Context.ArcOpeningContext.useArcOpeningCtx ()
 
     React.useEffectOnce (fun () ->
         if not gitVersionCheckStarted then
@@ -52,29 +48,11 @@ let Main () =
         else
             Some "Sign in to a DataHub account to use fetch, pull, push, update, and remote bootstrap."
 
-    let openArc =
-        fun _ ->
-            Renderer.Components.Helper.ArcVaultHelper.openArc onOpenArcError
-            |> Promise.start
-
     match gitStateCtx.state.CurrentArcPath with
     | None ->
-        Renderer.Components.LeftSidebar.Git.GitSidebarEmptyState.Main(
-            title = "Open an ARC to use Git features",
-            description = "Source control becomes available after you open or download an ARC.",
-            iconClassName = "swt:fluent--folder-open-24-regular",
-            primaryAction = {
-                Label = "Open ARC"
-                IconClassName = "swt:fluent--folder-open-24-regular"
-                Disabled = false
-                OnClick = openArc
-            },
-            secondaryAction = {
-                Label = "Download ARC"
-                IconClassName = "swt:fluent--cloud-arrow-down-24-regular"
-                Disabled = false
-                OnClick = (fun () -> pageStateCtx.setState (Some Renderer.Types.PageState.DataHubBrowser))
-            }
+        Renderer.Components.LeftSidebar.Git.GitSidebarOpenArcEmptyState.Main(
+            arcOpening,
+            fun () -> pageStateCtx.setState (Some Renderer.Types.PageState.DataHubBrowser)
         )
     | Some _ when
         gitStateCtx.state.RepositoryAvailability = Renderer.Context.GitWorkflow.GitRepositoryAvailability.MissingRepository

@@ -7,6 +7,7 @@ open Elmish
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
+open Renderer.Context.ArcOpeningContext
 open Renderer.Context.GitWorkflow
 open Renderer.Types
 open Swate.Components.Api.GitLabApi
@@ -483,6 +484,53 @@ Vitest.describe (
                         Vitest.expect(message).toContain ("has already been taken")
                 finally
                     cleanupGitLabCreateProjectFetchSpy ()
+            }
+        )
+)
+
+Vitest.describe (
+    "Git sidebar ARC opening",
+    fun () ->
+        let renderGitSidebarWithArcOpening controller =
+            renderToBody (Renderer.Components.LeftSidebar.Git.GitSidebarOpenArcEmptyState.Main(controller, ignore))
+
+        Vitest.test (
+            "clicking Open ARC delegates to the shared ARC-opening controller",
+            fun () -> promise {
+                let mutable openCalls = 0
+
+                let! _, cleanup =
+                    renderGitSidebarWithArcOpening {
+                        isOpeningArc = false
+                        openArc = fun () -> openCalls <- openCalls + 1
+                        openArcByPath = ignore
+                    }
+
+                try
+                    let openButton = findBodyButtonContaining "Open ARC" |> Option.get
+                    openButton.click ()
+                    Vitest.expect(openCalls).toBe (1)
+                    Vitest.expect(openButton.disabled).toBe (false)
+                finally
+                    cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "Open ARC is disabled while the shared ARC-opening controller is busy",
+            fun () -> promise {
+                let! _, cleanup =
+                    renderGitSidebarWithArcOpening {
+                        isOpeningArc = true
+                        openArc = ignore
+                        openArcByPath = ignore
+                    }
+
+                try
+                    let openButton = findBodyButtonContaining "Open ARC" |> Option.get
+                    Vitest.expect(openButton.disabled).toBe (true)
+                finally
+                    cleanup ()
             }
         )
 )

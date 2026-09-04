@@ -115,6 +115,15 @@ let private notifyGitRepositoryInitialized (arcPath: string) =
         |> fun rendererApi -> rendererApi.gitRepositoryInitialized arcPath
     )
 
+let private openExistingArc (event: IpcMainInvokeEvent) (arcPath: string) : JS.Promise<Result<string, exn>> = promise {
+    try
+        let windowId = windowIdFromIpcEvent event
+        let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
+        return Ok(ArcOpenDisposition.path disposition)
+    with error ->
+        return Error error
+}
+
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
 let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
     openARC =
@@ -136,9 +145,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             else
                 let arcPath = r.filePaths |> Array.exactlyOne |> PathHelpers.normalizePath
 
-                let windowId = windowIdFromIpcEvent event
-                let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
-                return Ok(Some(ArcOpenDisposition.path disposition))
+                match! openExistingArc event arcPath with
+                | Ok openedPath -> return Ok(Some openedPath)
+                | Error error -> return Error error
         }
     openARCByPath =
         fun (arcPath: string) -> promise {
@@ -149,9 +158,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 if not arcPathExists then
                     return Error(exn $"The ARC cannot be found at location: '{arcPath}'.")
                 else
-                    let windowId = windowIdFromIpcEvent event
-                    let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
-                    return Ok(ArcOpenDisposition.path disposition)
+                    return! openExistingArc event arcPath
             with e ->
                 return Error e
         }
