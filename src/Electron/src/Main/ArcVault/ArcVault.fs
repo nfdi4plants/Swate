@@ -373,14 +373,34 @@ module ArcVaultExtensions =
             this.ClearPendingFileWatcherState()
         }
 
-        /// Creates monitoring only after loading has completed, then adopts the loaded state.
-        member private this.AdoptLoadedArc(path: string, loadedArc: LoadedArc) =
+        /// Starts monitoring, reconciles changes made during loading, then adopts the loaded state.
+        member private this.AdoptLoadedArc(path: string, loadedArc: LoadedArc) = promise {
             let watcher = this.CreateFileWatcherForPath(path, None)
-
             this.path <- Some path
-            this.SetArc(loadedArc.Arc)
             this.watcher <- Some watcher
-            this.window.title <- this.arc.Value.Identifier
+
+            try
+                do! waitForFileWatcherReady watcher
+                let! currentRevision = captureArcRevision path
+
+                let! reconciledArc = promise {
+                    if currentRevision = loadedArc.Revision then
+                        return loadedArc
+                    else
+                        match! loadArcForOpening path with
+                        | Ok reloadedArc -> return reloadedArc
+                        | Error error -> return raise error
+                }
+
+                this.SetArc(reconciledArc.Arc)
+                this.RefreshHasUnsavedArcChangesFlag()
+                this.SetFileTree(reconciledArc.FileTree)
+                this.window.title <- this.arc.Value.Identifier
+            with error ->
+                do! this.StopFileWatcher()
+                this.path <- None
+                return raise error
+        }
 
         /// Binds an unused vault to an ARC path and rolls the binding back if startup fails.
         member this.OpenLoadedARC(path: string, loadedArc: LoadedArc) = promise {
@@ -395,7 +415,7 @@ module ArcVaultExtensions =
                     |> Remoting.buildProxySender<IPathChangeRendererApi>
 
                 swatelogfn this.window.id "path: %s" normalizedPath
-                this.AdoptLoadedArc(normalizedPath, loadedArc)
+                do! this.AdoptLoadedArc(normalizedPath, loadedArc)
                 sendMsg.pathChange (Some normalizedPath)
         }
 
@@ -436,7 +456,7 @@ module ArcVaultExtensions =
 
                 match! loadArcForOpening normalizedPath with
                 | Error error -> return raise error
-                | Ok loadedArc -> this.AdoptLoadedArc(normalizedPath, loadedArc)
+                | Ok loadedArc -> do! this.AdoptLoadedArc(normalizedPath, loadedArc)
 
                 sendMsg.pathChange (Some normalizedPath)
         }

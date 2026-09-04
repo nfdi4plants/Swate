@@ -1,6 +1,7 @@
 module Main.ArcVaultHelper
 
 open System
+open System.Collections.Generic
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
@@ -163,7 +164,11 @@ let swatelogfn id fmt =
 let swatefailfn id fmt =
     Printf.kprintf (fun s -> failwith ("[Swate-" + string id + "] " + s)) fmt
 
-type LoadedArc = { Arc: ARC }
+type LoadedArc = {
+    Arc: ARC
+    FileTree: Dictionary<string, FileEntry>
+    Revision: string
+}
 
 type OpenArcRootRenamePlan = {
     SourcePath: string
@@ -375,6 +380,47 @@ let createFileWatcher (path: string) (usePolling: bool option) =
 
     watcher
 
+let waitForFileWatcherReady (watcher: Chokidar.IWatcher) : JS.Promise<unit> =
+    Promise.create (fun resolve reject ->
+        let mutable completed = false
+
+        let timeoutId =
+            JS.setTimeout
+                (fun () ->
+                    if not completed then
+                        completed <- true
+                        reject (exn "Timed out while starting filesystem monitoring.")
+                )
+                10000
+
+        watcher.on (
+            Chokidar.Events.Ready,
+            fun () ->
+                if not completed then
+                    completed <- true
+                    JS.clearTimeout timeoutId
+                    resolve ()
+        )
+        |> ignore
+    )
+
+let captureArcRevision (arcPath: string) = promise {
+    let! entries = getFileEntries arcPath
+
+    let files =
+        entries
+        |> Array.filter (fun entry -> not entry.isDirectory)
+        |> Array.sortBy _.path
+
+    let revisions = ResizeArray<string>()
+
+    for file in files do
+        let! stats = Main.Bindings.Filesystem.statAsync file.path
+        revisions.Add($"{file.path}|{stats.size}|{stats.mtimeMs}")
+
+    return System.String.Join("\n", revisions)
+}
+
 /// Loads the ARC without creating a window or starting filesystem monitoring.
 let loadArcForOpening (arcPath: string) : JS.Promise<Result<LoadedArc, exn>> = promise {
     let normalizedPath = PathHelpers.normalizePath arcPath
@@ -383,10 +429,20 @@ let loadArcForOpening (arcPath: string) : JS.Promise<Result<LoadedArc, exn>> = p
         $"The selected folder '{normalizedPath}' is not a valid ARC folder."
 
     try
+        let! revision = captureArcRevision normalizedPath
+
         match! ARC.LoadAsyncSwateZeroByteRepair normalizedPath with
         | Error errors ->
             return Error(exn $"{invalidArcMessage} Unable to load ARC: {PathHelpers.formatContractErrors errors}")
-        | Ok arc -> return Ok { Arc = arc }
+        | Ok arc ->
+            let! fileEntries = getFileEntries normalizedPath
+
+            return
+                Ok {
+                    Arc = arc
+                    FileTree = createFileEntryTree fileEntries
+                    Revision = revision
+                }
     with error ->
         return Error(System.Exception($"{invalidArcMessage} Unable to load ARC: {error.Message}", error))
 }

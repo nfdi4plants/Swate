@@ -173,6 +173,7 @@ Vitest.describe (
                             |> Seq.toArray
 
                         Vitest.expect(owners.Length).toBe (1)
+                        Vitest.expect(owners.[0].fileTree.Count).toBeGreaterThan (0)
                         do! owners.[0].StopFileWatcher()
                     })
         )
@@ -477,6 +478,25 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "CreateARC adopts the persisted ARC as a clean baseline",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-create-clean-arc-"
+                let vault = ArcVault(TestHelpers.testWindow ())
+
+                try
+                    do! vault.CreateARC(rootPath, "CreatedCleanArc")
+                    Vitest.expect(vault.arc.IsSome).toBe (true)
+                    Vitest.expect(vault.hasUnsavedArcChanges).toBe (false)
+                    do! vault.StopFileWatcher()
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! vault.StopFileWatcher()
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
             "OpenARC releases an invalid folder after loading fails",
             fun () -> promise {
                 let! rootPath = TestHelpers.createTempDirectoryAsync "swate-open-invalid-arc-"
@@ -501,6 +521,37 @@ Vitest.describe (
                     do! TestHelpers.removeDirectoryAsync rootPath
                     return raise error
             }
+        )
+
+        Vitest.test (
+            "OpenLoadedARC reconciles workbook edits made after its initial load",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-open-edit-race-"
+                    "OpenEditRaceArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let! loadedResult = loadArcForOpening arcPath
+
+                        let loadedArc =
+                            match loadedResult with
+                            | Ok loadedArc -> loadedArc
+                            | Error error -> raise error
+
+                        let! externalArc = TestHelpers.loadArcAsync arcPath
+                        externalArc.Title <- Some "Edit made while opening"
+                        do! externalArc.UpdateAsync arcPath
+
+                        let vault = ArcVault(TestHelpers.testWindow ())
+
+                        try
+                            do! vault.OpenLoadedARC(arcPath, loadedArc)
+                            Vitest.expect(vault.arc.Value.Title).toEqual (Some "Edit made while opening")
+                            do! vault.StopFileWatcher()
+                        with error ->
+                            do! vault.StopFileWatcher()
+                            return raise error
+                    })
         )
 
         Vitest.test (
