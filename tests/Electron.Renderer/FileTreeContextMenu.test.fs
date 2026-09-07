@@ -19,6 +19,8 @@ let private createContextMenuConfig () : ContextMenuConfig = {
     openItem = ignore
     arcRootPath = Some "C:\\arc-root"
     openCreateModal = ignore
+    createDataMap = ignore
+    tryFindDataMapItemByPath = fun _ -> None
     openFileSystemCreateModal = fun _ _ -> ()
     requestRenameItem = ignore
     requestDeleteItem = ignore
@@ -177,6 +179,8 @@ Vitest.describe (
                             "New File"
                             "New Folder"
                             "<divider>"
+                            "Add DataMap"
+                            "<divider>"
                             "Add Study"
                             "Add Assay"
                             "Add Workflow"
@@ -252,6 +256,84 @@ Vitest.describe (
                 addNoteItem.OnClick()
 
                 Vitest.expect(requestedCreateKind).toEqual (Some ArcExplorerNodeKind.Note)
+        )
+
+        Vitest.test (
+            "supported ARC owner folders expose Add or Delete DataMap based on current content",
+            fun () ->
+                let owner = createFolderItem "AssayA" (Some "assays/AssayA")
+                let mutable requestedParentInfo = None
+                let mutable requestedDeleteItem = None
+
+                let config = {
+                    createContextMenuConfig () with
+                        createDataMap = fun parentInfo -> requestedParentInfo <- Some parentInfo
+                        requestDeleteItem = fun item -> requestedDeleteItem <- Some item
+                }
+
+                let addDataMap =
+                    createComposedContextMenuItems config owner
+                    |> List.find (fun item -> item.Label = "Add DataMap")
+
+                addDataMap.OnClick()
+                Vitest.expect(requestedParentInfo).toEqual (Some(DatamapParentInfo.create "AssayA" DataMapParent.Assay))
+
+                let dataMapItem =
+                    createFileItem DatamapParentInfo.DatamapFileName (Some "assays/AssayA/isa.datamap.xlsx")
+
+                let ownerWithDataMap = {
+                    owner with
+                        Children = Some [ dataMapItem ]
+                }
+
+                let menuItemsWithDataMap = createComposedContextMenuItems config ownerWithDataMap
+                let labelsWithDataMap = labels menuItemsWithDataMap
+
+                Vitest.expect(labelsWithDataMap).not.toContain ("Add DataMap")
+                Vitest.expect(labelsWithDataMap).toContain ("Delete DataMap")
+
+                menuItemsWithDataMap
+                |> List.find (fun item -> item.Label = "Delete DataMap")
+                |> fun item -> item.OnClick()
+
+                Vitest.expect(requestedDeleteItem |> Option.map _.Path).toEqual (Some dataMapItem.Path)
+        )
+
+        Vitest.test (
+            "collapsed ARC owner folders use the full file tree to expose Delete DataMap",
+            fun () ->
+                let owner = {
+                    createFolderItem "AssayA" (Some "assays/AssayA") with
+                        Children = None
+                }
+
+                let dataMapItem =
+                    createFileItem DatamapParentInfo.DatamapFileName (Some "assays/AssayA/isa.datamap.xlsx")
+
+                let mutable requestedDeleteItem = None
+
+                let config = {
+                    createContextMenuConfig () with
+                        tryFindDataMapItemByPath =
+                            fun path ->
+                                if PathHelpers.pathsEqual path dataMapItem.Path.Value then
+                                    Some dataMapItem
+                                else
+                                    None
+                        requestDeleteItem = fun item -> requestedDeleteItem <- Some item
+                }
+
+                let menuItems = createComposedContextMenuItems config owner
+                let menuLabels = labels menuItems
+
+                Vitest.expect(menuLabels).not.toContain ("Add DataMap")
+                Vitest.expect(menuLabels).toContain ("Delete DataMap")
+
+                menuItems
+                |> List.find (fun item -> item.Label = "Delete DataMap")
+                |> fun item -> item.OnClick()
+
+                Vitest.expect(requestedDeleteItem |> Option.map _.Path).toEqual (Some dataMapItem.Path)
         )
 
         Vitest.test (
