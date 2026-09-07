@@ -7,6 +7,7 @@ open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Primitive.Dropdown
 open Swate.Components.Composite.Actionbar
+open Swate.Components.Composite.Actionbar.Types
 
 [<Erase; Mangle(false)>]
 type ArcSelector =
@@ -214,4 +215,63 @@ type ArcSelector =
             contentClassName =
                 "swt:w-max swt:max-w-none swt:menu swt:bg-base-200 swt:rounded-box swt:z-99 swt:p-2 swt:shadow-sm swt:top-110% swt:menu-sm",
             closeOnClick = false
+        )
+
+    [<ReactComponent>]
+    static member Entry(?debug: bool) =
+        let debug = defaultArg debug false
+        let isOpen, setIsOpen = React.useState false
+
+        let currentlyOpenArcPath, setCurrentlyOpenArcPath =
+            React.useState (None: string option)
+
+        let initialRecentARCs = [|
+            ARCPointer.create ("Test 1", "/Here/Test 1", false)
+            ARCPointer.create ("Test 2", "/Here/Test 2", false)
+            ARCPointer.create ("Test 3", "/Here/Test 3", false)
+            ARCPointer.create (
+                "An ARC name that is much too long to fit inside the selector",
+                "/Here/An ARC name that is much too long to fit inside the selector",
+                false
+            )
+        |]
+
+        let recentARCs, setRecentARCs = React.useState initialRecentARCs
+
+        let removeRecentArc (arcPointer: ARCPointer) =
+            recentARCs
+            |> Array.filter (fun recentArc -> recentArc.path <> arcPointer.path)
+            |> setRecentARCs
+
+            if currentlyOpenArcPath = Some arcPointer.path then
+                setCurrentlyOpenArcPath None
+
+        let actionbarButtons = [|
+            ButtonInfo.create (
+                "swt:fluent--document-add-24-regular",
+                "Create a new ARC",
+                fun _ -> setIsOpen false
+            )
+            ButtonInfo.create (
+                "swt:fluent--folder-open-24-regular",
+                "Open an existing ARC",
+                fun _ -> setIsOpen false
+            )
+        |]
+
+        ArcSelector.Main(
+            recentARCs,
+            (fun arcPointer -> setCurrentlyOpenArcPath (Some arcPointer.path)),
+            isOpen,
+            setIsOpen,
+            rmvRecentArc = removeRecentArc,
+            actionbar =
+                Actionbar.Main(
+                    actionbarButtons,
+                    1,
+                    debug = debug,
+                    keepContextMenuPortalLocal = true
+                ),
+            ?currentlyOpenArcPath = currentlyOpenArcPath,
+            debug = debug
         )
