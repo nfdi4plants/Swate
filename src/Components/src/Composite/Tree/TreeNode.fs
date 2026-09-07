@@ -146,6 +146,7 @@ type TreeNode =
             isExpanded: bool,
             isSelected: bool,
             isActive: bool,
+            isTabStop: bool,
             isFocused: bool,
             isLoading: bool,
             error: string option,
@@ -167,7 +168,7 @@ type TreeNode =
 
         Html.div [
             prop.role "treeitem"
-            prop.tabIndex (if isActive then 0 else -1)
+            prop.tabIndex (if isTabStop then 0 else -1)
             if canSelect then
                 prop.custom ("aria-selected", isSelected)
             if not canSelect && not canExpand then

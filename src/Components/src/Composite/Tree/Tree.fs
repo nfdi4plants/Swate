@@ -64,6 +64,36 @@ type Tree =
                 overscan = 8
             )
 
+        // the virtualizer only returns the rows that are currently visible in the viewport,
+        // so we need to keep track of which nodes are currently mounted in the DOM
+        let virtualRows = virtualizer.getVirtualItems ()
+
+        // get the ids of the nodes that are currently mounted in the DOM, based on the virtual rows
+        let mountedNodeIds =
+            if shouldUseVirtualization then
+                virtualRows
+                |> Seq.choose (fun virtualRow ->
+                    rows
+                    |> Array.tryItem virtualRow.index
+                    |> Option.map (fun row -> TreeItem.id row.node)
+                )
+                |> Seq.toArray
+            else
+                rows |> Array.map (fun row -> TreeItem.id row.node)
+
+        // the node that is mounted on virtualization
+        let isMounted nodeId = mountedNodeIds |> Array.contains nodeId
+
+        // tab stop is the node that is currently focused,
+        // or if no node is focused, the active node, or if no node is active, the first mounted node
+        let tabStopId =
+            focusedId
+            |> Option.filter isMounted
+
+            |> Option.orElseWith (fun () -> activeId |> Option.filter isMounted)
+
+            |> Option.orElseWith (fun () -> mountedNodeIds |> Array.tryHead)
+
         let scrollToIndex index =
             if shouldUseVirtualization then
                 virtualizer.scrollToIndex (
@@ -97,6 +127,7 @@ type Tree =
                 isSelected = effectiveSelectedIds.Contains nodeId,
                 isActive = (activeId = Some nodeId),
                 isFocused = (focusedId = Some nodeId),
+                isTabStop = (tabStopId = Some nodeId),
                 isLoading = (loadState.Status = TreeLazyLoadStatus.Loading),
                 error = loadState.Error,
                 canExpand = canExpandNode,
@@ -137,7 +168,7 @@ type Tree =
                                 style.position.relative
                             ]
                             prop.children [
-                                for virtualRow in virtualizer.getVirtualItems () do
+                                for virtualRow in virtualRows do
                                     let row = rows.[virtualRow.index]
                                     let nodeId = TreeItem.id row.node
 
