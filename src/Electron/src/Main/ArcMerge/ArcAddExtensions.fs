@@ -81,7 +81,23 @@ module ArcAddExtensions =
                 (fun () -> ArcFileCreateContracts.createContracts true (ArcFiles.Workflow workflowCopy))
                 includeUpdateContractsFlag
         | ArcFiles.Investigation _ -> failwith "Adding investigation files is not supported."
-        | ArcFiles.DataMap _ -> failwith "Adding datamap files is not supported."
+        | ArcFiles.DataMap(None, _) ->
+            failwith "Swate could not determine which assay, study, run, or workflow this DataMap belongs to."
+        | ArcFiles.DataMap(Some parentInfo, dataMap) ->
+            let workingArc = copyArcPreservingStaticHashes sourceArc
+            let parentDescription = DatamapParentInfo.describeParent parentInfo
+
+            match workingArc.TryGetDataMap parentInfo with
+            | Some _ ->
+                failwith
+                    $"The {parentDescription} already has a DataMap. Delete the existing DataMap before adding a new one."
+            | None ->
+                if not (workingArc.TrySetDataMap(parentInfo, Some dataMap)) then
+                    failwith
+                        $"Could not add the DataMap because the {parentDescription} was not found in the current ARC. Refresh the File Explorer and try again."
+
+                workingArc.UpdateFileSystem()
+                workingArc, ArcFileCreateContracts.createContracts false arcFile
         | ArcFiles.Template _ -> failwith "Adding template files is not supported."
 
     let private commitAddedArcFile (targetArc: ARC) (workingArc: ARC) (arcFile: ArcFiles) =
@@ -98,6 +114,13 @@ module ArcAddExtensions =
         | ArcFiles.Workflow workflow ->
             workingArc.TryGetWorkflow workflow.Identifier
             |> Option.iter (fun sourceWorkflow -> targetArc.AddWorkflow(sourceWorkflow.Copy()))
+        | ArcFiles.DataMap(Some parentInfo, _) ->
+            workingArc.TryGetDataMap parentInfo
+            |> Option.iter (fun dataMap ->
+                dataMap.StaticHash <- cleanDataMapStaticHash dataMap
+
+                targetArc.TrySetDataMap(parentInfo, Some dataMap) |> ignore
+            )
         | _ -> ()
 
         targetArc.UpdateFileSystem()

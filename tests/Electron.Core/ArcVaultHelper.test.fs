@@ -61,6 +61,34 @@ Vitest.describe (
     "ArcVaultHelper",
     fun () ->
         Vitest.test (
+            "DataMap add synchronization preserves the persisted static-hash baseline",
+            fun () ->
+                let parentInfo = DatamapParentInfo.create "DataMapAssay" DataMapParent.Assay
+                let persistedDataMap = DataMap.init ()
+                persistedDataMap.StaticHash <- 123
+                let persistedAssay = ArcAssay("DataMapAssay")
+                persistedAssay.DataMap <- Some persistedDataMap
+                let persistedArc = ARC("PersistedArc")
+                persistedArc.AddAssay persistedAssay
+
+                let localDataMap = DataMap.init ()
+                localDataMap.StaticHash <- 456
+                let localAssay = ArcAssay("DataMapAssay")
+                localAssay.DataMap <- Some localDataMap
+                let localArc = ARC("LocalArc")
+                localArc.AddAssay localAssay
+
+                syncAddedArcFileFromPersisted
+                    persistedArc
+                    localArc
+                    (ArcFiles.DataMap(Some parentInfo, persistedDataMap))
+
+                Vitest.expect(persistedDataMap.StaticHash).toBe (123)
+                Vitest.expect(persistedArc.GetAssay("DataMapAssay").DataMap.Value.StaticHash).toBe (123)
+                Vitest.expect(localArc.GetAssay("DataMapAssay").DataMap.Value.StaticHash).toBe (123)
+        )
+
+        Vitest.test (
             "recent ARC broadcasts skip windows destroyed during simultaneous shutdown",
             fun () ->
                 let mutable aliveWindowSendCount = 0
