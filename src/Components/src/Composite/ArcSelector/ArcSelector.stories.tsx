@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { Main as ArcSelector } from './ArcSelector.fs.js';
-import { Main as Actionbar } from '../../Primitive/Actionbar/Actionbar.fs.js';
+import { Main as Actionbar } from '../../Composite/Actionbar/Actionbar.fs.js';
 
 const recentARCs = [
   { name: 'Test 1', path: '/Here/Test 1', isActive: false },
@@ -35,17 +35,22 @@ function ArcSelectorStory({ debug = true }: { debug?: boolean }) {
               {
                 icon: 'swt:fluent--document-add-24-regular',
                 toolTip: 'Create a new ARC',
-                onClick: () => setAction('create'),
+                onClick: () => {
+                  setAction('create');
+                  setIsOpen(false);
+                },
               },
               {
                 icon: 'swt:fluent--folder-open-24-regular',
                 toolTip: 'Open an existing ARC',
-                onClick: () => setAction('open'),
+                onClick: () => {
+                  setAction('open');
+                  setIsOpen(false);
+                },
               },
             ]}
             maxNumber={1}
             debug={debug}
-            onActionInvoked={() => setIsOpen(false)}
             keepContextMenuPortalLocal
           />
         )}

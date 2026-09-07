@@ -7,8 +7,8 @@ open Feliz.UseElmish
 open Swate.Components
 open Swate.Components.Composite.Authentication
 open Swate.Components.Composite.Authentication.Types
-open Swate.Components.Primitive.Actionbar
-open Swate.Components.Primitive.Actionbar.Types
+open Swate.Components.Composite.Actionbar
+open Swate.Components.Composite.Actionbar.Types
 open Swate.Components.Page.DataHub.DataHubTypes
 open Swate.Components.Api.GitLabApi
 open Swate.Components.Primitive

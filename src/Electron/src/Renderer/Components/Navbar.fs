@@ -6,8 +6,8 @@ open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Composite.Layout
 open Swate.Components.Composite.Authentication.Types
-open Swate.Components.Primitive.Actionbar
-open Swate.Components.Primitive.Actionbar.Types
+open Swate.Components.Composite.Actionbar
+open Swate.Components.Composite.Actionbar.Types
 open Swate.Components.Primitive.BaseModal
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
@@ -18,23 +18,22 @@ type private Selector =
 
     [<ReactComponent>]
     static member Actionbar
-        (setNewArcModalIsOpen: bool -> unit, onArcError: string -> unit, onActionInvoked: unit -> unit)
+        (setNewArcModalIsOpen: bool -> unit, onArcError: string -> unit, setSelectorIsOpen: bool -> unit)
         =
+        let onCreateArc _ =
+            setNewArcModalIsOpen true
+            setSelectorIsOpen false
+
+        let onOpenArc _ =
+            openArc onArcError |> Promise.start
+            setSelectorIsOpen false
+
         Actionbar.Main(
             [|
-                ButtonInfo.create (
-                    "swt:fluent--folder-add-24-regular swt:size-5",
-                    "Create a new ARC",
-                    fun _ -> setNewArcModalIsOpen true
-                )
-                ButtonInfo.create (
-                    "swt:fluent--folder-open-24-regular swt:size-5",
-                    "Open an existing ARC",
-                    fun _ -> openArc onArcError |> Promise.start
-                )
+                ButtonInfo.create ("swt:fluent--folder-add-24-regular swt:size-5", "Create a new ARC", onCreateArc)
+                ButtonInfo.create ("swt:fluent--folder-open-24-regular swt:size-5", "Open an existing ARC", onOpenArc)
             |],
             2,
-            onActionInvoked = onActionInvoked,
             keepContextMenuPortalLocal = true
         )
 
@@ -56,8 +55,10 @@ type private Selector =
                 dependencies = [||]
             }
 
-        let onOpen =
+        let changeSelectorIsOpen =
             fun (isOpen: bool) ->
+                setSelectorIsOpen isOpen
+
                 if isOpen then
                     recentArcs.refresh ()
 
@@ -73,10 +74,9 @@ type private Selector =
             recentArcs.state,
             (fun clickedARC -> openArcByPath onArcError clickedARC.path |> Promise.start),
             selectorIsOpen,
-            setSelectorIsOpen,
+            changeSelectorIsOpen,
             rmvRecentArc = removeRecentArc,
-            actionbar = Selector.Actionbar(setNewArcModalIsOpen, onArcError, fun () -> setSelectorIsOpen false),
-            onOpenChange = onOpen,
+            actionbar = Selector.Actionbar(setNewArcModalIsOpen, onArcError, changeSelectorIsOpen),
             isLoading = recentArcs.isLoading,
             ?currentlyOpenArcPath = Renderer.Context.AppStateContext.useAppStateCtx ()
         )

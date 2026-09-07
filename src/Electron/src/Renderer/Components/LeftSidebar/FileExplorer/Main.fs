@@ -3,7 +3,7 @@ namespace Renderer.Components.LeftSidebar.FileExplorer
 open Fable.Core
 open Feliz
 open Swate.Components
-open Swate.Components.Primitive.Actionbar.Types
+open Swate.Components.Composite.Actionbar.Types
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
 
@@ -124,7 +124,7 @@ type Main =
                         prop.testId "left-sidebar-file-explorer-toolbar"
                         prop.className "swt:flex swt:shrink-0 swt:justify-center swt:bg-base-100"
                         prop.children [
-                            Swate.Components.Primitive.Actionbar.Actionbar.Main(
+                            Swate.Components.Composite.Actionbar.Actionbar.Main(
                                 [|
                                     //ButtonInfo.create (
                                     //    "swt:fluent--book-open-24-regular swt:size-5",

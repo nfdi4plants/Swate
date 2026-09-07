@@ -6,7 +6,7 @@ open Fable.Core
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Primitive.Dropdown
-open Swate.Components.Primitive.Actionbar
+open Swate.Components.Composite.Actionbar
 
 module private ArcSelectorHelper =
 
@@ -101,7 +101,6 @@ type ArcSelector =
             ?rmvRecentArc: ARCPointer -> unit,
             ?actionbar: ReactElement,
             ?potMaxWidth: int,
-            ?onOpenChange: bool -> unit,
             ?debug: bool,
             ?isLoading: bool,
             ?currentlyOpenArcPath: string
@@ -120,11 +119,6 @@ type ArcSelector =
 
                 name
             )
-
-        let setIsOpen =
-            fun b ->
-                onOpenChange |> Option.iter (fun f -> f b)
-                setIsOpen b
 
         let onClick =
             fun (arcPointer: ARCPointer) ->

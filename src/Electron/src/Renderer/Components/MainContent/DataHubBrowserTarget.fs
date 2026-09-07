@@ -7,7 +7,7 @@ open Swate.Components
 open Swate.Components.Page.DataHub
 open Swate.Components.Page.DataHub.DataHubTypes
 open Swate.Components.Api.GitLabApi
-open Swate.Components.Primitive.Actionbar.Types
+open Swate.Components.Composite.Actionbar.Types
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Electron.Shared.GitTypes
 

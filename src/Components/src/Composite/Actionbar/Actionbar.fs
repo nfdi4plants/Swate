@@ -1,13 +1,10 @@
-namespace Swate.Components.Primitive.Actionbar
-
-open Browser.Types
+namespace Swate.Components.Composite.Actionbar
 
 open Feliz
 open Fable.Core
-open Fable.Core.JsInterop
 
 open Swate.Components
-open Swate.Components.Primitive.Actionbar.Types
+open Swate.Components.Composite.Actionbar.Types
 open Swate.Components.Primitive
 open Swate.Components.Primitive.ContextMenu
 open Swate.Components.Primitive.ContextMenu.Types
@@ -16,14 +13,13 @@ open Swate.Components.Primitive.ContextMenu.Types
 type Actionbar =
 
     [<ReactComponent>]
-    static member Button
+    static member private Button
         (
             buttonInfo: ButtonInfo,
             buttonSize: DaisyuiSize,
             tooltipPosition: DaisyuiTooltipPosition,
             ?buttonClassName: string,
             ?buttonTestId: string,
-            ?onActionInvoked: unit -> unit,
             ?debug: bool
         ) =
 
@@ -59,10 +55,7 @@ type Actionbar =
                 prop.children [
                     Html.i [ prop.className [ "swt:iconify " + buttonInfo.icon ] ]
                 ]
-                prop.onClick (fun e ->
-                    buttonInfo.onClick e
-                    onActionInvoked |> Option.iter (fun callback -> callback ())
-                )
+                prop.onClick buttonInfo.onClick
             ]
 
         match buttonInfo.toolTip with
@@ -77,6 +70,7 @@ type Actionbar =
                 ]
             ]
 
+    [<ReactComponent>]
     static member MaterialIcon(icon: string, ?styling: bool) =
 
         let styling = defaultArg styling false
@@ -88,9 +82,7 @@ type Actionbar =
         ]
 
     [<ReactComponent>]
-    static member ContextMenu
-        (containerRef, buttons: ButtonInfo[], ?onActionInvoked: unit -> unit, ?portalRootRef, ?debug)
-        =
+    static member private ContextMenu(containerRef, buttons: ButtonInfo[], ?portalRootRef, ?renderTrigger, ?debug) =
 
         let buttonElements =
             buttons
@@ -98,11 +90,7 @@ type Actionbar =
                 ContextMenuItem(
                     Html.li [ prop.text (Option.defaultValue "" button.toolTip) ],
                     Actionbar.MaterialIcon(button.icon),
-                    onClick =
-                        (fun event ->
-                            button.onClick event.buttonEvent
-                            onActionInvoked |> Option.iter (fun callback -> callback ())
-                        )
+                    onClick = (fun event -> button.onClick event.buttonEvent)
                 )
             )
             |> List.ofArray
@@ -116,21 +104,17 @@ type Actionbar =
                     Some target
                 ),
             ?portalRootRef = portalRootRef,
+            ?renderTrigger = renderTrigger,
             ?debug = debug
         )
 
-    [<Emit("new MouseEvent($0, $1)")>]
-    static member createMouseEvent (eventType: string) (options: obj) : MouseEvent = jsNative
-
     [<ReactComponent>]
-    static member RestElement
+    static member private RestElement
         (
             buttons: ButtonInfo[],
-            maxNumber,
             buttonSize,
             tooltipPosition,
             ?buttonClassName,
-            ?onActionInvoked: unit -> unit,
             ?keepContextMenuPortalLocal: bool,
             ?debug: bool
         ) =
@@ -139,31 +123,24 @@ type Actionbar =
 
         let containerRef = React.useElementRef ()
 
-        let fireOpenContextEvent (element: HTMLElement) clientX clientY =
-            let options =
-                createObj [
-                    "bubbles" ==> true
-                    "cancable" ==> true
-                    "clientX" ==> clientX
-                    "clientY" ==> clientY
-                    "button" ==> 2
-                ]
-
-            let event = Actionbar.createMouseEvent "contextmenu" options
-            element.dispatchEvent (event) |> ignore
-
-        if buttons.Length > 0 && buttons.Length <= maxNumber then
+        if Array.isEmpty buttons then
             Html.none
         else
-            let buttonInfo =
-                ButtonInfo.create (
-                    "swt:fluent--line-horizontal-1-dot-20-regular swt:size-5",
-                    "Show more options",
-                    (fun e ->
-                        match containerRef.current with
-                        | Some container -> fireOpenContextEvent container e.clientX e.clientY
-                        | None -> ()
+            let renderTrigger openMenu =
+                let buttonInfo =
+                    ButtonInfo.create (
+                        "swt:fluent--line-horizontal-1-dot-20-regular swt:size-5",
+                        "Show more options",
+                        (fun _ -> openMenu ())
                     )
+
+                Actionbar.Button(
+                    buttonInfo,
+                    buttonSize,
+                    tooltipPosition,
+                    ?buttonClassName = buttonClassName,
+                    debug = debug,
+                    buttonTestId = "actionbar-rest-button"
                 )
 
             Html.div [
@@ -171,21 +148,10 @@ type Actionbar =
                 if debug then
                     prop.testId "actionbar-test"
                 prop.children [
-                    Actionbar.Button(
-                        buttonInfo,
-                        buttonSize,
-                        tooltipPosition,
-                        ?buttonClassName = buttonClassName,
-                        debug = debug,
-                        buttonTestId = "actionbar-rest-button"
-                    )
-
-                    let restButtons = buttons.[maxNumber..] |> Array.map (fun button -> button)
-
                     Actionbar.ContextMenu(
                         containerRef,
-                        restButtons,
-                        ?onActionInvoked = onActionInvoked,
+                        buttons,
+                        renderTrigger = renderTrigger,
                         ?portalRootRef =
                             (if defaultArg keepContextMenuPortalLocal false then
                                  Some containerRef
@@ -206,7 +172,6 @@ type Actionbar =
             ?buttonSize: DaisyuiSize,
             ?tooltipPosition: DaisyuiTooltipPosition,
             ?buttonClassName: string,
-            ?onActionInvoked: unit -> unit,
             ?keepContextMenuPortalLocal: bool
         ) =
 
@@ -214,57 +179,29 @@ type Actionbar =
         let buttonSize = defaultArg buttonSize DaisyuiSize.MD
         let tooltipPosition = defaultArg tooltipPosition DaisyuiTooltipPosition.Bottom
 
+        let visibleCount = max 0 (min maxNumber buttons.Length)
+        let visibleButtons, overflowButtons = Array.splitAt visibleCount buttons
+
         let selectedElements =
-            React.useMemo (
-                (fun _ ->
-                    if buttons.Length > 0 && buttons.Length > maxNumber then
-                        Array.take maxNumber buttons
-                    else
-                        buttons
-                    |> Array.map (fun button ->
-                        Actionbar.Button(
-                            button,
-                            debug = debug,
-                            buttonSize = buttonSize,
-                            tooltipPosition = tooltipPosition,
-                            ?buttonClassName = buttonClassName,
-                            ?onActionInvoked = onActionInvoked
-                        )
-                    )
-                ),
-                [|
-                    buttons
-                    buttonSize
-                    tooltipPosition
-                    buttonClassName
-                    maxNumber
-                    onActionInvoked
-                |]
+            visibleButtons
+            |> Array.map (fun button ->
+                Actionbar.Button(
+                    button,
+                    debug = debug,
+                    buttonSize = buttonSize,
+                    tooltipPosition = tooltipPosition,
+                    ?buttonClassName = buttonClassName
+                )
             )
 
         let restElements =
-            React.useMemo (
-                (fun _ ->
-                    Actionbar.RestElement(
-                        buttons,
-                        maxNumber,
-                        buttonSize,
-                        tooltipPosition,
-                        ?buttonClassName = buttonClassName,
-                        ?onActionInvoked = onActionInvoked,
-                        ?keepContextMenuPortalLocal = keepContextMenuPortalLocal,
-                        debug = debug
-                    )
-                ),
-                [|
-                    buttons
-                    buttonSize
-                    tooltipPosition
-                    buttonClassName
-                    maxNumber
-                    onActionInvoked
-                    keepContextMenuPortalLocal
-                |]
+            Actionbar.RestElement(
+                overflowButtons,
+                buttonSize,
+                tooltipPosition,
+                ?buttonClassName = buttonClassName,
+                ?keepContextMenuPortalLocal = keepContextMenuPortalLocal,
+                debug = debug
             )
 
         let selectedElement = React.Fragment selectedElements
