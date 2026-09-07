@@ -20,18 +20,22 @@ type private Selector =
     static member Actionbar
         (setNewArcModalIsOpen: bool -> unit, onArcError: string -> unit, setSelectorIsOpen: bool -> unit)
         =
-        let onCreateArc _ =
-            setNewArcModalIsOpen true
-            setSelectorIsOpen false
-
-        let onOpenArc _ =
-            openArc onArcError |> Promise.start
-            setSelectorIsOpen false
-
         Actionbar.Main(
             [|
-                ButtonInfo.create ("swt:fluent--folder-add-24-regular swt:size-5", "Create a new ARC", onCreateArc)
-                ButtonInfo.create ("swt:fluent--folder-open-24-regular swt:size-5", "Open an existing ARC", onOpenArc)
+                ButtonInfo.create (
+                    "swt:fluent--folder-add-24-regular swt:size-5",
+                    "Create a new ARC",
+                    fun _ ->
+                        setNewArcModalIsOpen true
+                        setSelectorIsOpen false
+                )
+                ButtonInfo.create (
+                    "swt:fluent--folder-open-24-regular swt:size-5",
+                    "Open an existing ARC",
+                    fun _ ->
+                        openArc onArcError |> Promise.start
+                        setSelectorIsOpen false
+                )
             |],
             2,
             keepContextMenuPortalLocal = true

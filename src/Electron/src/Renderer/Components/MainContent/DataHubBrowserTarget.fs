@@ -41,29 +41,14 @@ let DataHubBrowserTarget () =
     let onArcError =
         createErrorModalCallback errorCtx.enqueue "Could not open ARC" appStateCtx
 
-    let loadAllRepos (query: ExploreRepoQuery) = Api.ipcGitLabApi.loadAllRepos query
-
-    let loadMostStarredRepos (query: ExploreMostStarredQuery) =
-        Api.ipcGitLabApi.loadMostStarredRepos query
-
-    let loadUserRepos (query: ExploreRepoQuery) = Api.ipcGitLabApi.loadUserRepos query
-
-    let loadOrganisationGroups (query: ExploreGroupsQuery) =
-        Api.ipcGitLabApi.loadOrganisationGroups query
-
-    let loadOrganisationRepos (query: ExploreGroupProjectsQuery) =
-        Api.ipcGitLabApi.loadOrganisationRepos query
-
     let loaders: ExploreLoaders = {
-        LoadAllRepos = loadAllRepos
-        LoadMostStarredRepos = loadMostStarredRepos
-        LoadUserRepos = loadUserRepos
-        LoadOrganisationGroups = loadOrganisationGroups
-        LoadOrganisationRepos = loadOrganisationRepos
+        LoadAllRepos = Api.ipcGitLabApi.loadAllRepos
+        LoadMostStarredRepos = Api.ipcGitLabApi.loadMostStarredRepos
+        LoadUserRepos = Api.ipcGitLabApi.loadUserRepos
+        LoadOrganisationGroups = Api.ipcGitLabApi.loadOrganisationGroups
+        LoadOrganisationRepos = Api.ipcGitLabApi.loadOrganisationRepos
     }
 
-    let closePage _ = pageCtx.setState None
-    let closeBrowser () = pageCtx.setState None
     let isCloneBusy = gitStateCtx.state.BusyOperation.IsSome
     let runStatus = Renderer.Context.GitWorkflow.currentRunStatus gitStateCtx.state
 
@@ -93,7 +78,7 @@ let DataHubBrowserTarget () =
                     let! wasOpened = Renderer.Components.Helper.ArcVaultHelper.openArcByPath onArcError clonedPath
 
                     if wasOpened then
-                        closeBrowser ()
+                        pageCtx.setState None
         }
         |> Promise.start
 
@@ -117,7 +102,7 @@ let DataHubBrowserTarget () =
                 loaders = loaders,
                 projectActionBtns = DataHubBrowserHelper.createActionBtns cloneAndOpenRepo,
                 classNames = "swt:grow swt:flex swt:flex-col swt:gap-2 swt:p-2 swt:overflow-hidden",
-                onClose = closePage
+                onClose = (fun _ -> pageCtx.setState None)
             )
         ]
     ]

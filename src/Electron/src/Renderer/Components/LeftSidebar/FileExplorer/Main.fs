@@ -103,17 +103,6 @@ type Main =
             }
             |> Promise.start
 
-        let openArcFolderInFileExplorer () =
-            promise {
-                match! Api.ipcArcVaultApi.openArcFolderInFileExplorer () with
-                | Ok() -> ()
-                | Error exn ->
-                    errorModalCtx.enqueue (
-                        ErrorModalRequest.create ($"Failed to open folder: {exn.Message}", title = "Open folder failed")
-                    )
-            }
-            |> Promise.start
-
         match appStateCtx with
         | Some path ->
             Html.div [
@@ -159,7 +148,19 @@ type Main =
                             Swate.Components.Composite.ArcVaultActions.ArcVaultActions.ArcVaultActions(
                                 path,
                                 copyArcPathToClipboard,
-                                openArcFolderInFileExplorer
+                                fun () ->
+                                    promise {
+                                        match! Api.ipcArcVaultApi.openArcFolderInFileExplorer () with
+                                        | Ok() -> ()
+                                        | Error exn ->
+                                            errorModalCtx.enqueue (
+                                                ErrorModalRequest.create (
+                                                    $"Failed to open folder: {exn.Message}",
+                                                    title = "Open folder failed"
+                                                )
+                                            )
+                                    }
+                                    |> Promise.start
                             )
                         ]
                     ]

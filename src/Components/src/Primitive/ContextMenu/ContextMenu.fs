@@ -10,8 +10,6 @@ open Swate.Components.Primitive.ContextMenu.Types
 
 module private ContextMenuDom =
 
-    let defaultOnSpawn (e: MouseEvent) = Some(box e)
-
     let tryGetEventTargetElement (e: Event) : Element option =
         let targetObj: obj = box e.target
 
@@ -90,7 +88,7 @@ type ContextMenu =
 
         let (spawnData: obj), setSpawnData = React.useState (null)
         let children, setChildren = React.useState ([])
-        let onSpawn = defaultArg onSpawn ContextMenuDom.defaultOnSpawn
+        let onSpawn = defaultArg onSpawn (fun e -> Some(box e))
         let (isOpen, setIsOpen) = React.useState (false)
         let (activeIndex: int option), setActiveIndex = React.useState (None)
 

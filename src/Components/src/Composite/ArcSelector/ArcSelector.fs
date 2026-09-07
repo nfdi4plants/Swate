@@ -8,13 +8,6 @@ open Swate.Components.Shared
 open Swate.Components.Primitive.Dropdown
 open Swate.Components.Composite.Actionbar
 
-module private ArcSelectorHelper =
-
-    let normalizePath = PathHelpers.normalizePath
-
-    let comparePaths =
-        fun (path1: string) (path2: string) -> normalizePath path1 = normalizePath path2
-
 [<Erase; Mangle(false)>]
 type ArcSelector =
 
@@ -111,7 +104,7 @@ type ArcSelector =
         let currentlyOpenArcName =
             currentlyOpenArcPath
             |> Option.map (fun path ->
-                let normalized = ArcSelectorHelper.normalizePath path
+                let normalized = PathHelpers.normalizePath path
 
                 let name =
                     normalized.Split([| "/" |], System.StringSplitOptions.RemoveEmptyEntries)
@@ -130,7 +123,9 @@ type ArcSelector =
             |> Array.mapi (fun i arcPointer ->
                 let isCurrentlyOpenArcPath =
                     currentlyOpenArcPath
-                    |> Option.exists (fun path -> ArcSelectorHelper.comparePaths path arcPointer.path)
+                    |> Option.exists (fun path ->
+                        PathHelpers.normalizePath path = PathHelpers.normalizePath arcPointer.path
+                    )
 
                 let testId = if debug then Some $"selector-arc-item-{i}" else None
 
