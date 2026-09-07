@@ -26,7 +26,10 @@ Vitest.describe (
 
                 Vitest.expect(merged.ContainsAssay("New Assay")).toBe (true)
                 Vitest.expect(merged.AssayCount).toBe (2)
-                Vitest.expect(merged.GetAssay("New Assay").DataMap.Value.DataContexts.[0].Label).toEqual (Some "Disc label")
+
+                Vitest
+                    .expect(merged.GetAssay("New Assay").DataMap.Value.DataContexts.[0].Label)
+                    .toEqual (Some "Disc label")
         )
 
         Vitest.test (
