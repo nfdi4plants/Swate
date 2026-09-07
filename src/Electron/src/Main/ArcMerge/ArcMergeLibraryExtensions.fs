@@ -2,6 +2,7 @@ namespace Main.ArcMerge
 
 open ARCtrl
 open Main.ARCtrlExtensions
+open Swate.Components.Shared
 
 module ArcMergeHelper =
 
@@ -26,7 +27,12 @@ module ArcMergeHelper =
     }
 
     let private cloneDataMapOption (dataMap: DataMap option) : DataMap option =
-        dataMap |> Option.map (fun dm -> dm.Copy())
+        dataMap
+        |> Option.map (fun source ->
+            let target = source.Copy()
+            preserveDataMapLabelsWorkaround source target
+            target
+        )
 
     let internal parseFileEvents (events: FileEvent list) : ParsedFileEvent list =
         events
@@ -96,6 +102,10 @@ module ArcMergeHelper =
             | None -> addLocal (copyEntity remoteEntity)
             | Some idx ->
                 let discCopy = copyEntity remoteEntity
+
+                match getDataMap remoteEntity, getDataMap discCopy with
+                | Some source, Some target -> preserveDataMapLabelsWorkaround source target
+                | _ -> ()
 
                 if not hasDataMapEvent then
                     let preservedDataMap = getLocal idx |> getDataMap |> cloneDataMapOption
@@ -260,11 +270,11 @@ module ArcMergeLibraryExtensions =
     type ARC with
         static member merge (arcLocal: ARC) (arcRemote: ARC) (events: FileEvent list) : ARC =
             if not (arcLocal.hasInMemoryChanges ()) then
-                arcRemote.Copy()
+                copyArcPreservingStaticHashes arcRemote
             elif events.IsEmpty then
-                arcLocal.Copy()
+                copyArcPreservingStaticHashes arcLocal
             else
-                let mergedArc = arcLocal.Copy()
+                let mergedArc = copyArcPreservingStaticHashes arcLocal
                 let parsedEvents = ArcMergeHelper.parseFileEvents events
                 let dataMapEvents = ArcMergeHelper.buildDataMapEventIndex parsedEvents
 

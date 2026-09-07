@@ -91,6 +91,18 @@ let getFileEntry (path: string) = promise {
     return FileEntry.create (basename path, path, stats.isDirectory (), None)
 }
 
+/// Refreshes one known relative path without rescanning the ARC directory.
+let refreshFileTreeEntry
+    (arcPath: string)
+    (relativePath: string)
+    (fileTree: Dictionary<string, FileEntry>)
+    : Fable.Core.JS.Promise<Dictionary<string, FileEntry>> =
+    promise {
+        let absolutePath = join [| arcPath; relativePath |]
+        let! entry = getFileEntry absolutePath
+        return upsertFileEntry entry fileTree
+    }
+
 let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
     let normalizedRepoRoot = normalizeRootPath repoRoot
     let! entry = getFileEntry path
@@ -147,4 +159,10 @@ let getFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise
         let scannedEntries = entries.ToArray()
         let! lfsFilesByRelativePath = tryGetLsFilesByRelativePath repoRoot
         return withFileEntriesLfsMetadata repoRoot lfsFilesByRelativePath scannedEntries
+}
+
+/// Scans a path and builds its keyed file tree.
+let getFileTree (path: string) : Fable.Core.JS.Promise<Dictionary<string, FileEntry>> = promise {
+    let! fileEntries = getFileEntries path
+    return createFileEntryTree fileEntries
 }

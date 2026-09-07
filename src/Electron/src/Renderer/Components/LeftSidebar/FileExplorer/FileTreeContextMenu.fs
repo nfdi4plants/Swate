@@ -131,6 +131,47 @@ let arcCreateContextMenuItems
     else
         []
 
+let dataMapContextMenuItems
+    (createDataMap: DatamapParentInfo -> unit)
+    (requestDeleteItem: FileItem -> unit)
+    (tryFindDataMapItemByPath: string -> FileItem option)
+    (item: FileItem)
+    =
+    let materializedDataMapItem =
+        item.Children
+        |> Option.defaultValue []
+        |> List.tryFind (fun child -> child.Path |> Option.bind DatamapParentInfo.tryFromPath |> Option.isSome)
+
+    let parentInfo =
+        if item.IsDirectory then
+            item.Path |> Option.bind DatamapParentInfo.tryFromFolderPath
+        else
+            None
+
+    let dataMapItem =
+        materializedDataMapItem
+        |> Option.orElseWith (fun () ->
+            parentInfo
+            |> Option.map DatamapParentInfo.toPath
+            |> Option.bind tryFindDataMapItemByPath
+        )
+
+    match parentInfo, dataMapItem with
+    | Some parentInfo, None -> [
+        ContextMenuItem.create
+            "Add DataMap"
+            "swt:fluent--database-arrow-up-20-regular"
+            (fun () -> createDataMap parentInfo)
+      ]
+    | Some _, Some dataMap -> [
+        ContextMenuItem.styled
+            "Delete DataMap"
+            "swt:fluent--delete-24-regular"
+            "swt:text-error"
+            (fun () -> requestDeleteItem dataMap)
+      ]
+    | _ -> []
+
 let fileSystemCreateContextMenuItems
     (openFileSystemCreateModal: FileSystemItemKind -> FileItem -> unit)
     (item: FileItem)
@@ -214,6 +255,7 @@ let createContextMenuItems (config: ContextMenuConfig) arcScopeId =
             openContextMenuItems config item
             copyPathContextMenuItems config.arcRootPath item
             fileSystemCreateContextMenuItems config.openFileSystemCreateModal item
+            dataMapContextMenuItems config.createDataMap config.requestDeleteItem config.tryFindDataMapItemByPath item
             Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems
                 item
                 toggleLfsMark

@@ -17,6 +17,8 @@ type ContextMenuConfig = {
     arcRootPath: string option
     openCreateModal: ArcFilesDiscriminate -> unit
     openNoteDraft: unit -> unit
+    createDataMap: DatamapParentInfo -> unit
+    tryFindDataMapItemByPath: string -> FileItem option
     openFileSystemCreateModal: FileSystemItemKind -> FileItem -> unit
     requestRenameItem: FileItem -> unit
     requestDeleteItem: FileItem -> unit

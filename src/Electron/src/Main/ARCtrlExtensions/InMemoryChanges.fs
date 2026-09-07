@@ -1,6 +1,7 @@
 namespace Main.ARCtrlExtensions
 
 open ARCtrl
+open Swate.Components.Shared
 
 [<AutoOpen>]
 module InMemoryChangesExtensions =
@@ -115,6 +116,43 @@ module InMemoryChangesExtensions =
     /// Copies ARC and preserves static hashes so unchanged entities are not treated as newly created.
     let copyArcPreservingStaticHashes (arc: ARC) : ARC =
         let copiedArc = arc.Copy()
+
+        for sourceAssay in arc.Assays do
+            copiedArc.TryGetAssay sourceAssay.Identifier
+            |> Option.bind (fun targetAssay ->
+                match sourceAssay.DataMap, targetAssay.DataMap with
+                | Some source, Some target -> Some(source, target)
+                | _ -> None
+            )
+            |> Option.iter (fun (source, target) -> preserveDataMapLabelsWorkaround source target)
+
+        for sourceStudy in arc.Studies do
+            copiedArc.TryGetStudy sourceStudy.Identifier
+            |> Option.bind (fun targetStudy ->
+                match sourceStudy.DataMap, targetStudy.DataMap with
+                | Some source, Some target -> Some(source, target)
+                | _ -> None
+            )
+            |> Option.iter (fun (source, target) -> preserveDataMapLabelsWorkaround source target)
+
+        for sourceRun in arc.Runs do
+            copiedArc.TryGetRun sourceRun.Identifier
+            |> Option.bind (fun targetRun ->
+                match sourceRun.DataMap, targetRun.DataMap with
+                | Some source, Some target -> Some(source, target)
+                | _ -> None
+            )
+            |> Option.iter (fun (source, target) -> preserveDataMapLabelsWorkaround source target)
+
+        for sourceWorkflow in arc.Workflows do
+            copiedArc.TryGetWorkflow sourceWorkflow.Identifier
+            |> Option.bind (fun targetWorkflow ->
+                match sourceWorkflow.DataMap, targetWorkflow.DataMap with
+                | Some source, Some target -> Some(source, target)
+                | _ -> None
+            )
+            |> Option.iter (fun (source, target) -> preserveDataMapLabelsWorkaround source target)
+
         syncArcStaticHashes arc copiedArc
         copiedArc
 
