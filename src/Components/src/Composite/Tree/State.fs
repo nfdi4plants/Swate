@@ -50,6 +50,15 @@ let withLoadError nodeId message loadedChildren =
 
 let invalidateNode nodeId loadedChildren = loadedChildren |> Map.remove nodeId
 
+/// <summary>
+/// Returns the effective direct children for the specified tree node.
+/// </summary>
+/// <remarks>
+/// For branch nodes, children previously loaded through the data source take
+/// precedence over children provided directly by <c>TreeItem.Branch</c>.
+/// The loaded children remain authoritative until the cached value is cleared
+/// through <c>invalidateNode</c> or <c>invalidateAll</c>.
+/// </remarks>
 let directChildren (loadedChildren: Map<string, TreeLoadState<'T>>) (node: TreeItem<'T>) =
     match node with
     | TreeItem.Leaf _ -> None
