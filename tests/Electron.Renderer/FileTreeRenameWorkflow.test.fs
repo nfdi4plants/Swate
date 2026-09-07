@@ -94,6 +94,18 @@ Vitest.describe (
                 Vitest.expect(remapped).toEqual (Some "assays/NewAssay/notes/protocol.md")
         )
 
+        Vitest.test (
+            "tryRemapSelectionPath does not remap sibling paths that only share a prefix",
+            fun () ->
+                let remapped =
+                    tryRemapSelectionPath
+                        "assays/OldAssay"
+                        "assays/NewAssay"
+                        (Some "assays/OldAssay2/notes/protocol.md")
+
+                Vitest.expect(remapped).toEqual (None)
+        )
+
 )
 
 let private getRenameMenuItems (item: FileItem) =

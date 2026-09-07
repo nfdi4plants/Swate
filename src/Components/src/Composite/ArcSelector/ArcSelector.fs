@@ -247,16 +247,8 @@ type ArcSelector =
                 setCurrentlyOpenArcPath None
 
         let actionbarButtons = [|
-            ButtonInfo.create (
-                "swt:fluent--document-add-24-regular",
-                "Create a new ARC",
-                fun _ -> setIsOpen false
-            )
-            ButtonInfo.create (
-                "swt:fluent--folder-open-24-regular",
-                "Open an existing ARC",
-                fun _ -> setIsOpen false
-            )
+            ButtonInfo.create ("swt:fluent--document-add-24-regular", "Create a new ARC", fun _ -> setIsOpen false)
+            ButtonInfo.create ("swt:fluent--folder-open-24-regular", "Open an existing ARC", fun _ -> setIsOpen false)
         |]
 
         ArcSelector.Main(
@@ -265,13 +257,7 @@ type ArcSelector =
             isOpen,
             setIsOpen,
             rmvRecentArc = removeRecentArc,
-            actionbar =
-                Actionbar.Main(
-                    actionbarButtons,
-                    1,
-                    debug = debug,
-                    keepContextMenuPortalLocal = true
-                ),
+            actionbar = Actionbar.Main(actionbarButtons, 1, debug = debug, keepContextMenuPortalLocal = true),
             ?currentlyOpenArcPath = currentlyOpenArcPath,
             debug = debug
         )
