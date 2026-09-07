@@ -231,8 +231,7 @@ module ARCtrlHelper =
                 | ArcFiles.Assay assay -> ArcFiles.Assay <| assay.Copy()
                 | ArcFiles.Run run -> ArcFiles.Run <| run.Copy()
                 | ArcFiles.Workflow workflow -> ArcFiles.Workflow <| workflow.Copy()
-                | ArcFiles.DataMap(parent, dataMap) ->
-                    ArcFiles.DataMap(parent, copyDataMapPreservingLabelsWorkaround dataMap)
+                | ArcFiles.DataMap(parent, dataMap) -> ArcFiles.DataMap(parent, dataMap.Copy())
                 | ArcFiles.Template template -> ArcFiles.Template <| template.Copy()
 
             match arcFile.TryGetDataMap(), copy.TryGetDataMap() with
