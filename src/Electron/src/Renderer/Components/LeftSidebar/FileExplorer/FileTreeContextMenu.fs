@@ -229,11 +229,6 @@ let deleteContextMenuItems (requestDeleteItem: FileItem -> unit) (item: FileItem
     else
         []
 
-let arcDeleteAndRenameContextMenuItems (config: ContextMenuConfig) (item: FileItem) = [
-    yield! renameContextMenuItems config.requestRenameItem item
-    yield! deleteContextMenuItems config.requestDeleteItem item
-]
-
 let createContextMenuItems (config: ContextMenuConfig) arcScopeId =
     let toggleLfsMark =
         Renderer.Components.FileExplorerLfs.createToggleLfsMark config.enqueueError arcScopeId config.runToggleLfsMark
@@ -262,5 +257,8 @@ let createContextMenuItems (config: ContextMenuConfig) arcScopeId =
                 (Some downloadLfsFile)
                 (Some freeLocalLfsCopy)
             arcCreateContextMenuItems config.openCreateModal config.openNoteDraft item
-            arcDeleteAndRenameContextMenuItems config item
+            [
+                yield! renameContextMenuItems config.requestRenameItem item
+                yield! deleteContextMenuItems config.requestDeleteItem item
+            ]
         ]

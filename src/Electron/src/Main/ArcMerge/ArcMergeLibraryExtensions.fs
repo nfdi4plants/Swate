@@ -78,6 +78,9 @@ module ArcMergeHelper =
     let private tryFindEntityIndex id getIdentifier entities =
         entities |> Seq.tryFindIndex (fun entity -> getIdentifier entity = id)
 
+    /// Shared by assays, studies, runs, and workflows to keep their merge behavior consistent.
+    /// The callback-heavy interface is intentionally retained here; replacing it with typed entity adapters
+    /// would be a broader ArcMerge refactor than the DataMap correctness changes in this PR.
     let private applyEntityAddOrChange
         (id: string)
         (hasDataMapEvent: bool)

@@ -16,7 +16,3 @@ let tryBuildRenameDraft (item: FileItem) : Result<ArcRenameDraft, string> =
                 SourcePath = sourcePath
                 InitialName = PathHelpers.getNameFromPath sourcePath
             }
-
-let tryRemapSelectionPath (sourcePath: string) (targetPath: string) (selectedPath: string option) =
-    selectedPath
-    |> Option.bind (PathHelpers.tryRemapPathPrefix sourcePath targetPath)

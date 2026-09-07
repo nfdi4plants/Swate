@@ -34,7 +34,7 @@ module FileTreeRenameWorkflow =
         match pageState with
         | Some(Renderer.Types.PageState.ArcFilePage(arcFile, _)) ->
             arcFile.TryGetRelativePath()
-            |> Option.bind (fun arcFilePath -> tryRemapSelectionPath sourcePath targetPath (Some arcFilePath))
+            |> Option.bind (PathHelpers.tryRemapPathPrefix sourcePath targetPath)
         | _ -> None
 
     let requestRenameItem
@@ -75,7 +75,8 @@ module FileTreeRenameWorkflow =
                             match renameResult with
                             | Error renameError -> return Error renameError.Message
                             | Ok() ->
-                                tryRemapSelectionPath renameDraft.SourcePath targetPath config.selectedTreePath
+                                config.selectedTreePath
+                                |> Option.bind (PathHelpers.tryRemapPathPrefix renameDraft.SourcePath targetPath)
                                 |> Option.iter (fun remappedSelectionPath ->
                                     config.setSelection (ArcSelection.forTreePath (Some remappedSelectionPath))
                                 )
