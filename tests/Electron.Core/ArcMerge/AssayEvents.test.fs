@@ -17,12 +17,16 @@ Vitest.describe (
             fun () ->
                 let arcLocal, arcRemote = MockData.createTwoCleanCopies ()
                 arcLocal.Title <- Some "User Title"
-                arcRemote.InitAssay("New Assay") |> ignore
+                let newAssay = arcRemote.InitAssay("New Assay")
+                let dataMap = DataMap.init ()
+                dataMap.DataContexts.Add(DataContext(Label = Some "Disc label"))
+                newAssay.DataMap <- Some dataMap
 
                 let merged = ARC.merge arcLocal arcRemote [ assayEvent EventName.Add "New Assay" ]
 
                 Vitest.expect(merged.ContainsAssay("New Assay")).toBe (true)
                 Vitest.expect(merged.AssayCount).toBe (2)
+                Vitest.expect(merged.GetAssay("New Assay").DataMap.Value.DataContexts.[0].Label).toEqual (Some "Disc label")
         )
 
         Vitest.test (

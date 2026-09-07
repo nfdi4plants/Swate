@@ -257,11 +257,6 @@ type FileTree =
             setIsDialogBusy false
             setActiveDialog None
 
-        let openCreateModal kind = openDialog (CreateDialog kind)
-
-        let openNoteDraft () =
-            pageStateCtx.setState (Some Renderer.Types.PageState.NotesDraftPage)
-
         let openFileSystemCreateModal kind (item: FileItem) =
             if
                 item.IsDirectory
@@ -282,16 +277,17 @@ type FileTree =
 
         let rootPath = fileTree |> Option.map (fun (tree: FileTreeNode) -> tree.path)
 
-        let inlineCreateKindForItem item =
-            match rootPath with
+        let canCreateFromItem path item =
+            match path with
             | Some path -> tryGetInlineArcCreateKind path item
             | None -> None
+            |> Option.isSome
 
-        let canCreateFromItem item =
-            inlineCreateKindForItem item |> Option.isSome
-
-        let createFromItem item =
-            inlineCreateKindForItem item |> Option.iter openCreateModal
+        let createFromItem path item =
+            match path with
+            | Some path -> tryGetInlineArcCreateKind path item
+            | None -> None
+            |> Option.iter (fun kind -> openDialog (CreateDialog kind))
 
         let applyCreateError errorMessage =
             errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create ARC file"))
@@ -403,9 +399,6 @@ type FileTree =
                         |> Promise.map (fun _ -> setIsDialogBusy false)
                         |> Promise.start
 
-        let renameContextMenuItems =
-            FileTreeContextMenu.renameContextMenuItems requestRenameItem
-
         let createDataMap (parentInfo: DatamapParentInfo) =
             promise {
                 match!
@@ -438,16 +431,16 @@ type FileTree =
                     "notes"
                     "Create new item in"
                     "swt:fluent--note-add-24-regular"
-                    openNoteDraft
+                    (fun () -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesDraftPage))
                     item
-            yield! renameContextMenuItems item
+            yield! FileTreeContextMenu.renameContextMenuItems requestRenameItem item
         ]
 
         let contextMenuConfig: ContextMenuConfig = {
             openItem = openPreview
             arcRootPath = appStateCtx
-            openCreateModal = openCreateModal
-            openNoteDraft = openNoteDraft
+            openCreateModal = (fun kind -> openDialog (CreateDialog kind))
+            openNoteDraft = (fun () -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesDraftPage))
             createDataMap = createDataMap
             tryFindDataMapItemByPath = tryFindDataMapItemByPath
             openFileSystemCreateModal = openFileSystemCreateModal
@@ -507,13 +500,10 @@ type FileTree =
                     }
                     newName
 
-        let createModalKind =
-            activeCreateKind |> Option.defaultValue ArcFilesDiscriminate.Study
-
         let arcCreateModal =
             CreateArcFileModal.Main(
                 isOpen = activeCreateKind.IsSome,
-                kind = createModalKind,
+                kind = (activeCreateKind |> Option.defaultValue ArcFilesDiscriminate.Study),
                 close = closeDialog,
                 submit = createArcEntry,
                 isCreating = isDialogBusy
@@ -568,8 +558,8 @@ type FileTree =
                             onDirectoryExpansionChange = handleExpansionChange,
                             onContextMenu = createContextMenuItems,
                             getItemIconClass = getItemIconClass,
-                            canCreateItem = canCreateFromItem,
-                            onCreateItem = createFromItem,
+                            canCreateItem = canCreateFromItem rootPath,
+                            onCreateItem = createFromItem rootPath,
                             getItemActions = itemActions,
                             getItemStatusAction = getItemStatusAction,
                             canDeleteItem =

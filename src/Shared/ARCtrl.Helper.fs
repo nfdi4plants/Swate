@@ -16,6 +16,13 @@ module ARCtrlHelper =
             source.DataContexts
             target.DataContexts
 
+    /// WORKAROUND: Creates a DataMap copy while retaining labels omitted by ARCtrl's Copy().
+    /// Remove this function after upgrading to an ARCtrl version that preserves labels.
+    let copyDataMapPreservingLabelsWorkaround (source: DataMap) =
+        let target = source.Copy()
+        preserveDataMapLabelsWorkaround source target
+        target
+
     [<RequireQualifiedAccess; StringEnum>]
     type ArcFilesDiscriminate =
         | [<CompiledName("investigation")>] Investigation
@@ -224,7 +231,8 @@ module ARCtrlHelper =
                 | ArcFiles.Assay assay -> ArcFiles.Assay <| assay.Copy()
                 | ArcFiles.Run run -> ArcFiles.Run <| run.Copy()
                 | ArcFiles.Workflow workflow -> ArcFiles.Workflow <| workflow.Copy()
-                | ArcFiles.DataMap(parent, dataMap) -> ArcFiles.DataMap(parent, dataMap.Copy())
+                | ArcFiles.DataMap(parent, dataMap) ->
+                    ArcFiles.DataMap(parent, copyDataMapPreservingLabelsWorkaround dataMap)
                 | ArcFiles.Template template -> ArcFiles.Template <| template.Copy()
 
             match arcFile.TryGetDataMap(), copy.TryGetDataMap() with

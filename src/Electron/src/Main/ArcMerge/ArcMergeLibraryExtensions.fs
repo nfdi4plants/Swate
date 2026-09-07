@@ -27,12 +27,7 @@ module ArcMergeHelper =
     }
 
     let private cloneDataMapOption (dataMap: DataMap option) : DataMap option =
-        dataMap
-        |> Option.map (fun source ->
-            let target = source.Copy()
-            preserveDataMapLabelsWorkaround source target
-            target
-        )
+        dataMap |> Option.map copyDataMapPreservingLabelsWorkaround
 
     let internal parseFileEvents (events: FileEvent list) : ParsedFileEvent list =
         events
@@ -95,17 +90,22 @@ module ArcMergeHelper =
         (getDataMap: 'entity -> DataMap option)
         (setDataMap: 'entity -> DataMap option -> unit)
         =
+        let copyEntityPreservingDataMapLabels sourceEntity =
+            let targetEntity = copyEntity sourceEntity
+
+            match getDataMap sourceEntity, getDataMap targetEntity with
+            | Some source, Some target -> preserveDataMapLabelsWorkaround source target
+            | _ -> ()
+
+            targetEntity
+
         match tryGetRemote id with
         | None -> ()
         | Some remoteEntity ->
             match tryFindLocalIndex id with
-            | None -> addLocal (copyEntity remoteEntity)
+            | None -> addLocal (copyEntityPreservingDataMapLabels remoteEntity)
             | Some idx ->
-                let discCopy = copyEntity remoteEntity
-
-                match getDataMap remoteEntity, getDataMap discCopy with
-                | Some source, Some target -> preserveDataMapLabelsWorkaround source target
-                | _ -> ()
+                let discCopy = copyEntityPreservingDataMapLabels remoteEntity
 
                 if not hasDataMapEvent then
                     let preservedDataMap = getLocal idx |> getDataMap |> cloneDataMapOption

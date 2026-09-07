@@ -68,6 +68,47 @@ module InMemoryChangesExtensions =
             |> tryGetSource
             |> Option.iter (fun sourceEntity -> syncEntityStaticHash sourceEntity targetEntity)
 
+    let private preserveEntityDataMapLabels
+        (targetEntities: seq<'Entity>)
+        (tryGetSource: string -> 'Entity option)
+        (getIdentifier: 'Entity -> string)
+        (getDataMap: 'Entity -> DataMap option)
+        =
+        for targetEntity in targetEntities do
+            targetEntity
+            |> getIdentifier
+            |> tryGetSource
+            |> Option.iter (fun sourceEntity ->
+                match getDataMap sourceEntity, getDataMap targetEntity with
+                | Some source, Some target -> preserveDataMapLabelsWorkaround source target
+                | _ -> ()
+            )
+
+    let private preserveArcDataMapLabels (source: ARC) (target: ARC) =
+        preserveEntityDataMapLabels
+            target.Assays
+            source.TryGetAssay
+            (fun (assay: ArcAssay) -> assay.Identifier)
+            (fun assay -> assay.DataMap)
+
+        preserveEntityDataMapLabels
+            target.Studies
+            source.TryGetStudy
+            (fun (study: ArcStudy) -> study.Identifier)
+            (fun study -> study.DataMap)
+
+        preserveEntityDataMapLabels
+            target.Runs
+            source.TryGetRun
+            (fun (run: ArcRun) -> run.Identifier)
+            (fun run -> run.DataMap)
+
+        preserveEntityDataMapLabels
+            target.Workflows
+            source.TryGetWorkflow
+            (fun (workflow: ArcWorkflow) -> workflow.Identifier)
+            (fun workflow -> workflow.DataMap)
+
     /// Syncs static hashes from source ARC to target ARC for matching entities.
     /// This keeps ARCtrl update contract generation scoped to actual changes.
     let syncArcStaticHashes (source: ARC) (target: ARC) : unit =
@@ -116,43 +157,7 @@ module InMemoryChangesExtensions =
     /// Copies ARC and preserves static hashes so unchanged entities are not treated as newly created.
     let copyArcPreservingStaticHashes (arc: ARC) : ARC =
         let copiedArc = arc.Copy()
-
-        for sourceAssay in arc.Assays do
-            copiedArc.TryGetAssay sourceAssay.Identifier
-            |> Option.bind (fun targetAssay ->
-                match sourceAssay.DataMap, targetAssay.DataMap with
-                | Some source, Some target -> Some(source, target)
-                | _ -> None
-            )
-            |> Option.iter (fun (source, target) -> preserveDataMapLabelsWorkaround source target)
-
-        for sourceStudy in arc.Studies do
-            copiedArc.TryGetStudy sourceStudy.Identifier
-            |> Option.bind (fun targetStudy ->
-                match sourceStudy.DataMap, targetStudy.DataMap with
-                | Some source, Some target -> Some(source, target)
-                | _ -> None
-            )
-            |> Option.iter (fun (source, target) -> preserveDataMapLabelsWorkaround source target)
-
-        for sourceRun in arc.Runs do
-            copiedArc.TryGetRun sourceRun.Identifier
-            |> Option.bind (fun targetRun ->
-                match sourceRun.DataMap, targetRun.DataMap with
-                | Some source, Some target -> Some(source, target)
-                | _ -> None
-            )
-            |> Option.iter (fun (source, target) -> preserveDataMapLabelsWorkaround source target)
-
-        for sourceWorkflow in arc.Workflows do
-            copiedArc.TryGetWorkflow sourceWorkflow.Identifier
-            |> Option.bind (fun targetWorkflow ->
-                match sourceWorkflow.DataMap, targetWorkflow.DataMap with
-                | Some source, Some target -> Some(source, target)
-                | _ -> None
-            )
-            |> Option.iter (fun (source, target) -> preserveDataMapLabelsWorkaround source target)
-
+        preserveArcDataMapLabels arc copiedArc
         syncArcStaticHashes arc copiedArc
         copiedArc
 
