@@ -5,6 +5,7 @@ open Main.ArcVault
 open Main.Bindings.Path
 open Main.IPC.Delete
 open ARCtrl
+open Swate.Components.Shared
 open Vitest
 
 let private expectSome (value: 'T option) (message: string) : 'T =
@@ -53,6 +54,138 @@ Vitest.describe (
                                 arcPath
                                 [| "assays"; "DeleteAssay" |]
                                 (fun arc -> arc.ContainsAssay("DeleteAssay"))
+                    })
+        )
+
+        Vitest.test (
+            "deletes an assay DataMap through a contract",
+            fun () ->
+                withTempArc
+                    (fun arc ->
+                        let assay = ArcAssay("DataMapAssay")
+                        assay.DataMap <- Some(DataMap.init ())
+                        arc.AddAssay assay
+                    )
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+
+                        let parentInfo = DatamapParentInfo.create "DataMapAssay" DataMapParent.Assay
+
+                        match! arc.TryDeleteDataMapAsync(arcPath, parentInfo) with
+                        | Error error -> failwith error.Message
+                        | Ok() ->
+                            Vitest.expect(arc.GetAssay("DataMapAssay").DataMap.IsNone).toBe (true)
+
+                            let! dataMapExists =
+                                pathExistsAsync (join [| arcPath; "assays"; "DataMapAssay"; "isa.datamap.xlsx" |])
+
+                            Vitest.expect(dataMapExists).toBe (false)
+                    })
+        )
+
+        Vitest.test (
+            "explains which ARC entity has no DataMap to delete",
+            fun () ->
+                withTempArc
+                    (fun arc -> arc.AddStudy(ArcStudy("StudyWithoutDataMap")))
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+
+                        let parentInfo = DatamapParentInfo.create "StudyWithoutDataMap" DataMapParent.Study
+
+                        match! arc.TryDeleteDataMapAsync(arcPath, parentInfo) with
+                        | Ok() -> failwith "Expected deleting a missing DataMap to fail."
+                        | Error error ->
+                            Vitest
+                                .expect(error.Message)
+                                .toBe (
+                                    "The study 'StudyWithoutDataMap' does not have a DataMap to delete. Refresh the File Explorer and try again."
+                                )
+                    })
+        )
+
+        Vitest.test (
+            "deletes a study DataMap through a contract",
+            fun () ->
+                withTempArc
+                    (fun arc ->
+                        let study = ArcStudy("DataMapStudy")
+                        study.DataMap <- Some(DataMap.init ())
+                        arc.AddStudy study
+                    )
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+
+                        let parentInfo = DatamapParentInfo.create "DataMapStudy" DataMapParent.Study
+
+                        match! arc.TryDeleteDataMapAsync(arcPath, parentInfo) with
+                        | Error error -> failwith error.Message
+                        | Ok() ->
+                            Vitest.expect(arc.GetStudy("DataMapStudy").DataMap.IsNone).toBe (true)
+
+                            let! dataMapExists =
+                                pathExistsAsync (join [| arcPath; "studies"; "DataMapStudy"; "isa.datamap.xlsx" |])
+
+                            Vitest.expect(dataMapExists).toBe (false)
+                    })
+        )
+
+        Vitest.test (
+            "deletes a workflow DataMap through a contract",
+            fun () ->
+                withTempArc
+                    (fun arc ->
+                        let workflow = ArcWorkflow("DataMapWorkflow")
+                        workflow.DataMap <- Some(DataMap.init ())
+                        arc.AddWorkflow workflow
+                    )
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+
+                        let parentInfo = DatamapParentInfo.create "DataMapWorkflow" DataMapParent.Workflow
+
+                        match! arc.TryDeleteDataMapAsync(arcPath, parentInfo) with
+                        | Error error -> failwith error.Message
+                        | Ok() ->
+                            Vitest.expect(arc.GetWorkflow("DataMapWorkflow").DataMap.IsNone).toBe (true)
+
+                            let! dataMapExists =
+                                pathExistsAsync (
+                                    join [|
+                                        arcPath
+                                        "workflows"
+                                        "DataMapWorkflow"
+                                        "isa.datamap.xlsx"
+                                    |]
+                                )
+
+                            Vitest.expect(dataMapExists).toBe (false)
+                    })
+        )
+
+        Vitest.test (
+            "deletes a run DataMap through a contract",
+            fun () ->
+                withTempArc
+                    (fun arc ->
+                        let run = ArcRun("DataMapRun")
+                        run.DataMap <- Some(DataMap.init ())
+                        arc.AddRun run
+                    )
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+
+                        let parentInfo = DatamapParentInfo.create "DataMapRun" DataMapParent.Run
+
+                        match! arc.TryDeleteDataMapAsync(arcPath, parentInfo) with
+                        | Error error -> failwith error.Message
+                        | Ok() ->
+                            Vitest.expect(arc.GetRun("DataMapRun").DataMap.IsNone).toBe (true)
+
+                            let! dataMapExists =
+                                pathExistsAsync (join [| arcPath; "runs"; "DataMapRun"; "isa.datamap.xlsx" |])
+
+                            Vitest.expect(dataMapExists).toBe (false)
                     })
         )
 

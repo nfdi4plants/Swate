@@ -15,6 +15,9 @@ open Main.Bindings
 open Node.Api
 open Swate.Electron.Shared.RenamePathRules
 
+let arcNotOpenError () =
+    exn "No ARC is open. Open an ARC and try again."
+
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"
 
@@ -22,47 +25,18 @@ let private pathDynamic: obj = importAll "path"
 /// It also ensures that the static hash is preserved to avoid unnecessary changes to the ARC when saving a datamap.
 let private setDataMapByParentInfo (arc: ARC) (dmpi: DatamapParentInfo) (dm: DataMap) : Result<unit, exn> =
     try
-        match dmpi.Parent with
-        | DataMapParent.Study ->
-            arc.TryGetStudy dmpi.ParentId
-            |> Option.iter (fun study ->
-                if study.DataMap.IsSome then
-                    dm.StaticHash <- study.DataMap.Value.StaticHash
+        arc.TryGetDataMap dmpi
+        |> Option.iter (fun currentDataMap -> dm.StaticHash <- currentDataMap.StaticHash)
 
-                study.DataMap <- Some dm
-            )
-
+        if arc.TrySetDataMap(dmpi, Some dm) then
             Ok()
-        | DataMapParent.Assay ->
-            arc.TryGetAssay dmpi.ParentId
-            |> Option.iter (fun assay ->
-                if assay.DataMap.IsSome then
-                    dm.StaticHash <- assay.DataMap.Value.StaticHash
+        else
+            let parentDescription = DatamapParentInfo.describeParent dmpi
 
-                assay.DataMap <- Some dm
+            Error(
+                exn
+                    $"Could not save the DataMap because the {parentDescription} was not found in the current ARC. Refresh the File Explorer and try again."
             )
-
-            Ok()
-        | DataMapParent.Workflow ->
-            arc.TryGetWorkflow dmpi.ParentId
-            |> Option.iter (fun workflow ->
-                if workflow.DataMap.IsSome then
-                    dm.StaticHash <- workflow.DataMap.Value.StaticHash
-
-                workflow.DataMap <- Some dm
-            )
-
-            Ok()
-        | DataMapParent.Run ->
-            arc.TryGetRun dmpi.ParentId
-            |> Option.iter (fun run ->
-                if run.DataMap.IsSome then
-                    dm.StaticHash <- run.DataMap.Value.StaticHash
-
-                run.DataMap <- Some dm
-            )
-
-            Ok()
     with e ->
         Error(exn $"Failed to set datamap on ARC: {e.Message}")
 
@@ -82,6 +56,9 @@ let syncAddedArcFileFromPersisted (source: ARC) (target: ARC) (arcFile: ArcFiles
     | ArcFiles.Run run ->
         source.TryGetRun run.Identifier
         |> Option.iter (fun sourceRun -> target.SetRun(run.Identifier, sourceRun))
+    | ArcFiles.DataMap(Some parentInfo, _) ->
+        source.TryGetDataMap parentInfo
+        |> Option.iter (fun persistedDataMap -> target.TrySetDataMap(parentInfo, Some persistedDataMap) |> ignore)
     | _ -> ()
 
 /// This function should only be used for partial updates to an ARC based on a file content DTO.

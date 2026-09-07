@@ -73,6 +73,16 @@ module ARCtrlHelper =
             Parent = parent
         |}
 
+        let describeParent (dmpi: DatamapParentInfo) =
+            let parentType =
+                match dmpi.Parent with
+                | DataMapParent.Assay -> "assay"
+                | DataMapParent.Study -> "study"
+                | DataMapParent.Run -> "run"
+                | DataMapParent.Workflow -> "workflow"
+
+            $"{parentType} '{dmpi.ParentId}'"
+
         let tryFromPath (path: string) =
             let segments = split path
 
@@ -82,6 +92,16 @@ module ARCtrlHelper =
             | [| WorkflowsFolderName; anyWorkflowName; DatamapFileName |] ->
                 create anyWorkflowName DataMapParent.Workflow |> Some
             | [| RunsFolderName; anyRunName; DatamapFileName |] -> create anyRunName DataMapParent.Run |> Some
+            | _ -> None
+
+        let tryFromFolderPath (path: string) =
+            let segments = split path
+
+            match segments with
+            | [| AssaysFolderName; anyAssayName |] -> create anyAssayName DataMapParent.Assay |> Some
+            | [| StudiesFolderName; anyStudyName |] -> create anyStudyName DataMapParent.Study |> Some
+            | [| WorkflowsFolderName; anyWorkflowName |] -> create anyWorkflowName DataMapParent.Workflow |> Some
+            | [| RunsFolderName; anyRunName |] -> create anyRunName DataMapParent.Run |> Some
             | _ -> None
 
         let toFolderPath (dmpi: DatamapParentInfo) =
@@ -194,6 +214,15 @@ module ARCtrlHelper =
             | ArcFiles.DataMap(_, dataMap) -> Some dataMap
             | _ -> None
 
+        member this.TryGetDataMapParentInfo() =
+            match this with
+            | ArcFiles.Assay assay -> Some(DatamapParentInfo.create assay.Identifier DataMapParent.Assay)
+            | ArcFiles.Study(study, _) -> Some(DatamapParentInfo.create study.Identifier DataMapParent.Study)
+            | ArcFiles.Run run -> Some(DatamapParentInfo.create run.Identifier DataMapParent.Run)
+            | ArcFiles.Workflow workflow -> Some(DatamapParentInfo.create workflow.Identifier DataMapParent.Workflow)
+            | ArcFiles.DataMap(parentInfo, _) -> parentInfo
+            | _ -> None
+
         member this.CanRenderDataMapView() = this.TryGetDataMap() |> Option.isSome
 
         /// React only refreshes if the reference changes, but when we update the ArcFile, we usually mutate the existing object. This function creates a new reference with the same content, which can be used to force React to re-render.
@@ -214,16 +243,34 @@ module ARCtrlHelper =
 
             copy
 
+    type ArcInvestigation with
+
+        member this.TryGetDataMap(parentInfo: DatamapParentInfo) =
+            match parentInfo.Parent with
+            | DataMapParent.Assay -> this.TryGetAssay parentInfo.ParentId |> Option.bind _.DataMap
+            | DataMapParent.Study -> this.TryGetStudy parentInfo.ParentId |> Option.bind _.DataMap
+            | DataMapParent.Run -> this.TryGetRun parentInfo.ParentId |> Option.bind _.DataMap
+            | DataMapParent.Workflow -> this.TryGetWorkflow parentInfo.ParentId |> Option.bind _.DataMap
+
+        member this.TrySetDataMap(parentInfo: DatamapParentInfo, dataMap: DataMap option) =
+            match parentInfo.Parent with
+            | DataMapParent.Assay ->
+                this.TryGetAssay parentInfo.ParentId
+                |> Option.map (fun assay -> assay.DataMap <- dataMap)
+            | DataMapParent.Study ->
+                this.TryGetStudy parentInfo.ParentId
+                |> Option.map (fun study -> study.DataMap <- dataMap)
+            | DataMapParent.Run ->
+                this.TryGetRun parentInfo.ParentId
+                |> Option.map (fun run -> run.DataMap <- dataMap)
+            | DataMapParent.Workflow ->
+                this.TryGetWorkflow parentInfo.ParentId
+                |> Option.map (fun workflow -> workflow.DataMap <- dataMap)
+            |> Option.isSome
+
     /// Single source of truth for file paths stored relative to the ARC root.
     let toArcRootRelativeFilePath (arcFile: ArcFiles) (filePath: string) =
-        let parentInfo =
-            match arcFile with
-            | ArcFiles.Assay assay -> Some(DatamapParentInfo.create assay.Identifier DataMapParent.Assay)
-            | ArcFiles.Study(study, _) -> Some(DatamapParentInfo.create study.Identifier DataMapParent.Study)
-            | ArcFiles.Run run -> Some(DatamapParentInfo.create run.Identifier DataMapParent.Run)
-            | ArcFiles.Workflow workflow -> Some(DatamapParentInfo.create workflow.Identifier DataMapParent.Workflow)
-            | ArcFiles.DataMap(Some parentInfo, _) -> Some parentInfo
-            | _ -> None
+        let parentInfo = arcFile.TryGetDataMapParentInfo()
 
         let withExplicitRelativePrefix (path: string) =
             let normalizedPath = PathHelpers.normalizeSeparators path
