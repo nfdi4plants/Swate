@@ -83,7 +83,8 @@ function ChangingMenu() {
         ref={owner}
         childInfo={() => ofArray(labels.map(label => ({
           text: <span>{label}</span>,
-          kbdbutton: { element: <span />, label },
+          label,
+          kbdbutton: { element: <span />, label: 'Keyboard hint' },
           isDivider: false,
           onClick: () => {
             setActivationCount(count => count + 1);

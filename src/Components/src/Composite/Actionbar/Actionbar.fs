@@ -90,6 +90,7 @@ type Actionbar =
                 ContextMenuItem(
                     Html.li [ prop.text (Option.defaultValue "" button.toolTip) ],
                     Actionbar.MaterialIcon(button.icon),
+                    ?label = button.toolTip,
                     onClick = (fun event -> button.onClick event.buttonEvent)
                 )
             )

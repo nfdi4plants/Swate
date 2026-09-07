@@ -35,6 +35,8 @@ type ContextMenu =
             Html.div [ prop.className "swt:divider swt:my-0 swt:col-span-3" ]
         else
             Html.button [
+                if child.label.IsSome then
+                    prop.ariaLabel child.label.Value
                 prop.className
                     "swt:col-span-3 swt:grid swt:grid-cols-subgrid swt:gap-x-2 swt:text-sm /
                     swt:text-base-content swt:px-2 swt:py-1 /
@@ -52,6 +54,7 @@ type ContextMenu =
                         Html.none
                     if child.text.IsSome then
                         Html.div [
+                            prop.custom ("data-context-menu-item-label", "")
                             prop.className "swt:col-start-2 swt:justify-self-start"
                             prop.children child.text.Value
                         ]
@@ -94,7 +97,8 @@ type ContextMenu =
 
         let listItemsRef: IRefValue<ResizeArray<HTMLElement>> = React.useRef (ResizeArray())
 
-        let listContentRef = React.useRef (ResizeArray())
+        let listContentRef: IRefValue<ResizeArray<string option>> =
+            React.useRef (ResizeArray())
 
         let debug = defaultArg debug false
 
@@ -150,7 +154,7 @@ type ContextMenu =
             setActiveIndex None
             setChildren items
             setSpawnData data
-            listContentRef.current.AddRange(items |> List.map (fun child -> child.kbdbutton |> Option.map _.label))
+            listContentRef.current.AddRange(items |> List.map _.label)
             let hasItems = not (List.isEmpty items)
             setIsOpen hasItems
 
@@ -258,13 +262,33 @@ type ContextMenu =
                                                             ref =
                                                                 fun (node: HTMLElement) ->
                                                                     listItemsRef.current.[index] <- node
+
+                                                                    if
+                                                                        child.label.IsNone
+                                                                        && not (isNullOrUndefined node)
+                                                                    then
+                                                                        match
+                                                                            node.querySelector (
+                                                                                "[data-context-menu-item-label]"
+                                                                            )
+                                                                        with
+                                                                        | :? HTMLElement as labelElement ->
+                                                                            listContentRef.current.[index] <-
+                                                                                labelElement.textContent
+                                                                                |> Option.ofObj
+                                                                                |> Option.map _.Trim()
+                                                                                |> Option.filter (
+                                                                                    System.String.IsNullOrWhiteSpace
+                                                                                    >> not
+                                                                                )
+                                                                        | _ -> ()
                                                             tabIndex =
                                                                 if activeIndex.IsSome && activeIndex.Value = index then
                                                                     0
                                                                 else
                                                                     -1
                                                             onClick = triggerEvent
-                                                            label = child.kbdbutton |> Option.map _.label
+                                                            label = child.label
                                                         |}
                                                     )
                                                     |> Fable.Core.JS.Constructors.Object.entries
