@@ -168,7 +168,11 @@ let tryDecodeFallbackText (text: string) =
             let json = text.Substring FallbackPrefix.Length
             let fallback = JS.JSON.parse json |> unbox<FallbackDto>
 
-            if isNull (box fallback) || isNull fallback.PlainText || isNull (box fallback.Payload) then
+            if
+                isNull (box fallback)
+                || isNull fallback.PlainText
+                || isNull (box fallback.Payload)
+            then
                 None
             else
                 match fallback.Payload |> encode |> tryDecode with

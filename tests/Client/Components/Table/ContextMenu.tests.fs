@@ -302,10 +302,7 @@ type TestCases =
             "foo"
             "The first value should be pasted into Explication."
 
-        Expect.equal
-            dataMap.DataContexts.[0].Unit.Value.NameText
-            "bar"
-            "The second value should be pasted into Unit."
+        Expect.equal dataMap.DataContexts.[0].Unit.Value.NameText "bar" "The second value should be pasted into Unit."
 
         Expect.equal
             dataMap.DataContexts.[0].ObjectType.Value.NameText
