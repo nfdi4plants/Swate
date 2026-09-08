@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Show **Delete DataMap**, rather than **Add DataMap**, in the context menu of a collapsed ARC entity folder that already contains a DataMap.
 -   Prevent newly added DataMaps from incorrectly appearing as unsaved after they have been written to disk.
 
+### 🐛 Fixed
+
+-   Recognize annotation-table column headers correctly when pasting tabular data.
+-   Paste DataMap values into the selected column instead of shifting them one column to the right.
+-   Keep pasted TSV values in their intended DataMap cells instead of interpreting three- or four-cell rows as ontology metadata.
+-   Preserve ontology term and unit metadata when copying and pasting within Swate in browsers that do not support custom clipboard formats.
+
 ## 2.1.0 - 2026-08-19
 
 ### ✨ Added
