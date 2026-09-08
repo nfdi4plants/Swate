@@ -373,7 +373,21 @@ type TestCases =
         let expected = cells |> Array.map (Array.map _.ToTabStr())
         Expect.equal actual expected "The typed clipboard codec should round-trip every composite cell kind."
 
-    static member ClipboardFallbackPreservesCompositeCells() =
+        Expect.isNone
+            (Swate.Components.ClipboardCodec.tryDecode """{"Version":1,"Rows":[[null]]}""")
+            "A payload containing a null cell should be rejected."
+
+        Expect.isNone
+            (Swate.Components.ClipboardCodec.tryDecode
+                """{"Version":1,"Rows":[[{"Kind":"term","Name":"incomplete"}]]}""")
+            "A payload with missing cell fields should be rejected."
+
+        Expect.isNone
+            (Swate.Components.ClipboardCodec.tryDecode
+                """{"Version":1,"Rows":[[{"Kind":"unknown","Value":"","Name":"","TermSourceRef":"","TermAccessionNumber":"","Selector":"","Format":"","SelectorFormat":""}]]}""")
+            "A payload with an unknown cell kind should be rejected."
+
+    static member ClipboardHtmlFallbackPreservesCompositeCells() =
         let cells = [|
             [|
                 CompositeCell.createTermFromString ("explicit", "TST", "TST:1")
@@ -381,23 +395,29 @@ type TestCases =
             |]
         |]
 
+        let representations =
+            Swate.Components.ClipboardCodec.createRepresentations "explicit\tmetre" cells
+
+        Expect.equal
+            representations.PlainText
+            "explicit\tmetre"
+            "External plain-text consumers should receive human-readable TSV."
+
         let decoded =
-            Swate.Components.ClipboardCodec.createFallbackText "explicit\tmetre" cells
-            |> Swate.Components.ClipboardCodec.tryDecodeFallbackText
+            representations.HtmlText
+            |> Swate.Components.ClipboardCodec.tryDecodeHtml
             |> Option.get
 
-        Expect.equal decoded.PlainText "explicit\tmetre" "The fallback should retain the display-oriented TSV."
-
         let actual =
-            decoded.Payload.Value.Rows
+            decoded.Rows
             |> Array.map (Array.map (Swate.Components.ClipboardCodec.toCompositeCell >> _.ToTabStr()))
 
         let expected = cells |> Array.map (Array.map _.ToTabStr())
         Expect.equal actual expected "The fallback should round-trip ontology metadata."
 
         Expect.isNone
-            (Swate.Components.ClipboardCodec.tryDecodeFallbackText "foo\tbar\tbaz")
-            "Ordinary TSV must not be treated as a structured fallback."
+            (Swate.Components.ClipboardCodec.tryDecodeHtml "<table><tr><td>foo</td></tr></table>")
+            "HTML without Swate metadata must not be treated as a structured fallback."
 
     static member TableCopyIncludesSelector() =
         let dataCell = CompositeCell.createDataFromString "DatamapTesting.txt#row=2"
@@ -611,8 +631,8 @@ let Main =
             <| fun _ -> TestCases.DataMapStructuredPastePreservesTermsAndUnits()
             testCase "Typed clipboard codec round-trips composite cells"
             <| fun _ -> TestCases.ClipboardCodecRoundTripsCompositeCells()
-            testCase "Plain-text clipboard fallback preserves composite cells"
-            <| fun _ -> TestCases.ClipboardFallbackPreservesCompositeCells()
+            testCase "HTML clipboard fallback preserves composite cells and plain TSV"
+            <| fun _ -> TestCases.ClipboardHtmlFallbackPreservesCompositeCells()
             testCase "Table cell copy includes the selector behind #"
             <| fun _ -> TestCases.TableCopyIncludesSelector()
             testCase "DataMap cell paste includes the selector behind #"

@@ -9,13 +9,10 @@ open Fable.Core.JsInterop
 let MimeType = "web application/x-swate-cells+json"
 
 [<Literal>]
-let private PlainTextMimeType = "text/plain"
-
-[<Literal>]
 let private CurrentVersion = 1
 
 [<Literal>]
-let private FallbackPrefix = "SWATE_CLIPBOARD_V1:"
+let private HtmlPayloadAttribute = "data-swate-cells"
 
 [<AllowNullLiteral>]
 type CellDto =
@@ -38,16 +35,7 @@ type ClipboardContent = {
     Payload: Payload option
 }
 
-[<AllowNullLiteral>]
-type private FallbackDto =
-    abstract PlainText: string
-    abstract Payload: Payload
-
-[<Emit("new Blob([$0], { type: $1 })")>]
-let private createBlob (_content: string) (_mimeType: string) : obj = jsNative
-
-[<Emit("new ClipboardItem($0)")>]
-let private createClipboardItem (_content: obj) : ClipboardItem = jsNative
+type ClipboardRepresentations = { PlainText: string; HtmlText: string }
 
 let private createCell kind value name termSourceRef termAccessionNumber selector format selectorFormat =
     createObj [
@@ -125,7 +113,46 @@ let toCompositeCell (cell: CellDto) =
             |> Option.filter (System.String.IsNullOrWhiteSpace >> not)
 
         CompositeCell.createData data
-    | _ -> CompositeCell.createFreeText cell.Value
+    | "freetext" -> CompositeCell.createFreeText cell.Value
+    | kind -> failwith $"Unknown clipboard cell kind: {kind}"
+
+let tryToCompositeCell (cell: CellDto) =
+    try
+        let require (value: string) =
+            value
+            |> Option.ofObj
+            |> Option.defaultWith (fun () -> failwith "Missing clipboard cell field")
+
+        match cell.Kind with
+        | "freetext" -> require cell.Value |> ignore
+        | "term" ->
+            [|
+                cell.Name
+                cell.TermSourceRef
+                cell.TermAccessionNumber
+            |]
+            |> Array.iter (require >> ignore)
+        | "unitized" ->
+            [|
+                cell.Value
+                cell.Name
+                cell.TermSourceRef
+                cell.TermAccessionNumber
+            |]
+            |> Array.iter (require >> ignore)
+        | "data" ->
+            [|
+                cell.Value
+                cell.Selector
+                cell.Format
+                cell.SelectorFormat
+            |]
+            |> Array.iter (require >> ignore)
+        | kind -> failwith $"Unknown clipboard cell kind: {kind}"
+
+        cell |> toCompositeCell |> Some
+    with _ ->
+        None
 
 let createPayload (cells: CompositeCell[][]) =
     createObj [
@@ -144,6 +171,10 @@ let tryDecode json =
             isNull (box payload)
             || payload.Version <> CurrentVersion
             || isNull (box payload.Rows)
+            || not (
+                payload.Rows
+                |> Array.forall (Array.forall (tryToCompositeCell >> Option.isSome))
+            )
         then
             None
         else
@@ -151,37 +182,48 @@ let tryDecode json =
     with _ ->
         None
 
-let createFallbackText (plainText: string) (cells: CompositeCell[][]) =
-    let fallback =
-        createObj [
-            "PlainText" ==> plainText
-            "Payload" ==> createPayload cells
-        ]
+let private escapeHtml (text: string) =
+    text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&#39;")
 
-    FallbackPrefix + JS.JSON.stringify fallback
+let createRepresentations (plainText: string) (cells: CompositeCell[][]) =
+    let encodedPayload = cells |> createPayload |> encode |> JS.encodeURIComponent
 
-let tryDecodeFallbackText (text: string) =
-    if isNull text || not (text.StartsWith FallbackPrefix) then
+    let tableRows =
+        plainText.TrimEnd([| '\r'; '\n' |]).Split([| "\r\n"; "\n"; "\r" |], System.StringSplitOptions.None)
+        |> Array.map (fun row ->
+            row.Split '\t'
+            |> Array.map (fun value -> $"<td>{escapeHtml value}</td>")
+            |> String.concat ""
+            |> fun columns -> $"<tr>{columns}</tr>"
+        )
+        |> String.concat ""
+
+    {
+        PlainText = plainText
+        HtmlText = $"<table {HtmlPayloadAttribute}=\"{encodedPayload}\">{tableRows}</table>"
+    }
+
+let tryDecodeHtml (htmlText: string) =
+    let marker = $"{HtmlPayloadAttribute}=\""
+
+    if isNull htmlText then
         None
     else
         try
-            let json = text.Substring FallbackPrefix.Length
-            let fallback = JS.JSON.parse json |> unbox<FallbackDto>
+            let payloadStart = htmlText.IndexOf marker
 
-            if
-                isNull (box fallback)
-                || isNull fallback.PlainText
-                || isNull (box fallback.Payload)
-            then
+            if payloadStart < 0 then
                 None
             else
-                match fallback.Payload |> encode |> tryDecode with
-                | Some payload ->
-                    Some {
-                        PlainText = fallback.PlainText
-                        Payload = Some payload
-                    }
-                | None -> None
+                let payloadStart = payloadStart + marker.Length
+                let payloadEnd = htmlText.IndexOf('"', payloadStart)
+
+                if payloadEnd < 0 then
+                    None
+                else
+                    htmlText.Substring(payloadStart, payloadEnd - payloadStart)
+                    |> JS.decodeURIComponent
+                    |> tryDecode
         with _ ->
             None
 
@@ -189,36 +231,40 @@ let write (plainText: string) (cells: CompositeCell[][] option) = promise {
     match cells with
     | None -> do! Swate.Components.GlobalBindings.navigator.clipboard.writeText plainText
     | Some cells ->
+        let clipboard = Swate.Components.GlobalBindings.navigator.clipboard
+        let representations = createRepresentations plainText cells
+        let payloadText = cells |> createPayload |> encode
+
         try
-            let clipboard = Swate.Components.GlobalBindings.navigator.clipboard
-
-            let content =
-                createObj [
-                    PlainTextMimeType ==> createBlob plainText PlainTextMimeType
-                    MimeType
-                    ==> (cells |> createPayload |> encode |> (fun json -> createBlob json MimeType))
-                ]
-
-            do! clipboard.write [| createClipboardItem content |]
-        with _ ->
             do!
-                cells
-                |> createFallbackText plainText
-                |> Swate.Components.GlobalBindings.navigator.clipboard.writeText
+                ClipboardBindings.createItemWithTypedContent
+                    representations.PlainText
+                    MimeType
+                    payloadText
+                    representations.HtmlText
+                |> Array.singleton
+                |> clipboard.write
+        with _ ->
+            try
+                do!
+                    ClipboardBindings.createItemWithHtmlContent representations.PlainText representations.HtmlText
+                    |> Array.singleton
+                    |> clipboard.write
+            with _ ->
+                do! clipboard.writeText representations.PlainText
 }
 
 let read () = promise {
     let! plainText = Swate.Components.GlobalBindings.navigator.clipboard.readText ()
-    let fallbackContent = tryDecodeFallbackText plainText
 
     try
         let clipboard = Swate.Components.GlobalBindings.navigator.clipboard
         let! items = clipboard.read ()
 
-        let item =
+        let typedItem =
             items |> Array.tryFind (fun item -> item.types |> Array.contains MimeType)
 
-        match item with
+        match typedItem with
         | Some item ->
             let! blob = item.getType MimeType
             let! json = blob.text ()
@@ -228,17 +274,26 @@ let read () = promise {
                 Payload = tryDecode json
             }
         | None ->
-            return
-                fallbackContent
-                |> Option.defaultValue {
+            let htmlItem =
+                items |> Array.tryFind (fun item -> item.types |> Array.contains "text/html")
+
+            match htmlItem with
+            | Some item ->
+                let! blob = item.getType "text/html"
+                let! htmlText = blob.text ()
+
+                return {
+                    PlainText = plainText
+                    Payload = tryDecodeHtml htmlText
+                }
+            | None ->
+                return {
                     PlainText = plainText
                     Payload = None
                 }
     with _ ->
-        return
-            fallbackContent
-            |> Option.defaultValue {
-                PlainText = plainText
-                Payload = None
-            }
+        return {
+            PlainText = plainText
+            Payload = None
+        }
 }

@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Paste DataMap values into the selected column instead of shifting them one column to the right.
 -   Keep pasted TSV values in their intended DataMap cells instead of interpreting three- or four-cell rows as ontology metadata.
 -   Preserve ontology term and unit metadata when copying and pasting within Swate in browsers that do not support custom clipboard formats.
+-   Fall back to plain text instead of failing when pasted clipboard data contains invalid Swate metadata.
 
 ## 2.1.0 - 2026-08-19
 
