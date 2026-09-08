@@ -112,6 +112,50 @@ export const TypeaheadUsesCurrentItemsAfterReopening: Story = {
   },
 };
 
+function FallbackLabelMenu() {
+  const owner = useRef<HTMLDivElement | undefined>(undefined);
+  const [selectedItem, setSelectedItem] = useState('none');
+
+  return <>
+    <div ref={node => { owner.current = node ?? undefined; }} data-testid="fallback-label-menu-owner">
+      Open menu here
+      <ContextMenu
+        ref={owner}
+        childInfo={() => ofArray(['Alpha', 'Beta'].map(label => ({
+          text: <span>{label}</span>,
+          kbdbutton: { element: <span>Shortcut</span>, label: 'Shortcut' },
+          isDivider: false,
+          onClick: () => setSelectedItem(label.toLowerCase()),
+        })))}
+      />
+    </div>
+    <output data-testid="fallback-label-result">{selectedItem}</output>
+  </>;
+}
+
+export const TypeaheadFallsBackToRenderedLabel: Story = {
+  render: () => <FallbackLabelMenu />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const owner = canvas.getByTestId('fallback-label-menu-owner');
+
+    fireEvent.contextMenu(owner, { clientX: 40, clientY: 40, bubbles: true });
+    const menu = await screen.findByRole('menu');
+    menu.focus();
+    await userEvent.keyboard('b');
+
+    const betaItem = screen.getByRole('button', { name: /^Beta/ });
+    await waitFor(() => expect(betaItem).toHaveFocus());
+
+    await userEvent.keyboard('{Enter}');
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('fallback-label-result')).toHaveTextContent('beta');
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    });
+  },
+};
+
 export const OpeningMouseReleaseDoesNotActivateAnItem: Story = {
   render: () => <ChangingMenu />,
   play: async ({ canvasElement }) => {
