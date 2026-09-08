@@ -89,9 +89,20 @@ type console =
     static member inline error e = jsNative
 
 [<Erase>]
+type ClipboardBlob =
+    abstract member text: unit -> JS.Promise<string>
+
+[<Erase>]
+type ClipboardItem =
+    abstract member types: string[]
+    abstract member getType: string -> JS.Promise<ClipboardBlob>
+
+[<Erase>]
 type Clipboard =
     abstract member writeText: string -> JS.Promise<unit>
     abstract member readText: unit -> JS.Promise<string>
+    abstract member write: ClipboardItem[] -> JS.Promise<unit>
+    abstract member read: unit -> JS.Promise<ClipboardItem[]>
 
 [<Erase>]
 type Navigator =
