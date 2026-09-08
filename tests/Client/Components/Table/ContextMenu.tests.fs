@@ -292,35 +292,55 @@ type TestCases =
         Expect.equal target.DataContexts.[0].Label (Some "explicit") "The first value should use the target column."
         Expect.equal target.DataContexts.[0].Description (Some "metre") "The next value should not shift right."
 
-    static member DataMapPasteRecognizesCompositeTermsAndUnits() =
+    static member DataMapPlainTextPasteKeepsTsvCellsSeparate() =
         let dataMap = DataMap(ResizeArray [ DataContext() ])
-        let term = CompositeCell.createTermFromString ("explicit", "TST", "TST:1")
-        let unit = CompositeCell.createUnitizedFromString ("4", "metre", "UO", "UO:0000008")
 
-        dataMap.PasteTabText({| x = 5; y = 1 |}, term.ToTabStr())
-        dataMap.PasteTabText({| x = 6; y = 1 |}, unit.ToTabStr())
+        dataMap.PasteTabText({| x = 5; y = 1 |}, "foo\tbar\tbaz")
 
         Expect.equal
             dataMap.DataContexts.[0].Explication.Value.NameText
-            "explicit"
-            "The term should stay in its target column."
-
-        Expect.equal
-            dataMap.DataContexts.[0].Explication.Value.TermSourceREF
-            (Some "TST")
-            "Term metadata should be preserved."
+            "foo"
+            "The first value should be pasted into Explication."
 
         Expect.equal
             dataMap.DataContexts.[0].Unit.Value.NameText
-            "metre"
-            "The unit name should not shift one column right."
+            "bar"
+            "The second value should be pasted into Unit."
 
-        Expect.equal dataMap.DataContexts.[0].Unit.Value.TermSourceREF (Some "UO") "Unit metadata should be preserved."
-        Expect.equal dataMap.DataContexts.[0].ObjectType None "Pasting a unit must not modify the following column."
+        Expect.equal
+            dataMap.DataContexts.[0].ObjectType.Value.NameText
+            "baz"
+            "The third value should be pasted into ObjectType."
 
+        Expect.equal
+            dataMap.DataContexts.[0].Explication.Value.TermSourceREF
+            None
+            "Ordinary TSV must not be interpreted as ontology metadata."
+
+        dataMap.PasteTabText({| x = 6; y = 2 |}, "one\ttwo\tthree\tfour")
+
+        Expect.equal
+            dataMap.DataContexts.[1].Unit.Value.NameText
+            "one"
+            "Four-field TSV starting at Unit should remain cell-oriented."
+
+        Expect.equal
+            dataMap.DataContexts.[1].ObjectType.Value.NameText
+            "two"
+            "The next in-range value should be pasted into ObjectType."
+
+    static member DataMapStructuredPastePreservesTermsAndUnits() =
+        let term = CompositeCell.createTermFromString ("explicit", "TST", "TST:1")
+        let unit = CompositeCell.createUnitizedFromString ("4", "metre", "UO", "UO:0000008")
         let structuredTarget = DataMap(ResizeArray [ DataContext() ])
-        let payload = Swate.Components.ClipboardCodec.createPayload [| [| unit |] |]
-        structuredTarget.PastePayload({| x = 6; y = 1 |}, payload)
+        let payload = Swate.Components.ClipboardCodec.createPayload [| [| term; unit |] |]
+
+        structuredTarget.PastePayload({| x = 5; y = 1 |}, payload)
+
+        Expect.equal
+            structuredTarget.DataContexts.[0].Explication.Value.TermSourceREF
+            (Some "TST")
+            "Structured term paste should preserve ontology metadata."
 
         Expect.equal
             structuredTarget.DataContexts.[0].Unit.Value.NameText
@@ -355,6 +375,32 @@ type TestCases =
 
         let expected = cells |> Array.map (Array.map _.ToTabStr())
         Expect.equal actual expected "The typed clipboard codec should round-trip every composite cell kind."
+
+    static member ClipboardFallbackPreservesCompositeCells() =
+        let cells = [|
+            [|
+                CompositeCell.createTermFromString ("explicit", "TST", "TST:1")
+                CompositeCell.createUnitizedFromString ("4", "metre", "UO", "UO:0000008")
+            |]
+        |]
+
+        let decoded =
+            Swate.Components.ClipboardCodec.createFallbackText "explicit\tmetre" cells
+            |> Swate.Components.ClipboardCodec.tryDecodeFallbackText
+            |> Option.get
+
+        Expect.equal decoded.PlainText "explicit\tmetre" "The fallback should retain the display-oriented TSV."
+
+        let actual =
+            decoded.Payload.Value.Rows
+            |> Array.map (Array.map (Swate.Components.ClipboardCodec.toCompositeCell >> _.ToTabStr()))
+
+        let expected = cells |> Array.map (Array.map _.ToTabStr())
+        Expect.equal actual expected "The fallback should round-trip ontology metadata."
+
+        Expect.isNone
+            (Swate.Components.ClipboardCodec.tryDecodeFallbackText "foo\tbar\tbaz")
+            "Ordinary TSV must not be treated as a structured fallback."
 
     static member TableCopyIncludesSelector() =
         let dataCell = CompositeCell.createDataFromString "DatamapTesting.txt#row=2"
@@ -562,10 +608,14 @@ let Main =
             <| fun _ -> TestCases.DataMapCopyIncludesSelector()
             testCase "DataMap term copy does not shift following columns"
             <| fun _ -> TestCases.DataMapCopyKeepsTermsInGridColumns()
-            testCase "DataMap paste recognizes annotation-table terms and units"
-            <| fun _ -> TestCases.DataMapPasteRecognizesCompositeTermsAndUnits()
+            testCase "DataMap plain-text paste keeps TSV cells separate"
+            <| fun _ -> TestCases.DataMapPlainTextPasteKeepsTsvCellsSeparate()
+            testCase "DataMap structured paste preserves terms and units"
+            <| fun _ -> TestCases.DataMapStructuredPastePreservesTermsAndUnits()
             testCase "Typed clipboard codec round-trips composite cells"
             <| fun _ -> TestCases.ClipboardCodecRoundTripsCompositeCells()
+            testCase "Plain-text clipboard fallback preserves composite cells"
+            <| fun _ -> TestCases.ClipboardFallbackPreservesCompositeCells()
             testCase "Table cell copy includes the selector behind #"
             <| fun _ -> TestCases.TableCopyIncludesSelector()
             testCase "DataMap cell paste includes the selector behind #"

@@ -88,31 +88,14 @@ module ARCtrlExtensions =
                 let startColumnIndex = startCoordinate.x - 1
                 let rowIndex = startCoordinate.y - 1 + rowOffset
 
-                let compositeTerm =
-                    match values with
-                    | [| name; termSourceRef; termAccessionNumber |] when
-                        startColumnIndex >= 0
-                        && startColumnIndex < this.ColumnCount
-                        && this.GetHeader(startColumnIndex).IsTermColumn
-                        ->
-                        CompositeCell.createTermFromString (name, termSourceRef, termAccessionNumber)
-                        |> Some
-                    | [| _; unitName; termSourceRef; termAccessionNumber |] when startColumnIndex = DataMapIndices.Unit ->
-                        CompositeCell.createTermFromString (unitName, termSourceRef, termAccessionNumber)
-                        |> Some
-                    | _ -> None
+                values
+                |> Array.iteri (fun columnOffset value ->
+                    let columnIndex = startColumnIndex + columnOffset
 
-                match compositeTerm with
-                | Some cell -> this.SetCell(startColumnIndex, rowIndex, cell)
-                | None ->
-                    values
-                    |> Array.iteri (fun columnOffset value ->
-                        let columnIndex = startColumnIndex + columnOffset
-
-                        if columnIndex < this.ColumnCount then
-                            this.GetCell(columnIndex, rowIndex).UpdateMainField(value)
-                            |> fun cell -> this.SetCell(columnIndex, rowIndex, cell)
-                    )
+                    if columnIndex < this.ColumnCount then
+                        this.GetCell(columnIndex, rowIndex).UpdateMainField(value)
+                        |> fun cell -> this.SetCell(columnIndex, rowIndex, cell)
+                )
             )
 
         member this.ClearCells(coordinates: seq<CellCoordinate>) =
