@@ -40,7 +40,10 @@ let cutCellsByIndices (indices: CellCoordinate[]) (state: Spreadsheet.Model) : S
         cells.Add(cell)
 
     let rows = cells |> Seq.map Array.singleton |> Seq.toArray
-    ClipboardCodec.write (CompositeCell.ToTabTxt(Array.ofSeq cells)) (Some rows) |> Promise.start
+
+    ClipboardCodec.write (CompositeCell.ToTabTxt(Array.ofSeq cells)) (Some rows)
+    |> Promise.start
+
     state
 
 let pasteCellByIndex (index: CellCoordinate) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> = promise {

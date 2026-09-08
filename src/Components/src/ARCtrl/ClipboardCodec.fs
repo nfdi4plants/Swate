@@ -92,18 +92,30 @@ let toCompositeCell (cell: CellDto) =
     match cell.Kind with
     | "term" -> CompositeCell.createTermFromString (cell.Name, cell.TermSourceRef, cell.TermAccessionNumber)
     | "unitized" ->
-        CompositeCell.createUnitizedFromString (
-            cell.Value,
-            cell.Name,
-            cell.TermSourceRef,
-            cell.TermAccessionNumber
-        )
+        CompositeCell.createUnitizedFromString (cell.Value, cell.Name, cell.TermSourceRef, cell.TermAccessionNumber)
     | "data" ->
         let data = Data.empty
-        data.FilePath <- cell.Value |> Option.ofObj |> Option.filter (System.String.IsNullOrWhiteSpace >> not)
-        data.Selector <- cell.Selector |> Option.ofObj |> Option.filter (System.String.IsNullOrWhiteSpace >> not)
-        data.Format <- cell.Format |> Option.ofObj |> Option.filter (System.String.IsNullOrWhiteSpace >> not)
-        data.SelectorFormat <- cell.SelectorFormat |> Option.ofObj |> Option.filter (System.String.IsNullOrWhiteSpace >> not)
+
+        data.FilePath <-
+            cell.Value
+            |> Option.ofObj
+            |> Option.filter (System.String.IsNullOrWhiteSpace >> not)
+
+        data.Selector <-
+            cell.Selector
+            |> Option.ofObj
+            |> Option.filter (System.String.IsNullOrWhiteSpace >> not)
+
+        data.Format <-
+            cell.Format
+            |> Option.ofObj
+            |> Option.filter (System.String.IsNullOrWhiteSpace >> not)
+
+        data.SelectorFormat <-
+            cell.SelectorFormat
+            |> Option.ofObj
+            |> Option.filter (System.String.IsNullOrWhiteSpace >> not)
+
         CompositeCell.createData data
     | _ -> CompositeCell.createFreeText cell.Value
 
@@ -118,9 +130,13 @@ let encode payload = JS.JSON.stringify payload
 
 let tryDecode json =
     try
-        let payload = JS.JSON.parse(json) |> unbox<Payload>
+        let payload = JS.JSON.parse (json) |> unbox<Payload>
 
-        if isNull (box payload) || payload.Version <> CurrentVersion || isNull (box payload.Rows) then
+        if
+            isNull (box payload)
+            || payload.Version <> CurrentVersion
+            || isNull (box payload.Rows)
+        then
             None
         else
             Some payload
@@ -133,10 +149,12 @@ let write (plainText: string) (cells: CompositeCell[][] option) = promise {
     | Some cells ->
         try
             let clipboard = Swate.Components.GlobalBindings.navigator.clipboard
+
             let content =
                 createObj [
                     PlainTextMimeType ==> createBlob plainText PlainTextMimeType
-                    MimeType ==> (cells |> createPayload |> encode |> fun json -> createBlob json MimeType)
+                    MimeType
+                    ==> (cells |> createPayload |> encode |> (fun json -> createBlob json MimeType))
                 ]
 
             do! clipboard.write [| createClipboardItem content |]
@@ -151,14 +169,26 @@ let read () = promise {
         let clipboard = Swate.Components.GlobalBindings.navigator.clipboard
         let! items = clipboard.read ()
 
-        let item = items |> Array.tryFind (fun item -> item.types |> Array.contains MimeType)
+        let item =
+            items |> Array.tryFind (fun item -> item.types |> Array.contains MimeType)
 
         match item with
         | Some item ->
             let! blob = item.getType MimeType
             let! json = blob.text ()
-            return { PlainText = plainText; Payload = tryDecode json }
-        | None -> return { PlainText = plainText; Payload = None }
+
+            return {
+                PlainText = plainText
+                Payload = tryDecode json
+            }
+        | None ->
+            return {
+                PlainText = plainText
+                Payload = None
+            }
     with _ ->
-        return { PlainText = plainText; Payload = None }
+        return {
+            PlainText = plainText
+            Payload = None
+        }
 }

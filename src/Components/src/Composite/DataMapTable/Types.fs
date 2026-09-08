@@ -13,6 +13,7 @@ module ARCtrlExtensions =
     open Swate.Components
     open Helper
     open ArcTableAux
+
     module Clipboard = Swate.Components.ClipboardCodec
 
     type DataMap with

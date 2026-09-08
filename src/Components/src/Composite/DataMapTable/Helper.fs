@@ -7,6 +7,7 @@ open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Composite.DataMapTable.Types
 open Swate.Components.Composite.Table.Types
+
 module Clipboard = Swate.Components.ClipboardCodec
 
 let copyCells (dataMap: DataMap) (coordinates: seq<CellCoordinate>) =
@@ -25,9 +26,12 @@ let updateDataMap (dataMap: DataMap) (setDataMap: DataMap -> unit) (update: Data
 let pasteCells (dataMap: DataMap) (coordinate: CellCoordinate) (setDataMap: DataMap -> unit) = promise {
     let! content = Clipboard.read ()
 
-    updateDataMap dataMap setDataMap (fun nextDataMap ->
-        match content.Payload with
-        | Some payload -> nextDataMap.PastePayload(coordinate, payload)
-        | None -> nextDataMap.PasteTabText(coordinate, content.PlainText)
-    )
+    updateDataMap
+        dataMap
+        setDataMap
+        (fun nextDataMap ->
+            match content.Payload with
+            | Some payload -> nextDataMap.PastePayload(coordinate, payload)
+            | None -> nextDataMap.PasteTabText(coordinate, content.PlainText)
+        )
 }

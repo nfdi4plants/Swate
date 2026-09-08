@@ -393,7 +393,7 @@ type AnnotationTableContextMenuUtil =
             |> Array.map (fun row ->
                 headers
                 |> Array.mapi (fun index header ->
-                    let sourceIndex = AnnotationTableContextMenuUtil.getIndex(index, row.Length)
+                    let sourceIndex = AnnotationTableContextMenuUtil.getIndex (index, row.Length)
                     Clipboard.toCompositeCell row.[sourceIndex] |> _.ConvertToValidCell(header)
                 )
             )
@@ -404,10 +404,7 @@ type AnnotationTableContextMenuUtil =
             |> Array.map2 (fun header cells -> CompositeColumn.create (header, ResizeArray cells)) headers
             |> ResizeArray
 
-        let groupedCellCoordinates =
-            cellCoordinates
-            |> Array.groupBy _.y
-            |> Array.map snd
+        let groupedCellCoordinates = cellCoordinates |> Array.groupBy _.y |> Array.map snd
 
         PasteCases.PasteCells {|
             data = columns

@@ -322,7 +322,11 @@ type TestCases =
         let payload = Swate.Components.ClipboardCodec.createPayload [| [| unit |] |]
         structuredTarget.PastePayload({| x = 6; y = 1 |}, payload)
 
-        Expect.equal structuredTarget.DataContexts.[0].Unit.Value.NameText "metre" "Structured unit paste should preserve the unit."
+        Expect.equal
+            structuredTarget.DataContexts.[0].Unit.Value.NameText
+            "metre"
+            "Structured unit paste should preserve the unit."
+
         Expect.equal
             structuredTarget.DataContexts.[0].Unit.Value.TermAccessionNumber
             (Some "UO:0000008")
