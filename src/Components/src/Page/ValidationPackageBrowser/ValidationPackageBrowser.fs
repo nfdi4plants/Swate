@@ -1,15 +1,15 @@
-namespace Swate.Components.Composite.ValidationPackageSelector
+namespace Swate.Components.Page.ValidationPackageBrowser
 
 open Fable.Core
 open Feliz
 open ARCtrl.ValidationPackages
 open Swate.Components
-open Swate.Components.Composite.ValidationPackageSelector.Context
+open Swate.Components.Page.ValidationPackageBrowser.Context
 open Types
 open Swate.Components.Primitive.Types
 open Swate.Components.Primitive.LoadingSpinner
 
-module private ValidationPackageSelectorModel =
+module private ValidationPackageBrowserModel =
 
     let createLatestPackage (dto: ValidationPackageDTO) =
         ValidationPackage(dto.Name, ?version = Some(Helper.toVersionString dto))
@@ -27,7 +27,7 @@ module private ValidationPackageSelectorModel =
 
 
 [<Erase; Mangle(false)>]
-type ValidationPackageSelector =
+type ValidationPackageBrowser =
 
     [<ReactComponent>]
     static member private UnlistedBanner
@@ -118,7 +118,7 @@ type ValidationPackageSelector =
         ]
 
     [<ReactComponent(true)>]
-    static member ValidationPackageSelector
+    static member ValidationPackageBrowser
         (
             config: ValidationPackagesConfig,
             writeConfig: ValidationPackagesConfig -> JS.Promise<Result<unit, exn>>,
@@ -222,7 +222,7 @@ type ValidationPackageSelector =
                 (fun () ->
 
                     let newConfig =
-                        ValidationPackageSelectorModel.createNextConfig config packages edits removedUnlisted
+                        ValidationPackageBrowserModel.createNextConfig config packages edits removedUnlisted
 
                     newConfig <> config_old
                 ),
@@ -230,7 +230,7 @@ type ValidationPackageSelector =
             )
 
         let toggle (dto: ValidationPackageDTO) =
-            let latest = ValidationPackageSelectorModel.createLatestPackage dto
+            let latest = ValidationPackageBrowserModel.createLatestPackage dto
 
             match rowStateOf dto with
             | PackageRowState.Unchecked
@@ -240,7 +240,7 @@ type ValidationPackageSelector =
 
         let updateToLatest (dto: ValidationPackageDTO) =
             setEdits (fun edits ->
-                Map.add dto.Name (Some(ValidationPackageSelectorModel.createLatestPackage dto)) edits
+                Map.add dto.Name (Some(ValidationPackageBrowserModel.createLatestPackage dto)) edits
             )
 
         let unlistedNames =
@@ -257,7 +257,7 @@ type ValidationPackageSelector =
                 setSubmitting true
 
                 let newConfig =
-                    ValidationPackageSelectorModel.createNextConfig config packages edits removedUnlisted
+                    ValidationPackageBrowserModel.createNextConfig config packages edits removedUnlisted
 
                 writeConfig newConfig
                 |> Promise.map (fun result ->
@@ -286,7 +286,7 @@ type ValidationPackageSelector =
                 [| box RowStateMap |]
             )
 
-        ValidationPackageSelectorCtx.Provider(
+        ValidationPackageBrowserCtx.Provider(
             ctxValue,
             React.Fragment [
                 Html.div [
@@ -298,7 +298,7 @@ type ValidationPackageSelector =
                         ]
                         match state with
                         | SelectorState.Loaded _ ->
-                            ValidationPackageSelector.UnlistedBanner(unlistedNames, setRemovedUnlisted)
+                            ValidationPackageBrowser.UnlistedBanner(unlistedNames, setRemovedUnlisted)
                         | _ -> Html.none
                         SearchField.SearchField(searchQuery, setSearchQuery, searchFields, setSearchFields)
                         Html.div [
@@ -322,7 +322,7 @@ type ValidationPackageSelector =
                                 ]
                             ]
                         ]
-                        ValidationPackageSelector.SubmitBar(
+                        ValidationPackageBrowser.SubmitBar(
                             isSubmitting = submitting,
                             isDirty = isDirty,
                             submit = submit

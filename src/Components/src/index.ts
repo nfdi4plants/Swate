@@ -55,7 +55,6 @@ export { default as TermSearchConfigProvider } from './dist/Composite/TermSearch
 export { default as ThemeProvider } from './dist/Composite/ThemeSelector/ThemeProvider.fs';
 export { default as ThemeSelector } from './dist/Composite/ThemeSelector/ThemeSelector.fs';
 export { default as TutorialOverlay } from './dist/Composite/TutorialOverlay/TutorialOverlay.fs';
-export { default as ValidationPackageSelector } from './dist/Composite/ValidationPackageSelector/ValidationPackageSelector.fs';
 
 export { Main as NoteSearch, SearchSuggestion } from './dist/Composite/Notes/NoteSearch/NoteSearch.fs';
 export { WidgetController, Entry as WidgetEntry } from './dist/Composite/Widgets/Widgets.fs';
@@ -73,6 +72,7 @@ export { default as GitSidebar } from './dist/Page/GitSidebar/GitSidebar.fs';
 export { default as Landing } from './dist/Page/Landing/Landing.fs';
 export { default as SettingsPage } from './dist/Page/SettingsPage/SettingsPage.fs';
 export { default as ProvenanceGrouping } from './dist/Page/ProvenanceGrouping/ProvenanceGrouping.fs';
+export { default as ValidationPackageBrowser } from './dist/Page/ValidationPackageBrowser/ValidationPackageBrowser.fs';
 
 export { Viewer as GitMergeConflictViewer } from './dist/Page/GitComparison/GitMergeConflictViewer.fs';
 export { TitleStack, HeaderRow, PanelShell, SectionCard } from './dist/Page/GitComparison/GitComparisonView.fs';

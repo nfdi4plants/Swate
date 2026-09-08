@@ -1,9 +1,9 @@
-namespace Swate.Components.Composite.ValidationPackageSelector
+namespace Swate.Components.Page.ValidationPackageBrowser
 
 open Fable.Core
 open Feliz
 open Swate.Components
-open Swate.Components.Composite.ValidationPackageSelector.Context
+open Swate.Components.Page.ValidationPackageBrowser.Context
 open Swate.Components.Primitive.Popover
 open Types
 
@@ -145,7 +145,7 @@ type PackageRow =
                                 match tag.Name with
                                 | Some name ->
                                     Html.span [
-                                        prop.className "swt:badge swt:badge-xs swt:badge-accent"
+                                        prop.className "swt:badge swt:badge-xs swt:badge-accent swt:h-auto swt:min-h-5 swt:whitespace-normal swt:wrap-break-word"
                                         prop.text name
                                     ]
                                 | None -> Html.none

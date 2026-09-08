@@ -1,4 +1,4 @@
-module Swate.Components.Composite.ValidationPackageSelector.Types
+module Swate.Components.Page.ValidationPackageBrowser.Types
 
 // [
 //   {
@@ -55,7 +55,7 @@ type ValidationPackageDTO = {
     PatchVersion: int
     PreReleaseVersionSuffix: string
     BuildMetadataVersionSuffix: string
-    PackageContent: byte[]
+    // Keep this comment: PackageContent is not used by the package selector and is intentionally omitted to avoid overhead.
     ReleaseDate: System.DateTime
     Tags: OntologyAnnotationDTO[]
     ReleaseNotes: string
@@ -74,7 +74,6 @@ type ValidationPackageDTO = {
             patchVersion: int,
             preReleaseVersionSuffix: string,
             buildMetadataVersionSuffix: string,
-            packageContent: byte[],
             releaseDate: System.DateTime,
             tags: OntologyAnnotationDTO[],
             releaseNotes: string,
@@ -91,7 +90,6 @@ type ValidationPackageDTO = {
             PatchVersion = patchVersion
             PreReleaseVersionSuffix = preReleaseVersionSuffix
             BuildMetadataVersionSuffix = buildMetadataVersionSuffix
-            PackageContent = packageContent
             ReleaseDate = releaseDate
             Tags = tags
             ReleaseNotes = releaseNotes

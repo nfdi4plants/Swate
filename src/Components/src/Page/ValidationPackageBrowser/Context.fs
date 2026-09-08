@@ -1,16 +1,16 @@
-module Swate.Components.Composite.ValidationPackageSelector.Context
+module Swate.Components.Page.ValidationPackageBrowser.Context
 
 open Feliz
 open Types
 
-type ValidationPackageSelectorContext = {
+type ValidationPackageBrowserContext = {
     RowStateMap: Map<string, PackageRowState>
     Toggle: ValidationPackageDTO -> unit
     UpdateToLatest: ValidationPackageDTO -> unit
 }
 
-let ValidationPackageSelectorCtx =
-    React.createContext<ValidationPackageSelectorContext> (
+let ValidationPackageBrowserCtx =
+    React.createContext<ValidationPackageBrowserContext> (
         {
             RowStateMap = Map.empty
             Toggle = ignore
@@ -19,5 +19,5 @@ let ValidationPackageSelectorCtx =
     )
 
 [<Hook>]
-let useValidationPackageSelectorCtx () =
-    React.useContext ValidationPackageSelectorCtx
+let useValidationPackageBrowserCtx () =
+    React.useContext ValidationPackageBrowserCtx

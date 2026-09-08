@@ -1,4 +1,4 @@
-module Swate.Components.Composite.ValidationPackageSelector.Helper
+module Swate.Components.Page.ValidationPackageBrowser.Helper
 
 open ARCtrl.ValidationPackages
 open Types
@@ -247,6 +247,22 @@ let unlistedNames (config: ValidationPackagesConfig) (packages: ValidationPackag
     |> Seq.distinct
     |> Seq.filter (fun name -> not (tableNames.Contains name))
     |> Seq.toArray
+
+/// The package registry returns all versions of each package. This keeps only the newest version per package name.
+let latestVersions (packages: ValidationPackageDTO[]) =
+    packages
+    |> Array.groupBy (fun p -> p.Name)
+    |> Array.map (fun (_, versions) ->
+        versions
+        |> Array.reduce (fun current candidate ->
+            let currentSemVer = ARCtrl.Helper.SemVer.SemVer.tryOfString (toVersionString current)
+            let candidateSemVer = ARCtrl.Helper.SemVer.SemVer.tryOfString (toVersionString candidate)
+
+            match currentSemVer, candidateSemVer with
+            | Some currentVersion, Some candidateVersion when SemVer.isOlder currentVersion candidateVersion -> candidate
+            | _ -> current
+        )
+    )
 
 let computeNewPackages
     (config: ValidationPackagesConfig)

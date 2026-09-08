@@ -5,6 +5,7 @@ open Fable.Core
 open Swate.Components.Api.GitLabApi
 open Swate.Components.Composite.Authentication.Types
 open Swate.Components.Page.DataHub.DataHubTypes
+open Swate.Components.Page.ValidationPackageBrowser.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.DTOs.NoteSearchDto
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
@@ -29,6 +30,12 @@ type CreateArcRequest = { identifier: string; initGit: bool }
 /// Remove it when ARCtrl provides a working .NET implementation or a CORS-enabled template source.
 type ITemplateApi = {
     getTemplates: unit -> JS.Promise<Result<string, exn>>
+}
+
+/// Two Way Bridge: Renderer <-> Main
+/// PackageContent is intentionally omitted from ValidationPackageDTO to avoid moving large payloads over IPC.
+type IValidationPackageIPC = {
+    getAllPackages: unit -> JS.Promise<Result<ValidationPackageDTO[], exn>>
 }
 
 /// Two Way Bridge: Renderer <-> Main

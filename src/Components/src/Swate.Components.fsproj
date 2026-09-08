@@ -233,17 +233,6 @@
     <Compile Include="Composite\Workspace\DropOverlay.fs" />
     <Compile Include="Composite\Workspace\Workspace.fs" />
     <Compile Include="Composite\Workspace\Workspace.fixture.fs" />
-    <Compile Include="Composite\ValidationPackageSelector\Types.fs" />
-    <Compile Include="Composite\ValidationPackageSelector\Helper.fs" />
-    <Compile Include="Composite\ValidationPackageSelector\Helper.test.fs" />
-    <Compile Include="Composite\ValidationPackageSelector\Context.fs" />
-    <Compile Include="Composite\ValidationPackageSelector\SearchField.fs" />
-    <Compile Include="Composite\ValidationPackageSelector\PackageRow.fs" />
-    <Compile Include="Composite\ValidationPackageSelector\PackagePagination.fs" />
-    <Compile Include="Composite\ValidationPackageSelector\PackageTable.fs" />
-    <Compile Include="Composite\ValidationPackageSelector\ValidationPackageSelector.fs" />
-    <Compile Include="Composite\ValidationPackageSelector\ValidationPackageSelector.sample.fs" />
-    
     <Compile Include="Page\ProvenanceGrouping\Types.fs" />
     <Compile Include="Page\ProvenanceGrouping\State.fs" />
     <Compile Include="Page\ProvenanceGrouping\ViewSupport.fs" />
@@ -310,6 +299,16 @@
     <Compile Include="Page\DataHubBrowser\MockData.fs" />
     <Compile Include="Page\DataHubBrowser\Model.fs" />
     <Compile Include="Page\DataHubBrowser\DataHubBrowser.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\Types.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\Helper.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\Helper.test.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\Context.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\SearchField.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\PackageRow.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\PackagePagination.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\PackageTable.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\ValidationPackageBrowser.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\ValidationPackageBrowser.sample.fs" />
     <Compile Include="Page\ArcFileEditor\Types.fs" />
     <Compile Include="Page\ArcFileEditor\Helper.fs" />
     <Compile Include="Page\ArcFileEditor\EmptyTableView\Helper.fs" />

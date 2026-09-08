@@ -139,6 +139,17 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage) setLeftSideba
             leftSidebarCtx.setState true
             setLeftSidebarTarget target
 
+    let validationBrowserActive =
+        match pageStateCtx.state with
+        | Some PageState.ValidationPackageBrowser -> true
+        | _ -> false
+
+    let toggleValidationBrowser () =
+        if validationBrowserActive then
+            pageStateCtx.setState None
+        else
+            pageStateCtx.setState (Some PageState.ValidationPackageBrowser)
+
     React.Fragment [
         Layout.LayoutBtn(
             iconClassName = "swt:fluent--home-24-regular",
@@ -157,6 +168,12 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage) setLeftSideba
             tooltip = "Download ARC from DataHub",
             isActive = false,
             onClick = fun () -> pageStateCtx.setState (Some PageState.DataHubBrowser)
+        )
+        Layout.LayoutBtn(
+            iconClassName = "swt:fluent--clipboard-checkmark-24-regular",
+            tooltip = "Validation packages",
+            isActive = validationBrowserActive,
+            onClick = fun () -> toggleValidationBrowser ()
         )
     ]
 
