@@ -239,9 +239,7 @@ type ValidationPackageBrowser =
             | PackageRowState.Checked -> setEdits (fun edits -> Map.add dto.Name None edits)
 
         let updateToLatest (dto: ValidationPackageDTO) =
-            setEdits (fun edits ->
-                Map.add dto.Name (Some(ValidationPackageBrowserModel.createLatestPackage dto)) edits
-            )
+            setEdits (fun edits -> Map.add dto.Name (Some(ValidationPackageBrowserModel.createLatestPackage dto)) edits)
 
         let unlistedNames =
             React.useMemo (

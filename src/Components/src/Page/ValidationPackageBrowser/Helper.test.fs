@@ -455,8 +455,13 @@ Vitest.describe (
                         preReleaseVersionSuffix = "alpha.1"
                     )
 
-                Vitest.expect(latestVersions [| prerelease; release |] |> Array.map toVersionString).toEqual [| "1.0.0" |]
-                Vitest.expect(latestVersions [| release; prerelease |] |> Array.map toVersionString).toEqual [| "1.0.0" |]
+                Vitest.expect(latestVersions [| prerelease; release |] |> Array.map toVersionString).toEqual [|
+                    "1.0.0"
+                |]
+
+                Vitest.expect(latestVersions [| release; prerelease |] |> Array.map toVersionString).toEqual [|
+                    "1.0.0"
+                |]
         )
 
         Vitest.test (

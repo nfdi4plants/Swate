@@ -21,30 +21,27 @@ module private ValidationPackageBrowserHelper =
 
     let configFilePath = ARCtrl.ArcPathHelper.combine configFolderPath configFileName
 
-    let emptyConfig () = ValidationPackagesConfig.make (ResizeArray<ValidationPackage>()) None
+    let emptyConfig () =
+        ValidationPackagesConfig.make (ResizeArray<ValidationPackage>()) None
 
-    let loadConfig
-        (onError: string -> unit)
-        (setConfig: ValidationPackagesConfig -> unit)
-        : JS.Promise<unit> =
-        promise {
-            let! existsResult = Api.ipcArcVaultApi.pathExists configFilePath
+    let loadConfig (onError: string -> unit) (setConfig: ValidationPackagesConfig -> unit) : JS.Promise<unit> = promise {
+        let! existsResult = Api.ipcArcVaultApi.pathExists configFilePath
 
-            match existsResult with
-            | Error error -> onError $"Could not check validation packages file: {error.Message}"
-            | Ok false -> () // Missing file: keep the empty config, it will be written on first submit.
-            | Ok true ->
-                let! fileResult = Api.ipcArcVaultApi.openFile configFilePath
+        match existsResult with
+        | Error error -> onError $"Could not check validation packages file: {error.Message}"
+        | Ok false -> () // Missing file: keep the empty config, it will be written on first submit.
+        | Ok true ->
+            let! fileResult = Api.ipcArcVaultApi.openFile configFilePath
 
-                match fileResult with
-                | Error error -> onError $"Could not read validation packages file: {error.Message}"
-                | Ok fileDto ->
-                    try
-                        let parsedConfig = ValidationPackagesConfig.fromYamlString fileDto.content
-                        setConfig parsedConfig
-                    with parseError ->
-                        onError $"Could not parse validation packages file: {parseError.Message}"
-        }
+            match fileResult with
+            | Error error -> onError $"Could not read validation packages file: {error.Message}"
+            | Ok fileDto ->
+                try
+                    let parsedConfig = ValidationPackagesConfig.fromYamlString fileDto.content
+                    setConfig parsedConfig
+                with parseError ->
+                    onError $"Could not parse validation packages file: {parseError.Message}"
+    }
 
     let writeConfig
         (setConfig: ValidationPackagesConfig -> unit)
@@ -94,20 +91,17 @@ let ValidationPackageBrowserTarget () =
     let config, setConfig =
         React.useState (fun () -> ValidationPackageBrowserHelper.emptyConfig ())
 
-    React.useEffectOnce (fun () ->
-        ValidationPackageBrowserHelper.loadConfig onError setConfig |> Promise.start
-    )
+    React.useEffectOnce (fun () -> ValidationPackageBrowserHelper.loadConfig onError setConfig |> Promise.start)
 
-    let fetchValidationPackages () : JS.Promise<ValidationPackageDTO[]> =
-        promise {
-            let! result = Api.ipcValidationPackageApi.getAllPackages ()
+    let fetchValidationPackages () : JS.Promise<ValidationPackageDTO[]> = promise {
+        let! result = Api.ipcValidationPackageApi.getAllPackages ()
 
-            match result with
-            | Ok packages ->
-                // The registry returns all versions of each package, the selector only supports one row per package name.
-                return latestVersions packages
-            | Error error -> return raise error
-        }
+        match result with
+        | Ok packages ->
+            // The registry returns all versions of each package, the selector only supports one row per package name.
+            return latestVersions packages
+        | Error error -> return raise error
+    }
 
     Html.div [
         prop.className "swt:size-full swt:flex swt:flex-col swt:overflow-hidden"

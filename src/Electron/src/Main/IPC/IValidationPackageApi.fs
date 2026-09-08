@@ -47,10 +47,7 @@ module private Raw =
 module private Normalize =
 
     let str (value: string) =
-        if System.String.IsNullOrWhiteSpace value then
-            ""
-        else
-            value
+        if System.String.IsNullOrWhiteSpace value then "" else value
 
     let optionalString (value: string) =
         if System.String.IsNullOrWhiteSpace value then

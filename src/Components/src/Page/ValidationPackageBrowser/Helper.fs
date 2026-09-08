@@ -255,11 +255,15 @@ let latestVersions (packages: ValidationPackageDTO[]) =
     |> Array.map (fun (_, versions) ->
         versions
         |> Array.reduce (fun current candidate ->
-            let currentSemVer = ARCtrl.Helper.SemVer.SemVer.tryOfString (toVersionString current)
-            let candidateSemVer = ARCtrl.Helper.SemVer.SemVer.tryOfString (toVersionString candidate)
+            let currentSemVer =
+                ARCtrl.Helper.SemVer.SemVer.tryOfString (toVersionString current)
+
+            let candidateSemVer =
+                ARCtrl.Helper.SemVer.SemVer.tryOfString (toVersionString candidate)
 
             match currentSemVer, candidateSemVer with
-            | Some currentVersion, Some candidateVersion when SemVer.isOlder currentVersion candidateVersion -> candidate
+            | Some currentVersion, Some candidateVersion when SemVer.isOlder currentVersion candidateVersion ->
+                candidate
             | _ -> current
         )
     )

@@ -145,7 +145,8 @@ type PackageRow =
                                 match tag.Name with
                                 | Some name ->
                                     Html.span [
-                                        prop.className "swt:badge swt:badge-xs swt:badge-accent swt:h-auto swt:min-h-5 swt:whitespace-normal swt:wrap-break-word"
+                                        prop.className
+                                            "swt:badge swt:badge-xs swt:badge-accent swt:h-auto swt:min-h-5 swt:whitespace-normal swt:wrap-break-word"
                                         prop.text name
                                     ]
                                 | None -> Html.none
