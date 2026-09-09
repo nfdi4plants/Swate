@@ -98,6 +98,15 @@ type ValidationPackageDTO = {
             ProgrammingLanguage = programmingLanguage
         }
 
+    member this.ToSemVer() : ARCtrl.Helper.SemVer.SemVer =
+        ARCtrl.Helper.SemVer.SemVer.create (
+            this.MajorVersion,
+            this.MinorVersion,
+            this.PatchVersion,
+            this.PreReleaseVersionSuffix,
+            this.BuildMetadataVersionSuffix
+        )
+
 [<RequireQualifiedAccess>]
 type SelectorState =
     | Idle

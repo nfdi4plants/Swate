@@ -15,11 +15,10 @@ open Renderer.Components.Helper.ArcVaultHelper
 
 module private ValidationPackageBrowserHelper =
 
-    let configFolderPath = ARCtrl.ArcPathHelper.ARCConfigFolderName
-
-    let configFileName = ARCtrl.ArcPathHelper.ValidationPackagesYamlFileName
-
-    let configFilePath = ARCtrl.ArcPathHelper.combine configFolderPath configFileName
+    let configFilePath =
+        ARCtrl.ArcPathHelper.combine
+            ARCtrl.ArcPathHelper.ARCConfigFolderName
+            ARCtrl.ArcPathHelper.ValidationPackagesYamlFileName
 
     let emptyConfig () =
         ValidationPackagesConfig.make (ResizeArray<ValidationPackage>()) None
@@ -49,7 +48,7 @@ module private ValidationPackageBrowserHelper =
         : JS.Promise<Result<unit, exn>> =
         promise {
             try
-                let! folderExists = Api.ipcArcVaultApi.pathExists configFolderPath
+                let! folderExists = Api.ipcArcVaultApi.pathExists ARCtrl.ArcPathHelper.ARCConfigFolderName
 
                 match folderExists with
                 | Ok false ->
@@ -58,7 +57,7 @@ module private ValidationPackageBrowserHelper =
                     let! _ =
                         Api.ipcArcVaultApi.createFileSystemItem {
                             parentPath = ""
-                            name = configFolderPath
+                            name = ARCtrl.ArcPathHelper.ARCConfigFolderName
                             kind = FileSystemItemKind.Folder
                         }
 
@@ -80,13 +79,37 @@ module private ValidationPackageBrowserHelper =
         }
 
 
+[<ReactComponent>]
+let private ParsingErrorWarning (parsingError: string, setParsingError: string option -> unit) =
+    Html.div [
+        prop.role.alertDialog
+        prop.className "swt:alert swt:alert-error"
+        prop.children [
+            Html.div [
+                prop.text
+                    "Parsing error occurred. If you dismiss this error, without resolving the issue, you might override existing validation package configuration."
+            ]
+            Html.div [
+                Html.span parsingError
+                Html.button [
+                    prop.text "Dismiss"
+                    prop.onClick (fun _ -> setParsingError None)
+                ]
+            ]
+        ]
+    ]
+
 [<ReactComponent(true)>]
 let ValidationPackageBrowserTarget () =
     let errorModal = useErrorModalCtx ()
     let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
+    /// If parsing error exists, we display a warning for the user, that if they proceed, they might loose existing validation package configuration.
+    let parsingError, setParsingError = React.useState None
 
     let onError =
-        createErrorModalCallback errorModal.enqueue "Validation packages" appStateCtx
+        fun (msg: string) ->
+            setParsingError (Some msg)
+            createErrorModalCallback errorModal.enqueue "Validation packages" appStateCtx msg
 
     let config, setConfig =
         React.useState (fun () -> ValidationPackageBrowserHelper.emptyConfig ())
@@ -107,11 +130,14 @@ let ValidationPackageBrowserTarget () =
         prop.className "swt:size-full swt:flex swt:flex-col swt:overflow-hidden"
         prop.testId "main-content-validation-package-browser"
         prop.children [
-            ValidationPackageBrowser.ValidationPackageBrowser(
-                config = config,
-                writeConfig = ValidationPackageBrowserHelper.writeConfig setConfig,
-                fetchValidationPackages = fetchValidationPackages,
-                onError = fun error -> onError error.Message
-            )
+            match parsingError with
+            | Some error -> ParsingErrorWarning(error, setParsingError)
+            | None ->
+                ValidationPackageBrowser.ValidationPackageBrowser(
+                    config = config,
+                    writeConfig = ValidationPackageBrowserHelper.writeConfig setConfig,
+                    fetchValidationPackages = fetchValidationPackages,
+                    onError = fun error -> onError error.Message
+                )
         ]
     ]
