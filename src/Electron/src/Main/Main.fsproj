@@ -8,6 +8,7 @@
     <None Include="SimpleGitTest.fsx" />
     <None Include="ChokidarTest.fsx" />
     <Compile Include="Bindings\Chokidar.fs" />
+    <Compile Include="Bindings\Abort.fs" />
     <Compile Include="Bindings\Filesystem.fs" />
     <Compile Include="Bindings\Path.fs" />
     <Compile Include="Bindings\NodeBindings.fs" />

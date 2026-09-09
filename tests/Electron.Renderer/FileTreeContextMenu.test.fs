@@ -12,6 +12,7 @@ open Renderer.Components.LeftSidebar.FileExplorer.Types
 let private createConfig () : PathActionConfig = {
     openPathInFileExplorer = fun _ -> promise { return Ok() }
     openPathWithDefaultApplication = fun _ -> promise { return Ok() }
+    importExternalFiles = fun _ -> promise { return Ok() }
     enqueueError = ignore
 }
 
@@ -102,12 +103,40 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "folder path actions reveal the folder location only",
+            "folder path actions import files into and reveal the folder",
             fun () ->
                 let item = createFolderItem "AssayA" (Some "assays/AssayA")
                 let menuItems = pathActionContextMenuItems (createConfig ()) item
 
-                Vitest.expect(labels menuItems).toEqual ([| "Open Folder Location" |])
+                Vitest.expect(labels menuItems).toEqual ([| "Import files"; "Open Folder Location" |])
+        )
+
+        Vitest.test (
+            "import files action targets the selected folder",
+            fun () -> promise {
+                let item = createFolderItem "AssayA" (Some "assays/AssayA")
+                let mutable importedInto = None
+
+                let config = {
+                    createConfig () with
+                        importExternalFiles =
+                            fun path -> promise {
+                                importedInto <- Some path
+                                return Ok()
+                            }
+                }
+
+                let menuItems = pathActionContextMenuItems config item
+
+                let importItem =
+                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Import files")
+
+                Vitest.expect(importItem.Icon).toContain ("swt:rotate-180")
+                importItem.OnClick()
+                do! Promise.sleep 0
+
+                Vitest.expect(importedInto).toEqual (Some "assays/AssayA")
+            }
         )
 
         Vitest.test (
@@ -172,6 +201,7 @@ Vitest.describe (
                     .toEqual (
                         [|
                             "Open"
+                            "Import files"
                             "Open Folder Location"
                             "<divider>"
                             "Copy Path"
@@ -217,7 +247,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "root ARC name context menu exposes generic root creation and ARC add actions",
+            "root ARC name context menu exposes import, generic creation, and ARC add actions",
             fun () ->
                 let item = createFolderItem "MyArc" (Some "")
                 let menuItems = rootContextMenuItems (createContextMenuConfig ()) item
@@ -226,6 +256,8 @@ Vitest.describe (
                     .expect(groupedLabels menuItems)
                     .toEqual (
                         [|
+                            "Import files"
+                            "<divider>"
                             "New File"
                             "New Folder"
                             "<divider>"
@@ -236,6 +268,35 @@ Vitest.describe (
                             "Add Note"
                         |]
                     )
+        )
+
+        Vitest.test (
+            "root import action targets the empty ARC-relative path",
+            fun () -> promise {
+                let item = createFolderItem "MyArc" (Some "")
+                let mutable importedInto = None
+
+                let config = {
+                    createContextMenuConfig () with
+                        pathActionConfig = {
+                            createConfig () with
+                                importExternalFiles =
+                                    fun path -> promise {
+                                        importedInto <- Some path
+                                        return Ok()
+                                    }
+                        }
+                }
+
+                let importItem =
+                    rootContextMenuItems config item
+                    |> List.find (fun menuItem -> menuItem.Label = "Import files")
+
+                importItem.OnClick()
+                do! Promise.sleep 0
+
+                Vitest.expect(importedInto).toEqual (Some "")
+            }
         )
 
         Vitest.test (

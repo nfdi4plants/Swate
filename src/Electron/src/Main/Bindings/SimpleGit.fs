@@ -2,6 +2,7 @@ module Main.Bindings.SimpleGit
 
 open Fable.Core
 open Fable.Core.JS
+open Main.Bindings.Abort
 
 type TaskOptions = U2<string[], obj>
 type GitOptions = obj
@@ -13,16 +14,6 @@ type GitGrepQuery = obj
 type LogOptions = obj
 type SimpleGitBinary = U3<string, string[], (string * string)>
 type SimpleGitErrorsHandler = obj option -> obj -> obj option
-
-[<AllowNullLiteral>]
-type IAbortSignal =
-    abstract member aborted: bool
-    abstract member reason: obj option
-
-[<AllowNullLiteral>]
-type IAbortController =
-    abstract member signal: IAbortSignal
-    abstract member abort: ?reason: obj -> unit
 
 [<AllowNullLiteral>]
 type SimpleGitTimeoutOptions [<ParamObject; Emit("$0")>] (?block: int, ?stdOut: bool, ?stdErr: bool) =
@@ -573,11 +564,6 @@ type ISimpleGit =
     abstract member tags: ?options: TaskOptions -> Promise<TagResult>
     abstract member updateServerInfo: unit -> Promise<string>
     abstract member version: unit -> Promise<VersionResult>
-
-[<Erase>]
-type AbortController =
-    [<Emit("new AbortController()")>]
-    static member create() : IAbortController = jsNative
 
 [<Erase>]
 type SimpleGit =

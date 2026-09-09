@@ -1,6 +1,7 @@
 module ElectronCore.IpcArchitectureReviewTests
 
 open Main.Bindings.Path
+open Main.Bindings.Filesystem
 open Main.ArcVault
 open Main.ArcVaultTypes
 open Main.IPC.FileSystemIO
@@ -86,6 +87,34 @@ Vitest.describe (
                         Vitest.expect(afterDelete.ContainsAssay("ExistingAssay")).toBe (false)
                         Vitest.expect(afterDelete.Title).toEqual (Some "Unsaved local investigation title")
                         Vitest.expect(vault.hasUnsavedArcChanges).toBe (true)
+                    })
+        )
+
+        Vitest.test (
+            "explicit ARC merge reports reload failures and preserves the in-memory ARC",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let! loadedArc = loadArcAsync arcPath
+                        loadedArc.Title <- Some "Unsaved in-memory title"
+
+                        let vault = ArcVault(testWindow ())
+                        vault.path <- Some arcPath
+                        vault.SetArc loadedArc
+
+                        let investigationPath = join [| arcPath; "isa.investigation.xlsx" |]
+                        do! writeFileAsync investigationPath "not an XLSX workbook" TextEncoding.Utf8
+
+                        match!
+                            vault.TryTriggerArcInMemoryMergeOnFileWatcherEvents [
+                                watcherEvent arcPath "change" "isa.investigation.xlsx"
+                            ]
+                        with
+                        | Ok() -> return failwith "Expected malformed ARC content to fail synchronization."
+                        | Error error ->
+                            Vitest.expect(error.Message.Length > 0).toBe (true)
+                            Vitest.expect(vault.arc.Value.Title).toEqual (Some "Unsaved in-memory title")
                     })
         )
 

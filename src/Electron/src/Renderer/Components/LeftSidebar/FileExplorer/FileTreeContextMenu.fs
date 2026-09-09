@@ -69,6 +69,12 @@ let private copyTextToClipboard (text: string) =
     }
     |> Promise.start
 
+let private importFilesContextMenuItem (config: PathActionConfig) (targetRelativePath: string) =
+    ContextMenuItem.create
+        "Import files"
+        "swt:fluent--arrow-import-24-regular swt:rotate-180"
+        (fun () -> runPathAction config "Import failed" config.importExternalFiles targetRelativePath)
+
 let private pathActionContextMenuItemsForRelativePath
     (config: PathActionConfig)
     (item: FileItem)
@@ -80,6 +86,9 @@ let private pathActionContextMenuItemsForRelativePath
                 "Open with Default Application"
                 "swt:fluent--open-24-regular"
                 (fun () -> runPathAction config "Open file failed" config.openPathWithDefaultApplication relativePath)
+
+        else
+            importFilesContextMenuItem config relativePath
 
         ContextMenuItem.create
             "Open Folder Location"
@@ -197,6 +206,7 @@ let fileSystemCreateContextMenuItems
 
 let rootContextMenuItems (config: ContextMenuConfig) (rootItem: FileItem) =
     withDividers [
+        [ importFilesContextMenuItem config.pathActionConfig "" ]
         fileSystemCreateContextMenuItems config.openFileSystemCreateModal rootItem
         arcCreateContextMenuItems config.openCreateModal config.openNoteDraft rootItem
     ]

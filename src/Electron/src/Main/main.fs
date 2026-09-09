@@ -7,6 +7,11 @@ open Main
 if SquirrelStartup.started then
     app.quit ()
 
+// Keep the BrowserWindow associated with Swate's installed Windows taskbar entry.
+// Without an explicit AppUserModelID, native taskbar progress can be attached to
+// Electron's development identity instead of the visible Swate icon.
+app.setAppUserModelId "com.squirrel.swate.swate"
+
 app
     .whenReady()
     .``then`` (fun () ->
