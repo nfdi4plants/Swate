@@ -23,14 +23,6 @@ open Main.IPC.Rename
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
 open Main.IPC.FileSystemIO
 
-type private ActiveFileImport = {
-    RequestId: string
-    mutable IsCancellationRequested: bool
-}
-
-let private activeFileImports =
-    System.Collections.Generic.Dictionary<int, ActiveFileImport>()
-
 let private createImportedFileWatcherEvents arcPath (request: ImportExternalFilesRequest) =
     let targetRelativePath =
         PathHelpers.normalizeCanonicalRelativePath request.targetRelativePath
@@ -438,16 +430,6 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     withLoadedArcVault
                         event
                         (fun vault -> promise {
-                            let windowId = windowIdFromIpcEvent event
-
-                            if activeFileImports.ContainsKey windowId then
-                                raise (exn "Another file import is already running in this window.")
-
-                            activeFileImports.[windowId] <- {
-                                RequestId = request.requestId
-                                IsCancellationRequested = false
-                            }
-
                             // The watcher ignores temporary import directories, while final imported files and
                             // unrelated external ARC changes remain eligible for normal watcher merges. Successful
                             // imports also replay their own events synchronously before the refreshed tree is exposed.
@@ -468,39 +450,36 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                         )
                                     )
 
-                            try
-                                let importedEvents = createImportedFileWatcherEvents vault.path.Value request
+                            return!
+                                vault.RunFileImport(
+                                    request.requestId,
+                                    fun abortSignal -> promise {
+                                        try
+                                            let importedEvents =
+                                                createImportedFileWatcherEvents vault.path.Value request
 
-                                let! result =
-                                    ArcFileSystemHelper.importExternalFilesOnDisk
-                                        vault.path.Value
-                                        request.targetRelativePath
-                                        request.sourceAbsolutePaths
-                                        reportImportProgress
-                                        (fun () ->
-                                            match activeFileImports.TryGetValue windowId with
-                                            | true, activeImport when activeImport.RequestId = request.requestId ->
-                                                activeImport.IsCancellationRequested
-                                            | _ -> false
-                                        )
-                                        (fun () ->
-                                            vault.TryTriggerArcInMemoryMergeOnFileWatcherEvents(
-                                                importedEvents |> Array.toList
-                                            )
-                                        )
+                                            let! result =
+                                                ArcFileSystemHelper.importExternalFilesOnDisk
+                                                    vault.path.Value
+                                                    request.targetRelativePath
+                                                    request.sourceAbsolutePaths
+                                                    reportImportProgress
+                                                    (fun () -> abortSignal.aborted)
+                                                    (fun () ->
+                                                        vault.TryTriggerArcInMemoryMergeOnFileWatcherEvents(
+                                                            importedEvents |> Array.toList
+                                                        )
+                                                    )
 
-                                match result with
-                                | Ok _
-                                | Error _ -> do! refreshVaultFileTree vault
+                                            match result with
+                                            | Ok _
+                                            | Error _ -> do! refreshVaultFileTree vault
 
-                                return result
-                            finally
-                                vault.window.setProgressBar -1.0
-
-                                match activeFileImports.TryGetValue windowId with
-                                | true, activeImport when activeImport.RequestId = request.requestId ->
-                                    activeFileImports.Remove windowId |> ignore
-                                | _ -> ()
+                                            return result
+                                        finally
+                                            vault.window.setProgressBar -1.0
+                                    }
+                                )
                         })
             with e ->
                 return Error(exn $"Could not import files: {e.Message}")
@@ -509,9 +488,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
         fun requestId -> promise {
             let windowId = windowIdFromIpcEvent event
 
-            match activeFileImports.TryGetValue windowId with
-            | true, activeImport when activeImport.RequestId = requestId -> activeImport.IsCancellationRequested <- true
-            | _ -> ()
+            ARC_VAULTS.TryGetVault(windowId)
+            |> Option.iter (fun vault -> vault.CancelFileImport(requestId) |> ignore)
 
             return Ok()
         }

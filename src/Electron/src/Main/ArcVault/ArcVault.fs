@@ -7,6 +7,7 @@ open Fable.Electron.Remoting.Main
 open Main
 open Main.ARCtrlExtensions
 open Main.Bindings
+open Main.Bindings.Abort
 open Main.ArcMerge
 open Main.ArcVaultHelper
 open Swate.Components.Shared
@@ -15,6 +16,18 @@ open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
+
+type private ActiveFileImport = {
+    RequestId: string
+    AbortController: IAbortController
+    Completion: Fable.Core.JS.Promise<Result<ImportExternalFilesResult, exn>>
+}
+
+type CloseLifecycleState =
+    | Idle
+    | WaitingForImportCleanup
+    | WaitingForSaveDecision
+    | Approved
 
 /// <summary>
 /// Represents a vault window in the application, optionally associated with a file path.
@@ -44,6 +57,61 @@ type ArcVault(window: BrowserWindow) =
     member val fileWatcherPendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
     member val private isBusyWritingValue: bool = false with get, set
     member val private fileWatcherOwnWriteArcMergeSuppressionTimeout: int option = None with get, set
+    member val private activeFileImport: ActiveFileImport option = None with get, set
+    member val CloseState = CloseLifecycleState.Idle with get, set
+
+    member this.HasActiveFileImport = this.activeFileImport.IsSome
+
+    member this.RunFileImport
+        (requestId: string, operation: IAbortSignal -> Fable.Core.JS.Promise<Result<ImportExternalFilesResult, exn>>)
+        =
+        match this.CloseState, this.activeFileImport with
+        | CloseLifecycleState.Idle, Some _ ->
+            Fable.Core.JS.Constructors.Promise.resolve (
+                Error(exn "Another file import is already running in this window.")
+            )
+        | CloseLifecycleState.Idle, None ->
+            let abortController = AbortController.create ()
+
+            let completion = promise {
+                do! Promise.sleep 0
+
+                try
+                    return! operation abortController.signal
+                finally
+                    match this.activeFileImport with
+                    | Some activeImport when activeImport.RequestId = requestId -> this.activeFileImport <- None
+                    | _ -> ()
+            }
+
+            this.activeFileImport <-
+                Some {
+                    RequestId = requestId
+                    AbortController = abortController
+                    Completion = completion
+                }
+
+            completion
+        | _, _ ->
+            Fable.Core.JS.Constructors.Promise.resolve (
+                Error(exn "Cannot start an import while the window is closing.")
+            )
+
+    member this.CancelFileImport(requestId: string) =
+        match this.activeFileImport with
+        | Some activeImport when activeImport.RequestId = requestId ->
+            activeImport.AbortController.abort ()
+            true
+        | _ -> false
+
+    member this.CancelActiveFileImportAndWait() = promise {
+        match this.activeFileImport with
+        | None -> return false
+        | Some activeImport ->
+            activeImport.AbortController.abort ()
+            let! _ = activeImport.Completion
+            return true
+    }
 
     /// Runs ARC merges sequentially so every operation observes the result of the preceding merge.
     member this.EnqueueArcMerge<'T>(operation: unit -> Fable.Core.JS.Promise<'T>) : Fable.Core.JS.Promise<'T> =
@@ -91,11 +159,6 @@ type ArcVault(window: BrowserWindow) =
     member this.IsFileWatcherArcMergeEligible =
         not this.isBusyWritingValue
         && this.fileWatcherOwnWriteArcMergeSuppressionTimeout.IsNone
-
-    /// Indicates whether a close confirmation dialog is currently open.
-    member val isCloseRequestPending: bool = false with get, set
-    /// Allows a confirmed close to pass through the onClose handler exactly once.
-    member val isCloseApproved: bool = false with get, set
 
     /// This function mutably sets the active ARC in memory without persisting to disk.
     member this.SetArc(arc: ARC) =
@@ -610,16 +673,15 @@ type ArcVaults() =
             swatelogfn windowId "%s" message
             return Error(exn message)
         | Some(vault: ArcVault) ->
-            vault.isCloseRequestPending <- false
-
             match decision with
             | SaveBeforeQuitDecision.CancelClose ->
                 swatelogfn windowId "Close request cancelled by user."
+                vault.CloseState <- CloseLifecycleState.Idle
                 return Ok()
             | SaveBeforeQuitDecision.CloseWithoutSaving ->
                 swatelogfn windowId "Close request approved by user. Closing without saving."
                 vault.RefreshHasUnsavedArcChangesFlag()
-                vault.isCloseApproved <- true
+                vault.CloseState <- CloseLifecycleState.Approved
                 vault.window.close ()
                 return Ok()
             | SaveBeforeQuitDecision.SaveAndClose ->
@@ -631,11 +693,11 @@ type ArcVaults() =
                     match persistResult with
                     | Error saveError -> return Error saveError
                     | Ok() ->
-                        vault.isCloseApproved <- true
+                        vault.CloseState <- CloseLifecycleState.Approved
                         vault.window.close ()
                         return Ok()
                 else
-                    vault.isCloseApproved <- true
+                    vault.CloseState <- CloseLifecycleState.Approved
                     vault.window.close ()
                     return Ok()
     }
@@ -643,26 +705,42 @@ type ArcVaults() =
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
 
         window.onClose (fun closeEvent ->
-            if not vault.isCloseApproved then
-                if vault.hasUnsavedArcChanges then
+            match vault.CloseState with
+            | CloseLifecycleState.Approved -> ()
+            | CloseLifecycleState.WaitingForImportCleanup
+            | CloseLifecycleState.WaitingForSaveDecision -> closeEvent.preventDefault ()
+            | CloseLifecycleState.Idle ->
+                if vault.HasActiveFileImport then
                     closeEvent.preventDefault ()
+                    vault.CloseState <- CloseLifecycleState.WaitingForImportCleanup
 
-                    if not vault.isCloseRequestPending then
-                        vault.isCloseRequestPending <- true
+                    promise {
+                        try
+                            let! _ = vault.CancelActiveFileImportAndWait()
+                            ()
+                        with importError ->
+                            swatelogfn id "Active import failed while closing: %s" importError.Message
 
-                        let saveBeforeQuitClient =
-                            Remoting.createIpc ()
-                            |> Remoting.withWindow vault.window
-                            |> Remoting.buildProxySender<IMainSaveBeforeQuitApi>
+                        vault.CloseState <- CloseLifecycleState.Idle
+                        window.close ()
+                    }
+                    |> Promise.start
+                elif vault.hasUnsavedArcChanges then
+                    closeEvent.preventDefault ()
+                    vault.CloseState <- CloseLifecycleState.WaitingForSaveDecision
 
-                        saveBeforeQuitClient.requestSaveBeforeQuit ()
+                    let saveBeforeQuitClient =
+                        Remoting.createIpc ()
+                        |> Remoting.withWindow vault.window
+                        |> Remoting.buildProxySender<IMainSaveBeforeQuitApi>
+
+                    saveBeforeQuitClient.requestSaveBeforeQuit ()
                 else
                     swatelogfn id "Closing window directly because no unsaved ARC changes are present."
         )
 
         window.onClosed (fun () ->
-            vault.isCloseRequestPending <- false
-            vault.isCloseApproved <- false
+            vault.CloseState <- CloseLifecycleState.Idle
             this.DisposeVault(id)
         )
 

@@ -8,6 +8,7 @@ open Fable.Core.JsInterop
 open Swate.Components.Page.GitSidebarTypes
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.GitTypes
+open Main.Bindings.Abort
 open Main.Bindings.Node
 open Main.Bindings.Filesystem
 open Main.Bindings.Path

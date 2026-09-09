@@ -12,11 +12,52 @@ open Main.Bindings.Path
 open Main.Notes.NoteConstants
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
+open Swate.Electron.Shared.FileIOTypes
 open Vitest
 
 Vitest.describe (
     "ArcVault merge queue",
     fun () ->
+        Vitest.test (
+            "active import cancellation waits for import cleanup to finish",
+            fun () -> promise {
+                let vault = ArcVault(TestHelpers.testWindow ())
+                let mutable finishCleanup = ignore
+                let mutable waitFinished = false
+
+                let cleanupCompletion =
+                    JS.Constructors.Promise.Create(fun resolve _ -> finishCleanup <- fun () -> resolve ())
+
+                let import =
+                    vault.RunFileImport(
+                        "import-request",
+                        fun abortSignal -> promise {
+                            do! cleanupCompletion
+
+                            if abortSignal.aborted then
+                                return Ok ImportExternalFilesResult.Cancelled
+                            else
+                                return Ok ImportExternalFilesResult.Completed
+                        }
+                    )
+
+                let cancellation = promise {
+                    let! hadActiveImport = vault.CancelActiveFileImportAndWait()
+                    Vitest.expect(hadActiveImport).toBe (true)
+                    waitFinished <- true
+                }
+
+                do! Promise.sleep 0
+                Vitest.expect(waitFinished).toBe (false)
+
+                finishCleanup ()
+                do! cancellation
+                let! importResult = import
+                Vitest.expect(importResult).toEqual (Ok ImportExternalFilesResult.Cancelled)
+                Vitest.expect(waitFinished).toBe (true)
+            }
+        )
+
         Vitest.test (
             "runs overlapping merges sequentially so the second observes the first result",
             fun () -> promise {
