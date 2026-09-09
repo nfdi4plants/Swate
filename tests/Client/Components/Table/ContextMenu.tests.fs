@@ -403,21 +403,22 @@ type TestCases =
             "explicit\tmetre"
             "External plain-text consumers should receive human-readable TSV."
 
-        let decoded =
-            representations.HtmlText
-            |> Swate.Components.ClipboardCodec.tryDecodeHtml
-            |> Option.get
+        if Swate.Components.ClipboardBindings.isHtmlParserAvailable then
+            let decoded =
+                representations.HtmlText
+                |> Swate.Components.ClipboardCodec.tryDecodeHtml
+                |> Option.get
 
-        let actual =
-            decoded.Rows
-            |> Array.map (Array.map (Swate.Components.ClipboardCodec.toCompositeCell >> _.ToTabStr()))
+            let actual =
+                decoded.Rows
+                |> Array.map (Array.map (Swate.Components.ClipboardCodec.toCompositeCell >> _.ToTabStr()))
 
-        let expected = cells |> Array.map (Array.map _.ToTabStr())
-        Expect.equal actual expected "The fallback should round-trip ontology metadata."
+            let expected = cells |> Array.map (Array.map _.ToTabStr())
+            Expect.equal actual expected "The fallback should round-trip ontology metadata."
 
-        Expect.isNone
-            (Swate.Components.ClipboardCodec.tryDecodeHtml "<table><tr><td>foo</td></tr></table>")
-            "HTML without Swate metadata must not be treated as a structured fallback."
+            Expect.isNone
+                (Swate.Components.ClipboardCodec.tryDecodeHtml "<table><tr><td>foo</td></tr></table>")
+                "HTML without Swate metadata must not be treated as a structured fallback."
 
     static member TableCopyIncludesSelector() =
         let dataCell = CompositeCell.createDataFromString "DatamapTesting.txt#row=2"
@@ -528,6 +529,13 @@ type TestCases =
             Expect.equal arcTableIndex.x 1 "Move column should target the first header column (1-based UI index)"
             Expect.equal arcTableIndex.y 0 "Move column target should stay on header row"
         | _ -> failwith "Move column menu entry should open move-column modal"
+
+    static member ClipboardIndexWrapsAndRejectsInvalidLengths() =
+        Expect.equal (AnnotationTableContextMenuUtil.getIndex (7, 3)) 1 "Clipboard indices should wrap using modulo."
+
+        Expect.throws
+            (fun () -> AnnotationTableContextMenuUtil.getIndex (0, 0) |> ignore)
+            "An empty clipboard range should be rejected instead of looping forever."
 
 let Main =
 
@@ -653,5 +661,7 @@ let Main =
             <| fun _ -> TestCases.IndexDeleteFirstRow()
             testCase "Header move column keeps 1-based header index"
             <| fun _ -> TestCases.HeaderMoveColumnUsesSelectedHeaderIndex()
+            testCase "Clipboard index wraps and rejects invalid lengths"
+            <| fun _ -> TestCases.ClipboardIndexWrapsAndRejectsInvalidLengths()
         ]
     ]

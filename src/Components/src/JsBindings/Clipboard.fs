@@ -31,6 +31,12 @@ module GlobalBindings =
 
 module ClipboardBindings =
 
+    [<Emit("typeof DOMParser !== 'undefined'")>]
+    let isHtmlParserAvailable: bool = jsNative
+
+    [<Emit("new DOMParser().parseFromString($0, 'text/html')")>]
+    let parseHtml (_htmlText: string) : Browser.Types.Document = jsNative
+
     [<Emit("new Blob([$0], { type: $1 })")>]
     let createBlob (_value: string) (_mimeType: string) : obj = jsNative
 

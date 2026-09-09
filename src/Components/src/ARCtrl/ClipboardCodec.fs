@@ -116,43 +116,35 @@ let toCompositeCell (cell: CellDto) =
     | "freetext" -> CompositeCell.createFreeText cell.Value
     | kind -> failwith $"Unknown clipboard cell kind: {kind}"
 
-let tryToCompositeCell (cell: CellDto) =
-    try
-        let require (value: string) =
-            value
-            |> Option.ofObj
-            |> Option.defaultWith (fun () -> failwith "Missing clipboard cell field")
-
-        match cell.Kind with
-        | "freetext" -> require cell.Value |> ignore
-        | "term" ->
-            [|
+let validateCellDto (cell: CellDto) =
+    cell
+    |> Option.ofObj
+    |> Option.bind (fun cell ->
+        match cell.Kind |> Option.ofObj with
+        | Some "freetext" -> Some [| cell.Value |]
+        | Some "term" ->
+            Some [|
                 cell.Name
                 cell.TermSourceRef
                 cell.TermAccessionNumber
             |]
-            |> Array.iter (require >> ignore)
-        | "unitized" ->
-            [|
+        | Some "unitized" ->
+            Some [|
                 cell.Value
                 cell.Name
                 cell.TermSourceRef
                 cell.TermAccessionNumber
             |]
-            |> Array.iter (require >> ignore)
-        | "data" ->
-            [|
+        | Some "data" ->
+            Some [|
                 cell.Value
                 cell.Selector
                 cell.Format
                 cell.SelectorFormat
             |]
-            |> Array.iter (require >> ignore)
-        | kind -> failwith $"Unknown clipboard cell kind: {kind}"
-
-        cell |> toCompositeCell |> Some
-    with _ ->
-        None
+        | _ -> None
+    )
+    |> Option.exists (Array.forall (Option.ofObj >> Option.isSome))
 
 let createPayload (cells: CompositeCell[][]) =
     createObj [
@@ -171,10 +163,7 @@ let tryDecode json =
             isNull (box payload)
             || payload.Version <> CurrentVersion
             || isNull (box payload.Rows)
-            || not (
-                payload.Rows
-                |> Array.forall (Array.forall (tryToCompositeCell >> Option.isSome))
-            )
+            || not (payload.Rows |> Array.forall (Array.forall validateCellDto))
         then
             None
         else
@@ -204,26 +193,16 @@ let createRepresentations (plainText: string) (cells: CompositeCell[][]) =
     }
 
 let tryDecodeHtml (htmlText: string) =
-    let marker = $"{HtmlPayloadAttribute}=\""
-
     if isNull htmlText then
         None
     else
         try
-            let payloadStart = htmlText.IndexOf marker
-
-            if payloadStart < 0 then
-                None
-            else
-                let payloadStart = payloadStart + marker.Length
-                let payloadEnd = htmlText.IndexOf('"', payloadStart)
-
-                if payloadEnd < 0 then
-                    None
-                else
-                    htmlText.Substring(payloadStart, payloadEnd - payloadStart)
-                    |> JS.decodeURIComponent
-                    |> tryDecode
+            htmlText
+            |> ClipboardBindings.parseHtml
+            |> _.querySelector($"[{HtmlPayloadAttribute}]")
+            |> Option.ofObj
+            |> Option.bind (fun element -> element.getAttribute HtmlPayloadAttribute |> Option.ofObj)
+            |> Option.bind (JS.decodeURIComponent >> tryDecode)
         with _ ->
             None
 
@@ -255,43 +234,57 @@ let write (plainText: string) (cells: CompositeCell[][] option) = promise {
 }
 
 let read () = promise {
-    let! plainText = Swate.Components.GlobalBindings.navigator.clipboard.readText ()
+    let clipboard = Swate.Components.GlobalBindings.navigator.clipboard
 
     try
-        let clipboard = Swate.Components.GlobalBindings.navigator.clipboard
         let! items = clipboard.read ()
 
-        let typedItem =
-            items |> Array.tryFind (fun item -> item.types |> Array.contains MimeType)
+        let hasType mimeType (item: ClipboardItem) = item.types |> Array.contains mimeType
 
-        match typedItem with
+        let item =
+            items
+            |> Array.tryFind (fun item -> hasType "text/plain" item && hasType MimeType item)
+            |> Option.orElseWith (fun () ->
+                items
+                |> Array.tryFind (fun item -> hasType "text/plain" item && hasType "text/html" item)
+            )
+            |> Option.orElseWith (fun () -> items |> Array.tryFind (hasType "text/plain"))
+
+        match item with
+        | None ->
+            return!
+                clipboard.readText ()
+                |> Promise.map (fun plainText -> {
+                    PlainText = plainText
+                    Payload = None
+                })
         | Some item ->
-            let! blob = item.getType MimeType
-            let! json = blob.text ()
+            let! plainBlob = item.getType "text/plain"
+            let! plainText = plainBlob.text ()
+
+            let! payload = promise {
+                try
+                    if hasType MimeType item then
+                        let! blob = item.getType MimeType
+                        let! json = blob.text ()
+                        return tryDecode json
+                    elif hasType "text/html" item then
+                        let! blob = item.getType "text/html"
+                        let! htmlText = blob.text ()
+                        return tryDecodeHtml htmlText
+                    else
+                        return None
+                with _ ->
+                    return None
+            }
 
             return {
                 PlainText = plainText
-                Payload = tryDecode json
+                Payload = payload
             }
-        | None ->
-            let htmlItem =
-                items |> Array.tryFind (fun item -> item.types |> Array.contains "text/html")
-
-            match htmlItem with
-            | Some item ->
-                let! blob = item.getType "text/html"
-                let! htmlText = blob.text ()
-
-                return {
-                    PlainText = plainText
-                    Payload = tryDecodeHtml htmlText
-                }
-            | None ->
-                return {
-                    PlainText = plainText
-                    Payload = None
-                }
     with _ ->
+        let! plainText = clipboard.readText ()
+
         return {
             PlainText = plainText
             Payload = None

@@ -166,15 +166,12 @@ type AnnotationTableContextMenuUtil =
         nextTable |> setTable
     }
 
-    //Recalculates the index, then the amount of selected cells is bigger than the amount of copied cells
+    // Wraps the target index when more cells are selected than copied.
     static member getIndex(startIndex, length) =
-        let rec loop index length =
-            if index < length then
-                index
-            else
-                loop (index - length) length
+        if length <= 0 then
+            invalidArg (nameof length) "Length must be greater than zero."
 
-        loop startIndex length
+        startIndex % length
 
     static member parseCopiedCells(copiedValue: string) =
         copiedValue.Split([| System.Environment.NewLine |], System.StringSplitOptions.RemoveEmptyEntries)
@@ -287,17 +284,20 @@ type AnnotationTableContextMenuUtil =
 
         result |> Array.map (fun row -> fitColumnsToTarget row headers)
 
+    static member getPasteTargetCoordinates(cellIndex: CellCoordinate, selectHandle: SelectHandle) =
+        // A context-menu click does not necessarily replace an existing selection.
+        // In that case the clicked cell, rather than the stale selection, is the paste target.
+        if selectHandle.contains cellIndex then
+            selectHandle.getSelectedCells () |> Array.ofSeq
+        else
+            [| cellIndex |]
+
     static member predictPasteBehaviour
         (cellIndex: CellCoordinate, targetTable: ArcTable, selectHandle: SelectHandle, data: string[][])
         =
 
-        // A context-menu click does not necessarily replace an existing selection.
-        // In that case the clicked cell, rather than the stale selection, is the paste target.
         let cellCoordinates =
-            if selectHandle.contains cellIndex then
-                selectHandle.getSelectedCells () |> Array.ofSeq
-            else
-                [| cellIndex |]
+            AnnotationTableContextMenuUtil.getPasteTargetCoordinates (cellIndex, selectHandle)
 
         //Get all required headers for cells
         let headers =
@@ -307,16 +307,7 @@ type AnnotationTableContextMenuUtil =
             |> Array.map (fun index -> targetTable.GetColumn(index.x - 1).Header)
 
         let checkForHeaders (row: string[]) =
-            let headers = ARCtrl.CompositeHeader.Cases |> Array.map (fun (_, header) -> header)
-
-            let areHeaders =
-                headers
-                |> Array.collect (fun _ ->
-                    row
-                    |> Array.map (fun cell -> AnnotationTableContextMenuUtil.checkForHeader (cell))
-                )
-
-            Array.contains true areHeaders
+            row |> Array.exists AnnotationTableContextMenuUtil.checkForHeader
 
         //Group all cells based on their row
         let groupedCellCoordinates =
@@ -375,10 +366,7 @@ type AnnotationTableContextMenuUtil =
         (cellIndex: CellCoordinate, targetTable: ArcTable, selectHandle: SelectHandle, payload: Clipboard.Payload)
         =
         let cellCoordinates =
-            if selectHandle.contains cellIndex then
-                selectHandle.getSelectedCells () |> Array.ofSeq
-            else
-                [| cellIndex |]
+            AnnotationTableContextMenuUtil.getPasteTargetCoordinates (cellIndex, selectHandle)
 
         let headers =
             cellCoordinates

@@ -6,43 +6,31 @@ open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.ClipboardCodec
 
+let private getCellsByIndex (indices: CellCoordinate[]) (state: Spreadsheet.Model) =
+    indices |> Array.map (fun index -> Generic.getCell (index.x, index.y) state)
+
+let private writeCells plainText (cells: CompositeCell[]) =
+    let rows = cells |> Array.map Array.singleton
+    ClipboardCodec.write plainText (Some rows)
+
 let copyCellByIndex (index: CellCoordinate) (state: Spreadsheet.Model) : JS.Promise<unit> =
     let cell = Generic.getCell (index.x, index.y) state
-    let rows = [| [| cell |] |]
-    ClipboardCodec.write (cell.ToClipboardStr()) (Some rows)
+    writeCells (cell.ToClipboardStr()) [| cell |]
 
 let copyCellsByIndex (indices: CellCoordinate[]) (state: Spreadsheet.Model) : JS.Promise<unit> =
-    let cells = [|
-        for index in indices do
-            yield Generic.getCell (index.x, index.y) state
-    |]
-
-    let rows = cells |> Array.map Array.singleton
-    ClipboardCodec.write (CompositeCell.ToTabTxt cells) (Some rows)
+    let cells = getCellsByIndex indices state
+    writeCells (CompositeCell.ToTabTxt cells) cells
 
 let cutCellByIndex (index: CellCoordinate) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let cell = Generic.getCell (index.x, index.y) state
-    // Remove selected cell value
-    let emptyCell = cell.GetEmptyCellFixed()
-    Generic.setCell (index.x, index.y) emptyCell state
-    let rows = [| [| cell |] |]
-    ClipboardCodec.write (cell.ToClipboardStr()) (Some rows) |> Promise.start
+    Table.clearCells [| index |] state |> ignore
+    writeCells (cell.ToClipboardStr()) [| cell |] |> Promise.start
     state
 
 let cutCellsByIndices (indices: CellCoordinate[]) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let cells = ResizeArray()
-
-    for index in indices do
-        let cell = Generic.getCell (index.x, index.y) state
-        // Remove selected cell value
-        let emptyCell = cell.GetEmptyCellFixed()
-        Generic.setCell (index.x, index.y) emptyCell state
-        cells.Add(cell)
-
-    let rows = cells |> Seq.map Array.singleton |> Seq.toArray
-
-    ClipboardCodec.write (CompositeCell.ToTabTxt(Array.ofSeq cells)) (Some rows)
-    |> Promise.start
+    let cells = getCellsByIndex indices state
+    Table.clearCells indices state |> ignore
+    writeCells (CompositeCell.ToTabTxt cells) cells |> Promise.start
 
     state
 
