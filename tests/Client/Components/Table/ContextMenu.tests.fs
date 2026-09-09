@@ -385,6 +385,11 @@ type TestCases =
                 """{"Version":1,"Rows":[[{"Kind":"unknown","Value":"","Name":"","TermSourceRef":"","TermAccessionNumber":"","Selector":"","Format":"","SelectorFormat":""}]]}""")
             "A payload with an unknown cell kind should be rejected."
 
+        Expect.isNone
+            (Swate.Components.ClipboardCodec.tryDecode
+                """{"Version":1,"Rows":[[{"Kind":"freetext","Value":"A","Name":"","TermSourceRef":"","TermAccessionNumber":"","Selector":"","Format":"","SelectorFormat":""}],[],[{"Kind":"freetext","Value":"B","Name":"","TermSourceRef":"","TermAccessionNumber":"","Selector":"","Format":"","SelectorFormat":""}]]}""")
+            "A payload containing an empty row should be rejected."
+
     static member ClipboardHtmlFallbackPreservesCompositeCells() =
         let cells = [|
             [|
@@ -393,8 +398,7 @@ type TestCases =
             |]
         |]
 
-        let htmlText =
-            Swate.Components.ClipboardCodec.createHtmlRepresentation "explicit\tmetre" cells
+        let htmlText = Swate.Components.ClipboardCodec.createHtmlRepresentation cells
 
         if Swate.Components.ClipboardBindings.isHtmlParserAvailable then
             let decoded =
@@ -410,6 +414,19 @@ type TestCases =
             Expect.isNone
                 (Swate.Components.ClipboardCodec.tryDecodeHtml "<table><tr><td>foo</td></tr></table>")
                 "HTML without Swate metadata must not be treated as a structured fallback."
+
+        let trailingEmptyRowCells = [|
+            [| CompositeCell.FreeText "A" |]
+            [| CompositeCell.FreeText "" |]
+        |]
+
+        let trailingEmptyRowHtml =
+            Swate.Components.ClipboardCodec.createHtmlRepresentation trailingEmptyRowCells
+
+        Expect.stringContains
+            trailingEmptyRowHtml
+            "<tr><td>A</td></tr><tr><td></td></tr>"
+            "The HTML fallback should retain a trailing empty row from the structured matrix."
 
     static member TableCopyIncludesSelector() =
         let dataCell = CompositeCell.createDataFromString "DatamapTesting.txt#row=2"

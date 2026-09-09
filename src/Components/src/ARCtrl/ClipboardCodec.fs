@@ -168,6 +168,11 @@ let validateCellDto (cell: CellDto) =
     )
     |> Option.exists (Array.forall (Option.ofObj >> Option.isSome))
 
+let private validateRow (row: CellDto[]) =
+    row
+    |> Option.ofObj
+    |> Option.exists (fun row -> row.Length > 0 && Array.forall validateCellDto row)
+
 let createPayload (cells: CompositeCell[][]) =
     createObj [
         "Version" ==> CurrentVersion
@@ -185,7 +190,8 @@ let tryDecode json =
             isNull (box payload)
             || payload.Version <> CurrentVersion
             || isNull (box payload.Rows)
-            || not (payload.Rows |> Array.forall (Array.forall validateCellDto))
+            || payload.Rows.Length = 0
+            || not (payload.Rows |> Array.forall validateRow)
         then
             None
         else
@@ -196,14 +202,14 @@ let tryDecode json =
 let private escapeHtml (text: string) =
     text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&#39;")
 
-let createHtmlRepresentation (plainText: string) (cells: CompositeCell[][]) =
+let createHtmlRepresentation (cells: CompositeCell[][]) =
     let encodedPayload = cells |> createPayload |> encode |> JS.encodeURIComponent
 
     let tableRows =
-        plainText.TrimEnd([| '\r'; '\n' |]).Split([| "\r\n"; "\n"; "\r" |], System.StringSplitOptions.None)
+        cells
         |> Array.map (fun row ->
-            row.Split '\t'
-            |> Array.map (fun value -> $"<td>{escapeHtml value}</td>")
+            row
+            |> Array.map (fun cell -> $"<td>{cell.ToClipboardStr() |> escapeHtml}</td>")
             |> String.concat ""
             |> fun columns -> $"<tr>{columns}</tr>"
         )
@@ -248,7 +254,7 @@ let write (plainText: string) (cells: CompositeCell[][] option) = promise {
     | None -> do! Swate.Components.GlobalBindings.navigator.clipboard.writeText plainText
     | Some cells ->
         let clipboard = Swate.Components.GlobalBindings.navigator.clipboard
-        let htmlText = createHtmlRepresentation plainText cells
+        let htmlText = createHtmlRepresentation cells
         let payloadText = cells |> createPayload |> encode
 
         try

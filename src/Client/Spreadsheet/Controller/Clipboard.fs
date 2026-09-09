@@ -6,31 +6,39 @@ open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.ClipboardCodec
 
-let private getCellsByIndex (indices: CellCoordinate[]) (state: Spreadsheet.Model) =
-    indices |> Array.map (fun index -> Generic.getCell (index.x, index.y) state)
-
-let private writeCells plainText (cells: CompositeCell[]) =
-    let rows = cells |> Array.map Array.singleton
-    ClipboardCodec.write plainText (Some rows)
+let getCellRowsByIndex (indices: CellCoordinate[]) (state: Spreadsheet.Model) =
+    indices
+    |> Array.groupBy _.y
+    |> Array.sortBy fst
+    |> Array.map (fun (_, row) ->
+        row
+        |> Array.sortBy _.x
+        |> Array.map (fun index -> Generic.getCell (index.x, index.y) state)
+    )
 
 let copyCellByIndex (index: CellCoordinate) (state: Spreadsheet.Model) : JS.Promise<unit> =
     let cell = Generic.getCell (index.x, index.y) state
-    writeCells (cell.ToClipboardStr()) [| cell |]
+    ClipboardCodec.write (cell.ToClipboardStr()) (Some [| [| cell |] |])
 
 let copyCellsByIndex (indices: CellCoordinate[]) (state: Spreadsheet.Model) : JS.Promise<unit> =
-    let cells = getCellsByIndex indices state
-    writeCells (CompositeCell.ToTabTxt cells) cells
+    let rows = getCellRowsByIndex indices state
+    ClipboardCodec.write (CompositeCell.ToClipboardTableTxt rows) (Some rows)
 
 let cutCellByIndex (index: CellCoordinate) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let cell = Generic.getCell (index.x, index.y) state
     Table.clearCells [| index |] state |> ignore
-    writeCells (cell.ToClipboardStr()) [| cell |] |> Promise.start
+
+    ClipboardCodec.write (cell.ToClipboardStr()) (Some [| [| cell |] |])
+    |> Promise.start
+
     state
 
 let cutCellsByIndices (indices: CellCoordinate[]) (state: Spreadsheet.Model) : Spreadsheet.Model =
-    let cells = getCellsByIndex indices state
+    let rows = getCellRowsByIndex indices state
     Table.clearCells indices state |> ignore
-    writeCells (CompositeCell.ToTabTxt cells) cells |> Promise.start
+
+    ClipboardCodec.write (CompositeCell.ToClipboardTableTxt rows) (Some rows)
+    |> Promise.start
 
     state
 
@@ -48,27 +56,57 @@ let pasteCellByIndex (index: CellCoordinate) (state: Spreadsheet.Model) : JS.Pro
     return state
 }
 
-let pasteCellsByIndexExtend (index: CellCoordinate) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> = promise {
-    let! content = ClipboardCodec.read ()
-    let header = Generic.getHeader index.x state
-
-    let cells =
-        content.Payload
-        |> Option.map (fun payload ->
-            payload.Rows
-            |> Array.choose Array.tryHead
-            |> Array.map (ClipboardCodec.toCompositeCell >> _.ConvertToValidCell(header))
-        )
-        |> Option.defaultWith (fun () -> CompositeCell.fromTabTxt content.PlainText header)
+let pastePayloadByIndexExtend
+    (index: CellCoordinate)
+    (payload: ClipboardCodec.Payload)
+    (state: Spreadsheet.Model)
+    : Spreadsheet.Model =
+    let columnCount = Generic.getColCount state
 
     let indexedCells =
-        cells
-        |> Array.indexed
-        |> Array.map (fun (i, c) ->
-            let coordinate: CellCoordinate = {| x = index.x; y = index.y + i |}
-            (coordinate, c)
+        payload.Rows
+        |> Array.mapi (fun rowOffset row ->
+            row
+            |> Array.mapi (fun columnOffset cell ->
+                let columnIndex = index.x + columnOffset
+
+                if columnIndex < columnCount then
+                    let header = Generic.getHeader columnIndex state
+                    let cell = ClipboardCodec.toCompositeCell cell |> _.ConvertToValidCell(header)
+
+                    let coordinate: CellCoordinate = {|
+                        x = columnIndex
+                        y = index.y + rowOffset
+                    |}
+
+                    Some(coordinate, cell)
+                else
+                    None
+            )
+            |> Array.choose id
         )
+        |> Array.concat
 
     Generic.setCells indexedCells state
-    return state
+    state
+
+let pasteCellsByIndexExtend (index: CellCoordinate) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> = promise {
+    let! content = ClipboardCodec.read ()
+
+    match content.Payload with
+    | Some payload -> return pastePayloadByIndexExtend index payload state
+    | None ->
+        let header = Generic.getHeader index.x state
+        let cells = CompositeCell.fromTabTxt content.PlainText header
+
+        let indexedCells =
+            cells
+            |> Array.indexed
+            |> Array.map (fun (i, c) ->
+                let coordinate: CellCoordinate = {| x = index.x; y = index.y + i |}
+                (coordinate, c)
+            )
+
+        Generic.setCells indexedCells state
+        return state
 }
