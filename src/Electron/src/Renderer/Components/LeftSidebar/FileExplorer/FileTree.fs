@@ -1,7 +1,7 @@
 namespace Renderer.Components.LeftSidebar.FileExplorer
 
+open Renderer.Components.Helper
 open Renderer.Components.Helper.ArcViewHelper
-open Renderer.Components.FileExplorerDeleteHelper
 open Renderer.Components.LeftSidebar.FileExplorer.Modals
 open Swate.Components
 open Swate.Components.Page.FileExplorer.Types
@@ -22,19 +22,10 @@ open Renderer.Components.LeftSidebar.FileExplorer.Types
 module private FileTreeHelper =
 
     type FileTreeDialog =
-        | CreateDialog of ArcExplorerNodeKind
+        | CreateDialog of ArcFilesDiscriminate
         | FileSystemCreateDialog of FileSystemCreateDraft
         | RenameDialog of ArcRenameDraft
         | DeleteDialog of FileItem
-
-    let saveArcFileAndOpen (arcFile: ArcFiles) : JS.Promise<Result<FileContentDTO, exn>> = promise {
-        match FileContentDTO.fromArcFile arcFile with
-        | None -> return Error(exn "Saving this file type is not supported in Electron yet.")
-        | Some request ->
-            match! Api.ipcArcVaultApi.addArcFile request with
-            | Error saveError -> return Error saveError
-            | Ok() -> return! Api.ipcArcVaultApi.openFile request.path
-    }
 
 open FileTreeHelper
 
@@ -83,10 +74,14 @@ type FileTree =
             (fun () ->
                 let filePaths = fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
 
-                if FileExplorerDeleteHelper.isSelectionMissing filePaths fileStateCtx.state.Selection.TreePath then
+                if
+                    FileExplorerStateReconciliation.isSelectionMissing filePaths fileStateCtx.state.Selection.TreePath
+                then
                     fileStateCtx.setSelection ArcSelection.empty
 
-                    if FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval pageStateCtx.state then
+                    if
+                        FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval pageStateCtx.state
+                    then
                         pageStateCtx.setState None
             ),
             [|
@@ -200,50 +195,55 @@ type FileTree =
             }
             |> Promise.start
 
-        let reloadSelectedPreviewAfterFileTreeUpdate () =
-            if
-                FileExplorerDeleteHelper.shouldClearPageStateForLfsPointerSelection
-                    fileStateCtx.state.FileTree
-                    fileStateCtx.state.Selection.TreePath
-                    pageStateCtx.state
-            then
-                pageStateCtx.setState None
-            else
-                match
-                    FileExplorerDeleteHelper.tryGetReloadableSelectedFilePath
-                        fileStateCtx.state.FileTree
-                        fileStateCtx.state.Selection.TreePath
-                        pageStateCtx.state
-                with
-                | None -> ()
-                | Some selectedPath ->
-                    promise {
-                        let! result = openView selectedPath
-
-                        match result with
-                        | Ok pageState -> pageStateCtx.setState (Some pageState)
-                        | Error errorMessage ->
-                            pageStateCtx.setState (
-                                Some(
-                                    Renderer.Types.PageState.ErrorPage
-                                        $"Could not reload preview for '{selectedPath}': {errorMessage}"
-                                )
-                            )
-                    }
-                    |> Promise.catch (fun exn ->
-                        pageStateCtx.setState (
-                            Some(
-                                Renderer.Types.PageState.ErrorPage
-                                    $"Could not reload preview for '{selectedPath}': {exn.Message}"
-                            )
-                        )
+        let reloadPreviewAfterFileTreeUpdate path transformPageState =
+            let applyReloadError details =
+                pageStateCtx.setState (
+                    Some(
+                        Renderer.Types.PageState.ErrorPage
+                            $"The preview could not be refreshed after the File Explorer changed. Select the file again. Details: {details}"
                     )
-                    |> Promise.start
+                )
+
+            promise {
+                match! openView path with
+                | Ok pageState -> pageStateCtx.setState (Some(transformPageState pageState))
+                | Error errorMessage -> applyReloadError errorMessage
+            }
+            |> Promise.catch (fun exn -> applyReloadError exn.Message)
+            |> Promise.start
 
         React.useEffect (
             (fun () ->
                 if hasObservedFileTreeUpdateRef.current then
-                    reloadSelectedPreviewAfterFileTreeUpdate ()
+                    match
+                        FileExplorerStateReconciliation.tryGetDataMapMismatchReload
+                            fileStateCtx.state.FileTree
+                            pageStateCtx.state
+                    with
+                    | Some(parentPath, requestedView) ->
+                        reloadPreviewAfterFileTreeUpdate
+                            parentPath
+                            (function
+                            | Renderer.Types.PageState.ArcFilePage(nextArcFile, _) ->
+                                Renderer.Types.PageState.ArcFilePage(nextArcFile, requestedView)
+                            | pageState -> pageState
+                            )
+                    | None when
+                        FileExplorerStateReconciliation.shouldClearPageStateForLfsPointerSelection
+                            fileStateCtx.state.FileTree
+                            fileStateCtx.state.Selection.TreePath
+                            pageStateCtx.state
+                        ->
+                        pageStateCtx.setState None
+                    | None ->
+                        match
+                            FileExplorerStateReconciliation.tryGetReloadableSelectedFilePath
+                                fileStateCtx.state.FileTree
+                                fileStateCtx.state.Selection.TreePath
+                                pageStateCtx.state
+                        with
+                        | None -> ()
+                        | Some selectedPath -> reloadPreviewAfterFileTreeUpdate selectedPath id
                 else
                     hasObservedFileTreeUpdateRef.current <- true
             ),
@@ -264,13 +264,16 @@ type FileTree =
             setIsDialogBusy false
             setActiveDialog None
 
-        let openCreateModal kind =
-            match kind with
-            | ArcExplorerNodeKind.Note -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesDraftPage)
-            | _ -> openDialog (CreateDialog kind)
-
-        let openFileSystemCreateModal kind item =
-            if canCreateFileSystemItemIn item then
+        let openFileSystemCreateModal kind (item: FileItem) =
+            if
+                item.IsDirectory
+                && (item.Path
+                    |> Option.map PathHelpers.normalizeCanonicalRelativePath
+                    |> Option.exists (fun path ->
+                        System.String.IsNullOrWhiteSpace path
+                        || ArcEntityPathRules.isGenericFileSystemParentAllowed path
+                    ))
+            then
                 openDialog (FileSystemCreateDialog { Parent = item; Kind = kind })
 
         let requestDeleteItem =
@@ -281,16 +284,17 @@ type FileTree =
 
         let rootPath = fileTree |> Option.map (fun (tree: FileTreeNode) -> tree.path)
 
-        let inlineCreateKindForItem item =
-            match rootPath with
+        let canCreateFromItem path item =
+            match path with
             | Some path -> tryGetInlineArcCreateKind path item
             | None -> None
+            |> Option.isSome
 
-        let canCreateFromItem item =
-            inlineCreateKindForItem item |> Option.isSome
-
-        let createFromItem item =
-            inlineCreateKindForItem item |> Option.iter openCreateModal
+        let createFromItem path item =
+            match path with
+            | Some path -> tryGetInlineArcCreateKind path item
+            | None -> None
+            |> Option.iter (fun kind -> openDialog (CreateDialog kind))
 
         let applyCreateError errorMessage =
             errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create ARC file"))
@@ -336,7 +340,7 @@ type FileTree =
                     setIsDialogBusy true
 
                     promise {
-                        let! createResult = saveArcFileAndOpen draft.ArcFile
+                        let! createResult = ArcFileApiHelper.addArcFileAndOpen draft.ArcFile
 
                         match createResult with
                         | Error exn ->
@@ -362,7 +366,7 @@ type FileTree =
                 match activeFileSystemCreateDraft with
                 | None -> closeDialog ()
                 | Some draft ->
-                    match tryGetItemRelativePath draft.Parent with
+                    match draft.Parent.Path |> Option.map PathHelpers.normalizeCanonicalRelativePath with
                     | None -> applyFileSystemCreateError "Could not resolve the selected folder path."
                     | Some parentPath ->
                         setIsDialogBusy true
@@ -402,8 +406,31 @@ type FileTree =
                         |> Promise.map (fun _ -> setIsDialogBusy false)
                         |> Promise.start
 
-        let renameContextMenuItems =
-            FileTreeContextMenu.renameContextMenuItems requestRenameItem
+        let createDataMap (parentInfo: DatamapParentInfo) =
+            promise {
+                match!
+                    ArcFileApiHelper.withArcFileRequest
+                        (ArcFiles.DataMap(Some parentInfo, DataMap.init ()))
+                        Api.ipcArcVaultApi.addArcFile
+                with
+                | Error exn -> applyCreateError exn.Message
+                | Ok _ -> ()
+            }
+            |> Promise.catch (fun exn -> applyCreateError exn.Message)
+            |> Promise.start
+
+        let tryFindDataMapItemByPath path =
+            fileStateCtx.state.FileTree
+            |> Array.tryFind (fun entry -> PathHelpers.pathsEqual entry.path path)
+            |> Option.map (fun entry ->
+                let item =
+                    Swate.Components.Page.FileExplorer.Types.FileTree.createFile
+                        entry.name
+                        (Some entry.path)
+                        FileItemIcon.Document
+
+                { item with Id = entry.path }
+            )
 
         let itemActions item = [
             yield!
@@ -411,15 +438,18 @@ type FileTree =
                     "notes"
                     "Create new item in"
                     "swt:fluent--note-add-24-regular"
-                    (fun () -> openCreateModal ArcExplorerNodeKind.Note)
+                    (fun () -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesDraftPage))
                     item
-            yield! renameContextMenuItems item
+            yield! FileTreeContextMenu.renameContextMenuItems requestRenameItem item
         ]
 
-        let contextMenuConfig: FileTreeContextMenu.ContextMenuConfig = {
+        let contextMenuConfig: ContextMenuConfig = {
             openItem = openPreview
             arcRootPath = appStateCtx
-            openCreateModal = openCreateModal
+            openCreateModal = (fun kind -> openDialog (CreateDialog kind))
+            openNoteDraft = (fun () -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesDraftPage))
+            createDataMap = createDataMap
+            tryFindDataMapItemByPath = tryFindDataMapItemByPath
             openFileSystemCreateModal = openFileSystemCreateModal
             requestRenameItem = requestRenameItem
             requestDeleteItem = requestDeleteItem
@@ -508,13 +538,10 @@ type FileTree =
                     }
                     newName
 
-        let createModalKind =
-            activeCreateKind |> Option.defaultValue ArcExplorerNodeKind.Study
-
         let arcCreateModal =
             CreateArcFileModal.Main(
                 isOpen = activeCreateKind.IsSome,
-                kind = createModalKind,
+                kind = (activeCreateKind |> Option.defaultValue ArcFilesDiscriminate.Study),
                 close = closeDialog,
                 submit = createArcEntry,
                 isCreating = isDialogBusy
@@ -618,11 +645,16 @@ type FileTree =
                             onDirectoryExpansionChange = handleExpansionChange,
                             onContextMenu = createContextMenuItems,
                             getItemIconClass = getItemIconClass,
-                            canCreateItem = canCreateFromItem,
-                            onCreateItem = createFromItem,
+                            canCreateItem = canCreateFromItem rootPath,
+                            onCreateItem = createFromItem rootPath,
                             getItemActions = itemActions,
                             getItemStatusAction = getItemStatusAction,
-                            canDeleteItem = canDeleteItem,
+                            canDeleteItem =
+                                (fun (item: FileItem) ->
+                                    item.Path
+                                    |> Option.map PathHelpers.normalizeCanonicalRelativePath
+                                    |> Option.exists ArcEntityPathRules.isDeletePathAllowed
+                                ),
                             onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
                             includeDefaultContextMenuItems = false,

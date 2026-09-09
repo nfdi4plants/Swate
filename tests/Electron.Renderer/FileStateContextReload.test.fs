@@ -5,7 +5,7 @@ open Browser.Dom
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Renderer.Components.FileExplorerDeleteHelper
+open Renderer.Components.Helper
 open Renderer.Context.FileStateContext
 open Renderer.Types
 open ARCtrl
@@ -122,7 +122,7 @@ Vitest.describe (
 )
 
 Vitest.describe (
-    "FileExplorer delete helpers",
+    "File explorer state reconciliation",
     fun () ->
         Vitest.test (
             "isSelectionMissing detects removed selections after file-tree updates",
@@ -131,7 +131,7 @@ Vitest.describe (
 
                 Vitest
                     .expect(
-                        FileExplorerDeleteHelper.isSelectionMissing
+                        FileExplorerStateReconciliation.isSelectionMissing
                             remainingPaths
                             (Some "assays/assay-b/isa.assay.xlsx")
                     )
@@ -139,7 +139,7 @@ Vitest.describe (
 
                 Vitest
                     .expect(
-                        FileExplorerDeleteHelper.isSelectionMissing
+                        FileExplorerStateReconciliation.isSelectionMissing
                             remainingPaths
                             (Some "assays/assay-a/isa.assay.xlsx")
                     )
@@ -155,7 +155,7 @@ Vitest.describe (
 
                 Vitest
                     .expect(
-                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
+                        FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval (
                             Some(RendererPageState.ArcFilePage(workflowArcFile, None))
                         )
                     )
@@ -163,7 +163,7 @@ Vitest.describe (
 
                 Vitest
                     .expect(
-                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
+                        FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval (
                             Some(RendererPageState.MarkdownPage "# md")
                         )
                     )
@@ -171,7 +171,7 @@ Vitest.describe (
 
                 Vitest
                     .expect(
-                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
+                        FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval (
                             Some(RendererPageState.TextPage "txt")
                         )
                     )
@@ -179,7 +179,7 @@ Vitest.describe (
 
                 Vitest
                     .expect(
-                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
+                        FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval (
                             Some RendererPageState.UnknownPage
                         )
                     )
@@ -187,7 +187,7 @@ Vitest.describe (
 
                 Vitest
                     .expect(
-                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
+                        FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval (
                             Some(RendererPageState.ErrorPage "err")
                         )
                     )
@@ -195,7 +195,7 @@ Vitest.describe (
 
                 Vitest
                     .expect(
-                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
+                        FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval (
                             Some RendererPageState.NotesDraftPage
                         )
                     )
@@ -203,13 +203,63 @@ Vitest.describe (
 
                 Vitest
                     .expect(
-                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
+                        FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval (
                             Some RendererPageState.ProvenanceGroupingPage
                         )
                     )
                     .toBe (false)
 
-                Vitest.expect(FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval None).toBe (false)
+                Vitest
+                    .expect(FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval None)
+                    .toBe (false)
+        )
+
+        Vitest.test (
+            "DataMap tree changes reload a stale open parent preview",
+            fun () ->
+                let assay = ArcAssay.init "DataMapAssay"
+                assay.DataMap <- Some(DataMap.init ())
+
+                let pageState =
+                    Some(RendererPageState.ArcFilePage(ArcFiles.Assay assay, Some ActiveView.DataMap))
+
+                let fileTreeWithDataMap = [|
+                    FileEntry.create ("isa.datamap.xlsx", "assays/DataMapAssay/isa.datamap.xlsx", false, None)
+                |]
+
+                Vitest
+                    .expect(FileExplorerStateReconciliation.tryGetDataMapMismatchReload fileTreeWithDataMap pageState)
+                    .toEqual (None)
+
+                let fileTree = [|
+                    FileEntry.create ("DataMapAssay", "assays/DataMapAssay", true, None)
+                    FileEntry.create ("isa.assay.xlsx", "assays/DataMapAssay/isa.assay.xlsx", false, None)
+                |]
+
+                Vitest
+                    .expect(FileExplorerStateReconciliation.tryGetDataMapMismatchReload fileTree pageState)
+                    .toEqual (Some("assays/DataMapAssay/isa.assay.xlsx", Some ActiveView.Metadata))
+
+                assay.DataMap <- None
+
+                Vitest
+                    .expect(FileExplorerStateReconciliation.tryGetDataMapMismatchReload fileTreeWithDataMap pageState)
+                    .toEqual (Some("assays/DataMapAssay/isa.assay.xlsx", Some ActiveView.DataMap))
+
+                let standaloneDataMapPage =
+                    Some(
+                        RendererPageState.ArcFilePage(
+                            ArcFiles.DataMap(
+                                Some(DatamapParentInfo.create "DataMapAssay" DataMapParent.Assay),
+                                DataMap.init ()
+                            ),
+                            Some ActiveView.DataMap
+                        )
+                    )
+
+                Vitest
+                    .expect(FileExplorerStateReconciliation.tryGetDataMapMismatchReload fileTree standaloneDataMapPage)
+                    .toEqual (None)
         )
 
         Vitest.test (

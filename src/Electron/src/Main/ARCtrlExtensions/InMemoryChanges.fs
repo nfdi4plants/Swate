@@ -1,6 +1,7 @@
 namespace Main.ARCtrlExtensions
 
 open ARCtrl
+open Swate.Components.Shared
 
 [<AutoOpen>]
 module InMemoryChangesExtensions =
@@ -67,6 +68,47 @@ module InMemoryChangesExtensions =
             |> tryGetSource
             |> Option.iter (fun sourceEntity -> syncEntityStaticHash sourceEntity targetEntity)
 
+    let private preserveEntityDataMapLabels
+        (targetEntities: seq<'Entity>)
+        (tryGetSource: string -> 'Entity option)
+        (getIdentifier: 'Entity -> string)
+        (getDataMap: 'Entity -> DataMap option)
+        =
+        for targetEntity in targetEntities do
+            targetEntity
+            |> getIdentifier
+            |> tryGetSource
+            |> Option.iter (fun sourceEntity ->
+                match getDataMap sourceEntity, getDataMap targetEntity with
+                | Some source, Some target -> preserveDataMapLabelsWorkaround source target
+                | _ -> ()
+            )
+
+    let private preserveArcDataMapLabels (source: ARC) (target: ARC) =
+        preserveEntityDataMapLabels
+            target.Assays
+            source.TryGetAssay
+            (fun (assay: ArcAssay) -> assay.Identifier)
+            (fun assay -> assay.DataMap)
+
+        preserveEntityDataMapLabels
+            target.Studies
+            source.TryGetStudy
+            (fun (study: ArcStudy) -> study.Identifier)
+            (fun study -> study.DataMap)
+
+        preserveEntityDataMapLabels
+            target.Runs
+            source.TryGetRun
+            (fun (run: ArcRun) -> run.Identifier)
+            (fun run -> run.DataMap)
+
+        preserveEntityDataMapLabels
+            target.Workflows
+            source.TryGetWorkflow
+            (fun (workflow: ArcWorkflow) -> workflow.Identifier)
+            (fun workflow -> workflow.DataMap)
+
     /// Syncs static hashes from source ARC to target ARC for matching entities.
     /// This keeps ARCtrl update contract generation scoped to actual changes.
     let syncArcStaticHashes (source: ARC) (target: ARC) : unit =
@@ -115,6 +157,7 @@ module InMemoryChangesExtensions =
     /// Copies ARC and preserves static hashes so unchanged entities are not treated as newly created.
     let copyArcPreservingStaticHashes (arc: ARC) : ARC =
         let copiedArc = arc.Copy()
+        preserveArcDataMapLabels arc copiedArc
         syncArcStaticHashes arc copiedArc
         copiedArc
 
