@@ -99,7 +99,7 @@ Vitest.describe (
                             Vitest
                                 .expect(error.Message)
                                 .toBe (
-                                    "The study 'StudyWithoutDataMap' does not have a DataMap to delete. Refresh the File Explorer and try again."
+                                    "Parent 'studies/StudyWithoutDataMap' does not have a DataMap to delete. Refresh the File Explorer and try again."
                                 )
                     })
         )

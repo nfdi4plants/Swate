@@ -50,6 +50,18 @@ module PathHelpers =
         && (normalizedPath = normalizedAncestorPath
             || normalizedPath.StartsWith(normalizedAncestorPath + "/"))
 
+    let tryRemapPathPrefix (sourcePath: string) (targetPath: string) (path: string) =
+        let normalizedSourcePath = normalizeCanonicalRelativePath sourcePath
+        let normalizedTargetPath = normalizeCanonicalRelativePath targetPath
+        let normalizedPath = normalizeCanonicalRelativePath path
+
+        if normalizeForComparison normalizedPath = normalizeForComparison normalizedSourcePath then
+            Some normalizedTargetPath
+        elif isSameOrDescendantPath normalizedPath normalizedSourcePath then
+            Some(normalizedTargetPath + normalizedPath.Substring(normalizedSourcePath.Length))
+        else
+            None
+
     let containsPathTraversalSegments (path: string) =
         normalizeSeparators path
         |> fun normalized -> normalized.Split([| '/' |], StringSplitOptions.RemoveEmptyEntries)

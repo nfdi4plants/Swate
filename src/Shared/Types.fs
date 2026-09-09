@@ -30,6 +30,4 @@ type ARCPointer = {
         isActive = isActive
     }
 
-type SelectorRef = { toggle: unit -> unit }
-
 type ImportedTextFile = { Name: string; Content: string }
