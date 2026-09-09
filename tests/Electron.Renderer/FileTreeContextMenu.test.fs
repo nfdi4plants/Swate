@@ -247,7 +247,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "root ARC name context menu exposes generic root creation and ARC add actions",
+            "root ARC name context menu exposes import, generic creation, and ARC add actions",
             fun () ->
                 let item = createFolderItem "MyArc" (Some "")
                 let menuItems = rootContextMenuItems (createContextMenuConfig ()) item
@@ -256,6 +256,8 @@ Vitest.describe (
                     .expect(groupedLabels menuItems)
                     .toEqual (
                         [|
+                            "Import files"
+                            "<divider>"
                             "New File"
                             "New Folder"
                             "<divider>"
@@ -266,6 +268,35 @@ Vitest.describe (
                             "Add Note"
                         |]
                     )
+        )
+
+        Vitest.test (
+            "root import action targets the empty ARC-relative path",
+            fun () -> promise {
+                let item = createFolderItem "MyArc" (Some "")
+                let mutable importedInto = None
+
+                let config = {
+                    createContextMenuConfig () with
+                        pathActionConfig = {
+                            createConfig () with
+                                importExternalFiles =
+                                    fun path -> promise {
+                                        importedInto <- Some path
+                                        return Ok()
+                                    }
+                        }
+                }
+
+                let importItem =
+                    rootContextMenuItems config item
+                    |> List.find (fun menuItem -> menuItem.Label = "Import files")
+
+                importItem.OnClick()
+                do! Promise.sleep 0
+
+                Vitest.expect(importedInto).toEqual (Some "")
+            }
         )
 
         Vitest.test (

@@ -469,6 +469,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                     )
 
                             try
+                                let importedEvents = createImportedFileWatcherEvents vault.path.Value request
+
                                 let! result =
                                     ArcFileSystemHelper.importExternalFilesOnDisk
                                         vault.path.Value
@@ -481,18 +483,14 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                 activeImport.IsCancellationRequested
                                             | _ -> false
                                         )
-
-                                match result with
-                                | Ok ImportExternalFilesResult.Completed ->
-                                    let importedEvents = createImportedFileWatcherEvents vault.path.Value request
-
-                                    do!
-                                        vault.TriggerArcInMemoryMergeOnFileWatcherEvents(
-                                            importedEvents |> Array.toList
+                                        (fun () ->
+                                            vault.TryTriggerArcInMemoryMergeOnFileWatcherEvents(
+                                                importedEvents |> Array.toList
+                                            )
                                         )
 
-                                    do! refreshVaultFileTree vault
-                                | Ok ImportExternalFilesResult.Cancelled
+                                match result with
+                                | Ok _
                                 | Error _ -> do! refreshVaultFileTree vault
 
                                 return result

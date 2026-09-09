@@ -66,6 +66,7 @@ type FileTree =
             React.useState<string option> None
 
         let activeImportRequestIdRef = React.useRef<string option> None
+        let isImportFilePickerOpenRef = React.useRef false
         let isCancellingImport, setIsCancellingImport = React.useState false
         // The file watcher emits the initial tree too; only later tree updates should refresh open previews.
         let hasObservedFileTreeUpdateRef = React.useRef false
@@ -458,34 +459,39 @@ type FileTree =
                 openPathWithDefaultApplication = Api.ipcArcVaultApi.openPathWithDefaultApplication
                 importExternalFiles =
                     fun targetRelativePath -> promise {
-                        match activeImportRequestIdRef.current with
-                        | Some _ -> return Ok()
-                        | None ->
-                            let requestId = System.Guid.NewGuid().ToString()
-                            activeImportRequestIdRef.current <- Some requestId
-                            setActiveImportRequestId (Some requestId)
-                            setIsCancellingImport false
+                        if activeImportRequestIdRef.current.IsSome || isImportFilePickerOpenRef.current then
+                            return Ok()
+                        else
+                            isImportFilePickerOpenRef.current <- true
 
                             try
                                 match! Api.ipcArcVaultApi.pickAbsolutePaths () with
                                 | Error exn -> return Error exn
                                 | Ok [||] -> return Ok()
                                 | Ok sourceAbsolutePaths ->
-                                    match!
-                                        Api.ipcArcVaultApi.tryImportExternalFiles {
-                                            requestId = requestId
-                                            targetRelativePath = targetRelativePath
-                                            sourceAbsolutePaths = sourceAbsolutePaths
-                                        }
-                                    with
-                                    | Error exn -> return Error exn
-                                    | Ok ImportExternalFilesResult.Completed
-                                    | Ok ImportExternalFilesResult.Cancelled -> return Ok()
-                            finally
-                                if activeImportRequestIdRef.current = Some requestId then
-                                    activeImportRequestIdRef.current <- None
-                                    setActiveImportRequestId None
+                                    let requestId = System.Guid.NewGuid().ToString()
+                                    activeImportRequestIdRef.current <- Some requestId
+                                    setActiveImportRequestId (Some requestId)
                                     setIsCancellingImport false
+
+                                    try
+                                        match!
+                                            Api.ipcArcVaultApi.tryImportExternalFiles {
+                                                requestId = requestId
+                                                targetRelativePath = targetRelativePath
+                                                sourceAbsolutePaths = sourceAbsolutePaths
+                                            }
+                                        with
+                                        | Error exn -> return Error exn
+                                        | Ok ImportExternalFilesResult.Completed
+                                        | Ok ImportExternalFilesResult.Cancelled -> return Ok()
+                                    finally
+                                        if activeImportRequestIdRef.current = Some requestId then
+                                            activeImportRequestIdRef.current <- None
+                                            setActiveImportRequestId None
+                                            setIsCancellingImport false
+                            finally
+                                isImportFilePickerOpenRef.current <- false
                     }
                 enqueueError = errorModal.enqueue
             }

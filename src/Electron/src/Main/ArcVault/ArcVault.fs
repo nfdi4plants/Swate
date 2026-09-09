@@ -46,7 +46,7 @@ type ArcVault(window: BrowserWindow) =
     member val private fileWatcherOwnWriteArcMergeSuppressionTimeout: int option = None with get, set
 
     /// Runs ARC merges sequentially so every operation observes the result of the preceding merge.
-    member this.EnqueueArcMerge(operation: unit -> Fable.Core.JS.Promise<unit>) =
+    member this.EnqueueArcMerge<'T>(operation: unit -> Fable.Core.JS.Promise<'T>) : Fable.Core.JS.Promise<'T> =
         let precedingMerge = lastArcMerge
 
         let queuedMerge = promise {
@@ -55,10 +55,14 @@ type ArcVault(window: BrowserWindow) =
             with precedingError ->
                 swatelogfn this.window.id "A preceding ARC merge failed: %s" precedingError.Message
 
-            do! operation ()
+            return! operation ()
         }
 
-        lastArcMerge <- queuedMerge
+        lastArcMerge <- promise {
+            let! _ = queuedMerge
+            return ()
+        }
+
         queuedMerge
 
     member private this.StartFileWatcherOwnWriteArcMergeSuppression() =
@@ -114,15 +118,11 @@ module ArcVaultExtensions =
 
     type ArcVault with
 
-        member private this.ApplyWatcherArcMerge(events: FileEvent list) = promise {
+        member private this.ApplyWatcherArcMerge(events: FileEvent list) : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
             match this.path, this.arc with
             | Some arcPath, Some arcLocal ->
                 match! ARC.LoadAsyncSwate arcPath with
-                | Error loadError ->
-                    swatelogfn
-                        this.window.id
-                        "Unable to reload ARC after file watcher event: %s"
-                        (PathHelpers.formatContractErrors loadError)
+                | Error loadError -> return Error(exn (PathHelpers.formatContractErrors loadError))
                 | Ok reloadedArc ->
                     // The file watcher is our source of truth for changes made on disk. Establish the reloaded
                     // ARC as a clean hash baseline before merging it; without this, unchanged entities have
@@ -137,8 +137,7 @@ module ArcVaultExtensions =
                     }
 
                     match mergeResult with
-                    | Error mergeError ->
-                        swatelogfn this.window.id "Unable to merge ARC after file watcher event: %s" mergeError.Message
+                    | Error mergeError -> return Error mergeError
                     | Ok mergedArc ->
                         // ARC.merge may copy or reconstruct entities without retaining the hashes established
                         // above, so transfer the disk baseline to the merged ARC. Watcher-applied values then
@@ -146,8 +145,8 @@ module ArcVaultExtensions =
                         syncArcStaticHashes reloadedArc mergedArc
                         this.SetArc mergedArc
                         this.RefreshHasUnsavedArcChangesFlag()
-            | Some _, None -> do! this.LoadArc()
-            | None, _ -> ()
+                        return Ok()
+            | _ -> return Error(arcNotOpenError ())
         }
 
         member private this.ApplyWatcherFileTreeEvents(events: ArcVaultFileSystemEvent list) = promise {
@@ -188,9 +187,16 @@ module ArcVaultExtensions =
                     this.SetFileTree(nextFileTree)
         }
 
-        member this.TriggerArcInMemoryMergeOnFileWatcherEvents(events: ArcVaultFileSystemEvent list) = promise {
+        member this.TryTriggerArcInMemoryMergeOnFileWatcherEvents(events: ArcVaultFileSystemEvent list) = promise {
             let arcEvents = WatcherHelpers.toArcMergeEvents events
-            do! this.EnqueueArcMerge(fun () -> this.ApplyWatcherArcMerge arcEvents)
+            return! this.EnqueueArcMerge(fun () -> this.ApplyWatcherArcMerge arcEvents)
+        }
+
+        member this.TriggerArcInMemoryMergeOnFileWatcherEvents(events: ArcVaultFileSystemEvent list) = promise {
+            match! this.TryTriggerArcInMemoryMergeOnFileWatcherEvents events with
+            | Ok() -> ()
+            | Error mergeError ->
+                swatelogfn this.window.id "Unable to merge ARC after file watcher event: %s" mergeError.Message
         }
 
         member private this._FileEventController(sendMsgApi: IArcFileWatcherApi) =

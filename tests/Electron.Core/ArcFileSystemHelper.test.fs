@@ -102,6 +102,8 @@ let private createRelativeDirectoryAsync arcPath relativePath = promise {
     return ()
 }
 
+let private acceptImportedFiles () = promise { return Ok() }
+
 Vitest.describe (
     "ArcFileSystemHelper generic filesystem operations",
     fun () ->
@@ -174,6 +176,7 @@ Vitest.describe (
                             [| sourcePath |]
                             progress.Add
                             (fun () -> false)
+                            acceptImportedFiles
                     with
                     | Error error -> failwith error.Message
                     | Ok ImportExternalFilesResult.Cancelled -> failwith "Expected import to complete."
@@ -216,6 +219,7 @@ Vitest.describe (
                             |]
                             onProgress
                             (fun () -> cancelRequested)
+                            acceptImportedFiles
                     with
                     | Error error -> failwith error.Message
                     | Ok ImportExternalFilesResult.Completed -> failwith "Expected import cancellation."
@@ -232,6 +236,34 @@ Vitest.describe (
                         Vitest.expect(secondExists).toBe (false)
                         Vitest.expect(targetEntries |> Array.exists _.StartsWith(".swate-import-")).toBe (false)
                         Vitest.expect(arcParentEntries |> Array.exists _.StartsWith(".swate-import-")).toBe (false)
+                })
+        )
+
+        Vitest.test (
+            "rolls back imported files when post-import validation fails",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let sourceDirectory = dirname arcPath
+                    let fileName = $"invalid-arc-import-{Guid.NewGuid():N}.xlsx"
+                    let sourcePath = join [| sourceDirectory; fileName |]
+                    do! writeRelativeFileAsync sourceDirectory fileName "malformed ARC workbook"
+
+                    match!
+                        ArcFileSystemHelper.importExternalFilesOnDisk
+                            arcPath
+                            "assays/AssayA"
+                            [| sourcePath |]
+                            ignore
+                            (fun () -> false)
+                            (fun () -> promise { return Error(exn "ARC synchronization failed") })
+                    with
+                    | Ok outcome -> failwith $"Expected validation failure, got {outcome}."
+                    | Error error ->
+                        Vitest.expect(error.Message).toContain ("ARC synchronization failed")
+
+                        let importedPath = absoluteArcPath arcPath $"assays/AssayA/{fileName}"
+                        let! importedFileExists = pathExistsAsync importedPath
+                        Vitest.expect(importedFileExists).toBe (false)
                 })
         )
 
@@ -254,6 +286,7 @@ Vitest.describe (
                             |]
                             ignore
                             (fun () -> false)
+                            acceptImportedFiles
                     with
                     | Ok outcome -> failwith $"Expected import failure, got {outcome}."
                     | Error _ ->
@@ -282,6 +315,7 @@ Vitest.describe (
                             [| join [| sourceDirectory; fileName |] |]
                             ignore
                             (fun () -> false)
+                            acceptImportedFiles
                     with
                     | Ok outcome -> failwith $"Expected destination conflict, got {outcome}."
                     | Error _ ->
