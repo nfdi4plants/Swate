@@ -691,7 +691,9 @@ type ArcVaults() =
                     let! persistResult = vault.WriteArc()
 
                     match persistResult with
-                    | Error saveError -> return Error saveError
+                    | Error saveError ->
+                        vault.CloseState <- CloseLifecycleState.Idle
+                        return Error saveError
                     | Ok() ->
                         vault.CloseState <- CloseLifecycleState.Approved
                         vault.window.close ()

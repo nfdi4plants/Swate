@@ -13,6 +13,7 @@ open Main.Notes.NoteConstants
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Vitest
 
 Vitest.describe (
@@ -55,6 +56,27 @@ Vitest.describe (
                 let! importResult = import
                 Vitest.expect(importResult).toEqual (Ok ImportExternalFilesResult.Cancelled)
                 Vitest.expect(waitFinished).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "failed save-and-close resets the close lifecycle so closing can be retried",
+            fun () -> promise {
+                let window = TestHelpers.testWindow ()
+                let vault = ArcVault(window)
+                let arc = ARC("close-save-failure")
+                vault.SetArc arc
+                arc.Title <- Some "Unsaved title"
+                vault.RefreshHasUnsavedArcChangesFlag()
+                Vitest.expect(vault.hasUnsavedArcChanges).toBe (true)
+
+                let vaults = ArcVaults()
+                vaults.Vaults.Add(window.id, vault)
+                vault.CloseState <- CloseLifecycleState.WaitingForSaveDecision
+
+                match! vaults.ResolveCloseRequest(window.id, SaveBeforeQuitDecision.SaveAndClose) with
+                | Ok() -> return failwith "Expected save-and-close to fail without an ARC path."
+                | Error _ -> Vitest.expect(vault.CloseState).toEqual (CloseLifecycleState.Idle)
             }
         )
 
