@@ -251,6 +251,11 @@ let unlistedNames (config: ValidationPackagesConfig) (packages: ValidationPackag
 /// The package registry returns all versions of each package. This keeps only the newest version per package name.
 let latestVersions (packages: ValidationPackageDTO[]) =
     packages
+    // ensure all SemVer are valid
+    |> Array.filter (fun current ->
+        ARCtrl.Helper.SemVer.SemVer.tryOfString (toVersionString current)
+        |> Option.isSome
+    )
     |> Array.groupBy (fun p -> p.Name)
     |> Array.map (fun (_, versions) ->
         versions
