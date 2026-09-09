@@ -18,8 +18,7 @@ let copyCells (dataMap: DataMap) (coordinates: seq<CellCoordinate>) =
 
 let updateDataMap (dataMap: DataMap) (setDataMap: DataMap -> unit) (update: DataMap -> unit) =
     // Always mutate a copy so memoized views compare against the unchanged current value.
-    let nextDataMap = dataMap.Copy()
-    preserveDataMapLabelsWorkaround dataMap nextDataMap
+    let nextDataMap = copyDataMapPreservingLabelsWorkaround dataMap
     update nextDataMap
     setDataMap nextDataMap
 

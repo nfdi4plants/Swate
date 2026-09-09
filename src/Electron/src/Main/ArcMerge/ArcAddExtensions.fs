@@ -85,16 +85,16 @@ module ArcAddExtensions =
             failwith "Swate could not determine which assay, study, run, or workflow this DataMap belongs to."
         | ArcFiles.DataMap(Some parentInfo, dataMap) ->
             let workingArc = copyArcPreservingStaticHashes sourceArc
-            let parentDescription = DatamapParentInfo.describeParent parentInfo
+            let parentPath = DatamapParentInfo.toFolderPath parentInfo
 
             match workingArc.TryGetDataMap parentInfo with
             | Some _ ->
                 failwith
-                    $"The {parentDescription} already has a DataMap. Delete the existing DataMap before adding a new one."
+                    $"Parent '{parentPath}' already has a DataMap. Delete the existing DataMap before adding a new one."
             | None ->
                 if not (workingArc.TrySetDataMap(parentInfo, Some dataMap)) then
                     failwith
-                        $"Could not add the DataMap because the {parentDescription} was not found in the current ARC. Refresh the File Explorer and try again."
+                        $"Could not add the DataMap because parent '{parentPath}' was not found in the current ARC. Refresh the File Explorer and try again."
 
                 workingArc.UpdateFileSystem()
                 workingArc, ArcFileCreateContracts.createContracts false arcFile

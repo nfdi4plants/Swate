@@ -86,13 +86,29 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "tryRemapSelectionPath remaps descendants under renamed source prefixes",
+            "tryRemapPathPrefix remaps descendants under renamed source prefixes",
             fun () ->
                 let remapped =
-                    tryRemapSelectionPath "assays/OldAssay" "assays/NewAssay" (Some "assays/OldAssay/notes/protocol.md")
+                    PathHelpers.tryRemapPathPrefix
+                        "assays/OldAssay"
+                        "assays/NewAssay"
+                        "assays/OldAssay/notes/protocol.md"
 
                 Vitest.expect(remapped).toEqual (Some "assays/NewAssay/notes/protocol.md")
         )
+
+        Vitest.test (
+            "tryRemapPathPrefix does not remap sibling paths that only share a prefix",
+            fun () ->
+                let remapped =
+                    PathHelpers.tryRemapPathPrefix
+                        "assays/OldAssay"
+                        "assays/NewAssay"
+                        "assays/OldAssay2/notes/protocol.md"
+
+                Vitest.expect(remapped).toEqual (None)
+        )
+
 )
 
 let private getRenameMenuItems (item: FileItem) =
