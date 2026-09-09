@@ -410,7 +410,7 @@ Vitest.describe (
                             Vitest
                                 .expect(errors.[0])
                                 .toBe (
-                                    "The assay 'ExistingAssay' already has a DataMap. Delete the existing DataMap before adding a new one."
+                                    "Parent 'assays/ExistingAssay' already has a DataMap. Delete the existing DataMap before adding a new one."
                                 )
 
                         let missingParent =
@@ -425,7 +425,7 @@ Vitest.describe (
                             Vitest
                                 .expect(errors.[0])
                                 .toBe (
-                                    "Could not add the DataMap because the workflow 'MissingWorkflow' was not found in the current ARC. Refresh the File Explorer and try again."
+                                    "Could not add the DataMap because parent 'workflows/MissingWorkflow' was not found in the current ARC. Refresh the File Explorer and try again."
                                 )
                     })
         )

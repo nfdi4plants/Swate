@@ -31,12 +31,12 @@ module DataMapExtensions =
         member this.TryDeleteDataMapAsync(arcPath: string, parentInfo: DatamapParentInfo) = promise {
             match this.TryGetDataMap parentInfo with
             | None ->
-                let parentDescription = DatamapParentInfo.describeParent parentInfo
+                let parentPath = DatamapParentInfo.toFolderPath parentInfo
 
                 return
                     Error(
                         exn
-                            $"The {parentDescription} does not have a DataMap to delete. Refresh the File Explorer and try again."
+                            $"Parent '{parentPath}' does not have a DataMap to delete. Refresh the File Explorer and try again."
                     )
             | Some dataMap ->
                 let deleteContract = dataMap.ToDeleteContract(parentInfo)

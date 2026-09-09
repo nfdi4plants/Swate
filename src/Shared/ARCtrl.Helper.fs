@@ -16,6 +16,13 @@ module ARCtrlHelper =
             source.DataContexts
             target.DataContexts
 
+    /// WORKAROUND: Creates a DataMap copy while retaining labels omitted by ARCtrl's Copy().
+    /// Remove this function after upgrading to an ARCtrl version that preserves labels.
+    let copyDataMapPreservingLabelsWorkaround (source: DataMap) =
+        let target = source.Copy()
+        preserveDataMapLabelsWorkaround source target
+        target
+
     [<RequireQualifiedAccess; StringEnum>]
     type ArcFilesDiscriminate =
         | [<CompiledName("investigation")>] Investigation
@@ -72,16 +79,6 @@ module ARCtrlHelper =
             ParentId = parentId
             Parent = parent
         |}
-
-        let describeParent (dmpi: DatamapParentInfo) =
-            let parentType =
-                match dmpi.Parent with
-                | DataMapParent.Assay -> "assay"
-                | DataMapParent.Study -> "study"
-                | DataMapParent.Run -> "run"
-                | DataMapParent.Workflow -> "workflow"
-
-            $"{parentType} '{dmpi.ParentId}'"
 
         let tryFromPath (path: string) =
             let segments = split path
