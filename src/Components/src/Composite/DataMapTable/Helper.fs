@@ -8,13 +8,11 @@ open Swate.Components.Shared
 open Swate.Components.Composite.DataMapTable.Types
 open Swate.Components.Composite.Table.Types
 
-module Clipboard = Swate.Components.ClipboardCodec
-
 let copyCells (dataMap: DataMap) (coordinates: seq<CellCoordinate>) =
     let coordinates = coordinates |> Seq.toArray
     let plainText = dataMap.SelectedCellsToTabText coordinates
     let cells = dataMap.GetSelectedCells coordinates
-    Clipboard.write plainText (Some cells)
+    Swate.Components.ClipboardCodec.write plainText (Some cells)
 
 let updateDataMap (dataMap: DataMap) (setDataMap: DataMap -> unit) (update: DataMap -> unit) =
     // Always mutate a copy so memoized views compare against the unchanged current value.
@@ -23,7 +21,7 @@ let updateDataMap (dataMap: DataMap) (setDataMap: DataMap -> unit) (update: Data
     setDataMap nextDataMap
 
 let pasteCells (dataMap: DataMap) (coordinate: CellCoordinate) (setDataMap: DataMap -> unit) = promise {
-    let! content = Clipboard.read ()
+    let! content = Swate.Components.ClipboardCodec.read ()
 
     updateDataMap
         dataMap

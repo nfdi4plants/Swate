@@ -14,8 +14,6 @@ module ARCtrlExtensions =
     open Helper
     open ArcTableAux
 
-    module Clipboard = Swate.Components.ClipboardCodec
-
     type DataMap with
 
         member this.GetSelectedCells(coordinates: seq<CellCoordinate>) =
@@ -44,7 +42,7 @@ module ARCtrlExtensions =
             )
             |> String.concat System.Environment.NewLine
 
-        member this.PastePayload(startCoordinate: CellCoordinate, payload: Clipboard.Payload) =
+        member this.PastePayload(startCoordinate: CellCoordinate, payload: Swate.Components.ClipboardCodec.Payload) =
             let requiredRowCount = startCoordinate.y - 1 + payload.Rows.Length
 
             if requiredRowCount > this.RowCount then
@@ -58,7 +56,7 @@ module ARCtrlExtensions =
                     let rowIndex = startCoordinate.y - 1 + rowOffset
 
                     if columnIndex < this.ColumnCount then
-                        let source = Clipboard.toCompositeCell dto
+                        let source = Swate.Components.ClipboardCodec.toCompositeCell dto
                         let target = this.GetCell(columnIndex, rowIndex)
 
                         let cell =

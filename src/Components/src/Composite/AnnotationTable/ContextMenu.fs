@@ -13,10 +13,8 @@ open Swate.Components.Primitive.ContextMenu.Types
 open Swate.Components.Composite.AnnotationTable.Types
 open Swate.Components.Composite.Table
 open Swate.Components.Composite.Table.Types
-
-module TableHelper = Swate.Components.Composite.Table.Helper
-module Clipboard = Swate.Components.ClipboardCodec
 open Swate.Components.Composite.Table.Helper
+open Swate.Components.ClipboardCodec
 
 type AnnotationTableContextMenuUtil =
 
@@ -39,7 +37,7 @@ type AnnotationTableContextMenuUtil =
         if selectHandle.contains tableIndex then
             let rowCoordinates =
                 selectHandle.getSelectedCells ()
-                |> TableHelper.selectedRowIndices table.RowCount
+                |> Swate.Components.Composite.Table.Helper.selectedRowIndices table.RowCount
 
             table.RemoveRows(rowCoordinates)
         else
@@ -155,7 +153,7 @@ type AnnotationTableContextMenuUtil =
                 let cell = table.GetCellAt((cellIndex.x - 1, cellIndex.y - 1))
                 cell.ToClipboardStr(), Some [| [| cell |] |]
 
-        Clipboard.write plainText payloadCells
+        Swate.Components.ClipboardCodec.write plainText payloadCells
 
     static member cut(cellIndex: CellCoordinate, table: ArcTable, setTable, selectHandle: SelectHandle) = promise {
         do! AnnotationTableContextMenuUtil.copy (cellIndex, table, selectHandle)
@@ -363,8 +361,12 @@ type AnnotationTableContextMenuUtil =
                 |}
 
     static member predictPayloadBehaviour
-        (cellIndex: CellCoordinate, targetTable: ArcTable, selectHandle: SelectHandle, payload: Clipboard.Payload)
-        =
+        (
+            cellIndex: CellCoordinate,
+            targetTable: ArcTable,
+            selectHandle: SelectHandle,
+            payload: Swate.Components.ClipboardCodec.Payload
+        ) =
         let cellCoordinates =
             AnnotationTableContextMenuUtil.getPasteTargetCoordinates (cellIndex, selectHandle)
 
@@ -382,7 +384,9 @@ type AnnotationTableContextMenuUtil =
                 headers
                 |> Array.mapi (fun index header ->
                     let sourceIndex = AnnotationTableContextMenuUtil.getIndex (index, row.Length)
-                    Clipboard.toCompositeCell row.[sourceIndex] |> _.ConvertToValidCell(header)
+
+                    Swate.Components.ClipboardCodec.toCompositeCell row.[sourceIndex]
+                    |> _.ConvertToValidCell(header)
                 )
             )
 
@@ -586,7 +590,7 @@ type AnnotationTableContextMenuUtil =
             setArcTable: ArcTable -> unit
         ) =
         promise {
-            let! content = Clipboard.read ()
+            let! content = Swate.Components.ClipboardCodec.read ()
 
             try
                 let prediction =
@@ -660,7 +664,7 @@ type AnnotationTableContextMenu =
                     fun _ ->
                         let nextTable = arcTable.Copy()
 
-                        TableHelper.fillColumn
+                        Swate.Components.Composite.Table.Helper.fillColumn
                             arcTable.RowCount
                             cellIndex
                             (fun coordinate -> arcTable.GetCellAt(coordinate.x - 1, coordinate.y - 1))
