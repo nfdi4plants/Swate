@@ -395,19 +395,12 @@ type TestCases =
             |]
         |]
 
-        let representations =
-            Swate.Components.ClipboardCodec.createRepresentations "explicit\tmetre" cells
-
-        Expect.equal
-            representations.PlainText
-            "explicit\tmetre"
-            "External plain-text consumers should receive human-readable TSV."
+        let htmlText =
+            Swate.Components.ClipboardCodec.createHtmlRepresentation "explicit\tmetre" cells
 
         if Swate.Components.ClipboardBindings.isHtmlParserAvailable then
             let decoded =
-                representations.HtmlText
-                |> Swate.Components.ClipboardCodec.tryDecodeHtml
-                |> Option.get
+                htmlText |> Swate.Components.ClipboardCodec.tryDecodeHtml |> Option.get
 
             let actual =
                 decoded.Rows

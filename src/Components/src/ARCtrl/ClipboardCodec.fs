@@ -35,54 +35,76 @@ type ClipboardContent = {
     Payload: Payload option
 }
 
-type ClipboardRepresentations = { PlainText: string; HtmlText: string }
+type private CellData = {
+    Kind: string
+    Value: string
+    Name: string
+    TermSourceRef: string
+    TermAccessionNumber: string
+    Selector: string
+    Format: string
+    SelectorFormat: string
+}
 
-let private createCell kind value name termSourceRef termAccessionNumber selector format selectorFormat =
+let private createCell (data: CellData) =
     createObj [
-        "Kind" ==> kind
-        "Value" ==> value
-        "Name" ==> name
-        "TermSourceRef" ==> termSourceRef
-        "TermAccessionNumber" ==> termAccessionNumber
-        "Selector" ==> selector
-        "Format" ==> format
-        "SelectorFormat" ==> selectorFormat
+        "Kind" ==> data.Kind
+        "Value" ==> data.Value
+        "Name" ==> data.Name
+        "TermSourceRef" ==> data.TermSourceRef
+        "TermAccessionNumber" ==> data.TermAccessionNumber
+        "Selector" ==> data.Selector
+        "Format" ==> data.Format
+        "SelectorFormat" ==> data.SelectorFormat
     ]
     |> unbox<CellDto>
 
 let ofCompositeCell (cell: CompositeCell) =
     match cell with
-    | CompositeCell.FreeText value -> createCell "freetext" value "" "" "" "" "" ""
+    | CompositeCell.FreeText value ->
+        createCell {
+            Kind = "freetext"
+            Value = value
+            Name = ""
+            TermSourceRef = ""
+            TermAccessionNumber = ""
+            Selector = ""
+            Format = ""
+            SelectorFormat = ""
+        }
     | CompositeCell.Term term ->
-        createCell
-            "term"
-            ""
-            term.NameText
-            (term.TermSourceREF |> Option.defaultValue "")
-            (term.TermAccessionNumber |> Option.defaultValue "")
-            ""
-            ""
-            ""
+        createCell {
+            Kind = "term"
+            Value = ""
+            Name = term.NameText
+            TermSourceRef = term.TermSourceREF |> Option.defaultValue ""
+            TermAccessionNumber = term.TermAccessionNumber |> Option.defaultValue ""
+            Selector = ""
+            Format = ""
+            SelectorFormat = ""
+        }
     | CompositeCell.Unitized(value, unit) ->
-        createCell
-            "unitized"
-            value
-            unit.NameText
-            (unit.TermSourceREF |> Option.defaultValue "")
-            (unit.TermAccessionNumber |> Option.defaultValue "")
-            ""
-            ""
-            ""
+        createCell {
+            Kind = "unitized"
+            Value = value
+            Name = unit.NameText
+            TermSourceRef = unit.TermSourceREF |> Option.defaultValue ""
+            TermAccessionNumber = unit.TermAccessionNumber |> Option.defaultValue ""
+            Selector = ""
+            Format = ""
+            SelectorFormat = ""
+        }
     | CompositeCell.Data data ->
-        createCell
-            "data"
-            (data.FilePath |> Option.defaultValue "")
-            ""
-            ""
-            ""
-            (data.Selector |> Option.defaultValue "")
-            (data.Format |> Option.defaultValue "")
-            (data.SelectorFormat |> Option.defaultValue "")
+        createCell {
+            Kind = "data"
+            Value = data.FilePath |> Option.defaultValue ""
+            Name = ""
+            TermSourceRef = ""
+            TermAccessionNumber = ""
+            Selector = data.Selector |> Option.defaultValue ""
+            Format = data.Format |> Option.defaultValue ""
+            SelectorFormat = data.SelectorFormat |> Option.defaultValue ""
+        }
 
 let toCompositeCell (cell: CellDto) =
     match cell.Kind with
@@ -174,7 +196,7 @@ let tryDecode json =
 let private escapeHtml (text: string) =
     text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&#39;")
 
-let createRepresentations (plainText: string) (cells: CompositeCell[][]) =
+let createHtmlRepresentation (plainText: string) (cells: CompositeCell[][]) =
     let encodedPayload = cells |> createPayload |> encode |> JS.encodeURIComponent
 
     let tableRows =
@@ -187,10 +209,7 @@ let createRepresentations (plainText: string) (cells: CompositeCell[][]) =
         )
         |> String.concat ""
 
-    {
-        PlainText = plainText
-        HtmlText = $"<table {HtmlPayloadAttribute}=\"{encodedPayload}\">{tableRows}</table>"
-    }
+    $"<table {HtmlPayloadAttribute}=\"{encodedPayload}\">{tableRows}</table>"
 
 let tryDecodeHtml (htmlText: string) =
     if isNull htmlText then
@@ -206,31 +225,45 @@ let tryDecodeHtml (htmlText: string) =
         with _ ->
             None
 
+let private hasType mimeType (item: ClipboardItem) = item.types |> Array.contains mimeType
+
+let private tryReadPayload (item: ClipboardItem) = promise {
+    try
+        if hasType MimeType item then
+            let! blob = item.getType MimeType
+            let! json = blob.text ()
+            return tryDecode json
+        elif hasType "text/html" item then
+            let! blob = item.getType "text/html"
+            let! htmlText = blob.text ()
+            return tryDecodeHtml htmlText
+        else
+            return None
+    with _ ->
+        return None
+}
+
 let write (plainText: string) (cells: CompositeCell[][] option) = promise {
     match cells with
     | None -> do! Swate.Components.GlobalBindings.navigator.clipboard.writeText plainText
     | Some cells ->
         let clipboard = Swate.Components.GlobalBindings.navigator.clipboard
-        let representations = createRepresentations plainText cells
+        let htmlText = createHtmlRepresentation plainText cells
         let payloadText = cells |> createPayload |> encode
 
         try
             do!
-                ClipboardBindings.createItemWithTypedContent
-                    representations.PlainText
-                    MimeType
-                    payloadText
-                    representations.HtmlText
+                ClipboardBindings.createItemWithTypedContent plainText MimeType payloadText htmlText
                 |> Array.singleton
                 |> clipboard.write
         with _ ->
             try
                 do!
-                    ClipboardBindings.createItemWithHtmlContent representations.PlainText representations.HtmlText
+                    ClipboardBindings.createItemWithHtmlContent plainText htmlText
                     |> Array.singleton
                     |> clipboard.write
             with _ ->
-                do! clipboard.writeText representations.PlainText
+                do! clipboard.writeText plainText
 }
 
 let read () = promise {
@@ -238,8 +271,6 @@ let read () = promise {
 
     try
         let! items = clipboard.read ()
-
-        let hasType mimeType (item: ClipboardItem) = item.types |> Array.contains mimeType
 
         let item =
             items
@@ -262,21 +293,7 @@ let read () = promise {
             let! plainBlob = item.getType "text/plain"
             let! plainText = plainBlob.text ()
 
-            let! payload = promise {
-                try
-                    if hasType MimeType item then
-                        let! blob = item.getType MimeType
-                        let! json = blob.text ()
-                        return tryDecode json
-                    elif hasType "text/html" item then
-                        let! blob = item.getType "text/html"
-                        let! htmlText = blob.text ()
-                        return tryDecodeHtml htmlText
-                    else
-                        return None
-                with _ ->
-                    return None
-            }
+            let! payload = tryReadPayload item
 
             return {
                 PlainText = plainText
