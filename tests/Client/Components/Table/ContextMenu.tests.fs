@@ -35,12 +35,10 @@ type TestCases =
         )
 
     static member AddColumns(selectHandle: SelectHandle, pasteData: string[][], expectedColumns: CompositeColumn[]) =
-
-        let clickedCell: CellCoordinate = {| x = 1; y = 1 |}
-
         let currentTable = Fixture.mkTable ()
 
         let cellCoordinates = selectHandle.getSelectedCells () |> Array.ofSeq
+        let clickedCell = cellCoordinates.[0]
 
         //Group all cells based on their row
         let groupedCellCoordinates =
