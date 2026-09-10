@@ -655,4 +655,27 @@ Vitest.describe (
                     return raise error
             }
         )
+
+        Vitest.test (
+            "Startup does not start a watcher when ARC loading fails",
+            fun () -> promise {
+                let! folderPath = TestHelpers.createTempDirectoryAsync "swate-invalid-arc-startup-"
+
+                try
+                    let vault = ArcVault(TestHelpers.testWindow ())
+                    vault.path <- Some folderPath
+                    let mutable watcherStartCount = 0
+
+                    try
+                        do! vault.Startup(startFileWatcher = (fun () -> watcherStartCount <- watcherStartCount + 1))
+                    with _ ->
+                        ()
+
+                    Vitest.expect(watcherStartCount).toBe (0)
+                    do! TestHelpers.removeDirectoryAsync folderPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync folderPath
+                    return raise error
+            }
+        )
 )

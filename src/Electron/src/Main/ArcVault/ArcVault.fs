@@ -390,9 +390,13 @@ module ArcVaultExtensions =
         }
 
         /// This functions should be called once, when an vault is first started with a path
-        member this.Startup() = promise {
+        member this.Startup(?startFileWatcher: unit -> unit) = promise {
             do! this.LoadArc()
-            this.StartFileWatcher()
+
+            match startFileWatcher with
+            | Some start -> start ()
+            | None -> this.StartFileWatcher()
+
             this.window.title <- this.arc.Value.Identifier
         }
 

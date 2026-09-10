@@ -120,7 +120,7 @@ let private notifyGitRepositoryInitialized (arcPath: string) =
 let private showArcOpenError (window: BaseWindow option) (arcPath: string) (error: exn) =
     let options =
         Dialog.ShowMessageBoxSync.Options(
-            "The selected folder is not a valid ARC and could not be opened.",
+            "The ARC could not be opened.",
             ``type`` = Enums.Dialog.ShowMessageBoxSync.Options.Type.Error,
             title = "Could not open ARC",
             detail = $"Folder: {arcPath}\n\n{error.Message}"
