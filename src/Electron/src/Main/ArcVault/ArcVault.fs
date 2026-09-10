@@ -391,8 +391,8 @@ module ArcVaultExtensions =
 
         /// This functions should be called once, when an vault is first started with a path
         member this.Startup() = promise {
-            this.StartFileWatcher()
             do! this.LoadArc()
+            this.StartFileWatcher()
             this.window.title <- this.arc.Value.Identifier
         }
 
@@ -414,9 +414,8 @@ module ArcVaultExtensions =
                     do! this.Startup()
                     sendMsg.pathChange (Some normalizedPath)
                 with error ->
-                    // Loading happens after the path has been assigned so the watcher and ARCtrl can use it.
-                    // Restore the empty-vault state when loading fails; otherwise a non-ARC folder leaves this
-                    // window permanently bound to a path that was never opened successfully.
+                    // The path is assigned before loading so ARCtrl can use it. Restore the empty-vault state
+                    // when startup fails; otherwise the window remains bound to a path that was never opened.
                     do! this.StopFileWatcher()
                     this.path <- None
                     this.ClearArc()
@@ -673,14 +672,26 @@ type ArcVaults() =
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
-        do! vault.OpenARC(path)
 
-        this.OnCloseWindow(window, vault, id)
+        try
+            do! vault.OpenARC(path)
 
-        window.focus ()
-        swatelogfn id "Register window"
+            this.OnCloseWindow(window, vault, id)
 
-        return id
+            window.focus ()
+            swatelogfn id "Register window"
+
+            return id
+        with error ->
+            // The normal close lifecycle is registered only for successfully initialized vaults.
+            // Clean up directly so a failed open cannot leave an empty window or orphaned entry.
+            do! vault.StopFileWatcher()
+            this.Vaults.Remove(id) |> ignore
+
+            if not (window.isDestroyed ()) then
+                window.destroy ()
+
+            return raise error
     }
 
     member this.RegisterVaultWithNewArc(path: string, newIdentifier: string) : Fable.Core.JS.Promise<int> = promise {
