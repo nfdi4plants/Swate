@@ -740,7 +740,10 @@ const VirtualizedTree = () => {
   );
 
   return (
-    <div className="swt:w-96">
+    <div className="swt:w-96 swt:space-y-2">
+      <button type="button" className="swt:btn swt:btn-sm">
+        Before tree
+      </button>
       <Tree
         items={items}
         defaultExpandedIds={["arc", "arc/studies", "arc/assays", "arc/runs", "arc/workflows", "arc/docs"]}
@@ -767,6 +770,13 @@ export const VirtualizedRows: Story = {
 
     await waitFor(() => expect(canvas.getByText("Workflow 16")).toBeVisible());
     await expect(canvas.queryByText("Study 01")).not.toBeInTheDocument();
+    await expect(canvas.queryByTestId("tree-node-arc")).not.toBeInTheDocument();
+
+    const beforeTree = canvas.getByRole("button", { name: "Before tree" });
+    beforeTree.focus();
+    await userEvent.tab();
+    const mountedTabStop = virtualizedViewport.querySelector("[role='treeitem'][tabindex='0']");
+    await expect(mountedTabStop).toHaveFocus();
 
     const workflowNode = canvas.getByTestId("tree-node-arc/workflows/workflow_16");
     workflowNode.focus();
