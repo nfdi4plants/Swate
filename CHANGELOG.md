@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Prevent newly added DataMaps from incorrectly appearing as unsaved after they have been written to disk.
 -   Add Validation Package Browser for managing and browsing validation packages. It can be opened from the the sidebar (by @Freymaurer)
 
+### 🐛 Fixed
+
+-   Keep the ARC selector at a stable width and truncate long ARC names, and close its dropdown only after direct or overflow actions are invoked without dismissing the overflow menu prematurely.
+
 ## 2.1.0 - 2026-08-19
 
 ### ✨ Added

@@ -4,7 +4,6 @@ import '../tailwind.css';
 // Primitive
 // ---------------------------------------------------------------------------
 
-export { default as Actionbar } from './dist/Primitive/Actionbar/Actionbar.fs';
 export { default as BaseModal } from './dist/Primitive/BaseModal/BaseModal.fs';
 export { default as Blankslate } from './dist/Primitive/Blankslate/Blankslate.fs';
 export { default as CardGrid } from './dist/Primitive/CardGrid/CardGrid.fs';
@@ -27,6 +26,8 @@ export { Dialog, StringSubmissionDialog } from './dist/Primitive/Dialog/Dialog.f
 // ---------------------------------------------------------------------------
 // Composite
 // ---------------------------------------------------------------------------
+
+export { default as Actionbar } from './dist/Composite/Actionbar/Actionbar.fs';
 
 export { default as AccountManager } from './dist/Composite/Authentication/AccountManager.fs';
 export { default as AnnotationTable } from './dist/Composite/AnnotationTable/AnnotationTable.fs';

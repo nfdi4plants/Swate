@@ -29,12 +29,54 @@ module private ContextMenuDom =
 [<Mangle(false)>]
 type ContextMenu =
 
+    [<ReactComponent>]
+    static member private Item(child: ContextMenuItem, props: IReactProperty list, ?key: string) =
+        if child.isDivider then
+            Html.div [ prop.className "swt:divider swt:my-0 swt:col-span-3" ]
+        else
+            Html.button [
+                if child.label.IsSome then
+                    prop.ariaLabel child.label.Value
+                prop.className
+                    "swt:col-span-3 swt:grid swt:grid-cols-subgrid swt:gap-x-2 swt:text-sm /
+                    swt:text-base-content swt:px-2 swt:py-1 /
+                    swt:w-full swt:text-left /
+                    swt:hover:bg-base-100 /
+                    swt:focus:bg-base-100 swt:focus:outline-hidden swt:focus:ring-2 swt:focus:ring-primary"
+                prop.children [
+                    if child.icon.IsSome then
+                        Html.div [
+                            prop.className
+                                "swt:col-start-1 swt:justify-self-start swt:self-center swt:flex swt:items-center"
+                            prop.children child.icon.Value
+                        ]
+                    else
+                        Html.none
+                    if child.text.IsSome then
+                        Html.div [
+                            prop.custom ("data-context-menu-item-label", "")
+                            prop.className "swt:col-start-2 swt:justify-self-start"
+                            prop.children child.text.Value
+                        ]
+                    if child.kbdbutton.IsSome then
+                        Html.div [
+                            prop.className "swt:col-start-3 swt:justify-self-end"
+                            prop.children child.kbdbutton.Value.element
+                        ]
+                    else
+                        Html.none
+                ]
+                yield! props
+            ]
+
     /// <summary></summary>
     /// <param name="childInfo"></param>
     /// <param name="ref">Element that owns the local context-menu listener.</param>
     /// <param name="onSpawn">A function that returns an option of any data. Data is stored in react
     /// state and can be accessed in context menu item onClick handlers. By default stores just the
     /// event target. Only if Some is returned context menu is opened.</param>
+    /// <param name="renderTrigger">Renders a trigger with an opener anchored to ref.current. Passes that
+    /// element to childInfo as spawn data, without invoking the mouse-specific onSpawn callback.</param>
     /// <returns></returns>
     [<ReactComponent(true)>]
     static member ContextMenu
@@ -42,20 +84,21 @@ type ContextMenu =
             childInfo: obj -> ContextMenuItem list,
             ref: IRefValue<HTMLElement option>,
             ?onSpawn: Browser.Types.MouseEvent -> obj option,
-            ?debug: bool
+            ?portalRootRef: IRefValue<HTMLElement option>,
+            ?debug: bool,
+            ?renderTrigger: (unit -> unit) -> ReactElement
         ) =
 
         let (spawnData: obj), setSpawnData = React.useState (null)
         let children, setChildren = React.useState ([])
-        let onSpawn = onSpawn |> Option.defaultValue (fun e -> box e |> Some)
+        let onSpawn = defaultArg onSpawn (fun e -> Some(box e))
         let (isOpen, setIsOpen) = React.useState (false)
         let (activeIndex: int option), setActiveIndex = React.useState (None)
 
-        let allowMouseUpCloseRef = React.useRef (false)
-        let timeout = React.useRef (None)
         let listItemsRef: IRefValue<ResizeArray<HTMLElement>> = React.useRef (ResizeArray())
 
-        let listContentRef = React.useRef (ResizeArray())
+        let listContentRef: IRefValue<ResizeArray<string option>> =
+            React.useRef (ResizeArray())
 
         let debug = defaultArg debug false
 
@@ -104,18 +147,28 @@ type ContextMenu =
         let interactions =
             FloatingUI.useInteractions [| role; dismiss; listNavigation; typeahead |]
 
-        let functionIsCalled = React.useRef (false)
+        let prepareMenu data =
+            let items = childInfo data
+            listContentRef.current.Clear()
+            listItemsRef.current.Clear()
+            setActiveIndex None
+            setChildren items
+            setSpawnData data
+            listContentRef.current.AddRange(items |> List.map _.label)
+            let hasItems = not (List.isEmpty items)
+            setIsOpen hasItems
+
+            hasItems
+
+        let openMenu () =
+            match ref.current with
+            | Some anchor ->
+                floating.refs.setPositionReference !^anchor
+                prepareMenu (box anchor) |> ignore
+            | None -> ()
 
         React.useEffect (
             (fun () ->
-
-                let myClearTimeout () =
-                    timeout.current
-                    |> Option.iter (fun timeout -> Fable.Core.JS.clearTimeout timeout)
-
-                let onMouseUp (e: Event) =
-                    if allowMouseUpCloseRef.current then
-                        setIsOpen false
 
                 let cleanupListeners =
                     match ref.current with
@@ -131,26 +184,8 @@ type ContextMenu =
                             if isInsideContextMenuScope then
                                 match onSpawn e with
                                 | Some data ->
-                                    functionIsCalled.current <- false
-                                    let children = childInfo data
-
-                                    match children with
-                                    | [] ->
-                                        setSpawnData null
-                                        setChildren []
-                                        setIsOpen false
-                                    | children ->
+                                    if prepareMenu data then
                                         e.preventDefault ()
-                                        setSpawnData (data)
-
-                                        children |> setChildren
-
-                                        listContentRef.current.AddRange(
-                                            children
-                                            |> List.map (fun child ->
-                                                child.kbdbutton |> Option.map (fun kbd -> kbd.label)
-                                            )
-                                        )
 
                                         let rect: ClientRect =
                                             {|
@@ -166,144 +201,112 @@ type ContextMenu =
                                             |> unbox
 
                                         let vEl = FloatingUI.VirtualElement(fun () -> rect)
-
                                         floating.refs.setPositionReference !^vEl
-                                        setIsOpen (true)
-
-                                        myClearTimeout ()
-
-                                        allowMouseUpCloseRef.current <- false
-
-                                        timeout.current <-
-                                            Some(JS.setTimeout (fun _ -> allowMouseUpCloseRef.current <- true) 300)
 
                                 | None -> ()
 
                         scopedElement.addEventListener ("contextmenu", onContextMenu)
-                        scopedElement.addEventListener ("mouseup", onMouseUp)
 
-                        fun () ->
-                            scopedElement.removeEventListener ("mouseup", onMouseUp)
-                            scopedElement.removeEventListener ("contextmenu", onContextMenu)
+                        fun () -> scopedElement.removeEventListener ("contextmenu", onContextMenu)
                     | None -> ignore
 
-                fun () ->
-
-                    cleanupListeners ()
-
-                    myClearTimeout ()
+                cleanupListeners
             ),
-            [| box floating.refs; box childInfo |]
+            [| box floating.refs; box childInfo; box onSpawn; box ref |]
         )
 
-        let close =
-            fun () ->
-                setIsOpen false
-                allowMouseUpCloseRef.current <- true
+        React.Fragment [
+            match renderTrigger with
+            | Some render -> render openMenu
+            | None -> Html.none
 
-                timeout.current
-                |> Option.iter (fun timeout -> Fable.Core.JS.clearTimeout timeout)
+            if isOpen then
+                FloatingUI.FloatingPortal(
+                    FloatingUI.FloatingOverlay(
+                        lockScroll = true,
+                        className = "swt:z-9999",
+                        children =
+                            FloatingUI.FloatingFocusManager(
+                                context = floating.context,
+                                initialFocus = floating.refs.floating,
+                                visuallyHiddenDismiss = true,
+                                children =
+                                    Html.div [
+                                        prop.ref floating.refs.setFloating
+                                        if debug then
+                                            prop.testId "context_menu"
+                                        prop.custom ("style", floating.floatingStyles)
+                                        for key, v in
+                                            interactions.getFloatingProps (null)
+                                            |> Fable.Core.JS.Constructors.Object.entries do
+                                            prop.custom (key, v)
+                                        prop.className
+                                            "swt:grid swt:grid-cols-[auto_1fr_auto] swt:bg-base-100 swt:border-2 swt:border-base-300 swt:min-w-56 swt:rounded-md swt:focus:outline-hidden"
+                                        prop.children [
+                                            for index in 0 .. children.Length - 1 do
+                                                let child = children.[index]
 
-        if isOpen then
-            FloatingUI.FloatingPortal(
-                FloatingUI.FloatingOverlay(
-                    lockScroll = true,
-                    className = "swt:z-9999",
-                    children =
-                        FloatingUI.FloatingFocusManager(
-                            context = floating.context,
-                            initialFocus = floating.refs.floating,
-                            visuallyHiddenDismiss = true,
-                            children =
-                                Html.div [
-                                    prop.ref floating.refs.setFloating
-                                    if debug then
-                                        prop.testId "context_menu"
-                                    prop.custom ("style", floating.floatingStyles)
-                                    for key, v in
-                                        interactions.getFloatingProps (null)
-                                        |> Fable.Core.JS.Constructors.Object.entries do
-                                        prop.custom (key, v)
-                                    prop.className
-                                        "swt:grid swt:grid-cols-[auto_1fr_auto] swt:bg-base-100 swt:border-2 swt:border-base-300 swt:min-w-56 swt:rounded-md swt:focus:outline-hidden"
-                                    prop.children [
-                                        for index in 0 .. children.Length - 1 do
-                                            let child = children.[index]
-
-                                            let triggerEvent =
-                                                fun (e: Browser.Types.MouseEvent) ->
-                                                    if not functionIsCalled.current then
-                                                        functionIsCalled.current <- true
-
-                                                        let d = {|
+                                                let triggerEvent =
+                                                    fun (e: Browser.Types.MouseEvent) ->
+                                                        let data = {|
                                                             buttonEvent = e
                                                             spawnData = spawnData
                                                         |}
 
-                                                        child.onClick |> Option.iter (fun f -> f d)
-                                                        close ()
+                                                        child.onClick |> Option.iter (fun callback -> callback data)
+                                                        setIsOpen false
 
-                                            let props =
-                                                interactions.getItemProps (
-                                                    {|
-                                                        ref =
-                                                            fun (node: HTMLElement) ->
-                                                                listItemsRef.current.[index] <- node
-                                                        tabIndex =
-                                                            if activeIndex.IsSome && activeIndex.Value = index then
-                                                                0
-                                                            else
-                                                                -1
-                                                        onClick = triggerEvent
-                                                        onMouseUp = triggerEvent
-                                                        label = child.kbdbutton |> Option.map _.label
-                                                    |}
+                                                let props =
+                                                    interactions.getItemProps (
+                                                        {|
+                                                            ref =
+                                                                fun (node: HTMLElement) ->
+                                                                    listItemsRef.current.[index] <- node
+
+                                                                    if
+                                                                        child.label.IsNone
+                                                                        && not (isNullOrUndefined node)
+                                                                    then
+                                                                        match
+                                                                            node.querySelector (
+                                                                                "[data-context-menu-item-label]"
+                                                                            )
+                                                                        with
+                                                                        | :? HTMLElement as labelElement ->
+                                                                            listContentRef.current.[index] <-
+                                                                                labelElement.textContent
+                                                                                |> Option.ofObj
+                                                                                |> Option.map _.Trim()
+                                                                                |> Option.filter (
+                                                                                    System.String.IsNullOrWhiteSpace
+                                                                                    >> not
+                                                                                )
+                                                                        | _ -> ()
+                                                            tabIndex =
+                                                                if activeIndex.IsSome && activeIndex.Value = index then
+                                                                    0
+                                                                else
+                                                                    -1
+                                                            onClick = triggerEvent
+                                                            label = child.label
+                                                        |}
+                                                    )
+                                                    |> Fable.Core.JS.Constructors.Object.entries
+
+                                                ContextMenu.Item(
+                                                    child,
+                                                    [ for key, value in props -> prop.custom (key, value) ],
+                                                    key = string index
                                                 )
-                                                |> Fable.Core.JS.Constructors.Object.entries
-
-                                            if child.isDivider then
-                                                Html.div [ prop.className "swt:divider swt:my-0 swt:col-span-3" ]
-                                            else
-                                                Html.button [
-                                                    prop.key index
-                                                    prop.className
-                                                        "swt:col-span-3 swt:grid swt:grid-cols-subgrid swt:gap-x-2 swt:text-sm /
-                                                        swt:text-base-content swt:px-2 swt:py-1 /
-                                                        swt:w-full swt:text-left /
-                                                        swt:hover:bg-base-100 /
-                                                        swt:focus:bg-base-100 swt:focus:outline-hidden swt:focus:ring-2 swt:focus:ring-primary"
-                                                    prop.children [
-                                                        if child.icon.IsSome then
-                                                            Html.div [
-                                                                prop.className
-                                                                    "swt:col-start-1 swt:justify-self-start swt:self-center swt:flex swt:items-center"
-                                                                prop.children child.icon.Value
-                                                            ]
-                                                        else
-                                                            Html.none
-                                                        if child.text.IsSome then
-                                                            Html.div [
-                                                                prop.className "swt:col-start-2 swt:justify-self-start"
-                                                                prop.children child.text.Value
-                                                            ]
-                                                        if child.kbdbutton.IsSome then
-                                                            Html.div [
-                                                                prop.className "swt:col-start-3 swt:justify-self-end"
-                                                                prop.children child.kbdbutton.Value.element
-                                                            ]
-                                                        else
-                                                            Html.none
-                                                    ]
-                                                    for key, v in props do
-                                                        prop.custom (key, v)
-                                                ]
+                                        ]
                                     ]
-                                ]
-                        )
+                            )
+                    ),
+                    ?root = (portalRootRef |> Option.bind _.current |> Option.map box)
                 )
-            )
-        else
-            Html.none
+            else
+                Html.none
+        ]
 
     [<ReactComponent>]
     static member Example() =

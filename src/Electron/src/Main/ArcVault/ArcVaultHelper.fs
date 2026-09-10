@@ -31,11 +31,11 @@ let private setDataMapByParentInfo (arc: ARC) (dmpi: DatamapParentInfo) (dm: Dat
         if arc.TrySetDataMap(dmpi, Some dm) then
             Ok()
         else
-            let parentDescription = DatamapParentInfo.describeParent dmpi
+            let parentPath = DatamapParentInfo.toFolderPath dmpi
 
             Error(
                 exn
-                    $"Could not save the DataMap because the {parentDescription} was not found in the current ARC. Refresh the File Explorer and try again."
+                    $"Could not save the DataMap because parent '{parentPath}' was not found in the current ARC. Refresh the File Explorer and try again."
             )
     with e ->
         Error(exn $"Failed to set datamap on ARC: {e.Message}")

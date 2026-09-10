@@ -2,6 +2,7 @@ namespace Main.ArcMerge
 
 open ARCtrl
 open Main.ARCtrlExtensions
+open Swate.Components.Shared
 
 module ArcMergeHelper =
 
@@ -26,7 +27,7 @@ module ArcMergeHelper =
     }
 
     let private cloneDataMapOption (dataMap: DataMap option) : DataMap option =
-        dataMap |> Option.map (fun dm -> dm.Copy())
+        dataMap |> Option.map copyDataMapPreservingLabelsWorkaround
 
     let internal parseFileEvents (events: FileEvent list) : ParsedFileEvent list =
         events
@@ -77,6 +78,9 @@ module ArcMergeHelper =
     let private tryFindEntityIndex id getIdentifier entities =
         entities |> Seq.tryFindIndex (fun entity -> getIdentifier entity = id)
 
+    /// Shared by assays, studies, runs, and workflows to keep their merge behavior consistent.
+    /// The callback-heavy interface is intentionally retained here; replacing it with typed entity adapters
+    /// would be a broader ArcMerge refactor than the DataMap correctness changes in this PR.
     let private applyEntityAddOrChange
         (id: string)
         (hasDataMapEvent: bool)
@@ -89,13 +93,22 @@ module ArcMergeHelper =
         (getDataMap: 'entity -> DataMap option)
         (setDataMap: 'entity -> DataMap option -> unit)
         =
+        let copyEntityPreservingDataMapLabels sourceEntity =
+            let targetEntity = copyEntity sourceEntity
+
+            match getDataMap sourceEntity, getDataMap targetEntity with
+            | Some source, Some target -> preserveDataMapLabelsWorkaround source target
+            | _ -> ()
+
+            targetEntity
+
         match tryGetRemote id with
         | None -> ()
         | Some remoteEntity ->
             match tryFindLocalIndex id with
-            | None -> addLocal (copyEntity remoteEntity)
+            | None -> addLocal (copyEntityPreservingDataMapLabels remoteEntity)
             | Some idx ->
-                let discCopy = copyEntity remoteEntity
+                let discCopy = copyEntityPreservingDataMapLabels remoteEntity
 
                 if not hasDataMapEvent then
                     let preservedDataMap = getLocal idx |> getDataMap |> cloneDataMapOption
@@ -260,11 +273,11 @@ module ArcMergeLibraryExtensions =
     type ARC with
         static member merge (arcLocal: ARC) (arcRemote: ARC) (events: FileEvent list) : ARC =
             if not (arcLocal.hasInMemoryChanges ()) then
-                arcRemote.Copy()
+                copyArcPreservingStaticHashes arcRemote
             elif events.IsEmpty then
-                arcLocal.Copy()
+                copyArcPreservingStaticHashes arcLocal
             else
-                let mergedArc = arcLocal.Copy()
+                let mergedArc = copyArcPreservingStaticHashes arcLocal
                 let parsedEvents = ArcMergeHelper.parseFileEvents events
                 let dataMapEvents = ArcMergeHelper.buildDataMapEventIndex parsedEvents
 
