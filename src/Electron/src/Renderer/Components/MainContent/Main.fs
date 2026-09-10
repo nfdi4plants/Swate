@@ -17,6 +17,7 @@ open Renderer.Components.MainContent.ProvenanceGroupingTarget
 open Renderer.Components.MainContent.TextPreviewTarget
 open Renderer.Components.MainContent.UnknownPreviewTarget
 open Renderer.Components.MainContent.SettingsPageTarget
+open Renderer.Components.MainContent.ValidationPackageBrowserTarget
 
 module private MainHelper =
 
@@ -82,6 +83,7 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                 prop.children [
                     match appRootPath, pageState with
                     | _, Some PageState.DataHubBrowser -> DataHubBrowserTarget()
+                    | Some _, Some PageState.ValidationPackageBrowser -> ValidationPackageBrowserTarget()
                     | _, Some PageState.SettingsPage ->
                         React.Suspense(
                             [ LazyComponents.LazySettingPage() ],

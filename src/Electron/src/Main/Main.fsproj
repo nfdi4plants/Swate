@@ -55,6 +55,7 @@
     <Compile Include="IPC\IArcVaultsApi.fs" />
     <Compile Include="IPC\IAuthApi.fs" />
     <Compile Include="IPC\ITemplateApi.fs" />
+    <Compile Include="IPC\IValidationPackageApi.fs" />
     <Compile Include="main.fs" />
     <None Include="SimpleGitTest.fsx" />
     <None Include="ChokidarTest.fsx" />
@@ -67,6 +68,7 @@
 
   <ItemGroup>
     <PackageReference Include="ARCtrl.Javascript" />
+    <PackageReference Include="Fable.Fetch" />
   </ItemGroup>
 
 </Project>

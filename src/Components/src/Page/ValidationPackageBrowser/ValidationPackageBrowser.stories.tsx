@@ -1,11 +1,11 @@
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { within, expect, userEvent, waitFor } from "storybook/test";
-import ValidationPackageSelectorFixture from "./ValidationPackageSelector.sample.fs.js";
+import ValidationPackageBrowserFixture from "./ValidationPackageBrowser.sample.fs.js";
 
 const meta: Meta = {
-  title: "Composite Components/ValidationPackageSelector",
-  component: ValidationPackageSelectorFixture,
+  title: "Page Components/ValidationPackageBrowser",
+  component: ValidationPackageBrowserFixture,
   tags: ["autodocs"],
   parameters: {
     layout: "fullscreen",
@@ -46,7 +46,7 @@ const clickDocumentElement = async (testId: string) => {
 };
 
 export const LoadsPackages: Story = {
-  render: () => <ValidationPackageSelectorFixture />,
+  render: () => <ValidationPackageBrowserFixture />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await loadedPackage(canvas);
@@ -58,7 +58,7 @@ export const LoadsPackages: Story = {
 };
 
 export const SearchFiltersByName: Story = {
-  render: () => <ValidationPackageSelectorFixture />,
+  render: () => <ValidationPackageBrowserFixture />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await loadedPackage(canvas);
@@ -71,7 +71,7 @@ export const SearchFiltersByName: Story = {
 };
 
 export const SearchScopeExtendsToSummary: Story = {
-  render: () => <ValidationPackageSelectorFixture />,
+  render: () => <ValidationPackageBrowserFixture />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await loadedPackage(canvas);
@@ -85,7 +85,7 @@ export const SearchScopeExtendsToSummary: Story = {
 };
 
 export const TagFilterNarrowsRows: Story = {
-  render: () => <ValidationPackageSelectorFixture />,
+  render: () => <ValidationPackageBrowserFixture />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await loadedPackage(canvas);
@@ -100,7 +100,7 @@ export const TagFilterNarrowsRows: Story = {
 };
 
 export const FilterChangeResetsPage: Story = {
-  render: () => <ValidationPackageSelectorFixture />,
+  render: () => <ValidationPackageBrowserFixture />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await loadedPackage(canvas);
@@ -113,7 +113,7 @@ export const FilterChangeResetsPage: Story = {
 };
 
 export const ToggleAndSubmitWritesConfig: Story = {
-  render: () => <ValidationPackageSelectorFixture />,
+  render: () => <ValidationPackageBrowserFixture />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await loadedPackage(canvas);
@@ -130,7 +130,7 @@ export const ToggleAndSubmitWritesConfig: Story = {
 };
 
 export const UpdateToLatestChangesVersion: Story = {
-  render: () => <ValidationPackageSelectorFixture />,
+  render: () => <ValidationPackageBrowserFixture />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await loadedPackage(canvas);
@@ -144,7 +144,7 @@ export const UpdateToLatestChangesVersion: Story = {
 };
 
 export const SortByCheckedState: Story = {
-  render: () => <ValidationPackageSelectorFixture />,
+  render: () => <ValidationPackageBrowserFixture />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await loadedPackage(canvas);
@@ -169,7 +169,7 @@ export const SortByCheckedState: Story = {
 };
 
 export const UnlistedBannerCanRemovePackages: Story = {
-  render: () => <ValidationPackageSelectorFixture />,
+  render: () => <ValidationPackageBrowserFixture />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await loadedPackage(canvas);

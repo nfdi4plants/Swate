@@ -1,4 +1,4 @@
-namespace Swate.Components.Composite.ValidationPackageSelector
+namespace Swate.Components.Page.ValidationPackageBrowser
 
 open Fable.Core
 open Feliz
@@ -19,7 +19,7 @@ type PackagePagination =
     static member PackagePagination(items: ValidationPackageDTO[]) =
         let page, setPage = React.useState 0
         let prevItems, setPrevItems = React.useState items
-        let ctx = useValidationPackageSelectorCtx ()
+        let ctx = useValidationPackageBrowserCtx ()
 
         // Render-time state adjustment: reset page whenever the filtered
         // items array changes identity (i.e. any filter changed). No useEffect.
