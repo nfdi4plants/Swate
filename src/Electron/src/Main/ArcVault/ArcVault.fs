@@ -79,6 +79,8 @@ type ArcVault(window: BrowserWindow) =
         this.arc <- Some arc
         this.window.title <- arc.Identifier
 
+    member this.ClearArc() = this.arc <- None
+
     /// Sets the dirty marker for unsaved in-memory ARC mutations.
     member this.RefreshHasUnsavedArcChangesFlag() =
         // Use this value to only send updates to the renderer when the dirty state actually changes. This avoids redundant updates.
@@ -407,8 +409,19 @@ module ArcVaultExtensions =
 
                 swatelogfn this.window.id "path: %s" normalizedPath
                 this.path <- Some normalizedPath
-                do! this.Startup()
-                sendMsg.pathChange (Some normalizedPath)
+
+                try
+                    do! this.Startup()
+                    sendMsg.pathChange (Some normalizedPath)
+                with error ->
+                    // Loading happens after the path has been assigned so the watcher and ARCtrl can use it.
+                    // Restore the empty-vault state when loading fails; otherwise a non-ARC folder leaves this
+                    // window permanently bound to a path that was never opened successfully.
+                    do! this.StopFileWatcher()
+                    this.path <- None
+                    this.ClearArc()
+                    this.fileTree.Clear()
+                    return raise error
         }
 
         member this.CreateARC(path: string, identifier: string) = promise {

@@ -630,4 +630,29 @@ Vitest.describe (
                         Vitest.expect(loadedArc.GetRun("Run With DataMap").DataMap.Value.StaticHash).not.toBe (0)
                     })
         )
+
+        Vitest.test (
+            "OpenARC restores an empty vault after opening a non-ARC folder fails",
+            fun () -> promise {
+                let! folderPath = TestHelpers.createTempDirectoryAsync "swate-open-invalid-arc-"
+
+                try
+                    let vault = ArcVault(TestHelpers.testWindow ())
+                    let mutable failed = false
+
+                    try
+                        do! vault.OpenARC folderPath
+                    with _ ->
+                        failed <- true
+
+                    Vitest.expect(failed).toBe (true)
+                    Vitest.expect(vault.path).toEqual (None)
+                    Vitest.expect(vault.arc).toEqual (None)
+                    Vitest.expect(vault.watcher).toEqual (None)
+                    do! TestHelpers.removeDirectoryAsync folderPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync folderPath
+                    return raise error
+            }
+        )
 )

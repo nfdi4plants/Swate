@@ -44,9 +44,8 @@ let ensureNotesFolderIfEnabled (onError: string -> unit) : JS.Promise<unit> = pr
 
 let openArc (onError: string -> unit) : JS.Promise<bool> = promise {
     match! Api.ipcArcVaultApi.openARC () with
-    | Error exn ->
-        onError exn.Message
-        return false
+    // ARC-open failures are presented by the Electron main process in a native dialog.
+    | Error _ -> return false
     | Ok None -> return false
     | Ok(Some _) ->
         do! ensureNotesFolderIfEnabled onError
@@ -55,9 +54,8 @@ let openArc (onError: string -> unit) : JS.Promise<bool> = promise {
 
 let openArcByPath (onError: string -> unit) (arcPath: string) : JS.Promise<bool> = promise {
     match! Api.ipcArcVaultApi.openARCByPath arcPath with
-    | Error exn ->
-        onError exn.Message
-        return false
+    // ARC-open failures are presented by the Electron main process in a native dialog.
+    | Error _ -> return false
     | Ok _ ->
         do! ensureNotesFolderIfEnabled onError
         return true
