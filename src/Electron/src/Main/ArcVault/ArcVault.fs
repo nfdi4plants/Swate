@@ -79,6 +79,8 @@ type ArcVault(window: BrowserWindow) =
         this.arc <- Some arc
         this.window.title <- arc.Identifier
 
+    member this.ClearArc() = this.arc <- None
+
     /// Sets the dirty marker for unsaved in-memory ARC mutations.
     member this.RefreshHasUnsavedArcChangesFlag() =
         // Use this value to only send updates to the renderer when the dirty state actually changes. This avoids redundant updates.
@@ -388,9 +390,13 @@ module ArcVaultExtensions =
         }
 
         /// This functions should be called once, when an vault is first started with a path
-        member this.Startup() = promise {
-            this.StartFileWatcher()
+        member this.Startup(?startFileWatcher: unit -> unit) = promise {
             do! this.LoadArc()
+
+            match startFileWatcher with
+            | Some start -> start ()
+            | None -> this.StartFileWatcher()
+
             this.window.title <- this.arc.Value.Identifier
         }
 
@@ -407,8 +413,18 @@ module ArcVaultExtensions =
 
                 swatelogfn this.window.id "path: %s" normalizedPath
                 this.path <- Some normalizedPath
-                do! this.Startup()
-                sendMsg.pathChange (Some normalizedPath)
+
+                try
+                    do! this.Startup()
+                    sendMsg.pathChange (Some normalizedPath)
+                with error ->
+                    // The path is assigned before loading so ARCtrl can use it. Restore the empty-vault state
+                    // when startup fails; otherwise the window remains bound to a path that was never opened.
+                    do! this.StopFileWatcher()
+                    this.path <- None
+                    this.ClearArc()
+                    this.fileTree.Clear()
+                    return raise error
         }
 
         member this.CreateARC(path: string, identifier: string) = promise {
@@ -660,14 +676,26 @@ type ArcVaults() =
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
-        do! vault.OpenARC(path)
 
-        this.OnCloseWindow(window, vault, id)
+        try
+            do! vault.OpenARC(path)
 
-        window.focus ()
-        swatelogfn id "Register window"
+            this.OnCloseWindow(window, vault, id)
 
-        return id
+            window.focus ()
+            swatelogfn id "Register window"
+
+            return id
+        with error ->
+            // The normal close lifecycle is registered only for successfully initialized vaults.
+            // Clean up directly so a failed open cannot leave an empty window or orphaned entry.
+            do! vault.StopFileWatcher()
+            this.Vaults.Remove(id) |> ignore
+
+            if not (window.isDestroyed ()) then
+                window.destroy ()
+
+            return raise error
     }
 
     member this.RegisterVaultWithNewArc(path: string, newIdentifier: string) : Fable.Core.JS.Promise<int> = promise {
