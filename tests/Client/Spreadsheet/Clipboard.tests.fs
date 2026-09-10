@@ -15,7 +15,10 @@ let private createTableState () =
 
     table.AddColumn(
         CompositeHeader.Output IOType.Data,
-        ResizeArray [ CompositeCell.createDataFromString ""; CompositeCell.createDataFromString "" ]
+        ResizeArray [
+            CompositeCell.createDataFromString ""
+            CompositeCell.createDataFromString ""
+        ]
     )
 
     let assay = ArcAssay.init "TestAssay"
@@ -25,10 +28,7 @@ let private createTableState () =
 let private createTermTableState (cell: CompositeCell) =
     let table = ArcTable.init "ClipboardTermTest"
 
-    table.AddColumn(
-        CompositeHeader.Characteristic(OntologyAnnotation.create "Measurement"),
-        ResizeArray [ cell ]
-    )
+    table.AddColumn(CompositeHeader.Characteristic(OntologyAnnotation.create "Measurement"), ResizeArray [ cell ])
 
     let assay = ArcAssay.init "TestAssay"
     assay.AddTable table
@@ -127,8 +127,5 @@ let Main =
             Expect.equal unit.NameText "metre" "The unit name should be preserved."
             Expect.equal unit.TermSourceREF (Some "UO") "The unit source should be preserved."
 
-            Expect.equal
-                unit.TermAccessionNumber
-                (Some "UO:0000008")
-                "The unit accession should be preserved."
+            Expect.equal unit.TermAccessionNumber (Some "UO:0000008") "The unit accession should be preserved."
     ]
