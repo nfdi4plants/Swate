@@ -106,15 +106,21 @@ let ValidationPackageBrowserTarget () =
     /// If parsing error exists, we display a warning for the user, that if they proceed, they might loose existing validation package configuration.
     let parsingError, setParsingError = React.useState None
 
-    let onError =
+    let showError =
+        fun (msg: string) -> createErrorModalCallback errorModal.enqueue "Validation packages" appStateCtx msg
+
+    let onConfigLoadError =
         fun (msg: string) ->
             setParsingError (Some msg)
-            createErrorModalCallback errorModal.enqueue "Validation packages" appStateCtx msg
+            showError msg
 
     let config, setConfig =
         React.useState (fun () -> ValidationPackageBrowserHelper.emptyConfig ())
 
-    React.useEffectOnce (fun () -> ValidationPackageBrowserHelper.loadConfig onError setConfig |> Promise.start)
+    React.useEffectOnce (fun () ->
+        ValidationPackageBrowserHelper.loadConfig onConfigLoadError setConfig
+        |> Promise.start
+    )
 
     let fetchValidationPackages () : JS.Promise<ValidationPackageDTO[]> = promise {
         let! result = Api.ipcValidationPackageApi.getAllPackages ()
@@ -137,7 +143,7 @@ let ValidationPackageBrowserTarget () =
                     config = config,
                     writeConfig = ValidationPackageBrowserHelper.writeConfig setConfig,
                     fetchValidationPackages = fetchValidationPackages,
-                    onError = fun error -> onError error.Message
+                    onError = fun error -> showError error.Message
                 )
         ]
     ]

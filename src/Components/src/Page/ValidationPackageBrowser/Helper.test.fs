@@ -465,6 +465,15 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "represents an ordinary release without empty prerelease or build identifiers",
+            fun () ->
+                let version = (ValidationPackageDTO.mkDefault ()).ToSemVer()
+
+                Vitest.expect(version.PreRelease).toEqual None
+                Vitest.expect(version.Metadata).toEqual None
+        )
+
+        Vitest.test (
             "keeps the current package when the candidate version is not a valid SemVer",
             fun () ->
                 let current =

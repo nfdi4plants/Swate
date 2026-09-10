@@ -99,12 +99,18 @@ type ValidationPackageDTO = {
         }
 
     member this.ToSemVer() : ARCtrl.Helper.SemVer.SemVer =
+        let optionalSuffix suffix =
+            if System.String.IsNullOrEmpty suffix then
+                None
+            else
+                Some suffix
+
         ARCtrl.Helper.SemVer.SemVer.create (
             this.MajorVersion,
             this.MinorVersion,
             this.PatchVersion,
-            this.PreReleaseVersionSuffix,
-            this.BuildMetadataVersionSuffix
+            ?pre = optionalSuffix this.PreReleaseVersionSuffix,
+            ?meta = optionalSuffix this.BuildMetadataVersionSuffix
         )
 
 [<RequireQualifiedAccess>]
