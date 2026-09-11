@@ -23,11 +23,7 @@ let private shouldIgnorePath (path: string) =
     || isLegacyDataMapPath normalizedPath
 
 /// Enriches a single file entry with Git LFS metadata from `git lfs ls-files -j`.
-let private withFileEntryLfsMetadata
-    (repoRoot: string)
-    (lfsFilesByRelativePath: Dictionary<string, GitLfsLsFileInfo>)
-    (entry: FileEntry)
-    : FileEntry =
+let private withFileEntryLfsMetadata (repoRoot: string) (lfsPathIndex: LfsPathIndex) (entry: FileEntry) : FileEntry =
     if entry.isDirectory then
         entry
     else
@@ -35,7 +31,7 @@ let private withFileEntryLfsMetadata
         | Some relativePath ->
             let normalizedRelativePath = PathHelpers.normalizeSeparators relativePath
 
-            match tryFindLsFileInfoByRelativePath lfsFilesByRelativePath normalizedRelativePath with
+            match tryFindLsFileInfoByRelativePath lfsPathIndex normalizedRelativePath with
             | Some lfsInfo -> { entry with lfs = Some lfsInfo }
             | None -> { entry with lfs = None }
         | None -> { entry with lfs = None }
@@ -43,10 +39,10 @@ let private withFileEntryLfsMetadata
 /// Enriches file entries with Git LFS metadata from `git lfs ls-files -j`.
 let private withFileEntriesLfsMetadata
     (repoRoot: string)
-    (lfsFilesByRelativePath: Dictionary<string, GitLfsLsFileInfo>)
+    (lfsPathIndex: LfsPathIndex)
     (entries: FileEntry[])
     : FileEntry[] =
-    entries |> Array.map (withFileEntryLfsMetadata repoRoot lfsFilesByRelativePath)
+    entries |> Array.map (withFileEntryLfsMetadata repoRoot lfsPathIndex)
 
 /// Build the renderer snapshot using ARC-relative dictionary keys and FileEntry paths.
 let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary<string, FileEntry> =
@@ -110,8 +106,8 @@ let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
     if entry.isDirectory then
         return entry
     else
-        let! lfsFilesByRelativePath = tryGetLsFilesByRelativePath normalizedRepoRoot
-        return withFileEntryLfsMetadata normalizedRepoRoot lfsFilesByRelativePath entry
+        let! lfsPathIndex = tryGetLsFilesByRelativePath normalizedRepoRoot
+        return withFileEntryLfsMetadata normalizedRepoRoot lfsPathIndex entry
 }
 
 /// Finds all files and subfolders of the given filepath
@@ -157,8 +153,8 @@ let getFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise
             )
 
         let scannedEntries = entries.ToArray()
-        let! lfsFilesByRelativePath = tryGetLsFilesByRelativePath repoRoot
-        return withFileEntriesLfsMetadata repoRoot lfsFilesByRelativePath scannedEntries
+        let! lfsPathIndex = tryGetLsFilesByRelativePath repoRoot
+        return withFileEntriesLfsMetadata repoRoot lfsPathIndex scannedEntries
 }
 
 /// Scans a path and builds its keyed file tree.

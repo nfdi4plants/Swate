@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🐛 Fixed
 
+-   Speed up opening and refreshing ARCs with many Git LFS files by avoiding repeated metadata scans for ordinary files #1340.
 -   Keep the ARC selector at a stable width and truncate long ARC names, and close its dropdown only after direct or overflow actions are invoked without dismissing the overflow menu prematurely.
 
 ## 2.1.0 - 2026-08-19

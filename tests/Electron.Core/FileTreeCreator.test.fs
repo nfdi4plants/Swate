@@ -114,7 +114,7 @@ Vitest.describe (
                 do!
                     withTempRepository (fun context -> promise {
                         let gitattributesPath = join [| context.RepoPath; ".gitattributes" |]
-                        let pointerFilePath = join [| context.RepoPath; "pointer.psd" |]
+                        let pointerFilePath = join [| context.RepoPath; "PointerAsset.psd" |]
                         let downloadedFilePath = join [| context.RepoPath; "downloaded.psd" |]
 
                         do! writeUtf8FileAsync gitattributesPath "*.psd filter=lfs diff=lfs merge=lfs -text\n"
@@ -125,7 +125,7 @@ Vitest.describe (
                             runGitAsync context.RepoPath [|
                                 "add"
                                 ".gitattributes"
-                                "pointer.psd"
+                                "PointerAsset.psd"
                                 "downloaded.psd"
                             |]
 
@@ -151,7 +151,7 @@ Vitest.describe (
                         let pointerLfs = pointerEntry.lfs |> Option.get
                         let downloadedLfs = downloadedEntry.lfs |> Option.get
 
-                        Vitest.expect(pointerLfs.name).toBe ("pointer.psd")
+                        Vitest.expect(pointerLfs.name).toBe ("PointerAsset.psd")
                         Vitest.expect(pointerLfs.size).toBeGreaterThan (0)
                         Vitest.expect(pointerLfs.checkout).toBe (true)
                         Vitest.expect(pointerLfs.downloaded).toBe (true)

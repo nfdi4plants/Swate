@@ -20,6 +20,16 @@ module GitRemoteProvisioningProvider = Main.Git.GitTokenProvider.RemoteProvision
 module GitTokenProvider = Main.Git.GitTokenProvider
 module JsonDecoder = Main.Git.JsonDecoder
 
+let private lfsFileInfo name oid size : GitLfsLsFileInfo = {
+    name = name
+    size = size
+    checkout = false
+    downloaded = true
+    ``oid_type`` = "sha256"
+    oid = oid
+    version = "https://git-lfs.github.com/spec/v1"
+}
+
 Vitest.describe (
     "Git LFS JSON decoding",
     fun () ->
@@ -148,29 +158,86 @@ Vitest.describe (
                 Vitest.expect(missingFiles.Length).toBe (0)
         )
 
-        Vitest.test (
-            "tryFindLsFileInfoByRelativePath matches the file tree path case-insensitively",
+        Vitest.describe (
+            "Git LFS relative path index",
             fun () ->
-                let filesByRelativePath =
-                    System.Collections.Generic.Dictionary<string, GitLfsLsFileInfo>()
+                Vitest.test (
+                    "matches exact and separator-normalized paths",
+                    fun () ->
+                        let info = lfsFileInfo "folder\\asset.psd" "exact-oid" 42.0
+                        let index = GitLfsService.createLsPathIndex [| info |]
 
-                filesByRelativePath.["Assays/GCqTOF_targets/dataset/150112_03.D/GC.ini"] <- {
-                    name = "Assays/GCqTOF_targets/dataset/150112_03.D/GC.ini"
-                    size = 42.0
-                    checkout = false
-                    downloaded = true
-                    ``oid_type`` = "sha256"
-                    oid = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-                    version = "https://git-lfs.github.com/spec/v1"
-                }
+                        let exact =
+                            GitLfsService.tryFindLsFileInfoByRelativePath index "folder/asset.psd"
+                            |> Option.get
 
-                let result =
-                    GitLfsService.tryFindLsFileInfoByRelativePath
-                        filesByRelativePath
-                        "assays/gcqtof_targets/dataset/150112_03.d/gc.ini"
+                        let backslash =
+                            GitLfsService.tryFindLsFileInfoByRelativePath index "folder\\asset.psd"
+                            |> Option.get
 
-                Vitest.expect(result.IsSome).toBe (true)
-                Vitest.expect((result |> Option.get).name).toBe ("Assays/GCqTOF_targets/dataset/150112_03.D/GC.ini")
+                        Vitest.expect(exact.oid).toBe ("exact-oid")
+                        Vitest.expect(exact.name).toBe ("folder/asset.psd")
+                        Vitest.expect(backslash.oid).toBe ("exact-oid")
+                )
+
+                Vitest.test (
+                    "keeps the last record for duplicate identical paths",
+                    fun () ->
+                        let first = lfsFileInfo "data/asset.raw" "first-oid" 10.0
+                        let last = lfsFileInfo "data/asset.raw" "last-oid" 20.0
+                        let index = GitLfsService.createLsPathIndex [| first; last |]
+
+                        let exact =
+                            GitLfsService.tryFindLsFileInfoByRelativePath index "data/asset.raw"
+                            |> Option.get
+
+                        Vitest.expect(exact.oid).toBe ("last-oid")
+                        Vitest.expect(exact.size).toBe (20.0)
+                )
+
+                Vitest.test (
+                    "returns None for missing and case-mismatched paths without affecting exact entries",
+                    fun () ->
+                        let existing = lfsFileInfo "data/existing.raw" "existing-oid" 42.0
+                        let index = GitLfsService.createLsPathIndex [| existing |]
+
+                        let missing = GitLfsService.tryFindLsFileInfoByRelativePath index "data/missing.raw"
+
+                        let caseMismatch =
+                            GitLfsService.tryFindLsFileInfoByRelativePath index "DATA/EXISTING.RAW"
+
+                        let found =
+                            GitLfsService.tryFindLsFileInfoByRelativePath index "data/existing.raw"
+                            |> Option.get
+
+                        Vitest.expect(missing).toEqual (None)
+                        Vitest.expect(caseMismatch).toEqual (None)
+                        Vitest.expect(found.oid).toBe ("existing-oid")
+                )
+
+                Vitest.test (
+                    "handles many case-mismatched misses without rescanning the LFS listing",
+                    TestOptions(timeout = 5000),
+                    fun () ->
+                        let files =
+                            Array.init
+                                5000
+                                (fun index -> lfsFileInfo $"lfs/file-{index}.raw" $"oid-{index}" (float index))
+
+                        let pathIndex = GitLfsService.createLsPathIndex files
+                        let mutable unexpectedMatchCount = 0
+
+                        for index in 0..49999 do
+                            let fileIndex = index % files.Length
+
+                            if
+                                GitLfsService.tryFindLsFileInfoByRelativePath pathIndex $"LFS/FILE-{fileIndex}.RAW"
+                                |> Option.isSome
+                            then
+                                unexpectedMatchCount <- unexpectedMatchCount + 1
+
+                        Vitest.expect(unexpectedMatchCount).toBe (0)
+                )
         )
 )
 
