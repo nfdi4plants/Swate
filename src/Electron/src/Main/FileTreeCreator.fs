@@ -23,11 +23,7 @@ let private shouldIgnorePath (path: string) =
     || isLegacyDataMapPath normalizedPath
 
 /// Enriches a single file entry with Git LFS metadata from `git lfs ls-files -j`.
-let private withFileEntryLfsMetadata
-    (repoRoot: string)
-    (lfsFilesByRelativePath: Dictionary<string, GitLfsLsFileInfo>)
-    (entry: FileEntry)
-    : FileEntry =
+let withFileEntryLfsMetadata (repoRoot: string) (lfsPathIndex: LfsPathIndex) (entry: FileEntry) : FileEntry =
     if entry.isDirectory then
         entry
     else
@@ -35,7 +31,7 @@ let private withFileEntryLfsMetadata
         | Some relativePath ->
             let normalizedRelativePath = PathHelpers.normalizeSeparators relativePath
 
-            match tryFindLsFileInfoByRelativePath lfsFilesByRelativePath normalizedRelativePath with
+            match tryFindLsFileInfoByRelativePath lfsPathIndex normalizedRelativePath with
             | Some lfsInfo -> { entry with lfs = Some lfsInfo }
             | None -> { entry with lfs = None }
         | None -> { entry with lfs = None }
@@ -43,10 +39,10 @@ let private withFileEntryLfsMetadata
 /// Enriches file entries with Git LFS metadata from `git lfs ls-files -j`.
 let private withFileEntriesLfsMetadata
     (repoRoot: string)
-    (lfsFilesByRelativePath: Dictionary<string, GitLfsLsFileInfo>)
+    (lfsPathIndex: LfsPathIndex)
     (entries: FileEntry[])
     : FileEntry[] =
-    entries |> Array.map (withFileEntryLfsMetadata repoRoot lfsFilesByRelativePath)
+    entries |> Array.map (withFileEntryLfsMetadata repoRoot lfsPathIndex)
 
 /// Build the renderer snapshot using ARC-relative dictionary keys and FileEntry paths.
 let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary<string, FileEntry> =
@@ -80,11 +76,27 @@ let removePathAndDescendants
         keysToRemove |> Array.iter (fun path -> nextTree.Remove(path) |> ignore)
         nextTree
 
+/// Removes a path and all descendants from a mutable file-tree snapshot.
+let removePathAndDescendantsInPlace (targetPath: string) (fileTree: Dictionary<string, FileEntry>) =
+    let normalizedTargetPath = PathHelpers.normalizePath targetPath
+
+    if not (String.IsNullOrWhiteSpace normalizedTargetPath) then
+        let keysToRemove =
+            fileTree.Keys
+            |> Seq.filter (fun path -> PathHelpers.isSameOrDescendantPath path normalizedTargetPath)
+            |> Seq.toArray
+
+        keysToRemove |> Array.iter (fun path -> fileTree.Remove(path) |> ignore)
+
 /// Add or replace a single file tree entry without mutating the current snapshot.
 let upsertFileEntry (entry: FileEntry) (fileTree: Dictionary<string, FileEntry>) : Dictionary<string, FileEntry> =
     let nextTree = Dictionary<string, FileEntry>(fileTree)
     nextTree.[entry.path] <- entry
     nextTree
+
+let copyFileTree (fileTree: Dictionary<string, FileEntry>) = Dictionary<string, FileEntry>(fileTree)
+
+let upsertFileEntryInPlace (entry: FileEntry) (fileTree: Dictionary<string, FileEntry>) = fileTree.[entry.path] <- entry
 
 let getFileEntry (path: string) = promise {
     let! stats = statAsync path
@@ -110,25 +122,28 @@ let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
     if entry.isDirectory then
         return entry
     else
-        let! lfsFilesByRelativePath = tryGetLsFilesByRelativePath normalizedRepoRoot
-        return withFileEntryLfsMetadata normalizedRepoRoot lfsFilesByRelativePath entry
+        let! lfsPathIndex = tryGetLsFilesByRelativePath normalizedRepoRoot
+        return withFileEntryLfsMetadata normalizedRepoRoot lfsPathIndex entry
 }
 
-/// Finds all files and subfolders of the given filepath
-let getFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise {
-    let repoRoot = normalizeRootPath path
+let getFileEntryWithLfsPathIndex (repoRoot: string) (lfsPathIndex: LfsPathIndex) (path: string) = promise {
+    let! entry = getFileEntry path
+    return withFileEntryLfsMetadata (normalizeRootPath repoRoot) lfsPathIndex entry
+}
 
-    let! rootStats = statAsync repoRoot
+let private scanFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise {
+    let scanRoot = normalizeRootPath path
+    let! rootStats = statAsync scanRoot
     let rootIsDir = rootStats.isDirectory ()
 
-    let rootName = basename repoRoot
-    let rootEntry = FileEntry.create (rootName, repoRoot, rootIsDir, None)
+    let rootName = basename scanRoot
+    let rootEntry = FileEntry.create (rootName, scanRoot, rootIsDir, None)
 
     if not rootIsDir then
         return [| rootEntry |]
     else
         let stack = ResizeArray<string>()
-        stack.Add(repoRoot)
+        stack.Add(scanRoot)
 
         let entries = ResizeArray<FileEntry>()
         entries.Add(rootEntry)
@@ -156,10 +171,33 @@ let getFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise
                         entries.Add(FileEntry.create (name, fullPath, false, None))
             )
 
-        let scannedEntries = entries.ToArray()
-        let! lfsFilesByRelativePath = tryGetLsFilesByRelativePath repoRoot
-        return withFileEntriesLfsMetadata repoRoot lfsFilesByRelativePath scannedEntries
+        return entries.ToArray()
 }
+
+/// Finds all files and subfolders below a path and enriches them relative to the repository root.
+let getFileEntriesInSubtree (repoRoot: string) (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise {
+    let normalizedRepoRoot = normalizeRootPath repoRoot
+    let! scannedEntries = scanFileEntries path
+    let! lfsPathIndex = tryGetLsFilesByRelativePath normalizedRepoRoot
+    return withFileEntriesLfsMetadata normalizedRepoRoot lfsPathIndex scannedEntries
+}
+
+/// Finds all files and subfolders of the given filepath.
+let getFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = getFileEntriesInSubtree path path
+
+/// Replaces one subtree in a copy of the current file-tree snapshot.
+let refreshFileTreeSubtree
+    (repoRoot: string)
+    (path: string)
+    (fileTree: Dictionary<string, FileEntry>)
+    : Fable.Core.JS.Promise<Dictionary<string, FileEntry>> =
+    promise {
+        let! entries = getFileEntriesInSubtree repoRoot path
+        let nextTree = copyFileTree fileTree
+        removePathAndDescendantsInPlace path nextTree
+        entries |> Array.iter (fun entry -> upsertFileEntryInPlace entry nextTree)
+        return nextTree
+    }
 
 /// Scans a path and builds its keyed file tree.
 let getFileTree (path: string) : Fable.Core.JS.Promise<Dictionary<string, FileEntry>> = promise {

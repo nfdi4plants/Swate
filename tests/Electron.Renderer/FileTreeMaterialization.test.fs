@@ -48,6 +48,31 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "only directories below the shallow watcher boundary get dynamic expansion requests",
+            fun () ->
+                Vitest.expect(shouldDynamicallyWatchDirectory "studies").toBe (false)
+                Vitest.expect(shouldDynamicallyWatchDirectory "studies/S1").toBe (false)
+                Vitest.expect(shouldDynamicallyWatchDirectory "studies/S1/dataset").toBe (true)
+                Vitest.expect(shouldDynamicallyWatchDirectory "studies\\S1\\dataset\\raw").toBe (true)
+
+                Vitest.expect(tryCreateDirectoryExpansionRequest "studies/S1" true).toEqual (None)
+
+                Vitest
+                    .expect(
+                        tryCreateDirectoryExpansionRequest "studies/S1/dataset" true
+                        |> Option.map _.isExpanded
+                    )
+                    .toEqual (Some true)
+
+                Vitest
+                    .expect(
+                        tryCreateDirectoryExpansionRequest "studies/S1/dataset" false
+                        |> Option.map _.isExpanded
+                    )
+                    .toEqual (Some false)
+        )
+
+        Vitest.test (
             "maps an unmaterialized non-empty directory without children or expansion state",
             fun () ->
                 let directory =

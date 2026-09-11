@@ -24,6 +24,11 @@ open IPCTypesHelper
 
 type CreateArcRequest = { identifier: string; initGit: bool }
 
+type FileTreeDirectoryExpansionRequest = {
+    relativePath: string
+    isExpanded: bool
+}
+
 /// TEMPORARY DUCT-TAPE WORKAROUND: This IPC API only exists because template loading currently cannot run
 /// through ARCtrl on the Swate .NET server or directly in the renderer due to GitHub CORS.
 /// Remove it when ARCtrl provides a working .NET implementation or a CORS-enabled template source.
@@ -51,6 +56,8 @@ type IArcVaultsApi = {
     pickAbsolutePaths: unit -> JS.Promise<Result<string[], exn>>
     pickExternalTextFiles: unit -> JS.Promise<Result<ImportedTextFile[], exn>>
     getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
+    /// Activates or deactivates live monitoring for an expanded File Explorer directory.
+    setFileTreeDirectoryExpanded: FileTreeDirectoryExpansionRequest -> JS.Promise<Result<unit, exn>>
     pathExists: string -> JS.Promise<Result<bool, exn>>
     openFile: string -> JS.Promise<Result<FileContentDTO, exn>>
     openArcFolderInFileExplorer: unit -> JS.Promise<Result<unit, exn>>

@@ -392,6 +392,32 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    setFileTreeDirectoryExpanded =
+        fun (request: FileTreeDirectoryExpansionRequest) -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            if getPathDepth request.relativePath <= ArcFileWatcherDepth then
+                                return
+                                    Error(exn $"Path '{request.relativePath}' is already covered by the ARC watcher.")
+                            elif request.isExpanded then
+                                match! tryResolveExistingArcDirectoryPath vault.path.Value request.relativePath with
+                                | Error pathError -> return Error pathError
+                                | Ok _ ->
+                                    do! vault.SetFileTreeDirectoryExpanded(request.relativePath, true)
+                                    return Ok()
+                            else
+                                match tryResolveArcRelativePath vault.path.Value request.relativePath with
+                                | Error pathError -> return Error pathError
+                                | Ok _ ->
+                                    do! vault.SetFileTreeDirectoryExpanded(request.relativePath, false)
+                                    return Ok()
+                        })
+            with e ->
+                return Error e
+        }
     pathExists =
         fun (relativePath: string) ->
             runLoadedArcPathAction

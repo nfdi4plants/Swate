@@ -60,7 +60,7 @@ type FileTree =
 
         let activeDialog, setActiveDialog = React.useState<FileTreeDialog option> None
         let isDialogBusy, setIsDialogBusy = React.useState false
-        // The file watcher emits the initial tree too; only later tree updates should refresh open previews.
+        // Vault startup publishes the initial tree; only later tree updates should refresh open previews.
         let hasObservedFileTreeUpdateRef = React.useRef false
 
         React.useEffect (
@@ -248,6 +248,29 @@ type FileTree =
                 match item.Path with
                 | Some path -> setMaterializedState (fun _ -> materialize path reconciledMaterializedState)
                 | None -> ()
+
+            match
+                item.Path
+                |> Option.bind (fun path -> tryCreateDirectoryExpansionRequest path willExpand)
+            with
+            | Some request ->
+                let reportExpansionError (error: exn) =
+                    errorModal.enqueue (
+                        ErrorModalRequest.create (
+                            error.Message,
+                            title = "File Explorer update failed",
+                            ?scopeId = arcScopeId
+                        )
+                    )
+
+                promise {
+                    match! Api.ipcArcVaultApi.setFileTreeDirectoryExpanded request with
+                    | Ok _ -> ()
+                    | Error expansionError -> reportExpansionError expansionError
+                }
+                |> Promise.catch reportExpansionError
+                |> Promise.start
+            | _ -> ()
 
         let openDialog dialog =
             setIsDialogBusy false

@@ -318,7 +318,9 @@ let shouldUsePollingByDefault (platform: string) =
 let private currentNodePlatform () : string =
     emitJsExpr () "process.platform" |> unbox<string>
 
-let createFileWatcher (path: string) (usePolling: bool option) =
+let fileWatcherDepth = ArcFileWatcherDepth
+
+let private createWatcherOptions (cwd: string) (depth: int) (usePolling: bool option) =
 
     let ignoreFn =
         fun (path: string) ->
@@ -336,7 +338,8 @@ let createFileWatcher (path: string) (usePolling: bool option) =
     let watcherOptions =
         if usePolling then
             Chokidar.WatchOptions(
-                cwd = path,
+                cwd = cwd,
+                depth = depth,
                 awaitWriteFinish = true,
                 ignored = !^ignoreFn,
                 ignoreInitial = true,
@@ -345,11 +348,70 @@ let createFileWatcher (path: string) (usePolling: bool option) =
                 binaryInterval = 400
             )
         else
-            Chokidar.WatchOptions(cwd = path, awaitWriteFinish = true, ignored = !^ignoreFn, ignoreInitial = true)
+            Chokidar.WatchOptions(
+                cwd = cwd,
+                depth = depth,
+                awaitWriteFinish = true,
+                ignored = !^ignoreFn,
+                ignoreInitial = true
+            )
+
+    watcherOptions
+
+let createFileWatcherOptions (path: string) (usePolling: bool option) =
+    createWatcherOptions path fileWatcherDepth usePolling
+
+let createPayloadWatcherOptions (arcPath: string) (usePolling: bool option) =
+    // An expanded directory only needs live events for its direct children. Expanded child
+    // directories receive their own watcher, so collapsed descendants are not traversed.
+    createWatcherOptions arcPath 0 usePolling
+
+let createFileWatcher (path: string) (usePolling: bool option) =
+    let watcherOptions = createFileWatcherOptions path usePolling
 
     let watcher = Chokidar.Chokidar.watch (path, watcherOptions)
 
     watcher
+
+let createPayloadWatcher (arcPath: string) (directoryPaths: string[]) (usePolling: bool option) =
+    let watcherOptions = createPayloadWatcherOptions arcPath usePolling
+    Chokidar.Chokidar.watch (directoryPaths, watcherOptions)
+
+let waitForFileWatcherReady (watcher: Chokidar.IWatcher) : Fable.Core.JS.Promise<unit> =
+    Fable.Core.JS.Constructors.Promise.Create(fun resolve reject ->
+        let mutable settled = false
+
+        let timeoutId =
+            Fable.Core.JS.setTimeout
+                (fun () ->
+                    if not settled then
+                        settled <- true
+                        reject (exn "Timed out while waiting for the ARC file watcher to become ready.")
+                )
+                30000
+
+        let settle action =
+            if not settled then
+                settled <- true
+                Fable.Core.JS.clearTimeout timeoutId
+                action ()
+
+        watcher.on (Chokidar.Events.Ready, fun () -> settle (fun () -> resolve ()))
+        |> ignore
+
+        watcher.on (
+            Chokidar.Events.Error,
+            fun (watcherError: obj) ->
+                let message =
+                    try
+                        watcherError?message |> unbox<string>
+                    with _ ->
+                        string watcherError
+
+                settle (fun () -> reject (exn $"ARC file watcher failed to start: {message}"))
+        )
+        |> ignore
+    )
 
 open Fable.Electron.Remoting.Main
 

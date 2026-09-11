@@ -28,7 +28,8 @@ type WatchOptions
         ?awaitWriteFinish: bool,
         ?usePolling: bool,
         ?interval: int,
-        ?binaryInterval: int
+        ?binaryInterval: int,
+        ?depth: int
     ) =
     member val persistent: bool option = persistent with get, set
     member val ignored = ignored with get, set
@@ -39,6 +40,7 @@ type WatchOptions
     member val usePolling: bool option = usePolling with get, set
     member val interval: int option = interval with get, set
     member val binaryInterval: int option = binaryInterval with get, set
+    member val depth: int option = depth with get, set
 
 type IWatched =
     [<EmitIndexerAttribute>]
@@ -46,10 +48,12 @@ type IWatched =
 
 type IWatcher =
     abstract member close: unit -> Promise<unit>
-    abstract member add: paths: string -> unit
-    abstract member add: paths: string[] -> unit
-    abstract member unwatch: paths: string -> Promise<unit>
-    abstract member unwatch: paths: string[] -> Promise<unit>
+    abstract member add: paths: string -> IWatcher
+    abstract member add: paths: string[] -> IWatcher
+    abstract member unwatch: paths: string -> IWatcher
+    abstract member unwatch: paths: string[] -> IWatcher
+    abstract member on: eventName: Events * callback: (unit -> unit) -> IWatcher
+    abstract member on: eventName: Events * callback: (obj -> unit) -> IWatcher
     abstract member on: eventName: Events * callback: (string -> unit) -> IWatcher
     abstract member on: eventName: Events * callback: (string -> string -> unit) -> IWatcher
     abstract member getWatched: unit -> IWatched

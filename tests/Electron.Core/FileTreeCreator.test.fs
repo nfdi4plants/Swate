@@ -45,6 +45,22 @@ let private writeUtf8FileAsync (path: string) (content: string) : Fable.Core.JS.
     return ()
 }
 
+let private createDirectoryAsync (path: string) : Fable.Core.JS.Promise<unit> = promise {
+    let! _ =
+        fsPromisesDynamic?mkdir (path, createObj [ "recursive" ==> true ])
+        |> unbox<Fable.Core.JS.Promise<obj>>
+
+    return ()
+}
+
+let private removePathAsync (path: string) : Fable.Core.JS.Promise<unit> = promise {
+    let! _ =
+        fsPromisesDynamic?rm (path, createObj [ "recursive" ==> true; "force" ==> true ])
+        |> unbox<Fable.Core.JS.Promise<obj>>
+
+    return ()
+}
+
 let private runGitAsync (repoPath: string) (args: string[]) : Fable.Core.JS.Promise<string> = promise {
     let! output =
         Fable.Core.JS.Constructors.Promise.Create(fun resolve reject ->
@@ -114,7 +130,7 @@ Vitest.describe (
                 do!
                     withTempRepository (fun context -> promise {
                         let gitattributesPath = join [| context.RepoPath; ".gitattributes" |]
-                        let pointerFilePath = join [| context.RepoPath; "pointer.psd" |]
+                        let pointerFilePath = join [| context.RepoPath; "PointerAsset.psd" |]
                         let downloadedFilePath = join [| context.RepoPath; "downloaded.psd" |]
 
                         do! writeUtf8FileAsync gitattributesPath "*.psd filter=lfs diff=lfs merge=lfs -text\n"
@@ -125,7 +141,7 @@ Vitest.describe (
                             runGitAsync context.RepoPath [|
                                 "add"
                                 ".gitattributes"
-                                "pointer.psd"
+                                "PointerAsset.psd"
                                 "downloaded.psd"
                             |]
 
@@ -151,7 +167,7 @@ Vitest.describe (
                         let pointerLfs = pointerEntry.lfs |> Option.get
                         let downloadedLfs = downloadedEntry.lfs |> Option.get
 
-                        Vitest.expect(pointerLfs.name).toBe ("pointer.psd")
+                        Vitest.expect(pointerLfs.name).toBe ("PointerAsset.psd")
                         Vitest.expect(pointerLfs.size).toBeGreaterThan (0)
                         Vitest.expect(pointerLfs.checkout).toBe (true)
                         Vitest.expect(pointerLfs.downloaded).toBe (true)
@@ -235,6 +251,47 @@ Vitest.describe (
                             |> Array.find (fun entry -> normalizeSlashes entry.path = normalizeSlashes plainFilePath)
 
                         Vitest.expect(plainEntry.lfs).toEqual (None)
+                    })
+            }
+        )
+
+        Vitest.test (
+            "refreshFileTreeSubtree replaces stale descendants and preserves unrelated LFS-aware branches",
+            fileTreeCreatorTestOptions,
+            fun () -> promise {
+                do!
+                    withTempRepository (fun context -> promise {
+                        let refreshRoot = join [| context.RepoPath; "studies"; "S1"; "dataset" |]
+                        let staleDirectory = join [| refreshRoot; "stale" |]
+                        let staleFile = join [| staleDirectory; "old.txt" |]
+                        let unrelatedDirectory = join [| context.RepoPath; "assays"; "A1" |]
+                        let unrelatedFile = join [| unrelatedDirectory; "keep.txt" |]
+                        let newLfsFile = join [| refreshRoot; "new.psd" |]
+                        let gitattributesPath = join [| context.RepoPath; ".gitattributes" |]
+
+                        do! createDirectoryAsync staleDirectory
+                        do! createDirectoryAsync unrelatedDirectory
+                        do! writeUtf8FileAsync staleFile "stale"
+                        do! writeUtf8FileAsync unrelatedFile "keep"
+                        do! writeUtf8FileAsync gitattributesPath "*.psd filter=lfs diff=lfs merge=lfs -text\n"
+
+                        let! initialTree = FileTreeCreator.getFileTree context.RepoPath
+
+                        do! removePathAsync staleDirectory
+                        do! writeUtf8FileAsync newLfsFile "new tracked payload"
+
+                        let! _ =
+                            runGitAsync context.RepoPath [| "add"; ".gitattributes"; "studies/S1/dataset/new.psd" |]
+
+                        let! refreshedTree =
+                            FileTreeCreator.refreshFileTreeSubtree context.RepoPath refreshRoot initialTree
+
+                        Vitest.expect(initialTree.ContainsKey(normalizeSlashes staleFile)).toBe (true)
+                        Vitest.expect(refreshedTree.ContainsKey(normalizeSlashes staleFile)).toBe (false)
+                        Vitest.expect(refreshedTree.ContainsKey(normalizeSlashes staleDirectory)).toBe (false)
+                        Vitest.expect(refreshedTree.ContainsKey(normalizeSlashes newLfsFile)).toBe (true)
+                        Vitest.expect(refreshedTree.[normalizeSlashes newLfsFile].lfs.IsSome).toBe (true)
+                        Vitest.expect(refreshedTree.ContainsKey(normalizeSlashes unrelatedFile)).toBe (true)
                     })
             }
         )
