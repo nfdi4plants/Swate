@@ -132,13 +132,3 @@ let throttleAndDebounce (fn: 'a -> unit, timespan: int) =
                 timespan
 
         id <- Some timeoutId
-
-type Clipboard =
-    abstract member writeText: string -> JS.Promise<unit>
-    abstract member readText: unit -> JS.Promise<string>
-
-type Navigator =
-    abstract member clipboard: Clipboard
-
-[<Emit("navigator")>]
-let navigator: Navigator = jsNative

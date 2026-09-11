@@ -16,7 +16,7 @@ module ARCtrlExtensions =
 
     type DataMap with
 
-        member this.SelectedCellsToTabText(coordinates: seq<CellCoordinate>) =
+        member this.GetSelectedCells(coordinates: seq<CellCoordinate>) =
             coordinates
             |> Seq.filter (fun coordinate -> coordinate.x > 0 && coordinate.y > 0)
             |> Seq.groupBy _.y
@@ -28,7 +28,48 @@ module ARCtrlExtensions =
                 |> Seq.toArray
             )
             |> Seq.toArray
-            |> CompositeCell.ToClipboardTableTxt
+
+        member this.SelectedCellsToTabText(coordinates: seq<CellCoordinate>) =
+            this.GetSelectedCells(coordinates)
+            |> Array.map (fun row ->
+                row
+                |> Array.map (fun cell ->
+                    match cell with
+                    | CompositeCell.Data _ -> cell.ToClipboardStr()
+                    | _ -> cell.ToString()
+                )
+                |> String.concat "\t"
+            )
+            |> String.concat System.Environment.NewLine
+
+        member this.PastePayload(startCoordinate: CellCoordinate, payload: Swate.Components.ClipboardCodec.Payload) =
+            let requiredRowCount = startCoordinate.y - 1 + payload.Rows.Length
+
+            if requiredRowCount > this.RowCount then
+                this.DataContexts.AddRange(Array.init (requiredRowCount - this.RowCount) (fun _ -> DataContext()))
+
+            payload.Rows
+            |> Array.iteri (fun rowOffset row ->
+                row
+                |> Array.iteri (fun columnOffset dto ->
+                    let columnIndex = startCoordinate.x - 1 + columnOffset
+                    let rowIndex = startCoordinate.y - 1 + rowOffset
+
+                    if columnIndex < this.ColumnCount then
+                        let source = Swate.Components.ClipboardCodec.toCompositeCell dto
+                        let target = this.GetCell(columnIndex, rowIndex)
+
+                        let cell =
+                            match source, columnIndex with
+                            | CompositeCell.Unitized(_, unit), DataMapIndices.Unit -> CompositeCell.createTerm unit
+                            | CompositeCell.Term term, _ when this.GetHeader(columnIndex).IsTermColumn ->
+                                CompositeCell.createTerm term
+                            | CompositeCell.Data _, DataMapIndices.Data -> source
+                            | _ -> target.UpdateMainField(source.ToString())
+
+                        this.SetCell(columnIndex, rowIndex, cell)
+                )
+            )
 
         member this.PasteTabText(startCoordinate: CellCoordinate, clipboardText: string) =
             let rows =
@@ -41,10 +82,13 @@ module ARCtrlExtensions =
 
             rows
             |> Array.iteri (fun rowOffset row ->
-                row.Split '\t'
+                let values = row.Split '\t'
+                let startColumnIndex = startCoordinate.x - 1
+                let rowIndex = startCoordinate.y - 1 + rowOffset
+
+                values
                 |> Array.iteri (fun columnOffset value ->
-                    let columnIndex = startCoordinate.x - 1 + columnOffset
-                    let rowIndex = startCoordinate.y - 1 + rowOffset
+                    let columnIndex = startColumnIndex + columnOffset
 
                     if columnIndex < this.ColumnCount then
                         this.GetCell(columnIndex, rowIndex).UpdateMainField(value)

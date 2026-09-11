@@ -35,12 +35,10 @@ type TestCases =
         )
 
     static member AddColumns(selectHandle: SelectHandle, pasteData: string[][], expectedColumns: CompositeColumn[]) =
-
-        let clickedCell: CellCoordinate = {| x = 1; y = 1 |}
-
         let currentTable = Fixture.mkTable ()
 
         let cellCoordinates = selectHandle.getSelectedCells () |> Array.ofSeq
+        let clickedCell = cellCoordinates.[0]
 
         //Group all cells based on their row
         let groupedCellCoordinates =
@@ -144,6 +142,55 @@ type TestCases =
             |})
             "Should predict paste fitted cells behavior"
 
+    static member PasteIntoClickedColumnOutsideSelection() =
+        let currentTable = Fixture.mkTable ()
+        let staleSelection = Fixture.mkSelectHandle (1, 1, 1, 1)
+        let clickedTermCell: CellCoordinate = {| x = 3; y = 1 |}
+
+        let termPasteBehavior =
+            AnnotationTableContextMenuUtil.predictPasteBehaviour (
+                clickedTermCell,
+                currentTable,
+                staleSelection,
+                Fixture.Body_Component_InstrumentModel_SingleRow_Term_String
+            )
+
+        Expect.equal
+            termPasteBehavior
+            (PasteCases.PasteCells {|
+                data = [| Fixture.Component_InstrumentModel_Term_Body |] |> ResizeArray
+                coordinates = [| [| clickedTermCell |] |]
+            |})
+            "Term paste should use the clicked column header when the previous selection is elsewhere"
+
+        let clickedUnitCell: CellCoordinate = {| x = 4; y = 1 |}
+        let unitData = [| [| "4"; "Degree Celsius"; "UO"; "UO:000000001" |] |]
+
+        let unitPasteBehavior =
+            AnnotationTableContextMenuUtil.predictPasteBehaviour (
+                clickedUnitCell,
+                currentTable,
+                staleSelection,
+                unitData
+            )
+
+        let expectedUnitColumn =
+            CompositeColumn.create (
+                currentTable.GetColumn(3).Header,
+                [|
+                    CompositeCell.createUnitizedFromString ("4", "Degree Celsius", "UO", "UO:000000001")
+                |]
+                |> ResizeArray
+            )
+
+        Expect.equal
+            unitPasteBehavior
+            (PasteCases.PasteCells {|
+                data = [| expectedUnitColumn |] |> ResizeArray
+                coordinates = [| [| clickedUnitCell |] |]
+            |})
+            "Unit paste should use the clicked column header when the previous selection is elsewhere"
+
     static member HeaderDeleteFirstColumn() =
         let table = Fixture.mkTable ()
         let selectHandle = TestCases.NoSelectionHandle()
@@ -220,6 +267,166 @@ type TestCases =
             copiedTextWithoutSelector
             "DatamapTesting.txt"
             "Copied DataMap data should not include trailing tabs for empty metadata."
+
+    static member DataMapCopyKeepsTermsInGridColumns() =
+        let source =
+            DataMap(
+                ResizeArray [
+                    DataContext(
+                        explication = OntologyAnnotation("explicit", "TST", "TST:1"),
+                        unit = OntologyAnnotation("metre", "UO", "UO:0000008")
+                    )
+                ]
+            )
+
+        let copiedText =
+            source.SelectedCellsToTabText [ {| x = 5; y = 1 |}; {| x = 6; y = 1 |} ]
+
+        Expect.equal copiedText "explicit\tmetre" "Each selected DataMap cell should occupy one clipboard column."
+
+        let target = DataMap(ResizeArray [ DataContext() ])
+        target.PasteTabText({| x = 2; y = 1 |}, copiedText)
+
+        Expect.equal target.DataContexts.[0].Label (Some "explicit") "The first value should use the target column."
+        Expect.equal target.DataContexts.[0].Description (Some "metre") "The next value should not shift right."
+
+    static member DataMapPlainTextPasteKeepsTsvCellsSeparate() =
+        let dataMap = DataMap(ResizeArray [ DataContext() ])
+
+        dataMap.PasteTabText({| x = 5; y = 1 |}, "foo\tbar\tbaz")
+
+        Expect.equal
+            dataMap.DataContexts.[0].Explication.Value.NameText
+            "foo"
+            "The first value should be pasted into Explication."
+
+        Expect.equal dataMap.DataContexts.[0].Unit.Value.NameText "bar" "The second value should be pasted into Unit."
+
+        Expect.equal
+            dataMap.DataContexts.[0].ObjectType.Value.NameText
+            "baz"
+            "The third value should be pasted into ObjectType."
+
+        Expect.equal
+            dataMap.DataContexts.[0].Explication.Value.TermSourceREF
+            None
+            "Ordinary TSV must not be interpreted as ontology metadata."
+
+        dataMap.PasteTabText({| x = 6; y = 2 |}, "one\ttwo\tthree\tfour")
+
+        Expect.equal
+            dataMap.DataContexts.[1].Unit.Value.NameText
+            "one"
+            "Four-field TSV starting at Unit should remain cell-oriented."
+
+        Expect.equal
+            dataMap.DataContexts.[1].ObjectType.Value.NameText
+            "two"
+            "The next in-range value should be pasted into ObjectType."
+
+    static member DataMapStructuredPastePreservesTermsAndUnits() =
+        let term = CompositeCell.createTermFromString ("explicit", "TST", "TST:1")
+        let unit = CompositeCell.createUnitizedFromString ("4", "metre", "UO", "UO:0000008")
+        let structuredTarget = DataMap(ResizeArray [ DataContext() ])
+        let payload = Swate.Components.ClipboardCodec.createPayload [| [| term; unit |] |]
+
+        structuredTarget.PastePayload({| x = 5; y = 1 |}, payload)
+
+        Expect.equal
+            structuredTarget.DataContexts.[0].Explication.Value.TermSourceREF
+            (Some "TST")
+            "Structured term paste should preserve ontology metadata."
+
+        Expect.equal
+            structuredTarget.DataContexts.[0].Unit.Value.NameText
+            "metre"
+            "Structured unit paste should preserve the unit."
+
+        Expect.equal
+            structuredTarget.DataContexts.[0].Unit.Value.TermAccessionNumber
+            (Some "UO:0000008")
+            "Structured unit paste should preserve ontology metadata."
+
+    static member ClipboardCodecRoundTripsCompositeCells() =
+        let cells = [|
+            [|
+                CompositeCell.createFreeText "plain"
+                CompositeCell.createTermFromString ("term", "TST", "TST:1")
+                CompositeCell.createUnitizedFromString ("4", "metre", "UO", "UO:0000008")
+                CompositeCell.createDataFromString "file.txt#row=2"
+            |]
+        |]
+
+        let decoded =
+            cells
+            |> Swate.Components.ClipboardCodec.createPayload
+            |> Swate.Components.ClipboardCodec.encode
+            |> Swate.Components.ClipboardCodec.tryDecode
+            |> Option.get
+
+        let actual =
+            decoded.Rows
+            |> Array.map (Array.map (Swate.Components.ClipboardCodec.toCompositeCell >> _.ToTabStr()))
+
+        let expected = cells |> Array.map (Array.map _.ToTabStr())
+        Expect.equal actual expected "The typed clipboard codec should round-trip every composite cell kind."
+
+        Expect.isNone
+            (Swate.Components.ClipboardCodec.tryDecode """{"Version":1,"Rows":[[null]]}""")
+            "A payload containing a null cell should be rejected."
+
+        Expect.isNone
+            (Swate.Components.ClipboardCodec.tryDecode
+                """{"Version":1,"Rows":[[{"Kind":"term","Name":"incomplete"}]]}""")
+            "A payload with missing cell fields should be rejected."
+
+        Expect.isNone
+            (Swate.Components.ClipboardCodec.tryDecode
+                """{"Version":1,"Rows":[[{"Kind":"unknown","Value":"","Name":"","TermSourceRef":"","TermAccessionNumber":"","Selector":"","Format":"","SelectorFormat":""}]]}""")
+            "A payload with an unknown cell kind should be rejected."
+
+        Expect.isNone
+            (Swate.Components.ClipboardCodec.tryDecode
+                """{"Version":1,"Rows":[[{"Kind":"freetext","Value":"A","Name":"","TermSourceRef":"","TermAccessionNumber":"","Selector":"","Format":"","SelectorFormat":""}],[],[{"Kind":"freetext","Value":"B","Name":"","TermSourceRef":"","TermAccessionNumber":"","Selector":"","Format":"","SelectorFormat":""}]]}""")
+            "A payload containing an empty row should be rejected."
+
+    static member ClipboardHtmlFallbackPreservesCompositeCells() =
+        let cells = [|
+            [|
+                CompositeCell.createTermFromString ("explicit", "TST", "TST:1")
+                CompositeCell.createUnitizedFromString ("4", "metre", "UO", "UO:0000008")
+            |]
+        |]
+
+        let htmlText = Swate.Components.ClipboardCodec.createHtmlRepresentation cells
+
+        if Swate.Components.ClipboardBindings.isHtmlParserAvailable then
+            let decoded =
+                htmlText |> Swate.Components.ClipboardCodec.tryDecodeHtml |> Option.get
+
+            let actual =
+                decoded.Rows
+                |> Array.map (Array.map (Swate.Components.ClipboardCodec.toCompositeCell >> _.ToTabStr()))
+
+            let expected = cells |> Array.map (Array.map _.ToTabStr())
+            Expect.equal actual expected "The fallback should round-trip ontology metadata."
+
+            Expect.isNone
+                (Swate.Components.ClipboardCodec.tryDecodeHtml "<table><tr><td>foo</td></tr></table>")
+                "HTML without Swate metadata must not be treated as a structured fallback."
+
+        let trailingEmptyRowCells = [|
+            [| CompositeCell.FreeText "A" |]
+            [| CompositeCell.FreeText "" |]
+        |]
+
+        let trailingEmptyRowHtml =
+            Swate.Components.ClipboardCodec.createHtmlRepresentation trailingEmptyRowCells
+
+        Expect.stringContains
+            trailingEmptyRowHtml
+            "<tr><td>A</td></tr><tr><td></td></tr>"
+            "The HTML fallback should retain a trailing empty row from the structured matrix."
 
     static member TableCopyIncludesSelector() =
         let dataCell = CompositeCell.createDataFromString "DatamapTesting.txt#row=2"
@@ -331,6 +538,13 @@ type TestCases =
             Expect.equal arcTableIndex.y 0 "Move column target should stay on header row"
         | _ -> failwith "Move column menu entry should open move-column modal"
 
+    static member ClipboardIndexWrapsAndRejectsInvalidLengths() =
+        Expect.equal (AnnotationTableContextMenuUtil.getIndex (7, 3)) 1 "Clipboard indices should wrap using modulo."
+
+        Expect.throws
+            (fun () -> AnnotationTableContextMenuUtil.getIndex (0, 0) |> ignore)
+            "An empty clipboard range should be rejected instead of looping forever."
+
 let Main =
 
     testList "Context Menu" [
@@ -421,8 +635,20 @@ let Main =
             <| fun _ -> TestCases.AddUnknownPattern([| [| "" |] |])
         ]
         testList "Regression" [
+            testCase "Paste uses clicked column rather than stale selection"
+            <| fun _ -> TestCases.PasteIntoClickedColumnOutsideSelection()
             testCase "DataMap cell copy includes the selector behind #"
             <| fun _ -> TestCases.DataMapCopyIncludesSelector()
+            testCase "DataMap term copy does not shift following columns"
+            <| fun _ -> TestCases.DataMapCopyKeepsTermsInGridColumns()
+            testCase "DataMap plain-text paste keeps TSV cells separate"
+            <| fun _ -> TestCases.DataMapPlainTextPasteKeepsTsvCellsSeparate()
+            testCase "DataMap structured paste preserves terms and units"
+            <| fun _ -> TestCases.DataMapStructuredPastePreservesTermsAndUnits()
+            testCase "Typed clipboard codec round-trips composite cells"
+            <| fun _ -> TestCases.ClipboardCodecRoundTripsCompositeCells()
+            testCase "HTML clipboard fallback preserves composite cells and plain TSV"
+            <| fun _ -> TestCases.ClipboardHtmlFallbackPreservesCompositeCells()
             testCase "Table cell copy includes the selector behind #"
             <| fun _ -> TestCases.TableCopyIncludesSelector()
             testCase "DataMap cell paste includes the selector behind #"
@@ -443,5 +669,7 @@ let Main =
             <| fun _ -> TestCases.IndexDeleteFirstRow()
             testCase "Header move column keeps 1-based header index"
             <| fun _ -> TestCases.HeaderMoveColumnUsesSelectedHeaderIndex()
+            testCase "Clipboard index wraps and rejects invalid lengths"
+            <| fun _ -> TestCases.ClipboardIndexWrapsAndRejectsInvalidLengths()
         ]
     ]
