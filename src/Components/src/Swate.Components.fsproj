@@ -78,7 +78,9 @@
     <Compile Include="ARCtrl\TermCollection.fs" />
     <Compile Include="ARCtrl\Helper.fs" />
     <Compile Include="ARCtrl\ArcIO.fs" />
+    <Compile Include="ARCtrl\EmptyColumnJson.fs" />
     <Compile Include="ARCtrl\Json.fs" />
+    <Compile Include="ARCtrl\EmptyColumnJson.test.fs" />
     <Compile Include="ARCtrl\Types\CompositeCellDiscriminate.fs" />
     <Compile Include="ARCtrl\Types\CompositeHeaderDiscriminate.fs" />
     <Compile Include="ARCtrl\ArcTable.fs" />
@@ -125,6 +127,7 @@
     <Compile Include="Primitive\ErrorModal\ErrorModal.fs" />
     <Compile Include="Primitive\ErrorModal\Provider.fs" />
     <Compile Include="Primitive\Navbar\Navbar.fs" />
+
     <Compile Include="Composite\Tree\Types.fs" />
     <Compile Include="Composite\Tree\TreeHelper.fs" />
     <Compile Include="Composite\Tree\State.fs" />
@@ -134,6 +137,7 @@
     <Compile Include="Composite\Tree\Hooks.fs" />
     <Compile Include="Composite\Tree\TreeNode.fs" />
     <Compile Include="Composite\Tree\Tree.fs" />
+
     <Compile Include="Composite\Actionbar\Types.fs" />
     <Compile Include="Composite\Actionbar\Actionbar.fs" />
     <Compile Include="Composite\ThemeSelector\Types.fs" />
