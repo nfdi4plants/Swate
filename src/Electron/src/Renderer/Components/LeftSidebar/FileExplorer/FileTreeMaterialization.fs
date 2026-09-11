@@ -3,6 +3,8 @@ module Renderer.Components.LeftSidebar.FileExplorer.FileTreeMaterialization
 open Swate.Components.Shared
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.FileIOHelper
+open Swate.Electron.Shared.IPCTypes
 
 type MaterializedState = {
     ArcScopeId: string option
@@ -15,6 +17,18 @@ let materialize path state = {
     state with
         Paths = state.Paths.Add(PathHelpers.normalizePath path)
 }
+
+/// Deep payload directories receive live monitoring only while expanded in the File Explorer.
+let shouldDynamicallyWatchDirectory (path: string) = getPathDepth path > ArcFileWatcherDepth
+
+let tryCreateDirectoryExpansionRequest (path: string) (isExpanded: bool) =
+    if shouldDynamicallyWatchDirectory path then
+        Some {
+            relativePath = path
+            isExpanded = isExpanded
+        }
+    else
+        None
 
 let rec private collectDirectoryPaths (node: FileTreeNode) (directoryPaths: Set<string>) =
     if node.isDirectory then

@@ -6,6 +6,8 @@ open ARCtrl
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 
+[<Literal>]
+let ArcFileWatcherDepth = 2
 
 let getNonEmptyPathParts (path: string) =
     PathHelpers.normalizePath path
