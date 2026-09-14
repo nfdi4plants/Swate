@@ -30,6 +30,7 @@ type CloseLifecycleState =
 type ArcVault(window: BrowserWindow) =
 
     let fileWatcherOwnWriteArcMergeSuppressionMs = 500
+    let closeDecisionRecoveryMs = 30_000
 
     let mutable lastArcMerge: Fable.Core.JS.Promise<unit> =
         Fable.Core.JS.Constructors.Promise.resolve ()
@@ -52,7 +53,27 @@ type ArcVault(window: BrowserWindow) =
     member val private isBusyWritingValue: bool = false with get, set
     member val private fileWatcherOwnWriteArcMergeSuppressionTimeout: int option = None with get, set
     member val activeFileImport: ActiveFileImport option = None with get, set
+    member val private closeDecisionRecoveryTimeout: int option = None with get, set
     member val CloseState = CloseLifecycleState.Idle with get, set
+
+    member this.BeginWaitingForSaveDecision() =
+        this.closeDecisionRecoveryTimeout |> Option.iter Fable.Core.JS.clearTimeout
+        this.CloseState <- CloseLifecycleState.WaitingForSaveDecision
+
+        this.closeDecisionRecoveryTimeout <-
+            Fable.Core.JS.setTimeout
+                (fun () ->
+                    if this.CloseState = CloseLifecycleState.WaitingForSaveDecision then
+                        this.CloseState <- CloseLifecycleState.Idle
+
+                    this.closeDecisionRecoveryTimeout <- None
+                )
+                closeDecisionRecoveryMs
+            |> Some
+
+    member this.ClearCloseDecisionRecovery() =
+        this.closeDecisionRecoveryTimeout |> Option.iter Fable.Core.JS.clearTimeout
+        this.closeDecisionRecoveryTimeout <- None
 
     /// Runs ARC merges sequentially so every operation observes the result of the preceding merge.
     member this.EnqueueArcMerge<'T>(operation: unit -> Fable.Core.JS.Promise<'T>) : Fable.Core.JS.Promise<'T> =
@@ -68,8 +89,12 @@ type ArcVault(window: BrowserWindow) =
         }
 
         lastArcMerge <- promise {
-            let! _ = queuedMerge
-            return ()
+            try
+                let! _ = queuedMerge
+                return ()
+            with mergeError ->
+                swatelogfn this.window.id "Queued ARC merge failed: %s" mergeError.Message
+                return ()
         }
 
         queuedMerge
@@ -124,6 +149,12 @@ module ArcVaultExtensions =
 
         member private this.ApplyWatcherArcMerge(events: FileEvent list) : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
             match this.path, this.arc with
+            | Some _, None ->
+                try
+                    do! this.LoadArc()
+                    return Ok()
+                with loadError ->
+                    return Error loadError
             | Some arcPath, Some arcLocal ->
                 match! ARC.LoadAsyncSwate arcPath with
                 | Error loadError -> return Error(exn (PathHelpers.formatContractErrors loadError))
@@ -613,6 +644,8 @@ type ArcVaults() =
             swatelogfn windowId "%s" message
             return Error(exn message)
         | Some(vault: ArcVault) ->
+            vault.ClearCloseDecisionRecovery()
+
             match decision with
             | SaveBeforeQuitDecision.CancelClose ->
                 swatelogfn windowId "Close request cancelled by user."
@@ -674,7 +707,7 @@ type ArcVaults() =
                     |> Promise.start
                 elif vault.hasUnsavedArcChanges then
                     closeEvent.preventDefault ()
-                    vault.CloseState <- CloseLifecycleState.WaitingForSaveDecision
+                    vault.BeginWaitingForSaveDecision()
 
                     let saveBeforeQuitClient =
                         Remoting.createIpc ()
@@ -687,6 +720,7 @@ type ArcVaults() =
         )
 
         window.onClosed (fun () ->
+            vault.ClearCloseDecisionRecovery()
             vault.CloseState <- CloseLifecycleState.Idle
             this.DisposeVault(id)
         )

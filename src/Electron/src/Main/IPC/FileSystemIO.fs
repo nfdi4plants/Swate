@@ -216,6 +216,10 @@ module ArcFileSystemHelper =
         Entries: ExternalFileImportEntry[]
     }
 
+    let createTemporaryImportDirectoryName () =
+        let guid = Guid.NewGuid().ToString("N")
+        $".swate-import-{guid}"
+
     let private resolveImportTargetDirectory arcPath targetRelativePath = promise {
         let normalizedTargetPath =
             PathHelpers.normalizeCanonicalRelativePath targetRelativePath
@@ -268,7 +272,7 @@ module ArcFileSystemHelper =
         return {
             TargetDirectory = targetDirectory
             // The watcher explicitly ignores this operation-owned directory and its contents.
-            TemporaryDirectory = join [| targetDirectory; $".swate-import-{Guid.NewGuid():N}" |]
+            TemporaryDirectory = join [| targetDirectory; createTemporaryImportDirectoryName () |]
             Entries = entries
         }
     }
@@ -350,7 +354,9 @@ module ArcFileSystemHelper =
                 return Error importError
         }
 
-    let importExternalFilesOnDisk
+    let importExternalFilesOnDiskWithTemporaryCleanup
+        (removeTemporaryDirectory: string -> JS.Promise<unit>)
+        (logTemporaryCleanupError: exn -> unit)
         (arcPath: string)
         (targetRelativePath: string)
         (sourcePaths: string[])
@@ -370,7 +376,10 @@ module ArcFileSystemHelper =
                     temporaryDirectory <- Some plan.TemporaryDirectory
                     do! copyExternalFilesToTemporaryDirectory plan onProgress isCancellationRequested
                     do! copyTemporaryFilesIntoTarget plan createdTargetPaths isCancellationRequested
-                    do! rmAsync plan.TemporaryDirectory (RmOptions(recursive = true, force = true))
+
+                    match! removePathWithRetriesAsync removeTemporaryDirectory plan.TemporaryDirectory with
+                    | Ok() -> ()
+                    | Error cleanupError -> logTemporaryCleanupError cleanupError
 
                     match! validateImportedFiles () with
                     | Error validationError -> raise validationError
@@ -382,6 +391,11 @@ module ArcFileSystemHelper =
                     | Some path -> return! externalFileImportFailureResult path createdTargetPaths importError
                     | None -> return Error importError
         }
+
+    let importExternalFilesOnDisk =
+        importExternalFilesOnDiskWithTemporaryCleanup
+            (fun temporaryDirectory -> rmAsync temporaryDirectory (RmOptions(recursive = true, force = true)))
+            (fun cleanupError -> printfn $"Unable to remove completed import staging directory: {cleanupError.Message}")
 
     type CreateFileSystemItemPlan = {
         ParentPath: string

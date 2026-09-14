@@ -294,15 +294,55 @@ Vitest.describe (
                 let failedMerge =
                     vault.EnqueueArcMerge(fun () -> promise { return raise (exn "Expected merge failure") })
 
-                let followingMerge = vault.EnqueueArcMerge(fun () -> promise { continued <- true })
-
                 try
                     do! failedMerge
                 with error ->
                     Vitest.expect(error.Message).toContain ("Expected merge failure")
 
+                do! Promise.sleep 0
+                let followingMerge = vault.EnqueueArcMerge(fun () -> promise { continued <- true })
                 do! followingMerge
                 Vitest.expect(continued).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "watcher merge reloads an open ARC whose in-memory load is missing",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-watcher-recovery-"
+                    "WatcherRecoveryArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+
+                        match! vault.TryTriggerArcInMemoryMergeOnFileWatcherEvents [] with
+                        | Error error -> failwith error.Message
+                        | Ok() ->
+                            Vitest.expect(vault.arc.IsSome).toBe (true)
+                            Vitest.expect(vault.arc.Value.Identifier).toBe ("WatcherRecoveryArc")
+                    })
+        )
+
+        Vitest.test (
+            "lost close decision eventually returns the close lifecycle to idle",
+            fun () -> promise {
+                Vitest.vi.useFakeTimers () |> ignore
+
+                try
+                    let vault = ArcVault(TestHelpers.testWindow ())
+                    vault.BeginWaitingForSaveDecision()
+                    Vitest.expect(vault.CloseState).toEqual (CloseLifecycleState.WaitingForSaveDecision)
+
+                    do! Vitest.vi.advanceTimersByTimeAsync 30_000
+                    Vitest.expect(vault.CloseState).toEqual (CloseLifecycleState.Idle)
+
+                    vault.BeginWaitingForSaveDecision()
+                    Vitest.expect(vault.CloseState).toEqual (CloseLifecycleState.WaitingForSaveDecision)
+                    vault.ClearCloseDecisionRecovery()
+                finally
+                    Vitest.vi.useRealTimers () |> ignore
             }
         )
 )

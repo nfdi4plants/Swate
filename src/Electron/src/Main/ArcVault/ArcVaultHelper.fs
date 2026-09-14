@@ -318,18 +318,17 @@ let shouldUsePollingByDefault (platform: string) =
 let private currentNodePlatform () : string =
     emitJsExpr () "process.platform" |> unbox<string>
 
+let isFileWatcherPathIgnored (path: string) =
+    let normalizedPath = PathHelpers.normalizeSeparators path
+    let tempXlsxPattern = """\.~\$.*\.xlsx$"""
+    let temporaryImportPattern = """(^|/)\.swate-import-[0-9a-fA-F]{32}(/|$)"""
+
+    System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
+    || isGitMetadataPath normalizedPath
+    || isLegacyDataMapPath normalizedPath
+    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryImportPattern)
+
 let createFileWatcher (path: string) (usePolling: bool option) =
-
-    let ignoreFn =
-        fun (path: string) ->
-            let normalizedPath = PathHelpers.normalizeSeparators path
-            let tempXlsxPattern = """\.~\$.*\.xlsx$"""
-            let temporaryImportPattern = """(^|/)\.swate-import-[0-9a-fA-F]{32}(/|$)"""
-
-            System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
-            || isGitMetadataPath normalizedPath
-            || isLegacyDataMapPath normalizedPath
-            || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryImportPattern)
 
     // Native Windows file events can keep handles that block app-initiated folder renames.
     let usePolling =
@@ -340,14 +339,14 @@ let createFileWatcher (path: string) (usePolling: bool option) =
             Chokidar.WatchOptions(
                 cwd = path,
                 awaitWriteFinish = true,
-                ignored = !^ignoreFn,
+                ignored = !^isFileWatcherPathIgnored,
                 ignoreInitial = true,
                 usePolling = true,
                 interval = 200,
                 binaryInterval = 400
             )
         else
-            Chokidar.WatchOptions(cwd = path, awaitWriteFinish = true, ignored = !^ignoreFn, ignoreInitial = true)
+            Chokidar.WatchOptions(cwd = path, awaitWriteFinish = true, ignored = !^isFileWatcherPathIgnored, ignoreInitial = true)
 
     let watcher = Chokidar.Chokidar.watch (path, watcherOptions)
 

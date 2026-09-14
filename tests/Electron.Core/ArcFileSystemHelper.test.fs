@@ -11,6 +11,7 @@ open Vitest
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private fsDynamic: obj = importAll "fs"
+let private newGuidN () = Guid.NewGuid().ToString("N")
 
 [<Emit("Object.assign(new Error($0), { code: $1 })")>]
 let private nodeError (message: string) (code: string) : exn = jsNative
@@ -109,6 +110,19 @@ Vitest.describe (
     fun () ->
 
         Vitest.test (
+            "temporary import directory name matches the watcher ignore convention",
+            fun () ->
+                let directoryName = ArcFileSystemHelper.createTemporaryImportDirectoryName ()
+                let exactPattern = """^\.swate-import-[0-9a-f]{32}$"""
+
+                Vitest.expect(System.Text.RegularExpressions.Regex.IsMatch(directoryName, exactPattern)).toBe (true)
+
+                Vitest
+                    .expect(Main.ArcVaultHelper.isFileWatcherPathIgnored $"C:/arc/{directoryName}/file.txt")
+                    .toBe (true)
+        )
+
+        Vitest.test (
             "checks whether relative files and directories exist",
             fun () ->
                 withAssayArc (fun arcPath -> promise {
@@ -198,8 +212,8 @@ Vitest.describe (
             fun () ->
                 withAssayArc (fun arcPath -> promise {
                     let sourceDirectory = dirname arcPath
-                    let firstName = $"cancel-first-{Guid.NewGuid():N}.txt"
-                    let secondName = $"cancel-second-{Guid.NewGuid():N}.txt"
+                    let firstName = $"cancel-first-{newGuidN ()}.txt"
+                    let secondName = $"cancel-second-{newGuidN ()}.txt"
                     do! writeRelativeFileAsync sourceDirectory firstName "first"
                     do! writeRelativeFileAsync sourceDirectory secondName "second"
 
@@ -244,7 +258,7 @@ Vitest.describe (
             fun () ->
                 withAssayArc (fun arcPath -> promise {
                     let sourceDirectory = dirname arcPath
-                    let fileName = $"invalid-arc-import-{Guid.NewGuid():N}.xlsx"
+                    let fileName = $"invalid-arc-import-{newGuidN ()}.xlsx"
                     let sourcePath = join [| sourceDirectory; fileName |]
                     do! writeRelativeFileAsync sourceDirectory fileName "malformed ARC workbook"
 
@@ -272,8 +286,8 @@ Vitest.describe (
             fun () ->
                 withAssayArc (fun arcPath -> promise {
                     let sourceDirectory = dirname arcPath
-                    let firstName = $"error-first-{Guid.NewGuid():N}.txt"
-                    let missingName = $"missing-{Guid.NewGuid():N}.txt"
+                    let firstName = $"error-first-{newGuidN ()}.txt"
+                    let missingName = $"missing-{newGuidN ()}.txt"
                     do! writeRelativeFileAsync sourceDirectory firstName "first"
 
                     match!
@@ -300,10 +314,41 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "keeps published files when only staging-directory cleanup fails",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let sourceDirectory = dirname arcPath
+                    let fileName = $"cleanup-failure-{newGuidN ()}.txt"
+                    let sourcePath = join [| sourceDirectory; fileName |]
+                    let mutable cleanupErrorWasLogged = false
+                    do! writeRelativeFileAsync sourceDirectory fileName "published content"
+
+                    match!
+                        ArcFileSystemHelper.importExternalFilesOnDiskWithTemporaryCleanup
+                            (fun _ -> JS.Constructors.Promise.reject (nodeError "staging directory busy" "EBUSY"))
+                            (fun _ -> cleanupErrorWasLogged <- true)
+                            arcPath
+                            "assays/AssayA"
+                            [| sourcePath |]
+                            ignore
+                            (fun () -> false)
+                            acceptImportedFiles
+                    with
+                    | Error error -> failwith error.Message
+                    | Ok ImportExternalFilesResult.Cancelled -> failwith "Expected import to complete."
+                    | Ok ImportExternalFilesResult.Completed ->
+                        let importedPath = absoluteArcPath arcPath $"assays/AssayA/{fileName}"
+                        let! importedFileExists = pathExistsAsync importedPath
+                        Vitest.expect(importedFileExists).toBe (true)
+                        Vitest.expect(cleanupErrorWasLogged).toBe (true)
+                })
+        )
+
+        Vitest.test (
             "does not overwrite an existing destination file",
             fun () ->
                 withAssayArc (fun arcPath -> promise {
-                    let fileName = $"existing-{Guid.NewGuid():N}.txt"
+                    let fileName = $"existing-{newGuidN ()}.txt"
                     let sourceDirectory = dirname arcPath
                     do! writeRelativeFileAsync sourceDirectory fileName "new content"
                     do! writeRelativeFileAsync arcPath $"assays/AssayA/{fileName}" "original content"
