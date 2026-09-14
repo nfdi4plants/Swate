@@ -1,6 +1,7 @@
 module Main.WatcherHelpers
 
 open System
+open System.Collections.Generic
 open Fable.Electron
 open Main.Bindings
 open Main.ArcMerge
@@ -41,6 +42,24 @@ let buildWatcherEvent (arcPath: string) (eventName: string) (path: string) =
         RelativePath = relativePath
         AbsolutePath = absolutePath
     }
+
+/// Queues an external watcher event for its coordinated ARC merge and file-tree update.
+/// Events caused by an active or recently completed app write are intentionally discarded.
+let tryQueueFileWatcherEvent
+    isEligible
+    arcPath
+    (pendingEvents: ResizeArray<ArcVaultFileSystemEvent>)
+    (pendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent>)
+    eventName
+    changedPath
+    =
+    match arcPath with
+    | Some rootPath when isEligible ->
+        let watcherEvent = buildWatcherEvent rootPath eventName changedPath
+        pendingEvents.Add watcherEvent
+        pendingArcMergeEvents.Add watcherEvent
+        true
+    | _ -> false
 
 /// Converts raw filesystem events into ARC merge events; unlink-dir events expand to possible canonical files.
 let toArcMergeEvents (events: ArcVaultFileSystemEvent list) =

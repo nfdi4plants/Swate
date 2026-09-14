@@ -451,35 +451,69 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                     )
 
                             return!
-                                vault.RunFileImport(
-                                    request.requestId,
-                                    fun abortSignal -> promise {
-                                        try
-                                            let importedEvents =
-                                                createImportedFileWatcherEvents vault.path.Value request
+                                IPCHelper.withExclusiveBusyWriting
+                                    vault
+                                    (fun () ->
+                                        FileImportCoordinator.run
+                                            vault.window
+                                            request.requestId
+                                            (fun () ->
+                                                if vault.CloseState = CloseLifecycleState.Idle then
+                                                    Ok()
+                                                else
+                                                    Error(exn "Cannot start an import while the window is closing.")
+                                            )
+                                            (fun () -> vault.activeFileImport)
+                                            (fun value -> vault.activeFileImport <- value)
+                                            (fun abortSignal -> promise {
+                                                try
+                                                    let importedEvents =
+                                                        createImportedFileWatcherEvents vault.path.Value request
 
-                                            let! result =
-                                                ArcFileSystemHelper.importExternalFilesOnDisk
-                                                    vault.path.Value
-                                                    request.targetRelativePath
-                                                    request.sourceAbsolutePaths
-                                                    reportImportProgress
-                                                    (fun () -> abortSignal.aborted)
-                                                    (fun () ->
-                                                        vault.TryTriggerArcInMemoryMergeOnFileWatcherEvents(
-                                                            importedEvents |> Array.toList
-                                                        )
-                                                    )
+                                                    let! result =
+                                                        ArcFileSystemHelper.importExternalFilesOnDisk
+                                                            vault.path.Value
+                                                            request.targetRelativePath
+                                                            request.sourceAbsolutePaths
+                                                            reportImportProgress
+                                                            (fun () -> abortSignal.aborted)
+                                                            (fun () ->
+                                                                match vault.activeFileImport with
+                                                                | Some activeImport when
+                                                                    activeImport.State.requestId = request.requestId
+                                                                    ->
+                                                                    let finalizingImport = {
+                                                                        activeImport with
+                                                                            State = {
+                                                                                activeImport.State with
+                                                                                    phase =
+                                                                                        FileImportPhase.Finalizing
+                                                                            }
+                                                                    }
 
-                                            match result with
-                                            | Ok _
-                                            | Error _ -> do! refreshVaultFileTree vault
+                                                                    vault.activeFileImport <- Some finalizingImport
 
-                                            return result
-                                        finally
-                                            vault.window.setProgressBar -1.0
-                                    }
-                                )
+                                                                    FileImportCoordinator.publishState
+                                                                        vault.window
+                                                                        (Some finalizingImport)
+                                                                | _ -> ()
+
+                                                                vault.TryTriggerArcInMemoryMergeOnFileWatcherEvents(
+                                                                    importedEvents |> Array.toList
+                                                                )
+                                                            )
+
+                                                    match result with
+                                                    | Ok ImportExternalFilesResult.Completed ->
+                                                        do! refreshVaultFileTree vault
+                                                    | Ok ImportExternalFilesResult.Cancelled
+                                                    | Error _ -> ()
+
+                                                    return result
+                                                finally
+                                                    vault.window.setProgressBar -1.0
+                                            })
+                                    )
                         })
             with e ->
                 return Error(exn $"Could not import files: {e.Message}")
@@ -488,10 +522,27 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
         fun requestId -> promise {
             let windowId = windowIdFromIpcEvent event
 
-            ARC_VAULTS.TryGetVault(windowId)
-            |> Option.iter (fun vault -> vault.CancelFileImport(requestId) |> ignore)
+            match ARC_VAULTS.TryGetVault(windowId) with
+            | Some vault ->
+                match vault.activeFileImport with
+                | Some activeImport when
+                    activeImport.State.requestId = requestId
+                    && activeImport.State.phase = FileImportPhase.Copying
+                    ->
+                    activeImport.AbortController.abort ()
+                | _ -> ()
+            | None -> ()
 
             return Ok()
+        }
+    getActiveFileImport =
+        fun () -> promise {
+            let windowId = windowIdFromIpcEvent event
+
+            return
+                match ARC_VAULTS.TryGetVault(windowId) with
+                | Some vault -> Ok(vault.activeFileImport |> Option.map _.State)
+                | None -> Error(exn $"The ARC for window id {windowId} should exist")
         }
     getFileTree =
         fun () -> promise {

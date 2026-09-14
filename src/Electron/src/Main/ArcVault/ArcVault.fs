@@ -7,21 +7,15 @@ open Fable.Electron.Remoting.Main
 open Main
 open Main.ARCtrlExtensions
 open Main.Bindings
-open Main.Bindings.Abort
 open Main.ArcMerge
 open Main.ArcVaultHelper
+open Main.FileImportCoordinator
 open Swate.Components.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
-
-type private ActiveFileImport = {
-    RequestId: string
-    AbortController: IAbortController
-    Completion: Fable.Core.JS.Promise<Result<ImportExternalFilesResult, exn>>
-}
 
 type CloseLifecycleState =
     | Idle
@@ -57,61 +51,8 @@ type ArcVault(window: BrowserWindow) =
     member val fileWatcherPendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
     member val private isBusyWritingValue: bool = false with get, set
     member val private fileWatcherOwnWriteArcMergeSuppressionTimeout: int option = None with get, set
-    member val private activeFileImport: ActiveFileImport option = None with get, set
+    member val activeFileImport: ActiveFileImport option = None with get, set
     member val CloseState = CloseLifecycleState.Idle with get, set
-
-    member this.HasActiveFileImport = this.activeFileImport.IsSome
-
-    member this.RunFileImport
-        (requestId: string, operation: IAbortSignal -> Fable.Core.JS.Promise<Result<ImportExternalFilesResult, exn>>)
-        =
-        match this.CloseState, this.activeFileImport with
-        | CloseLifecycleState.Idle, Some _ ->
-            Fable.Core.JS.Constructors.Promise.resolve (
-                Error(exn "Another file import is already running in this window.")
-            )
-        | CloseLifecycleState.Idle, None ->
-            let abortController = AbortController.create ()
-
-            let completion = promise {
-                do! Promise.sleep 0
-
-                try
-                    return! operation abortController.signal
-                finally
-                    match this.activeFileImport with
-                    | Some activeImport when activeImport.RequestId = requestId -> this.activeFileImport <- None
-                    | _ -> ()
-            }
-
-            this.activeFileImport <-
-                Some {
-                    RequestId = requestId
-                    AbortController = abortController
-                    Completion = completion
-                }
-
-            completion
-        | _, _ ->
-            Fable.Core.JS.Constructors.Promise.resolve (
-                Error(exn "Cannot start an import while the window is closing.")
-            )
-
-    member this.CancelFileImport(requestId: string) =
-        match this.activeFileImport with
-        | Some activeImport when activeImport.RequestId = requestId ->
-            activeImport.AbortController.abort ()
-            true
-        | _ -> false
-
-    member this.CancelActiveFileImportAndWait() = promise {
-        match this.activeFileImport with
-        | None -> return false
-        | Some activeImport ->
-            activeImport.AbortController.abort ()
-            let! _ = activeImport.Completion
-            return true
-    }
 
     /// Runs ARC merges sequentially so every operation observes the result of the preceding merge.
     member this.EnqueueArcMerge<'T>(operation: unit -> Fable.Core.JS.Promise<'T>) : Fable.Core.JS.Promise<'T> =
@@ -268,16 +209,14 @@ module ArcVaultExtensions =
 
                 swatelogfn this.window.id "File change detected: %s on %s" eventName path
 
-                let isArcMergeEligible = this.IsFileWatcherArcMergeEligible
-
-                this.path
-                |> Option.iter (fun arcPath ->
-                    let watcherEvent = WatcherHelpers.buildWatcherEvent arcPath eventName path
-                    this.fileWatcherPendingEvents.Add watcherEvent
-
-                    if isArcMergeEligible then
-                        this.fileWatcherPendingArcMergeEvents.Add watcherEvent
-                )
+                WatcherHelpers.tryQueueFileWatcherEvent
+                    this.IsFileWatcherArcMergeEligible
+                    this.path
+                    this.fileWatcherPendingEvents
+                    this.fileWatcherPendingArcMergeEvents
+                    eventName
+                    path
+                |> ignore
 
                 match this.fileWatcherReloadArcTimeout with
                 | Some timeoutId ->
@@ -333,8 +272,10 @@ module ArcVaultExtensions =
 
         /// Writes the active in-memory ARC scaffold to disk without touching unmanaged files such as notes.
         member this.WriteArc() : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
-            match this.path, this.arc with
-            | Some arcPath, Some arc ->
+            match this.isBusyWriting, this.path, this.arc with
+            | true, _, _ ->
+                return Error(exn "Swate is still saving another change. Please wait a moment and try again.")
+            | false, Some arcPath, Some arc ->
                 this.isBusyWriting <- true
 
                 try
@@ -712,13 +653,18 @@ type ArcVaults() =
             | CloseLifecycleState.WaitingForImportCleanup
             | CloseLifecycleState.WaitingForSaveDecision -> closeEvent.preventDefault ()
             | CloseLifecycleState.Idle ->
-                if vault.HasActiveFileImport then
+                if vault.activeFileImport.IsSome then
                     closeEvent.preventDefault ()
                     vault.CloseState <- CloseLifecycleState.WaitingForImportCleanup
 
                     promise {
                         try
-                            let! _ = vault.CancelActiveFileImportAndWait()
+                            let activeImport = vault.activeFileImport.Value
+
+                            if activeImport.State.phase = FileImportPhase.Copying then
+                                activeImport.AbortController.abort ()
+
+                            let! _ = activeImport.Completion
                             ()
                         with importError ->
                             swatelogfn id "Active import failed while closing: %s" importError.Message

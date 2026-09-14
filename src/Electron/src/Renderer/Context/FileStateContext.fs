@@ -25,6 +25,10 @@ type FileStateController = {
     refreshFileTree: unit -> unit
     setSelection: ArcSelection -> unit
     updateSelection: (ArcSelection -> ArcSelection) -> unit
+    activeFileImport: ActiveFileImportState option
+    isCancellingFileImport: bool
+    importExternalFiles: string -> JS.Promise<Result<unit, exn>>
+    cancelFileImport: unit -> JS.Promise<Result<unit, exn>>
 }
 
 let FileStateCtx =
@@ -35,6 +39,10 @@ let FileStateCtx =
             refreshFileTree = ignore
             setSelection = ignore
             updateSelection = ignore
+            activeFileImport = None
+            isCancellingFileImport = false
+            importExternalFiles = fun _ -> JS.Constructors.Promise.resolve (Ok())
+            cancelFileImport = fun () -> JS.Constructors.Promise.resolve (Ok())
         }
     )
 
@@ -42,12 +50,24 @@ let FileStateCtx =
 let useFileStateCtx () = React.useContext FileStateCtx
 
 type FileTreeSnapshotLoader = unit -> JS.Promise<Result<Dictionary<string, FileEntry>, exn>>
+type ActiveFileImportLoader = unit -> JS.Promise<Result<ActiveFileImportState option, exn>>
+
+type FileImportApi = {
+    loadActiveImport: ActiveFileImportLoader
+    pickAbsolutePaths: unit -> JS.Promise<Result<string[], exn>>
+    runImport: ImportExternalFilesRequest -> JS.Promise<Result<ImportExternalFilesResult, exn>>
+    cancelImport: string -> JS.Promise<Result<unit, exn>>
+}
 
 let private fileTreeFromDictionary (fileTreeDict: Dictionary<string, FileEntry>) = fileTreeDict.Values |> Seq.toArray
 
 [<ReactComponent>]
-let FileStateCtxProviderWithFileTreeSnapshot (loadFileTreeSnapshot: FileTreeSnapshotLoader, children: ReactElement) =
+let FileStateCtxProviderWithSnapshots
+    (loadFileTreeSnapshot: FileTreeSnapshotLoader, fileImportApi: FileImportApi, children: ReactElement)
+    =
     let selection, setSelectionState = React.useStateWithUpdater ArcSelection.empty
+    let isFilePickerOpenRef = React.useRef false
+    let isCancellingFileImport, setIsCancellingFileImport = React.useState false
 
     let fileTree =
         Renderer.MainSyncedState.useMainSyncedState {
@@ -76,6 +96,73 @@ let FileStateCtxProviderWithFileTreeSnapshot (loadFileTreeSnapshot: FileTreeSnap
             [| box fileTree.state; box selection |]
         )
 
+    let activeFileImport =
+        Renderer.MainSyncedState.useMainSyncedState {
+            initial = None
+            load =
+                fun () -> promise {
+                    match! fileImportApi.loadActiveImport () with
+                    | Ok state -> return state
+                    | Error ex -> return raise ex
+                }
+            subscribe =
+                fun setActiveImport ->
+                    Renderer.IpcReceiver.subscribeProxyReceiver<IFileImportRendererApi> {
+                        fileImportStateUpdate =
+                            fun state ->
+                                if
+                                    state.IsNone
+                                    || state |> Option.exists (fun value -> value.phase = FileImportPhase.Finalizing)
+                                then
+                                    setIsCancellingFileImport false
+
+                                setActiveImport state
+                    }
+            onError = fun ex -> console.error ("Failed to load active file import state.", ex.Message)
+            dependencies = [||]
+        }
+
+    let importExternalFiles targetRelativePath = promise {
+        if activeFileImport.state.IsSome || isFilePickerOpenRef.current then
+            return Ok()
+        else
+            isFilePickerOpenRef.current <- true
+
+            try
+                match! fileImportApi.pickAbsolutePaths () with
+                | Error ex -> return Error ex
+                | Ok [||] -> return Ok()
+                | Ok sourceAbsolutePaths ->
+                    let requestId = System.Guid.NewGuid().ToString()
+
+                    match!
+                        fileImportApi.runImport {
+                            requestId = requestId
+                            targetRelativePath = targetRelativePath
+                            sourceAbsolutePaths = sourceAbsolutePaths
+                        }
+                    with
+                    | Error ex -> return Error ex
+                    | Ok ImportExternalFilesResult.Completed
+                    | Ok ImportExternalFilesResult.Cancelled -> return Ok()
+            finally
+                isFilePickerOpenRef.current <- false
+    }
+
+    let cancelFileImport () = promise {
+        match activeFileImport.state with
+        | None
+        | Some { phase = FileImportPhase.Finalizing } -> return Ok()
+        | Some activeImport ->
+            setIsCancellingFileImport true
+
+            match! fileImportApi.cancelImport activeImport.requestId with
+            | Ok() -> return Ok()
+            | Error ex ->
+                setIsCancellingFileImport false
+                return Error ex
+    }
+
     let fileStateCtx: FileStateController =
         React.useMemo (
             (fun _ -> {
@@ -86,12 +173,17 @@ let FileStateCtxProviderWithFileTreeSnapshot (loadFileTreeSnapshot: FileTreeSnap
                 updateSelection =
                     fun update ->
                         setSelectionState (fun currentSelection -> update currentSelection |> ArcSelection.normalize)
+                activeFileImport = activeFileImport.state
+                isCancellingFileImport = isCancellingFileImport
+                importExternalFiles = importExternalFiles
+                cancelFileImport = cancelFileImport
             }),
-            [| box fileState; box fileTree.isLoading |]
+            [|
+                box fileState
+                box fileTree.isLoading
+                box activeFileImport.state
+                box isCancellingFileImport
+            |]
         )
 
     FileStateCtx.Provider(fileStateCtx, children)
-
-[<ReactComponent>]
-let FileStateCtxProvider (loadFileTreeSnapshot: FileTreeSnapshotLoader, children: ReactElement) =
-    FileStateCtxProviderWithFileTreeSnapshot(loadFileTreeSnapshot, children)

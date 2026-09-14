@@ -209,8 +209,14 @@ let Main () =
         Swate.Components.Composite.TermSearch.TermSearchConfigProvider.TIBQueryProvider(
             Context.AppStateContext.AppStateCtx.Provider(
                 model.ArcRootPath,
-                Renderer.Context.FileStateContext.FileStateCtxProvider(
+                Renderer.Context.FileStateContext.FileStateCtxProviderWithSnapshots(
                     (fun () -> Api.ipcArcVaultApi.getFileTree ()),
+                    {
+                        loadActiveImport = fun () -> Api.ipcArcVaultApi.getActiveFileImport ()
+                        pickAbsolutePaths = fun () -> Api.ipcArcVaultApi.pickAbsolutePaths ()
+                        runImport = Api.ipcArcVaultApi.tryImportExternalFiles
+                        cancelImport = Api.ipcArcVaultApi.cancelImportExternalFiles
+                    },
                     Renderer.Context.PageStateContext.PageStateCtx.Provider(
                         pageCtx,
                         ErrorModalProvider.ErrorModalProvider(

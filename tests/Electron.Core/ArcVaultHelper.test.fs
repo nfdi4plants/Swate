@@ -16,6 +16,25 @@ open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Vitest
 
+module FileImportCoordinator = Main.FileImportCoordinator
+module WatcherHelpers = Main.WatcherHelpers
+
+let private runFileImport
+    (vault: ArcVault)
+    (requestId, operation: Main.Bindings.Abort.IAbortSignal -> JS.Promise<Result<ImportExternalFilesResult, exn>>)
+    =
+    Main.IPC.IPCHelper.withExclusiveBusyWriting
+        vault
+        (fun () ->
+            FileImportCoordinator.run
+                vault.window
+                requestId
+                (fun () -> Ok())
+                (fun () -> vault.activeFileImport)
+                (fun value -> vault.activeFileImport <- value)
+                operation
+        )
+
 Vitest.describe (
     "ArcVault merge queue",
     fun () ->
@@ -30,21 +49,22 @@ Vitest.describe (
                     JS.Constructors.Promise.Create(fun resolve _ -> finishCleanup <- fun () -> resolve ())
 
                 let import =
-                    vault.RunFileImport(
-                        "import-request",
-                        fun abortSignal -> promise {
-                            do! cleanupCompletion
+                    runFileImport
+                        vault
+                        ("import-request",
+                         fun abortSignal -> promise {
+                             do! cleanupCompletion
 
-                            if abortSignal.aborted then
-                                return Ok ImportExternalFilesResult.Cancelled
-                            else
-                                return Ok ImportExternalFilesResult.Completed
-                        }
-                    )
+                             if abortSignal.aborted then
+                                 return Ok ImportExternalFilesResult.Cancelled
+                             else
+                                 return Ok ImportExternalFilesResult.Completed
+                         })
 
                 let cancellation = promise {
-                    let! hadActiveImport = vault.CancelActiveFileImportAndWait()
-                    Vitest.expect(hadActiveImport).toBe (true)
+                    let activeImport = vault.activeFileImport.Value
+                    activeImport.AbortController.abort ()
+                    let! _ = activeImport.Completion
                     waitFinished <- true
                 }
 
@@ -56,6 +76,149 @@ Vitest.describe (
                 let! importResult = import
                 Vitest.expect(importResult).toEqual (Ok ImportExternalFilesResult.Cancelled)
                 Vitest.expect(waitFinished).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "file import owns busy-write state and exposes its lifecycle until cleanup completes",
+            fun () -> promise {
+                let vault = ArcVault(TestHelpers.testWindow ())
+                let mutable finishImport = ignore
+
+                let importCompletion =
+                    JS.Constructors.Promise.Create(fun resolve _ -> finishImport <- fun () -> resolve ())
+
+                let import =
+                    runFileImport
+                        vault
+                        ("coordinated-import",
+                         fun _ -> promise {
+                             do! importCompletion
+                             return Ok ImportExternalFilesResult.Completed
+                         })
+
+                Vitest.expect(vault.isBusyWriting).toBe (true)
+
+                Vitest
+                    .expect(vault.activeFileImport |> Option.map _.State)
+                    .toEqual (
+                        Some {
+                            requestId = "coordinated-import"
+                            phase = FileImportPhase.Copying
+                        }
+                    )
+
+                let activeImport = vault.activeFileImport.Value
+
+                vault.activeFileImport <-
+                    Some {
+                        activeImport with
+                            State = {
+                                activeImport.State with
+                                    phase = FileImportPhase.Finalizing
+                            }
+                    }
+
+                Vitest.expect(vault.activeFileImport.Value.State.phase = FileImportPhase.Copying).toBe (false)
+
+                Vitest.expect(vault.activeFileImport.Value.State.phase).toEqual (FileImportPhase.Finalizing)
+
+                finishImport ()
+                let! result = import
+                Vitest.expect(result).toEqual (Ok ImportExternalFilesResult.Completed)
+                Vitest.expect(vault.isBusyWriting).toBe (false)
+                Vitest.expect(vault.activeFileImport |> Option.map _.State).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "file import does not start while another ARC write owns the vault",
+            fun () -> promise {
+                let vault = ArcVault(TestHelpers.testWindow ())
+                vault.isBusyWriting <- true
+
+                let mutable operationStarted = false
+
+                match!
+                    runFileImport
+                        vault
+                        ("blocked-import",
+                         fun _ ->
+                             operationStarted <- true
+                             JS.Constructors.Promise.resolve (Ok ImportExternalFilesResult.Completed))
+                with
+                | Ok _ -> return failwith "Expected the import to be rejected while the vault is busy."
+                | Error error ->
+                    Vitest.expect(error.Message).toContain ("still saving")
+                    Vitest.expect(operationStarted).toBe (false)
+                    Vitest.expect(vault.isBusyWriting).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "busy-writing helper restores an existing owner after a nested operation",
+            fun () -> promise {
+                let vault = ArcVault(TestHelpers.testWindow ())
+                vault.isBusyWriting <- true
+                let mutable observedBusyState = false
+
+                match!
+                    Main.IPC.IPCHelper.withBusyWriting
+                        vault
+                        (fun () -> promise {
+                            observedBusyState <- vault.isBusyWriting
+                            return Ok()
+                        })
+                with
+                | Error error -> return failwith error.Message
+                | Ok() ->
+                    Vitest.expect(observedBusyState).toBe (true)
+                    Vitest.expect(vault.isBusyWriting).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "app-owned import writes are not queued for duplicate watcher merge or tree publication",
+            fun () -> promise {
+                let vault = ArcVault(TestHelpers.testWindow ())
+                vault.path <- Some "C:/arc"
+                let mutable finishImport = ignore
+
+                let importCompletion =
+                    JS.Constructors.Promise.Create(fun resolve _ -> finishImport <- fun () -> resolve ())
+
+                let import =
+                    runFileImport
+                        vault
+                        ("watcher-suppression",
+                         fun _ -> promise {
+                             do! importCompletion
+                             return Ok ImportExternalFilesResult.Completed
+                         })
+
+                let queueWatcherEvent () =
+                    WatcherHelpers.tryQueueFileWatcherEvent
+                        vault.IsFileWatcherArcMergeEligible
+                        vault.path
+                        vault.fileWatcherPendingEvents
+                        vault.fileWatcherPendingArcMergeEvents
+                        "add"
+                        "C:/arc/imported.txt"
+
+                let queuedDuringImport = queueWatcherEvent ()
+
+                Vitest.expect(queuedDuringImport).toBe (false)
+                Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (0)
+                Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (0)
+
+                finishImport ()
+                let! _ = import
+
+                let queuedDuringDelayedSuppression = queueWatcherEvent ()
+
+                Vitest.expect(queuedDuringDelayedSuppression).toBe (false)
+                Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (0)
+                Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (0)
             }
         )
 

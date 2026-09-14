@@ -114,3 +114,13 @@ type ImportExternalFilesRequest = {
 type ImportExternalFilesResult =
     | Completed
     | Cancelled
+
+[<RequireQualifiedAccess>]
+type FileImportPhase =
+    | Copying
+    | Finalizing
+
+type ActiveFileImportState = {
+    requestId: string
+    phase: FileImportPhase
+}

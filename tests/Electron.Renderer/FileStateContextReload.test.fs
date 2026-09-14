@@ -46,6 +46,14 @@ let private FileTreeProbe (onFileTree: string[] -> unit) =
 
     Html.none
 
+[<ReactComponent>]
+let private FileImportProbe (onImport: ActiveFileImportState option -> unit) =
+    let fileStateCtx = useFileStateCtx ()
+
+    React.useEffect ((fun () -> onImport fileStateCtx.activeFileImport), [| box fileStateCtx.activeFileImport |])
+
+    Html.none
+
 let private createSnapshot () =
     let snapshot = Dictionary<string, FileEntry>()
     snapshot.Add("", FileEntry.create ("arc", "", true, None))
@@ -58,6 +66,13 @@ let private createSnapshot () =
 
     snapshot
 
+let private fileImportApi loadActiveImport = {
+    loadActiveImport = loadActiveImport
+    pickAbsolutePaths = fun () -> JS.Constructors.Promise.resolve (Ok [||])
+    runImport = fun _ -> JS.Constructors.Promise.resolve (Ok ImportExternalFilesResult.Completed)
+    cancelImport = fun _ -> JS.Constructors.Promise.resolve (Ok())
+}
+
 Vitest.describe (
     "FileStateContext reload hydration",
     fun () ->
@@ -65,10 +80,13 @@ Vitest.describe (
             "loads the current file tree snapshot when the provider mounts",
             fun () -> promise {
                 let name = bridgeName "IFileTreeRendererApi"
+                let importBridgeName = bridgeName "IFileImportRendererApi"
                 let observedFileTrees = ResizeArray<string[]>()
                 let mutable listenerRegistered = false
                 let mutable disposeCalled = false
                 let mutable snapshotLoadCalls = 0
+                let mutable importSubscriptionRegistered = false
+                let mutable importDisposeCalled = false
 
                 let container = document.createElement ("div") :?> Browser.Types.HTMLDivElement
                 document.body.appendChild container |> ignore
@@ -86,14 +104,24 @@ Vitest.describe (
                                 fun () -> disposeCalled <- true
                         ])
 
+                    setBridgeProperty
+                        importBridgeName
+                        (createObj [
+                            "fileImportStateUpdate"
+                            ==> fun (_listener: ActiveFileImportState option -> unit) ->
+                                importSubscriptionRegistered <- true
+                                fun () -> importDisposeCalled <- true
+                        ])
+
                     let loadSnapshot () = promise {
                         snapshotLoadCalls <- snapshotLoadCalls + 1
                         return Ok(createSnapshot ())
                     }
 
                     root.render (
-                        FileStateCtxProviderWithFileTreeSnapshot(
+                        FileStateCtxProviderWithSnapshots(
                             loadSnapshot,
+                            fileImportApi (fun () -> JS.Constructors.Promise.resolve (Ok None)),
                             FileTreeProbe(fun paths -> observedFileTrees.Add paths)
                         )
                     )
@@ -117,6 +145,74 @@ Vitest.describe (
 
                     container.remove ()
                     clearBridgeProperty name
+                    clearBridgeProperty importBridgeName
+            }
+        )
+
+        Vitest.test (
+            "keeps an active import visible when the file explorer child is unmounted and remounted",
+            fun () -> promise {
+                let fileTreeBridgeName = bridgeName "IFileTreeRendererApi"
+                let importBridgeName = bridgeName "IFileImportRendererApi"
+                let mutable publishImportState = ignore
+                let mutable importListenerRegistered = false
+                let mutable fileTreeDisposeCalled = false
+                let mutable importDisposeCalled = false
+                let observedImports = ResizeArray<ActiveFileImportState option>()
+                let container = document.createElement ("div") :?> Browser.Types.HTMLDivElement
+                document.body.appendChild container |> ignore
+                let root = ReactDOM.createRoot container
+
+                let render child =
+                    root.render (
+                        FileStateCtxProviderWithSnapshots(
+                            (fun () -> JS.Constructors.Promise.resolve (Ok(createSnapshot ()))),
+                            fileImportApi (fun () -> JS.Constructors.Promise.resolve (Ok None)),
+                            child
+                        )
+                    )
+
+                try
+                    setBridgeProperty
+                        fileTreeBridgeName
+                        (createObj [
+                            "fileTreeUpdate"
+                            ==> fun (_: Dictionary<string, FileEntry> -> unit) ->
+                                fileTreeDisposeCalled <- false
+                                fun () -> fileTreeDisposeCalled <- true
+                        ])
+
+                    setBridgeProperty
+                        importBridgeName
+                        (createObj [
+                            "fileImportStateUpdate"
+                            ==> fun (listener: ActiveFileImportState option -> unit) ->
+                                publishImportState <- listener
+                                importListenerRegistered <- true
+                                fun () -> importDisposeCalled <- true
+                        ])
+
+                    render (FileImportProbe observedImports.Add)
+                    do! waitForEffect (fun () -> importListenerRegistered)
+
+                    let activeImport =
+                        Some {
+                            requestId = "survives-remount"
+                            phase = FileImportPhase.Copying
+                        }
+
+                    publishImportState activeImport
+                    do! waitForEffect (fun () -> observedImports |> Seq.contains activeImport)
+
+                    render Html.none
+                    do! Promise.sleep 0
+                    render (FileImportProbe observedImports.Add)
+                    do! waitForEffect (fun () -> observedImports |> Seq.filter ((=) activeImport) |> Seq.length >= 2)
+                finally
+                    root.unmount ()
+                    container.remove ()
+                    clearBridgeProperty fileTreeBridgeName
+                    clearBridgeProperty importBridgeName
             }
         )
 )
