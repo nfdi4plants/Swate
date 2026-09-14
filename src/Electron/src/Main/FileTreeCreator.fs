@@ -3,12 +3,32 @@ module Main.FileTreeCreator
 
 open System
 open System.Collections.Generic
+open ARCtrl
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Main.Git.GitLfsService
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
+
+/// Serializes asynchronous file-tree mutations against the latest published snapshot.
+type FileTreeWorkQueue(onPreviousError: exn -> unit) =
+    let mutable currentWork = promise { return () }
+
+    member _.Enqueue(operation: unit -> Fable.Core.JS.Promise<unit>) =
+        let previousWork = currentWork
+
+        let nextWork = promise {
+            try
+                do! previousWork
+            with previousError ->
+                onPreviousError previousError
+
+            do! operation ()
+        }
+
+        currentWork <- nextWork
+        nextWork
 
 let normalizeRootPath (path: string) =
     resolve [| path |] |> PathHelpers.normalizePath
@@ -126,11 +146,6 @@ let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
         return withFileEntryLfsMetadata normalizedRepoRoot lfsPathIndex entry
 }
 
-let getFileEntryWithLfsPathIndex (repoRoot: string) (lfsPathIndex: LfsPathIndex) (path: string) = promise {
-    let! entry = getFileEntry path
-    return withFileEntryLfsMetadata (normalizeRootPath repoRoot) lfsPathIndex entry
-}
-
 let private scanFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise {
     let scanRoot = normalizeRootPath path
     let! rootStats = statAsync scanRoot
@@ -182,9 +197,6 @@ let getFileEntriesInSubtree (repoRoot: string) (path: string) : Fable.Core.JS.Pr
     return withFileEntriesLfsMetadata normalizedRepoRoot lfsPathIndex scannedEntries
 }
 
-/// Finds all files and subfolders of the given filepath.
-let getFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = getFileEntriesInSubtree path path
-
 /// Replaces one subtree in a copy of the current file-tree snapshot.
 let refreshFileTreeSubtree
     (repoRoot: string)
@@ -199,8 +211,27 @@ let refreshFileTreeSubtree
         return nextTree
     }
 
+/// Refreshes an expanded directory. Collapsing is a renderer-only concern.
+let updateFileTreeDirectoryExpansion
+    (repoRoot: string)
+    (relativePath: string)
+    (isExpanded: bool)
+    (fileTree: Dictionary<string, FileEntry>)
+    =
+    promise {
+        if not isExpanded then
+            return fileTree
+        else
+            let relativePath = PathHelpers.normalizeCanonicalRelativePath relativePath
+
+            let absolutePath =
+                ArcPathHelper.combine repoRoot relativePath |> PathHelpers.normalizePath
+
+            return! refreshFileTreeSubtree repoRoot absolutePath fileTree
+    }
+
 /// Scans a path and builds its keyed file tree.
 let getFileTree (path: string) : Fable.Core.JS.Promise<Dictionary<string, FileEntry>> = promise {
-    let! fileEntries = getFileEntries path
+    let! fileEntries = getFileEntriesInSubtree path path
     return createFileEntryTree fileEntries
 }

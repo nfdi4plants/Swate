@@ -399,21 +399,27 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     withLoadedArcVault
                         event
                         (fun vault -> promise {
-                            if getPathDepth request.relativePath <= ArcFileWatcherDepth then
-                                return
-                                    Error(exn $"Path '{request.relativePath}' is already covered by the ARC watcher.")
-                            elif request.isExpanded then
+                            if request.isExpanded then
                                 match! tryResolveExistingArcDirectoryPath vault.path.Value request.relativePath with
                                 | Error pathError -> return Error pathError
                                 | Ok _ ->
-                                    do! vault.SetFileTreeDirectoryExpanded(request.relativePath, true)
+                                    do!
+                                        vault.fileTreeWorkQueue.Enqueue(fun () -> promise {
+                                            let! fileTree =
+                                                updateFileTreeDirectoryExpansion
+                                                    vault.path.Value
+                                                    request.relativePath
+                                                    true
+                                                    vault.fileTree
+
+                                            vault.SetFileTree fileTree
+                                        })
+
                                     return Ok()
                             else
                                 match tryResolveArcRelativePath vault.path.Value request.relativePath with
                                 | Error pathError -> return Error pathError
-                                | Ok _ ->
-                                    do! vault.SetFileTreeDirectoryExpanded(request.relativePath, false)
-                                    return Ok()
+                                | Ok _ -> return Ok()
                         })
             with e ->
                 return Error e
@@ -444,7 +450,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             if vault.fileTree.Count > 0 then
                                 promise { return vault.fileTree.Values |> Seq.toArray }
                             else
-                                getFileEntries arcPath
+                                getFileEntriesInSubtree arcPath arcPath
 
                         let! notes = Main.NoteSearchReader.readNotes arcPath fileEntries
                         return Ok(notes |> Array.map NoteSearchNoteDto.ofNote)
