@@ -198,43 +198,51 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "app-owned import writes remain queued for the watcher-owned tree update but not an ARC merge",
+            "watcher suppression consumes only the delayed event owned by an import",
             fun () -> promise {
                 let vault = ArcVault(TestHelpers.testWindow ())
                 vault.path <- Some "C:/arc"
-                let mutable finishImport = ignore
 
-                let importCompletion =
-                    JS.Constructors.Promise.Create(fun resolve _ -> finishImport <- fun () -> resolve ())
+                let importedEvent =
+                    WatcherHelpers.buildWatcherEvent "C:/arc" "add" "C:/arc/imported.txt"
 
-                let import =
-                    runFileImport
-                        vault
-                        ("watcher-suppression",
-                         fun _ -> promise {
-                             do! importCompletion
-                             return Ok ImportExternalFilesResult.Completed
-                         })
+                vault.fileWatcherImportOwnedEvents.Add(
+                    importedEvent.EventName.ToLowerInvariant(),
+                    PathHelpers.normalizePath (importedEvent.AbsolutePath.ToLowerInvariant())
+                )
+                |> ignore
 
-                let queueWatcherEvent () =
+                let queueWatcherEvent eventName path =
                     WatcherHelpers.queueFileWatcherEvent
-                        vault.IsFileWatcherArcMergeEligible
+                        (fun event ->
+                            vault.fileWatcherImportOwnedEvents.Remove(
+                                event.EventName.ToLowerInvariant(),
+                                PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant())
+                            )
+                            |> not
+                        )
                         vault.path
                         vault.fileWatcherPendingEvents
                         vault.fileWatcherPendingArcMergeEvents
-                        "add"
-                        "C:/arc/imported.txt"
+                        eventName
+                        path
 
-                queueWatcherEvent ()
+                vault.isBusyWriting <- true
+                queueWatcherEvent "change" "C:/arc/investigation.xlsx"
                 Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (1)
-                Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (0)
+                Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (1)
 
-                finishImport ()
-                let! _ = import
+                vault.isBusyWriting <- false
+                do! Promise.sleep 2_100
 
-                queueWatcherEvent ()
+                queueWatcherEvent "add" "C:/arc/imported.txt"
                 Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (2)
-                Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (0)
+                Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (1)
+
+                // Ownership is consumed by the delayed watcher event, so a later external edit
+                // to the same file is no longer suppressed.
+                queueWatcherEvent "add" "C:/arc/imported.txt"
+                Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (2)
             }
         )
 
@@ -346,23 +354,18 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "lost close decision eventually returns the close lifecycle to idle",
+            "close decisions are rejected unless a save decision is pending",
             fun () -> promise {
-                Vitest.vi.useFakeTimers () |> ignore
+                let window = TestHelpers.testWindow ()
+                let vault = ArcVault(window)
+                let vaults = ArcVaults()
+                vaults.Vaults.Add(window.id, vault)
 
-                try
-                    let vault = ArcVault(TestHelpers.testWindow ())
-                    vault.BeginWaitingForSaveDecision()
-                    Vitest.expect(vault.CloseState).toEqual (CloseLifecycleState.WaitingForSaveDecision)
-
-                    do! Vitest.vi.advanceTimersByTimeAsync 30_000
+                match! vaults.ResolveCloseRequest(window.id, SaveBeforeQuitDecision.CloseWithoutSaving) with
+                | Ok() -> return failwith "Expected an unsolicited close decision to be rejected."
+                | Error error ->
+                    Vitest.expect(error.Message).toContain ("no save decision is pending")
                     Vitest.expect(vault.CloseState).toEqual (CloseLifecycleState.Idle)
-
-                    vault.BeginWaitingForSaveDecision()
-                    Vitest.expect(vault.CloseState).toEqual (CloseLifecycleState.WaitingForSaveDecision)
-                    vault.ClearCloseDecisionRecovery()
-                finally
-                    Vitest.vi.useRealTimers () |> ignore
             }
         )
 )

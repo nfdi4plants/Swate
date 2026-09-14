@@ -189,6 +189,7 @@ Vitest.describe (
                             [| sourcePath |]
                             progress.Add
                             (fun () -> false)
+                            ignore
                             acceptImportedFiles
                     with
                     | Error error -> failwith error.Message
@@ -232,6 +233,7 @@ Vitest.describe (
                             |]
                             onProgress
                             (fun () -> cancelRequested)
+                            ignore
                             acceptImportedFiles
                     with
                     | Error error -> failwith error.Message
@@ -268,6 +270,7 @@ Vitest.describe (
                             [| sourcePath |]
                             ignore
                             (fun () -> false)
+                            ignore
                             (fun () -> promise { return Error(exn "ARC synchronization failed") })
                     with
                     | Ok outcome -> failwith $"Expected validation failure, got {outcome}."
@@ -299,6 +302,7 @@ Vitest.describe (
                             |]
                             ignore
                             (fun () -> false)
+                            ignore
                             acceptImportedFiles
                     with
                     | Ok outcome -> failwith $"Expected import failure, got {outcome}."
@@ -320,18 +324,26 @@ Vitest.describe (
                     let fileName = $"cleanup-failure-{newGuidN ()}.txt"
                     let sourcePath = join [| sourceDirectory; fileName |]
                     let mutable cleanupErrorWasLogged = false
+                    let lifecycleOrder = ResizeArray<string>()
                     do! writeRelativeFileAsync sourceDirectory fileName "published content"
 
                     match!
                         ArcFileSystemHelper.importExternalFilesOnDiskWithTemporaryCleanup
-                            (fun _ -> JS.Constructors.Promise.reject (nodeError "staging directory busy" "EBUSY"))
+                            (fun _ ->
+                                lifecycleOrder.Add "cleanup"
+                                JS.Constructors.Promise.reject (nodeError "staging directory busy" "EBUSY")
+                            )
                             (fun _ -> cleanupErrorWasLogged <- true)
                             arcPath
                             "assays/AssayA"
                             [| sourcePath |]
                             ignore
                             (fun () -> false)
-                            acceptImportedFiles
+                            (fun () -> lifecycleOrder.Add "published")
+                            (fun () -> promise {
+                                lifecycleOrder.Add "validate"
+                                return Ok()
+                            })
                     with
                     | Error error -> failwith error.Message
                     | Ok ImportExternalFilesResult.Cancelled -> failwith "Expected import to complete."
@@ -340,6 +352,17 @@ Vitest.describe (
                         let! importedFileExists = pathExistsAsync importedPath
                         Vitest.expect(importedFileExists).toBe (true)
                         Vitest.expect(cleanupErrorWasLogged).toBe (true)
+                        Vitest.expect(lifecycleOrder.[0]).toBe ("published")
+                        Vitest.expect(lifecycleOrder.[lifecycleOrder.Count - 1]).toBe ("validate")
+
+                        Vitest
+                            .expect(
+                                lifecycleOrder
+                                |> Seq.skip 1
+                                |> Seq.take (lifecycleOrder.Count - 2)
+                                |> Seq.forall ((=) "cleanup")
+                            )
+                            .toBe (true)
                 })
         )
 
@@ -359,6 +382,7 @@ Vitest.describe (
                             [| join [| sourceDirectory; fileName |] |]
                             ignore
                             (fun () -> false)
+                            ignore
                             acceptImportedFiles
                     with
                     | Ok outcome -> failwith $"Expected destination conflict, got {outcome}."

@@ -21,6 +21,7 @@ type CloseLifecycleState =
     | Idle
     | WaitingForImportCleanup
     | WaitingForSaveDecision
+    | ResolvingSaveDecision
     | Approved
 
 /// <summary>
@@ -28,9 +29,6 @@ type CloseLifecycleState =
 /// </summary>
 /// <param name="path">Can be None if not opened ARC.</param>
 type ArcVault(window: BrowserWindow) =
-
-    let fileWatcherOwnWriteArcMergeSuppressionMs = 500
-    let closeDecisionRecoveryMs = 30_000
 
     let mutable lastArcMerge: Fable.Core.JS.Promise<unit> =
         Fable.Core.JS.Constructors.Promise.resolve ()
@@ -50,30 +48,10 @@ type ArcVault(window: BrowserWindow) =
     member val fileWatcherReloadArcTimeout: int option = None with get, set
     member val fileWatcherPendingEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
     member val fileWatcherPendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
+    member val fileWatcherImportOwnedEvents: HashSet<string * string> = HashSet() with get
     member val private isBusyWritingValue: bool = false with get, set
-    member val private fileWatcherOwnWriteArcMergeSuppressionTimeout: int option = None with get, set
     member val activeFileImport: ActiveFileImport option = None with get, set
-    member val private closeDecisionRecoveryTimeout: int option = None with get, set
     member val CloseState = CloseLifecycleState.Idle with get, set
-
-    member this.BeginWaitingForSaveDecision() =
-        this.closeDecisionRecoveryTimeout |> Option.iter Fable.Core.JS.clearTimeout
-        this.CloseState <- CloseLifecycleState.WaitingForSaveDecision
-
-        this.closeDecisionRecoveryTimeout <-
-            Fable.Core.JS.setTimeout
-                (fun () ->
-                    if this.CloseState = CloseLifecycleState.WaitingForSaveDecision then
-                        this.CloseState <- CloseLifecycleState.Idle
-
-                    this.closeDecisionRecoveryTimeout <- None
-                )
-                closeDecisionRecoveryMs
-            |> Some
-
-    member this.ClearCloseDecisionRecovery() =
-        this.closeDecisionRecoveryTimeout |> Option.iter Fable.Core.JS.clearTimeout
-        this.closeDecisionRecoveryTimeout <- None
 
     /// Runs ARC merges sequentially so every operation observes the result of the preceding merge.
     member this.EnqueueArcMerge<'T>(operation: unit -> Fable.Core.JS.Promise<'T>) : Fable.Core.JS.Promise<'T> =
@@ -99,32 +77,10 @@ type ArcVault(window: BrowserWindow) =
 
         queuedMerge
 
-    member private this.StartFileWatcherOwnWriteArcMergeSuppression() =
-        this.fileWatcherOwnWriteArcMergeSuppressionTimeout
-        |> Option.iter Fable.Core.JS.clearTimeout
-
-        let timeoutId =
-            Fable.Core.JS.setTimeout
-                (fun () -> this.fileWatcherOwnWriteArcMergeSuppressionTimeout <- None)
-                fileWatcherOwnWriteArcMergeSuppressionMs
-
-        this.fileWatcherOwnWriteArcMergeSuppressionTimeout <- Some timeoutId
-
     /// Indicates whether the vault is currently busy writing changes to disk.
-    /// When a write finishes, watcher ARC merges stay suppressed briefly to cover delayed own-write events.
     member this.isBusyWriting
         with get () = this.isBusyWritingValue
-        and set value =
-            let wasBusyWriting = this.isBusyWritingValue
-            this.isBusyWritingValue <- value
-
-            if wasBusyWriting && not value then
-                this.StartFileWatcherOwnWriteArcMergeSuppression()
-
-    /// Indicates whether a captured watcher event is eligible to update the in-memory ARC.
-    member this.IsFileWatcherArcMergeEligible =
-        not this.isBusyWritingValue
-        && this.fileWatcherOwnWriteArcMergeSuppressionTimeout.IsNone
+        and set value = this.isBusyWritingValue <- value
 
     /// This function mutably sets the active ARC in memory without persisting to disk.
     member this.SetArc(arc: ARC) =
@@ -235,13 +191,56 @@ module ArcVaultExtensions =
         }
 
         member private this._FileEventController(sendMsgApi: IArcFileWatcherApi) =
+            let rec scheduleReload () =
+                let timeoutId =
+                    Fable.Core.JS.setTimeout
+                        (fun () ->
+                            promise {
+                                swatelogfn this.window.id "Scheduled ARC reload triggered by file watcher."
+
+                                if this.isBusyWriting then
+                                    // Preserve both queues while a writer owns the vault. A later retry will merge
+                                    // unrelated external events instead of discarding them at the debounce boundary.
+                                    scheduleReload ()
+                                else
+                                    let pendingEvents = this.fileWatcherPendingEvents |> Seq.toList
+                                    let pendingArcMergeEvents = this.fileWatcherPendingArcMergeEvents |> Seq.toList
+                                    this.fileWatcherPendingEvents.Clear()
+                                    this.fileWatcherPendingArcMergeEvents.Clear()
+
+                                    // FileTree updates are renderer-visible and can trigger an immediate openFile call.
+                                    // Merge first so that call reads the same ARC state represented by the published tree.
+                                    if not pendingArcMergeEvents.IsEmpty then
+                                        do! this.TriggerArcInMemoryMergeOnFileWatcherEvents pendingArcMergeEvents
+
+                                    do! this.ApplyWatcherFileTreeEvents pendingEvents
+
+                                    this.fileWatcherReloadArcTimeout <- None
+                                    sendMsgApi.IsLoadingChanges false
+                            }
+                            |> Promise.catch (fun ex ->
+                                swatelogfn this.window.id "Scheduled ARC reload failed: %s" ex.Message
+                                sendMsgApi.IsLoadingChanges false
+                                this.fileWatcherReloadArcTimeout <- None
+                            )
+                            |> Promise.start
+                        )
+                        500
+
+                this.fileWatcherReloadArcTimeout <- Some timeoutId
 
             fun (eventName: string) (path: string) ->
 
                 swatelogfn this.window.id "File change detected: %s on %s" eventName path
 
                 WatcherHelpers.queueFileWatcherEvent
-                    this.IsFileWatcherArcMergeEligible
+                    (fun event ->
+                        this.fileWatcherImportOwnedEvents.Remove(
+                            event.EventName.ToLowerInvariant(),
+                            PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant())
+                        )
+                        |> not
+                    )
                     this.path
                     this.fileWatcherPendingEvents
                     this.fileWatcherPendingArcMergeEvents
@@ -254,36 +253,7 @@ module ArcVaultExtensions =
                     this.fileWatcherReloadArcTimeout <- None
                 | None -> sendMsgApi.IsLoadingChanges true
 
-                let timeoutId =
-                    Fable.Core.JS.setTimeout
-                        (fun () ->
-                            promise {
-                                swatelogfn this.window.id "Scheduled ARC reload triggered by file watcher."
-                                let pendingEvents = this.fileWatcherPendingEvents |> Seq.toList
-                                let pendingArcMergeEvents = this.fileWatcherPendingArcMergeEvents |> Seq.toList
-                                this.fileWatcherPendingEvents.Clear()
-                                this.fileWatcherPendingArcMergeEvents.Clear()
-
-                                // FileTree updates are renderer-visible and can trigger an immediate openFile call.
-                                // Merge first so that call reads the same ARC state represented by the published tree.
-                                if not pendingArcMergeEvents.IsEmpty && not this.isBusyWriting then
-                                    do! this.TriggerArcInMemoryMergeOnFileWatcherEvents pendingArcMergeEvents
-
-                                do! this.ApplyWatcherFileTreeEvents pendingEvents
-
-                                this.fileWatcherReloadArcTimeout <- None
-                                sendMsgApi.IsLoadingChanges false
-                            }
-                            |> Promise.catch (fun ex ->
-                                swatelogfn this.window.id "Scheduled ARC reload failed: %s" ex.Message
-                                sendMsgApi.IsLoadingChanges false
-                                this.fileWatcherReloadArcTimeout <- None
-                            )
-                            |> Promise.start
-                        )
-                        500
-
-                this.fileWatcherReloadArcTimeout <- Some timeoutId
+                scheduleReload ()
 
         /// Applies an ARC content DTO to the in-memory ARC and marks the vault dirty.
         member this.UpdateArcByFileContentDTO(request: FileContentDTO) : Result<unit, exn> =
@@ -432,6 +402,7 @@ module ArcVaultExtensions =
             this.fileWatcherReloadArcTimeout <- None
             this.fileWatcherPendingEvents.Clear()
             this.fileWatcherPendingArcMergeEvents.Clear()
+            this.fileWatcherImportOwnedEvents.Clear()
 
         member this.StopFileWatcher() = promise {
             match this.watcher with
@@ -644,37 +615,44 @@ type ArcVaults() =
             swatelogfn windowId "%s" message
             return Error(exn message)
         | Some(vault: ArcVault) ->
-            vault.ClearCloseDecisionRecovery()
+            if vault.CloseState <> CloseLifecycleState.WaitingForSaveDecision then
+                let message = "Close decision ignored because no save decision is pending."
+                swatelogfn windowId "%s" message
+                return Error(exn message)
+            else
+                // Consume ownership before any asynchronous save work so duplicate renderer
+                // responses cannot resolve the same close request concurrently.
+                vault.CloseState <- CloseLifecycleState.ResolvingSaveDecision
 
-            match decision with
-            | SaveBeforeQuitDecision.CancelClose ->
-                swatelogfn windowId "Close request cancelled by user."
-                vault.CloseState <- CloseLifecycleState.Idle
-                return Ok()
-            | SaveBeforeQuitDecision.CloseWithoutSaving ->
-                swatelogfn windowId "Close request approved by user. Closing without saving."
-                vault.RefreshHasUnsavedArcChangesFlag()
-                vault.CloseState <- CloseLifecycleState.Approved
-                vault.window.close ()
-                return Ok()
-            | SaveBeforeQuitDecision.SaveAndClose ->
-                swatelogfn windowId "Close request approved by user. Closing after main save."
-
-                if vault.hasUnsavedArcChanges then
-                    let! persistResult = vault.WriteArc()
-
-                    match persistResult with
-                    | Error saveError ->
-                        vault.CloseState <- CloseLifecycleState.Idle
-                        return Error saveError
-                    | Ok() ->
-                        vault.CloseState <- CloseLifecycleState.Approved
-                        vault.window.close ()
-                        return Ok()
-                else
+                match decision with
+                | SaveBeforeQuitDecision.CancelClose ->
+                    swatelogfn windowId "Close request cancelled by user."
+                    vault.CloseState <- CloseLifecycleState.Idle
+                    return Ok()
+                | SaveBeforeQuitDecision.CloseWithoutSaving ->
+                    swatelogfn windowId "Close request approved by user. Closing without saving."
+                    vault.RefreshHasUnsavedArcChangesFlag()
                     vault.CloseState <- CloseLifecycleState.Approved
                     vault.window.close ()
                     return Ok()
+                | SaveBeforeQuitDecision.SaveAndClose ->
+                    swatelogfn windowId "Close request approved by user. Closing after main save."
+
+                    if vault.hasUnsavedArcChanges then
+                        let! persistResult = vault.WriteArc()
+
+                        match persistResult with
+                        | Error saveError ->
+                            vault.CloseState <- CloseLifecycleState.Idle
+                            return Error saveError
+                        | Ok() ->
+                            vault.CloseState <- CloseLifecycleState.Approved
+                            vault.window.close ()
+                            return Ok()
+                    else
+                        vault.CloseState <- CloseLifecycleState.Approved
+                        vault.window.close ()
+                        return Ok()
     }
 
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
@@ -683,7 +661,8 @@ type ArcVaults() =
             match vault.CloseState with
             | CloseLifecycleState.Approved -> ()
             | CloseLifecycleState.WaitingForImportCleanup
-            | CloseLifecycleState.WaitingForSaveDecision -> closeEvent.preventDefault ()
+            | CloseLifecycleState.WaitingForSaveDecision
+            | CloseLifecycleState.ResolvingSaveDecision -> closeEvent.preventDefault ()
             | CloseLifecycleState.Idle ->
                 if vault.activeFileImport.IsSome then
                     closeEvent.preventDefault ()
@@ -707,7 +686,7 @@ type ArcVaults() =
                     |> Promise.start
                 elif vault.hasUnsavedArcChanges then
                     closeEvent.preventDefault ()
-                    vault.BeginWaitingForSaveDecision()
+                    vault.CloseState <- CloseLifecycleState.WaitingForSaveDecision
 
                     let saveBeforeQuitClient =
                         Remoting.createIpc ()
@@ -720,7 +699,6 @@ type ArcVaults() =
         )
 
         window.onClosed (fun () ->
-            vault.ClearCloseDecisionRecovery()
             vault.CloseState <- CloseLifecycleState.Idle
             this.DisposeVault(id)
         )

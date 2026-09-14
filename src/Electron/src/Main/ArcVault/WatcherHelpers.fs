@@ -57,7 +57,7 @@ let queueFileWatcherEvent
         let watcherEvent = buildWatcherEvent rootPath eventName changedPath
         pendingEvents.Add watcherEvent
 
-        if isArcMergeEligible then
+        if isArcMergeEligible watcherEvent then
             pendingArcMergeEvents.Add watcherEvent
     | None -> ()
 

@@ -374,6 +374,7 @@ module ArcFileSystemHelper =
         (sourcePaths: string[])
         (onProgress: float -> unit)
         (isCancellationRequested: unit -> bool)
+        (onFilesPublished: unit -> unit)
         (validateImportedFiles: unit -> JS.Promise<Result<unit, exn>>)
         : JS.Promise<Result<ImportExternalFilesResult, exn>> =
         promise {
@@ -388,6 +389,7 @@ module ArcFileSystemHelper =
                     temporaryDirectory <- Some plan.TemporaryDirectory
                     do! copyExternalFilesToTemporaryDirectory plan onProgress isCancellationRequested
                     do! copyTemporaryFilesIntoTarget plan createdTargetPaths isCancellationRequested
+                    onFilesPublished ()
 
                     match! removePathWithRetriesAsync removeTemporaryDirectory plan.TemporaryDirectory with
                     | Ok() -> ()
