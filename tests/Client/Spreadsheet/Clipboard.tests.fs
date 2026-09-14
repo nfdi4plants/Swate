@@ -34,6 +34,11 @@ let private createTermTableState (cell: CompositeCell) =
     assay.AddTable table
     Spreadsheet.Model.init (ArcFiles.Assay assay, Spreadsheet.ActiveView.Table 0)
 
+let private createDataMapState (dataContexts: DataContext seq) =
+    let assay = ArcAssay.init "DataMapClipboardTest"
+    assay.DataMap <- Some(ARCtrl.DataMap(ResizeArray dataContexts))
+    Spreadsheet.Model.init (ArcFiles.Assay assay, Spreadsheet.ActiveView.DataMap)
+
 let Main =
     testList "Spreadsheet Clipboard" [
         testCase "retains the shape of a multi-column selection"
@@ -128,4 +133,37 @@ let Main =
             Expect.equal unit.TermSourceREF (Some "UO") "The unit source should be preserved."
 
             Expect.equal unit.TermAccessionNumber (Some "UO:0000008") "The unit accession should be preserved."
+
+        testCase "uses DataMap structured-paste rules from the spreadsheet controller"
+        <| fun _ ->
+            let existingTerm = OntologyAnnotation("old name", "OLD", "OLD:1")
+            let state = createDataMapState [ DataContext(explication = existingTerm) ]
+
+            let payload =
+                [|
+                    [|
+                        CompositeCell.FreeText "new name"
+                        CompositeCell.createUnitizedFromString ("4", "metre", "UO", "UO:0000008")
+                    |]
+                    [| CompositeCell.FreeText "second name" |]
+                |]
+                |> Swate.Components.ClipboardCodec.createPayload
+
+            Spreadsheet.Controller.Clipboard.pastePayloadByIndexExtend {| x = 4; y = 0 |} payload state
+            |> ignore
+
+            let dataMap = state.DataMapOrDefault
+            let pastedTerm = dataMap.DataContexts.[0].Explication.Value
+            let pastedUnit = dataMap.DataContexts.[0].Unit.Value
+
+            Expect.equal pastedTerm.NameText "new name" "Text should update the existing DataMap term name."
+            Expect.equal pastedTerm.TermSourceREF (Some "OLD") "Text should retain the destination term source."
+            Expect.equal pastedTerm.TermAccessionNumber (Some "OLD:1") "Text should retain the destination accession."
+            Expect.equal pastedUnit.NameText "metre" "A unitized source should contribute its unit term."
+            Expect.equal pastedUnit.TermSourceREF (Some "UO") "The pasted unit ontology source should be retained."
+            Expect.equal dataMap.RowCount 2 "Structured paste should grow the DataMap for additional rows."
+            Expect.equal
+                dataMap.DataContexts.[1].Explication.Value.NameText
+                "second name"
+                "The payload row beyond the original DataMap should be pasted."
     ]

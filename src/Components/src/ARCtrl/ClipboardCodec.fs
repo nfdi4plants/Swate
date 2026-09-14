@@ -3,7 +3,6 @@ module Swate.Components.ClipboardCodec
 open ARCtrl
 open Browser.Dom
 open Fable.Core
-open Fable.Core.JsInterop
 
 [<Literal>]
 let MimeType = "web application/x-swate-cells+json"
@@ -14,28 +13,7 @@ let private CurrentVersion = 1
 [<Literal>]
 let private HtmlPayloadAttribute = "data-swate-cells"
 
-[<AllowNullLiteral>]
-type CellDto =
-    abstract Kind: string
-    abstract Value: string
-    abstract Name: string
-    abstract TermSourceRef: string
-    abstract TermAccessionNumber: string
-    abstract Selector: string
-    abstract Format: string
-    abstract SelectorFormat: string
-
-[<AllowNullLiteral>]
-type Payload =
-    abstract Version: int
-    abstract Rows: CellDto[][]
-
-type ClipboardContent = {
-    PlainText: string
-    Payload: Payload option
-}
-
-type private CellData = {
+type CellDto = {
     Kind: string
     Value: string
     Name: string
@@ -46,23 +24,20 @@ type private CellData = {
     SelectorFormat: string
 }
 
-let private createCell (data: CellData) =
-    createObj [
-        "Kind" ==> data.Kind
-        "Value" ==> data.Value
-        "Name" ==> data.Name
-        "TermSourceRef" ==> data.TermSourceRef
-        "TermAccessionNumber" ==> data.TermAccessionNumber
-        "Selector" ==> data.Selector
-        "Format" ==> data.Format
-        "SelectorFormat" ==> data.SelectorFormat
-    ]
-    |> unbox<CellDto>
+type Payload = {
+    Version: int
+    Rows: CellDto[][]
+}
+
+type ClipboardContent = {
+    PlainText: string
+    Payload: Payload option
+}
 
 let ofCompositeCell (cell: CompositeCell) =
     match cell with
     | CompositeCell.FreeText value ->
-        createCell {
+        {
             Kind = "freetext"
             Value = value
             Name = ""
@@ -73,7 +48,7 @@ let ofCompositeCell (cell: CompositeCell) =
             SelectorFormat = ""
         }
     | CompositeCell.Term term ->
-        createCell {
+        {
             Kind = "term"
             Value = ""
             Name = term.NameText
@@ -84,7 +59,7 @@ let ofCompositeCell (cell: CompositeCell) =
             SelectorFormat = ""
         }
     | CompositeCell.Unitized(value, unit) ->
-        createCell {
+        {
             Kind = "unitized"
             Value = value
             Name = unit.NameText
@@ -95,7 +70,7 @@ let ofCompositeCell (cell: CompositeCell) =
             SelectorFormat = ""
         }
     | CompositeCell.Data data ->
-        createCell {
+        {
             Kind = "data"
             Value = data.FilePath |> Option.defaultValue ""
             Name = ""
@@ -139,46 +114,44 @@ let toCompositeCell (cell: CellDto) =
     | kind -> failwith $"Unknown clipboard cell kind: {kind}"
 
 let validateCellDto (cell: CellDto) =
-    cell
-    |> Option.ofObj
-    |> Option.bind (fun cell ->
-        match cell.Kind |> Option.ofObj with
-        | Some "freetext" -> Some [| cell.Value |]
-        | Some "term" ->
-            Some [|
-                cell.Name
-                cell.TermSourceRef
-                cell.TermAccessionNumber
-            |]
-        | Some "unitized" ->
-            Some [|
-                cell.Value
-                cell.Name
-                cell.TermSourceRef
-                cell.TermAccessionNumber
-            |]
-        | Some "data" ->
-            Some [|
-                cell.Value
-                cell.Selector
-                cell.Format
-                cell.SelectorFormat
-            |]
-        | _ -> None
-    )
-    |> Option.exists (Array.forall (Option.ofObj >> Option.isSome))
+    if isNull (box cell) then
+        false
+    else
+        let requiredFields =
+            match cell.Kind |> Option.ofObj with
+            | Some "freetext" -> Some [| cell.Value |]
+            | Some "term" ->
+                Some [|
+                    cell.Name
+                    cell.TermSourceRef
+                    cell.TermAccessionNumber
+                |]
+            | Some "unitized" ->
+                Some [|
+                    cell.Value
+                    cell.Name
+                    cell.TermSourceRef
+                    cell.TermAccessionNumber
+                |]
+            | Some "data" ->
+                Some [|
+                    cell.Value
+                    cell.Selector
+                    cell.Format
+                    cell.SelectorFormat
+                |]
+            | _ -> None
+
+        requiredFields |> Option.exists (Array.forall (Option.ofObj >> Option.isSome))
 
 let private validateRow (row: CellDto[]) =
-    row
-    |> Option.ofObj
-    |> Option.exists (fun row -> row.Length > 0 && Array.forall validateCellDto row)
+    not (isNull (box row)) && row.Length > 0 && Array.forall validateCellDto row
 
 let createPayload (cells: CompositeCell[][]) =
-    createObj [
-        "Version" ==> CurrentVersion
-        "Rows" ==> (cells |> Array.map (Array.map ofCompositeCell))
-    ]
-    |> unbox<Payload>
+    {
+        Version = CurrentVersion
+        Rows = cells |> Array.map (Array.map ofCompositeCell)
+    }
 
 let encode payload = JS.JSON.stringify payload
 
@@ -202,9 +175,8 @@ let tryDecode json =
 let private escapeHtml (text: string) =
     text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&#39;")
 
-let createHtmlRepresentation (cells: CompositeCell[][]) =
-    let encodedPayload = cells |> createPayload |> encode |> JS.encodeURIComponent
-
+let private createHtmlRepresentationFromPayload (cells: CompositeCell[][]) (payloadText: string) =
+    let encodedPayload = payloadText |> JS.encodeURIComponent
     let tableRows =
         cells
         |> Array.map (fun row ->
@@ -216,6 +188,10 @@ let createHtmlRepresentation (cells: CompositeCell[][]) =
         |> String.concat ""
 
     $"<table {HtmlPayloadAttribute}=\"{encodedPayload}\">{tableRows}</table>"
+
+let createHtmlRepresentation (cells: CompositeCell[][]) =
+    let payloadText = cells |> createPayload |> encode
+    createHtmlRepresentationFromPayload cells payloadText
 
 let tryDecodeHtml (htmlText: string) =
     if isNull htmlText then
@@ -254,8 +230,8 @@ let write (plainText: string) (cells: CompositeCell[][] option) = promise {
     | None -> do! Swate.Components.GlobalBindings.navigator.clipboard.writeText plainText
     | Some cells ->
         let clipboard = Swate.Components.GlobalBindings.navigator.clipboard
-        let htmlText = createHtmlRepresentation cells
         let payloadText = cells |> createPayload |> encode
+        let htmlText = createHtmlRepresentationFromPayload cells payloadText
 
         try
             do!

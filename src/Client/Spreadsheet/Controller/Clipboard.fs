@@ -5,6 +5,7 @@ open ARCtrl
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.ClipboardCodec
+open Swate.Components.Composite.DataMapTable.Types
 
 let getCellRowsByIndex (indices: CellCoordinate[]) (state: Spreadsheet.Model) =
     indices
@@ -61,33 +62,40 @@ let pastePayloadByIndexExtend
     (payload: ClipboardCodec.Payload)
     (state: Spreadsheet.Model)
     : Spreadsheet.Model =
-    let columnCount = Generic.getColCount state
+    match state.ActiveView with
+    | Spreadsheet.ActiveView.DataMap ->
+        // The spreadsheet controller uses zero-based coordinates, while DataMapTable uses
+        // one-based grid coordinates that exclude its header row and index column.
+        state.DataMapOrDefault.PastePayload({| x = index.x + 1; y = index.y + 1 |}, payload)
+    | _ ->
+        let columnCount = Generic.getColCount state
 
-    let indexedCells =
-        payload.Rows
-        |> Array.mapi (fun rowOffset row ->
-            row
-            |> Array.mapi (fun columnOffset cell ->
-                let columnIndex = index.x + columnOffset
+        let indexedCells =
+            payload.Rows
+            |> Array.mapi (fun rowOffset row ->
+                row
+                |> Array.mapi (fun columnOffset cell ->
+                    let columnIndex = index.x + columnOffset
 
-                if columnIndex < columnCount then
-                    let header = Generic.getHeader columnIndex state
-                    let cell = ClipboardCodec.toCompositeCell cell |> _.ConvertToValidCell(header)
+                    if columnIndex < columnCount then
+                        let header = Generic.getHeader columnIndex state
+                        let cell = ClipboardCodec.toCompositeCell cell |> _.ConvertToValidCell(header)
 
-                    let coordinate: CellCoordinate = {|
-                        x = columnIndex
-                        y = index.y + rowOffset
-                    |}
+                        let coordinate: CellCoordinate = {|
+                            x = columnIndex
+                            y = index.y + rowOffset
+                        |}
 
-                    Some(coordinate, cell)
-                else
-                    None
+                        Some(coordinate, cell)
+                    else
+                        None
+                )
+                |> Array.choose id
             )
-            |> Array.choose id
-        )
-        |> Array.concat
+            |> Array.concat
 
-    Generic.setCells indexedCells state
+        Generic.setCells indexedCells state
+
     state
 
 let pasteCellsByIndexExtend (index: CellCoordinate) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> = promise {
