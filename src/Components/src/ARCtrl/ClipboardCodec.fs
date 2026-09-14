@@ -24,10 +24,7 @@ type CellDto = {
     SelectorFormat: string
 }
 
-type Payload = {
-    Version: int
-    Rows: CellDto[][]
-}
+type Payload = { Version: int; Rows: CellDto[][] }
 
 type ClipboardContent = {
     PlainText: string
@@ -36,50 +33,46 @@ type ClipboardContent = {
 
 let ofCompositeCell (cell: CompositeCell) =
     match cell with
-    | CompositeCell.FreeText value ->
-        {
-            Kind = "freetext"
-            Value = value
-            Name = ""
-            TermSourceRef = ""
-            TermAccessionNumber = ""
-            Selector = ""
-            Format = ""
-            SelectorFormat = ""
-        }
-    | CompositeCell.Term term ->
-        {
-            Kind = "term"
-            Value = ""
-            Name = term.NameText
-            TermSourceRef = term.TermSourceREF |> Option.defaultValue ""
-            TermAccessionNumber = term.TermAccessionNumber |> Option.defaultValue ""
-            Selector = ""
-            Format = ""
-            SelectorFormat = ""
-        }
-    | CompositeCell.Unitized(value, unit) ->
-        {
-            Kind = "unitized"
-            Value = value
-            Name = unit.NameText
-            TermSourceRef = unit.TermSourceREF |> Option.defaultValue ""
-            TermAccessionNumber = unit.TermAccessionNumber |> Option.defaultValue ""
-            Selector = ""
-            Format = ""
-            SelectorFormat = ""
-        }
-    | CompositeCell.Data data ->
-        {
-            Kind = "data"
-            Value = data.FilePath |> Option.defaultValue ""
-            Name = ""
-            TermSourceRef = ""
-            TermAccessionNumber = ""
-            Selector = data.Selector |> Option.defaultValue ""
-            Format = data.Format |> Option.defaultValue ""
-            SelectorFormat = data.SelectorFormat |> Option.defaultValue ""
-        }
+    | CompositeCell.FreeText value -> {
+        Kind = "freetext"
+        Value = value
+        Name = ""
+        TermSourceRef = ""
+        TermAccessionNumber = ""
+        Selector = ""
+        Format = ""
+        SelectorFormat = ""
+      }
+    | CompositeCell.Term term -> {
+        Kind = "term"
+        Value = ""
+        Name = term.NameText
+        TermSourceRef = term.TermSourceREF |> Option.defaultValue ""
+        TermAccessionNumber = term.TermAccessionNumber |> Option.defaultValue ""
+        Selector = ""
+        Format = ""
+        SelectorFormat = ""
+      }
+    | CompositeCell.Unitized(value, unit) -> {
+        Kind = "unitized"
+        Value = value
+        Name = unit.NameText
+        TermSourceRef = unit.TermSourceREF |> Option.defaultValue ""
+        TermAccessionNumber = unit.TermAccessionNumber |> Option.defaultValue ""
+        Selector = ""
+        Format = ""
+        SelectorFormat = ""
+      }
+    | CompositeCell.Data data -> {
+        Kind = "data"
+        Value = data.FilePath |> Option.defaultValue ""
+        Name = ""
+        TermSourceRef = ""
+        TermAccessionNumber = ""
+        Selector = data.Selector |> Option.defaultValue ""
+        Format = data.Format |> Option.defaultValue ""
+        SelectorFormat = data.SelectorFormat |> Option.defaultValue ""
+      }
 
 let toCompositeCell (cell: CellDto) =
     match cell.Kind with
@@ -147,11 +140,10 @@ let validateCellDto (cell: CellDto) =
 let private validateRow (row: CellDto[]) =
     not (isNull (box row)) && row.Length > 0 && Array.forall validateCellDto row
 
-let createPayload (cells: CompositeCell[][]) =
-    {
-        Version = CurrentVersion
-        Rows = cells |> Array.map (Array.map ofCompositeCell)
-    }
+let createPayload (cells: CompositeCell[][]) = {
+    Version = CurrentVersion
+    Rows = cells |> Array.map (Array.map ofCompositeCell)
+}
 
 let encode payload = JS.JSON.stringify payload
 
@@ -177,6 +169,7 @@ let private escapeHtml (text: string) =
 
 let private createHtmlRepresentationFromPayload (cells: CompositeCell[][]) (payloadText: string) =
     let encodedPayload = payloadText |> JS.encodeURIComponent
+
     let tableRows =
         cells
         |> Array.map (fun row ->

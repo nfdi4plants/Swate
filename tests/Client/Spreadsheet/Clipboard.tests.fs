@@ -162,6 +162,7 @@ let Main =
             Expect.equal pastedUnit.NameText "metre" "A unitized source should contribute its unit term."
             Expect.equal pastedUnit.TermSourceREF (Some "UO") "The pasted unit ontology source should be retained."
             Expect.equal dataMap.RowCount 2 "Structured paste should grow the DataMap for additional rows."
+
             Expect.equal
                 dataMap.DataContexts.[1].Explication.Value.NameText
                 "second name"
