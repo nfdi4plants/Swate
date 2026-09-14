@@ -45,14 +45,6 @@ let private createImportedFileWatcherEvents arcPath (request: ImportExternalFile
         }
     )
 
-let private refreshVaultFileTree (vault: ArcVault) = promise {
-    match vault.path with
-    | Some arcPath ->
-        let! fileTree = getFileTree arcPath
-        vault.SetFileTree fileTree
-    | None -> ()
-}
-
 let private withLoadedArcVault<'T>
     (event: IpcMainInvokeEvent)
     (operation: ArcVault -> JS.Promise<Result<'T, exn>>)
@@ -502,12 +494,6 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                                     importedEvents |> Array.toList
                                                                 )
                                                             )
-
-                                                    match result with
-                                                    | Ok ImportExternalFilesResult.Completed ->
-                                                        do! refreshVaultFileTree vault
-                                                    | Ok ImportExternalFilesResult.Cancelled
-                                                    | Error _ -> ()
 
                                                     return result
                                                 finally

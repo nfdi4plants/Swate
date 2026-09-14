@@ -43,10 +43,9 @@ let buildWatcherEvent (arcPath: string) (eventName: string) (path: string) =
         AbsolutePath = absolutePath
     }
 
-/// Queues an external watcher event for its coordinated ARC merge and file-tree update.
-/// Events caused by an active or recently completed app write are intentionally discarded.
-let tryQueueFileWatcherEvent
-    isEligible
+/// Always queues a watcher event for the file tree, while ARC merge eligibility is controlled separately.
+let queueFileWatcherEvent
+    isArcMergeEligible
     arcPath
     (pendingEvents: ResizeArray<ArcVaultFileSystemEvent>)
     (pendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent>)
@@ -54,12 +53,13 @@ let tryQueueFileWatcherEvent
     changedPath
     =
     match arcPath with
-    | Some rootPath when isEligible ->
+    | Some rootPath ->
         let watcherEvent = buildWatcherEvent rootPath eventName changedPath
         pendingEvents.Add watcherEvent
-        pendingArcMergeEvents.Add watcherEvent
-        true
-    | _ -> false
+
+        if isArcMergeEligible then
+            pendingArcMergeEvents.Add watcherEvent
+    | None -> ()
 
 /// Converts raw filesystem events into ARC merge events; unlink-dir events expand to possible canonical files.
 let toArcMergeEvents (events: ArcVaultFileSystemEvent list) =

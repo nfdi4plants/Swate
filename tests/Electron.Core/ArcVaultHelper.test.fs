@@ -178,7 +178,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "app-owned import writes are not queued for duplicate watcher merge or tree publication",
+            "app-owned import writes remain queued for the watcher-owned tree update but not an ARC merge",
             fun () -> promise {
                 let vault = ArcVault(TestHelpers.testWindow ())
                 vault.path <- Some "C:/arc"
@@ -197,7 +197,7 @@ Vitest.describe (
                          })
 
                 let queueWatcherEvent () =
-                    WatcherHelpers.tryQueueFileWatcherEvent
+                    WatcherHelpers.queueFileWatcherEvent
                         vault.IsFileWatcherArcMergeEligible
                         vault.path
                         vault.fileWatcherPendingEvents
@@ -205,19 +205,15 @@ Vitest.describe (
                         "add"
                         "C:/arc/imported.txt"
 
-                let queuedDuringImport = queueWatcherEvent ()
-
-                Vitest.expect(queuedDuringImport).toBe (false)
-                Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (0)
+                queueWatcherEvent ()
+                Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (1)
                 Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (0)
 
                 finishImport ()
                 let! _ = import
 
-                let queuedDuringDelayedSuppression = queueWatcherEvent ()
-
-                Vitest.expect(queuedDuringDelayedSuppression).toBe (false)
-                Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (0)
+                queueWatcherEvent ()
+                Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (2)
                 Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (0)
             }
         )

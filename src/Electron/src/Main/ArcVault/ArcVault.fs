@@ -209,14 +209,13 @@ module ArcVaultExtensions =
 
                 swatelogfn this.window.id "File change detected: %s on %s" eventName path
 
-                WatcherHelpers.tryQueueFileWatcherEvent
+                WatcherHelpers.queueFileWatcherEvent
                     this.IsFileWatcherArcMergeEligible
                     this.path
                     this.fileWatcherPendingEvents
                     this.fileWatcherPendingArcMergeEvents
                     eventName
                     path
-                |> ignore
 
                 match this.fileWatcherReloadArcTimeout with
                 | Some timeoutId ->
