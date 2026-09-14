@@ -318,16 +318,47 @@ let shouldUsePollingByDefault (platform: string) =
 let private currentNodePlatform () : string =
     emitJsExpr () "process.platform" |> unbox<string>
 
-let createWatcherOptions (cwd: string) (usePolling: bool option) =
+let shouldIgnoreWatcherPath (path: string) =
+    let normalizedPath = PathHelpers.normalizeSeparators path
+    let tempXlsxPattern = """\.~\$.*\.xlsx$"""
 
-    let ignoreFn =
-        fun (path: string) ->
-            let normalizedPath = PathHelpers.normalizeSeparators path
-            let tempXlsxPattern = """\.~\$.*\.xlsx$"""
+    System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
+    || isGitMetadataPath normalizedPath
+    || isLegacyDataMapPath normalizedPath
 
-            System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
-            || isGitMetadataPath normalizedPath
-            || isLegacyDataMapPath normalizedPath
+let private isArcZone segment =
+    [
+        ArcPathHelper.StudiesFolderName
+        ArcPathHelper.AssaysFolderName
+        ArcPathHelper.WorkflowsFolderName
+        ArcPathHelper.RunsFolderName
+    ]
+    |> List.exists (PathHelpers.pathsEqual segment)
+
+/// Keeps the permanent watcher on ARC metadata and structural directories without traversing payload trees.
+let shouldIgnoreForArcStructureWatcher (arcPath: string) (path: string) (stats: Filesystem.Stats) =
+    if shouldIgnoreWatcherPath path then
+        true
+    else
+        match tryGetRepoRelativePathOrRoot arcPath path with
+        | None -> true
+        | Some relativePath ->
+            let segments = getNonEmptyPathParts relativePath
+            let statsAvailable = not (isNull (box stats))
+            let isDirectory = statsAvailable && stats.isDirectory ()
+
+            match segments with
+            | [||] -> false
+            | [| _ |] -> false
+            | [| zone; _ |] when isArcZone zone -> false
+            | [| zone; _; _ |] when isArcZone zone ->
+                statsAvailable && not isDirectory && not (isArcModelReadContractPath relativePath)
+            | _ -> true
+
+let createWatcherOptions
+    (cwd: string)
+    (usePolling: bool option)
+    (ignored: U4<string, ResizeArray<string>, string -> bool, string -> Filesystem.Stats -> bool>) =
 
     // Native Windows file events can keep handles that block app-initiated folder renames.
     let usePolling =
@@ -338,19 +369,21 @@ let createWatcherOptions (cwd: string) (usePolling: bool option) =
             Chokidar.WatchOptions(
                 cwd = cwd,
                 awaitWriteFinish = true,
-                ignored = !^ignoreFn,
+                ignored = ignored,
                 ignoreInitial = true,
                 usePolling = true,
                 interval = 200,
                 binaryInterval = 400
             )
         else
-            Chokidar.WatchOptions(cwd = cwd, awaitWriteFinish = true, ignored = !^ignoreFn, ignoreInitial = true)
+            Chokidar.WatchOptions(cwd = cwd, awaitWriteFinish = true, ignored = ignored, ignoreInitial = true)
 
     watcherOptions
 
 let createFileWatcher (path: string) (usePolling: bool option) =
-    let watcherOptions = createWatcherOptions path usePolling
+    let ignoreFn = shouldIgnoreForArcStructureWatcher path
+    let ignored: U4<string, ResizeArray<string>, string -> bool, string -> Filesystem.Stats -> bool> = !^ignoreFn
+    let watcherOptions = createWatcherOptions path usePolling ignored
 
     let watcher = Chokidar.Chokidar.watch (path, watcherOptions)
 

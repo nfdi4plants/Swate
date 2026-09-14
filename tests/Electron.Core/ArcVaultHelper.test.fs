@@ -1,6 +1,7 @@
 module ElectronCore.ArcVaultHelperTests
 
 open ARCtrl
+open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Electron.Main
 open Main.ARCtrlExtensions
@@ -125,12 +126,50 @@ Vitest.describe (
         Vitest.test (
             "watcher options do not limit traversal depth",
             fun () ->
-                let expandedDirectoryOptions = createWatcherOptions "C:/arc" (Some true)
+                let ignored: U4<string, ResizeArray<string>, string -> bool, string -> Stats -> bool> =
+                    unbox (fun (_: string) -> false)
+
+                let expandedDirectoryOptions =
+                    createWatcherOptions "C:/arc" (Some true) ignored
 
                 Vitest.expect(expandedDirectoryOptions.depth).toEqual (None)
                 Vitest.expect(expandedDirectoryOptions.usePolling).toEqual (Some true)
                 Vitest.expect(expandedDirectoryOptions.interval).toEqual (Some 200)
                 Vitest.expect(expandedDirectoryOptions.binaryInterval).toEqual (Some 400)
+        )
+
+        Vitest.test (
+            "permanent watcher keeps ARC structure but prunes payload descendants",
+            fun () ->
+                let directoryStats =
+                    createObj [ "isDirectory" ==> (fun () -> true) ] |> unbox<Stats>
+
+                let fileStats =
+                    createObj [ "isDirectory" ==> (fun () -> false) ] |> unbox<Stats>
+
+                Vitest
+                    .expect(
+                        shouldIgnoreForArcStructureWatcher
+                            "C:/arc"
+                            "C:/arc/studies/S1/isa.study.xlsx"
+                            fileStats
+                    )
+                    .toBe (false)
+
+                Vitest
+                    .expect(
+                        shouldIgnoreForArcStructureWatcher "C:/arc" "C:/arc/studies/S1/dataset" directoryStats
+                    )
+                    .toBe (false)
+
+                Vitest
+                    .expect(
+                        shouldIgnoreForArcStructureWatcher
+                            "C:/arc"
+                            "C:/arc/studies/S1/dataset/data.raw"
+                            fileStats
+                    )
+                    .toBe (true)
         )
 
         Vitest.test (
@@ -388,7 +427,7 @@ Vitest.describe (
                             do! writeTextFileAsync collapsedFilePath "collapsed"
                             do! writeTextFileAsync stillLiveFilePath "still live"
                             do! waitForWatcherBatch ()
-                            Vitest.expect(vault.fileTree.ContainsKey collapsedFilePath).toBe (true)
+                            Vitest.expect(vault.fileTree.ContainsKey collapsedFilePath).toBe (false)
                             Vitest.expect(vault.fileTree.ContainsKey stillLiveFilePath).toBe (true)
                             do! vault.StopFileWatcher()
                         with error ->

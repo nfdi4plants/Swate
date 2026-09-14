@@ -2,6 +2,8 @@
 module Main.ArcVault
 
 open System.Collections.Generic
+open Fable.Core
+open Fable.Core.JsInterop
 open Fable.Electron
 open Fable.Electron.Remoting.Main
 open Main
@@ -314,7 +316,11 @@ module ArcVaultExtensions =
                     |> Seq.map (ArcPathHelper.combine arcPath >> PathHelpers.normalizePath)
                     |> Seq.toArray
 
-                let watcherOptions = createWatcherOptions arcPath usePolling
+                let ignoreFn = fun (path: string) -> shouldIgnoreWatcherPath path
+                let ignored: U4<string, ResizeArray<string>, string -> bool, string -> Filesystem.Stats -> bool> =
+                    !^ignoreFn
+
+                let watcherOptions = createWatcherOptions arcPath usePolling ignored
                 let watcher = Chokidar.Chokidar.watch (absolutePaths, watcherOptions)
 
                 let sendMsgApi =
@@ -458,7 +464,7 @@ module ArcVaultExtensions =
                 | None -> return raise (arcNotOpenError ())
                 | Some arcPath ->
                     let relativePath = PathHelpers.normalizeCanonicalRelativePath relativePath
-                    let key = PathHelpers.normalizeForComparison relativePath
+                    let key = relativePath
 
                     let absolutePath =
                         ArcPathHelper.combine arcPath relativePath |> PathHelpers.normalizePath
@@ -647,7 +653,7 @@ module ArcVaultExtensions =
 
                     this.expandedDirectoryPaths <-
                         expandedRelativePaths
-                        |> Array.map (fun path -> PathHelpers.normalizeForComparison path, path)
+                        |> Array.map (fun path -> PathHelpers.normalizeCanonicalRelativePath path, path)
                         |> Map.ofArray
 
                     do! this.EnsurePayloadWatcher arcPath

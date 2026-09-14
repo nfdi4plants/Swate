@@ -3,6 +3,7 @@ module Main.Bindings.Chokidar
 
 open Fable.Core
 open Fable.Core.JS
+open Main.Bindings.Filesystem
 
 [<StringEnum(CaseRules.LowerFirst)>]
 type Events =
@@ -21,7 +22,7 @@ type Events =
 type WatchOptions
     (
         ?persistent: bool,
-        ?ignored: U3<string, ResizeArray<string>, string -> bool>,
+        ?ignored: U4<string, ResizeArray<string>, string -> bool, string -> Stats -> bool>,
         ?ignoreInitial: bool,
         ?followSimlinks: bool,
         ?cwd: string,
