@@ -303,6 +303,50 @@ export const MultiSelectionWithoutCheckboxes: Story = {
   },
 };
 
+const NodeSelectabilityTree = () => {
+  const [selected, setSelected] = React.useState<string[]>([]);
+  const items = React.useMemo(
+    () => [branch("folder", "folder", [leaf("folder/file.txt", "file.txt")])],
+    [],
+  );
+
+  return (
+    <div className="swt:w-96">
+      <Tree
+        items={items}
+        defaultExpandedIds={["folder"]}
+        selectedIds={selected}
+        onSelectionChange={setSelected}
+        isNodeSelectable={(node) => node.type === "leaf"}
+        debug
+      />
+      <div data-testid="node-selectability-selection">Selected: {selected.join("|") || "none"}</div>
+    </div>
+  );
+};
+
+export const IsNodeSelectableKeepsLeafSelectable: Story = {
+  render: () => <NodeSelectabilityTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const branchNode = canvas.getByTestId("tree-node-folder");
+    const leafNode = canvas.getByTestId("tree-node-folder/file.txt");
+
+    await expect(branchNode).not.toHaveAttribute("aria-selected");
+    await expect(leafNode).toHaveAttribute("aria-selected", "false");
+
+    await userEvent.click(canvas.getByText("folder"));
+    await expect(branchNode).not.toHaveAttribute("aria-selected");
+    await expect(canvas.getByTestId("node-selectability-selection")).toHaveTextContent("Selected: none");
+
+    await userEvent.click(canvas.getByText("file.txt"));
+    await expect(leafNode).toHaveAttribute("aria-selected", "true");
+    await expect(canvas.getByTestId("node-selectability-selection")).toHaveTextContent(
+      "Selected: folder/file.txt",
+    );
+  },
+};
+
 const SelectionModeNormalizationTree = () => {
   const items = React.useMemo(() => [leaf("alpha.txt", "alpha.txt"), leaf("beta.txt", "beta.txt")], []);
   const [selectionMode, setSelectionMode] = React.useState<"multiple" | "single">("multiple");
@@ -667,17 +711,12 @@ export const DataSourceInvalidateAllCache: Story = {
 
 const LazyErrorTree = () => {
   const [errorMessage, setErrorMessage] = React.useState("none");
-  const [isReady, setIsReady] = React.useState(false);
-  const originalConsoleError = React.useRef(console.error);
+  const [errorCount, setErrorCount] = React.useState(0);
   const items = React.useMemo(() => [branch("arc/runs", "runs", undefined)], []);
 
-  React.useEffect(() => {
-    console.error = (error: unknown) => setErrorMessage(error instanceof Error ? error.message : String(error));
-    setIsReady(true);
-
-    return () => {
-      console.error = originalConsoleError.current;
-    };
+  const onError = React.useCallback((error: unknown) => {
+    setErrorMessage(error instanceof Error ? error.message : String(error));
+    setErrorCount((count) => count + 1);
   }, []);
 
   const dataSource = React.useMemo(
@@ -692,8 +731,9 @@ const LazyErrorTree = () => {
 
   return (
     <div className="swt:w-96 swt:space-y-2">
-      {isReady ? <Tree items={items} dataSource={dataSource as any} debug /> : null}
+      <Tree items={items} dataSource={dataSource as any} onError={onError} debug />
       <div data-testid="lazy-error-message">Error: {errorMessage}</div>
+      <div data-testid="lazy-error-count">Errors: {errorCount}</div>
     </div>
   );
 };
@@ -708,6 +748,7 @@ export const LazyLoadingErrorState: Story = {
     await expect(canvas.getByRole("button", { name: "Expand runs" })).toBeVisible();
     await expect(canvas.queryByRole("button", { name: "Collapse runs" })).not.toBeInTheDocument();
     await expect(canvas.getByTestId("lazy-error-message")).toHaveTextContent("Run metadata could not be loaded");
+    await expect(canvas.getByTestId("lazy-error-count")).toHaveTextContent("Errors: 1");
   },
 };
 
