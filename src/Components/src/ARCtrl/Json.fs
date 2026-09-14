@@ -279,6 +279,12 @@ module Export =
             | ArcFiles.DataMap(_, _), anyElse ->
                 failwithf "Error. It is not intended to parse Datamap to %s format." (string anyElse)
 
+        let jsonString =
+            match jef with
+            | JsonExportFormat.ARCtrl -> EmptyColumnJson.normalize false jsonString
+            | JsonExportFormat.ARCtrlCompressed -> EmptyColumnJson.normalize true jsonString
+            | _ -> jsonString
+
         name, jsonString
 
     let tryParseToJsonString (arcfile: ArcFiles, jef: JsonExportFormat) =

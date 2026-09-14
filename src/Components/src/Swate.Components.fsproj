@@ -78,7 +78,9 @@
     <Compile Include="ARCtrl\TermCollection.fs" />
     <Compile Include="ARCtrl\Helper.fs" />
     <Compile Include="ARCtrl\ArcIO.fs" />
+    <Compile Include="ARCtrl\EmptyColumnJson.fs" />
     <Compile Include="ARCtrl\Json.fs" />
+    <Compile Include="ARCtrl\EmptyColumnJson.test.fs" />
     <Compile Include="ARCtrl\Types\CompositeCellDiscriminate.fs" />
     <Compile Include="ARCtrl\Types\CompositeHeaderDiscriminate.fs" />
     <Compile Include="ARCtrl\ArcTable.fs" />
