@@ -587,7 +587,19 @@ type FileTree =
                                     not fileStateCtx.isCancellingFileImport
                                     && activeImport.phase = FileImportPhase.Copying
                                 then
-                                    Swate.Components.Composite.AnnotationTable.FooterButtons.Cancel(cancelImport)
+                                    Html.button [
+                                        prop.className
+                                            "swt:btn swt:btn-ghost swt:btn-xs swt:shrink-0 swt:gap-1 swt:normal-case"
+                                        prop.title "Cancel"
+                                        prop.onClick (fun _ -> cancelImport () |> ignore)
+                                        prop.children [
+                                            Html.span [
+                                                prop.className
+                                                    "swt:iconify swt:fluent--dismiss-circle-24-regular swt:size-4"
+                                            ]
+                                            Html.span [ prop.text "Cancel" ]
+                                        ]
+                                    ]
                             ]
                         ]
                     ]
