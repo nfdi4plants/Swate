@@ -104,17 +104,22 @@ let pasteCellsByIndexExtend (index: CellCoordinate) (state: Spreadsheet.Model) :
     match content.Payload with
     | Some payload -> return pastePayloadByIndexExtend index payload state
     | None ->
-        let header = Generic.getHeader index.x state
-        let cells = CompositeCell.fromTabTxt content.PlainText header
+        match state.ActiveView with
+        | Spreadsheet.ActiveView.DataMap ->
+            state.DataMapOrDefault.PasteTabText({| x = index.x + 1; y = index.y + 1 |}, content.PlainText)
+        | _ ->
+            let header = Generic.getHeader index.x state
+            let cells = CompositeCell.fromTabTxt content.PlainText header
 
-        let indexedCells =
-            cells
-            |> Array.indexed
-            |> Array.map (fun (i, c) ->
-                let coordinate: CellCoordinate = {| x = index.x; y = index.y + i |}
-                (coordinate, c)
-            )
+            let indexedCells =
+                cells
+                |> Array.indexed
+                |> Array.map (fun (i, c) ->
+                    let coordinate: CellCoordinate = {| x = index.x; y = index.y + i |}
+                    (coordinate, c)
+                )
 
-        Generic.setCells indexedCells state
+            Generic.setCells indexedCells state
+
         return state
 }
