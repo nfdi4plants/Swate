@@ -468,7 +468,9 @@ module ArcVaultExtensions =
                 | Some arcPath ->
                     let relativePath = PathHelpers.normalizeCanonicalRelativePath relativePath
                     let key = PathHelpers.normalizeForComparison relativePath
-                    let absolutePath = ArcPathHelper.combine arcPath relativePath |> PathHelpers.normalizePath
+
+                    let absolutePath =
+                        ArcPathHelper.combine arcPath relativePath |> PathHelpers.normalizePath
 
                     if isExpanded then
                         if not (this.expandedDirectoryPaths.ContainsKey key) then
@@ -493,7 +495,9 @@ module ArcVaultExtensions =
                         this.SetFileTree refreshedFileTree
                     elif this.expandedDirectoryPaths.ContainsKey key then
                         this.expandedDirectoryPaths <- this.expandedDirectoryPaths.Remove key
-                        this.payloadWatcher |> Option.iter (fun watcher -> watcher.unwatch absolutePath |> ignore)
+
+                        this.payloadWatcher
+                        |> Option.iter (fun watcher -> watcher.unwatch absolutePath |> ignore)
             })
 
         member this.LoadArc() = promise {
