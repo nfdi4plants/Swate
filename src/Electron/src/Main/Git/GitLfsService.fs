@@ -39,20 +39,34 @@ let parseLsFiles (stdoutText: string) : GitLfsLsFileInfo[] =
 
         raise (Exception($"Failed to parse git lfs ls-files JSON: {detail}", ex))
 
-/// Git LFS metadata indexed by separator-normalized repository-relative path.
-type LfsPathIndex = Dictionary<string, GitLfsLsFileInfo>
-
-let private emptyLsPathIndex () : LfsPathIndex = Dictionary<string, GitLfsLsFileInfo>()
+/// Git LFS metadata indexed for exact and unambiguous case-insensitive path lookup.
+type LfsPathIndex = {
+    Exact: Dictionary<string, GitLfsLsFileInfo>
+    Normalized: Dictionary<string, GitLfsLsFileInfo option>
+}
 
 /// Builds the reusable path index for one `git lfs ls-files -j` snapshot.
 let createLsPathIndex (files: GitLfsLsFileInfo[]) : LfsPathIndex =
-    let index = emptyLsPathIndex ()
+    let index = {
+        Exact = Dictionary<string, GitLfsLsFileInfo>()
+        Normalized = Dictionary<string, GitLfsLsFileInfo option>()
+    }
 
     files
     |> Array.iter (fun info ->
         if not (String.IsNullOrWhiteSpace info.name) then
             let path = PathHelpers.normalizeSeparators info.name
-            index.[path] <- { info with name = path }
+            index.Exact.[path] <- { info with name = path }
+    )
+
+    index.Exact.Values
+    |> Seq.iter (fun info ->
+        let normalizedPath = PathHelpers.normalizeForComparison info.name
+
+        match index.Normalized.TryGetValue normalizedPath with
+        | false, _ -> index.Normalized.[normalizedPath] <- Some info
+        | true, Some _ -> index.Normalized.[normalizedPath] <- None
+        | true, None -> ()
     )
 
     index
@@ -60,9 +74,14 @@ let createLsPathIndex (files: GitLfsLsFileInfo[]) : LfsPathIndex =
 let tryFindLsFileInfoByRelativePath (index: LfsPathIndex) (relativePath: string) =
     let normalizedPath = PathHelpers.normalizeSeparators relativePath
 
-    match index.TryGetValue normalizedPath with
+    match index.Exact.TryGetValue normalizedPath with
     | true, info -> Some info
-    | false, _ -> None
+    | false, _ ->
+        let comparisonPath = PathHelpers.normalizeForComparison normalizedPath
+
+        match index.Normalized.TryGetValue comparisonPath with
+        | true, info -> info
+        | false, _ -> None
 
 let buildLsFilesJsonArgs () = [| "lfs"; "ls-files"; "-j" |]
 
@@ -250,7 +269,7 @@ let private readLsFilesByRelativePath (repoRoot: string) : JS.Promise<Result<Lfs
                 |> _.Trim()
 
             if String.IsNullOrWhiteSpace stdoutText then
-                return Ok(emptyLsPathIndex ())
+                return Ok(createLsPathIndex [||])
             else
                 try
                     return stdoutText |> parseLsFiles |> createLsPathIndex |> Ok
@@ -280,7 +299,7 @@ let tryGetLsFilesByRelativePath (repoRoot: string) : JS.Promise<LfsPathIndex> = 
     | Ok lfsPathIndex -> return lfsPathIndex
     | Error message ->
         Browser.Dom.console.warn $"Git LFS ls-files warning: {message}"
-        return emptyLsPathIndex ()
+        return createLsPathIndex [||]
 }
 
 let tryFindListingForPath (repoRoot: string) (relativePath: string) : JS.Promise<Result<GitLfsLsFileInfo, string>> = promise {

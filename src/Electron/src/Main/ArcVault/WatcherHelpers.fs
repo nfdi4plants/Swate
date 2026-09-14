@@ -43,11 +43,11 @@ let buildWatcherEvent (arcPath: string) (eventName: string) (path: string) =
         AbsolutePath = absolutePath
     }
 
-/// Retains only the final event for each normalized path while preserving the order of final events.
+/// Retains only the final event for each case-sensitive normalized path while preserving final-event order.
 let coalesceEventsByPath (events: ArcVaultFileSystemEvent list) =
     events
     |> List.rev
-    |> List.distinctBy (fun event -> PathHelpers.normalizeForComparison event.AbsolutePath)
+    |> List.distinctBy (fun event -> PathHelpers.normalizePath event.AbsolutePath)
     |> List.rev
 
 /// True when an event can change the in-memory ARC model. Payload events still update the FileTree.

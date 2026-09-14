@@ -196,7 +196,7 @@ Vitest.describe (
                 )
 
                 Vitest.test (
-                    "returns None for missing and case-mismatched paths without affecting exact entries",
+                    "matches case differences when the normalized path is unambiguous",
                     fun () ->
                         let existing = lfsFileInfo "data/existing.raw" "existing-oid" 42.0
                         let index = GitLfsService.createLsPathIndex [| existing |]
@@ -211,12 +211,34 @@ Vitest.describe (
                             |> Option.get
 
                         Vitest.expect(missing).toEqual (None)
-                        Vitest.expect(caseMismatch).toEqual (None)
+                        Vitest.expect(caseMismatch |> Option.map _.oid).toEqual (Some "existing-oid")
                         Vitest.expect(found.oid).toBe ("existing-oid")
                 )
 
                 Vitest.test (
-                    "handles many case-mismatched misses without rescanning the LFS listing",
+                    "prefers exact matches and rejects ambiguous case-insensitive collisions",
+                    fun () ->
+                        let upper = lfsFileInfo "Data/File.raw" "upper-oid" 10.0
+                        let lower = lfsFileInfo "data/file.raw" "lower-oid" 20.0
+                        let index = GitLfsService.createLsPathIndex [| upper; lower |]
+
+                        let exactUpper =
+                            GitLfsService.tryFindLsFileInfoByRelativePath index "Data/File.raw"
+                            |> Option.get
+
+                        let exactLower =
+                            GitLfsService.tryFindLsFileInfoByRelativePath index "data/file.raw"
+                            |> Option.get
+
+                        let ambiguous = GitLfsService.tryFindLsFileInfoByRelativePath index "DATA/FILE.RAW"
+
+                        Vitest.expect(exactUpper.oid).toBe ("upper-oid")
+                        Vitest.expect(exactLower.oid).toBe ("lower-oid")
+                        Vitest.expect(ambiguous).toEqual (None)
+                )
+
+                Vitest.test (
+                    "handles many case-insensitive matches without rescanning the LFS listing",
                     TestOptions(timeout = 5000),
                     fun () ->
                         let files =
@@ -225,7 +247,7 @@ Vitest.describe (
                                 (fun index -> lfsFileInfo $"lfs/file-{index}.raw" $"oid-{index}" (float index))
 
                         let pathIndex = GitLfsService.createLsPathIndex files
-                        let mutable unexpectedMatchCount = 0
+                        let mutable matchCount = 0
 
                         for index in 0..49999 do
                             let fileIndex = index % files.Length
@@ -234,9 +256,9 @@ Vitest.describe (
                                 GitLfsService.tryFindLsFileInfoByRelativePath pathIndex $"LFS/FILE-{fileIndex}.RAW"
                                 |> Option.isSome
                             then
-                                unexpectedMatchCount <- unexpectedMatchCount + 1
+                                matchCount <- matchCount + 1
 
-                        Vitest.expect(unexpectedMatchCount).toBe (0)
+                        Vitest.expect(matchCount).toBe (50000)
                 )
         )
 )

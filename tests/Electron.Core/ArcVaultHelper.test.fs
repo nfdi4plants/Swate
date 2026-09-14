@@ -192,7 +192,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "watcher batches keep only the final event for each normalized path",
+            "watcher batches normalize separators but preserve case-distinct paths",
             fun () ->
                 let createEvent eventName relativePath : ArcVaultFileSystemEvent = {
                     EventName = eventName
@@ -204,13 +204,15 @@ Vitest.describe (
                     [
                         createEvent "add" "data/File.txt"
                         createEvent "change" "other.txt"
-                        createEvent "unlink" "DATA\\file.txt"
+                        createEvent "unlink" "data\\File.txt"
+                        createEvent "change" "data/file.txt"
                     ]
                     |> WatcherHelpers.coalesceEventsByPath
 
-                Vitest.expect(coalesced.Length).toBe (2)
+                Vitest.expect(coalesced.Length).toBe (3)
                 Vitest.expect(coalesced.[0].RelativePath).toBe ("other.txt")
                 Vitest.expect(coalesced.[1].EventName).toBe ("unlink")
+                Vitest.expect(coalesced.[2].RelativePath).toBe ("data/file.txt")
         )
 
         Vitest.test (
