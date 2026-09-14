@@ -478,16 +478,18 @@ Vitest.describe (
                         "title" ==> ""
                         "isDestroyed" ==> (fun () -> false)
                         "close" ==> ignore
-                        "on" ==>
-                            (fun (eventName: string) (handler: obj -> unit) ->
-                                if eventName = "close" then
-                                    closeHandler <- handler)
-                        "webContents" ==>
-                            createObj [
-                                "send" ==>
-                                    (fun (_channel: string) (_payload: obj) ->
-                                        saveDialogRequestCount <- saveDialogRequestCount + 1)
-                            ]
+                        "on"
+                        ==> (fun (eventName: string) (handler: obj -> unit) ->
+                            if eventName = "close" then
+                                closeHandler <- handler
+                        )
+                        "webContents"
+                        ==> createObj [
+                            "send"
+                            ==> (fun (_channel: string) (_payload: obj) ->
+                                saveDialogRequestCount <- saveDialogRequestCount + 1
+                            )
+                        ]
                     ]
                     |> unbox<BrowserWindow>
 
