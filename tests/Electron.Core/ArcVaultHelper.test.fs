@@ -132,6 +132,26 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "synchronously rejected file import clears its active and busy-write state",
+            fun () -> promise {
+                let vault = ArcVault(TestHelpers.testWindow ())
+                let mutable failureMessage = None
+
+                try
+                    let! _ =
+                        runFileImport vault ("rejected-import", fun _ -> raise (exn "Import failed synchronously."))
+
+                    ()
+                with error ->
+                    failureMessage <- Some error.Message
+
+                Vitest.expect(failureMessage).toEqual (Some "Import failed synchronously.")
+                Vitest.expect(vault.activeFileImport).toEqual (None)
+                Vitest.expect(vault.isBusyWriting).toBe (false)
+            }
+        )
+
+        Vitest.test (
             "file import does not start while another ARC write owns the vault",
             fun () -> promise {
                 let vault = ArcVault(TestHelpers.testWindow ())

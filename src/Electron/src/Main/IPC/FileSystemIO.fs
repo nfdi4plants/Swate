@@ -220,17 +220,25 @@ module ArcFileSystemHelper =
         let guid = Guid.NewGuid().ToString("N")
         $".swate-import-{guid}"
 
+    let private resolveArcRootOrRelativePath arcPath relativePath =
+        let normalizedPath = relativePath |> PathHelpers.normalizeCanonicalRelativePath
+
+        if String.IsNullOrWhiteSpace normalizedPath then
+            Ok(resolveAbsolutePath arcPath)
+        else
+            tryResolveArcRelativePath arcPath normalizedPath
+
+    let private ensureTargetDoesNotExist targetAbsolutePath errorMessage = promise {
+        let! targetExists = pathExistsAsync targetAbsolutePath
+
+        if targetExists then
+            return Error(exn errorMessage)
+        else
+            return Ok()
+    }
+
     let private resolveImportTargetDirectory arcPath targetRelativePath = promise {
-        let normalizedTargetPath =
-            PathHelpers.normalizeCanonicalRelativePath targetRelativePath
-
-        let targetDirectoryResult =
-            if String.IsNullOrWhiteSpace normalizedTargetPath then
-                Ok(resolveAbsolutePath arcPath)
-            else
-                tryResolveArcRelativePath arcPath normalizedTargetPath
-
-        match targetDirectoryResult with
+        match resolveArcRootOrRelativePath arcPath targetRelativePath with
         | Error pathError -> return Error pathError
         | Ok targetDirectory ->
             let! targetIsDirectory = ARCtrl.FileSystemHelper.directoryExistsAsync targetDirectory
@@ -264,10 +272,14 @@ module ArcFileSystemHelper =
 
         for entry in entries do
             let destinationPath = join [| targetDirectory; entry.FileName |]
-            let! destinationExists = pathExistsAsync destinationPath
 
-            if destinationExists then
-                raise (exn $"Cannot import '{entry.FileName}' because a file with that name already exists.")
+            match!
+                ensureTargetDoesNotExist
+                    destinationPath
+                    $"Cannot import '{entry.FileName}' because a file with that name already exists."
+            with
+            | Ok() -> ()
+            | Error targetError -> raise targetError
 
         return {
             TargetDirectory = targetDirectory
@@ -423,28 +435,13 @@ module ArcFileSystemHelper =
         | Ok firstAbsolutePath, Ok secondAbsolutePath -> Ok(firstAbsolutePath, secondAbsolutePath)
 
     let private resolveCreatePathPair arcPath parentRelativePath targetRelativePath =
-        let normalizedParentPath =
-            parentRelativePath |> PathHelpers.normalizeCanonicalRelativePath
-
-        let parentPath =
-            if String.IsNullOrWhiteSpace normalizedParentPath then
-                Ok(resolveAbsolutePath arcPath)
-            else
-                tryResolveArcRelativePath arcPath normalizedParentPath
-
-        match parentPath, tryResolveArcRelativePath arcPath targetRelativePath with
+        match
+            resolveArcRootOrRelativePath arcPath parentRelativePath,
+            tryResolveArcRelativePath arcPath targetRelativePath
+        with
         | Error pathError, _
         | _, Error pathError -> Error pathError
         | Ok parentAbsolutePath, Ok targetAbsolutePath -> Ok(parentAbsolutePath, targetAbsolutePath)
-
-    let private ensureTargetDoesNotExist targetAbsolutePath errorMessage = promise {
-        let! targetExists = pathExistsAsync targetAbsolutePath
-
-        if targetExists then
-            return Error(exn errorMessage)
-        else
-            return Ok()
-    }
 
     let private createTargetAsync kind targetAbsolutePath =
         match kind with

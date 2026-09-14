@@ -35,16 +35,11 @@ let run
         let abortController = AbortController.create ()
 
         let completion = promise {
-            do! Promise.sleep 0
-
             try
                 return! operation abortController.signal
             finally
-                match getActiveImport () with
-                | Some current when current.State.requestId = requestId ->
-                    setActiveImport None
-                    publishState window None
-                | _ -> ()
+                setActiveImport None
+                publishState window None
         }
 
         let activeImport = {

@@ -845,34 +845,26 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 return Error e
         }
     openFile =
-        fun (relativePath: string) -> promise {
-            let windowId = windowIdFromIpcEvent event
+        fun (relativePath: string) ->
+            withLoadedArcVault
+                event
+                (fun vault -> promise {
+                    let arcfileDTO = FileContentDTO.fromArcByPath relativePath vault.arc.Value
 
-            match ARC_VAULTS.TryGetVault(windowId) with
-            | None -> return Error(exn $"The ARC for window id {windowId} should exist")
-            | Some vault when vault.arc.IsSome ->
-                let arcfileDTO = FileContentDTO.fromArcByPath relativePath vault.arc.Value
-
-                match arcfileDTO with
-                | Some dto -> return Ok dto
-                | _ ->
-                    // Fallback to text preview for unknown file types
-                    try
-                        let absolutePath = tryResolveArcRelativePath vault.path.Value relativePath
-
-                        match absolutePath with
-                        | Error pathError -> return Error pathError
-                        | Ok path ->
-                            let! content = ARCtrl.FileSystemHelper.readFileTextAsync path
-                            let fileType = FileContentDTO.inferTextFileTypeFromPath relativePath
-
-                            let dto = FileContentDTO.create fileType content relativePath
-
-                            return Ok dto
-                    with e ->
-                        return Error(exn $"Could not read file {relativePath}: {e.Message}")
-            | _ -> return Error(arcNotOpenError ())
-        }
+                    match arcfileDTO with
+                    | Some dto -> return Ok dto
+                    | _ ->
+                        // Fallback to text preview for unknown file types
+                        try
+                            match tryResolveArcRelativePath vault.path.Value relativePath with
+                            | Error pathError -> return Error pathError
+                            | Ok path ->
+                                let! content = ARCtrl.FileSystemHelper.readFileTextAsync path
+                                let fileType = FileContentDTO.inferTextFileTypeFromPath relativePath
+                                return Ok(FileContentDTO.create fileType content relativePath)
+                        with e ->
+                            return Error(exn $"Could not read file {relativePath}: {e.Message}")
+                })
     runGitLfs =
         fun (request: GitLfsRequest) -> promise {
             let windowId = windowIdFromIpcEvent event
