@@ -318,7 +318,7 @@ let shouldUsePollingByDefault (platform: string) =
 let private currentNodePlatform () : string =
     emitJsExpr () "process.platform" |> unbox<string>
 
-let private createWatcherOptions (cwd: string) (usePolling: bool option) =
+let createWatcherOptions (cwd: string) (usePolling: bool option) =
 
     let ignoreFn =
         fun (path: string) ->

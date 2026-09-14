@@ -3,7 +3,6 @@ module Main.FileTreeCreator
 
 open System
 open System.Collections.Generic
-open ARCtrl
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Main.Git.GitLfsService
@@ -15,7 +14,7 @@ open Swate.Electron.Shared.FileIOTypes
 type FileTreeWorkQueue(onPreviousError: exn -> unit) =
     let mutable currentWork = promise { return () }
 
-    member _.Enqueue(operation: unit -> Fable.Core.JS.Promise<unit>) =
+    member this.EnqueueFileTreeWork(operation: unit -> Fable.Core.JS.Promise<unit>) =
         let previousWork = currentWork
 
         let nextWork = promise {
@@ -209,25 +208,6 @@ let refreshFileTreeSubtree
         removePathAndDescendantsInPlace path nextTree
         entries |> Array.iter (fun entry -> upsertFileEntryInPlace entry nextTree)
         return nextTree
-    }
-
-/// Refreshes an expanded directory. Collapsing is a renderer-only concern.
-let updateFileTreeDirectoryExpansion
-    (repoRoot: string)
-    (relativePath: string)
-    (isExpanded: bool)
-    (fileTree: Dictionary<string, FileEntry>)
-    =
-    promise {
-        if not isExpanded then
-            return fileTree
-        else
-            let relativePath = PathHelpers.normalizeCanonicalRelativePath relativePath
-
-            let absolutePath =
-                ArcPathHelper.combine repoRoot relativePath |> PathHelpers.normalizePath
-
-            return! refreshFileTreeSubtree repoRoot absolutePath fileTree
     }
 
 /// Scans a path and builds its keyed file tree.

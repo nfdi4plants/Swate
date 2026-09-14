@@ -18,13 +18,6 @@ module WatcherHelpers = Main.WatcherHelpers
 
 let private watcherTestOptions = TestOptions(timeout = 20000)
 
-let private updateDirectoryExpansion (vault: ArcVault) relativePath isExpanded = promise {
-    let! fileTree =
-        Main.FileTreeCreator.updateFileTreeDirectoryExpansion vault.path.Value relativePath isExpanded vault.fileTree
-
-    vault.SetFileTree fileTree
-}
-
 let private lifecycleTestWindow id isDestroyed onSend =
     // The remoting proxy calls webContents.send with channel and payload arguments.
     // Discard those transport details so lifecycle tests only observe whether a send occurred.
@@ -130,6 +123,17 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "watcher options do not limit traversal depth",
+            fun () ->
+                let expandedDirectoryOptions = createWatcherOptions "C:/arc" (Some true)
+
+                Vitest.expect(expandedDirectoryOptions.depth).toEqual (None)
+                Vitest.expect(expandedDirectoryOptions.usePolling).toEqual (Some true)
+                Vitest.expect(expandedDirectoryOptions.interval).toEqual (Some 200)
+                Vitest.expect(expandedDirectoryOptions.binaryInterval).toEqual (Some 400)
+        )
+
+        Vitest.test (
             "waitForFileWatcherReady resolves from the native ready event",
             fun () -> promise {
                 let mutable readyCallback: (unit -> unit) option = None
@@ -160,7 +164,7 @@ Vitest.describe (
                 let order = ResizeArray<string>()
 
                 let delayedFirst =
-                    vault.fileTreeWorkQueue.Enqueue(fun () -> promise {
+                    vault.fileTreeWorkQueue.EnqueueFileTreeWork(fun () -> promise {
                         order.Add "first-start"
 
                         do!
@@ -172,7 +176,7 @@ Vitest.describe (
                     })
 
                 let second =
-                    vault.fileTreeWorkQueue.Enqueue(fun () -> promise { order.Add "second" })
+                    vault.fileTreeWorkQueue.EnqueueFileTreeWork(fun () -> promise { order.Add "second" })
 
                 do! delayedFirst
                 do! second
@@ -367,8 +371,10 @@ Vitest.describe (
 
                         try
                             do! vault.OpenARC arcPath
-                            do! updateDirectoryExpansion vault "studies/S1/dataset" true
-                            do! updateDirectoryExpansion vault "studies/S1/dataset-two" true
+                            do! vault.SetFileTreeDirectoryExpanded("studies/S1/dataset", true)
+                            do! vault.SetFileTreeDirectoryExpanded("studies/S1/dataset-two", true)
+                            Vitest.expect(vault.payloadWatcher.IsSome).toBe (true)
+                            Vitest.expect(vault.expandedDirectoryPaths.Count).toBe (2)
 
                             do! writeTextFileAsync liveFilePath "live"
                             do! writeTextFileAsync secondLiveFilePath "live"
@@ -376,7 +382,8 @@ Vitest.describe (
                             Vitest.expect(vault.fileTree.ContainsKey liveFilePath).toBe (true)
                             Vitest.expect(vault.fileTree.ContainsKey secondLiveFilePath).toBe (true)
 
-                            do! updateDirectoryExpansion vault "studies/S1/dataset" false
+                            do! vault.SetFileTreeDirectoryExpanded("studies/S1/dataset", false)
+                            Vitest.expect(vault.expandedDirectoryPaths.Count).toBe (1)
 
                             do! writeTextFileAsync collapsedFilePath "collapsed"
                             do! writeTextFileAsync stillLiveFilePath "still live"
@@ -769,7 +776,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "RenameOpenArcRoot restores the recursive ARC watcher under the renamed root",
+            "RenameOpenArcRoot restores expanded-directory watchers under the renamed root",
             watcherTestOptions,
             fun () ->
                 TestHelpers.withTempArcWith
@@ -783,13 +790,17 @@ Vitest.describe (
 
                         try
                             do! vault.OpenARC arcPath
-                            do! updateDirectoryExpansion vault "studies/S1/dataset" true
+                            do! vault.SetFileTreeDirectoryExpanded("studies/S1/dataset", true)
 
                             match! vault.RenameOpenArcRoot "renamed-expanded-watcher" with
                             | Error error -> failwith error.Message
                             | Ok renamedPath ->
-                                Vitest.expect(vault.watcher.IsSome).toBe (true)
-                                Vitest.expect(vault.path).toEqual (Some renamedPath)
+                                Vitest.expect(vault.payloadWatcher.IsSome).toBe (true)
+                                Vitest.expect(vault.expandedDirectoryPaths.Count).toBe (1)
+
+                                Vitest
+                                    .expect(vault.expandedDirectoryPaths.Values |> Seq.exactlyOne)
+                                    .toBe ("studies/S1/dataset")
 
                             do! vault.StopFileWatcher()
                         with error ->

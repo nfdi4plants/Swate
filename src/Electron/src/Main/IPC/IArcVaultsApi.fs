@@ -403,23 +403,14 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 match! tryResolveExistingArcDirectoryPath vault.path.Value request.relativePath with
                                 | Error pathError -> return Error pathError
                                 | Ok _ ->
-                                    do!
-                                        vault.fileTreeWorkQueue.Enqueue(fun () -> promise {
-                                            let! fileTree =
-                                                updateFileTreeDirectoryExpansion
-                                                    vault.path.Value
-                                                    request.relativePath
-                                                    true
-                                                    vault.fileTree
-
-                                            vault.SetFileTree fileTree
-                                        })
-
+                                    do! vault.SetFileTreeDirectoryExpanded(request.relativePath, true)
                                     return Ok()
                             else
                                 match tryResolveArcRelativePath vault.path.Value request.relativePath with
                                 | Error pathError -> return Error pathError
-                                | Ok _ -> return Ok()
+                                | Ok _ ->
+                                    do! vault.SetFileTreeDirectoryExpanded(request.relativePath, false)
+                                    return Ok()
                         })
             with e ->
                 return Error e

@@ -29,7 +29,7 @@ type ArcVault(window: BrowserWindow) =
     member val path: string option = None with get, set
     member val arc: ARC option = None with get, private set
     // This flag is intentionally coarse and can remain true even if later edits restore the previous logical state.
-    //Good workaround, for a missing member 👍 Might even be more performant, than calculating a isDirty flag. On the other hand, it is unable to detect if changes are removed again. For example:
+    //Good workaround, for a missing member 👍 Might even be more performant, than calculating a isDirty flag. On the other hand, it is unable to detect if changes are removed again. For example:
     //Add Assay 1 -> Set hasUnsavedArcChanges <- true
     //Remove Assay 1 -> Still true, even tough changes were removed again and it is in its original state.
     //I am not sure if performance of calculating changes or precision should be more important. Lets see in the future. Maybe you can add this comment as /// comment on this member?
@@ -37,6 +37,9 @@ type ArcVault(window: BrowserWindow) =
     member val hasUnsavedArcChanges: bool = false with get, private set
     member val fileTree: Dictionary<string, FileEntry> = Dictionary<string, FileEntry>() with get, set
     member val watcher: Chokidar.IWatcher option = None with get, set
+    member val payloadWatcher: Chokidar.IWatcher option = None with get, set
+    /// Expanded payload directories keyed by their normalized relative path.
+    member val expandedDirectoryPaths: Map<string, string> = Map.empty with get, set
     member val fileWatcherReloadArcTimeout: int option = None with get, set
     member val fileWatcherPendingEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
     member val fileWatcherPendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
@@ -102,6 +105,7 @@ type ArcVault(window: BrowserWindow) =
 
             if valueIsChanging then
                 sendArcHasUnsavedChangesUpdate hasNewChanges this.window
+
 
 [<AutoOpen>]
 module ArcVaultExtensions =
@@ -189,6 +193,16 @@ module ArcVaultExtensions =
                             WatcherHelpers.eventNameEquals Chokidar.Events.Unlink event.EventName
                             || WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName
                         then
+                            if WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName then
+                                this.expandedDirectoryPaths <-
+                                    this.expandedDirectoryPaths
+                                    |> Map.filter (fun _ path ->
+                                        not (PathHelpers.isSameOrDescendantPath path event.RelativePath)
+                                    )
+
+                                this.payloadWatcher
+                                |> Option.iter (fun watcher -> watcher.unwatch event.AbsolutePath |> ignore)
+
                             removePathAndDescendantsInPlace event.AbsolutePath nextFileTree
                             hasFileTreeChanges <- true
                     with fileTreeError ->
@@ -239,7 +253,7 @@ module ArcVaultExtensions =
                                 try
                                     try
                                         do!
-                                            this.fileTreeWorkQueue.Enqueue(fun () -> promise {
+                                            this.fileTreeWorkQueue.EnqueueFileTreeWork(fun () -> promise {
                                                 swatelogfn
                                                     this.window.id
                                                     "Scheduled ARC and file-tree update triggered by file watcher."
@@ -274,7 +288,7 @@ module ArcVaultExtensions =
 
                 this.fileWatcherReloadArcTimeout <- Some timeoutId
 
-        member private this._FileEventController(sendMsgApi: IArcFileWatcherApi) =
+        member private this.FileEventController(sendMsgApi: IArcFileWatcherApi) =
 
             fun (eventName: string) (path: string) ->
 
@@ -292,6 +306,37 @@ module ArcVaultExtensions =
                 )
 
                 this.SchedulePendingFileWatcherEvents sendMsgApi
+
+        member private this.EnsurePayloadWatcher(arcPath: string, ?usePolling: bool) = promise {
+            if this.payloadWatcher.IsNone && this.expandedDirectoryPaths.Count > 0 then
+                let absolutePaths =
+                    this.expandedDirectoryPaths.Values
+                    |> Seq.map (ArcPathHelper.combine arcPath >> PathHelpers.normalizePath)
+                    |> Seq.toArray
+
+                let watcherOptions = createWatcherOptions arcPath usePolling
+                let watcher = Chokidar.Chokidar.watch (absolutePaths, watcherOptions)
+
+                let sendMsgApi =
+                    Remoting.createIpc ()
+                    |> Remoting.withWindow this.window
+                    |> Remoting.buildProxySender<IArcFileWatcherApi>
+
+                watcher.on (Chokidar.Events.All, this.FileEventController sendMsgApi) |> ignore
+                this.payloadWatcher <- Some watcher
+
+                try
+                    do! waitForFileWatcherReady watcher
+                with watcherError ->
+                    this.payloadWatcher <- None
+
+                    try
+                        do! watcher.close ()
+                    with _ ->
+                        ()
+
+                    return raise watcherError
+        }
 
         /// Applies an ARC content DTO to the in-memory ARC and marks the vault dirty.
         member this.UpdateArcByFileContentDTO(request: FileContentDTO) : Result<unit, exn> =
@@ -405,6 +450,47 @@ module ArcVaultExtensions =
                 return toRendererFileTree arcPath this.fileTree.Values
         }
 
+        /// Activates live monitoring for an expanded directory, or stops it when collapsed.
+        /// Expansion also replaces the potentially stale subtree before it is displayed.
+        member this.SetFileTreeDirectoryExpanded(relativePath: string, isExpanded: bool) =
+            this.fileTreeWorkQueue.EnqueueFileTreeWork(fun () -> promise {
+                match this.path with
+                | None -> return raise (arcNotOpenError ())
+                | Some arcPath ->
+                    let relativePath = PathHelpers.normalizeCanonicalRelativePath relativePath
+                    let key = PathHelpers.normalizeForComparison relativePath
+
+                    let absolutePath =
+                        ArcPathHelper.combine arcPath relativePath |> PathHelpers.normalizePath
+
+                    if isExpanded then
+                        if not (this.expandedDirectoryPaths.ContainsKey key) then
+                            this.expandedDirectoryPaths <- this.expandedDirectoryPaths.Add(key, relativePath)
+
+                            try
+                                match this.payloadWatcher with
+                                | Some watcher ->
+                                    // Re-adding a parent also restores its expanded descendants after collapse.
+                                    this.expandedDirectoryPaths.Values
+                                    |> Seq.filter (fun path -> PathHelpers.isSameOrDescendantPath path relativePath)
+                                    |> Seq.map (ArcPathHelper.combine arcPath >> PathHelpers.normalizePath)
+                                    |> Seq.toArray
+                                    |> watcher.add
+                                    |> ignore
+                                | None -> do! this.EnsurePayloadWatcher arcPath
+                            with watcherError ->
+                                this.expandedDirectoryPaths <- this.expandedDirectoryPaths.Remove key
+                                return raise watcherError
+
+                        let! refreshedFileTree = refreshFileTreeSubtree arcPath absolutePath this.fileTree
+                        this.SetFileTree refreshedFileTree
+                    elif this.expandedDirectoryPaths.ContainsKey key then
+                        this.expandedDirectoryPaths <- this.expandedDirectoryPaths.Remove key
+
+                        this.payloadWatcher
+                        |> Option.iter (fun watcher -> watcher.unwatch absolutePath |> ignore)
+            })
+
         member this.LoadArc() = promise {
             if this.path.IsSome then
                 match! ARC.LoadAsyncSwateZeroByteRepair this.path.Value with
@@ -428,10 +514,18 @@ module ArcVaultExtensions =
                         |> Remoting.withWindow this.window
                         |> Remoting.buildProxySender<IArcFileWatcherApi>
 
-                    watcher.on (Chokidar.Events.All, this._FileEventController sendMsgApi) |> ignore
+                    watcher.on (Chokidar.Events.All, this.FileEventController sendMsgApi) |> ignore
                     this.watcher <- Some watcher
             else
                 swatefailfn this.window.id "No path set for StartFileWatcher."
+
+        member private this.StartFileWatcherAndWaitUntilReady(?usePolling: bool) = promise {
+            let shouldWaitForReady = this.watcher.IsNone
+            this.StartFileWatcher(?usePolling = usePolling)
+
+            if shouldWaitForReady then
+                do! waitForFileWatcherReady this.watcher.Value
+        }
 
         member this.ClearPendingFileWatcherState() =
             this.fileWatcherReloadArcTimeout |> Option.iter Fable.Core.JS.clearTimeout
@@ -450,6 +544,16 @@ module ArcVaultExtensions =
 
             this.watcher <- None
 
+            match this.payloadWatcher with
+            | Some watcher ->
+                try
+                    do! watcher.close ()
+                with _ ->
+                    ()
+            | None -> ()
+
+            this.payloadWatcher <- None
+            this.expandedDirectoryPaths <- Map.empty
             this.ClearPendingFileWatcherState()
         }
 
@@ -458,12 +562,7 @@ module ArcVaultExtensions =
             this.isFileWatcherInitializing <- true
 
             try
-                let shouldWaitForWatcher = this.watcher.IsNone
-                this.StartFileWatcher()
-
-                if shouldWaitForWatcher then
-                    do! waitForFileWatcherReady this.watcher.Value
-
+                do! this.StartFileWatcherAndWaitUntilReady()
                 do! this.LoadArc()
                 let! fileTree = getFileTree this.path.Value
                 this.window.title <- this.arc.Value.Identifier
@@ -541,7 +640,18 @@ module ArcVaultExtensions =
             | Some currentPath ->
                 let hadWatcher = this.watcher.IsSome
 
-                let restoreWatchers arcPath = promise { this.StartFileWatcher() }
+                let expandedRelativePaths = this.expandedDirectoryPaths.Values |> Seq.toArray
+
+                let restoreWatchers arcPath = promise {
+                    this.StartFileWatcher()
+
+                    this.expandedDirectoryPaths <-
+                        expandedRelativePaths
+                        |> Array.map (fun path -> PathHelpers.normalizeForComparison path, path)
+                        |> Map.ofArray
+
+                    do! this.EnsurePayloadWatcher arcPath
+                }
 
                 if hadWatcher then
                     do! this.StopFileWatcher()
@@ -607,251 +717,251 @@ module ArcVaultExtensions =
         }
 
 
-/// Describes the outcome of an ARC lifecycle action performed by the controller.
-[<RequireQualifiedAccess>]
-type ArcOpenDisposition =
-    | OpenedInCurrent of path: string
-    | OpenedInNewWindow of path: string
-    | FocusedExisting of path: string
-    | CreatedInCurrent of path: string
-    | CreatedInNewWindow of path: string
+    /// Describes the outcome of an ARC lifecycle action performed by the controller.
+    [<RequireQualifiedAccess>]
+    type ArcOpenDisposition =
+        | OpenedInCurrent of path: string
+        | OpenedInNewWindow of path: string
+        | FocusedExisting of path: string
+        | CreatedInCurrent of path: string
+        | CreatedInNewWindow of path: string
 
-    member this.CreatedArcPath =
-        match this with
-        | CreatedInCurrent path
-        | CreatedInNewWindow path -> Some path
-        | OpenedInCurrent _
-        | OpenedInNewWindow _
-        | FocusedExisting _ -> None
+        member this.CreatedArcPath =
+            match this with
+            | CreatedInCurrent path
+            | CreatedInNewWindow path -> Some path
+            | OpenedInCurrent _
+            | OpenedInNewWindow _
+            | FocusedExisting _ -> None
 
-module ArcOpenDisposition =
-    let path =
-        function
-        | ArcOpenDisposition.OpenedInCurrent p
-        | ArcOpenDisposition.OpenedInNewWindow p
-        | ArcOpenDisposition.FocusedExisting p
-        | ArcOpenDisposition.CreatedInCurrent p
-        | ArcOpenDisposition.CreatedInNewWindow p -> p
+    module ArcOpenDisposition =
+        let path =
+            function
+            | ArcOpenDisposition.OpenedInCurrent p
+            | ArcOpenDisposition.OpenedInNewWindow p
+            | ArcOpenDisposition.FocusedExisting p
+            | ArcOpenDisposition.CreatedInCurrent p
+            | ArcOpenDisposition.CreatedInNewWindow p -> p
 
 
-type ArcVaults() =
-    /// Key is window.id
-    member val Vaults = Dictionary<int, ArcVault>() with get
+    type ArcVaults() =
+        /// Key is window.id
+        member val Vaults = Dictionary<int, ArcVault>() with get
 
-    member this.Paths = this.Vaults.Values |> Seq.choose (fun x -> x.path) |> Array.ofSeq
+        member this.Paths = this.Vaults.Values |> Seq.choose (fun x -> x.path) |> Array.ofSeq
 
-    member this.BroadcastRecentARCs() =
-        let recentARCs = RECENT_ARCS.Get()
+        member this.BroadcastRecentARCs() =
+            let recentARCs = RECENT_ARCS.Get()
 
-        this.Vaults.Values
-        |> Array.ofSeq
-        |> fun arr ->
-            if arr.Length > 0 then
-                arr
-                |> Array.iter (fun vault ->
-                    if not (vault.window.isDestroyed ()) then
-                        Remoting.createIpc ()
-                        |> Remoting.withWindow vault.window
-                        |> Remoting.buildProxySender<IRecentArcsRendererApi>
-                        |> fun client -> client.recentARCsUpdate recentARCs
-                )
+            this.Vaults.Values
+            |> Array.ofSeq
+            |> fun arr ->
+                if arr.Length > 0 then
+                    arr
+                    |> Array.iter (fun vault ->
+                        if not (vault.window.isDestroyed ()) then
+                            Remoting.createIpc ()
+                            |> Remoting.withWindow vault.window
+                            |> Remoting.buildProxySender<IRecentArcsRendererApi>
+                            |> fun client -> client.recentARCsUpdate recentARCs
+                    )
 
-    /// Centralized side-effect: update recent ARCs store and broadcast to all windows.
-    member private this.TrackRecentAndBroadcast(arcPath: string) =
-        let normalizedArcPath = PathHelpers.normalizePath arcPath
-        RECENT_ARCS.Add(normalizedArcPath) |> ignore
-        this.BroadcastRecentARCs()
-
-    member this.DisposeVault(id: int) =
-        match this.Vaults.TryGetValue(id) with
-        | false, _ -> swatefailfn id "Failed to remove vault."
-        | true, vault ->
-            vault.StopFileWatcher() |> Promise.start
-            this.Vaults.Remove(id) |> ignore
-            vault.path |> Option.iter (fun p -> RECENT_ARCS.Inactivate(p) |> ignore)
+        /// Centralized side-effect: update recent ARCs store and broadcast to all windows.
+        member private this.TrackRecentAndBroadcast(arcPath: string) =
+            let normalizedArcPath = PathHelpers.normalizePath arcPath
+            RECENT_ARCS.Add(normalizedArcPath) |> ignore
             this.BroadcastRecentARCs()
-            printfn $"[Swate] Removed vault '{id}'"
 
-    member this.ResolveCloseRequest(windowId: int, decision: SaveBeforeQuitDecision) = promise {
-        match this.TryGetVault(windowId) with
-        | None ->
-            let message = "Close request ignored. No vault found."
-            swatelogfn windowId "%s" message
-            return Error(exn message)
-        | Some(vault: ArcVault) ->
-            vault.isCloseRequestPending <- false
+        member this.DisposeVault(id: int) =
+            match this.Vaults.TryGetValue(id) with
+            | false, _ -> swatefailfn id "Failed to remove vault."
+            | true, vault ->
+                vault.StopFileWatcher() |> Promise.start
+                this.Vaults.Remove(id) |> ignore
+                vault.path |> Option.iter (fun p -> RECENT_ARCS.Inactivate(p) |> ignore)
+                this.BroadcastRecentARCs()
+                printfn $"[Swate] Removed vault '{id}'"
 
-            match decision with
-            | SaveBeforeQuitDecision.CancelClose ->
-                swatelogfn windowId "Close request cancelled by user."
-                return Ok()
-            | SaveBeforeQuitDecision.CloseWithoutSaving ->
-                swatelogfn windowId "Close request approved by user. Closing without saving."
-                vault.RefreshHasUnsavedArcChangesFlag()
-                vault.isCloseApproved <- true
-                vault.window.close ()
-                return Ok()
-            | SaveBeforeQuitDecision.SaveAndClose ->
-                swatelogfn windowId "Close request approved by user. Closing after main save."
+        member this.ResolveCloseRequest(windowId: int, decision: SaveBeforeQuitDecision) = promise {
+            match this.TryGetVault(windowId) with
+            | None ->
+                let message = "Close request ignored. No vault found."
+                swatelogfn windowId "%s" message
+                return Error(exn message)
+            | Some(vault: ArcVault) ->
+                vault.isCloseRequestPending <- false
 
-                if vault.hasUnsavedArcChanges then
-                    let! persistResult = vault.WriteArc()
-
-                    match persistResult with
-                    | Error saveError -> return Error saveError
-                    | Ok() ->
-                        vault.isCloseApproved <- true
-                        vault.window.close ()
-                        return Ok()
-                else
+                match decision with
+                | SaveBeforeQuitDecision.CancelClose ->
+                    swatelogfn windowId "Close request cancelled by user."
+                    return Ok()
+                | SaveBeforeQuitDecision.CloseWithoutSaving ->
+                    swatelogfn windowId "Close request approved by user. Closing without saving."
+                    vault.RefreshHasUnsavedArcChangesFlag()
                     vault.isCloseApproved <- true
                     vault.window.close ()
                     return Ok()
-    }
+                | SaveBeforeQuitDecision.SaveAndClose ->
+                    swatelogfn windowId "Close request approved by user. Closing after main save."
 
-    member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
+                    if vault.hasUnsavedArcChanges then
+                        let! persistResult = vault.WriteArc()
 
-        window.onClose (fun closeEvent ->
-            if not vault.isCloseApproved then
-                if vault.hasUnsavedArcChanges then
-                    closeEvent.preventDefault ()
+                        match persistResult with
+                        | Error saveError -> return Error saveError
+                        | Ok() ->
+                            vault.isCloseApproved <- true
+                            vault.window.close ()
+                            return Ok()
+                    else
+                        vault.isCloseApproved <- true
+                        vault.window.close ()
+                        return Ok()
+        }
 
-                    if not vault.isCloseRequestPending then
-                        vault.isCloseRequestPending <- true
+        member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
 
-                        let saveBeforeQuitClient =
-                            Remoting.createIpc ()
-                            |> Remoting.withWindow vault.window
-                            |> Remoting.buildProxySender<IMainSaveBeforeQuitApi>
+            window.onClose (fun closeEvent ->
+                if not vault.isCloseApproved then
+                    if vault.hasUnsavedArcChanges then
+                        closeEvent.preventDefault ()
 
-                        saveBeforeQuitClient.requestSaveBeforeQuit ()
-                else
-                    swatelogfn id "Closing window directly because no unsaved ARC changes are present."
-        )
+                        if not vault.isCloseRequestPending then
+                            vault.isCloseRequestPending <- true
 
-        window.onClosed (fun () ->
-            vault.isCloseRequestPending <- false
-            vault.isCloseApproved <- false
-            this.DisposeVault(id)
-        )
+                            let saveBeforeQuitClient =
+                                Remoting.createIpc ()
+                                |> Remoting.withWindow vault.window
+                                |> Remoting.buildProxySender<IMainSaveBeforeQuitApi>
 
-    member this.RegisterVault() : Fable.Core.JS.Promise<int> = promise {
-        let! window = createWindow ()
-        let id = window.id
-        let vault = ArcVault(window)
-        this.Vaults.Add(id, vault)
+                            saveBeforeQuitClient.requestSaveBeforeQuit ()
+                    else
+                        swatelogfn id "Closing window directly because no unsaved ARC changes are present."
+            )
 
-        this.OnCloseWindow(window, vault, id)
+            window.onClosed (fun () ->
+                vault.isCloseRequestPending <- false
+                vault.isCloseApproved <- false
+                this.DisposeVault(id)
+            )
 
-        window.focus ()
-        swatelogfn id "Register window"
+        member this.RegisterVault() : Fable.Core.JS.Promise<int> = promise {
+            let! window = createWindow ()
+            let id = window.id
+            let vault = ArcVault(window)
+            this.Vaults.Add(id, vault)
 
-        return id
-    }
+            this.OnCloseWindow(window, vault, id)
 
-    member this.RegisterVaultWithArc(path: string) = promise {
-        let! window = createWindow ()
-        let id = window.id
-        let vault = ArcVault(window)
-        this.Vaults.Add(id, vault)
-        do! vault.OpenARC(path)
+            window.focus ()
+            swatelogfn id "Register window"
 
-        this.OnCloseWindow(window, vault, id)
+            return id
+        }
 
-        window.focus ()
-        swatelogfn id "Register window"
+        member this.RegisterVaultWithArc(path: string) = promise {
+            let! window = createWindow ()
+            let id = window.id
+            let vault = ArcVault(window)
+            this.Vaults.Add(id, vault)
+            do! vault.OpenARC(path)
 
-        return id
-    }
+            this.OnCloseWindow(window, vault, id)
 
-    member this.RegisterVaultWithNewArc(path: string, newIdentifier: string) : Fable.Core.JS.Promise<int> = promise {
-        let! window = createWindow ()
-        let id = window.id
-        let vault = ArcVault(window)
-        this.Vaults.Add(id, vault)
+            window.focus ()
+            swatelogfn id "Register window"
 
-        do! vault.CreateARC(path, newIdentifier)
+            return id
+        }
 
-        this.OnCloseWindow(window, vault, id)
+        member this.RegisterVaultWithNewArc(path: string, newIdentifier: string) : Fable.Core.JS.Promise<int> = promise {
+            let! window = createWindow ()
+            let id = window.id
+            let vault = ArcVault(window)
+            this.Vaults.Add(id, vault)
 
-        window.focus ()
-        swatelogfn id "Register window"
+            do! vault.CreateARC(path, newIdentifier)
 
-        return id
-    }
+            this.OnCloseWindow(window, vault, id)
 
-    member this.OpenARCInVault(windowId: int, path: string) = promise {
-        match this.Vaults.TryGetValue windowId with
-        | false, _ -> failwith $"Vault with window-id '{windowId}' not found."
-        | true, vault -> do! vault.OpenARC path
+            window.focus ()
+            swatelogfn id "Register window"
 
-        return ()
-    }
+            return id
+        }
 
-    member this.CreateARCInVault(windowId: int, path: string, identifier: string) = promise {
-        match this.Vaults.TryGetValue windowId with
-        | false, _ -> failwith $"Vault with window-id '{windowId}' not found."
-        | true, vault -> do! vault.CreateARC(path, identifier)
+        member this.OpenARCInVault(windowId: int, path: string) = promise {
+            match this.Vaults.TryGetValue windowId with
+            | false, _ -> failwith $"Vault with window-id '{windowId}' not found."
+            | true, vault -> do! vault.OpenARC path
 
-        return ()
-    }
+            return ()
+        }
 
-    member this.TryGetVault(windowId: int) =
-        match this.Vaults.TryGetValue windowId with
-        | true, vault -> Some vault
-        | false, _ -> None
+        member this.CreateARCInVault(windowId: int, path: string, identifier: string) = promise {
+            match this.Vaults.TryGetValue windowId with
+            | false, _ -> failwith $"Vault with window-id '{windowId}' not found."
+            | true, vault -> do! vault.CreateARC(path, identifier)
 
-    member this.TryGetVaultByPath(path: string) =
-        this.Vaults.Values
-        |> Seq.tryFind (fun v -> v.path |> Option.exists (fun vaultPath -> PathHelpers.pathsEqual vaultPath path))
+            return ()
+        }
+
+        member this.TryGetVault(windowId: int) =
+            match this.Vaults.TryGetValue windowId with
+            | true, vault -> Some vault
+            | false, _ -> None
+
+        member this.TryGetVaultByPath(path: string) =
+            this.Vaults.Values
+            |> Seq.tryFind (fun v -> v.path |> Option.exists (fun vaultPath -> PathHelpers.pathsEqual vaultPath path))
 
     // ── ARC Lifecycle Controller ──────────────────────────────────────────
-    // All open/create/focus decisions are made here.
-    // IPC handlers should delegate to these methods.
+        // All open/create/focus decisions are made here.
+        // IPC handlers should delegate to these methods.
 
-    /// Open an existing ARC at the given path.
+        /// Open an existing ARC at the given path.
     /// Decision: already-open → focus, calling window empty → open there, else → new window.
-    member this.OpenOrFocusArc(callingWindowId: int, arcPath: string) = promise {
-        let normalizedArcPath = PathHelpers.normalizePath arcPath
+        member this.OpenOrFocusArc(callingWindowId: int, arcPath: string) = promise {
+            let normalizedArcPath = PathHelpers.normalizePath arcPath
 
-        match this.TryGetVaultByPath normalizedArcPath with
-        | Some vault ->
-            vault.window.focus ()
-            this.TrackRecentAndBroadcast(normalizedArcPath)
-            return ArcOpenDisposition.FocusedExisting normalizedArcPath
-        | None ->
-            match this.TryGetVault callingWindowId with
-            | Some vault when vault.path.IsNone ->
-                do! vault.OpenARC(normalizedArcPath)
+            match this.TryGetVaultByPath normalizedArcPath with
+            | Some vault ->
+                vault.window.focus ()
                 this.TrackRecentAndBroadcast(normalizedArcPath)
-                return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
-            | _ ->
-                let! _ = this.RegisterVaultWithArc(normalizedArcPath)
-                this.TrackRecentAndBroadcast(normalizedArcPath)
-                return ArcOpenDisposition.OpenedInNewWindow normalizedArcPath
-    }
+                return ArcOpenDisposition.FocusedExisting normalizedArcPath
+            | None ->
+                match this.TryGetVault callingWindowId with
+                | Some vault when vault.path.IsNone ->
+                    do! vault.OpenARC(normalizedArcPath)
+                    this.TrackRecentAndBroadcast(normalizedArcPath)
+                    return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
+                | _ ->
+                    let! _ = this.RegisterVaultWithArc(normalizedArcPath)
+                    this.TrackRecentAndBroadcast(normalizedArcPath)
+                    return ArcOpenDisposition.OpenedInNewWindow normalizedArcPath
+        }
 
-    /// Create a new ARC at the given path with the given identifier.
+        /// Create a new ARC at the given path with the given identifier.
     /// Decision: path already open → focus, calling window empty → create there, else → new window.
-    member this.CreateOrFocusArc(callingWindowId: int, arcPath: string, identifier: string) = promise {
-        let normalizedArcPath = PathHelpers.normalizePath arcPath
+        member this.CreateOrFocusArc(callingWindowId: int, arcPath: string, identifier: string) = promise {
+            let normalizedArcPath = PathHelpers.normalizePath arcPath
 
-        match this.TryGetVaultByPath normalizedArcPath with
-        | Some vault ->
-            vault.window.focus ()
-            this.TrackRecentAndBroadcast(normalizedArcPath)
-            return ArcOpenDisposition.FocusedExisting normalizedArcPath
-        | None ->
-            match this.TryGetVault callingWindowId with
-            | Some vault when vault.path.IsNone ->
-                do! vault.CreateARC(normalizedArcPath, identifier)
+            match this.TryGetVaultByPath normalizedArcPath with
+            | Some vault ->
+                vault.window.focus ()
                 this.TrackRecentAndBroadcast(normalizedArcPath)
-                return ArcOpenDisposition.CreatedInCurrent normalizedArcPath
-            | _ ->
-                let! _ = this.RegisterVaultWithNewArc(normalizedArcPath, identifier)
-                this.TrackRecentAndBroadcast(normalizedArcPath)
-                return ArcOpenDisposition.CreatedInNewWindow normalizedArcPath
-    }
+                return ArcOpenDisposition.FocusedExisting normalizedArcPath
+            | None ->
+                match this.TryGetVault callingWindowId with
+                | Some vault when vault.path.IsNone ->
+                    do! vault.CreateARC(normalizedArcPath, identifier)
+                    this.TrackRecentAndBroadcast(normalizedArcPath)
+                    return ArcOpenDisposition.CreatedInCurrent normalizedArcPath
+                | _ ->
+                    let! _ = this.RegisterVaultWithNewArc(normalizedArcPath, identifier)
+                    this.TrackRecentAndBroadcast(normalizedArcPath)
+                    return ArcOpenDisposition.CreatedInNewWindow normalizedArcPath
+        }
 
 
-let ARC_VAULTS: ArcVaults = ArcVaults()
+    let ARC_VAULTS: ArcVaults = ArcVaults()

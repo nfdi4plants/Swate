@@ -48,14 +48,14 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "only directories below the shallow watcher boundary get dynamic expansion requests",
+            "creates expansion requests independently of directory depth",
             fun () ->
-                Vitest.expect(shouldDynamicallyWatchDirectory "studies").toBe (false)
-                Vitest.expect(shouldDynamicallyWatchDirectory "studies/S1").toBe (false)
-                Vitest.expect(shouldDynamicallyWatchDirectory "studies/S1/dataset").toBe (true)
-                Vitest.expect(shouldDynamicallyWatchDirectory "studies\\S1\\dataset\\raw").toBe (true)
-
-                Vitest.expect(tryCreateDirectoryExpansionRequest "studies/S1" true).toEqual (None)
+                Vitest
+                    .expect(
+                        tryCreateDirectoryExpansionRequest "studies/S1" true
+                        |> Option.map _.relativePath
+                    )
+                    .toEqual (Some "studies/S1")
 
                 Vitest
                     .expect(
