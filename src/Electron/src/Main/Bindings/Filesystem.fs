@@ -75,13 +75,10 @@ let renameAsync (oldPath: string) (newPath: string) : JS.Promise<unit> = jsNativ
 let rmAsync (path: string) (options: RmOptions) : JS.Promise<unit> = jsNative
 
 [<Import("copyFile", "fs/promises")>]
-let copyFileAsync (sourcePath: string) (targetPath: string) : JS.Promise<unit> = jsNative
+let copyFileAsync (sourcePath: string) (targetPath: string) (mode: int) : JS.Promise<unit> = jsNative
 
 [<Import("constants", "fs")>]
 let fileSystemConstants: FileSystemConstants = jsNative
-
-[<Import("copyFile", "fs/promises")>]
-let copyFileWithFlagsAsync (sourcePath: string) (targetPath: string) (flags: int) : JS.Promise<unit> = jsNative
 
 [<Import("link", "fs/promises")>]
 let linkAsync (existingPath: string) (newPath: string) : JS.Promise<unit> = jsNative

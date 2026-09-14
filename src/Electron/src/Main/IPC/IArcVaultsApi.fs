@@ -38,11 +38,7 @@ let private createImportedFileWatcherEvents arcPath (request: ImportExternalFile
                 $"{targetRelativePath}/{fileName}"
             |> PathHelpers.normalizePath
 
-        {
-            EventName = Chokidar.Events.Add.ToString()
-            RelativePath = relativePath
-            AbsolutePath = Main.Bindings.Path.join [| arcPath; relativePath |]
-        }
+        WatcherHelpers.buildWatcherEvent arcPath (Chokidar.Events.Add.ToString()) relativePath
     )
 
 let private withLoadedArcVault<'T>
@@ -113,21 +109,6 @@ let private runLoadedArcPathAction
         with e ->
             return Error e
     }
-
-let private pickAbsolutePaths (event: IpcMainInvokeEvent) = promise {
-    let properties = [|
-        Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
-        Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
-    |]
-
-    let window = dialogParentFromIpcEvent event
-    let! result = dialog.showOpenDialog (?window = window, properties = properties)
-
-    if result.canceled then
-        return Ok None
-    else
-        return Ok(Some result.filePaths)
-}
 
 let private initGitRepositoryForCreatedArcDisposition
     (initRepository: string -> JS.Promise<Main.Git.GitService.GitResult<string>>)

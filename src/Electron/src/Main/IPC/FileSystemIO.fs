@@ -286,7 +286,7 @@ module ArcFileSystemHelper =
                 raise ImportCancelledException
 
             let temporaryPath = join [| plan.TemporaryDirectory; entry.FileName |]
-            do! copyFileAsync entry.SourcePath temporaryPath
+            do! copyFileAsync entry.SourcePath temporaryPath 0
             onProgress (float (sourceIndex + 1) / float plan.Entries.Length)
     }
 
@@ -308,7 +308,7 @@ module ArcFileSystemHelper =
                 with _ ->
                     // Hard links are an optional fast path. COPYFILE_EXCL provides a portable fallback
                     // while preserving the no-overwrite contract if linking is unavailable or denied.
-                    do! copyFileWithFlagsAsync temporaryPath destinationPath fileSystemConstants.COPYFILE_EXCL
+                    do! copyFileAsync temporaryPath destinationPath fileSystemConstants.COPYFILE_EXCL
 
                 createdTargetPaths.Add destinationPath
 

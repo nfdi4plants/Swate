@@ -10,7 +10,6 @@ open Swate.Electron.Shared.FileIOTypes
 open Vitest
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
-let private fsDynamic: obj = importAll "fs"
 let private newGuidN () = Guid.NewGuid().ToString("N")
 
 [<Emit("Object.assign(new Error($0), { code: $1 })")>]
