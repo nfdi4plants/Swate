@@ -346,7 +346,12 @@ let createFileWatcher (path: string) (usePolling: bool option) =
                 binaryInterval = 400
             )
         else
-            Chokidar.WatchOptions(cwd = path, awaitWriteFinish = true, ignored = !^isFileWatcherPathIgnored, ignoreInitial = true)
+            Chokidar.WatchOptions(
+                cwd = path,
+                awaitWriteFinish = true,
+                ignored = !^isFileWatcherPathIgnored,
+                ignoreInitial = true
+            )
 
     let watcher = Chokidar.Chokidar.watch (path, watcherOptions)
 
