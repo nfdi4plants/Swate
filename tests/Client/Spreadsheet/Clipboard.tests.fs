@@ -1,9 +1,14 @@
 module Spreadsheet.Tests.Clipboard
 
+open Fable.Core
 open Fable.Mocha
 open ARCtrl
+open Swate.Components
 open Swate.Components.Shared
 open global.Spreadsheet
+
+[<Emit("Object.defineProperty($0, 'clipboard', { configurable: true, value: $1 })")>]
+let private setNavigatorClipboard (navigator: Navigator) (clipboard: Clipboard) : unit = jsNative
 
 let private createTableState () =
     let table = ArcTable.init "ClipboardTest"
@@ -167,4 +172,47 @@ let Main =
                 dataMap.DataContexts.[1].Explication.Value.NameText
                 "second name"
                 "The payload row beyond the original DataMap should be pasted."
+
+        testCaseAsync "routes DataMap clipboard content without a payload through plain-text paste"
+        <| async {
+            let state = createDataMapState [ DataContext() ]
+            let originalClipboard = GlobalBindings.navigator.clipboard
+
+            let clipboardMock =
+                { new Clipboard with
+                    member _.read() = promise { return [||] }
+                    member _.readText() = promise { return "explicit\tmetre\nsecond\tsecond unit" }
+                    member _.write _ = promise { return () }
+                    member _.writeText _ = promise { return () }
+                }
+
+            try
+                setNavigatorClipboard GlobalBindings.navigator clipboardMock
+
+                let! _ =
+                    Spreadsheet.Controller.Clipboard.pasteCellsByIndexExtend {| x = 4; y = 0 |} state
+                    |> Async.AwaitPromise
+
+                let dataMap = state.DataMapOrDefault
+                Expect.equal dataMap.RowCount 2 "Plain-text paste should grow the DataMap for additional rows."
+
+                Expect.equal
+                    dataMap.DataContexts.[0].Explication.Value.NameText
+                    "explicit"
+                    "TSV should use the first target column."
+
+                Expect.equal dataMap.DataContexts.[0].Unit.Value.NameText "metre" "TSV should preserve adjacent cells."
+
+                Expect.equal
+                    dataMap.DataContexts.[1].Explication.Value.NameText
+                    "second"
+                    "The second row should be pasted."
+
+                Expect.equal
+                    dataMap.DataContexts.[1].Unit.Value.NameText
+                    "second unit"
+                    "The second-row unit should be pasted."
+            finally
+                setNavigatorClipboard GlobalBindings.navigator originalClipboard
+        }
     ]
