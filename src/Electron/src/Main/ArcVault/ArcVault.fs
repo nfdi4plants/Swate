@@ -657,12 +657,22 @@ type ArcVaults() =
 
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
 
+        let requestSaveDecision () =
+            Remoting.createIpc ()
+            |> Remoting.withWindow vault.window
+            |> Remoting.buildProxySender<IMainSaveBeforeQuitApi>
+            |> fun client -> client.requestSaveBeforeQuit ()
+
         window.onClose (fun closeEvent ->
             match vault.CloseState with
             | CloseLifecycleState.Approved -> ()
             | CloseLifecycleState.WaitingForImportCleanup
-            | CloseLifecycleState.WaitingForSaveDecision
             | CloseLifecycleState.ResolvingSaveDecision -> closeEvent.preventDefault ()
+            | CloseLifecycleState.WaitingForSaveDecision ->
+                closeEvent.preventDefault ()
+                // A renderer reload can lose the original modal and IPC delivery. A new native
+                // close attempt replays the request while retaining the same lifecycle ownership.
+                requestSaveDecision ()
             | CloseLifecycleState.Idle ->
                 if vault.activeFileImport.IsSome then
                     closeEvent.preventDefault ()
@@ -687,13 +697,7 @@ type ArcVaults() =
                 elif vault.hasUnsavedArcChanges then
                     closeEvent.preventDefault ()
                     vault.CloseState <- CloseLifecycleState.WaitingForSaveDecision
-
-                    let saveBeforeQuitClient =
-                        Remoting.createIpc ()
-                        |> Remoting.withWindow vault.window
-                        |> Remoting.buildProxySender<IMainSaveBeforeQuitApi>
-
-                    saveBeforeQuitClient.requestSaveBeforeQuit ()
+                    requestSaveDecision ()
                 else
                     swatelogfn id "Closing window directly because no unsaved ARC changes are present."
         )

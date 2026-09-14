@@ -466,6 +466,55 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "a repeated close attempt restores a lost save dialog request",
+            fun () ->
+                let mutable closeHandler: obj -> unit = ignore
+                let mutable saveDialogRequestCount = 0
+                let mutable preventedCloseCount = 0
+
+                let window =
+                    createObj [
+                        "id" ==> 3
+                        "title" ==> ""
+                        "isDestroyed" ==> (fun () -> false)
+                        "close" ==> ignore
+                        "on" ==>
+                            (fun (eventName: string) (handler: obj -> unit) ->
+                                if eventName = "close" then
+                                    closeHandler <- handler)
+                        "webContents" ==>
+                            createObj [
+                                "send" ==>
+                                    (fun (_channel: string) (_payload: obj) ->
+                                        saveDialogRequestCount <- saveDialogRequestCount + 1)
+                            ]
+                    ]
+                    |> unbox<BrowserWindow>
+
+                let vault = ArcVault(window)
+                let arc = ARC("UnsavedArc")
+                vault.SetArc arc
+                arc.Title <- Some "Unsaved title"
+                vault.RefreshHasUnsavedArcChangesFlag()
+                saveDialogRequestCount <- 0
+
+                let vaults = ArcVaults()
+                vaults.OnCloseWindow(window, vault, window.id)
+
+                let closeEvent =
+                    createObj [
+                        "preventDefault" ==> (fun () -> preventedCloseCount <- preventedCloseCount + 1)
+                    ]
+
+                closeHandler closeEvent
+                closeHandler closeEvent
+
+                Vitest.expect(vault.CloseState).toEqual (CloseLifecycleState.WaitingForSaveDecision)
+                Vitest.expect(preventedCloseCount).toBe (2)
+                Vitest.expect(saveDialogRequestCount).toBe (2)
+        )
+
+        Vitest.test (
             "file watcher polling defaults to Windows only",
             fun () ->
                 Vitest.expect(shouldUsePollingByDefault "win32").toBe (true)
