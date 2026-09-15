@@ -680,10 +680,10 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                             match classification with
                             | ArcEntityPathRules.DeletePathClassification.EntityFolderTarget(zone,
-                                                                                              identifier,
-                                                                                              deleteTargetPath)
+                                                                                             identifier,
+                                                                                             deleteTargetPath)
                             | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.EntityFile(zone,
-                                                                                                                                                  identifier),
+                                                                                                                                                   identifier),
                                                                                               deleteTargetPath) ->
                                 match vault.arc with
                                 | None -> return Error(arcNotOpenError ())
@@ -697,7 +697,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             |> fun watcherEvent ->
                                                 PathHelpers.normalizePath (
                                                     watcherEvent.AbsolutePath.ToLowerInvariant()
-                                                ))
+                                                )
+                                        )
 
                                     ownedPaths |> List.iter (vault.fileWatcherOwnedPaths.Add >> ignore)
                                     let wasBusyWriting = vault.isBusyWriting
@@ -798,6 +799,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         event
                         (fun vault -> promise {
                             let arcPath = vault.path.Value
+
                             let renameClassification =
                                 ArcEntityPathRules.classifyRenameTarget request.relativePath
 
@@ -811,8 +813,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                     let ownedPaths =
                                         match renameClassification with
                                         | ArcEntityPathRules.RenamePathClassification.EntityFolderTarget(zone,
-                                                                                                           sourceIdentifier,
-                                                                                                           sourceFolder) ->
+                                                                                                         sourceIdentifier,
+                                                                                                         sourceFolder) ->
                                             let targetPaths =
                                                 match
                                                     Swate.Electron.Shared.RenamePathRules.tryBuildRenameTargetPath
@@ -835,7 +837,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                 |> fun watcherEvent ->
                                                     PathHelpers.normalizePath (
                                                         watcherEvent.AbsolutePath.ToLowerInvariant()
-                                                    ))
+                                                    )
+                                            )
                                         | _ -> []
 
                                     ownedPaths |> List.iter (vault.fileWatcherOwnedPaths.Add >> ignore)
@@ -925,7 +928,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                         "Direct writing of ARC content files is not supported. Use saveArcFile for these file types to ensure ARC integrity."
                                                 )
                                         | _ ->
-                                            return Error(exn $"Unsupported file content type for writing: {request.fileType}")
+                                            return
+                                                Error(
+                                                    exn
+                                                        $"Unsupported file content type for writing: {request.fileType}"
+                                                )
                                     })
             with e ->
                 return Error e

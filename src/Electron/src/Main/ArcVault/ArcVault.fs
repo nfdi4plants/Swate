@@ -279,7 +279,8 @@ module ArcVaultExtensions =
                     arc.GetUpdateContractsSwate()
                     |> Array.map (fun contract ->
                         WatcherHelpers.buildWatcherEvent arcPath "change" contract.Path
-                        |> fun event -> PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant()))
+                        |> fun event -> PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant())
+                    )
 
                 ownedPaths |> Array.iter (this.fileWatcherOwnedPaths.Add >> ignore)
                 this.isBusyWriting <- true
@@ -318,7 +319,8 @@ module ArcVaultExtensions =
                         arcLocal.GetAddContracts(arcFile, false)
                         |> Array.map (fun contract ->
                             WatcherHelpers.buildWatcherEvent arcPath "add" contract.Path
-                            |> fun event -> PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant()))
+                            |> fun event -> PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant())
+                        )
 
                     ownedPaths |> Array.iter (this.fileWatcherOwnedPaths.Add >> ignore)
                     let wasBusyWriting = this.isBusyWriting

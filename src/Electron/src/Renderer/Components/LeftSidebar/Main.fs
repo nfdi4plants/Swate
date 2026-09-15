@@ -8,7 +8,7 @@ open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Electron.Shared.FileIOTypes
 
 [<ReactComponent>]
-let private FileImportStatusNotice() =
+let private FileImportStatusNotice () =
     let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
     let errorModal = useErrorModalCtx ()
 
@@ -16,9 +16,7 @@ let private FileImportStatusNotice() =
         fileStateCtx.cancelFileImport ()
         |> Promise.map (
             Result.mapError (fun cancelError ->
-                errorModal.enqueue (
-                    ErrorModalRequest.create (cancelError.Message, title = "Could not cancel import")
-                )
+                errorModal.enqueue (ErrorModalRequest.create (cancelError.Message, title = "Could not cancel import"))
             )
         )
         |> Promise.catch (fun cancelError ->
@@ -54,14 +52,12 @@ let private FileImportStatusNotice() =
                             && activeImport.phase = FileImportPhase.Copying
                         then
                             Html.button [
-                                prop.className
-                                    "swt:btn swt:btn-ghost swt:btn-xs swt:shrink-0 swt:gap-1 swt:normal-case"
+                                prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:shrink-0 swt:gap-1 swt:normal-case"
                                 prop.title "Cancel"
                                 prop.onClick (fun _ -> cancelImport () |> ignore)
                                 prop.children [
                                     Html.span [
-                                        prop.className
-                                            "swt:iconify swt:fluent--dismiss-circle-24-regular swt:size-4"
+                                        prop.className "swt:iconify swt:fluent--dismiss-circle-24-regular swt:size-4"
                                     ]
                                     Html.span [ prop.text "Cancel" ]
                                 ]
