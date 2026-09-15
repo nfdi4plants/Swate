@@ -111,13 +111,12 @@ module private FilePickerWidgetHelper =
         | Some(InsertTarget.DataMap selection) ->
             match nextArcFile.TryGetDataMap() with
             | Some dataMap ->
-                dataMap.PasteTabText(
-                    {|
-                        x = selection.xStart
-                        y = selection.yStart
-                    |},
-                    String.concat System.Environment.NewLine paths
-                )
+                let anchor: CellCoordinate = {|
+                    x = selection.xStart
+                    y = selection.yStart
+                |}
+
+                dataMap.PasteTabText(anchor, [| anchor |], String.concat System.Environment.NewLine paths)
 
                 setArcFile nextArcFile
             | None -> ()

@@ -56,8 +56,6 @@ module DataMapExtensions =
                             $"Parent '{parentPath}' does not have a DataMap to delete. Refresh the File Explorer and try again."
                     )
             | Some dataMap ->
-                let deleteContract = dataMap.ToDeleteContract(parentInfo)
-
                 match! ARC.LoadAsyncSwate arcPath with
                 | Error errors ->
                     return
@@ -76,15 +74,25 @@ module DataMapExtensions =
                                     $"The DataMap could not be deleted because parent '{parentPath}' was not found on disk. Refresh the File Explorer and try again."
                             )
                     | Some parentUpdateContract ->
-                        match! fullFillContractBatchAsync arcPath [| parentUpdateContract; deleteContract |] with
+                        match! fullFillContractBatchAsync arcPath [| parentUpdateContract |] with
                         | Error errors ->
                             return
                                 Error(
                                     exn
-                                        $"The DataMap could not be deleted from disk. {PathHelpers.formatContractErrors errors}"
+                                        $"The DataMap could not be deleted because its parent could not be updated. {PathHelpers.formatContractErrors errors}"
                                 )
                         | Ok _ ->
-                            this.TrySetDataMap(parentInfo, None) |> ignore
-                            this.UpdateFileSystem()
-                            return Ok()
+                            let deleteContract = dataMap.ToDeleteContract(parentInfo)
+
+                            match! fullFillContractBatchAsync arcPath [| deleteContract |] with
+                            | Error errors ->
+                                return
+                                    Error(
+                                        exn
+                                            $"The DataMap could not be deleted from disk. {PathHelpers.formatContractErrors errors}"
+                                    )
+                            | Ok _ ->
+                                this.TrySetDataMap(parentInfo, None) |> ignore
+                                this.UpdateFileSystem()
+                                return Ok()
         }

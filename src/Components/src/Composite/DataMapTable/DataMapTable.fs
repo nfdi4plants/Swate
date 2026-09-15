@@ -357,12 +357,7 @@ type DataMapTable =
                                     e.preventDefault ()
                                     let coordinates = tableRef.current.SelectHandle.getSelectedCells () |> Seq.toArray
 
-                                    promise {
-                                        do! copyCells datamap coordinates
-
-                                        updateDataMap datamap setDatamap _.ClearCells(coordinates)
-                                    }
-                                    |> Promise.start
+                                    cutCells datamap coordinates setDatamap |> Promise.start
                                 | None -> ()
                             )
                     )

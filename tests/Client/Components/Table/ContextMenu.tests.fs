@@ -21,6 +21,12 @@ let private setNavigatorClipboard
     : unit =
     jsNative
 
+[<Emit("(() => { const original = globalThis.ClipboardItem; globalThis.ClipboardItem = class { constructor(values) { this.types = Object.keys(values); } }; return original; })()")>]
+let private installClipboardItemMock () : obj = jsNative
+
+[<Emit("globalThis.ClipboardItem = $0")>]
+let private restoreClipboardItem (clipboardItem: obj) : unit = jsNative
+
 type TestCases =
 
     static member private NoSelectionHandle() =
@@ -303,7 +309,8 @@ type TestCases =
         Expect.equal copiedText "explicit\tmetre" "Each selected DataMap cell should occupy one clipboard column."
 
         let target = DataMap(ResizeArray [ DataContext() ])
-        target.PasteTabText({| x = 2; y = 1 |}, copiedText)
+        let targetAnchor: CellCoordinate = {| x = 2; y = 1 |}
+        target.PasteTabText(targetAnchor, [| targetAnchor |], copiedText)
 
         Expect.equal target.DataContexts.[0].Label (Some "explicit") "The first value should use the target column."
         Expect.equal target.DataContexts.[0].Description (Some "metre") "The next value should not shift right."
@@ -311,7 +318,8 @@ type TestCases =
     static member DataMapPlainTextPasteKeepsTsvCellsSeparate() =
         let dataMap = DataMap(ResizeArray [ DataContext() ])
 
-        dataMap.PasteTabText({| x = 5; y = 1 |}, "foo\tbar\tbaz")
+        let firstAnchor: CellCoordinate = {| x = 5; y = 1 |}
+        dataMap.PasteTabText(firstAnchor, [| firstAnchor |], "foo\tbar\tbaz")
 
         Expect.equal
             dataMap.DataContexts.[0].Explication.Value.NameText
@@ -330,7 +338,8 @@ type TestCases =
             None
             "Ordinary TSV must not be interpreted as ontology metadata."
 
-        dataMap.PasteTabText({| x = 6; y = 2 |}, "one\ttwo\tthree\tfour")
+        let secondAnchor: CellCoordinate = {| x = 6; y = 2 |}
+        dataMap.PasteTabText(secondAnchor, [| secondAnchor |], "one\ttwo\tthree\tfour")
 
         Expect.equal
             dataMap.DataContexts.[1].Unit.Value.NameText
@@ -341,6 +350,25 @@ type TestCases =
             dataMap.DataContexts.[1].ObjectType.Value.NameText
             "two"
             "The next in-range value should be pasted into ObjectType."
+
+        let repeatedMap = DataMap(ResizeArray [ DataContext(); DataContext() ])
+        let repeatAnchor: CellCoordinate = {| x = 5; y = 1 |}
+
+        let selection: CellCoordinate[] = [|
+            {| x = 5; y = 1 |}
+            {| x = 6; y = 1 |}
+            {| x = 7; y = 1 |}
+            {| x = 5; y = 2 |}
+            {| x = 6; y = 2 |}
+            {| x = 7; y = 2 |}
+        |]
+
+        repeatedMap.PasteTabText(repeatAnchor, selection, "alpha\tbeta")
+
+        for row in repeatedMap.DataContexts do
+            Expect.equal row.Explication.Value.NameText "alpha" "Plain text should repeat from the first source column."
+            Expect.equal row.Unit.Value.NameText "beta" "Plain text should repeat from the second source column."
+            Expect.equal row.ObjectType.Value.NameText "alpha" "Plain text should wrap across a wider selection."
 
     static member DataMapStructuredPastePreservesTermsAndUnits() =
         let term = CompositeCell.createTermFromString ("explicit", "TST", "TST:1")
@@ -365,6 +393,207 @@ type TestCases =
             structuredTarget.DataContexts.[0].Unit.Value.TermAccessionNumber
             (Some "UO:0000008")
             "Structured unit paste should preserve ontology metadata."
+
+    static member PlainTextSelectionRepeatsLikeStructuredPaste() =
+        let selection: CellCoordinate[] = [|
+            {| x = 5; y = 1 |}
+            {| x = 6; y = 1 |}
+            {| x = 7; y = 1 |}
+            {| x = 5; y = 2 |}
+            {| x = 6; y = 2 |}
+            {| x = 7; y = 2 |}
+        |]
+
+        let anchor = selection.[0]
+        let plainTarget = DataMap(ResizeArray [ DataContext(); DataContext() ])
+        let structuredTarget = DataMap(ResizeArray [ DataContext(); DataContext() ])
+
+        plainTarget.PasteTabText(anchor, selection, "alpha\tbeta")
+
+        structuredTarget.PasteStructuredCells(
+            anchor,
+            selection,
+            [|
+                [|
+                    CompositeCell.FreeText "alpha"
+                    CompositeCell.FreeText "beta"
+                |]
+            |]
+        )
+
+        for rowIndex in 0..1 do
+            for columnIndex in 4..6 do
+                Expect.equal
+                    (plainTarget.GetCell(columnIndex, rowIndex).ToString())
+                    (structuredTarget.GetCell(columnIndex, rowIndex).ToString())
+                    "Plain-text and structured paste should repeat identically across a selection."
+
+    static member AnnotationTableStructuredPastePreservesOntologyMetadata() =
+        let table = Fixture.mkTable ()
+        let term = CompositeCell.createTermFromString ("instrument", "MS", "MS:1000031")
+
+        let unitized =
+            CompositeCell.createUnitizedFromString ("4", "metre", "UO", "UO:0000008")
+
+        let anchor: CellCoordinate = {| x = 3; y = 1 |}
+        let mutable updatedTable = table
+
+        AnnotationTableContextMenuUtil.applyStructuredCells (
+            anchor,
+            table,
+            Fixture.mkSelectHandle (1, 1, 3, 4),
+            [| [| term; unitized |] |],
+            (fun nextTable -> updatedTable <- nextTable)
+        )
+
+        let pastedTerm = updatedTable.GetCellAt(2, 0).AsTerm
+        let _, pastedUnit = updatedTable.GetCellAt(3, 0).AsUnitized
+        Expect.equal pastedTerm.TermSourceREF (Some "MS") "Term source metadata should be preserved."
+        Expect.equal pastedTerm.TermAccessionNumber (Some "MS:1000031") "Term accession metadata should be preserved."
+        Expect.equal pastedUnit.TermSourceREF (Some "UO") "Unit source metadata should be preserved."
+        Expect.equal pastedUnit.TermAccessionNumber (Some "UO:0000008") "Unit accession metadata should be preserved."
+
+    static member private ClipboardItem(plainText: string, cells: CompositeCell[][]) =
+        let payload =
+            cells
+            |> Swate.Components.ClipboardCodec.createPayload
+            |> Swate.Components.ClipboardCodec.encode
+
+        let blob text =
+            { new ClipboardBlob with
+                member _.text() = promise { return text }
+            }
+
+        { new ClipboardItem with
+            member _.types = [| Swate.Components.ClipboardCodec.MimeType; "text/plain" |]
+
+            member _.getType mimeType = promise {
+                return
+                    if mimeType = Swate.Components.ClipboardCodec.MimeType then
+                        blob payload
+                    else
+                        blob plainText
+            }
+        }
+
+    static member StructuredPasteFallsBackForHeadersAndBlankBodies() = async {
+        let table = Fixture.mkTable ()
+        let originalClipboard = GlobalBindings.navigator.clipboard
+
+        let runPaste coordinate cells plainText = async {
+            let item = TestCases.ClipboardItem(plainText, cells)
+
+            let clipboardMock =
+                { new Clipboard with
+                    member _.read() = promise { return [| item |] }
+                    member _.readText() = promise { return plainText }
+                    member _.write _ = promise { return () }
+                    member _.writeText _ = promise { return () }
+                }
+
+            let mutable modal = None
+            let mutable tableWasUpdated = false
+
+            try
+                setNavigatorClipboard GlobalBindings.navigator clipboardMock
+
+                do!
+                    AnnotationTableContextMenuUtil.tryPasteCopiedCells (
+                        coordinate,
+                        table,
+                        Fixture.mkSelectHandle (coordinate.y, coordinate.y, coordinate.x, coordinate.x),
+                        (fun nextModal -> modal <- nextModal),
+                        (fun _ -> tableWasUpdated <- true)
+                    )
+                    |> Async.AwaitPromise
+
+                return modal, tableWasUpdated
+            finally
+                setNavigatorClipboard GlobalBindings.navigator originalClipboard
+        }
+
+        let headerText = table.ToStringSeqs().[0].[0]
+
+        let! headerModal, headerUpdated =
+            runPaste {| x = 1; y = 0 |} [| [| CompositeCell.FreeText "structured" |] |] headerText
+
+        match headerModal with
+        | Some(AnnotationTable.ModalTypes.PasteCaseUserInput(PasteCases.AddColumns _, _)) -> ()
+        | _ -> failwith "Structured clipboard content targeting a header should use the plain-text header flow."
+
+        Expect.isFalse headerUpdated "Header fallback should not apply structured body cells."
+
+        let! blankModal, blankUpdated = runPaste {| x = 1; y = 1 |} [| [| CompositeCell.FreeText "" |] |] ""
+
+        match blankModal with
+        | Some(AnnotationTable.ModalTypes.UnknownPasteCase(PasteCases.Unknown _)) -> ()
+        | _ -> failwith "An all-blank structured body payload should use the Unknown flow."
+
+        Expect.isFalse blankUpdated "An all-blank structured payload should not clear the target cell."
+    }
+
+    static member ClipboardWriteFallsBackFromTypedToHtml() = async {
+        let originalClipboard = GlobalBindings.navigator.clipboard
+        let originalClipboardItem = installClipboardItemMock ()
+        let attempts = ResizeArray<string[]>()
+        let mutable plainTextFallbackUsed = false
+
+        let clipboardMock =
+            { new Clipboard with
+                member _.read() = promise { return [||] }
+                member _.readText() = promise { return "" }
+
+                member _.write items = promise {
+                    attempts.Add(items.[0].types)
+
+                    if attempts.Count = 1 then
+                        return raise (System.Exception "custom MIME unsupported")
+                }
+
+                member _.writeText _ = promise { plainTextFallbackUsed <- true }
+            }
+
+        try
+            setNavigatorClipboard GlobalBindings.navigator clipboardMock
+
+            do!
+                Swate.Components.ClipboardCodec.write "plain" (Some [| [| CompositeCell.FreeText "plain" |] |])
+                |> Async.AwaitPromise
+
+            Expect.equal attempts.Count 2 "Writing should retry after custom MIME writing fails."
+
+            Expect.isTrue
+                (attempts.[0] |> Array.contains Swate.Components.ClipboardCodec.MimeType)
+                "The first write should contain the typed payload."
+
+            Expect.isFalse
+                (attempts.[1] |> Array.contains Swate.Components.ClipboardCodec.MimeType)
+                "The HTML fallback should omit the unsupported custom MIME type."
+
+            Expect.isTrue (attempts.[1] |> Array.contains "text/html") "The second write should retain HTML content."
+            Expect.isFalse plainTextFallbackUsed "A successful HTML write should not fall back to writeText."
+
+            let mutable finalPlainText = None
+
+            let plainTextClipboardMock =
+                { new Clipboard with
+                    member _.read() = promise { return [||] }
+                    member _.readText() = promise { return "" }
+                    member _.write _ = promise { return raise (System.Exception "rich clipboard unsupported") }
+                    member _.writeText value = promise { finalPlainText <- Some value }
+                }
+
+            setNavigatorClipboard GlobalBindings.navigator plainTextClipboardMock
+
+            do!
+                Swate.Components.ClipboardCodec.write "plain" (Some [| [| CompositeCell.FreeText "plain" |] |])
+                |> Async.AwaitPromise
+
+            Expect.equal finalPlainText (Some "plain") "Failed typed and HTML writes should fall back to plain text."
+        finally
+            setNavigatorClipboard GlobalBindings.navigator originalClipboard
+            restoreClipboardItem originalClipboardItem
+    }
 
     static member ClipboardCodecRoundTripsCompositeCells() =
         let cells = [|
@@ -425,7 +654,8 @@ type TestCases =
     static member DataMapCellPastePreservesSelector() =
         let dataMap = DataMap(ResizeArray [ DataContext() ])
 
-        dataMap.PasteTabText({| x = 1; y = 1 |}, "DatamapTesting.txt#row=2")
+        let anchor: CellCoordinate = {| x = 1; y = 1 |}
+        dataMap.PasteTabText(anchor, [| anchor |], "DatamapTesting.txt#row=2")
 
         Expect.equal dataMap.DataContexts.[0].FilePath (Some "DatamapTesting.txt") "The path should be pasted."
         Expect.equal dataMap.DataContexts.[0].Selector (Some "row=2") "The selector should be pasted."
@@ -446,7 +676,9 @@ type TestCases =
     static member DataMapGridPasteGrowsRows() =
         let dataMap = DataMap(ResizeArray [ DataContext() ])
 
-        dataMap.PasteTabText({| x = 1; y = 1 |}, "first.txt#row=2\tFirst\nsecond.txt#row=3\tSecond")
+        let anchor: CellCoordinate = {| x = 1; y = 1 |}
+
+        dataMap.PasteTabText(anchor, [| anchor |], "first.txt#row=2\tFirst\nsecond.txt#row=3\tSecond")
 
         Expect.equal dataMap.DataContexts.Count 2 "The DataMap should grow for additional clipboard rows."
         Expect.equal dataMap.DataContexts.[1].FilePath (Some "second.txt") "The second path should be pasted."
@@ -602,6 +834,25 @@ type TestCases =
             replacement.TermSourceREF
             None
             "Unrelated destination ontology identity must not survive replacement."
+
+        let data = CompositeCell.createDataFromString "file.txt#row=2"
+        dataMap.PasteStructuredCells(anchor, [| anchor |], [| [| data |] |])
+        let dataReplacement = dataMap.DataContexts.[0].Explication.Value
+
+        Expect.equal
+            dataReplacement.NameText
+            "file.txt#row=2"
+            "Structured data should use its visible value in a term column."
+
+        Expect.equal
+            dataReplacement.TermAccessionNumber
+            None
+            "Structured data must not retain the destination ontology accession."
+
+        Expect.equal
+            dataReplacement.TermSourceREF
+            None
+            "Structured data must not retain the destination ontology source."
 
     static member ClipboardRejectsMalformedFieldTypes() =
         Expect.isNone
@@ -781,6 +1032,14 @@ let Main =
             <| fun _ -> TestCases.DataMapPlainTextPasteKeepsTsvCellsSeparate()
             testCase "DataMap structured paste preserves terms and units"
             <| fun _ -> TestCases.DataMapStructuredPastePreservesTermsAndUnits()
+            testCase "Plain-text selection repetition matches structured paste"
+            <| fun _ -> TestCases.PlainTextSelectionRepeatsLikeStructuredPaste()
+            testCase "AnnotationTable structured paste preserves term and unit metadata"
+            <| fun _ -> TestCases.AnnotationTableStructuredPastePreservesOntologyMetadata()
+            testCaseAsync "Structured paste falls back for headers and blank bodies"
+            <| TestCases.StructuredPasteFallsBackForHeadersAndBlankBodies()
+            testCaseAsync "Clipboard write falls back from typed content to HTML"
+            <| TestCases.ClipboardWriteFallsBackFromTypedToHtml()
             testCase "Typed clipboard codec round-trips composite cells"
             <| fun _ -> TestCases.ClipboardCodecRoundTripsCompositeCells()
             testCase "Table cell copy includes the selector behind #"

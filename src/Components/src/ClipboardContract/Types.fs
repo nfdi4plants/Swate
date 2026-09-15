@@ -8,7 +8,4 @@ type ClipboardContent = {
     PlainText: string
 }
 
-type MappedCell = {
-    Source: CompositeCell
-    Target: CellCoordinate
-}
+type MappedCell<'T> = { Source: 'T; Target: CellCoordinate }

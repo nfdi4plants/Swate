@@ -99,14 +99,7 @@ type DataMapContextMenu =
                         kbdbutton = ATCMC.KbdHint("X"),
                         onClick =
                             (fun _ ->
-                                promise {
-                                    do! DataMapTableHelper.copyCells dataMap selectedCoordinates
-
-                                    DataMapTableHelper.updateDataMap
-                                        dataMap
-                                        setDataMap
-                                        _.ClearCells(selectedCoordinates)
-                                }
+                                DataMapTableHelper.cutCells dataMap selectedCoordinates setDataMap
                                 |> Promise.start
                             )
                     )

@@ -245,6 +245,11 @@ let write (plainText: string) (cells: CompositeCell[][] option) = promise {
                 do! clipboard.writeText plainText
 }
 
+let cut (content: Swate.Components.ClipboardContract.Types.ClipboardContent) (clearSource: unit -> unit) = promise {
+    do! write content.PlainText content.Cells
+    clearSource ()
+}
+
 let private createContent cells plainText : Swate.Components.ClipboardContract.Types.ClipboardContent = {
     Cells = cells
     PlainText = plainText

@@ -30,7 +30,7 @@ module Mapping =
         let remainder = value % length
         if remainder < 0 then remainder + length else remainder
 
-    let map (source: CompositeCell[][]) (anchor: CellCoordinate) (selection: CellCoordinate[]) =
+    let map (source: 'T[][]) (anchor: CellCoordinate) (selection: CellCoordinate[]) : MappedCell<'T>[] =
         if
             Array.isEmpty source
             || source |> Array.exists Array.isEmpty

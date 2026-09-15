@@ -21,8 +21,10 @@ module ARCtrlExtensions =
                     CompositeCell.createTerm unit
                 | CompositeCell.Term term, column when this.GetHeader(column).IsTermColumn ->
                     CompositeCell.createTerm term
-                | CompositeCell.FreeText value, column when this.GetHeader(column).IsTermColumn ->
-                    CompositeCell.createTerm (OntologyAnnotation.create value)
+                | CompositeCell.FreeText _ as value, column when this.GetHeader(column).IsTermColumn ->
+                    CompositeCell.createTerm (OntologyAnnotation.create (value.ToString()))
+                | CompositeCell.Data _ as value, column when this.GetHeader(column).IsTermColumn ->
+                    CompositeCell.createTerm (OntologyAnnotation.create (value.ToString()))
                 | CompositeCell.Data _, DataMapIndices.Data -> source
                 | _ -> target.UpdateMainField(source.ToString())
 
@@ -51,27 +53,44 @@ module ARCtrlExtensions =
             )
             |> Array.iter (fun mapped -> this.ApplyClipboardCell(mapped.Target, mapped.Source))
 
-        member this.PasteTabText(startCoordinate: CellCoordinate, clipboardText: string) =
-            let rows =
+        member this.PasteTabText(startCoordinate: CellCoordinate, selection: CellCoordinate[], clipboardText: string) =
+            let parsedRows =
                 clipboardText.TrimEnd([| '\r'; '\n' |]).Split(LineBreaks, System.StringSplitOptions.None)
                 |> Array.map (fun row -> row.Split([| '\t' |], System.StringSplitOptions.None))
 
-            let requiredRowCount = startCoordinate.y - 1 + rows.Length
+            let columnCount = parsedRows |> Array.map _.Length |> Array.max
+
+            let rows =
+                parsedRows
+                |> Array.map (fun row ->
+                    if row.Length = columnCount then
+                        row
+                    else
+                        Array.append row (Array.create (columnCount - row.Length) "")
+                )
+
+            let mapped = Mapping.map rows startCoordinate selection
+
+            let requiredRowCount =
+                mapped
+                |> Array.map (_.Target.y)
+                |> Array.filter (fun row -> row > 0)
+                |> Array.append [| this.RowCount |]
+                |> Array.max
 
             if requiredRowCount > this.RowCount then
                 this.DataContexts.AddRange(Array.init (requiredRowCount - this.RowCount) (fun _ -> DataContext()))
 
-            rows
-            |> Array.iteri (fun rowOffset row ->
-                let startColumnIndex = startCoordinate.x - 1
-                let rowIndex = startCoordinate.y - 1 + rowOffset
+            mapped
+            |> Array.filter (fun mapped ->
+                mapped.Target.x > 0
+                && mapped.Target.x <= this.ColumnCount
+                && mapped.Target.y > 0
+            )
+            |> Array.iter (fun mapped ->
+                let columnIndex = mapped.Target.x - 1
+                let rowIndex = mapped.Target.y - 1
 
-                row
-                |> Array.iteri (fun columnOffset value ->
-                    let columnIndex = startColumnIndex + columnOffset
-
-                    if columnIndex < this.ColumnCount then
-                        this.GetCell(columnIndex, rowIndex).UpdateMainField(value)
-                        |> fun cell -> this.SetCell(columnIndex, rowIndex, cell)
-                )
+                this.GetCell(columnIndex, rowIndex).UpdateMainField(mapped.Source)
+                |> fun cell -> this.SetCell(columnIndex, rowIndex, cell)
             )
