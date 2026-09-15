@@ -379,6 +379,19 @@ type AnnotationTableContextMenuUtil =
                     coordinates = groupedCellCoordinates
                 |}
 
+    static member private preserveTargetUnit(currentCell: CompositeCell, incomingCell: CompositeCell) =
+        if incomingCell.isUnitized then
+            let value, unit = incomingCell.AsUnitized
+
+            if unit.isEmpty () && currentCell.isUnitized then
+                CompositeCell.createUnitized (value, snd currentCell.AsUnitized)
+            elif unit.isEmpty () && currentCell.isTerm then
+                CompositeCell.createUnitized (value, currentCell.AsTerm)
+            else
+                incomingCell
+        else
+            incomingCell
+
     static member private applyMappedCells
         (
             cellIndex: CellCoordinate,
@@ -433,7 +446,10 @@ type AnnotationTableContextMenuUtil =
             targetTable,
             selectHandle,
             cells,
-            (fun header _ source -> source.ConvertToValidCell(header)),
+            (fun header currentCell source ->
+                let incomingCell = source.ConvertToValidCell(header)
+                AnnotationTableContextMenuUtil.preserveTargetUnit (currentCell, incomingCell)
+            ),
             setTable
         )
 
@@ -446,19 +462,8 @@ type AnnotationTableContextMenuUtil =
             setTable: ArcTable -> unit
         ) =
         let convert (header: CompositeHeader) (currentCell: CompositeCell) (value: string) =
-            let parsedCell = CompositeCell.fromContentValid ([| value |], header)
-
-            if parsedCell.isUnitized then
-                let numericValue, unit = parsedCell.AsUnitized
-
-                if unit.isEmpty () && currentCell.isUnitized then
-                    CompositeCell.createUnitized (numericValue, snd currentCell.AsUnitized)
-                elif unit.isEmpty () && currentCell.isTerm then
-                    CompositeCell.createUnitized (numericValue, currentCell.AsTerm)
-                else
-                    parsedCell
-            else
-                parsedCell
+            let incomingCell = CompositeCell.fromContentValid ([| value |], header)
+            AnnotationTableContextMenuUtil.preserveTargetUnit (currentCell, incomingCell)
 
         AnnotationTableContextMenuUtil.applyMappedCells (
             cellIndex,

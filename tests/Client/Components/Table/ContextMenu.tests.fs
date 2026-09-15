@@ -544,6 +544,25 @@ type TestCases =
         Expect.equal pastedUnit.TermSourceREF (Some "UO") "Unit source metadata should be preserved."
         Expect.equal pastedUnit.TermAccessionNumber (Some "UO:0000008") "Unit accession metadata should be preserved."
 
+    static member AnnotationTableStructuredUnitlessValuePreservesTargetUnit() =
+        let table = Fixture.mkTable ()
+        let anchor: CellCoordinate = {| x = 4; y = 1 |}
+        let mutable updatedTable = table
+
+        AnnotationTableContextMenuUtil.applyStructuredCells (
+            anchor,
+            table,
+            Fixture.mkSelectHandle (1, 1, 4, 4),
+            [| [| CompositeCell.createUnitizedFromString "4" |] |],
+            (fun nextTable -> updatedTable <- nextTable)
+        )
+
+        let value, unit = updatedTable.GetCellAt(3, 0).AsUnitized
+        Expect.equal value "4" "The structured numeric value should be applied."
+        Expect.equal unit.NameText "Degree Celsius" "The existing destination unit should be retained."
+        Expect.equal unit.TermSourceREF (Some "UO") "The existing unit source should be retained."
+        Expect.equal unit.TermAccessionNumber (Some "UO:000000001") "The existing unit accession should be retained."
+
     static member private ClipboardItem(plainText: string, cells: CompositeCell[][]) =
         let payload =
             cells
@@ -891,6 +910,23 @@ type TestCases =
             |]
             "The shared mapper should wrap the source matrix across the full selection."
 
+        let twoByTwoSelection: CellCoordinate[] = [|
+            {| x = 3; y = 4 |}
+            {| x = 4; y = 4 |}
+            {| x = 3; y = 5 |}
+            {| x = 4; y = 5 |}
+        |]
+
+        let bottomRightAnchor: CellCoordinate = {| x = 4; y = 5 |}
+
+        let mappedFromBottomRight =
+            Swate.Components.ClipboardContract.Contract.Mapping.map source bottomRightAnchor twoByTwoSelection
+
+        Expect.equal
+            (mappedFromBottomRight |> Array.map (fun item -> item.Source.ToString()))
+            [| "1,1"; "2,1"; "1,2"; "2,2" |]
+            "A clicked cell inside a multi-cell target must not rotate the source relative to the selection."
+
     static member DataMapStructuredTermRulesAreExplicit() =
         let unit = CompositeCell.createUnitizedFromString ("4", "metre", "UO", "UO:0000008")
 
@@ -1135,6 +1171,8 @@ let Main =
             <| fun _ -> TestCases.AnnotationTableStructuredOverflowClipsColumnsAndExtendsRows()
             testCase "AnnotationTable structured paste preserves term and unit metadata"
             <| fun _ -> TestCases.AnnotationTableStructuredPastePreservesOntologyMetadata()
+            testCase "AnnotationTable structured unitless values preserve the target unit"
+            <| fun _ -> TestCases.AnnotationTableStructuredUnitlessValuePreservesTargetUnit()
             testCaseAsync "Structured paste falls back for headers and blank bodies"
             <| TestCases.StructuredPasteFallsBackForHeadersAndBlankBodies()
             testCaseAsync "Clipboard write falls back from typed content to HTML"

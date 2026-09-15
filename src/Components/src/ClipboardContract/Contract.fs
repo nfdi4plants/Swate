@@ -58,6 +58,12 @@ module Mapping =
         let sourceHeight = source.Length
         let sourceWidth = source.[0].Length
 
+        let effectiveAnchor =
+            if selection.Length > 1 then
+                selection |> Array.minBy (fun coordinate -> coordinate.y, coordinate.x)
+            else
+                anchor
+
         let targets =
             if selection.Length > 1 then
                 selection |> Array.distinct
@@ -77,6 +83,9 @@ module Mapping =
         targets
         |> Array.sortBy (fun coordinate -> coordinate.y, coordinate.x)
         |> Array.map (fun target -> {
-            Source = source.[modulo (target.y - anchor.y) sourceHeight].[modulo (target.x - anchor.x) sourceWidth]
+            Source =
+                source.[modulo (target.y - effectiveAnchor.y) sourceHeight].[modulo
+                    (target.x - effectiveAnchor.x)
+                    sourceWidth]
             Target = target
         })
