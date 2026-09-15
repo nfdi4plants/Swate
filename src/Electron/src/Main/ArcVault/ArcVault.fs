@@ -4,6 +4,7 @@ module Main.ArcVault
 open System.Collections.Generic
 open Fable.Core
 open Fable.Electron
+open Fable.Electron.Main
 open Fable.Electron.Remoting.Main
 open Main
 open Main.ARCtrlExtensions
@@ -682,19 +683,30 @@ type ArcVaults() =
                     vault.CloseState <- CloseLifecycleState.WaitingForImportCleanup
 
                     promise {
-                        try
-                            let activeImport = vault.activeFileImport.Value
+                        let! importResult = promise {
+                            try
+                                let activeImport = vault.activeFileImport.Value
 
-                            if activeImport.State.phase = FileImportPhase.Copying then
-                                activeImport.AbortController.abort ()
+                                if activeImport.State.phase = FileImportPhase.Copying then
+                                    activeImport.AbortController.abort ()
 
-                            let! _ = activeImport.Completion
-                            ()
-                        with importError ->
-                            swatelogfn id "Active import failed while closing: %s" importError.Message
+                                return! activeImport.Completion
+                            with importError ->
+                                return Error importError
+                        }
 
                         vault.CloseState <- CloseLifecycleState.Idle
-                        window.close ()
+
+                        match importResult with
+                        | Ok _ -> window.close ()
+                        | Error importError ->
+                            swatelogfn id "Active import failed while closing: %s" importError.Message
+
+                            if not (window.isDestroyed ()) then
+                                dialog.showErrorBox (
+                                    "Could not close Swate",
+                                    $"The active file import could not be rolled back completely. The window was kept open to avoid hiding a partial import.\n\n{importError.Message}"
+                                )
                     }
                     |> Promise.start
                 elif vault.hasUnsavedArcChanges then

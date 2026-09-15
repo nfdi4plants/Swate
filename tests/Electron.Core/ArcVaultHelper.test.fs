@@ -18,6 +18,7 @@ open Vitest
 
 module FileImportCoordinator = Main.FileImportCoordinator
 module WatcherHelpers = Main.WatcherHelpers
+module Abort = Main.Bindings.Abort
 
 let private runFileImport
     (vault: ArcVault)
@@ -490,6 +491,59 @@ Vitest.describe (
                 Vitest.expect(vault.CloseState).toEqual (CloseLifecycleState.WaitingForSaveDecision)
                 Vitest.expect(preventedCloseCount).toBe (2)
                 Vitest.expect(saveDialogRequestCount).toBe (2)
+        )
+
+        Vitest.test (
+            "an import rollback failure keeps the window open and resets the close lifecycle",
+            fun () -> promise {
+                let mutable closeHandler: obj -> unit = ignore
+                let mutable closeCount = 0
+                let mutable preventedCloseCount = 0
+
+                let window =
+                    createObj [
+                        "id" ==> 4
+                        "title" ==> ""
+                        "isDestroyed" ==> (fun () -> false)
+                        "close" ==> (fun () -> closeCount <- closeCount + 1)
+                        "on"
+                        ==> (fun (eventName: string) (handler: obj -> unit) ->
+                            if eventName = "close" then
+                                closeHandler <- handler
+                        )
+                        "webContents" ==> createObj [ "send" ==> (fun (_: string) (_: obj) -> ()) ]
+                    ]
+                    |> unbox<BrowserWindow>
+
+                let vault = ArcVault(window)
+                let abortController = Abort.AbortController.create ()
+
+                vault.activeFileImport <-
+                    Some {
+                        State = {
+                            requestId = "failed-rollback"
+                            phase = FileImportPhase.Copying
+                        }
+                        AbortController = abortController
+                        Completion = JS.Constructors.Promise.resolve (Error(exn "EPERM during rollback"))
+                    }
+
+                let vaults = ArcVaults()
+                vaults.OnCloseWindow(window, vault, window.id)
+
+                let closeEvent =
+                    createObj [
+                        "preventDefault" ==> (fun () -> preventedCloseCount <- preventedCloseCount + 1)
+                    ]
+
+                closeHandler closeEvent
+                do! Promise.sleep 0
+
+                Vitest.expect(preventedCloseCount).toBe (1)
+                Vitest.expect(closeCount).toBe (0)
+                Vitest.expect(abortController.signal.aborted).toBe (true)
+                Vitest.expect(vault.CloseState).toEqual (CloseLifecycleState.Idle)
+            }
         )
 
         Vitest.test (

@@ -334,14 +334,22 @@ module ArcFileSystemHelper =
         let cleanupErrors = ResizeArray<string>()
 
         for createdTargetPath in createdTargetPaths |> Seq.rev do
-            try
-                do! rmAsync createdTargetPath (RmOptions(force = true))
-            with cleanupError ->
+            match!
+                removePathWithRetriesAsync
+                    (fun path -> rmAsync path (RmOptions(force = true)))
+                    createdTargetPath
+            with
+            | Ok() -> ()
+            | Error cleanupError ->
                 cleanupErrors.Add($"Could not remove '{createdTargetPath}': {cleanupError.Message}")
 
-        try
-            do! rmAsync temporaryDirectory (RmOptions(recursive = true, force = true))
-        with cleanupError ->
+        match!
+            removePathWithRetriesAsync
+                (fun path -> rmAsync path (RmOptions(recursive = true, force = true)))
+                temporaryDirectory
+        with
+        | Ok() -> ()
+        | Error cleanupError ->
             cleanupErrors.Add(
                 $"Could not remove temporary import directory '{temporaryDirectory}': {cleanupError.Message}"
             )
