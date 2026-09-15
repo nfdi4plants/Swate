@@ -394,6 +394,25 @@ type TestCases =
             (Some "UO:0000008")
             "Structured unit paste should preserve ontology metadata."
 
+    static member DataMapUnitizedPasteIntoFreeTextPreservesVisibleValue() =
+        let dataMap = DataMap(ResizeArray [ DataContext() ])
+        let anchor: CellCoordinate = {| x = 2; y = 1 |}
+
+        dataMap.PasteStructuredCells(
+            anchor,
+            [| anchor |],
+            [|
+                [|
+                    CompositeCell.createUnitizedFromString ("4", "metre", "UO", "UO:0000008")
+                |]
+            |]
+        )
+
+        Expect.equal
+            dataMap.DataContexts.[0].Label
+            (Some "4 metre")
+            "Pasting a unitized DataMap cell into free text should retain its complete visible value."
+
     static member PlainTextSelectionGeometryMatchesAcrossTargets() =
         let dataMapSelection: CellCoordinate[] = [|
             {| x = 5; y = 1 |}
@@ -562,6 +581,28 @@ type TestCases =
         Expect.equal unit.NameText "Degree Celsius" "The existing destination unit should be retained."
         Expect.equal unit.TermSourceREF (Some "UO") "The existing unit source should be retained."
         Expect.equal unit.TermAccessionNumber (Some "UO:000000001") "The existing unit accession should be retained."
+
+    static member AnnotationTableUnitizedPasteIntoFreeTextPreservesVisibleValue() =
+        let table = Fixture.mkTable ()
+        let anchor: CellCoordinate = {| x = 1; y = 1 |}
+        let mutable updatedTable = table
+
+        AnnotationTableContextMenuUtil.applyStructuredCells (
+            anchor,
+            table,
+            Fixture.mkSelectHandle (1, 1, 1, 1),
+            [|
+                [|
+                    CompositeCell.createUnitizedFromString ("4", "metre", "UO", "UO:0000008")
+                |]
+            |],
+            (fun nextTable -> updatedTable <- nextTable)
+        )
+
+        Expect.equal
+            (updatedTable.GetCellAt(0, 0).ToString())
+            "4 metre"
+            "Pasting a unitized cell into free text should retain its complete visible value."
 
     static member private ClipboardItem(plainText: string, cells: CompositeCell[][]) =
         let payload =
@@ -1159,6 +1200,8 @@ let Main =
             <| fun _ -> TestCases.DataMapPlainTextPasteKeepsTsvCellsSeparate()
             testCase "DataMap structured paste preserves terms and units"
             <| fun _ -> TestCases.DataMapStructuredPastePreservesTermsAndUnits()
+            testCase "DataMap unitized paste into free text preserves the visible value"
+            <| fun _ -> TestCases.DataMapUnitizedPasteIntoFreeTextPreservesVisibleValue()
             testCase "Plain-text selection geometry matches across targets"
             <| fun _ -> TestCases.PlainTextSelectionGeometryMatchesAcrossTargets()
             testCase "Plain text preserves empty rows across targets"
@@ -1173,6 +1216,8 @@ let Main =
             <| fun _ -> TestCases.AnnotationTableStructuredPastePreservesOntologyMetadata()
             testCase "AnnotationTable structured unitless values preserve the target unit"
             <| fun _ -> TestCases.AnnotationTableStructuredUnitlessValuePreservesTargetUnit()
+            testCase "AnnotationTable unitized paste into free text preserves the visible value"
+            <| fun _ -> TestCases.AnnotationTableUnitizedPasteIntoFreeTextPreservesVisibleValue()
             testCaseAsync "Structured paste falls back for headers and blank bodies"
             <| TestCases.StructuredPasteFallsBackForHeadersAndBlankBodies()
             testCaseAsync "Clipboard write falls back from typed content to HTML"

@@ -26,7 +26,7 @@ module ARCtrlExtensions =
                 | CompositeCell.Data _ as value, column when this.GetHeader(column).IsTermColumn ->
                     CompositeCell.createTerm (OntologyAnnotation.create (value.ToString()))
                 | CompositeCell.Data _, DataMapIndices.Data -> source
-                | _ -> target.UpdateMainField(source.ToString())
+                | _ -> target.UpdateMainField(source.ToVisibleString())
 
             this.SetCell(columnIndex, rowIndex, cell)
 

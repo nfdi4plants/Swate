@@ -38,7 +38,7 @@ module Capture =
 
     let toPlainText (cells: CompositeCell[][]) =
         cells
-        |> Array.map (Array.map _.ToString() >> String.concat "\t")
+        |> Array.map (Array.map _.ToVisibleString() >> String.concat "\t")
         |> String.concat System.Environment.NewLine
 
 module Mapping =
