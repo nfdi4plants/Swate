@@ -7,7 +7,6 @@ let client =
         ExplorePanelElmish.Main
         Components.Tests.Table.ContextMenu.Main
         Components.Tests.Table.KeyboardNavigation.Main
-        Spreadsheet.Tests.Clipboard.Main
         Spreadsheet.Tests.DataAnnotator.Main
         OfficeAddIn.AnnotationTable.Successful.Main
     ]

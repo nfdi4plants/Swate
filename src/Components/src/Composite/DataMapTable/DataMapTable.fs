@@ -347,7 +347,11 @@ type DataMapTable =
                                 | Some GridSelect.KeyboardShortcut.Paste ->
                                     e.preventDefault ()
 
-                                    pasteCells datamap selectedCells.selectedCellsReducedSet.MinimumElement setDatamap
+                                    pasteFromClipboard
+                                        datamap
+                                        selectedCells.selectedCellsReducedSet.MinimumElement
+                                        (tableRef.current.SelectHandle.getSelectedCells () |> Seq.toArray)
+                                        setDatamap
                                     |> Promise.start
                                 | Some GridSelect.KeyboardShortcut.Cut ->
                                     e.preventDefault ()

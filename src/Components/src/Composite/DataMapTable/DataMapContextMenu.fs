@@ -114,7 +114,11 @@ type DataMapContextMenu =
                         text = Html.div "Paste",
                         icon = Icons.Paste(),
                         kbdbutton = ATCMC.KbdHint("V"),
-                        onClick = (fun _ -> DataMapTableHelper.pasteCells dataMap index setDataMap |> Promise.start)
+                        onClick =
+                            (fun _ ->
+                                DataMapTableHelper.pasteFromClipboard dataMap index selectedCoordinates setDataMap
+                                |> Promise.start
+                            )
                     )
                     ContextMenuItem(
                         text = Html.div "Clear",

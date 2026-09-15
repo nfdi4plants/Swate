@@ -89,6 +89,8 @@
     <Compile Include="ARCtrl\Extensions\OntologyAnnotation.fs" />
     <Compile Include="ARCtrl\Extensions\CompositeHeader.fs" />
     <Compile Include="ARCtrl\Extensions\CompositeCell.fs" />
+    <Compile Include="ClipboardContract\Types.fs" />
+    <Compile Include="ClipboardContract\Contract.fs" />
     <Compile Include="ARCtrl\ClipboardCodec.fs" />
     <Compile Include="ARCtrl\Extensions\ArcTable.fs" />
     <Compile Include="ARCtrl\Extensions\DataFile.fs" />
@@ -162,6 +164,7 @@
     <Compile Include="Composite\AnnotationTable\AnnotationTable.fs" />
     <Compile Include="Composite\AnnotationTable\ResetTableConfirmationModal.fs" />
     <Compile Include="Composite\DataMapTable\Types.fs" />
+    <Compile Include="Composite\DataMapTable\ClipboardTarget.fs" />
     <Compile Include="Composite\DataMapTable\Helper.fs" />
     <Compile Include="Composite\DataMapTable\DataMapContextMenu.fs" />
     <Compile Include="Composite\DataMapTable\DataMapTable.fs" />

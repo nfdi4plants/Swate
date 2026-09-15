@@ -26,11 +26,6 @@ type CellDto = {
 
 type Payload = { Version: int; Rows: CellDto[][] }
 
-type ClipboardContent = {
-    PlainText: string
-    Payload: Payload option
-}
-
 let ofCompositeCell (cell: CompositeCell) =
     match cell with
     | CompositeCell.FreeText value -> {
@@ -135,7 +130,10 @@ let validateCellDto (cell: CellDto) =
                 |]
             | _ -> None
 
-        requiredFields |> Option.exists (Array.forall (Option.ofObj >> Option.isSome))
+        requiredFields
+        |> Option.exists (
+            Array.forall (fun field -> not (isNull (box field)) && ClipboardBindings.isString (box field))
+        )
 
 let private validateRow (row: CellDto[]) =
     not (isNull (box row)) && row.Length > 0 && Array.forall validateCellDto row
@@ -157,6 +155,7 @@ let tryDecode json =
             || isNull (box payload.Rows)
             || payload.Rows.Length = 0
             || not (payload.Rows |> Array.forall validateRow)
+            || payload.Rows |> Array.exists (fun row -> row.Length <> payload.Rows.[0].Length)
         then
             None
         else
@@ -167,24 +166,21 @@ let tryDecode json =
 let private escapeHtml (text: string) =
     text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&#39;")
 
-let private createHtmlRepresentationFromPayload (cells: CompositeCell[][]) (payloadText: string) =
+let private createHtmlTable (plainText: string) (payloadText: string) =
     let encodedPayload = payloadText |> JS.encodeURIComponent
 
     let tableRows =
-        cells
+        plainText.Split(Swate.Components.ClipboardContract.Contract.LineBreaks, System.StringSplitOptions.None)
+        |> Array.map (fun row -> row.Split([| '\t' |], System.StringSplitOptions.None))
         |> Array.map (fun row ->
             row
-            |> Array.map (fun cell -> $"<td>{cell.ToClipboardStr() |> escapeHtml}</td>")
+            |> Array.map (fun value -> $"<td>{value |> escapeHtml}</td>")
             |> String.concat ""
             |> fun columns -> $"<tr>{columns}</tr>"
         )
         |> String.concat ""
 
     $"<table {HtmlPayloadAttribute}=\"{encodedPayload}\">{tableRows}</table>"
-
-let createHtmlRepresentation (cells: CompositeCell[][]) =
-    let payloadText = cells |> createPayload |> encode
-    createHtmlRepresentationFromPayload cells payloadText
 
 let tryDecodeHtml (htmlText: string) =
     if isNull htmlText then
@@ -202,13 +198,21 @@ let tryDecodeHtml (htmlText: string) =
 
 let private hasType mimeType (item: ClipboardItem) = item.types |> Array.contains mimeType
 
-let private tryReadPayload (item: ClipboardItem) = promise {
+let private tryReadTypedPayload (item: ClipboardItem) = promise {
     try
         if hasType MimeType item then
             let! blob = item.getType MimeType
             let! json = blob.text ()
             return tryDecode json
-        elif hasType "text/html" item then
+        else
+            return None
+    with _ ->
+        return None
+}
+
+let private tryReadHtmlPayload (item: ClipboardItem) = promise {
+    try
+        if hasType "text/html" item then
             let! blob = item.getType "text/html"
             let! htmlText = blob.text ()
             return tryDecodeHtml htmlText
@@ -224,7 +228,7 @@ let write (plainText: string) (cells: CompositeCell[][] option) = promise {
     | Some cells ->
         let clipboard = Swate.Components.GlobalBindings.navigator.clipboard
         let payloadText = cells |> createPayload |> encode
-        let htmlText = createHtmlRepresentationFromPayload cells payloadText
+        let htmlText = createHtmlTable plainText payloadText
 
         try
             do!
@@ -241,44 +245,51 @@ let write (plainText: string) (cells: CompositeCell[][] option) = promise {
                 do! clipboard.writeText plainText
 }
 
+let private createContent cells plainText : Swate.Components.ClipboardContract.Types.ClipboardContent = {
+    Cells = cells
+    PlainText = plainText
+}
+
 let read () = promise {
     let clipboard = Swate.Components.GlobalBindings.navigator.clipboard
 
     try
         let! items = clipboard.read ()
 
-        let item =
+        let! payloads =
             items
-            |> Array.tryFind (fun item -> hasType "text/plain" item && hasType MimeType item)
-            |> Option.orElseWith (fun () ->
-                items
-                |> Array.tryFind (fun item -> hasType "text/plain" item && hasType "text/html" item)
-            )
-            |> Option.orElseWith (fun () -> items |> Array.tryFind (hasType "text/plain"))
+            |> Array.filter (hasType MimeType)
+            |> Array.map tryReadTypedPayload
+            |> Promise.all
 
-        match item with
-        | None ->
-            return!
-                clipboard.readText ()
-                |> Promise.map (fun plainText -> {
-                    PlainText = plainText
-                    Payload = None
-                })
-        | Some item ->
-            let! plainBlob = item.getType "text/plain"
-            let! plainText = plainBlob.text ()
+        let! htmlPayloads =
+            items
+            |> Array.filter (hasType "text/html")
+            |> Array.map tryReadHtmlPayload
+            |> Promise.all
 
-            let! payload = tryReadPayload item
+        let payload =
+            payloads
+            |> Array.tryPick id
+            |> Option.orElseWith (fun () -> htmlPayloads |> Array.tryPick id)
 
-            return {
-                PlainText = plainText
-                Payload = payload
-            }
+        let plainItem = items |> Array.tryFind (hasType "text/plain")
+
+        let! plainText =
+            match plainItem with
+            | Some item -> promise {
+                let! blob = item.getType "text/plain"
+                return! blob.text ()
+              }
+            | None -> clipboard.readText ()
+
+        return
+            createContent
+                (payload
+                 |> Option.map (fun value -> value.Rows |> Array.map (Array.map toCompositeCell)))
+                plainText
     with _ ->
         let! plainText = clipboard.readText ()
 
-        return {
-            PlainText = plainText
-            Payload = None
-        }
+        return createContent None plainText
 }

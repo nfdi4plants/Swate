@@ -1,17 +1,25 @@
 module Components.Tests.Table.ContextMenu
 
 open Fable.Mocha
+open Fable.Core
 open ARCtrl
 open Swate.Components
 open Swate.Components.Composite.AnnotationTable.Types
 open global.Swate.Components.Composite.AnnotationTable
 open global.Swate.Components.Composite.AnnotationTable.Types.AnnotationTableContextMenu
 open global.Swate.Components.Composite.DataMapTable.Types
+open global.Swate.Components.Composite.DataMapTable.ClipboardTarget
 open global.Swate.Components.Composite.Table
 open global.Swate.Components.Composite.Table.Types
 open global.Swate.Components.Primitive.ContextMenu.Types
 open Browser.Types
 
+[<Emit("Object.defineProperty($0, 'clipboard', { configurable: true, value: $1 })")>]
+let private setNavigatorClipboard
+    (navigator: Swate.Components.Navigator)
+    (clipboard: Swate.Components.Clipboard)
+    : unit =
+    jsNative
 
 type TestCases =
 
@@ -253,7 +261,11 @@ type TestCases =
         let dataMap =
             DataMap(ResizeArray [ DataContext(name = "DatamapTesting.txt#row=2") ])
 
-        let copiedText = dataMap.SelectedCellsToTabText [ {| x = 1; y = 1 |} ]
+        let copiedText =
+            Swate.Components.ClipboardContract.Contract.Capture.matrix
+                (fun coordinate -> dataMap.GetCell(coordinate.x - 1, coordinate.y - 1))
+                [ {| x = 1; y = 1 |} ]
+            |> Swate.Components.ClipboardContract.Contract.Capture.toPlainText
 
         Expect.equal copiedText "DatamapTesting.txt#row=2" "Copied DataMap data should include its selector."
 
@@ -261,7 +273,10 @@ type TestCases =
             DataMap(ResizeArray [ DataContext(name = "DatamapTesting.txt") ])
 
         let copiedTextWithoutSelector =
-            dataMapWithoutSelector.SelectedCellsToTabText [ {| x = 1; y = 1 |} ]
+            Swate.Components.ClipboardContract.Contract.Capture.matrix
+                (fun coordinate -> dataMapWithoutSelector.GetCell(coordinate.x - 1, coordinate.y - 1))
+                [ {| x = 1; y = 1 |} ]
+            |> Swate.Components.ClipboardContract.Contract.Capture.toPlainText
 
         Expect.equal
             copiedTextWithoutSelector
@@ -280,7 +295,10 @@ type TestCases =
             )
 
         let copiedText =
-            source.SelectedCellsToTabText [ {| x = 5; y = 1 |}; {| x = 6; y = 1 |} ]
+            Swate.Components.ClipboardContract.Contract.Capture.matrix
+                (fun coordinate -> source.GetCell(coordinate.x - 1, coordinate.y - 1))
+                [ {| x = 5; y = 1 |}; {| x = 6; y = 1 |} ]
+            |> Swate.Components.ClipboardContract.Contract.Capture.toPlainText
 
         Expect.equal copiedText "explicit\tmetre" "Each selected DataMap cell should occupy one clipboard column."
 
@@ -328,9 +346,10 @@ type TestCases =
         let term = CompositeCell.createTermFromString ("explicit", "TST", "TST:1")
         let unit = CompositeCell.createUnitizedFromString ("4", "metre", "UO", "UO:0000008")
         let structuredTarget = DataMap(ResizeArray [ DataContext() ])
-        let payload = Swate.Components.ClipboardCodec.createPayload [| [| term; unit |] |]
+        let cells = [| [| term; unit |] |]
+        let anchor: CellCoordinate = {| x = 5; y = 1 |}
 
-        structuredTarget.PastePayload({| x = 5; y = 1 |}, payload)
+        structuredTarget.PasteStructuredCells(anchor, [| anchor |], cells)
 
         Expect.equal
             structuredTarget.DataContexts.[0].Explication.Value.TermSourceREF
@@ -389,44 +408,6 @@ type TestCases =
             (Swate.Components.ClipboardCodec.tryDecode
                 """{"Version":1,"Rows":[[{"Kind":"freetext","Value":"A","Name":"","TermSourceRef":"","TermAccessionNumber":"","Selector":"","Format":"","SelectorFormat":""}],[],[{"Kind":"freetext","Value":"B","Name":"","TermSourceRef":"","TermAccessionNumber":"","Selector":"","Format":"","SelectorFormat":""}]]}""")
             "A payload containing an empty row should be rejected."
-
-    static member ClipboardHtmlFallbackPreservesCompositeCells() =
-        let cells = [|
-            [|
-                CompositeCell.createTermFromString ("explicit", "TST", "TST:1")
-                CompositeCell.createUnitizedFromString ("4", "metre", "UO", "UO:0000008")
-            |]
-        |]
-
-        let htmlText = Swate.Components.ClipboardCodec.createHtmlRepresentation cells
-
-        if Swate.Components.ClipboardBindings.isHtmlParserAvailable then
-            let decoded =
-                htmlText |> Swate.Components.ClipboardCodec.tryDecodeHtml |> Option.get
-
-            let actual =
-                decoded.Rows
-                |> Array.map (Array.map (Swate.Components.ClipboardCodec.toCompositeCell >> _.ToTabStr()))
-
-            let expected = cells |> Array.map (Array.map _.ToTabStr())
-            Expect.equal actual expected "The fallback should round-trip ontology metadata."
-
-            Expect.isNone
-                (Swate.Components.ClipboardCodec.tryDecodeHtml "<table><tr><td>foo</td></tr></table>")
-                "HTML without Swate metadata must not be treated as a structured fallback."
-
-        let trailingEmptyRowCells = [|
-            [| CompositeCell.FreeText "A" |]
-            [| CompositeCell.FreeText "" |]
-        |]
-
-        let trailingEmptyRowHtml =
-            Swate.Components.ClipboardCodec.createHtmlRepresentation trailingEmptyRowCells
-
-        Expect.stringContains
-            trailingEmptyRowHtml
-            "<tr><td>A</td></tr><tr><td></td></tr>"
-            "The HTML fallback should retain a trailing empty row from the structured matrix."
 
     static member TableCopyIncludesSelector() =
         let dataCell = CompositeCell.createDataFromString "DatamapTesting.txt#row=2"
@@ -545,6 +526,161 @@ type TestCases =
             (fun () -> AnnotationTableContextMenuUtil.getIndex (0, 0) |> ignore)
             "An empty clipboard range should be rejected instead of looping forever."
 
+    static member ClipboardCaptureAndMappingPreserveGeometry() =
+        let source =
+            Swate.Components.ClipboardContract.Contract.Capture.matrix
+                (fun coordinate -> CompositeCell.FreeText $"{coordinate.x},{coordinate.y}")
+                [
+                    {| x = 2; y = 2 |}
+                    {| x = 1; y = 1 |}
+                    {| x = 2; y = 1 |}
+                    {| x = 1; y = 2 |}
+                ]
+
+        Expect.equal
+            (source |> Array.map (Array.map _.ToString()))
+            [| [| "1,1"; "2,1" |]; [| "1,2"; "2,2" |] |]
+            "Capture should retain a two-dimensional selection."
+
+        let anchor: CellCoordinate = {| x = 3; y = 4 |}
+
+        let selection: CellCoordinate[] = [|
+            {| x = 3; y = 4 |}
+            {| x = 4; y = 4 |}
+            {| x = 5; y = 4 |}
+            {| x = 3; y = 5 |}
+            {| x = 4; y = 5 |}
+            {| x = 5; y = 5 |}
+        |]
+
+        let mapped =
+            Swate.Components.ClipboardContract.Contract.Mapping.map source anchor selection
+
+        Expect.equal
+            (mapped |> Array.map (fun item -> item.Target, item.Source.ToString()))
+            [|
+                {| x = 3; y = 4 |}, "1,1"
+                {| x = 4; y = 4 |}, "2,1"
+                {| x = 5; y = 4 |}, "1,1"
+                {| x = 3; y = 5 |}, "1,2"
+                {| x = 4; y = 5 |}, "2,2"
+                {| x = 5; y = 5 |}, "1,2"
+            |]
+            "The shared mapper should wrap the source matrix across the full selection."
+
+    static member DataMapStructuredTermRulesAreExplicit() =
+        let unit = CompositeCell.createUnitizedFromString ("4", "metre", "UO", "UO:0000008")
+
+        let dataMap =
+            DataMap(
+                ResizeArray [
+                    DataContext(
+                        explication = OntologyAnnotation("old", "OLD", "OLD:1"),
+                        unit = OntologyAnnotation("old", "OLD", "OLD:1"),
+                        objectType = OntologyAnnotation("old", "OLD", "OLD:1")
+                    )
+                ]
+            )
+
+        let anchor: CellCoordinate = {| x = 5; y = 1 |}
+        dataMap.PasteStructuredCells(anchor, [| anchor |], [| [| unit; unit; unit |] |])
+
+        for term in
+            [
+                dataMap.DataContexts.[0].Explication
+                dataMap.DataContexts.[0].Unit
+                dataMap.DataContexts.[0].ObjectType
+            ] do
+            Expect.equal term.Value.NameText "metre" "Every DataMap term column should use the unit ontology term."
+            Expect.equal term.Value.TermAccessionNumber (Some "UO:0000008") "Unit metadata should be retained."
+
+        dataMap.PasteStructuredCells(anchor, [| anchor |], [| [| CompositeCell.FreeText "replacement" |] |])
+        let replacement = dataMap.DataContexts.[0].Explication.Value
+        Expect.equal replacement.NameText "replacement" "Structured text should replace the visible term name."
+
+        Expect.equal
+            replacement.TermSourceREF
+            None
+            "Unrelated destination ontology identity must not survive replacement."
+
+    static member ClipboardRejectsMalformedFieldTypes() =
+        Expect.isNone
+            (Swate.Components.ClipboardCodec.tryDecode
+                """{"Version":1,"Rows":[[{"Kind":"freetext","Value":42,"Name":"","TermSourceRef":"","TermAccessionNumber":"","Selector":"","Format":"","SelectorFormat":""}]]}""")
+            "Structured DTO fields with non-string runtime values must be rejected."
+
+    static member CutKeepsSourceWhenClipboardWriteFails() = async {
+        let table = ArcTable.init "Cut failure"
+        table.AddColumn(CompositeHeader.FreeText "Value", ResizeArray [ CompositeCell.FreeText "keep me" ])
+
+        let originalClipboard = GlobalBindings.navigator.clipboard
+        let mutable currentTable = table
+
+        let clipboardMock =
+            { new Clipboard with
+                member _.read() = promise { return [||] }
+                member _.readText() = promise { return "" }
+                member _.write _ = promise { return raise (System.Exception "write failed") }
+                member _.writeText _ = promise { return raise (System.Exception "write failed") }
+            }
+
+        try
+            setNavigatorClipboard GlobalBindings.navigator clipboardMock
+
+            try
+                do!
+                    AnnotationTableContextMenuUtil.cut (
+                        {| x = 1; y = 1 |},
+                        table,
+                        (fun nextTable -> currentTable <- nextTable),
+                        TestCases.NoSelectionHandle()
+                    )
+                    |> Async.AwaitPromise
+
+                failwith "The rejected clipboard write should propagate."
+            with _ ->
+                Expect.equal
+                    (currentTable.GetCellAt(0, 0).ToString())
+                    "keep me"
+                    "A failed clipboard write must not clear the active AnnotationTable source."
+        finally
+            setNavigatorClipboard GlobalBindings.navigator originalClipboard
+    }
+
+    static member CutClearsSourceAfterClipboardWriteSucceeds() = async {
+        let table = ArcTable.init "Cut success"
+        table.AddColumn(CompositeHeader.FreeText "Value", ResizeArray [ CompositeCell.FreeText "clear me" ])
+
+        let originalClipboard = GlobalBindings.navigator.clipboard
+        let mutable currentTable = table
+        let mutable writeCompleted = false
+
+        let clipboardMock =
+            { new Clipboard with
+                member _.read() = promise { return [||] }
+                member _.readText() = promise { return "" }
+                member _.write _ = promise { writeCompleted <- true }
+                member _.writeText _ = promise { writeCompleted <- true }
+            }
+
+        try
+            setNavigatorClipboard GlobalBindings.navigator clipboardMock
+
+            do!
+                AnnotationTableContextMenuUtil.cut (
+                    {| x = 1; y = 1 |},
+                    table,
+                    (fun nextTable -> currentTable <- nextTable),
+                    TestCases.NoSelectionHandle()
+                )
+                |> Async.AwaitPromise
+
+            Expect.isTrue writeCompleted "Clipboard writing must finish before cut completes."
+            Expect.equal (currentTable.GetCellAt(0, 0).ToString()) "" "A successful cut should clear the source."
+        finally
+            setNavigatorClipboard GlobalBindings.navigator originalClipboard
+    }
+
 let Main =
 
     testList "Context Menu" [
@@ -647,8 +783,6 @@ let Main =
             <| fun _ -> TestCases.DataMapStructuredPastePreservesTermsAndUnits()
             testCase "Typed clipboard codec round-trips composite cells"
             <| fun _ -> TestCases.ClipboardCodecRoundTripsCompositeCells()
-            testCase "HTML clipboard fallback preserves composite cells and plain TSV"
-            <| fun _ -> TestCases.ClipboardHtmlFallbackPreservesCompositeCells()
             testCase "Table cell copy includes the selector behind #"
             <| fun _ -> TestCases.TableCopyIncludesSelector()
             testCase "DataMap cell paste includes the selector behind #"
@@ -671,5 +805,15 @@ let Main =
             <| fun _ -> TestCases.HeaderMoveColumnUsesSelectedHeaderIndex()
             testCase "Clipboard index wraps and rejects invalid lengths"
             <| fun _ -> TestCases.ClipboardIndexWrapsAndRejectsInvalidLengths()
+            testCase "Clipboard capture and mapping preserve matrix geometry"
+            <| fun _ -> TestCases.ClipboardCaptureAndMappingPreserveGeometry()
+            testCase "DataMap structured term conversions are target-owned"
+            <| fun _ -> TestCases.DataMapStructuredTermRulesAreExplicit()
+            testCase "Clipboard rejects malformed structured field types"
+            <| fun _ -> TestCases.ClipboardRejectsMalformedFieldTypes()
+            testCaseAsync "Cut keeps source cells when clipboard writing fails"
+            <| TestCases.CutKeepsSourceWhenClipboardWriteFails()
+            testCaseAsync "Cut clears source cells after clipboard writing succeeds"
+            <| TestCases.CutClearsSourceAfterClipboardWriteSucceeds()
         ]
     ]

@@ -4,6 +4,7 @@ open ARCtrl
 open Fable.Core
 open Feliz
 open Swate.Components
+open Swate.Components.Composite.DataMapTable.ClipboardTarget
 open Swate.Components.JsBindings
 open Swate.Components.Shared
 open Swate.Components.Primitive

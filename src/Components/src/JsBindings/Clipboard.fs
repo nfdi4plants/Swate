@@ -31,6 +31,9 @@ module GlobalBindings =
 
 module ClipboardBindings =
 
+    [<Emit("typeof $0 === 'string'")>]
+    let isString (_value: obj) : bool = jsNative
+
     [<Emit("typeof DOMParser !== 'undefined'")>]
     let isHtmlParserAvailable: bool = jsNative
 
