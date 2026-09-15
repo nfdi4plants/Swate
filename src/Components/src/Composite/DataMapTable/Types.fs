@@ -16,42 +16,6 @@ module ARCtrlExtensions =
 
     type DataMap with
 
-        member this.SelectedCellsToTabText(coordinates: seq<CellCoordinate>) =
-            coordinates
-            |> Seq.filter (fun coordinate -> coordinate.x > 0 && coordinate.y > 0)
-            |> Seq.groupBy _.y
-            |> Seq.sortBy fst
-            |> Seq.map (fun (_, row) ->
-                row
-                |> Seq.sortBy _.x
-                |> Seq.map (fun coordinate -> this.GetCell(coordinate.x - 1, coordinate.y - 1))
-                |> Seq.toArray
-            )
-            |> Seq.toArray
-            |> CompositeCell.ToClipboardTableTxt
-
-        member this.PasteTabText(startCoordinate: CellCoordinate, clipboardText: string) =
-            let rows =
-                clipboardText.TrimEnd([| '\r'; '\n' |]).Split([| "\r\n"; "\n"; "\r" |], System.StringSplitOptions.None)
-
-            let requiredRowCount = startCoordinate.y - 1 + rows.Length
-
-            if requiredRowCount > this.RowCount then
-                this.DataContexts.AddRange(Array.init (requiredRowCount - this.RowCount) (fun _ -> DataContext()))
-
-            rows
-            |> Array.iteri (fun rowOffset row ->
-                row.Split '\t'
-                |> Array.iteri (fun columnOffset value ->
-                    let columnIndex = startCoordinate.x - 1 + columnOffset
-                    let rowIndex = startCoordinate.y - 1 + rowOffset
-
-                    if columnIndex < this.ColumnCount then
-                        this.GetCell(columnIndex, rowIndex).UpdateMainField(value)
-                        |> fun cell -> this.SetCell(columnIndex, rowIndex, cell)
-                )
-            )
-
         member this.ClearCells(coordinates: seq<CellCoordinate>) =
             coordinates
             |> Seq.distinct

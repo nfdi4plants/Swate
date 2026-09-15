@@ -80,7 +80,7 @@ module InMemoryChangesExtensions =
             |> tryGetSource
             |> Option.iter (fun sourceEntity ->
                 match getDataMap sourceEntity, getDataMap targetEntity with
-                | Some source, Some target -> preserveDataMapLabelsWorkaround source target
+                | Some source, Some target -> DataMapCopyWorkaround.preserveLabels source target
                 | _ -> ()
             )
 
