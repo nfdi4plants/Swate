@@ -320,7 +320,7 @@ module ArcFileSystemHelper =
                 with _ ->
                     // Hard links are an optional fast path. COPYFILE_EXCL provides a portable fallback
                     // while preserving the no-overwrite contract if linking is unavailable or denied.
-                    do! copyFileAsync temporaryPath destinationPath fileSystemConstants.COPYFILE_EXCL
+                    do! copyFileAsync temporaryPath destinationPath copyFileExclusiveFlag
 
                 createdTargetPaths.Add destinationPath
 

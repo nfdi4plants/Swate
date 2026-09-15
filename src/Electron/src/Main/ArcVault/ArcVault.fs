@@ -2,6 +2,7 @@
 module Main.ArcVault
 
 open System.Collections.Generic
+open Fable.Core
 open Fable.Electron
 open Fable.Electron.Remoting.Main
 open Main
@@ -30,8 +31,7 @@ type CloseLifecycleState =
 /// <param name="path">Can be None if not opened ARC.</param>
 type ArcVault(window: BrowserWindow) =
 
-    let mutable lastArcMerge: Fable.Core.JS.Promise<unit> =
-        Fable.Core.JS.Constructors.Promise.resolve ()
+    let arcMergeQueue = ArcMergeQueue(window.id)
 
     member val window: BrowserWindow = window with get
     member val path: string option = None with get, set
@@ -55,27 +55,7 @@ type ArcVault(window: BrowserWindow) =
 
     /// Runs ARC merges sequentially so every operation observes the result of the preceding merge.
     member this.EnqueueArcMerge<'T>(operation: unit -> Fable.Core.JS.Promise<'T>) : Fable.Core.JS.Promise<'T> =
-        let precedingMerge = lastArcMerge
-
-        let queuedMerge = promise {
-            try
-                do! precedingMerge
-            with precedingError ->
-                swatelogfn this.window.id "A preceding ARC merge failed: %s" precedingError.Message
-
-            return! operation ()
-        }
-
-        lastArcMerge <- promise {
-            try
-                let! _ = queuedMerge
-                return ()
-            with mergeError ->
-                swatelogfn this.window.id "Queued ARC merge failed: %s" mergeError.Message
-                return ()
-        }
-
-        queuedMerge
+        arcMergeQueue.Enqueue operation
 
     /// Indicates whether the vault is currently busy writing changes to disk.
     member this.isBusyWriting

@@ -176,28 +176,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "busy-writing helper restores an existing owner after a nested operation",
-            fun () -> promise {
-                let vault = ArcVault(TestHelpers.testWindow ())
-                vault.isBusyWriting <- true
-                let mutable observedBusyState = false
-
-                match!
-                    Main.IPC.IPCHelper.withBusyWriting
-                        vault
-                        (fun () -> promise {
-                            observedBusyState <- vault.isBusyWriting
-                            return Ok()
-                        })
-                with
-                | Error error -> return failwith error.Message
-                | Ok() ->
-                    Vitest.expect(observedBusyState).toBe (true)
-                    Vitest.expect(vault.isBusyWriting).toBe (true)
-            }
-        )
-
-        Vitest.test (
             "watcher suppression consumes only the delayed path owned by an app write",
             fun () -> promise {
                 let vault = ArcVault(TestHelpers.testWindow ())

@@ -23,24 +23,6 @@ open Main.IPC.Rename
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
 open Main.IPC.FileSystemIO
 
-let private createImportedFileWatcherEvents arcPath (request: ImportExternalFilesRequest) =
-    let targetRelativePath =
-        PathHelpers.normalizeCanonicalRelativePath request.targetRelativePath
-
-    request.sourceAbsolutePaths
-    |> Array.map (fun sourcePath ->
-        let fileName = path.basename sourcePath
-
-        let relativePath =
-            if String.IsNullOrWhiteSpace targetRelativePath then
-                fileName
-            else
-                $"{targetRelativePath}/{fileName}"
-            |> PathHelpers.normalizePath
-
-        WatcherHelpers.buildWatcherEvent arcPath (Chokidar.Events.Add.ToString()) relativePath
-    )
-
 let private withLoadedArcVault<'T>
     (event: IpcMainInvokeEvent)
     (operation: ArcVault -> JS.Promise<Result<'T, exn>>)
@@ -440,7 +422,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             (fun value -> vault.activeFileImport <- value)
                                             (fun abortSignal -> promise {
                                                 let importedEvents =
-                                                    createImportedFileWatcherEvents vault.path.Value request
+                                                    WatcherHelpers.createImportedFileWatcherEvents
+                                                        vault.path.Value
+                                                        request
 
                                                 // Chokidar's awaitWriteFinish can emit these well after the import
                                                 // releases the busy flag, so ownership must outlive the write itself.

@@ -6,8 +6,10 @@ open Fable.Electron
 open Main.Bindings
 open Main.ArcMerge
 open Main.ArcVaultTypes
+open Main.Bindings.Path
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
+open Swate.Electron.Shared.FileIOTypes
 
 let eventNameEquals (expected: Chokidar.Events) (actual: string) =
     String.Equals(actual, expected.ToString(), StringComparison.OrdinalIgnoreCase)
@@ -42,6 +44,24 @@ let buildWatcherEvent (arcPath: string) (eventName: string) (path: string) =
         RelativePath = relativePath
         AbsolutePath = absolutePath
     }
+
+let createImportedFileWatcherEvents arcPath (request: ImportExternalFilesRequest) =
+    let targetRelativePath =
+        PathHelpers.normalizeCanonicalRelativePath request.targetRelativePath
+
+    request.sourceAbsolutePaths
+    |> Array.map (fun sourcePath ->
+        let fileName = basename sourcePath
+
+        let relativePath =
+            if String.IsNullOrWhiteSpace targetRelativePath then
+                fileName
+            else
+                $"{targetRelativePath}/{fileName}"
+            |> PathHelpers.normalizePath
+
+        buildWatcherEvent arcPath (Chokidar.Events.Add.ToString()) relativePath
+    )
 
 /// Always queues a watcher event for the file tree, while ARC merge eligibility is controlled separately.
 let queueFileWatcherEvent

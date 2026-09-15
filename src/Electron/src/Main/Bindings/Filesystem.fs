@@ -32,9 +32,6 @@ type Dirent =
     abstract member isFile: unit -> bool
     abstract member isSymbolicLink: unit -> bool
 
-type FileSystemConstants =
-    abstract member COPYFILE_EXCL: int
-
 [<Import("mkdirSync", "fs")>]
 let mkdirSync (path: string) (options: MkdirOptions) : unit = jsNative
 
@@ -77,8 +74,8 @@ let rmAsync (path: string) (options: RmOptions) : JS.Promise<unit> = jsNative
 [<Import("copyFile", "fs/promises")>]
 let copyFileAsync (sourcePath: string) (targetPath: string) (mode: int) : JS.Promise<unit> = jsNative
 
-[<Import("constants", "fs")>]
-let fileSystemConstants: FileSystemConstants = jsNative
+[<Import("COPYFILE_EXCL", "fs/constants")>]
+let copyFileExclusiveFlag: int = jsNative
 
 [<Import("link", "fs/promises")>]
 let linkAsync (existingPath: string) (newPath: string) : JS.Promise<unit> = jsNative
