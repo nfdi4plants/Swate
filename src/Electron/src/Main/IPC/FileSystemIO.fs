@@ -228,15 +228,6 @@ module ArcFileSystemHelper =
         else
             tryResolveArcRelativePath arcPath normalizedPath
 
-    let private ensureTargetDoesNotExist targetAbsolutePath errorMessage = promise {
-        let! targetExists = pathExistsAsync targetAbsolutePath
-
-        if targetExists then
-            return Error(exn errorMessage)
-        else
-            return Ok()
-    }
-
     let private resolveImportTargetDirectory arcPath targetRelativePath = promise {
         match resolveArcRootOrRelativePath arcPath targetRelativePath with
         | Error pathError -> return Error pathError
@@ -272,14 +263,10 @@ module ArcFileSystemHelper =
 
         for entry in entries do
             let destinationPath = join [| targetDirectory; entry.FileName |]
+            let! targetExists = pathExistsAsync destinationPath
 
-            match!
-                ensureTargetDoesNotExist
-                    destinationPath
-                    $"Cannot import '{entry.FileName}' because a file with that name already exists."
-            with
-            | Ok() -> ()
-            | Error targetError -> raise targetError
+            if targetExists then
+                raise (exn $"Cannot import '{entry.FileName}' because a file with that name already exists.")
 
         return {
             TargetDirectory = targetDirectory
@@ -335,13 +322,10 @@ module ArcFileSystemHelper =
 
         for createdTargetPath in createdTargetPaths |> Seq.rev do
             match!
-                removePathWithRetriesAsync
-                    (fun path -> rmAsync path (RmOptions(force = true)))
-                    createdTargetPath
+                removePathWithRetriesAsync (fun path -> rmAsync path (RmOptions(force = true))) createdTargetPath
             with
             | Ok() -> ()
-            | Error cleanupError ->
-                cleanupErrors.Add($"Could not remove '{createdTargetPath}': {cleanupError.Message}")
+            | Error cleanupError -> cleanupErrors.Add($"Could not remove '{createdTargetPath}': {cleanupError.Message}")
 
         match!
             removePathWithRetriesAsync
@@ -389,29 +373,28 @@ module ArcFileSystemHelper =
             match! resolveImportTargetDirectory arcPath targetRelativePath with
             | Error pathError -> return Error pathError
             | Ok targetDirectory ->
-                let createdTargetPaths = ResizeArray<string>()
-                let mutable temporaryDirectory = None
-
                 try
                     let! plan = createExternalFileImportPlan targetDirectory sourcePaths
-                    temporaryDirectory <- Some plan.TemporaryDirectory
-                    do! copyExternalFilesToTemporaryDirectory plan onProgress isCancellationRequested
-                    do! copyTemporaryFilesIntoTarget plan createdTargetPaths isCancellationRequested
-                    onFilesPublished ()
+                    let createdTargetPaths = ResizeArray<string>()
 
-                    match! removePathWithRetriesAsync removeTemporaryDirectory plan.TemporaryDirectory with
-                    | Ok() -> ()
-                    | Error cleanupError -> logTemporaryCleanupError cleanupError
+                    try
+                        do! copyExternalFilesToTemporaryDirectory plan onProgress isCancellationRequested
+                        do! copyTemporaryFilesIntoTarget plan createdTargetPaths isCancellationRequested
+                        onFilesPublished ()
 
-                    match! validateImportedFiles () with
-                    | Error validationError -> raise validationError
-                    | Ok() -> ()
+                        match! removePathWithRetriesAsync removeTemporaryDirectory plan.TemporaryDirectory with
+                        | Ok() -> ()
+                        | Error cleanupError -> logTemporaryCleanupError cleanupError
 
-                    return Ok ImportExternalFilesResult.Completed
-                with importError ->
-                    match temporaryDirectory with
-                    | Some path -> return! externalFileImportFailureResult path createdTargetPaths importError
-                    | None -> return Error importError
+                        match! validateImportedFiles () with
+                        | Error validationError -> raise validationError
+                        | Ok() -> ()
+
+                        return Ok ImportExternalFilesResult.Completed
+                    with importError ->
+                        return! externalFileImportFailureResult plan.TemporaryDirectory createdTargetPaths importError
+                with planError ->
+                    return Error planError
         }
 
     let importExternalFilesOnDisk =
@@ -445,10 +428,16 @@ module ArcFileSystemHelper =
         | Ok firstAbsolutePath, Ok secondAbsolutePath -> Ok(firstAbsolutePath, secondAbsolutePath)
 
     let private resolveCreatePathPair arcPath parentRelativePath targetRelativePath =
-        match
-            resolveArcRootOrRelativePath arcPath parentRelativePath,
-            tryResolveArcRelativePath arcPath targetRelativePath
-        with
+        let normalizedParentPath =
+            parentRelativePath |> PathHelpers.normalizeCanonicalRelativePath
+
+        let parentPath =
+            if String.IsNullOrWhiteSpace normalizedParentPath then
+                Ok(resolveAbsolutePath arcPath)
+            else
+                tryResolveArcRelativePath arcPath normalizedParentPath
+
+        match parentPath, tryResolveArcRelativePath arcPath targetRelativePath with
         | Error pathError, _
         | _, Error pathError -> Error pathError
         | Ok parentAbsolutePath, Ok targetAbsolutePath -> Ok(parentAbsolutePath, targetAbsolutePath)
@@ -533,14 +522,11 @@ module ArcFileSystemHelper =
                         if parentIsDirectory |> not then
                             return Error(exn $"Cannot create item because '{plan.ParentPath}' is not a folder.")
                         else
-                            let! targetCheck =
-                                ensureTargetDoesNotExist
-                                    targetAbsolutePath
-                                    $"A file or folder already exists at '{plan.TargetPath}'."
+                            let! targetExists = pathExistsAsync targetAbsolutePath
 
-                            match targetCheck with
-                            | Error conflictError -> return Error conflictError
-                            | Ok() ->
+                            if targetExists then
+                                return Error(exn $"A file or folder already exists at '{plan.TargetPath}'.")
+                            else
                                 do! createTargetAsync plan.Kind targetAbsolutePath
                                 return Ok plan.TargetPath
                     with createError ->
@@ -570,14 +556,15 @@ module ArcFileSystemHelper =
                 match resolveArcRelativePathPair arcPath genericRenamePlan.SourcePath genericRenamePlan.TargetPath with
                 | Error pathError -> return Error pathError
                 | Ok(sourceAbsolutePath, targetAbsolutePath) ->
-                    let! targetCheck =
-                        ensureTargetDoesNotExist
-                            targetAbsolutePath
-                            $"Cannot rename '{genericRenamePlan.SourcePath}' to '{genericRenamePlan.TargetPath}' because the destination already exists."
+                    let! targetExists = pathExistsAsync targetAbsolutePath
 
-                    match targetCheck with
-                    | Error conflictError -> return Error conflictError
-                    | Ok() ->
+                    if targetExists then
+                        return
+                            Error(
+                                exn
+                                    $"Cannot rename '{genericRenamePlan.SourcePath}' to '{genericRenamePlan.TargetPath}' because the destination already exists."
+                            )
+                    else
                         return!
                             renameResolvedPathOnDisk
                                 genericRenamePlan.SourcePath

@@ -68,8 +68,7 @@ let private createSnapshot () =
 
 let private fileImportApi loadActiveImport = {
     loadActiveImport = loadActiveImport
-    pickAbsolutePaths =
-        fun () -> JS.Constructors.Promise.resolve (Ok None)
+    pickAbsolutePaths = fun () -> JS.Constructors.Promise.resolve (Ok None)
     runImport = fun _ -> JS.Constructors.Promise.resolve (Ok ImportExternalFilesResult.Completed)
     cancelImport = fun _ -> JS.Constructors.Promise.resolve (Ok())
 }

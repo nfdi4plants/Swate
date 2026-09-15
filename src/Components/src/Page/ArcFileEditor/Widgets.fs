@@ -46,7 +46,7 @@ module private WidgetsHelper =
         | WidgetType.JsonImport ->
             "Import JSON",
             Html.i [
-                prop.className "swt:iconify swt:fluent--arrow-import-20-filled swt:size-6 swt:rotate-180"
+                prop.className "swt:iconify swt:fluent--arrow-import-20-filled swt:size-6"
             ]
         | WidgetType.JsonExport ->
             "Export JSON",

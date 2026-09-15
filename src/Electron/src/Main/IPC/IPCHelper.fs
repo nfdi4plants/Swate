@@ -31,6 +31,19 @@ module IPCHelper =
             | Some arcPath -> Ok(vault, arcPath)
             | None -> Error(arcNotOpenError ())
 
+    let withBusyWriting
+        (vault: ArcVault)
+        (operation: unit -> JS.Promise<Result<'T, exn>>)
+        : JS.Promise<Result<'T, exn>> =
+        promise {
+            vault.isBusyWriting <- true
+
+            try
+                return! operation ()
+            finally
+                vault.isBusyWriting <- false
+        }
+
     let withExclusiveBusyWriting
         (vault: ArcVault)
         (operation: unit -> JS.Promise<Result<'T, exn>>)
@@ -40,11 +53,4 @@ module IPCHelper =
                 Error(exn "Swate is still saving another change. Please wait a moment and try again.")
             )
         else
-            promise {
-                vault.isBusyWriting <- true
-
-                try
-                    return! operation ()
-                finally
-                    vault.isBusyWriting <- false
-            }
+            withBusyWriting vault operation

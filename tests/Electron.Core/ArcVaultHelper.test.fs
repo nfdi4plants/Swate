@@ -177,74 +177,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "watcher suppression consumes only the delayed path owned by an app write",
-            fun () -> promise {
-                let vault = ArcVault(TestHelpers.testWindow ())
-                vault.path <- Some "C:/arc"
-
-                let importedEvent =
-                    WatcherHelpers.buildWatcherEvent "C:/arc" "add" "C:/arc/imported.txt"
-
-                vault.fileWatcherOwnedPaths.Add(
-                    PathHelpers.normalizePath (importedEvent.AbsolutePath.ToLowerInvariant())
-                )
-                |> ignore
-
-                let queueWatcherEvent eventName path =
-                    WatcherHelpers.queueFileWatcherEvent
-                        (fun event ->
-                            vault.fileWatcherOwnedPaths.Remove(
-                                PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant())
-                            )
-                            |> not
-                        )
-                        vault.path
-                        vault.fileWatcherPendingEvents
-                        vault.fileWatcherPendingArcMergeEvents
-                        eventName
-                        path
-
-                vault.isBusyWriting <- true
-                queueWatcherEvent "change" "C:/arc/investigation.xlsx"
-                Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (1)
-                Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (1)
-
-                vault.isBusyWriting <- false
-                do! Promise.sleep 2_100
-
-                queueWatcherEvent "change" "C:/arc/imported.txt"
-                Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (2)
-                Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (1)
-
-                // Ownership is consumed by the delayed watcher event, so a later external edit
-                // to the same file is no longer suppressed.
-                queueWatcherEvent "add" "C:/arc/imported.txt"
-                Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (2)
-            }
-        )
-
-        Vitest.test (
-            "failed save-and-close resets the close lifecycle so closing can be retried",
-            fun () -> promise {
-                let window = TestHelpers.testWindow ()
-                let vault = ArcVault(window)
-                let arc = ARC("close-save-failure")
-                vault.SetArc arc
-                arc.Title <- Some "Unsaved title"
-                vault.RefreshHasUnsavedArcChangesFlag()
-                Vitest.expect(vault.hasUnsavedArcChanges).toBe (true)
-
-                let vaults = ArcVaults()
-                vaults.Vaults.Add(window.id, vault)
-                vault.CloseState <- CloseLifecycleState.WaitingForSaveDecision
-
-                match! vaults.ResolveCloseRequest(window.id, SaveBeforeQuitDecision.SaveAndClose) with
-                | Ok() -> return failwith "Expected save-and-close to fail without an ARC path."
-                | Error _ -> Vitest.expect(vault.CloseState).toEqual (CloseLifecycleState.Idle)
-            }
-        )
-
-        Vitest.test (
             "runs overlapping merges sequentially so the second observes the first result",
             fun () -> promise {
                 let vault = ArcVault(TestHelpers.testWindow ())
@@ -311,55 +243,7 @@ Vitest.describe (
             }
         )
 
-        Vitest.test (
-            "watcher merge reloads an open ARC whose in-memory load is missing",
-            fun () ->
-                TestHelpers.withTempArcWith
-                    "swate-watcher-recovery-"
-                    "WatcherRecoveryArc"
-                    ignore
-                    (fun arcPath -> promise {
-                        let vault = ArcVault(TestHelpers.testWindow ())
-                        vault.path <- Some arcPath
-
-                        match! vault.TryTriggerArcInMemoryMergeOnFileWatcherEvents [] with
-                        | Error error -> failwith error.Message
-                        | Ok() ->
-                            Vitest.expect(vault.arc.IsSome).toBe (true)
-                            Vitest.expect(vault.arc.Value.Identifier).toBe ("WatcherRecoveryArc")
-                    })
-        )
-
-        Vitest.test (
-            "close decisions are rejected unless a save decision is pending",
-            fun () -> promise {
-                let window = TestHelpers.testWindow ()
-                let vault = ArcVault(window)
-                let vaults = ArcVaults()
-                vaults.Vaults.Add(window.id, vault)
-
-                match! vaults.ResolveCloseRequest(window.id, SaveBeforeQuitDecision.CloseWithoutSaving) with
-                | Ok() -> return failwith "Expected an unsolicited close decision to be rejected."
-                | Error error ->
-                    Vitest.expect(error.Message).toContain ("no save decision is pending")
-                    Vitest.expect(vault.CloseState).toEqual (CloseLifecycleState.Idle)
-            }
-        )
 )
-
-let private lifecycleTestWindow id isDestroyed onSend =
-    // The remoting proxy calls webContents.send with channel and payload arguments.
-    // Discard those transport details so lifecycle tests only observe whether a send occurred.
-    let send: obj = emitJsExpr onSend "((..._args) => $0())"
-
-    // ArcVault only needs this subset of BrowserWindow for lifecycle broadcasts. Keeping the
-    // fixture minimal avoids constructing a real Electron window in the Vitest environment.
-    createObj [
-        "id" ==> id
-        "isDestroyed" ==> (fun () -> isDestroyed)
-        "webContents" ==> createObj [ "send" ==> send ]
-    ]
-    |> unbox<BrowserWindow>
 
 let private mkdirRecursiveAsync (directoryPath: string) = promise {
     let! _ = mkdirAsync directoryPath (MkdirOptions(recursive = true))
@@ -423,77 +307,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "recent ARC broadcasts skip windows destroyed during simultaneous shutdown",
-            fun () ->
-                let mutable aliveWindowSendCount = 0
-
-                let aliveWindow =
-                    lifecycleTestWindow 1 false (fun () -> aliveWindowSendCount <- aliveWindowSendCount + 1)
-
-                let destroyedWindow =
-                    lifecycleTestWindow 2 true (fun () -> failwith "Destroyed window received an IPC message.")
-
-                let vaults = ArcVaults()
-                vaults.Vaults.Add(aliveWindow.id, ArcVault(aliveWindow))
-                vaults.Vaults.Add(destroyedWindow.id, ArcVault(destroyedWindow))
-
-                vaults.BroadcastRecentARCs()
-
-                Vitest.expect(aliveWindowSendCount).toBe (1)
-        )
-
-        Vitest.test (
-            "a repeated close attempt restores a lost save dialog request",
-            fun () ->
-                let mutable closeHandler: obj -> unit = ignore
-                let mutable saveDialogRequestCount = 0
-                let mutable preventedCloseCount = 0
-
-                let window =
-                    createObj [
-                        "id" ==> 3
-                        "title" ==> ""
-                        "isDestroyed" ==> (fun () -> false)
-                        "close" ==> ignore
-                        "on"
-                        ==> (fun (eventName: string) (handler: obj -> unit) ->
-                            if eventName = "close" then
-                                closeHandler <- handler
-                        )
-                        "webContents"
-                        ==> createObj [
-                            "send"
-                            ==> (fun (_channel: string) (_payload: obj) ->
-                                saveDialogRequestCount <- saveDialogRequestCount + 1
-                            )
-                        ]
-                    ]
-                    |> unbox<BrowserWindow>
-
-                let vault = ArcVault(window)
-                let arc = ARC("UnsavedArc")
-                vault.SetArc arc
-                arc.Title <- Some "Unsaved title"
-                vault.RefreshHasUnsavedArcChangesFlag()
-                saveDialogRequestCount <- 0
-
-                let vaults = ArcVaults()
-                vaults.OnCloseWindow(window, vault, window.id)
-
-                let closeEvent =
-                    createObj [
-                        "preventDefault" ==> (fun () -> preventedCloseCount <- preventedCloseCount + 1)
-                    ]
-
-                closeHandler closeEvent
-                closeHandler closeEvent
-
-                Vitest.expect(vault.CloseState).toEqual (CloseLifecycleState.WaitingForSaveDecision)
-                Vitest.expect(preventedCloseCount).toBe (2)
-                Vitest.expect(saveDialogRequestCount).toBe (2)
-        )
-
-        Vitest.test (
             "an import rollback failure keeps the window open and resets the close lifecycle",
             fun () -> promise {
                 let mutable closeHandler: obj -> unit = ignore
@@ -542,7 +355,7 @@ Vitest.describe (
                 Vitest.expect(preventedCloseCount).toBe (1)
                 Vitest.expect(closeCount).toBe (0)
                 Vitest.expect(abortController.signal.aborted).toBe (true)
-                Vitest.expect(vault.CloseState).toEqual (CloseLifecycleState.Idle)
+                Vitest.expect(vault.isWaitingForImportCleanup).toBe (false)
             }
         )
 

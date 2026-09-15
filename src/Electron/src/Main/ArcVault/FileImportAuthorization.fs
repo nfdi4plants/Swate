@@ -2,6 +2,7 @@ module Main.FileImportAuthorization
 
 open System
 open System.Collections.Generic
+
 type private AuthorizedSelection = {
     AuthorizationId: string
     AbsolutePaths: string[]
@@ -30,5 +31,3 @@ let consume windowId authorizationId =
         selectionsByWindow.Remove windowId |> ignore
         Ok(Array.copy selection.AbsolutePaths)
     | _ -> Error(exn "The selected files are not authorized for import. Pick the files again.")
-
-let clear windowId = selectionsByWindow.Remove windowId |> ignore

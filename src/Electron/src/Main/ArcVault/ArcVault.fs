@@ -19,12 +19,9 @@ open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
 
-type CloseLifecycleState =
-    | Idle
-    | WaitingForImportCleanup
-    | WaitingForSaveDecision
-    | ResolvingSaveDecision
-    | Approved
+let private startFileWatcherOwnWriteArcMergeSuppression suppressionMs currentTimeout onElapsed =
+    currentTimeout |> Option.iter Fable.Core.JS.clearTimeout
+    Fable.Core.JS.setTimeout onElapsed suppressionMs
 
 /// <summary>
 /// Represents a vault window in the application, optionally associated with a file path.
@@ -32,6 +29,7 @@ type CloseLifecycleState =
 /// <param name="path">Can be None if not opened ARC.</param>
 type ArcVault(window: BrowserWindow) =
 
+    let fileWatcherOwnWriteArcMergeSuppressionMs = 500
     let arcMergeQueue = ArcMergeQueue(window.id)
 
     member val window: BrowserWindow = window with get
@@ -49,19 +47,42 @@ type ArcVault(window: BrowserWindow) =
     member val fileWatcherReloadArcTimeout: int option = None with get, set
     member val fileWatcherPendingEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
     member val fileWatcherPendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
-    member val fileWatcherOwnedPaths: HashSet<string> = HashSet() with get
+    /// Imported paths awaiting their delayed Chokidar events. These events update the tree but must not re-merge the import.
+    member val importedFileWatcherPaths: HashSet<string> = HashSet() with get
     member val private isBusyWritingValue: bool = false with get, set
+    member val private fileWatcherOwnWriteArcMergeSuppressionTimeout: int option = None with get, set
     member val activeFileImport: ActiveFileImport option = None with get, set
-    member val CloseState = CloseLifecycleState.Idle with get, set
+    member val isWaitingForImportCleanup = false with get, set
 
     /// Runs ARC merges sequentially so every operation observes the result of the preceding merge.
     member this.EnqueueArcMerge<'T>(operation: unit -> Fable.Core.JS.Promise<'T>) : Fable.Core.JS.Promise<'T> =
         arcMergeQueue.Enqueue operation
 
     /// Indicates whether the vault is currently busy writing changes to disk.
+    /// When a write finishes, watcher ARC merges stay suppressed briefly to cover delayed own-write events.
     member this.isBusyWriting
         with get () = this.isBusyWritingValue
-        and set value = this.isBusyWritingValue <- value
+        and set value =
+            let wasBusyWriting = this.isBusyWritingValue
+            this.isBusyWritingValue <- value
+
+            if wasBusyWriting && not value then
+                this.fileWatcherOwnWriteArcMergeSuppressionTimeout <-
+                    startFileWatcherOwnWriteArcMergeSuppression
+                        fileWatcherOwnWriteArcMergeSuppressionMs
+                        this.fileWatcherOwnWriteArcMergeSuppressionTimeout
+                        (fun () -> this.fileWatcherOwnWriteArcMergeSuppressionTimeout <- None)
+                    |> Some
+
+    /// Indicates whether a captured watcher event is eligible to update the in-memory ARC.
+    member this.IsFileWatcherArcMergeEligible =
+        not this.isBusyWritingValue
+        && this.fileWatcherOwnWriteArcMergeSuppressionTimeout.IsNone
+
+    /// Indicates whether a close confirmation dialog is currently open.
+    member val isCloseRequestPending: bool = false with get, set
+    /// Allows a confirmed close to pass through the onClose handler exactly once.
+    member val isCloseApproved: bool = false with get, set
 
     /// This function mutably sets the active ARC in memory without persisting to disk.
     member this.SetArc(arc: ARC) =
@@ -179,9 +200,9 @@ module ArcVaultExtensions =
                             promise {
                                 swatelogfn this.window.id "Scheduled ARC reload triggered by file watcher."
 
-                                if this.isBusyWriting then
-                                    // Preserve both queues while a writer owns the vault. A later retry will merge
-                                    // unrelated external events instead of discarding them at the debounce boundary.
+                                if this.isBusyWriting && this.activeFileImport.IsSome then
+                                    // Imports are long-running. Retain their queued tree and unrelated ARC events
+                                    // until the import's explicit synchronization releases the writer.
                                     scheduleReload ()
                                 else
                                     let pendingEvents = this.fileWatcherPendingEvents |> Seq.toList
@@ -216,10 +237,13 @@ module ArcVaultExtensions =
 
                 WatcherHelpers.queueFileWatcherEvent
                     (fun event ->
-                        this.fileWatcherOwnedPaths.Remove(
-                            PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant())
-                        )
-                        |> not
+                        let isImportedPath =
+                            this.importedFileWatcherPaths.Remove(
+                                PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant())
+                            )
+
+                        not isImportedPath
+                        && (this.activeFileImport.IsSome || this.IsFileWatcherArcMergeEligible)
                     )
                     this.path
                     this.fileWatcherPendingEvents
@@ -256,30 +280,16 @@ module ArcVaultExtensions =
             | true, _, _ ->
                 return Error(exn "Swate is still saving another change. Please wait a moment and try again.")
             | false, Some arcPath, Some arc ->
-                let ownedPaths =
-                    // ARCtrl updates StaticHash while discovering update contracts.
-                    // Discover watcher ownership on a hash-preserving copy so the live ARC performs
-                    // contract discovery exactly once inside TryUpdateAsyncSwate.
-                    (copyArcPreservingStaticHashes arc).GetUpdateContractsSwate()
-                    |> Array.map (fun contract ->
-                        WatcherHelpers.buildWatcherEvent arcPath "change" contract.Path
-                        |> fun event -> PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant())
-                    )
-
-                ownedPaths |> Array.iter (this.fileWatcherOwnedPaths.Add >> ignore)
                 this.isBusyWriting <- true
 
                 try
                     try
                         match! arc.TryUpdateAsyncSwate(arcPath) with
-                        | Error errors ->
-                            ownedPaths |> Array.iter (this.fileWatcherOwnedPaths.Remove >> ignore)
-                            return Error(exn (PathHelpers.formatContractErrors errors))
+                        | Error errors -> return Error(exn (PathHelpers.formatContractErrors errors))
                         | Ok _ ->
                             this.RefreshHasUnsavedArcChangesFlag()
                             return Ok()
                     with e ->
-                        ownedPaths |> Array.iter (this.fileWatcherOwnedPaths.Remove >> ignore)
                         return Error(exn $"Failed to persist ARC to disk: {e.Message}")
                 finally
                     this.isBusyWriting <- false
@@ -299,22 +309,12 @@ module ArcVaultExtensions =
                 match Swate.Electron.Shared.FileIOHelper.FileContentDTO.toArcFile normalizedRequest with
                 | None -> return Error(exn $"Unsupported file type for adding: {normalizedRequest.fileType}")
                 | Some arcFile ->
-                    let ownedPaths =
-                        arcLocal.GetAddContracts(arcFile, false)
-                        |> Array.map (fun contract ->
-                            WatcherHelpers.buildWatcherEvent arcPath "add" contract.Path
-                            |> fun event -> PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant())
-                        )
-
-                    ownedPaths |> Array.iter (this.fileWatcherOwnedPaths.Add >> ignore)
                     let wasBusyWriting = this.isBusyWriting
                     this.isBusyWriting <- true
 
                     try
                         match! arcLocal.TryAddArcFileAsync(arcPath, arcFile, false) with
-                        | Error errors ->
-                            ownedPaths |> Array.iter (this.fileWatcherOwnedPaths.Remove >> ignore)
-                            return Error(exn (PathHelpers.formatContractErrors errors))
+                        | Error errors -> return Error(exn (PathHelpers.formatContractErrors errors))
                         | Ok _ ->
                             match! ARC.LoadAsyncSwate arcPath with
                             | Ok persistedArc ->
@@ -406,7 +406,7 @@ module ArcVaultExtensions =
             this.fileWatcherReloadArcTimeout <- None
             this.fileWatcherPendingEvents.Clear()
             this.fileWatcherPendingArcMergeEvents.Clear()
-            this.fileWatcherOwnedPaths.Clear()
+            this.importedFileWatcherPaths.Clear()
 
         member this.StopFileWatcher() = promise {
             match this.watcher with
@@ -619,106 +619,92 @@ type ArcVaults() =
             swatelogfn windowId "%s" message
             return Error(exn message)
         | Some(vault: ArcVault) ->
-            if vault.CloseState <> CloseLifecycleState.WaitingForSaveDecision then
-                let message = "Close decision ignored because no save decision is pending."
-                swatelogfn windowId "%s" message
-                return Error(exn message)
-            else
-                // Consume ownership before any asynchronous save work so duplicate renderer
-                // responses cannot resolve the same close request concurrently.
-                vault.CloseState <- CloseLifecycleState.ResolvingSaveDecision
+            vault.isCloseRequestPending <- false
 
-                match decision with
-                | SaveBeforeQuitDecision.CancelClose ->
-                    swatelogfn windowId "Close request cancelled by user."
-                    vault.CloseState <- CloseLifecycleState.Idle
-                    return Ok()
-                | SaveBeforeQuitDecision.CloseWithoutSaving ->
-                    swatelogfn windowId "Close request approved by user. Closing without saving."
-                    vault.RefreshHasUnsavedArcChangesFlag()
-                    vault.CloseState <- CloseLifecycleState.Approved
-                    vault.window.close ()
-                    return Ok()
-                | SaveBeforeQuitDecision.SaveAndClose ->
-                    swatelogfn windowId "Close request approved by user. Closing after main save."
+            match decision with
+            | SaveBeforeQuitDecision.CancelClose ->
+                swatelogfn windowId "Close request cancelled by user."
+                return Ok()
+            | SaveBeforeQuitDecision.CloseWithoutSaving ->
+                swatelogfn windowId "Close request approved by user. Closing without saving."
+                vault.RefreshHasUnsavedArcChangesFlag()
+                vault.isCloseApproved <- true
+                vault.window.close ()
+                return Ok()
+            | SaveBeforeQuitDecision.SaveAndClose ->
+                swatelogfn windowId "Close request approved by user. Closing after main save."
 
-                    if vault.hasUnsavedArcChanges then
-                        let! persistResult = vault.WriteArc()
+                if vault.hasUnsavedArcChanges then
+                    let! persistResult = vault.WriteArc()
 
-                        match persistResult with
-                        | Error saveError ->
-                            vault.CloseState <- CloseLifecycleState.Idle
-                            return Error saveError
-                        | Ok() ->
-                            vault.CloseState <- CloseLifecycleState.Approved
-                            vault.window.close ()
-                            return Ok()
-                    else
-                        vault.CloseState <- CloseLifecycleState.Approved
+                    match persistResult with
+                    | Error saveError -> return Error saveError
+                    | Ok() ->
+                        vault.isCloseApproved <- true
                         vault.window.close ()
                         return Ok()
+                else
+                    vault.isCloseApproved <- true
+                    vault.window.close ()
+                    return Ok()
     }
 
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
-
-        let requestSaveDecision () =
-            Remoting.createIpc ()
-            |> Remoting.withWindow vault.window
-            |> Remoting.buildProxySender<IMainSaveBeforeQuitApi>
-            |> fun client -> client.requestSaveBeforeQuit ()
-
         window.onClose (fun closeEvent ->
-            match vault.CloseState with
-            | CloseLifecycleState.Approved -> ()
-            | CloseLifecycleState.WaitingForImportCleanup
-            | CloseLifecycleState.ResolvingSaveDecision -> closeEvent.preventDefault ()
-            | CloseLifecycleState.WaitingForSaveDecision ->
-                closeEvent.preventDefault ()
-                // A renderer reload can lose the original modal and IPC delivery. A new native
-                // close attempt replays the request while retaining the same lifecycle ownership.
-                requestSaveDecision ()
-            | CloseLifecycleState.Idle ->
+            if not vault.isCloseApproved then
                 if vault.activeFileImport.IsSome then
                     closeEvent.preventDefault ()
-                    vault.CloseState <- CloseLifecycleState.WaitingForImportCleanup
 
-                    promise {
-                        let! importResult = promise {
-                            try
-                                let activeImport = vault.activeFileImport.Value
+                    if not vault.isWaitingForImportCleanup then
+                        vault.isWaitingForImportCleanup <- true
 
-                                if activeImport.State.phase = FileImportPhase.Copying then
-                                    activeImport.AbortController.abort ()
+                        promise {
+                            let! importResult = promise {
+                                try
+                                    let activeImport = vault.activeFileImport.Value
 
-                                return! activeImport.Completion
-                            with importError ->
-                                return Error importError
+                                    if activeImport.State.phase = FileImportPhase.Copying then
+                                        activeImport.AbortController.abort ()
+
+                                    return! activeImport.Completion
+                                with importError ->
+                                    return Error importError
+                            }
+
+                            vault.isWaitingForImportCleanup <- false
+
+                            match importResult with
+                            | Ok _ -> window.close ()
+                            | Error importError ->
+                                swatelogfn id "Active import failed while closing: %s" importError.Message
+
+                                if not (window.isDestroyed ()) then
+                                    dialog.showErrorBox (
+                                        "Could not close Swate",
+                                        $"The active file import could not be rolled back completely. The window was kept open to avoid hiding a partial import.\n\n{importError.Message}"
+                                    )
                         }
-
-                        vault.CloseState <- CloseLifecycleState.Idle
-
-                        match importResult with
-                        | Ok _ -> window.close ()
-                        | Error importError ->
-                            swatelogfn id "Active import failed while closing: %s" importError.Message
-
-                            if not (window.isDestroyed ()) then
-                                dialog.showErrorBox (
-                                    "Could not close Swate",
-                                    $"The active file import could not be rolled back completely. The window was kept open to avoid hiding a partial import.\n\n{importError.Message}"
-                                )
-                    }
-                    |> Promise.start
+                        |> Promise.start
                 elif vault.hasUnsavedArcChanges then
                     closeEvent.preventDefault ()
-                    vault.CloseState <- CloseLifecycleState.WaitingForSaveDecision
-                    requestSaveDecision ()
+
+                    if not vault.isCloseRequestPending then
+                        vault.isCloseRequestPending <- true
+
+                        let saveBeforeQuitClient =
+                            Remoting.createIpc ()
+                            |> Remoting.withWindow vault.window
+                            |> Remoting.buildProxySender<IMainSaveBeforeQuitApi>
+
+                        saveBeforeQuitClient.requestSaveBeforeQuit ()
                 else
                     swatelogfn id "Closing window directly because no unsaved ARC changes are present."
         )
 
         window.onClosed (fun () ->
-            vault.CloseState <- CloseLifecycleState.Idle
+            vault.isWaitingForImportCleanup <- false
+            vault.isCloseRequestPending <- false
+            vault.isCloseApproved <- false
             this.DisposeVault(id)
         )
 

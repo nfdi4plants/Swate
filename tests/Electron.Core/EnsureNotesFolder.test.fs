@@ -2,7 +2,7 @@ module ElectronCore.EnsureNotesFolderTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Main.IPC.ArcVaultsApi
+open Main.Notes.NoteScaffolding
 open Vitest
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
@@ -66,7 +66,7 @@ Vitest.describe (
                     let notesReadmePath =
                         pathDynamic?join (notesFolderPath, "README.md") |> unbox<string>
 
-                    let! ensureResult = Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath arcPath
+                    let! ensureResult = ensureNotesFolderAtArcPath arcPath
                     assertEnsureSucceeded ensureResult
 
                     let! hasNotesFolder = pathExistsAsync notesFolderPath
@@ -99,7 +99,7 @@ Vitest.describe (
                         fsPromisesDynamic?mkdir (notesFolderPath, createObj [ "recursive" ==> true ])
                         |> unbox<JS.Promise<obj>>
 
-                    let! ensureResult = Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath arcPath
+                    let! ensureResult = ensureNotesFolderAtArcPath arcPath
                     assertEnsureSucceeded ensureResult
 
                     let! hasNotesReadme = pathExistsAsync notesReadmePath
@@ -124,12 +124,12 @@ Vitest.describe (
 
                     let customContent = "custom readme content"
 
-                    let! firstEnsureResult = Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath arcPath
+                    let! firstEnsureResult = ensureNotesFolderAtArcPath arcPath
                     assertEnsureSucceeded firstEnsureResult
 
                     do! writeUtf8FileAsync notesReadmePath customContent
 
-                    let! secondEnsureResult = Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath arcPath
+                    let! secondEnsureResult = ensureNotesFolderAtArcPath arcPath
                     assertEnsureSucceeded secondEnsureResult
 
                     let! finalContent = readUtf8FileAsync notesReadmePath

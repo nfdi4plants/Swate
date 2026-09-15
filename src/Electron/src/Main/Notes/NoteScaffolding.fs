@@ -13,7 +13,6 @@ let private mkdirRecursiveWithCreationFlagAsync (directoryPath: string) : JS.Pro
 }
 
 /// Ensures ARC notes scaffolding exists for the provided ARC root path.
-/// Kept separate from the IPC handler so the filesystem operation can be reused and tested directly.
 let ensureNotesFolderAtArcPath (arcPath: string) : JS.Promise<Result<unit, exn>> = promise {
     try
         if String.IsNullOrWhiteSpace arcPath then

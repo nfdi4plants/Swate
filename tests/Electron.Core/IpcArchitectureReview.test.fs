@@ -45,8 +45,7 @@ Vitest.describe (
 
                 match consume 7101 authorizationId with
                 | Error error -> failwith error.Message
-                | Ok paths ->
-                    Vitest.expect(paths).toEqual ([| "C:/selected/one.txt"; "C:/selected/two.csv" |])
+                | Ok paths -> Vitest.expect(paths).toEqual ([| "C:/selected/one.txt"; "C:/selected/two.csv" |])
 
                 match consume 7101 authorizationId with
                 | Ok _ -> failwith "A picker authorization must not be reusable."
