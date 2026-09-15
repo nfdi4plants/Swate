@@ -74,8 +74,10 @@ let rmAsync (path: string) (options: RmOptions) : JS.Promise<unit> = jsNative
 [<Import("copyFile", "fs/promises")>]
 let copyFileAsync (sourcePath: string) (targetPath: string) (mode: int) : JS.Promise<unit> = jsNative
 
-[<Import("COPYFILE_EXCL", "fs/constants")>]
-let copyFileExclusiveFlag: int = jsNative
+[<Import("constants", "fs")>]
+let private fileSystemConstants: {| COPYFILE_EXCL: int |} = jsNative
+
+let copyFileExclusiveFlag = fileSystemConstants.COPYFILE_EXCL
 
 [<Import("link", "fs/promises")>]
 let linkAsync (existingPath: string) (newPath: string) : JS.Promise<unit> = jsNative
