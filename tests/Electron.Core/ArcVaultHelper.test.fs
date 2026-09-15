@@ -763,9 +763,11 @@ Vitest.describe (
 
                         let! rootNoteAfterSave = readFileAsync rootNotePath TextEncoding.Utf8
                         let! studyNoteAfterSave = readFileAsync studyNotePath TextEncoding.Utf8
+                        let! persistedArc = TestHelpers.loadArcAsync arcPath
 
                         Vitest.expect(rootNoteAfterSave).toBe (rootNoteContent)
                         Vitest.expect(studyNoteAfterSave).toBe (studyNoteContent)
+                        Vitest.expect(persistedArc.Title).toEqual (Some "Saved title")
                     })
         )
 

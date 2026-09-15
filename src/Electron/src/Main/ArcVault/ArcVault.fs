@@ -276,7 +276,10 @@ module ArcVaultExtensions =
                 return Error(exn "Swate is still saving another change. Please wait a moment and try again.")
             | false, Some arcPath, Some arc ->
                 let ownedPaths =
-                    arc.GetUpdateContractsSwate()
+                    // ARCtrl updates StaticHash while discovering update contracts.
+                    // Discover watcher ownership on a hash-preserving copy so the live ARC performs
+                    // contract discovery exactly once inside TryUpdateAsyncSwate.
+                    (copyArcPreservingStaticHashes arc).GetUpdateContractsSwate()
                     |> Array.map (fun contract ->
                         WatcherHelpers.buildWatcherEvent arcPath "change" contract.Path
                         |> fun event -> PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant())
