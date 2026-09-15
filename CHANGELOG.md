@@ -18,10 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### ✨ Added
 
+-   Add external file importing to the Electron FileTree, including cancellation and cleanup of temporary or partially imported files on cancellation or failure.
 -   Allow canceling in-flight Git network operations (ARC download/clone, fetch, update preview, pull, push, and Git LFS transfers) from the Git sidebar and the DataHub download view. Cancellation kills the underlying git process and restores a clean repository state: a canceled pull aborts any half-applied merge or rebase, and a canceled ARC download removes the partially cloned folder #1306.
 -   Keep open ARC editors synchronized when DataMaps are added or deleted through the File Explorer or by external filesystem changes.
 -   Show **Delete DataMap**, rather than **Add DataMap**, in the context menu of a collapsed ARC entity folder that already contains a DataMap.
 -   Prevent newly added DataMaps from incorrectly appearing as unsaved after they have been written to disk.
+
+### 🔄 Changed
+
+-   Rotate the Import JSON icon by 180 degrees in all navbars.
 
 ### 🐛 Fixed
 

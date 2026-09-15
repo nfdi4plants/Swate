@@ -46,6 +46,7 @@ type FileTree =
         let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
         let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
         let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
+
         let errorModal = useErrorModalCtx ()
 
         let arcScopeId =
@@ -60,6 +61,7 @@ type FileTree =
 
         let activeDialog, setActiveDialog = React.useState<FileTreeDialog option> None
         let isDialogBusy, setIsDialogBusy = React.useState false
+
         // The file watcher emits the initial tree too; only later tree updates should refresh open previews.
         let hasObservedFileTreeUpdateRef = React.useRef false
 
@@ -449,6 +451,7 @@ type FileTree =
             pathActionConfig = {
                 openPathInFileExplorer = Api.ipcArcVaultApi.showPathInFileExplorer
                 openPathWithDefaultApplication = Api.ipcArcVaultApi.openPathWithDefaultApplication
+                importExternalFiles = fileStateCtx.importExternalFiles
                 enqueueError = errorModal.enqueue
             }
             enqueueError = errorModal.enqueue

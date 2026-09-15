@@ -2,7 +2,7 @@ module ElectronCore.EnsureNotesFolderTests
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Main.IPC.ArcVaultsApi
+open Main.Notes.NoteScaffolding
 open Vitest
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
