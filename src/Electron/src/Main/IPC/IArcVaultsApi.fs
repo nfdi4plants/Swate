@@ -688,17 +688,32 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 match vault.arc with
                                 | None -> return Error(arcNotOpenError ())
                                 | Some arcLocal ->
-                                    let ownedPaths =
+                                    let ownedPathCandidates =
                                         "isa.investigation.xlsx"
                                         :: deleteTargetPath
                                         :: ArcEntityPathRules.buildCanonicalEntityPaths zone identifier
-                                        |> List.map (fun relativePath ->
-                                            WatcherHelpers.buildWatcherEvent arcPath "change" relativePath
-                                            |> fun watcherEvent ->
-                                                PathHelpers.normalizePath (
-                                                    watcherEvent.AbsolutePath.ToLowerInvariant()
-                                                )
-                                        )
+
+                                    let rec findExistingOwnedPaths candidates = promise {
+                                        match candidates with
+                                        | [] -> return []
+                                        | relativePath :: remainingPaths ->
+                                            let watcherEvent =
+                                                WatcherHelpers.buildWatcherEvent arcPath "change" relativePath
+
+                                            let! exists = pathExistsAsync watcherEvent.AbsolutePath
+                                            let! remainingExistingPaths = findExistingOwnedPaths remainingPaths
+
+                                            return
+                                                if exists then
+                                                    PathHelpers.normalizePath (
+                                                        watcherEvent.AbsolutePath.ToLowerInvariant()
+                                                    )
+                                                    :: remainingExistingPaths
+                                                else
+                                                    remainingExistingPaths
+                                    }
+
+                                    let! ownedPaths = findExistingOwnedPaths ownedPathCandidates
 
                                     ownedPaths |> List.iter (vault.fileWatcherOwnedPaths.Add >> ignore)
                                     let wasBusyWriting = vault.isBusyWriting
@@ -810,12 +825,24 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 match vault.arc with
                                 | None -> return Error(arcNotOpenError ())
                                 | Some arcLocal ->
-                                    let ownedPaths =
+                                    let! ownedRelativePaths = promise {
                                         match renameClassification with
                                         | ArcEntityPathRules.RenamePathClassification.EntityFolderTarget(zone,
                                                                                                          sourceIdentifier,
                                                                                                          sourceFolder) ->
-                                            let targetPaths =
+                                            let sourceCanonicalPaths =
+                                                ArcEntityPathRules.buildCanonicalEntityPaths zone sourceIdentifier
+
+                                            let sourceEntityPath = sourceCanonicalPaths.[0]
+                                            let sourceDataMapPath = sourceCanonicalPaths.[1]
+
+                                            let sourceDataMapAbsolutePath =
+                                                WatcherHelpers.buildWatcherEvent arcPath "change" sourceDataMapPath
+                                                |> fun watcherEvent -> watcherEvent.AbsolutePath
+
+                                            let! sourceDataMapExists = pathExistsAsync sourceDataMapAbsolutePath
+
+                                            let targetFolderAndCanonicalPaths =
                                                 match
                                                     Swate.Electron.Shared.RenamePathRules.tryBuildRenameTargetPath
                                                         sourceFolder
@@ -823,23 +850,41 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                 with
                                                 | Error _ -> []
                                                 | Ok targetFolder ->
-                                                    targetFolder
-                                                    :: (targetFolder
+                                                    let targetCanonicalPaths =
+                                                        targetFolder
                                                         |> PathHelpers.getNameFromPath
-                                                        |> ArcEntityPathRules.buildCanonicalEntityPaths zone)
+                                                        |> ArcEntityPathRules.buildCanonicalEntityPaths zone
 
-                                            "isa.investigation.xlsx"
-                                            :: (sourceFolder
-                                                :: ArcEntityPathRules.buildCanonicalEntityPaths zone sourceIdentifier
-                                                @ targetPaths)
-                                            |> List.map (fun relativePath ->
-                                                WatcherHelpers.buildWatcherEvent arcPath "change" relativePath
-                                                |> fun watcherEvent ->
-                                                    PathHelpers.normalizePath (
-                                                        watcherEvent.AbsolutePath.ToLowerInvariant()
-                                                    )
-                                            )
-                                        | _ -> []
+                                                    [
+                                                        targetFolder
+                                                        targetCanonicalPaths.[0]
+
+                                                        if sourceDataMapExists then
+                                                            targetCanonicalPaths.[1]
+                                                    ]
+
+                                            return [
+                                                "isa.investigation.xlsx"
+                                                sourceFolder
+                                                sourceEntityPath
+
+                                                if sourceDataMapExists then
+                                                    sourceDataMapPath
+
+                                                yield! targetFolderAndCanonicalPaths
+                                            ]
+                                        | _ -> return []
+                                    }
+
+                                    let ownedPaths =
+                                        ownedRelativePaths
+                                        |> List.map (fun relativePath ->
+                                            WatcherHelpers.buildWatcherEvent arcPath "change" relativePath
+                                            |> fun watcherEvent ->
+                                                PathHelpers.normalizePath (
+                                                    watcherEvent.AbsolutePath.ToLowerInvariant()
+                                                )
+                                        )
 
                                     ownedPaths |> List.iter (vault.fileWatcherOwnedPaths.Add >> ignore)
                                     let wasBusyWriting = vault.isBusyWriting
