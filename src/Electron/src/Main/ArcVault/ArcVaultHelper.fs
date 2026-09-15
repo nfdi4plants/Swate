@@ -153,7 +153,8 @@ type internal ArcMergeQueue(windowId: int) =
                 return! processNext ()
             }
 
-            processNext ())
+            processNext ()
+        )
 
     member _.Enqueue<'T>(operation: unit -> JS.Promise<'T>) : JS.Promise<'T> =
         JS.Constructors.Promise.Create(fun resolve reject ->
@@ -164,7 +165,8 @@ type internal ArcMergeQueue(windowId: int) =
                 with error ->
                     swatelogfn windowId "Queued ARC merge failed: %s" error.Message
                     reject error
-            }))
+            })
+        )
 
 type OpenArcRootRenamePlan = {
     SourcePath: string
