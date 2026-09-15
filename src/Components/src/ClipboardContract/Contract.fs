@@ -10,7 +10,7 @@ module PlainText =
 
     let parseRows (text: string) =
         let rows =
-            text.Split(LineBreaks, System.StringSplitOptions.None)
+            text.TrimEnd([| '\r'; '\n' |]).Split(LineBreaks, System.StringSplitOptions.None)
             |> Array.map (fun row -> row.Split([| '\t' |], System.StringSplitOptions.None))
 
         let columnCount = rows |> Array.map _.Length |> Array.max

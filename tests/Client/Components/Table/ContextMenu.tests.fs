@@ -394,8 +394,8 @@ type TestCases =
             (Some "UO:0000008")
             "Structured unit paste should preserve ontology metadata."
 
-    static member PlainTextSelectionRepeatsLikeStructuredPaste() =
-        let selection: CellCoordinate[] = [|
+    static member PlainTextSelectionGeometryMatchesAcrossTargets() =
+        let dataMapSelection: CellCoordinate[] = [|
             {| x = 5; y = 1 |}
             {| x = 6; y = 1 |}
             {| x = 7; y = 1 |}
@@ -404,29 +404,120 @@ type TestCases =
             {| x = 7; y = 2 |}
         |]
 
-        let anchor = selection.[0]
-        let plainTarget = DataMap(ResizeArray [ DataContext(); DataContext() ])
-        let structuredTarget = DataMap(ResizeArray [ DataContext(); DataContext() ])
+        let dataMap = DataMap(ResizeArray [ DataContext(); DataContext() ])
+        dataMap.PasteTabText(dataMapSelection.[0], dataMapSelection, "A\tB")
 
-        plainTarget.PasteTabText(anchor, selection, "alpha\tbeta")
+        let table = Fixture.mkTable ()
+        let mutable updatedTable = table
+        let tableSelection = Fixture.mkSelectHandle (1, 2, 2, 4)
 
-        structuredTarget.PasteStructuredCells(
-            anchor,
-            selection,
-            [|
-                [|
-                    CompositeCell.FreeText "alpha"
-                    CompositeCell.FreeText "beta"
-                |]
-            |]
+        AnnotationTableContextMenuUtil.applyPlainTextCells (
+            {| x = 2; y = 1 |},
+            table,
+            tableSelection,
+            "A\tB",
+            (fun nextTable -> updatedTable <- nextTable)
         )
 
         for rowIndex in 0..1 do
-            for columnIndex in 4..6 do
-                Expect.equal
-                    (plainTarget.GetCell(columnIndex, rowIndex).ToString())
-                    (structuredTarget.GetCell(columnIndex, rowIndex).ToString())
-                    "Plain-text and structured paste should repeat identically across a selection."
+            let dataMapValues = [|
+                for columnIndex in 4..6 -> dataMap.GetCell(columnIndex, rowIndex).ToString()
+            |]
+
+            let tableValues = [|
+                for columnIndex in 1..3 -> updatedTable.GetCellAt(columnIndex, rowIndex).ToString()
+            |]
+
+            Expect.equal dataMapValues [| "A"; "B"; "A" |] "DataMap should repeat the two source cells."
+            Expect.equal tableValues dataMapValues "AnnotationTable should preserve the same source geometry."
+
+    static member PlainTextPreservesEmptyRowsAcrossTargets() =
+        let text = "A\n\nB"
+        let dataMap = DataMap(ResizeArray [ DataContext(); DataContext(); DataContext() ])
+        let dataMapAnchor: CellCoordinate = {| x = 2; y = 1 |}
+        dataMap.PasteTabText(dataMapAnchor, [| dataMapAnchor |], text)
+
+        let table = Fixture.mkTable ()
+        let tableAnchor: CellCoordinate = {| x = 1; y = 1 |}
+        let mutable updatedTable = table
+
+        AnnotationTableContextMenuUtil.applyPlainTextCells (
+            tableAnchor,
+            table,
+            Fixture.mkSelectHandle (1, 1, 1, 1),
+            text,
+            (fun nextTable -> updatedTable <- nextTable)
+        )
+
+        let dataMapValues = [|
+            for rowIndex in 0..2 -> dataMap.GetCell(1, rowIndex).ToString()
+        |]
+
+        let tableValues = [|
+            for rowIndex in 0..2 -> updatedTable.GetCellAt(0, rowIndex).ToString()
+        |]
+
+        Expect.equal dataMapValues [| "A"; ""; "B" |] "DataMap should preserve the empty middle row."
+        Expect.equal tableValues dataMapValues "AnnotationTable should preserve the same empty-row geometry."
+
+    static member PlainTextParserIgnoresTerminalSeparators() =
+        let parse = Swate.Components.ClipboardContract.Contract.PlainText.parseRows
+        Expect.equal (parse "A\n") [| [| "A" |] |] "A terminal newline should terminate, not add, a row."
+        Expect.equal (parse "A\n\nB") [| [| "A" |]; [| "" |]; [| "B" |] |] "An internal empty row should be retained."
+
+    static member AnnotationTablePlainNumericPastePreservesTargetUnit() =
+        let table = Fixture.mkTable ()
+        let anchor: CellCoordinate = {| x = 4; y = 1 |}
+        let mutable updatedTable = table
+
+        AnnotationTableContextMenuUtil.applyPlainTextCells (
+            anchor,
+            table,
+            Fixture.mkSelectHandle (1, 1, 4, 4),
+            "4",
+            (fun nextTable -> updatedTable <- nextTable)
+        )
+
+        let value, unit = updatedTable.GetCellAt(3, 0).AsUnitized
+        Expect.equal value "4" "A numeric plain-text value should remain unitized."
+        Expect.equal unit.NameText "Degree Celsius" "The existing destination unit should be retained."
+        Expect.equal unit.TermAccessionNumber (Some "UO:000000001") "The existing unit metadata should be retained."
+
+    static member AnnotationTableStructuredOverflowClipsColumnsAndExtendsRows() =
+        let table = Fixture.mkTable ()
+        let originalRowCount = table.RowCount
+        let originalColumnCount = table.ColumnCount
+
+        let anchor: CellCoordinate = {|
+            x = originalColumnCount
+            y = originalRowCount
+        |}
+
+        let mutable updatedTable = table
+
+        AnnotationTableContextMenuUtil.applyStructuredCells (
+            anchor,
+            table,
+            Fixture.mkSelectHandle (anchor.y, anchor.y, anchor.x, anchor.x),
+            [|
+                [| CompositeCell.FreeText "A"; CompositeCell.FreeText "B" |]
+                [| CompositeCell.FreeText "C"; CompositeCell.FreeText "D" |]
+            |],
+            (fun nextTable -> updatedTable <- nextTable)
+        )
+
+        Expect.equal updatedTable.ColumnCount originalColumnCount "Right overflow should be clipped."
+        Expect.equal updatedTable.RowCount (originalRowCount + 1) "Bottom overflow should extend rows."
+
+        Expect.equal
+            (updatedTable.GetCellAt(originalColumnCount - 1, originalRowCount - 1).ToString())
+            "A"
+            "The in-range source cell should be applied."
+
+        Expect.equal
+            (updatedTable.GetCellAt(originalColumnCount - 1, originalRowCount).ToString())
+            "C"
+            "The next source row should be applied to the extended row."
 
     static member AnnotationTableStructuredPastePreservesOntologyMetadata() =
         let table = Fixture.mkTable ()
@@ -1032,8 +1123,16 @@ let Main =
             <| fun _ -> TestCases.DataMapPlainTextPasteKeepsTsvCellsSeparate()
             testCase "DataMap structured paste preserves terms and units"
             <| fun _ -> TestCases.DataMapStructuredPastePreservesTermsAndUnits()
-            testCase "Plain-text selection repetition matches structured paste"
-            <| fun _ -> TestCases.PlainTextSelectionRepeatsLikeStructuredPaste()
+            testCase "Plain-text selection geometry matches across targets"
+            <| fun _ -> TestCases.PlainTextSelectionGeometryMatchesAcrossTargets()
+            testCase "Plain text preserves empty rows across targets"
+            <| fun _ -> TestCases.PlainTextPreservesEmptyRowsAcrossTargets()
+            testCase "Plain-text parser ignores terminal separators and preserves internal empty rows"
+            <| fun _ -> TestCases.PlainTextParserIgnoresTerminalSeparators()
+            testCase "AnnotationTable plain numeric paste preserves the target unit"
+            <| fun _ -> TestCases.AnnotationTablePlainNumericPastePreservesTargetUnit()
+            testCase "AnnotationTable structured overflow clips columns and extends rows"
+            <| fun _ -> TestCases.AnnotationTableStructuredOverflowClipsColumnsAndExtendsRows()
             testCase "AnnotationTable structured paste preserves term and unit metadata"
             <| fun _ -> TestCases.AnnotationTableStructuredPastePreservesOntologyMetadata()
             testCaseAsync "Structured paste falls back for headers and blank bodies"

@@ -384,12 +384,13 @@ type AnnotationTableContextMenuUtil =
                     coordinates = groupedCellCoordinates
                 |}
 
-    static member applyStructuredCells
+    static member private applyMappedCells
         (
             cellIndex: CellCoordinate,
             targetTable: ArcTable,
             selectHandle: SelectHandle,
-            cells: CompositeCell[][],
+            cells: 'T[][],
+            convert: CompositeHeader -> CompositeCell -> 'T -> CompositeCell,
             setTable: ArcTable -> unit
         ) =
         let coordinates =
@@ -417,11 +418,29 @@ type AnnotationTableContextMenuUtil =
         mapped
         |> Array.iter (fun mapped ->
             let header = nextTable.GetColumn(mapped.Target.x - 1).Header
-            let targetCell = mapped.Source.ConvertToValidCell(header)
-            nextTable.SetCellAt(mapped.Target.x - 1, mapped.Target.y - 1, targetCell)
+            let currentCell = nextTable.GetCellAt(mapped.Target.x - 1, mapped.Target.y - 1)
+            let nextCell = convert header currentCell mapped.Source
+            nextTable.SetCellAt(mapped.Target.x - 1, mapped.Target.y - 1, nextCell)
         )
 
         setTable nextTable
+
+    static member applyStructuredCells
+        (
+            cellIndex: CellCoordinate,
+            targetTable: ArcTable,
+            selectHandle: SelectHandle,
+            cells: CompositeCell[][],
+            setTable: ArcTable -> unit
+        ) =
+        AnnotationTableContextMenuUtil.applyMappedCells (
+            cellIndex,
+            targetTable,
+            selectHandle,
+            cells,
+            (fun header _ source -> source.ConvertToValidCell(header)),
+            setTable
+        )
 
     static member applyPlainTextCells
         (
@@ -431,12 +450,29 @@ type AnnotationTableContextMenuUtil =
             text: string,
             setTable: ArcTable -> unit
         ) =
-        let cells =
-            text
-            |> Swate.Components.ClipboardContract.Contract.PlainText.parseRows
-            |> Array.map (Array.map CompositeCell.createFreeText)
+        let convert (header: CompositeHeader) (currentCell: CompositeCell) (value: string) =
+            let parsedCell = CompositeCell.fromContentValid ([| value |], header)
 
-        AnnotationTableContextMenuUtil.applyStructuredCells (cellIndex, targetTable, selectHandle, cells, setTable)
+            if parsedCell.isUnitized then
+                let numericValue, unit = parsedCell.AsUnitized
+
+                if unit.isEmpty () && currentCell.isUnitized then
+                    CompositeCell.createUnitized (numericValue, snd currentCell.AsUnitized)
+                elif unit.isEmpty () && currentCell.isTerm then
+                    CompositeCell.createUnitized (numericValue, currentCell.AsTerm)
+                else
+                    parsedCell
+            else
+                parsedCell
+
+        AnnotationTableContextMenuUtil.applyMappedCells (
+            cellIndex,
+            targetTable,
+            selectHandle,
+            Swate.Components.ClipboardContract.Contract.PlainText.parseRows text,
+            convert,
+            setTable
+        )
 
     static member getValueOfCompositeHeader(compositeHeader: CompositeHeader) =
         match compositeHeader with
