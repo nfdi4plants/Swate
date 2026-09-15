@@ -37,7 +37,10 @@ export class BrowserWindow {
 }
 
 export const contextBridge = { exposeInMainWorld: noop };
-export const dialog = { showOpenDialog: () => Promise.resolve({ canceled: true, filePaths: [] }) };
+export const dialog = {
+    showOpenDialog: () => Promise.resolve({ canceled: true, filePaths: [] }),
+    showErrorBox: noop,
+};
 export const ipcMain = { handle: noop, on: noop };
 export const ipcRenderer = { invoke: noop, on: noop, removeListener: noop, send: noop };
 export const screen = { getPrimaryDisplay: () => ({ workAreaSize: { width: 1280, height: 720 } }) };

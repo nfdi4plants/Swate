@@ -13,9 +13,8 @@ open Swate.Components.Primitive.ContextMenu.Types
 open Swate.Components.Composite.AnnotationTable.Types
 open Swate.Components.Composite.Table
 open Swate.Components.Composite.Table.Types
-
-module TableHelper = Swate.Components.Composite.Table.Helper
 open Swate.Components.Composite.Table.Helper
+open Swate.Components.ClipboardCodec
 
 type AnnotationTableContextMenuUtil =
 
@@ -38,7 +37,7 @@ type AnnotationTableContextMenuUtil =
         if selectHandle.contains tableIndex then
             let rowCoordinates =
                 selectHandle.getSelectedCells ()
-                |> TableHelper.selectedRowIndices table.RowCount
+                |> Swate.Components.Composite.Table.Helper.selectedRowIndices table.RowCount
 
             table.RemoveRows(rowCoordinates)
         else
@@ -94,8 +93,10 @@ type AnnotationTableContextMenuUtil =
 
         table.Copy()
 
-    static member copy(cellIndex: CellCoordinate, table: ArcTable, selectHandle: SelectHandle) =
-        let result =
+    static member private getCopyContent
+        (cellIndex: CellCoordinate, table: ArcTable, selectHandle: SelectHandle)
+        : ClipboardContract.Types.ClipboardContent =
+        let plainText, payloadCells =
             if selectHandle.getCount () > 1 then
 
                 let cellCoordinates =
@@ -135,53 +136,68 @@ type AnnotationTableContextMenuUtil =
                         table.AddColumns(columns)
                         table.ToStringSeqs()
 
-                    tableString
-                    |> Array.map (fun row -> row |> String.concat "\t")
-                    |> String.concat System.Environment.NewLine
+                    (tableString
+                     |> Array.map (fun row -> row |> String.concat "\t")
+                     |> String.concat System.Environment.NewLine),
+                    None
                 else
-                    CompositeCell.ToClipboardTableTxt(cells)
+                    let cells =
+                        Swate.Components.ClipboardContract.Contract.Capture.matrix
+                            (fun coordinate -> table.GetCellAt(coordinate.x - 1, coordinate.y - 1))
+                            (cellCoordinates |> Array.collect snd)
+
+                    Swate.Components.ClipboardContract.Contract.Capture.toPlainText cells, Some cells
             else if cellIndex.y - 1 < 0 then
                 let column = table.GetColumn(cellIndex.x - 1)
                 let table = ArcTable.init ("placeholder")
                 table.AddColumn(column.Header)
 
-                table.ToStringSeqs()
-                |> Array.map (fun row -> row |> String.concat "\t")
-                |> String.concat System.Environment.NewLine
+                (table.ToStringSeqs()
+                 |> Array.map (fun row -> row |> String.concat "\t")
+                 |> String.concat System.Environment.NewLine),
+                None
             else
                 let cell = table.GetCellAt((cellIndex.x - 1, cellIndex.y - 1))
-                cell.ToClipboardStr()
+                Swate.Components.ClipboardContract.Contract.Capture.toPlainText [| [| cell |] |], Some [| [| cell |] |]
 
-        navigator.clipboard.writeText result
+        {
+            PlainText = plainText
+            Cells = payloadCells
+        }
+
+    static member copy(cellIndex: CellCoordinate, table: ArcTable, selectHandle: SelectHandle) =
+        let content =
+            AnnotationTableContextMenuUtil.getCopyContent (cellIndex, table, selectHandle)
+
+        Swate.Components.ClipboardCodec.write content.PlainText content.Cells
 
     static member cut(cellIndex: CellCoordinate, table: ArcTable, setTable, selectHandle: SelectHandle) = promise {
-        do! AnnotationTableContextMenuUtil.copy (cellIndex, table, selectHandle)
+        let content =
+            AnnotationTableContextMenuUtil.getCopyContent (cellIndex, table, selectHandle)
 
-        let nextTable =
-            AnnotationTableContextMenuUtil.clear (cellIndex, table, selectHandle)
-
-        nextTable |> setTable
+        return!
+            Swate.Components.ClipboardContract.Actions.cut
+                content
+                (fun () ->
+                    AnnotationTableContextMenuUtil.clear (cellIndex, table, selectHandle)
+                    |> setTable
+                )
     }
 
-    //Recalculates the index, then the amount of selected cells is bigger than the amount of copied cells
+    // Wraps the target index when more cells are selected than copied.
     static member getIndex(startIndex, length) =
-        let rec loop index length =
-            if index < length then
-                index
-            else
-                loop (index - length) length
+        if length <= 0 then
+            invalidArg (nameof length) "Length must be greater than zero."
 
-        loop startIndex length
+        startIndex % length
 
-    static member getCopiedCells() = promise {
-        let! copiedValue = navigator.clipboard.readText ()
-
-        let rows =
-            copiedValue.Split([| System.Environment.NewLine |], System.StringSplitOptions.RemoveEmptyEntries)
-            |> Array.map (fun item -> item.Split('\t') |> Array.map _.Trim())
-
-        return rows
-    }
+    static member parseCopiedCells(copiedValue: string) =
+        copiedValue
+        |> fun text ->
+            text.Split(Swate.Components.ClipboardContract.Contract.LineBreaks, System.StringSplitOptions.None)
+        |> Array.map (fun row -> row.Split([| '\t' |], System.StringSplitOptions.None))
+        |> Array.filter (fun row -> row |> Array.exists (String.IsNullOrEmpty >> not))
+        |> Array.map (Array.map _.Trim())
 
     static member getFittedCells(data: string[][], headers: CompositeHeader[]) =
 
@@ -285,12 +301,20 @@ type AnnotationTableContextMenuUtil =
 
         result |> Array.map (fun row -> fitColumnsToTarget row headers)
 
+    static member getPasteTargetCoordinates(cellIndex: CellCoordinate, selectHandle: SelectHandle) =
+        // A context-menu click does not necessarily replace an existing selection.
+        // In that case the clicked cell, rather than the stale selection, is the paste target.
+        if selectHandle.contains cellIndex then
+            selectHandle.getSelectedCells () |> Array.ofSeq
+        else
+            [| cellIndex |]
+
     static member predictPasteBehaviour
         (cellIndex: CellCoordinate, targetTable: ArcTable, selectHandle: SelectHandle, data: string[][])
         =
 
-        //Convert cell coordinates to array
-        let cellCoordinates = selectHandle.getSelectedCells () |> Array.ofSeq
+        let cellCoordinates =
+            AnnotationTableContextMenuUtil.getPasteTargetCoordinates (cellIndex, selectHandle)
 
         //Get all required headers for cells
         let headers =
@@ -300,16 +324,7 @@ type AnnotationTableContextMenuUtil =
             |> Array.map (fun index -> targetTable.GetColumn(index.x - 1).Header)
 
         let checkForHeaders (row: string[]) =
-            let headers = ARCtrl.CompositeHeader.Cases |> Array.map (fun (_, header) -> header)
-
-            let areHeaders =
-                headers
-                |> Array.collect (fun _ ->
-                    row
-                    |> Array.map (fun cell -> AnnotationTableContextMenuUtil.checkForHeader (cell))
-                )
-
-            Array.contains true areHeaders
+            row |> Array.exists AnnotationTableContextMenuUtil.checkForHeader
 
         //Group all cells based on their row
         let groupedCellCoordinates =
@@ -363,6 +378,101 @@ type AnnotationTableContextMenuUtil =
                     data = columns
                     coordinates = groupedCellCoordinates
                 |}
+
+    static member private preserveTargetUnit(currentCell: CompositeCell, incomingCell: CompositeCell) =
+        if incomingCell.isUnitized then
+            let value, unit = incomingCell.AsUnitized
+
+            if unit.isEmpty () && currentCell.isUnitized then
+                CompositeCell.createUnitized (value, snd currentCell.AsUnitized)
+            elif unit.isEmpty () && currentCell.isTerm then
+                CompositeCell.createUnitized (value, currentCell.AsTerm)
+            else
+                incomingCell
+        else
+            incomingCell
+
+    static member private applyMappedCells
+        (
+            cellIndex: CellCoordinate,
+            targetTable: ArcTable,
+            selectHandle: SelectHandle,
+            cells: 'T[][],
+            convert: CompositeHeader -> CompositeCell -> 'T -> CompositeCell,
+            setTable: ArcTable -> unit
+        ) =
+        let coordinates =
+            AnnotationTableContextMenuUtil.getPasteTargetCoordinates (cellIndex, selectHandle)
+
+        let nextTable = targetTable.Copy()
+
+        let mapped =
+            Swate.Components.ClipboardContract.Contract.Mapping.map cells cellIndex coordinates
+            |> Array.filter (fun mapped ->
+                mapped.Target.x > 0
+                && mapped.Target.x <= nextTable.ColumnCount
+                && mapped.Target.y > 0
+            )
+
+        let requiredRowCount =
+            mapped
+            |> Array.map _.Target.y
+            |> Array.append [| nextTable.RowCount |]
+            |> Array.max
+
+        if requiredRowCount > nextTable.RowCount then
+            nextTable.AddRowsEmpty(requiredRowCount - nextTable.RowCount)
+
+        mapped
+        |> Array.iter (fun mapped ->
+            let header = nextTable.GetColumn(mapped.Target.x - 1).Header
+            let currentCell = nextTable.GetCellAt(mapped.Target.x - 1, mapped.Target.y - 1)
+            let nextCell = convert header currentCell mapped.Source
+            nextTable.SetCellAt(mapped.Target.x - 1, mapped.Target.y - 1, nextCell)
+        )
+
+        setTable nextTable
+
+    static member applyStructuredCells
+        (
+            cellIndex: CellCoordinate,
+            targetTable: ArcTable,
+            selectHandle: SelectHandle,
+            cells: CompositeCell[][],
+            setTable: ArcTable -> unit
+        ) =
+        AnnotationTableContextMenuUtil.applyMappedCells (
+            cellIndex,
+            targetTable,
+            selectHandle,
+            cells,
+            (fun header currentCell source ->
+                let incomingCell = source.ConvertToValidCell(header)
+                AnnotationTableContextMenuUtil.preserveTargetUnit (currentCell, incomingCell)
+            ),
+            setTable
+        )
+
+    static member applyPlainTextCells
+        (
+            cellIndex: CellCoordinate,
+            targetTable: ArcTable,
+            selectHandle: SelectHandle,
+            text: string,
+            setTable: ArcTable -> unit
+        ) =
+        let convert (header: CompositeHeader) (currentCell: CompositeCell) (value: string) =
+            let incomingCell = CompositeCell.fromContentValid ([| value |], header)
+            AnnotationTableContextMenuUtil.preserveTargetUnit (currentCell, incomingCell)
+
+        AnnotationTableContextMenuUtil.applyMappedCells (
+            cellIndex,
+            targetTable,
+            selectHandle,
+            Swate.Components.ClipboardContract.Contract.PlainText.parseRows text,
+            convert,
+            setTable
+        )
 
     static member getValueOfCompositeHeader(compositeHeader: CompositeHeader) =
         match compositeHeader with
@@ -551,20 +661,76 @@ type AnnotationTableContextMenuUtil =
             setArcTable: ArcTable -> unit
         ) =
         promise {
-            let! data = AnnotationTableContextMenuUtil.getCopiedCells ()
+            let! content = Swate.Components.ClipboardCodec.read ()
 
             try
-                let prediction =
-                    AnnotationTableContextMenuUtil.predictPasteBehaviour (cellIndex, arcTable, selectHandle, data)
+                let targetCoordinates =
+                    AnnotationTableContextMenuUtil.getPasteTargetCoordinates (cellIndex, selectHandle)
 
-                AnnotationTableContextMenuUtil.paste (
-                    prediction,
-                    cellIndex,
-                    arcTable,
-                    selectHandle,
-                    setModal,
-                    setArcTable
-                )
+                match content.Cells with
+                | Some cells when
+                    targetCoordinates |> Array.forall (fun coordinate -> coordinate.y > 0)
+                    && cells
+                       |> Array.concat
+                       |> Array.exists (fun cell -> not (System.String.IsNullOrWhiteSpace(cell.ToString())))
+                    ->
+                    AnnotationTableContextMenuUtil.applyStructuredCells (
+                        cellIndex,
+                        arcTable,
+                        selectHandle,
+                        cells,
+                        setArcTable
+                    )
+                | Some _ when targetCoordinates |> Array.forall (fun coordinate -> coordinate.y > 0) ->
+                    let headers =
+                        targetCoordinates
+                        |> Array.distinctBy _.x
+                        |> Array.map (fun coordinate -> arcTable.GetColumn(coordinate.x - 1).Header)
+
+                    AnnotationTableContextMenuUtil.paste (
+                        PasteCases.Unknown {|
+                            data = AnnotationTableContextMenuUtil.parseCopiedCells content.PlainText
+                            headers = headers
+                        |},
+                        cellIndex,
+                        arcTable,
+                        selectHandle,
+                        setModal,
+                        setArcTable
+                    )
+                | _ ->
+                    let rows =
+                        Swate.Components.ClipboardContract.Contract.PlainText.parseRows content.PlainText
+
+                    let isHeaderOriented =
+                        targetCoordinates |> Array.exists (fun coordinate -> coordinate.y <= 0)
+                        || rows.[0] |> Array.exists AnnotationTableContextMenuUtil.checkForHeader
+
+                    if isHeaderOriented then
+                        let prediction =
+                            AnnotationTableContextMenuUtil.predictPasteBehaviour (
+                                cellIndex,
+                                arcTable,
+                                selectHandle,
+                                rows
+                            )
+
+                        AnnotationTableContextMenuUtil.paste (
+                            prediction,
+                            cellIndex,
+                            arcTable,
+                            selectHandle,
+                            setModal,
+                            setArcTable
+                        )
+                    else
+                        AnnotationTableContextMenuUtil.applyPlainTextCells (
+                            cellIndex,
+                            arcTable,
+                            selectHandle,
+                            content.PlainText,
+                            setArcTable
+                        )
             with exn ->
                 setModal (AnnotationTable.ModalTypes.Error(exn.Message) |> Some)
         }
@@ -615,7 +781,7 @@ type AnnotationTableContextMenu =
                     fun _ ->
                         let nextTable = arcTable.Copy()
 
-                        TableHelper.fillColumn
+                        Swate.Components.Composite.Table.Helper.fillColumn
                             arcTable.RowCount
                             cellIndex
                             (fun coordinate -> arcTable.GetCellAt(coordinate.x - 1, coordinate.y - 1))

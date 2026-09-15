@@ -2,6 +2,7 @@ module ElectronCore.ArcDeleteHelperTests
 
 open Main.ARCtrlExtensions
 open Main.ArcVault
+open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Main.IPC.Delete
 open ARCtrl
@@ -80,6 +81,75 @@ Vitest.describe (
                                 pathExistsAsync (join [| arcPath; "assays"; "DataMapAssay"; "isa.datamap.xlsx" |])
 
                             Vitest.expect(dataMapExists).toBe (false)
+
+                            let! persistedArc = loadArcAsync arcPath
+                            Vitest.expect(persistedArc.GetAssay("DataMapAssay").DataMap.IsNone).toBe (true)
+                    })
+        )
+
+        Vitest.test (
+            "loads only the requested persisted DataMap parent for every parent kind",
+            fun () ->
+                withTempArc
+                    (fun arc ->
+                        let assay = ArcAssay("TargetAssay")
+                        assay.DataMap <- Some(DataMap.init ())
+                        arc.AddAssay assay
+
+                        let study = ArcStudy("TargetStudy")
+                        study.DataMap <- Some(DataMap.init ())
+                        arc.AddStudy study
+
+                        let run = ArcRun("TargetRun")
+                        run.DataMap <- Some(DataMap.init ())
+                        arc.AddRun run
+
+                        let workflow = ArcWorkflow("TargetWorkflow")
+                        workflow.DataMap <- Some(DataMap.init ())
+                        arc.AddWorkflow workflow
+
+                        arc.AddStudy(ArcStudy("UnreadableUnrelatedStudy"))
+                    )
+                    (fun arcPath -> promise {
+                        let unreadableStudyPath =
+                            join [|
+                                arcPath
+                                "studies"
+                                "UnreadableUnrelatedStudy"
+                                "isa.study.xlsx"
+                            |]
+
+                        do! writeFileAsync unreadableStudyPath "not an XLSX workbook" TextEncoding.Utf8
+
+                        let parents = [|
+                            DatamapParentInfo.create "TargetAssay" DataMapParent.Assay
+                            DatamapParentInfo.create "TargetStudy" DataMapParent.Study
+                            DatamapParentInfo.create "TargetRun" DataMapParent.Run
+                            DatamapParentInfo.create "TargetWorkflow" DataMapParent.Workflow
+                        |]
+
+                        for parentInfo in parents do
+                            match! loadPersistedDataMapParentAsync arcPath parentInfo with
+                            | Error errors -> failwith (PathHelpers.formatContractErrors errors)
+                            | Ok None -> failwith "Expected the requested persisted parent."
+                            | Ok(Some persistedArc) ->
+                                let containsRequestedParent =
+                                    match parentInfo.Parent with
+                                    | DataMapParent.Assay -> persistedArc.ContainsAssay(parentInfo.ParentId)
+                                    | DataMapParent.Study -> persistedArc.ContainsStudy(parentInfo.ParentId)
+                                    | DataMapParent.Run -> persistedArc.ContainsRun(parentInfo.ParentId)
+                                    | DataMapParent.Workflow -> persistedArc.ContainsWorkflow(parentInfo.ParentId)
+
+                                Vitest.expect(containsRequestedParent).toBe (true)
+                                Vitest.expect(persistedArc.TryGetDataMap(parentInfo).IsNone).toBe (true)
+
+                                let loadedParentCount =
+                                    persistedArc.Assays.Count
+                                    + persistedArc.Studies.Count
+                                    + persistedArc.Runs.Count
+                                    + persistedArc.Workflows.Count
+
+                                Vitest.expect(loadedParentCount).toBe (1)
                     })
         )
 

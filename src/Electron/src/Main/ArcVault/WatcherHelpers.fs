@@ -1,12 +1,15 @@
 module Main.WatcherHelpers
 
 open System
+open System.Collections.Generic
 open Fable.Electron
 open Main.Bindings
 open Main.ArcMerge
 open Main.ArcVaultTypes
+open Main.Bindings.Path
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
+open Swate.Electron.Shared.FileIOTypes
 
 let eventNameEquals (expected: Chokidar.Events) (actual: string) =
     String.Equals(actual, expected.ToString(), StringComparison.OrdinalIgnoreCase)
@@ -41,6 +44,42 @@ let buildWatcherEvent (arcPath: string) (eventName: string) (path: string) =
         RelativePath = relativePath
         AbsolutePath = absolutePath
     }
+
+let createImportedFileWatcherEvents arcPath targetRelativePath sourceAbsolutePaths =
+    let targetRelativePath =
+        PathHelpers.normalizeCanonicalRelativePath targetRelativePath
+
+    sourceAbsolutePaths
+    |> Array.map (fun sourcePath ->
+        let fileName = basename sourcePath
+
+        let relativePath =
+            if String.IsNullOrWhiteSpace targetRelativePath then
+                fileName
+            else
+                $"{targetRelativePath}/{fileName}"
+            |> PathHelpers.normalizePath
+
+        buildWatcherEvent arcPath (Chokidar.Events.Add.ToString()) relativePath
+    )
+
+/// Always queues a watcher event for the file tree, while ARC merge eligibility is controlled separately.
+let queueFileWatcherEvent
+    isArcMergeEligible
+    arcPath
+    (pendingEvents: ResizeArray<ArcVaultFileSystemEvent>)
+    (pendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent>)
+    eventName
+    changedPath
+    =
+    match arcPath with
+    | Some rootPath ->
+        let watcherEvent = buildWatcherEvent rootPath eventName changedPath
+        pendingEvents.Add watcherEvent
+
+        if isArcMergeEligible watcherEvent then
+            pendingArcMergeEvents.Add watcherEvent
+    | None -> ()
 
 /// Converts raw filesystem events into ARC merge events; unlink-dir events expand to possible canonical files.
 let toArcMergeEvents (events: ArcVaultFileSystemEvent list) =
