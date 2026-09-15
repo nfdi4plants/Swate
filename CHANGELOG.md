@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Show **Delete DataMap**, rather than **Add DataMap**, in the context menu of a collapsed ARC entity folder that already contains a DataMap.
 -   Prevent newly added DataMaps from incorrectly appearing as unsaved after they have been written to disk.
 
+### 🔄 Changed
+
+-   Rotate the Import JSON icon by 180 degrees in all navbars.
+
 ### 🐛 Fixed
 
 -   Keep the ARC selector at a stable width and truncate long ARC names, and close its dropdown only after direct or overflow actions are invoked without dismissing the overflow menu prematurely.
