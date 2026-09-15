@@ -39,7 +39,7 @@ let updateDataMap (dataMap: DataMap) (setDataMap: DataMap -> unit) (update: Data
     setDataMap nextDataMap
 
 let cutCells (dataMap: DataMap) (coordinates: CellCoordinate[]) (setDataMap: DataMap -> unit) =
-    Swate.Components.ClipboardCodec.cut
+    Swate.Components.ClipboardContract.Actions.cut
         (captureCells dataMap coordinates)
         (fun () -> updateDataMap dataMap setDataMap _.ClearCells(coordinates))
 

@@ -176,7 +176,7 @@ type AnnotationTableContextMenuUtil =
             AnnotationTableContextMenuUtil.getCopyContent (cellIndex, table, selectHandle)
 
         return!
-            Swate.Components.ClipboardCodec.cut
+            Swate.Components.ClipboardContract.Actions.cut
                 content
                 (fun () ->
                     AnnotationTableContextMenuUtil.clear (cellIndex, table, selectHandle)
@@ -397,17 +397,46 @@ type AnnotationTableContextMenuUtil =
 
         let nextTable = targetTable.Copy()
 
-        Swate.Components.ClipboardContract.Contract.Mapping.map cells cellIndex coordinates
-        |> Array.iter (fun mapped ->
-            if mapped.Target.y <= 0 then
-                invalidArg (nameof coordinates) "Structured clipboard cells cannot be pasted into headers."
+        let mapped =
+            Swate.Components.ClipboardContract.Contract.Mapping.map cells cellIndex coordinates
+            |> Array.filter (fun mapped ->
+                mapped.Target.x > 0
+                && mapped.Target.x <= nextTable.ColumnCount
+                && mapped.Target.y > 0
+            )
 
+        let requiredRowCount =
+            mapped
+            |> Array.map _.Target.y
+            |> Array.append [| nextTable.RowCount |]
+            |> Array.max
+
+        if requiredRowCount > nextTable.RowCount then
+            nextTable.AddRowsEmpty(requiredRowCount - nextTable.RowCount)
+
+        mapped
+        |> Array.iter (fun mapped ->
             let header = nextTable.GetColumn(mapped.Target.x - 1).Header
             let targetCell = mapped.Source.ConvertToValidCell(header)
             nextTable.SetCellAt(mapped.Target.x - 1, mapped.Target.y - 1, targetCell)
         )
 
         setTable nextTable
+
+    static member applyPlainTextCells
+        (
+            cellIndex: CellCoordinate,
+            targetTable: ArcTable,
+            selectHandle: SelectHandle,
+            text: string,
+            setTable: ArcTable -> unit
+        ) =
+        let cells =
+            text
+            |> Swate.Components.ClipboardContract.Contract.PlainText.parseRows
+            |> Array.map (Array.map CompositeCell.createFreeText)
+
+        AnnotationTableContextMenuUtil.applyStructuredCells (cellIndex, targetTable, selectHandle, cells, setTable)
 
     static member getValueOfCompositeHeader(compositeHeader: CompositeHeader) =
         match compositeHeader with
@@ -634,18 +663,38 @@ type AnnotationTableContextMenuUtil =
                         setArcTable
                     )
                 | _ ->
-                    let prediction =
-                        let data = AnnotationTableContextMenuUtil.parseCopiedCells content.PlainText
-                        AnnotationTableContextMenuUtil.predictPasteBehaviour (cellIndex, arcTable, selectHandle, data)
+                    let rows =
+                        Swate.Components.ClipboardContract.Contract.PlainText.parseRows content.PlainText
 
-                    AnnotationTableContextMenuUtil.paste (
-                        prediction,
-                        cellIndex,
-                        arcTable,
-                        selectHandle,
-                        setModal,
-                        setArcTable
-                    )
+                    let isHeaderOriented =
+                        targetCoordinates |> Array.exists (fun coordinate -> coordinate.y <= 0)
+                        || rows.[0] |> Array.exists AnnotationTableContextMenuUtil.checkForHeader
+
+                    if isHeaderOriented then
+                        let prediction =
+                            AnnotationTableContextMenuUtil.predictPasteBehaviour (
+                                cellIndex,
+                                arcTable,
+                                selectHandle,
+                                rows
+                            )
+
+                        AnnotationTableContextMenuUtil.paste (
+                            prediction,
+                            cellIndex,
+                            arcTable,
+                            selectHandle,
+                            setModal,
+                            setArcTable
+                        )
+                    else
+                        AnnotationTableContextMenuUtil.applyPlainTextCells (
+                            cellIndex,
+                            arcTable,
+                            selectHandle,
+                            content.PlainText,
+                            setArcTable
+                        )
             with exn ->
                 setModal (AnnotationTable.ModalTypes.Error(exn.Message) |> Some)
         }

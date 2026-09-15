@@ -6,6 +6,23 @@ open Swate.Components.ClipboardContract.Types
 
 let LineBreaks = [| "\r\n"; "\n"; "\r" |]
 
+module PlainText =
+
+    let parseRows (text: string) =
+        let rows =
+            text.Split(LineBreaks, System.StringSplitOptions.None)
+            |> Array.map (fun row -> row.Split([| '\t' |], System.StringSplitOptions.None))
+
+        let columnCount = rows |> Array.map _.Length |> Array.max
+
+        rows
+        |> Array.map (fun row ->
+            if row.Length = columnCount then
+                row
+            else
+                Array.append row (Array.create (columnCount - row.Length) "")
+        )
+
 module Capture =
 
     let matrix (getCell: CellCoordinate -> CompositeCell) (coordinates: seq<CellCoordinate>) =

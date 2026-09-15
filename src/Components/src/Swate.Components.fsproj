@@ -90,9 +90,10 @@
     <Compile Include="ARCtrl\Extensions\CompositeHeader.fs" />
     <Compile Include="ARCtrl\Extensions\CompositeCell.fs" />
     <Compile Include="ClipboardContract\Types.fs" />
-    <Compile Include="ClipboardContract\Contract.fs" />
-    <Compile Include="ARCtrl\ClipboardCodec.fs" />
-    <Compile Include="ARCtrl\Extensions\ArcTable.fs" />
+      <Compile Include="ClipboardContract\Contract.fs" />
+      <Compile Include="ARCtrl\ClipboardCodec.fs" />
+      <Compile Include="ClipboardContract\Actions.fs" />
+      <Compile Include="ARCtrl\Extensions\ArcTable.fs" />
     <Compile Include="ARCtrl\Extensions\DataFile.fs" />
     <Compile Include="ARCtrl\Extensions\DataMap.fs" />
     <Compile Include="ARCtrl\Extensions\Template.fs" />

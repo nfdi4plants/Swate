@@ -54,20 +54,8 @@ module ARCtrlExtensions =
             |> Array.iter (fun mapped -> this.ApplyClipboardCell(mapped.Target, mapped.Source))
 
         member this.PasteTabText(startCoordinate: CellCoordinate, selection: CellCoordinate[], clipboardText: string) =
-            let parsedRows =
-                clipboardText.TrimEnd([| '\r'; '\n' |]).Split(LineBreaks, System.StringSplitOptions.None)
-                |> Array.map (fun row -> row.Split([| '\t' |], System.StringSplitOptions.None))
-
-            let columnCount = parsedRows |> Array.map _.Length |> Array.max
-
             let rows =
-                parsedRows
-                |> Array.map (fun row ->
-                    if row.Length = columnCount then
-                        row
-                    else
-                        Array.append row (Array.create (columnCount - row.Length) "")
-                )
+                Swate.Components.ClipboardContract.Contract.PlainText.parseRows clipboardText
 
             let mapped = Mapping.map rows startCoordinate selection
 
