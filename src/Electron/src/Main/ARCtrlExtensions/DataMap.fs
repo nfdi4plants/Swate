@@ -2,12 +2,35 @@ namespace Main.ARCtrlExtensions
 
 open ARCtrl
 open ARCtrl.Contract
+open Main.Bindings.Filesystem
+open Main.Bindings.Path
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 
 
 [<AutoOpen>]
 module DataMapExtensions =
+
+    let loadPersistedDataMapParentAsync (arcPath: string) (parentInfo: DatamapParentInfo) = promise {
+        let parentFilePath =
+            match parentInfo.Parent with
+            | DataMapParent.Assay -> ARCtrl.Helper.Identifier.Assay.fileNameFromIdentifier parentInfo.ParentId
+            | DataMapParent.Study -> ARCtrl.Helper.Identifier.Study.fileNameFromIdentifier parentInfo.ParentId
+            | DataMapParent.Run -> ARCtrl.Helper.Identifier.Run.fileNameFromIdentifier parentInfo.ParentId
+            | DataMapParent.Workflow -> ARCtrl.Helper.Identifier.Workflow.fileNameFromIdentifier parentInfo.ParentId
+
+        if not (existsSync (join [| arcPath; parentFilePath |])) then
+            return Ok None
+        else
+            let persistedArc = ARC.fromFilePaths [| parentFilePath |]
+            let contracts = persistedArc.GetReadContracts()
+
+            match! fullFillContractBatchAsync arcPath contracts with
+            | Error errors -> return Error errors
+            | Ok fulfilledContracts ->
+                persistedArc.SetISAFromContracts fulfilledContracts
+                return Ok(Some persistedArc)
+    }
 
     let private tryGetParentDataMapRemovalContract (arc: ARC) (parentInfo: DatamapParentInfo) =
         match parentInfo.Parent with
@@ -56,14 +79,22 @@ module DataMapExtensions =
                             $"Parent '{parentPath}' does not have a DataMap to delete. Refresh the File Explorer and try again."
                     )
             | Some dataMap ->
-                match! ARC.LoadAsyncSwate arcPath with
+                match! loadPersistedDataMapParentAsync arcPath parentInfo with
                 | Error errors ->
                     return
                         Error(
                             exn
                                 $"The DataMap could not be deleted because its persisted parent could not be loaded. {PathHelpers.formatContractErrors errors}"
                         )
-                | Ok persistedArc ->
+                | Ok None ->
+                    let parentPath = DatamapParentInfo.toFolderPath parentInfo
+
+                    return
+                        Error(
+                            exn
+                                $"The DataMap could not be deleted because parent '{parentPath}' was not found on disk. Refresh the File Explorer and try again."
+                        )
+                | Ok(Some persistedArc) ->
                     match tryGetParentDataMapRemovalContract persistedArc parentInfo with
                     | None ->
                         let parentPath = DatamapParentInfo.toFolderPath parentInfo
