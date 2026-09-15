@@ -244,7 +244,7 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
                 let progressReporter = createGitProgressReporter vault
 
                 return!
-                    withBusyWriting
+                    withExclusiveBusyWriting
                         vault
                         (fun () -> promise {
                             let! result = GitService.pull arcPath request.Remote request.Branch (Some progressReporter)
@@ -330,7 +330,7 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
                 return!
-                    withBusyWriting
+                    withExclusiveBusyWriting
                         vault
                         (fun () -> promise {
                             let! result = GitService.stagePaths arcPath request.Pathspecs
@@ -348,7 +348,7 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
                 return!
-                    withBusyWriting
+                    withExclusiveBusyWriting
                         vault
                         (fun () -> promise {
                             let! result = GitService.unstagePaths arcPath request.Pathspecs
@@ -361,7 +361,7 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
                 return!
-                    withBusyWriting
+                    withExclusiveBusyWriting
                         vault
                         (fun () -> promise {
                             let! result = GitService.discardPaths arcPath request.Pathspecs
@@ -379,7 +379,7 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
                 return!
-                    withBusyWriting
+                    withExclusiveBusyWriting
                         vault
                         (fun () -> promise {
                             let! result = GitService.commit arcPath request.Message
@@ -413,7 +413,7 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
                 let progressReporter = createGitProgressReporter vault
 
                 return!
-                    withBusyWriting
+                    withExclusiveBusyWriting
                         vault
                         (fun () -> promise {
                             let! result = GitService.pruneLfsCacheWithProgress arcPath (Some progressReporter)
@@ -428,7 +428,7 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
                 return!
-                    withBusyWriting
+                    withExclusiveBusyWriting
                         vault
                         (fun () -> promise {
                             let! result = GitService.downloadLfsFile arcPath request.Path
@@ -453,7 +453,7 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
                 let progressReporter = createGitProgressReporter vault
 
                 return!
-                    withBusyWriting
+                    withExclusiveBusyWriting
                         vault
                         (fun () -> promise {
                             let! result = GitService.dedupLfsStorageWithProgress arcPath (Some progressReporter)
@@ -472,7 +472,7 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
                 return!
-                    withBusyWriting
+                    withExclusiveBusyWriting
                         vault
                         (fun () -> promise {
                             let! result = GitService.freeLocalLfsCopy arcPath request.Path
@@ -495,7 +495,7 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
                 return!
-                    withBusyWriting
+                    withExclusiveBusyWriting
                         vault
                         (fun () -> promise {
                             let! result = GitService.createBranch arcPath request.Name request.StartPoint
@@ -516,7 +516,7 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
                 return!
-                    withBusyWriting
+                    withExclusiveBusyWriting
                         vault
                         (fun () -> promise {
                             let! result = GitService.checkoutBranch arcPath request
@@ -537,7 +537,7 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
                 return!
-                    withBusyWriting
+                    withExclusiveBusyWriting
                         vault
                         (fun () -> promise {
                             let! result =

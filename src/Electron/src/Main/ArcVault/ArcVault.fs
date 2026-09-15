@@ -48,7 +48,7 @@ type ArcVault(window: BrowserWindow) =
     member val fileWatcherReloadArcTimeout: int option = None with get, set
     member val fileWatcherPendingEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
     member val fileWatcherPendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
-    member val fileWatcherImportOwnedEvents: HashSet<string * string> = HashSet() with get
+    member val fileWatcherOwnedPaths: HashSet<string> = HashSet() with get
     member val private isBusyWritingValue: bool = false with get, set
     member val activeFileImport: ActiveFileImport option = None with get, set
     member val CloseState = CloseLifecycleState.Idle with get, set
@@ -235,8 +235,7 @@ module ArcVaultExtensions =
 
                 WatcherHelpers.queueFileWatcherEvent
                     (fun event ->
-                        this.fileWatcherImportOwnedEvents.Remove(
-                            event.EventName.ToLowerInvariant(),
+                        this.fileWatcherOwnedPaths.Remove(
                             PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant())
                         )
                         |> not
@@ -276,16 +275,26 @@ module ArcVaultExtensions =
             | true, _, _ ->
                 return Error(exn "Swate is still saving another change. Please wait a moment and try again.")
             | false, Some arcPath, Some arc ->
+                let ownedPaths =
+                    arc.GetUpdateContractsSwate()
+                    |> Array.map (fun contract ->
+                        WatcherHelpers.buildWatcherEvent arcPath "change" contract.Path
+                        |> fun event -> PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant()))
+
+                ownedPaths |> Array.iter (this.fileWatcherOwnedPaths.Add >> ignore)
                 this.isBusyWriting <- true
 
                 try
                     try
                         match! arc.TryUpdateAsyncSwate(arcPath) with
-                        | Error errors -> return Error(exn (PathHelpers.formatContractErrors errors))
+                        | Error errors ->
+                            ownedPaths |> Array.iter (this.fileWatcherOwnedPaths.Remove >> ignore)
+                            return Error(exn (PathHelpers.formatContractErrors errors))
                         | Ok _ ->
                             this.RefreshHasUnsavedArcChangesFlag()
                             return Ok()
                     with e ->
+                        ownedPaths |> Array.iter (this.fileWatcherOwnedPaths.Remove >> ignore)
                         return Error(exn $"Failed to persist ARC to disk: {e.Message}")
                 finally
                     this.isBusyWriting <- false
@@ -305,12 +314,21 @@ module ArcVaultExtensions =
                 match Swate.Electron.Shared.FileIOHelper.FileContentDTO.toArcFile normalizedRequest with
                 | None -> return Error(exn $"Unsupported file type for adding: {normalizedRequest.fileType}")
                 | Some arcFile ->
+                    let ownedPaths =
+                        arcLocal.GetAddContracts(arcFile, false)
+                        |> Array.map (fun contract ->
+                            WatcherHelpers.buildWatcherEvent arcPath "add" contract.Path
+                            |> fun event -> PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant()))
+
+                    ownedPaths |> Array.iter (this.fileWatcherOwnedPaths.Add >> ignore)
                     let wasBusyWriting = this.isBusyWriting
                     this.isBusyWriting <- true
 
                     try
                         match! arcLocal.TryAddArcFileAsync(arcPath, arcFile, false) with
-                        | Error errors -> return Error(exn (PathHelpers.formatContractErrors errors))
+                        | Error errors ->
+                            ownedPaths |> Array.iter (this.fileWatcherOwnedPaths.Remove >> ignore)
+                            return Error(exn (PathHelpers.formatContractErrors errors))
                         | Ok _ ->
                             match! ARC.LoadAsyncSwate arcPath with
                             | Ok persistedArc ->
@@ -402,7 +420,7 @@ module ArcVaultExtensions =
             this.fileWatcherReloadArcTimeout <- None
             this.fileWatcherPendingEvents.Clear()
             this.fileWatcherPendingArcMergeEvents.Clear()
-            this.fileWatcherImportOwnedEvents.Clear()
+            this.fileWatcherOwnedPaths.Clear()
 
         member this.StopFileWatcher() = promise {
             match this.watcher with

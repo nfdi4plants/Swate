@@ -198,7 +198,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "watcher suppression consumes only the delayed event owned by an import",
+            "watcher suppression consumes only the delayed path owned by an app write",
             fun () -> promise {
                 let vault = ArcVault(TestHelpers.testWindow ())
                 vault.path <- Some "C:/arc"
@@ -206,8 +206,7 @@ Vitest.describe (
                 let importedEvent =
                     WatcherHelpers.buildWatcherEvent "C:/arc" "add" "C:/arc/imported.txt"
 
-                vault.fileWatcherImportOwnedEvents.Add(
-                    importedEvent.EventName.ToLowerInvariant(),
+                vault.fileWatcherOwnedPaths.Add(
                     PathHelpers.normalizePath (importedEvent.AbsolutePath.ToLowerInvariant())
                 )
                 |> ignore
@@ -215,8 +214,7 @@ Vitest.describe (
                 let queueWatcherEvent eventName path =
                     WatcherHelpers.queueFileWatcherEvent
                         (fun event ->
-                            vault.fileWatcherImportOwnedEvents.Remove(
-                                event.EventName.ToLowerInvariant(),
+                            vault.fileWatcherOwnedPaths.Remove(
                                 PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant())
                             )
                             |> not
@@ -235,7 +233,7 @@ Vitest.describe (
                 vault.isBusyWriting <- false
                 do! Promise.sleep 2_100
 
-                queueWatcherEvent "add" "C:/arc/imported.txt"
+                queueWatcherEvent "change" "C:/arc/imported.txt"
                 Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (2)
                 Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (1)
 
