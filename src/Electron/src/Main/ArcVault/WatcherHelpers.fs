@@ -45,11 +45,11 @@ let buildWatcherEvent (arcPath: string) (eventName: string) (path: string) =
         AbsolutePath = absolutePath
     }
 
-let createImportedFileWatcherEvents arcPath (request: ImportExternalFilesRequest) =
+let createImportedFileWatcherEvents arcPath targetRelativePath sourceAbsolutePaths =
     let targetRelativePath =
-        PathHelpers.normalizeCanonicalRelativePath request.targetRelativePath
+        PathHelpers.normalizeCanonicalRelativePath targetRelativePath
 
-    request.sourceAbsolutePaths
+    sourceAbsolutePaths
     |> Array.map (fun sourcePath ->
         let fileName = basename sourcePath
 

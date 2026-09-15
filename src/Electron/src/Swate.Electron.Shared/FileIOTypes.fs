@@ -107,7 +107,7 @@ type CreateFileSystemItemRequest = {
 type ImportExternalFilesRequest = {
     requestId: string
     targetRelativePath: string
-    sourceAbsolutePaths: string[]
+    authorizationId: string
 }
 
 [<RequireQualifiedAccess>]

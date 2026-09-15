@@ -18,6 +18,7 @@ open Main
 open Main.Bindings
 open Main.ARCtrlExtensions
 open Main.ArcVaultHelper
+open Main.FileImportAuthorization
 open Main.IPC.Delete
 open Main.IPC.Rename
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
@@ -335,9 +336,10 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 let! result = dialog.showOpenDialog (?window = window, properties = properties)
 
                 if result.canceled then
-                    return Ok [||]
+                    clear (windowIdFromIpcEvent event)
+                    return Ok None
                 else
-                    return Ok result.filePaths
+                    return Ok(Some(issue (windowIdFromIpcEvent event) result.filePaths))
             with e ->
                 return Error(exn $"Could not pick files: {e.Message}")
         }
@@ -380,6 +382,16 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             try
                 if String.IsNullOrWhiteSpace request.requestId then
                     raise (exn "Import request ID must not be empty.")
+
+                let windowId = windowIdFromIpcEvent event
+
+                let sourceAbsolutePaths =
+                    match consume windowId request.authorizationId with
+                    | Ok paths -> paths
+                    | Error authorizationError -> raise authorizationError
+
+                if sourceAbsolutePaths.Length = 0 then
+                    raise (exn "No files were selected for import.")
 
                 return!
                     withLoadedArcVault
@@ -424,7 +436,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                 let importedEvents =
                                                     WatcherHelpers.createImportedFileWatcherEvents
                                                         vault.path.Value
-                                                        request
+                                                        request.targetRelativePath
+                                                        sourceAbsolutePaths
 
                                                 // Chokidar's awaitWriteFinish can emit these well after the import
                                                 // releases the busy flag, so ownership must outlive the write itself.
@@ -453,7 +466,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                     ArcFileSystemHelper.importExternalFilesOnDisk
                                                         vault.path.Value
                                                         request.targetRelativePath
-                                                        request.sourceAbsolutePaths
+                                                        sourceAbsolutePaths
                                                         reportImportProgress
                                                         (fun () -> abortSignal.aborted)
                                                         (fun () ->

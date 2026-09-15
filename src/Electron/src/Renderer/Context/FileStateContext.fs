@@ -54,7 +54,7 @@ type ActiveFileImportLoader = unit -> JS.Promise<Result<ActiveFileImportState op
 
 type FileImportApi = {
     loadActiveImport: ActiveFileImportLoader
-    pickAbsolutePaths: unit -> JS.Promise<Result<string[], exn>>
+    pickAbsolutePaths: unit -> JS.Promise<Result<string option, exn>>
     runImport: ImportExternalFilesRequest -> JS.Promise<Result<ImportExternalFilesResult, exn>>
     cancelImport: string -> JS.Promise<Result<unit, exn>>
 }
@@ -131,15 +131,15 @@ let FileStateCtxProviderWithSnapshots
             try
                 match! fileImportApi.pickAbsolutePaths () with
                 | Error ex -> return Error ex
-                | Ok [||] -> return Ok()
-                | Ok sourceAbsolutePaths ->
+                | Ok None -> return Ok()
+                | Ok(Some authorizationId) ->
                     let requestId = System.Guid.NewGuid().ToString()
 
                     match!
                         fileImportApi.runImport {
                             requestId = requestId
                             targetRelativePath = targetRelativePath
-                            sourceAbsolutePaths = sourceAbsolutePaths
+                            authorizationId = authorizationId
                         }
                     with
                     | Error ex -> return Error ex
