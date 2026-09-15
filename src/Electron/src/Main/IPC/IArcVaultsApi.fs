@@ -24,6 +24,14 @@ open Main.IPC.Rename
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
 open Main.IPC.FileSystemIO
 
+let private refreshVaultFileTree (vault: ArcVault) = promise {
+    match vault.path with
+    | Some arcPath ->
+        let! fileTree = getFileTree arcPath
+        vault.SetFileTree fileTree
+    | None -> ()
+}
+
 let private withLoadedArcVault<'T>
     (event: IpcMainInvokeEvent)
     (operation: ArcVault -> JS.Promise<Result<'T, exn>>)
@@ -616,9 +624,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             | Ok() ->
                                 match vault.path with
                                 | None -> return Error(arcNotOpenError ())
-                                | Some arcPath ->
-                                    let! fileTree = getFileTree arcPath
-                                    vault.SetFileTree fileTree
+                                | Some _ ->
+                                    do! refreshVaultFileTree vault
                                     return Ok()
                         })
             with e ->
@@ -849,8 +856,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                     let directoryPath = path.dirname absolutePath
                                     do! ARCtrl.FileSystemHelper.createDirectoryAsync directoryPath
                                     do! ARCtrl.FileSystemHelper.writeFileTextAsync absolutePath request.content
-                                    let! fileTree = getFileTree arcPath
-                                    vault.SetFileTree fileTree
+                                    do! refreshVaultFileTree vault
                                     return Ok()
                                 | FileContentType.CLI ->
                                     return Error(exn "Direct writing of CLI files is not supported.")
@@ -921,9 +927,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         | Ok successResult ->
                             match enforcedRequest.Command with
                             | Track
-                            | Untrack ->
-                                let! fileTree = getFileTree arcPath
-                                vault.SetFileTree fileTree
+                            | Untrack -> do! refreshVaultFileTree vault
                             | _ -> ()
 
                             return Ok successResult

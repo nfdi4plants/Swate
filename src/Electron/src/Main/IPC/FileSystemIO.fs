@@ -228,16 +228,29 @@ module ArcFileSystemHelper =
         else
             tryResolveArcRelativePath arcPath normalizedPath
 
+    let private ensureDirectory absolutePath errorMessage = promise {
+        let! isDirectory = ARCtrl.FileSystemHelper.directoryExistsAsync absolutePath
+
+        if isDirectory then
+            return Ok absolutePath
+        else
+            return Error(exn errorMessage)
+    }
+
+    let private ensureTargetDoesNotExist targetAbsolutePath errorMessage = promise {
+        let! targetExists = pathExistsAsync targetAbsolutePath
+
+        if targetExists then
+            return Error(exn errorMessage)
+        else
+            return Ok()
+    }
+
     let private resolveImportTargetDirectory arcPath targetRelativePath = promise {
         match resolveArcRootOrRelativePath arcPath targetRelativePath with
         | Error pathError -> return Error pathError
         | Ok targetDirectory ->
-            let! targetIsDirectory = ARCtrl.FileSystemHelper.directoryExistsAsync targetDirectory
-
-            if targetIsDirectory then
-                return Ok targetDirectory
-            else
-                return Error(exn $"Cannot import because '{targetRelativePath}' is not a folder.")
+            return! ensureDirectory targetDirectory $"Cannot import because '{targetRelativePath}' is not a folder."
     }
 
     let private createExternalFileImportPlan targetDirectory sourcePaths = promise {
@@ -263,10 +276,14 @@ module ArcFileSystemHelper =
 
         for entry in entries do
             let destinationPath = join [| targetDirectory; entry.FileName |]
-            let! targetExists = pathExistsAsync destinationPath
 
-            if targetExists then
-                raise (exn $"Cannot import '{entry.FileName}' because a file with that name already exists.")
+            match!
+                ensureTargetDoesNotExist
+                    destinationPath
+                    $"Cannot import '{entry.FileName}' because a file with that name already exists."
+            with
+            | Ok() -> ()
+            | Error targetError -> raise targetError
 
         return {
             TargetDirectory = targetDirectory
@@ -428,16 +445,10 @@ module ArcFileSystemHelper =
         | Ok firstAbsolutePath, Ok secondAbsolutePath -> Ok(firstAbsolutePath, secondAbsolutePath)
 
     let private resolveCreatePathPair arcPath parentRelativePath targetRelativePath =
-        let normalizedParentPath =
-            parentRelativePath |> PathHelpers.normalizeCanonicalRelativePath
-
-        let parentPath =
-            if String.IsNullOrWhiteSpace normalizedParentPath then
-                Ok(resolveAbsolutePath arcPath)
-            else
-                tryResolveArcRelativePath arcPath normalizedParentPath
-
-        match parentPath, tryResolveArcRelativePath arcPath targetRelativePath with
+        match
+            resolveArcRootOrRelativePath arcPath parentRelativePath,
+            tryResolveArcRelativePath arcPath targetRelativePath
+        with
         | Error pathError, _
         | _, Error pathError -> Error pathError
         | Ok parentAbsolutePath, Ok targetAbsolutePath -> Ok(parentAbsolutePath, targetAbsolutePath)
@@ -517,16 +528,20 @@ module ArcFileSystemHelper =
                 | Error pathError -> return Error pathError
                 | Ok(parentAbsolutePath, targetAbsolutePath) ->
                     try
-                        let! parentIsDirectory = ARCtrl.FileSystemHelper.directoryExistsAsync parentAbsolutePath
-
-                        if parentIsDirectory |> not then
-                            return Error(exn $"Cannot create item because '{plan.ParentPath}' is not a folder.")
-                        else
-                            let! targetExists = pathExistsAsync targetAbsolutePath
-
-                            if targetExists then
-                                return Error(exn $"A file or folder already exists at '{plan.TargetPath}'.")
-                            else
+                        match!
+                            ensureDirectory
+                                parentAbsolutePath
+                                $"Cannot create item because '{plan.ParentPath}' is not a folder."
+                        with
+                        | Error directoryError -> return Error directoryError
+                        | Ok _ ->
+                            match!
+                                ensureTargetDoesNotExist
+                                    targetAbsolutePath
+                                    $"A file or folder already exists at '{plan.TargetPath}'."
+                            with
+                            | Error targetError -> return Error targetError
+                            | Ok() ->
                                 do! createTargetAsync plan.Kind targetAbsolutePath
                                 return Ok plan.TargetPath
                     with createError ->
