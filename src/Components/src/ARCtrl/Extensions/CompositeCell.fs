@@ -94,6 +94,14 @@ type CompositeCell with
         | CompositeCell.Data data -> data.Name |> Option.defaultValue ""
         | _ -> this.ToTabStr()
 
+    member this.ToVisibleString() =
+        match this with
+        | CompositeCell.Unitized(value, unit) ->
+            [| value; unit.NameText |]
+            |> Array.filter (System.String.IsNullOrWhiteSpace >> not)
+            |> String.concat " "
+        | _ -> this.ToString()
+
     static member fromTabStr(str: string, header: CompositeHeader) =
         let content = str.Split('\t') |> Array.map _.Trim()
         CompositeCell.fromContentValid (content, header)
@@ -153,8 +161,8 @@ type CompositeCell with
         | CompositeCell.FreeText _ when header.IsDataColumn -> this.ToDataCell()
         | CompositeCell.Data _ when header.IsDataColumn -> this
         // freetext header?
-        | CompositeCell.Term _
-        | CompositeCell.Unitized _ -> this.ToFreeTextCell()
+        | CompositeCell.Term _ -> this.ToFreeTextCell()
+        | CompositeCell.Unitized _ -> this.ToVisibleString() |> CompositeCell.createFreeText
         | CompositeCell.FreeText _ -> this
         | CompositeCell.Data _ -> this.ToFreeTextCell()
 

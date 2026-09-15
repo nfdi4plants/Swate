@@ -26,6 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🐛 Fixed
 
 -   Keep the ARC selector at a stable width and truncate long ARC names, and close its dropdown only after direct or overflow actions are invoked without dismissing the overflow menu prematurely.
+-   Recognize annotation-table column headers correctly when pasting tabular data.
+-   Paste DataMap values into the selected column instead of shifting them one column to the right.
+-   Keep pasted TSV values in their intended DataMap cells instead of interpreting three- or four-cell rows as ontology metadata.
+-   Preserve ontology term and unit metadata when copying and pasting within Swate in browsers that do not support custom clipboard formats.
+-   Fall back to plain text instead of failing when pasted clipboard data contains invalid Swate metadata.
+-   Preserve the row-and-column layout of multi-cell selections when copying between Swate, Excel, Google Sheets, and LibreOffice, including when applications prefer HTML clipboard content.
+-   Apply multi-cell paste consistently in annotation tables and DataMaps, repeating copied cells across larger selections and growing DataMaps when additional rows are needed.
+-   Preserve ontology metadata when pasting terms and units into supported table or DataMap columns, while preventing unrelated ontology identifiers from carrying over when values are replaced with plain text.
+-   Route annotation-table selections containing column headers through the header-aware paste flow, so pasted headers continue to add or update columns correctly.
+-   Clear cells during Cut only after the clipboard has been updated successfully, preventing data loss when browser clipboard access fails.
 
 ## 2.1.0 - 2026-08-19
 
