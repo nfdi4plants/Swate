@@ -34,9 +34,6 @@ module ClipboardBindings =
     [<Emit("typeof $0 === 'string'")>]
     let isString (_value: obj) : bool = jsNative
 
-    [<Emit("typeof DOMParser !== 'undefined'")>]
-    let isHtmlParserAvailable: bool = jsNative
-
     [<Emit("new DOMParser().parseFromString($0, 'text/html')")>]
     let parseHtml (_htmlText: string) : Browser.Types.Document = jsNative
 

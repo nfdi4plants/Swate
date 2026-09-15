@@ -199,11 +199,6 @@ type AnnotationTableContextMenuUtil =
         |> Array.filter (fun row -> row |> Array.exists (String.IsNullOrEmpty >> not))
         |> Array.map (Array.map _.Trim())
 
-    static member getCopiedCells() = promise {
-        let! copiedValue = navigator.clipboard.readText ()
-        return AnnotationTableContextMenuUtil.parseCopiedCells copiedValue
-    }
-
     static member getFittedCells(data: string[][], headers: CompositeHeader[]) =
 
         let fitColumnsToTarget (row: string[][]) (headers: CompositeHeader[]) =
