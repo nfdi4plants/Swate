@@ -15,6 +15,7 @@
     <Compile Include="FileTreeRenameWorkflow.test.fs" />
     <Compile Include="GitWorkflow.test.fs" />
     <Compile Include="NoteSearchInterop.test.fs" />
+    <Compile Include="ValidationPackagesTargetHelper.test.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Electron\src\Renderer\Renderer.fsproj" />

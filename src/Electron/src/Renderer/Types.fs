@@ -30,6 +30,7 @@ type PageState =
     | ErrorPage of string
     | DataHubBrowser
     | SettingsPage
+    | ValidationPackagesPage
 
     static member fromFileContentDTO(dto: FileContentDTO) : PageState =
         match dto.fileType with

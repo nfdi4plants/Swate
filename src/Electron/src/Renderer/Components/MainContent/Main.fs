@@ -17,6 +17,7 @@ open Renderer.Components.MainContent.ProvenanceGroupingTarget
 open Renderer.Components.MainContent.TextPreviewTarget
 open Renderer.Components.MainContent.UnknownPreviewTarget
 open Renderer.Components.MainContent.SettingsPageTarget
+open Renderer.Components.MainContent.ValidationPackagesTarget
 
 module private MainHelper =
 
@@ -106,6 +107,7 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                     // | Some _, Some PageState.LandingDraftPage -> LandingDraftTarget()
                     | Some _, Some PageState.NotesDraftPage -> NotesDraftTarget()
                     | Some _, Some PageState.NotesSearchPage -> NotesSearchTarget()
+                    | Some _, Some PageState.ValidationPackagesPage -> ValidationPackagesTarget()
                     | Some _, Some PageState.ProvenanceGroupingPage ->
                         React.Suspense(
                             [ LazyComponents.ProvenanceGroupingTarget() ],

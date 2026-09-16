@@ -18,3 +18,5 @@ let ipcAuthApi = Remoting.createIpc () |> Remoting.buildProxySender<IAuthApi>
 
 let ipcTemplateApi =
     Remoting.createIpc () |> Remoting.buildProxySender<ITemplateApi>
+
+let ipcAvprApi = Remoting.createIpc () |> Remoting.buildProxySender<IAvprApi>
