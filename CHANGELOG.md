@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🐛 Fixed
+
+-   Show a native error message instead of crashing or silently failing when a selected folder is not a valid ARC.
+
+## 2.2.0 - 2026-09-16
+
 ### ✨ Added
 
 -   Add external file importing to the Electron FileTree, including cancellation and cleanup of temporary or partially imported files on cancellation or failure.
@@ -23,14 +29,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Keep open ARC editors synchronized when DataMaps are added or deleted through the File Explorer or by external filesystem changes.
 -   Show **Delete DataMap**, rather than **Add DataMap**, in the context menu of a collapsed ARC entity folder that already contains a DataMap.
 -   Prevent newly added DataMaps from incorrectly appearing as unsaved after they have been written to disk.
+-   Show the current Swate release version before the active ARC name in the Electron window title.
 
 ### 🔄 Changed
 
 -   Rotate the Import JSON icon by 180 degrees in all navbars.
+-   Restore the **Download ARC from DataHub** action to the Electron ARC selector.
 
 ### 🐛 Fixed
 
--   Show a native error message instead of crashing or silently failing when a selected folder is not a valid ARC.
 -   Keep the ARC selector at a stable width and truncate long ARC names, and close its dropdown only after direct or overflow actions are invoked without dismissing the overflow menu prematurely.
 -   Recognize annotation-table column headers correctly when pasting tabular data.
 -   Paste DataMap values into the selected column instead of shifting them one column to the right.
@@ -42,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Preserve ontology metadata when pasting terms and units into supported table or DataMap columns, while preventing unrelated ontology identifiers from carrying over when values are replaced with plain text.
 -   Route annotation-table selections containing column headers through the header-aware paste flow, so pasted headers continue to add or update columns correctly.
 -   Clear cells during Cut only after the clipboard has been updated successfully, preventing data loss when browser clipboard access fails.
+-   Handle Windows, Unix, and legacy Mac line breaks consistently when displaying errors and importing data in the Data Annotator.
 
 ## 2.1.0 - 2026-08-19
 

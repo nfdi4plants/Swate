@@ -306,7 +306,7 @@ let createWindow () = promise {
 
     let mainWindowOptions =
         BrowserWindowConstructorOptions(
-            title = "Swate",
+            title = Swate.Electron.Shared.ApplicationVersion.windowTitle None,
             icon = (windowIconPath |> U2.Case2),
             width = int screenSize.width,
             height = int screenSize.height,
