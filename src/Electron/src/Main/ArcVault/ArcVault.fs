@@ -87,7 +87,7 @@ type ArcVault(window: BrowserWindow) =
     /// This function mutably sets the active ARC in memory without persisting to disk.
     member this.SetArc(arc: ARC) =
         this.arc <- Some arc
-        this.window.title <- arc.Identifier
+        this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle (Some arc.Identifier)
 
     /// Sets the dirty marker for unsaved in-memory ARC mutations.
     member this.RefreshHasUnsavedArcChangesFlag() =
@@ -425,7 +425,7 @@ module ArcVaultExtensions =
         member this.Startup() = promise {
             this.StartFileWatcher()
             do! this.LoadArc()
-            this.window.title <- this.arc.Value.Identifier
+            this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle (Some this.arc.Value.Identifier)
         }
 
         member this.OpenARC(path: string) = promise {
