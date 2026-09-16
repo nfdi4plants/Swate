@@ -756,284 +756,284 @@ module ArcVaultExtensions =
         }
 
 
-    /// Describes the outcome of an ARC lifecycle action performed by the controller.
-    [<RequireQualifiedAccess>]
-    type ArcOpenDisposition =
-        | OpenedInCurrent of path: string
-        | OpenedInNewWindow of path: string
-        | FocusedExisting of path: string
-        | CreatedInCurrent of path: string
-        | CreatedInNewWindow of path: string
+/// Describes the outcome of an ARC lifecycle action performed by the controller.
+[<RequireQualifiedAccess>]
+type ArcOpenDisposition =
+    | OpenedInCurrent of path: string
+    | OpenedInNewWindow of path: string
+    | FocusedExisting of path: string
+    | CreatedInCurrent of path: string
+    | CreatedInNewWindow of path: string
 
-        member this.CreatedArcPath =
-            match this with
-            | CreatedInCurrent path
-            | CreatedInNewWindow path -> Some path
-            | OpenedInCurrent _
-            | OpenedInNewWindow _
-            | FocusedExisting _ -> None
+    member this.CreatedArcPath =
+        match this with
+        | CreatedInCurrent path
+        | CreatedInNewWindow path -> Some path
+        | OpenedInCurrent _
+        | OpenedInNewWindow _
+        | FocusedExisting _ -> None
 
-    module ArcOpenDisposition =
-        let path =
-            function
-            | ArcOpenDisposition.OpenedInCurrent p
-            | ArcOpenDisposition.OpenedInNewWindow p
-            | ArcOpenDisposition.FocusedExisting p
-            | ArcOpenDisposition.CreatedInCurrent p
-            | ArcOpenDisposition.CreatedInNewWindow p -> p
+module ArcOpenDisposition =
+    let path =
+        function
+        | ArcOpenDisposition.OpenedInCurrent p
+        | ArcOpenDisposition.OpenedInNewWindow p
+        | ArcOpenDisposition.FocusedExisting p
+        | ArcOpenDisposition.CreatedInCurrent p
+        | ArcOpenDisposition.CreatedInNewWindow p -> p
 
 
-    type ArcVaults() =
-        /// Key is window.id
-        member val Vaults = Dictionary<int, ArcVault>() with get
+type ArcVaults() =
+    /// Key is window.id
+    member val Vaults = Dictionary<int, ArcVault>() with get
 
-        member this.Paths = this.Vaults.Values |> Seq.choose (fun x -> x.path) |> Array.ofSeq
+    member this.Paths = this.Vaults.Values |> Seq.choose (fun x -> x.path) |> Array.ofSeq
 
-        member this.BroadcastRecentARCs() =
-            let recentARCs = RECENT_ARCS.Get()
+    member this.BroadcastRecentARCs() =
+        let recentARCs = RECENT_ARCS.Get()
 
-            this.Vaults.Values
-            |> Array.ofSeq
-            |> fun arr ->
-                if arr.Length > 0 then
-                    arr
-                    |> Array.iter (fun vault ->
-                        if not (vault.window.isDestroyed ()) then
-                            Remoting.createIpc ()
-                            |> Remoting.withWindow vault.window
-                            |> Remoting.buildProxySender<IRecentArcsRendererApi>
-                            |> fun client -> client.recentARCsUpdate recentARCs
-                    )
+        this.Vaults.Values
+        |> Array.ofSeq
+        |> fun arr ->
+            if arr.Length > 0 then
+                arr
+                |> Array.iter (fun vault ->
+                    if not (vault.window.isDestroyed ()) then
+                        Remoting.createIpc ()
+                        |> Remoting.withWindow vault.window
+                        |> Remoting.buildProxySender<IRecentArcsRendererApi>
+                        |> fun client -> client.recentARCsUpdate recentARCs
+                )
 
-        /// Centralized side-effect: update recent ARCs store and broadcast to all windows.
-        member private this.TrackRecentAndBroadcast(arcPath: string) =
-            let normalizedArcPath = PathHelpers.normalizePath arcPath
-            RECENT_ARCS.Add(normalizedArcPath) |> ignore
+    /// Centralized side-effect: update recent ARCs store and broadcast to all windows.
+    member private this.TrackRecentAndBroadcast(arcPath: string) =
+        let normalizedArcPath = PathHelpers.normalizePath arcPath
+        RECENT_ARCS.Add(normalizedArcPath) |> ignore
+        this.BroadcastRecentARCs()
+
+    member this.DisposeVault(id: int) =
+        match this.Vaults.TryGetValue(id) with
+        | false, _ -> swatefailfn id "Failed to remove vault."
+        | true, vault ->
+            vault.StopFileWatcher() |> Promise.start
+            this.Vaults.Remove(id) |> ignore
+            vault.path |> Option.iter (fun p -> RECENT_ARCS.Inactivate(p) |> ignore)
             this.BroadcastRecentARCs()
+            printfn $"[Swate] Removed vault '{id}'"
 
-        member this.DisposeVault(id: int) =
-            match this.Vaults.TryGetValue(id) with
-            | false, _ -> swatefailfn id "Failed to remove vault."
-            | true, vault ->
-                vault.StopFileWatcher() |> Promise.start
-                this.Vaults.Remove(id) |> ignore
-                vault.path |> Option.iter (fun p -> RECENT_ARCS.Inactivate(p) |> ignore)
-                this.BroadcastRecentARCs()
-                printfn $"[Swate] Removed vault '{id}'"
+    member this.ResolveCloseRequest(windowId: int, decision: SaveBeforeQuitDecision) = promise {
+        match this.TryGetVault(windowId) with
+        | None ->
+            let message = "Close request ignored. No vault found."
+            swatelogfn windowId "%s" message
+            return Error(exn message)
+        | Some(vault: ArcVault) ->
+            vault.isCloseRequestPending <- false
 
-        member this.ResolveCloseRequest(windowId: int, decision: SaveBeforeQuitDecision) = promise {
-            match this.TryGetVault(windowId) with
-            | None ->
-                let message = "Close request ignored. No vault found."
-                swatelogfn windowId "%s" message
-                return Error(exn message)
-            | Some(vault: ArcVault) ->
-                vault.isCloseRequestPending <- false
+            match decision with
+            | SaveBeforeQuitDecision.CancelClose ->
+                swatelogfn windowId "Close request cancelled by user."
+                return Ok()
+            | SaveBeforeQuitDecision.CloseWithoutSaving ->
+                swatelogfn windowId "Close request approved by user. Closing without saving."
+                vault.RefreshHasUnsavedArcChangesFlag()
+                vault.isCloseApproved <- true
+                vault.window.close ()
+                return Ok()
+            | SaveBeforeQuitDecision.SaveAndClose ->
+                swatelogfn windowId "Close request approved by user. Closing after main save."
 
-                match decision with
-                | SaveBeforeQuitDecision.CancelClose ->
-                    swatelogfn windowId "Close request cancelled by user."
-                    return Ok()
-                | SaveBeforeQuitDecision.CloseWithoutSaving ->
-                    swatelogfn windowId "Close request approved by user. Closing without saving."
-                    vault.RefreshHasUnsavedArcChangesFlag()
-                    vault.isCloseApproved <- true
-                    vault.window.close ()
-                    return Ok()
-                | SaveBeforeQuitDecision.SaveAndClose ->
-                    swatelogfn windowId "Close request approved by user. Closing after main save."
+                if vault.hasUnsavedArcChanges then
+                    let! persistResult = vault.WriteArc()
 
-                    if vault.hasUnsavedArcChanges then
-                        let! persistResult = vault.WriteArc()
-
-                        match persistResult with
-                        | Error saveError -> return Error saveError
-                        | Ok() ->
-                            vault.isCloseApproved <- true
-                            vault.window.close ()
-                            return Ok()
-                    else
+                    match persistResult with
+                    | Error saveError -> return Error saveError
+                    | Ok() ->
                         vault.isCloseApproved <- true
                         vault.window.close ()
                         return Ok()
-        }
+                else
+                    vault.isCloseApproved <- true
+                    vault.window.close ()
+                    return Ok()
+    }
 
-        member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
-            window.onClose (fun closeEvent ->
-                if not vault.isCloseApproved then
-                    if vault.activeFileImport.IsSome then
-                        closeEvent.preventDefault ()
+    member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
+        window.onClose (fun closeEvent ->
+            if not vault.isCloseApproved then
+                if vault.activeFileImport.IsSome then
+                    closeEvent.preventDefault ()
 
-                        if not vault.isWaitingForImportCleanup then
-                            vault.isWaitingForImportCleanup <- true
+                    if not vault.isWaitingForImportCleanup then
+                        vault.isWaitingForImportCleanup <- true
 
-                            promise {
-                                let! importResult = promise {
-                                    try
-                                        let activeImport = vault.activeFileImport.Value
+                        promise {
+                            let! importResult = promise {
+                                try
+                                    let activeImport = vault.activeFileImport.Value
 
-                                        if activeImport.State.phase = FileImportPhase.Copying then
-                                            activeImport.AbortController.abort ()
+                                    if activeImport.State.phase = FileImportPhase.Copying then
+                                        activeImport.AbortController.abort ()
 
-                                        return! activeImport.Completion
-                                    with importError ->
-                                        return Error importError
-                                }
-
-                                vault.isWaitingForImportCleanup <- false
-
-                                match importResult with
-                                | Ok _ -> window.close ()
-                                | Error importError ->
-                                    swatelogfn id "Active import failed while closing: %s" importError.Message
-
-                                    if not (window.isDestroyed ()) then
-                                        dialog.showErrorBox (
-                                            "Could not close Swate",
-                                            $"The active file import could not be rolled back completely. The window was kept open to avoid hiding a partial import.\n\n{importError.Message}"
-                                        )
+                                    return! activeImport.Completion
+                                with importError ->
+                                    return Error importError
                             }
-                            |> Promise.start
-                    elif vault.hasUnsavedArcChanges then
-                        closeEvent.preventDefault ()
 
-                        if not vault.isCloseRequestPending then
-                            vault.isCloseRequestPending <- true
+                            vault.isWaitingForImportCleanup <- false
 
-                            let saveBeforeQuitClient =
-                                Remoting.createIpc ()
-                                |> Remoting.withWindow vault.window
-                                |> Remoting.buildProxySender<IMainSaveBeforeQuitApi>
+                            match importResult with
+                            | Ok _ -> window.close ()
+                            | Error importError ->
+                                swatelogfn id "Active import failed while closing: %s" importError.Message
 
-                            saveBeforeQuitClient.requestSaveBeforeQuit ()
-                    else
-                        swatelogfn id "Closing window directly because no unsaved ARC changes are present."
-            )
+                                if not (window.isDestroyed ()) then
+                                    dialog.showErrorBox (
+                                        "Could not close Swate",
+                                        $"The active file import could not be rolled back completely. The window was kept open to avoid hiding a partial import.\n\n{importError.Message}"
+                                    )
+                        }
+                        |> Promise.start
+                elif vault.hasUnsavedArcChanges then
+                    closeEvent.preventDefault ()
 
-            window.onClosed (fun () ->
-                vault.isWaitingForImportCleanup <- false
-                vault.isCloseRequestPending <- false
-                vault.isCloseApproved <- false
-                this.DisposeVault(id)
-            )
+                    if not vault.isCloseRequestPending then
+                        vault.isCloseRequestPending <- true
 
-        member this.RegisterVault() : Fable.Core.JS.Promise<int> = promise {
-            let! window = createWindow ()
-            let id = window.id
-            let vault = ArcVault(window)
-            this.Vaults.Add(id, vault)
+                        let saveBeforeQuitClient =
+                            Remoting.createIpc ()
+                            |> Remoting.withWindow vault.window
+                            |> Remoting.buildProxySender<IMainSaveBeforeQuitApi>
 
-            this.OnCloseWindow(window, vault, id)
+                        saveBeforeQuitClient.requestSaveBeforeQuit ()
+                else
+                    swatelogfn id "Closing window directly because no unsaved ARC changes are present."
+        )
 
-            window.focus ()
-            swatelogfn id "Register window"
+        window.onClosed (fun () ->
+            vault.isWaitingForImportCleanup <- false
+            vault.isCloseRequestPending <- false
+            vault.isCloseApproved <- false
+            this.DisposeVault(id)
+        )
 
-            return id
-        }
+    member this.RegisterVault() : Fable.Core.JS.Promise<int> = promise {
+        let! window = createWindow ()
+        let id = window.id
+        let vault = ArcVault(window)
+        this.Vaults.Add(id, vault)
 
-        member this.RegisterVaultWithArc(path: string) = promise {
-            let! window = createWindow ()
-            let id = window.id
-            let vault = ArcVault(window)
-            this.Vaults.Add(id, vault)
-            do! vault.OpenARC(path)
+        this.OnCloseWindow(window, vault, id)
 
-            this.OnCloseWindow(window, vault, id)
+        window.focus ()
+        swatelogfn id "Register window"
 
-            window.focus ()
-            swatelogfn id "Register window"
+        return id
+    }
 
-            return id
-        }
+    member this.RegisterVaultWithArc(path: string) = promise {
+        let! window = createWindow ()
+        let id = window.id
+        let vault = ArcVault(window)
+        this.Vaults.Add(id, vault)
+        do! vault.OpenARC(path)
 
-        member this.RegisterVaultWithNewArc(path: string, newIdentifier: string) : Fable.Core.JS.Promise<int> = promise {
-            let! window = createWindow ()
-            let id = window.id
-            let vault = ArcVault(window)
-            this.Vaults.Add(id, vault)
+        this.OnCloseWindow(window, vault, id)
 
-            do! vault.CreateARC(path, newIdentifier)
+        window.focus ()
+        swatelogfn id "Register window"
 
-            this.OnCloseWindow(window, vault, id)
+        return id
+    }
 
-            window.focus ()
-            swatelogfn id "Register window"
+    member this.RegisterVaultWithNewArc(path: string, newIdentifier: string) : Fable.Core.JS.Promise<int> = promise {
+        let! window = createWindow ()
+        let id = window.id
+        let vault = ArcVault(window)
+        this.Vaults.Add(id, vault)
 
-            return id
-        }
+        do! vault.CreateARC(path, newIdentifier)
 
-        member this.OpenARCInVault(windowId: int, path: string) = promise {
-            match this.Vaults.TryGetValue windowId with
-            | false, _ -> failwith $"Vault with window-id '{windowId}' not found."
-            | true, vault -> do! vault.OpenARC path
+        this.OnCloseWindow(window, vault, id)
 
-            return ()
-        }
+        window.focus ()
+        swatelogfn id "Register window"
 
-        member this.CreateARCInVault(windowId: int, path: string, identifier: string) = promise {
-            match this.Vaults.TryGetValue windowId with
-            | false, _ -> failwith $"Vault with window-id '{windowId}' not found."
-            | true, vault -> do! vault.CreateARC(path, identifier)
+        return id
+    }
 
-            return ()
-        }
+    member this.OpenARCInVault(windowId: int, path: string) = promise {
+        match this.Vaults.TryGetValue windowId with
+        | false, _ -> failwith $"Vault with window-id '{windowId}' not found."
+        | true, vault -> do! vault.OpenARC path
 
-        member this.TryGetVault(windowId: int) =
-            match this.Vaults.TryGetValue windowId with
-            | true, vault -> Some vault
-            | false, _ -> None
+        return ()
+    }
 
-        member this.TryGetVaultByPath(path: string) =
-            this.Vaults.Values
-            |> Seq.tryFind (fun v -> v.path |> Option.exists (fun vaultPath -> PathHelpers.pathsEqual vaultPath path))
+    member this.CreateARCInVault(windowId: int, path: string, identifier: string) = promise {
+        match this.Vaults.TryGetValue windowId with
+        | false, _ -> failwith $"Vault with window-id '{windowId}' not found."
+        | true, vault -> do! vault.CreateARC(path, identifier)
 
-        // ── ARC Lifecycle Controller ──────────────────────────────────────────
-        // All open/create/focus decisions are made here.
-        // IPC handlers should delegate to these methods.
+        return ()
+    }
 
-        /// Open an existing ARC at the given path.
-        /// Decision: already-open → focus, calling window empty → open there, else → new window.
-        member this.OpenOrFocusArc(callingWindowId: int, arcPath: string) = promise {
-            let normalizedArcPath = PathHelpers.normalizePath arcPath
+    member this.TryGetVault(windowId: int) =
+        match this.Vaults.TryGetValue windowId with
+        | true, vault -> Some vault
+        | false, _ -> None
 
-            match this.TryGetVaultByPath normalizedArcPath with
-            | Some vault ->
-                vault.window.focus ()
+    member this.TryGetVaultByPath(path: string) =
+        this.Vaults.Values
+        |> Seq.tryFind (fun v -> v.path |> Option.exists (fun vaultPath -> PathHelpers.pathsEqual vaultPath path))
+
+    // ── ARC Lifecycle Controller ──────────────────────────────────────────
+    // All open/create/focus decisions are made here.
+    // IPC handlers should delegate to these methods.
+
+    /// Open an existing ARC at the given path.
+    /// Decision: already-open → focus, calling window empty → open there, else → new window.
+    member this.OpenOrFocusArc(callingWindowId: int, arcPath: string) = promise {
+        let normalizedArcPath = PathHelpers.normalizePath arcPath
+
+        match this.TryGetVaultByPath normalizedArcPath with
+        | Some vault ->
+            vault.window.focus ()
+            this.TrackRecentAndBroadcast(normalizedArcPath)
+            return ArcOpenDisposition.FocusedExisting normalizedArcPath
+        | None ->
+            match this.TryGetVault callingWindowId with
+            | Some vault when vault.path.IsNone ->
+                do! vault.OpenARC(normalizedArcPath)
                 this.TrackRecentAndBroadcast(normalizedArcPath)
-                return ArcOpenDisposition.FocusedExisting normalizedArcPath
-            | None ->
-                match this.TryGetVault callingWindowId with
-                | Some vault when vault.path.IsNone ->
-                    do! vault.OpenARC(normalizedArcPath)
-                    this.TrackRecentAndBroadcast(normalizedArcPath)
-                    return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
-                | _ ->
-                    let! _ = this.RegisterVaultWithArc(normalizedArcPath)
-                    this.TrackRecentAndBroadcast(normalizedArcPath)
-                    return ArcOpenDisposition.OpenedInNewWindow normalizedArcPath
-        }
-
-        /// Create a new ARC at the given path with the given identifier.
-        /// Decision: path already open → focus, calling window empty → create there, else → new window.
-        member this.CreateOrFocusArc(callingWindowId: int, arcPath: string, identifier: string) = promise {
-            let normalizedArcPath = PathHelpers.normalizePath arcPath
-
-            match this.TryGetVaultByPath normalizedArcPath with
-            | Some vault ->
-                vault.window.focus ()
+                return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
+            | _ ->
+                let! _ = this.RegisterVaultWithArc(normalizedArcPath)
                 this.TrackRecentAndBroadcast(normalizedArcPath)
-                return ArcOpenDisposition.FocusedExisting normalizedArcPath
-            | None ->
-                match this.TryGetVault callingWindowId with
-                | Some vault when vault.path.IsNone ->
-                    do! vault.CreateARC(normalizedArcPath, identifier)
-                    this.TrackRecentAndBroadcast(normalizedArcPath)
-                    return ArcOpenDisposition.CreatedInCurrent normalizedArcPath
-                | _ ->
-                    let! _ = this.RegisterVaultWithNewArc(normalizedArcPath, identifier)
-                    this.TrackRecentAndBroadcast(normalizedArcPath)
-                    return ArcOpenDisposition.CreatedInNewWindow normalizedArcPath
-        }
+                return ArcOpenDisposition.OpenedInNewWindow normalizedArcPath
+    }
+
+    /// Create a new ARC at the given path with the given identifier.
+    /// Decision: path already open → focus, calling window empty → create there, else → new window.
+    member this.CreateOrFocusArc(callingWindowId: int, arcPath: string, identifier: string) = promise {
+        let normalizedArcPath = PathHelpers.normalizePath arcPath
+
+        match this.TryGetVaultByPath normalizedArcPath with
+        | Some vault ->
+            vault.window.focus ()
+            this.TrackRecentAndBroadcast(normalizedArcPath)
+            return ArcOpenDisposition.FocusedExisting normalizedArcPath
+        | None ->
+            match this.TryGetVault callingWindowId with
+            | Some vault when vault.path.IsNone ->
+                do! vault.CreateARC(normalizedArcPath, identifier)
+                this.TrackRecentAndBroadcast(normalizedArcPath)
+                return ArcOpenDisposition.CreatedInCurrent normalizedArcPath
+            | _ ->
+                let! _ = this.RegisterVaultWithNewArc(normalizedArcPath, identifier)
+                this.TrackRecentAndBroadcast(normalizedArcPath)
+                return ArcOpenDisposition.CreatedInNewWindow normalizedArcPath
+    }
 
 
-    let ARC_VAULTS: ArcVaults = ArcVaults()
+let ARC_VAULTS: ArcVaults = ArcVaults()
