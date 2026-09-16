@@ -588,10 +588,7 @@ module ArcOpenDisposition =
         | ArcOpenDisposition.CreatedInNewWindow p -> p
 
 
-type ArcVaults(?windowFactory: unit -> BrowserWindow, ?windowLoader: BrowserWindow -> Fable.Core.JS.Promise<unit>) =
-
-    let createVaultWindow = defaultArg windowFactory Main.ArcVaultHelper.createWindow
-    let loadVaultWindow = defaultArg windowLoader Main.ArcVaultHelper.loadWindow
+type ArcVaults() =
 
     /// Key is window.id
     member val Vaults = Dictionary<int, ArcVault>() with get
@@ -735,13 +732,13 @@ type ArcVaults(?windowFactory: unit -> BrowserWindow, ?windowLoader: BrowserWind
     }
 
     member this.RegisterVault() : Fable.Core.JS.Promise<int> = promise {
-        let window = createVaultWindow ()
+        let window = createWindow ()
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
 
         try
-            do! loadVaultWindow window
+            do! loadWindow window
 
             this.OnCloseWindow(window, vault, id)
 
@@ -755,14 +752,14 @@ type ArcVaults(?windowFactory: unit -> BrowserWindow, ?windowLoader: BrowserWind
     }
 
     member this.RegisterVaultWithArc(path: string) = promise {
-        let window = createVaultWindow ()
+        let window = createWindow ()
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
 
         try
             do! vault.OpenARC(path)
-            do! loadVaultWindow window
+            do! loadWindow window
 
             this.OnCloseWindow(window, vault, id)
 
@@ -776,14 +773,14 @@ type ArcVaults(?windowFactory: unit -> BrowserWindow, ?windowLoader: BrowserWind
     }
 
     member this.RegisterVaultWithNewArc(path: string, newIdentifier: string) : Fable.Core.JS.Promise<int> = promise {
-        let window = createVaultWindow ()
+        let window = createWindow ()
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
 
         try
             do! vault.CreateARC(path, newIdentifier)
-            do! loadVaultWindow window
+            do! loadWindow window
 
             this.OnCloseWindow(window, vault, id)
 

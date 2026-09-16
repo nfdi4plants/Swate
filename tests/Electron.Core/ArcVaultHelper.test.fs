@@ -20,6 +20,13 @@ module FileImportCoordinator = Main.FileImportCoordinator
 module WatcherHelpers = Main.WatcherHelpers
 module Abort = Main.Bindings.Abort
 
+let private electronMock: obj = import "__electronMock" "electron"
+
+let private resetElectronMock () = electronMock?reset () |> ignore
+
+let private setBrowserWindowFactory (factory: obj -> obj) =
+    electronMock?setBrowserWindowFactory (factory) |> ignore
+
 let private runFileImport
     (vault: ArcVault)
     (requestId, operation: Main.Bindings.Abort.IAbortSignal -> JS.Promise<Result<ImportExternalFilesResult, exn>>)
@@ -259,9 +266,14 @@ let private lifecycleTestWindow id isDestroyed onSend =
     ]
     |> unbox<BrowserWindow>
 
-let private registrationTestWindow id =
+let private registrationTestWindow id (loadError: exn) onLoad =
     let mutable destroyed = false
     let send: obj = emitJsExpr () "((..._args) => {})"
+    let noop: obj = emitJsExpr () "((..._args) => {})"
+
+    let failLoad (_: string) =
+        onLoad ()
+        JS.Constructors.Promise.reject loadError
 
     let window =
         createObj [
@@ -270,7 +282,15 @@ let private registrationTestWindow id =
             "isDestroyed" ==> (fun () -> destroyed)
             "destroy" ==> (fun () -> destroyed <- true)
             "focus" ==> ignore
-            "webContents" ==> createObj [ "send" ==> send ]
+            "loadFile" ==> failLoad
+            "loadURL" ==> failLoad
+            "webContents"
+            ==> createObj [
+                "send" ==> send
+                "setWindowOpenHandler" ==> noop
+                "on" ==> noop
+                "openDevTools" ==> noop
+            ]
         ]
         |> unbox<BrowserWindow>
 
@@ -330,6 +350,8 @@ let private addDataMapToAllEntityTypes (arc: ARC) =
 Vitest.describe (
     "ArcVaultHelper",
     fun () ->
+        Vitest.afterEach (fun () -> resetElectronMock ())
+
         Vitest.test (
             "DataMap add synchronization preserves the persisted static-hash baseline",
             fun () ->
@@ -382,14 +404,11 @@ Vitest.describe (
             "RegisterVault cleans up when renderer loading fails",
             fun () -> promise {
                 let windowId = 11
-                let window, isDestroyed = registrationTestWindow windowId
                 let loadError = exn "Expected renderer load failure"
+                let window, isDestroyed = registrationTestWindow windowId loadError ignore
+                setBrowserWindowFactory (fun _ -> window :> obj)
 
-                let vaults =
-                    ArcVaults(
-                        windowFactory = (fun () -> window),
-                        windowLoader = (fun _ -> JS.Constructors.Promise.reject loadError)
-                    )
+                let vaults = ArcVaults()
 
                 do! expectRegistrationLoadFailure loadError vaults windowId isDestroyed vaults.RegisterVault
             }
@@ -404,20 +423,19 @@ Vitest.describe (
                     ignore
                     (fun arcPath -> promise {
                         let windowId = 12
-                        let window, isDestroyed = registrationTestWindow windowId
                         let loadError = exn "Expected renderer load failure"
                         let mutable initializedVault: ArcVault option = None
                         let mutable vaultsRef: ArcVaults option = None
 
-                        let vaults =
-                            ArcVaults(
-                                windowFactory = (fun () -> window),
-                                windowLoader =
-                                    (fun _ ->
-                                        initializedVault <- vaultsRef.Value.TryGetVault(windowId)
-                                        JS.Constructors.Promise.reject loadError
-                                    )
-                            )
+                        let window, isDestroyed =
+                            registrationTestWindow
+                                windowId
+                                loadError
+                                (fun () -> initializedVault <- vaultsRef.Value.TryGetVault(windowId))
+
+                        let vaults = ArcVaults()
+
+                        setBrowserWindowFactory (fun _ -> window :> obj)
 
                         vaultsRef <- Some vaults
 
@@ -441,14 +459,11 @@ Vitest.describe (
 
                 try
                     let windowId = 13
-                    let window, isDestroyed = registrationTestWindow windowId
                     let loadError = exn "Expected renderer load failure"
+                    let window, isDestroyed = registrationTestWindow windowId loadError ignore
+                    setBrowserWindowFactory (fun _ -> window :> obj)
 
-                    let vaults =
-                        ArcVaults(
-                            windowFactory = (fun () -> window),
-                            windowLoader = (fun _ -> JS.Constructors.Promise.reject loadError)
-                        )
+                    let vaults = ArcVaults()
 
                     let arcPath = join [| rootPath; "new-arc" |]
 
