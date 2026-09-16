@@ -40,7 +40,8 @@ type PackageRow =
                             match tag.Name with
                             | Some name ->
                                 Html.span [
-                                    prop.className "swt:badge swt:badge-accent"
+                                    prop.className
+                                        "swt:badge swt:badge-accent swt:h-auto swt:py-0.5 swt:whitespace-normal swt:break-words swt:max-w-full swt:text-left"
                                     prop.text name
                                 ]
                             | None -> Html.none
@@ -145,7 +146,8 @@ type PackageRow =
                                 match tag.Name with
                                 | Some name ->
                                     Html.span [
-                                        prop.className "swt:badge swt:badge-xs swt:badge-accent"
+                                        prop.className
+                                            "swt:badge swt:badge-xs swt:badge-accent swt:h-auto swt:py-0.5 swt:whitespace-normal swt:break-words swt:max-w-full swt:text-left"
                                         prop.text name
                                     ]
                                 | None -> Html.none
