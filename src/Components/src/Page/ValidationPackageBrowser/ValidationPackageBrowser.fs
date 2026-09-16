@@ -95,7 +95,7 @@ type ValidationPackageBrowser =
             ]
 
     [<ReactComponent>]
-    static member private SubmitBar(isSubmitting: bool, isDirty: bool, submit: unit -> unit) =
+    static member private SubmitBar(isSubmitting: bool, isDirty: bool, isBlocked: bool, submit: unit -> unit) =
 
         Html.div [
             prop.className "swt:flex swt:justify-end swt:items-center swt:gap-2 swt:p-2 swt:border-t"
@@ -110,7 +110,7 @@ type ValidationPackageBrowser =
                     prop.type' "button"
                     prop.testId "validation-package-selector-submit"
                     prop.className "swt:btn swt:btn-primary"
-                    prop.disabled (not isDirty || isSubmitting)
+                    prop.disabled (not isDirty || isSubmitting || isBlocked)
                     prop.onClick (fun _ -> submit ())
                     prop.text "Submit"
                 ]
@@ -124,8 +124,11 @@ type ValidationPackageBrowser =
             writeConfig: ValidationPackagesConfig -> JS.Promise<Result<unit, exn>>,
             // https://avpr.nfdi4plants.org/swagger/index.html#/Validation%20Packages/GetAllPackages
             fetchValidationPackages: unit -> JS.Promise<ValidationPackageDTO[]>,
-            ?onError: exn -> unit
+            ?onError: exn -> unit,
+            // Blocks submitting, for example while the host could not read the existing config and a write would overwrite it.
+            ?submitDisabled: bool
         ) =
+        let submitDisabled = defaultArg submitDisabled false
         let state, setState = React.useState (fun () -> SelectorState.Idle)
 
         let edits, setEdits =
@@ -251,7 +254,7 @@ type ValidationPackageBrowser =
             )
 
         let submit () =
-            if isDirty && not submitting then
+            if isDirty && not submitting && not submitDisabled then
                 setSubmitting true
 
                 let newConfig =
@@ -323,6 +326,7 @@ type ValidationPackageBrowser =
                         ValidationPackageBrowser.SubmitBar(
                             isSubmitting = submitting,
                             isDirty = isDirty,
+                            isBlocked = submitDisabled,
                             submit = submit
                         )
                     ]

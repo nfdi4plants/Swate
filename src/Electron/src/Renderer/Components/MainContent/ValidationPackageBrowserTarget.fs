@@ -64,7 +64,8 @@ module private ValidationPackageBrowserHelper =
                     ()
                 | _ -> ()
 
-                let yaml = config.toYamlString ()
+                // The compact layout keeps the file identical to what ARCitect and the DataHUB templates write.
+                let yaml = ValidationPackagesYaml.toCompactYamlString config
 
                 let! writeResult =
                     Api.ipcArcVaultApi.writeFile (FileContentDTO.create FileContentType.YAML yaml configFilePath)
@@ -80,21 +81,30 @@ module private ValidationPackageBrowserHelper =
 
 
 [<ReactComponent>]
-let private ParsingErrorWarning (parsingError: string, setParsingError: string option -> unit) =
+let private ParsingErrorWarning (parsingError: string, reload: unit -> unit) =
     Html.div [
-        prop.role.alertDialog
-        prop.className "swt:alert swt:alert-error"
+        prop.role.alert
+        prop.className "swt:alert swt:alert-error swt:m-2"
+        prop.testId "validation-package-browser-parse-error"
         prop.children [
             Html.div [
-                prop.text
-                    "Parsing error occurred. If you dismiss this error, without resolving the issue, you might override existing validation package configuration."
-            ]
-            Html.div [
-                Html.span parsingError
-                Html.button [
-                    prop.text "Dismiss"
-                    prop.onClick (fun _ -> setParsingError None)
+                prop.className "swt:flex swt:flex-col swt:gap-1"
+                prop.children [
+                    Html.span [
+                        prop.text
+                            "The existing validation package configuration could not be read. Submitting is disabled so the file is not overwritten. Fix the file and reload."
+                    ]
+                    Html.span [
+                        prop.className "swt:text-sm swt:opacity-80"
+                        prop.text parsingError
+                    ]
                 ]
+            ]
+            Html.button [
+                prop.type' "button"
+                prop.className "swt:btn swt:btn-sm"
+                prop.text "Reload"
+                prop.onClick (fun _ -> reload ())
             ]
         ]
     ]
@@ -103,6 +113,7 @@ let private ParsingErrorWarning (parsingError: string, setParsingError: string o
 let ValidationPackageBrowserTarget () =
     let errorModal = useErrorModalCtx ()
     let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
+    let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
     /// If parsing error exists, we display a warning for the user, that if they proceed, they might loose existing validation package configuration.
     let parsingError, setParsingError = React.useState None
 
@@ -117,10 +128,19 @@ let ValidationPackageBrowserTarget () =
     let config, setConfig =
         React.useState (fun () -> ValidationPackageBrowserHelper.emptyConfig ())
 
-    React.useEffectOnce (fun () ->
+    let reload () =
+        setParsingError None
+
         ValidationPackageBrowserHelper.loadConfig onConfigLoadError setConfig
         |> Promise.start
-    )
+
+    React.useEffectOnce reload
+
+    let onConfigWritten (nextConfig: ValidationPackagesConfig) =
+        setConfig nextConfig
+        // The git sidebar only refetches status on ARC change or after git operations,
+        // so ask for a refresh here to make the written file show up as a change right away.
+        gitStateCtx.refresh ()
 
     let fetchValidationPackages () : JS.Promise<ValidationPackageDTO[]> = promise {
         let! result = Api.ipcValidationPackageApi.getAllPackages ()
@@ -137,13 +157,14 @@ let ValidationPackageBrowserTarget () =
         prop.testId "main-content-validation-package-browser"
         prop.children [
             match parsingError with
-            | Some error -> ParsingErrorWarning(error, setParsingError)
-            | None ->
-                ValidationPackageBrowser.ValidationPackageBrowser(
-                    config = config,
-                    writeConfig = ValidationPackageBrowserHelper.writeConfig setConfig,
-                    fetchValidationPackages = fetchValidationPackages,
-                    onError = fun error -> showError error.Message
-                )
+            | Some error -> ParsingErrorWarning(error, reload)
+            | None -> Html.none
+            ValidationPackageBrowser.ValidationPackageBrowser(
+                config = config,
+                writeConfig = ValidationPackageBrowserHelper.writeConfig onConfigWritten,
+                fetchValidationPackages = fetchValidationPackages,
+                onError = (fun error -> showError error.Message),
+                submitDisabled = parsingError.IsSome
+            )
         ]
     ]
