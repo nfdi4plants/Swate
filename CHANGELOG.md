@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ✨ Added
+
+-   Add a **Validation Packages** page to the Electron File Explorer action bar. It lists the packages published on the ARC validation package registry (AVPR), lets you add, remove, or update them to the latest version, and saves the selection to `.arc/validation_packages.yml` in the same layout ARCitect writes, so both tools can edit the same ARC. The Git sidebar refreshes after saving so the file can be committed right away.
+
+### 🐛 Fixed
+
+-   Let long tag names grow their badge in the validation package selector instead of spilling over its border.
+
 ## 2.2.0 - 2026-09-16
 
 ### ✨ Added
