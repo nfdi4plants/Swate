@@ -132,8 +132,14 @@ let mkSelectHandle (yStart, yEnd, xStart, xEnd) =
         xEnd = xEnd
     |}
 
+    let contains (coordinate: CellCoordinate) =
+        coordinate.x >= range.xStart
+        && coordinate.x <= range.xEnd
+        && coordinate.y >= range.yStart
+        && coordinate.y <= range.yEnd
+
     new SelectHandle(
-        (fun _ -> failwith "Not implemented"),
+        contains,
         (fun _ -> failwith "Not implemented"),
         (fun _ -> failwith "Not implemented"),
         (fun _ -> Some range),

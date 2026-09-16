@@ -141,6 +141,33 @@ let swatelogfn id fmt =
 let swatefailfn id fmt =
     Printf.kprintf (fun s -> failwith ("[Swate-" + string id + "] " + s)) fmt
 
+/// Serializes ARC merge operations through a single FIFO owner. Individual operation failures
+/// reject their caller's promise without terminating the queue processor.
+type internal ArcMergeQueue(windowId: int) =
+
+    let mailbox =
+        MailboxProcessor.Start(fun inbox ->
+            let rec processNext () = async {
+                let! operation = inbox.Receive()
+                do! operation () |> Async.AwaitPromise
+                return! processNext ()
+            }
+
+            processNext ()
+        )
+
+    member _.Enqueue<'T>(operation: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+        JS.Constructors.Promise.Create(fun resolve reject ->
+            mailbox.Post(fun () -> promise {
+                try
+                    let! result = operation ()
+                    resolve result
+                with error ->
+                    swatelogfn windowId "Queued ARC merge failed: %s" error.Message
+                    reject error
+            })
+        )
+
 type OpenArcRootRenamePlan = {
     SourcePath: string
     TargetPath: string
@@ -279,7 +306,7 @@ let createWindow () = promise {
 
     let mainWindowOptions =
         BrowserWindowConstructorOptions(
-            title = "Swate",
+            title = Swate.Electron.Shared.ApplicationVersion.windowTitle None,
             icon = (windowIconPath |> U2.Case2),
             width = int screenSize.width,
             height = int screenSize.height,
@@ -318,13 +345,15 @@ let shouldUsePollingByDefault (platform: string) =
 let private currentNodePlatform () : string =
     emitJsExpr () "process.platform" |> unbox<string>
 
-let shouldIgnoreWatcherPath (path: string) =
+let isFileWatcherPathIgnored (path: string) =
     let normalizedPath = PathHelpers.normalizeSeparators path
     let tempXlsxPattern = """\.~\$.*\.xlsx$"""
+    let temporaryImportPattern = """(^|/)\.swate-import-[0-9a-fA-F]{32}(/|$)"""
 
     System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
     || isGitMetadataPath normalizedPath
     || isLegacyDataMapPath normalizedPath
+    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryImportPattern)
 
 let private isArcZone segment =
     [
@@ -335,12 +364,22 @@ let private isArcZone segment =
     ]
     |> List.exists (PathHelpers.pathsEqual segment)
 
+let private tryGetWatcherRelativePath arcPath path =
+    match tryGetRepoRelativePathOrRoot arcPath path with
+    | Some relativePath -> Some relativePath
+    | None when
+        not (Main.Bindings.Path.isAbsolute path)
+        && not (PathHelpers.containsPathTraversalSegments path)
+        ->
+        Some(PathHelpers.normalizeCanonicalRelativePath path)
+    | None -> None
+
 /// Keeps the permanent watcher on ARC metadata and structural directories without traversing payload trees.
 let shouldIgnoreForArcStructureWatcher (arcPath: string) (path: string) (stats: Filesystem.Stats) =
-    if shouldIgnoreWatcherPath path then
+    if isFileWatcherPathIgnored path then
         true
     else
-        match tryGetRepoRelativePathOrRoot arcPath path with
+        match tryGetWatcherRelativePath arcPath path with
         | None -> true
         | Some relativePath ->
             let segments = getNonEmptyPathParts relativePath
@@ -357,10 +396,26 @@ let shouldIgnoreForArcStructureWatcher (arcPath: string) (path: string) (stats: 
                 && not (isArcModelReadContractPath relativePath)
             | _ -> true
 
+/// Bounds payload monitoring to explicitly expanded directories and their immediate children.
+let shouldIgnoreForPayloadWatcher (arcPath: string) (isExpanded: string -> bool) (path: string) =
+    if isFileWatcherPathIgnored path then
+        true
+    else
+        match tryGetWatcherRelativePath arcPath path with
+        | None -> true
+        | Some relativePath ->
+            let relativePath = PathHelpers.normalizeCanonicalRelativePath relativePath
+
+            if String.IsNullOrWhiteSpace relativePath then
+                false
+            else
+                let parentPath = PathHelpers.tryGetParentPath relativePath |> Option.defaultValue ""
+                not (isExpanded relativePath || isExpanded parentPath)
+
 let createWatcherOptions
     (cwd: string)
     (usePolling: bool option)
-    (ignored: U4<string, ResizeArray<string>, string -> bool, string -> Filesystem.Stats -> bool>)
+    (ignored: U4<string, ResizeArray<string>, string -> bool, System.Func<string, Filesystem.Stats, bool>>)
     =
 
     // Native Windows file events can keep handles that block app-initiated folder renames.
@@ -386,8 +441,8 @@ let createWatcherOptions
 let createFileWatcher (path: string) (usePolling: bool option) =
     let ignoreFn = shouldIgnoreForArcStructureWatcher path
 
-    let ignored: U4<string, ResizeArray<string>, string -> bool, string -> Filesystem.Stats -> bool> =
-        !^ignoreFn
+    let ignored: U4<string, ResizeArray<string>, string -> bool, System.Func<string, Filesystem.Stats, bool>> =
+        !^(System.Func<string, Filesystem.Stats, bool>(ignoreFn))
 
     let watcherOptions = createWatcherOptions path usePolling ignored
 

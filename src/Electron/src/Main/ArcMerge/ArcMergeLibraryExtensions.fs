@@ -27,7 +27,7 @@ module ArcMergeHelper =
     }
 
     let private cloneDataMapOption (dataMap: DataMap option) : DataMap option =
-        dataMap |> Option.map copyDataMapPreservingLabelsWorkaround
+        dataMap |> Option.map DataMapCopyWorkaround.copy
 
     let internal parseFileEvents (events: FileEvent list) : ParsedFileEvent list =
         events
@@ -97,7 +97,7 @@ module ArcMergeHelper =
             let targetEntity = copyEntity sourceEntity
 
             match getDataMap sourceEntity, getDataMap targetEntity with
-            | Some source, Some target -> preserveDataMapLabelsWorkaround source target
+            | Some source, Some target -> DataMapCopyWorkaround.preserveLabels source target
             | _ -> ()
 
             targetEntity

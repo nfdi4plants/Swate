@@ -53,8 +53,11 @@ type IArcVaultsApi = {
 
     pickArcPaths: unit -> JS.Promise<Result<string[], exn>>
     pickDirectory: unit -> JS.Promise<Result<string, exn>>
-    pickAbsolutePaths: unit -> JS.Promise<Result<string[], exn>>
+    pickAbsolutePaths: unit -> JS.Promise<Result<string option, exn>>
     pickExternalTextFiles: unit -> JS.Promise<Result<ImportedTextFile[], exn>>
+    tryImportExternalFiles: ImportExternalFilesRequest -> JS.Promise<Result<ImportExternalFilesResult, exn>>
+    cancelImportExternalFiles: string -> JS.Promise<Result<unit, exn>>
+    getActiveFileImport: unit -> JS.Promise<Result<ActiveFileImportState option, exn>>
     getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
     /// Activates or deactivates live monitoring for an expanded File Explorer directory.
     setFileTreeDirectoryExpanded: FileTreeDirectoryExpansionRequest -> JS.Promise<Result<unit, exn>>
@@ -159,6 +162,10 @@ module MainToRendererIpc =
 
     type IFileTreeRendererApi = {
         fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
+    }
+
+    type IFileImportRendererApi = {
+        fileImportStateUpdate: ActiveFileImportState option -> unit
     }
 
     type IGitProgressRendererApi = {

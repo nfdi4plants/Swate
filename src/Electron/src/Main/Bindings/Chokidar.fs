@@ -22,7 +22,7 @@ type Events =
 type WatchOptions
     (
         ?persistent: bool,
-        ?ignored: U4<string, ResizeArray<string>, string -> bool, string -> Stats -> bool>,
+        ?ignored: U4<string, ResizeArray<string>, string -> bool, System.Func<string, Stats, bool>>,
         ?ignoreInitial: bool,
         ?followSimlinks: bool,
         ?cwd: string,

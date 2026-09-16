@@ -16,17 +16,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 2.2.0 - 2026-09-16
+
 ### ✨ Added
 
+-   Add external file importing to the Electron FileTree, including cancellation and cleanup of temporary or partially imported files on cancellation or failure.
 -   Allow canceling in-flight Git network operations (ARC download/clone, fetch, update preview, pull, push, and Git LFS transfers) from the Git sidebar and the DataHub download view. Cancellation kills the underlying git process and restores a clean repository state: a canceled pull aborts any half-applied merge or rebase, and a canceled ARC download removes the partially cloned folder #1306.
 -   Keep open ARC editors synchronized when DataMaps are added or deleted through the File Explorer or by external filesystem changes.
 -   Show **Delete DataMap**, rather than **Add DataMap**, in the context menu of a collapsed ARC entity folder that already contains a DataMap.
 -   Prevent newly added DataMaps from incorrectly appearing as unsaved after they have been written to disk.
+-   Show the current Swate release version before the active ARC name in the Electron window title.
+
+### 🔄 Changed
+
+-   Rotate the Import JSON icon by 180 degrees in all navbars.
+-   Restore the **Download ARC from DataHub** action to the Electron ARC selector.
 
 ### 🐛 Fixed
 
 -   Speed up large ARCs by avoiding repeated Git LFS metadata scans and limiting payload monitoring to folders currently expanded in the File Explorer #1340.
 -   Keep the ARC selector at a stable width and truncate long ARC names, and close its dropdown only after direct or overflow actions are invoked without dismissing the overflow menu prematurely.
+-   Recognize annotation-table column headers correctly when pasting tabular data.
+-   Paste DataMap values into the selected column instead of shifting them one column to the right.
+-   Keep pasted TSV values in their intended DataMap cells instead of interpreting three- or four-cell rows as ontology metadata.
+-   Preserve ontology term and unit metadata when copying and pasting within Swate in browsers that do not support custom clipboard formats.
+-   Fall back to plain text instead of failing when pasted clipboard data contains invalid Swate metadata.
+-   Preserve the row-and-column layout of multi-cell selections when copying between Swate, Excel, Google Sheets, and LibreOffice, including when applications prefer HTML clipboard content.
+-   Apply multi-cell paste consistently in annotation tables and DataMaps, repeating copied cells across larger selections and growing DataMaps when additional rows are needed.
+-   Preserve ontology metadata when pasting terms and units into supported table or DataMap columns, while preventing unrelated ontology identifiers from carrying over when values are replaced with plain text.
+-   Route annotation-table selections containing column headers through the header-aware paste flow, so pasted headers continue to add or update columns correctly.
+-   Clear cells during Cut only after the clipboard has been updated successfully, preventing data loss when browser clipboard access fails.
+-   Handle Windows, Unix, and legacy Mac line breaks consistently when displaying errors and importing data in the Data Annotator.
 
 ## 2.1.0 - 2026-08-19
 

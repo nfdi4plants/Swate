@@ -6,7 +6,10 @@ open Fable.Core.JsInterop
 open Main.Bindings.Filesystem
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.RenamePathRules
+open Main.Bindings.Filesystem
+open Main.Bindings.Path
 
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
@@ -220,6 +223,219 @@ let mapRenameDiskError (sourcePath: string) (targetPath: string) (renameError: e
 [<RequireQualifiedAccess>]
 module ArcFileSystemHelper =
 
+    exception private ImportCancelledException
+
+    type private ExternalFileImportEntry = { SourcePath: string; FileName: string }
+
+    type private ExternalFileImportPlan = {
+        TargetDirectory: string
+        TemporaryDirectory: string
+        Entries: ExternalFileImportEntry[]
+    }
+
+    let createTemporaryImportDirectoryName () =
+        let guid = Guid.NewGuid().ToString("N")
+        $".swate-import-{guid}"
+
+    let private resolveArcRootOrRelativePath arcPath relativePath =
+        let normalizedPath = relativePath |> PathHelpers.normalizeCanonicalRelativePath
+
+        if String.IsNullOrWhiteSpace normalizedPath then
+            Ok(resolveAbsolutePath arcPath)
+        else
+            tryResolveArcRelativePath arcPath normalizedPath
+
+    let private ensureDirectory absolutePath errorMessage = promise {
+        let! isDirectory = ARCtrl.FileSystemHelper.directoryExistsAsync absolutePath
+
+        if isDirectory then
+            return Ok absolutePath
+        else
+            return Error(exn errorMessage)
+    }
+
+    let private ensureTargetDoesNotExist targetAbsolutePath errorMessage = promise {
+        let! targetExists = pathExistsAsync targetAbsolutePath
+
+        if targetExists then
+            return Error(exn errorMessage)
+        else
+            return Ok()
+    }
+
+    let private resolveImportTargetDirectory arcPath targetRelativePath = promise {
+        match resolveArcRootOrRelativePath arcPath targetRelativePath with
+        | Error pathError -> return Error pathError
+        | Ok targetDirectory ->
+            return! ensureDirectory targetDirectory $"Cannot import because '{targetRelativePath}' is not a folder."
+    }
+
+    let private createExternalFileImportPlan targetDirectory sourcePaths = promise {
+        let entries =
+            sourcePaths
+            |> Array.map (fun sourcePath ->
+                let absolutePath = resolveAbsolutePath sourcePath
+
+                {
+                    SourcePath = absolutePath
+                    FileName = basename absolutePath
+                }
+            )
+
+        let duplicateName =
+            entries
+            |> Array.groupBy (fun entry -> entry.FileName.ToLowerInvariant())
+            |> Array.tryFind (fun (_, duplicates) -> duplicates.Length > 1)
+
+        match duplicateName with
+        | Some(_, duplicates) -> raise (exn $"Cannot import multiple files named '{duplicates.[0].FileName}'.")
+        | None -> ()
+
+        for entry in entries do
+            let destinationPath = join [| targetDirectory; entry.FileName |]
+
+            match!
+                ensureTargetDoesNotExist
+                    destinationPath
+                    $"Cannot import '{entry.FileName}' because a file with that name already exists."
+            with
+            | Ok() -> ()
+            | Error targetError -> raise targetError
+
+        return {
+            TargetDirectory = targetDirectory
+            // The watcher explicitly ignores this operation-owned directory and its contents.
+            TemporaryDirectory = join [| targetDirectory; createTemporaryImportDirectoryName () |]
+            Entries = entries
+        }
+    }
+
+    let private copyExternalFilesToTemporaryDirectory plan onProgress isCancellationRequested = promise {
+        do! mkdirAsync plan.TemporaryDirectory
+        onProgress 0.0
+
+        for sourceIndex, entry in plan.Entries |> Array.indexed do
+            if isCancellationRequested () then
+                raise ImportCancelledException
+
+            let temporaryPath = join [| plan.TemporaryDirectory; entry.FileName |]
+            do! copyFileAsync entry.SourcePath temporaryPath 0
+            onProgress (float (sourceIndex + 1) / float plan.Entries.Length)
+    }
+
+    let private copyTemporaryFilesIntoTarget
+        (plan: ExternalFileImportPlan)
+        (createdTargetPaths: ResizeArray<string>)
+        isCancellationRequested
+        =
+        promise {
+            for entry in plan.Entries do
+                if isCancellationRequested () then
+                    raise ImportCancelledException
+
+                let temporaryPath = join [| plan.TemporaryDirectory; entry.FileName |]
+                let destinationPath = join [| plan.TargetDirectory; entry.FileName |]
+
+                try
+                    do! linkAsync temporaryPath destinationPath
+                with _ ->
+                    // Hard links are an optional fast path. COPYFILE_EXCL provides a portable fallback
+                    // while preserving the no-overwrite contract if linking is unavailable or denied.
+                    do! copyFileAsync temporaryPath destinationPath copyFileExclusiveFlag
+
+                createdTargetPaths.Add destinationPath
+
+                // A fallback copy cannot be interrupted. Re-check immediately afterward so a
+                // cancellation requested during the copy rolls back the registered destination.
+                if isCancellationRequested () then
+                    raise ImportCancelledException
+        }
+
+    let private cleanupExternalFileImport temporaryDirectory (createdTargetPaths: ResizeArray<string>) = promise {
+        let cleanupErrors = ResizeArray<string>()
+
+        for createdTargetPath in createdTargetPaths |> Seq.rev do
+            match!
+                removePathWithRetriesAsync (fun path -> rmAsync path (RmOptions(force = true))) createdTargetPath
+            with
+            | Ok() -> ()
+            | Error cleanupError -> cleanupErrors.Add($"Could not remove '{createdTargetPath}': {cleanupError.Message}")
+
+        match!
+            removePathWithRetriesAsync
+                (fun path -> rmAsync path (RmOptions(recursive = true, force = true)))
+                temporaryDirectory
+        with
+        | Ok() -> ()
+        | Error cleanupError ->
+            cleanupErrors.Add(
+                $"Could not remove temporary import directory '{temporaryDirectory}': {cleanupError.Message}"
+            )
+
+        return cleanupErrors |> Seq.toArray
+    }
+
+    let private externalFileImportFailureResult
+        temporaryDirectory
+        (createdTargetPaths: ResizeArray<string>)
+        (importError: exn)
+        =
+        promise {
+            let! cleanupErrors = cleanupExternalFileImport temporaryDirectory createdTargetPaths
+
+            if cleanupErrors.Length > 0 then
+                let cleanupMessage = String.concat " " cleanupErrors
+                return Error(exn $"Import failed: {importError.Message} Cleanup also failed: {cleanupMessage}")
+            elif importError :? ImportCancelledException then
+                return Ok ImportExternalFilesResult.Cancelled
+            else
+                return Error importError
+        }
+
+    let importExternalFilesOnDiskWithTemporaryCleanup
+        (removeTemporaryDirectory: string -> JS.Promise<unit>)
+        (logTemporaryCleanupError: exn -> unit)
+        (arcPath: string)
+        (targetRelativePath: string)
+        (sourcePaths: string[])
+        (onProgress: float -> unit)
+        (isCancellationRequested: unit -> bool)
+        (onFilesPublished: unit -> unit)
+        (validateImportedFiles: unit -> JS.Promise<Result<unit, exn>>)
+        : JS.Promise<Result<ImportExternalFilesResult, exn>> =
+        promise {
+            match! resolveImportTargetDirectory arcPath targetRelativePath with
+            | Error pathError -> return Error pathError
+            | Ok targetDirectory ->
+                try
+                    let! plan = createExternalFileImportPlan targetDirectory sourcePaths
+                    let createdTargetPaths = ResizeArray<string>()
+
+                    try
+                        do! copyExternalFilesToTemporaryDirectory plan onProgress isCancellationRequested
+                        do! copyTemporaryFilesIntoTarget plan createdTargetPaths isCancellationRequested
+                        onFilesPublished ()
+
+                        match! removePathWithRetriesAsync removeTemporaryDirectory plan.TemporaryDirectory with
+                        | Ok() -> ()
+                        | Error cleanupError -> logTemporaryCleanupError cleanupError
+
+                        match! validateImportedFiles () with
+                        | Error validationError -> raise validationError
+                        | Ok() -> ()
+
+                        return Ok ImportExternalFilesResult.Completed
+                    with importError ->
+                        return! externalFileImportFailureResult plan.TemporaryDirectory createdTargetPaths importError
+                with planError ->
+                    return Error planError
+        }
+
+    let importExternalFilesOnDisk =
+        importExternalFilesOnDiskWithTemporaryCleanup
+            (fun temporaryDirectory -> rmAsync temporaryDirectory (RmOptions(recursive = true, force = true)))
+            (fun cleanupError -> printfn $"Unable to remove completed import staging directory: {cleanupError.Message}")
+
     type CreateFileSystemItemPlan = {
         ParentPath: string
         TargetPath: string
@@ -246,28 +462,13 @@ module ArcFileSystemHelper =
         | Ok firstAbsolutePath, Ok secondAbsolutePath -> Ok(firstAbsolutePath, secondAbsolutePath)
 
     let private resolveCreatePathPair arcPath parentRelativePath targetRelativePath =
-        let normalizedParentPath =
-            parentRelativePath |> PathHelpers.normalizeCanonicalRelativePath
-
-        let parentPath =
-            if String.IsNullOrWhiteSpace normalizedParentPath then
-                Ok(resolveAbsolutePath arcPath)
-            else
-                tryResolveArcRelativePath arcPath normalizedParentPath
-
-        match parentPath, tryResolveArcRelativePath arcPath targetRelativePath with
+        match
+            resolveArcRootOrRelativePath arcPath parentRelativePath,
+            tryResolveArcRelativePath arcPath targetRelativePath
+        with
         | Error pathError, _
         | _, Error pathError -> Error pathError
         | Ok parentAbsolutePath, Ok targetAbsolutePath -> Ok(parentAbsolutePath, targetAbsolutePath)
-
-    let private ensureTargetDoesNotExist targetAbsolutePath errorMessage = promise {
-        let! targetExists = pathExistsAsync targetAbsolutePath
-
-        if targetExists then
-            return Error(exn errorMessage)
-        else
-            return Ok()
-    }
 
     let private createTargetAsync kind targetAbsolutePath =
         match kind with
@@ -344,18 +545,19 @@ module ArcFileSystemHelper =
                 | Error pathError -> return Error pathError
                 | Ok(parentAbsolutePath, targetAbsolutePath) ->
                     try
-                        let! parentIsDirectory = ARCtrl.FileSystemHelper.directoryExistsAsync parentAbsolutePath
-
-                        if parentIsDirectory |> not then
-                            return Error(exn $"Cannot create item because '{plan.ParentPath}' is not a folder.")
-                        else
-                            let! targetCheck =
+                        match!
+                            ensureDirectory
+                                parentAbsolutePath
+                                $"Cannot create item because '{plan.ParentPath}' is not a folder."
+                        with
+                        | Error directoryError -> return Error directoryError
+                        | Ok _ ->
+                            match!
                                 ensureTargetDoesNotExist
                                     targetAbsolutePath
                                     $"A file or folder already exists at '{plan.TargetPath}'."
-
-                            match targetCheck with
-                            | Error conflictError -> return Error conflictError
+                            with
+                            | Error targetError -> return Error targetError
                             | Ok() ->
                                 do! createTargetAsync plan.Kind targetAbsolutePath
                                 return Ok plan.TargetPath
@@ -386,14 +588,15 @@ module ArcFileSystemHelper =
                 match resolveArcRelativePathPair arcPath genericRenamePlan.SourcePath genericRenamePlan.TargetPath with
                 | Error pathError -> return Error pathError
                 | Ok(sourceAbsolutePath, targetAbsolutePath) ->
-                    let! targetCheck =
-                        ensureTargetDoesNotExist
-                            targetAbsolutePath
-                            $"Cannot rename '{genericRenamePlan.SourcePath}' to '{genericRenamePlan.TargetPath}' because the destination already exists."
+                    let! targetExists = pathExistsAsync targetAbsolutePath
 
-                    match targetCheck with
-                    | Error conflictError -> return Error conflictError
-                    | Ok() ->
+                    if targetExists then
+                        return
+                            Error(
+                                exn
+                                    $"Cannot rename '{genericRenamePlan.SourcePath}' to '{genericRenamePlan.TargetPath}' because the destination already exists."
+                            )
+                    else
                         return!
                             renameResolvedPathOnDisk
                                 genericRenamePlan.SourcePath
@@ -455,7 +658,9 @@ module ArcFileSystemHelper =
 
                     if
                         sourceIsDirectory
-                        && PathHelpers.isSameOrDescendantPath genericMovePlan.TargetPath genericMovePlan.SourcePath
+                        && PathHelpers.isSameOrDescendantPathForFsComparison
+                            genericMovePlan.TargetPath
+                            genericMovePlan.SourcePath
                     then
                         return Error(exn "Move target must not be inside the source path.")
                     else
@@ -473,7 +678,9 @@ module ArcFileSystemHelper =
                             | Error removeError -> return Error removeError
                             | Ok() -> return! moveToTargetAsync ()
                         | false, _ when
-                            PathHelpers.isSameOrDescendantPath genericMovePlan.TargetPath genericMovePlan.SourcePath
+                            PathHelpers.isSameOrDescendantPathForFsComparison
+                                genericMovePlan.TargetPath
+                                genericMovePlan.SourcePath
                             ->
                             return!
                                 moveFileIntoDescendantPathOnDisk

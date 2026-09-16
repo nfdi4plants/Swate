@@ -13,9 +13,13 @@ open Main.Bindings.Path
 open Main.Notes.NoteConstants
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
+open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Vitest
 
+module FileImportCoordinator = Main.FileImportCoordinator
 module WatcherHelpers = Main.WatcherHelpers
+module Abort = Main.Bindings.Abort
 
 let private watcherTestOptions = TestOptions(timeout = 20000)
 
@@ -115,6 +119,59 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "an import rollback failure keeps the window open and resets the close lifecycle",
+            fun () -> promise {
+                let mutable closeHandler: obj -> unit = ignore
+                let mutable closeCount = 0
+                let mutable preventedCloseCount = 0
+
+                let window =
+                    createObj [
+                        "id" ==> 4
+                        "title" ==> ""
+                        "isDestroyed" ==> (fun () -> false)
+                        "close" ==> (fun () -> closeCount <- closeCount + 1)
+                        "on"
+                        ==> (fun (eventName: string) (handler: obj -> unit) ->
+                            if eventName = "close" then
+                                closeHandler <- handler
+                        )
+                        "webContents" ==> createObj [ "send" ==> (fun (_: string) (_: obj) -> ()) ]
+                    ]
+                    |> unbox<BrowserWindow>
+
+                let vault = ArcVault(window)
+                let abortController = Abort.AbortController.create ()
+
+                vault.activeFileImport <-
+                    Some {
+                        State = {
+                            requestId = "failed-rollback"
+                            phase = FileImportPhase.Copying
+                        }
+                        AbortController = abortController
+                        Completion = JS.Constructors.Promise.resolve (Error(exn "EPERM during rollback"))
+                    }
+
+                let vaults = ArcVaults()
+                vaults.OnCloseWindow(window, vault, window.id)
+
+                let closeEvent =
+                    createObj [
+                        "preventDefault" ==> (fun () -> preventedCloseCount <- preventedCloseCount + 1)
+                    ]
+
+                closeHandler closeEvent
+                do! Promise.sleep 0
+
+                Vitest.expect(preventedCloseCount).toBe (1)
+                Vitest.expect(closeCount).toBe (0)
+                Vitest.expect(abortController.signal.aborted).toBe (true)
+                Vitest.expect(vault.isWaitingForImportCleanup).toBe (false)
+            }
+        )
+
+        Vitest.test (
             "file watcher polling defaults to Windows only",
             fun () ->
                 Vitest.expect(shouldUsePollingByDefault "win32").toBe (true)
@@ -126,7 +183,7 @@ Vitest.describe (
         Vitest.test (
             "watcher options do not limit traversal depth",
             fun () ->
-                let ignored: U4<string, ResizeArray<string>, string -> bool, string -> Stats -> bool> =
+                let ignored: U4<string, ResizeArray<string>, string -> bool, System.Func<string, Stats, bool>> =
                     unbox (fun (_: string) -> false)
 
                 let expandedDirectoryOptions = createWatcherOptions "C:/arc" (Some true) ignored
@@ -662,9 +719,11 @@ Vitest.describe (
 
                         let! rootNoteAfterSave = readFileAsync rootNotePath TextEncoding.Utf8
                         let! studyNoteAfterSave = readFileAsync studyNotePath TextEncoding.Utf8
+                        let! persistedArc = TestHelpers.loadArcAsync arcPath
 
                         Vitest.expect(rootNoteAfterSave).toBe (rootNoteContent)
                         Vitest.expect(studyNoteAfterSave).toBe (studyNoteContent)
+                        Vitest.expect(persistedArc.Title).toEqual (Some "Saved title")
                     })
         )
 

@@ -47,9 +47,15 @@ let private tryGetRepoRelativePathCore (repoRoot: string) (absolutePath: string)
         || String.IsNullOrWhiteSpace normalizedAbsolutePath
     then
         None
-    elif pathsEqual normalizedAbsolutePath normalizedRoot then
+    elif
+        String.Equals(
+            PathHelpers.normalizePathForFsComparison normalizedAbsolutePath,
+            PathHelpers.normalizePathForFsComparison normalizedRoot,
+            StringComparison.Ordinal
+        )
+    then
         if allowRoot then Some "" else None
-    elif PathHelpers.isSameOrDescendantPath normalizedAbsolutePath normalizedRoot then
+    elif PathHelpers.isSameOrDescendantPathForFsComparison normalizedAbsolutePath normalizedRoot then
         let prefix = normalizedRoot + "/"
 
         if normalizedAbsolutePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) then
