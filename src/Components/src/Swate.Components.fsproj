@@ -246,6 +246,8 @@
     <Compile Include="Composite\ValidationPackageSelector\Helper.test.fs" />
     <Compile Include="Composite\ValidationPackageSelector\AvprApi.fs" />
     <Compile Include="Composite\ValidationPackageSelector\AvprApi.test.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\ValidationPackagesYaml.fs" />
+    <Compile Include="Composite\ValidationPackageSelector\ValidationPackagesYaml.test.fs" />
     <Compile Include="Composite\ValidationPackageSelector\Context.fs" />
     <Compile Include="Composite\ValidationPackageSelector\SearchField.fs" />
     <Compile Include="Composite\ValidationPackageSelector\PackageRow.fs" />
