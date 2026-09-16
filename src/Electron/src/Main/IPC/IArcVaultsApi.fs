@@ -588,6 +588,39 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    readValidationPackagesConfig =
+        fun () -> promise {
+            try
+                match tryGetVaultAndArcPath event with
+                | Error error -> return Error error
+                | Ok(_, arcPath) ->
+                    return! Main.ValidationPackages.ValidationPackagesConfigIO.readConfigYamlAtArcPath arcPath
+            with error ->
+                return Error error
+        }
+    writeValidationPackagesConfig =
+        fun (yaml: string) -> promise {
+            try
+                match tryGetVaultAndArcPath event with
+                | Error error -> return Error error
+                | Ok(vault, arcPath) ->
+                    return!
+                        withExclusiveBusyWriting
+                            vault
+                            (fun () -> promise {
+                                match!
+                                    Main.ValidationPackages.ValidationPackagesConfigIO.writeConfigYamlAtArcPath
+                                        arcPath
+                                        yaml
+                                with
+                                | Error error -> return Error error
+                                | Ok() ->
+                                    do! refreshVaultFileTree vault
+                                    return Ok()
+                            })
+            with error ->
+                return Error error
+        }
     listProvenanceTables =
         fun () -> promise {
             try

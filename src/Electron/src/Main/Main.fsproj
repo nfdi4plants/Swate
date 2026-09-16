@@ -49,6 +49,7 @@
     <Compile Include="ArcVault\FileImportCoordinator.fs" />
     <Compile Include="ArcVault\ArcVault.fs" />
     <Compile Include="Provenance\ProvenanceGroupingReader.fs" />
+    <Compile Include="ValidationPackages\ValidationPackagesConfigIO.fs" />
     <Compile Include="IPC\GitLfs.fs" />
     <Compile Include="IPC\IPCHelper.fs" />
     <Compile Include="IPC\FileSystemIO.fs" />
@@ -59,6 +60,7 @@
     <Compile Include="IPC\IArcVaultsApi.fs" />
     <Compile Include="IPC\IAuthApi.fs" />
     <Compile Include="IPC\ITemplateApi.fs" />
+    <Compile Include="IPC\IAvprApi.fs" />
     <Compile Include="main.fs" />
     <None Include="SimpleGitTest.fsx" />
     <None Include="ChokidarTest.fsx" />

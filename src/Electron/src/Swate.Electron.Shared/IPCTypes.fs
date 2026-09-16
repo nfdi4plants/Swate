@@ -32,6 +32,14 @@ type ITemplateApi = {
 }
 
 /// Two Way Bridge: Renderer <-> Main
+/// Proxies the ARC validation package registry (AVPR) through main so the request uses Chromium's network
+/// stack instead of the renderer, which would be subject to CORS.
+type IAvprApi = {
+    /// Returns the raw JSON of https://avpr.nfdi4plants.org/api/v1/packages.
+    getPackages: unit -> JS.Promise<Result<string, exn>>
+}
+
+/// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
     /// Open ARC via folder dialog. Main decides: current window / new window / focus existing.
     openARC: unit -> JS.Promise<Result<string option, exn>>
@@ -60,6 +68,10 @@ type IArcVaultsApi = {
     showPathInFileExplorer: string -> JS.Promise<Result<unit, exn>>
     openPathWithDefaultApplication: string -> JS.Promise<Result<unit, exn>>
     readNotes: unit -> JS.Promise<Result<NoteSearchDto[], exn>>
+    /// Reads the raw YAML of `.arc/validation_packages.yml`. Returns None when the file does not exist yet.
+    readValidationPackagesConfig: unit -> JS.Promise<Result<string option, exn>>
+    /// Validates the YAML against the ARCtrl validation packages schema and writes it to `.arc/validation_packages.yml`.
+    writeValidationPackagesConfig: string -> JS.Promise<Result<unit, exn>>
     listProvenanceTables: unit -> JS.Promise<Result<ProvenanceTableSelectionDto[], exn>>
     loadProvenanceTable: ProvenanceTableSelectionDto -> JS.Promise<Result<ProvenanceLoadResultDto, exn>>
     /// Persists the active in-memory ARC scaffold to disk.
