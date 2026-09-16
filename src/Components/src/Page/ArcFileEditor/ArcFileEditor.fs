@@ -253,7 +253,7 @@ type Main =
         let addRowsWithCount rowCount =
             match tryGetAddRowsTarget () with
             | Some(AddRowsTarget.Table table) ->
-                table.AddRowsEmpty rowCount
+                table.AddRowsEmptyKeepingUnits rowCount
                 setArcFileState (ArcFiles.refreshRef arcFileState)
             | Some(AddRowsTarget.DataMap dataMap) ->
                 dataMap.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
