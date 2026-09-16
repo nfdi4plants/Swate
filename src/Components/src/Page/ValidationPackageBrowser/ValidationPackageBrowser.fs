@@ -1,15 +1,15 @@
-namespace Swate.Components.Composite.ValidationPackageSelector
+namespace Swate.Components.Page.ValidationPackageBrowser
 
 open Fable.Core
 open Feliz
 open ARCtrl.ValidationPackages
 open Swate.Components
-open Swate.Components.Composite.ValidationPackageSelector.Context
+open Swate.Components.Page.ValidationPackageBrowser.Context
 open Types
 open Swate.Components.Primitive.Types
 open Swate.Components.Primitive.LoadingSpinner
 
-module private ValidationPackageSelectorModel =
+module private ValidationPackageBrowserModel =
 
     let createLatestPackage (dto: ValidationPackageDTO) =
         ValidationPackage(dto.Name, ?version = Some(Helper.toVersionString dto))
@@ -27,7 +27,7 @@ module private ValidationPackageSelectorModel =
 
 
 [<Erase; Mangle(false)>]
-type ValidationPackageSelector =
+type ValidationPackageBrowser =
 
     [<ReactComponent>]
     static member private UnlistedBanner
@@ -95,7 +95,7 @@ type ValidationPackageSelector =
             ]
 
     [<ReactComponent>]
-    static member private SubmitBar(isSubmitting: bool, isDirty: bool, submit: unit -> unit) =
+    static member private SubmitBar(isSubmitting: bool, isDirty: bool, isBlocked: bool, submit: unit -> unit) =
 
         Html.div [
             prop.className "swt:flex swt:justify-end swt:items-center swt:gap-2 swt:p-2 swt:border-t"
@@ -110,7 +110,7 @@ type ValidationPackageSelector =
                     prop.type' "button"
                     prop.testId "validation-package-selector-submit"
                     prop.className "swt:btn swt:btn-primary"
-                    prop.disabled (not isDirty || isSubmitting)
+                    prop.disabled (not isDirty || isSubmitting || isBlocked)
                     prop.onClick (fun _ -> submit ())
                     prop.text "Submit"
                 ]
@@ -118,14 +118,17 @@ type ValidationPackageSelector =
         ]
 
     [<ReactComponent(true)>]
-    static member ValidationPackageSelector
+    static member ValidationPackageBrowser
         (
             config: ValidationPackagesConfig,
             writeConfig: ValidationPackagesConfig -> JS.Promise<Result<unit, exn>>,
             // https://avpr.nfdi4plants.org/swagger/index.html#/Validation%20Packages/GetAllPackages
             fetchValidationPackages: unit -> JS.Promise<ValidationPackageDTO[]>,
-            ?onError: exn -> unit
+            ?onError: exn -> unit,
+            // Blocks submitting, for example while the host could not read the existing config and a write would overwrite it.
+            ?submitDisabled: bool
         ) =
+        let submitDisabled = defaultArg submitDisabled false
         let state, setState = React.useState (fun () -> SelectorState.Idle)
 
         let edits, setEdits =
@@ -222,7 +225,7 @@ type ValidationPackageSelector =
                 (fun () ->
 
                     let newConfig =
-                        ValidationPackageSelectorModel.createNextConfig config packages edits removedUnlisted
+                        ValidationPackageBrowserModel.createNextConfig config packages edits removedUnlisted
 
                     newConfig <> config_old
                 ),
@@ -230,7 +233,7 @@ type ValidationPackageSelector =
             )
 
         let toggle (dto: ValidationPackageDTO) =
-            let latest = ValidationPackageSelectorModel.createLatestPackage dto
+            let latest = ValidationPackageBrowserModel.createLatestPackage dto
 
             match rowStateOf dto with
             | PackageRowState.Unchecked
@@ -239,9 +242,7 @@ type ValidationPackageSelector =
             | PackageRowState.Checked -> setEdits (fun edits -> Map.add dto.Name None edits)
 
         let updateToLatest (dto: ValidationPackageDTO) =
-            setEdits (fun edits ->
-                Map.add dto.Name (Some(ValidationPackageSelectorModel.createLatestPackage dto)) edits
-            )
+            setEdits (fun edits -> Map.add dto.Name (Some(ValidationPackageBrowserModel.createLatestPackage dto)) edits)
 
         let unlistedNames =
             React.useMemo (
@@ -253,11 +254,11 @@ type ValidationPackageSelector =
             )
 
         let submit () =
-            if isDirty && not submitting then
+            if isDirty && not submitting && not submitDisabled then
                 setSubmitting true
 
                 let newConfig =
-                    ValidationPackageSelectorModel.createNextConfig config packages edits removedUnlisted
+                    ValidationPackageBrowserModel.createNextConfig config packages edits removedUnlisted
 
                 writeConfig newConfig
                 |> Promise.map (fun result ->
@@ -286,7 +287,7 @@ type ValidationPackageSelector =
                 [| box RowStateMap |]
             )
 
-        ValidationPackageSelectorCtx.Provider(
+        ValidationPackageBrowserCtx.Provider(
             ctxValue,
             React.Fragment [
                 Html.div [
@@ -298,7 +299,7 @@ type ValidationPackageSelector =
                         ]
                         match state with
                         | SelectorState.Loaded _ ->
-                            ValidationPackageSelector.UnlistedBanner(unlistedNames, setRemovedUnlisted)
+                            ValidationPackageBrowser.UnlistedBanner(unlistedNames, setRemovedUnlisted)
                         | _ -> Html.none
                         SearchField.SearchField(searchQuery, setSearchQuery, searchFields, setSearchFields)
                         Html.div [
@@ -322,9 +323,10 @@ type ValidationPackageSelector =
                                 ]
                             ]
                         ]
-                        ValidationPackageSelector.SubmitBar(
+                        ValidationPackageBrowser.SubmitBar(
                             isSubmitting = submitting,
                             isDirty = isDirty,
+                            isBlocked = submitDisabled,
                             submit = submit
                         )
                     ]

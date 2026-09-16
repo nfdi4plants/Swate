@@ -1,4 +1,4 @@
-module internal Swate.Components.Composite.ValidationPackageSelector.Sample
+module internal Swate.Components.Page.ValidationPackageBrowser.Sample
 
 open Fable.Core
 open Feliz
@@ -55,7 +55,6 @@ module private Fixtures =
             index % 7,
             (if index % 5 = 0 then "alpha.1" else ""),
             "",
-            [||],
             System.DateTime(2026, 8, 19).AddDays(float index),
             tag,
             $"Release notes for {name}",
@@ -78,7 +77,6 @@ module private Fixtures =
                 0,
                 "",
                 "",
-                [||],
                 System.DateTime(2026, 8, 19),
                 [| mkTag "Invenio" |],
                 "",
@@ -97,7 +95,6 @@ module private Fixtures =
                 0,
                 "",
                 "",
-                [||],
                 System.DateTime(2026, 8, 19),
                 [| mkTag "Metadata" |],
                 "",
@@ -152,7 +149,7 @@ let Main () =
                 ]
             ]
         ]
-        ValidationPackageSelector.ValidationPackageSelector(
+        ValidationPackageBrowser.ValidationPackageBrowser(
             config = currentConfig,
             writeConfig = write,
             fetchValidationPackages = fetch
