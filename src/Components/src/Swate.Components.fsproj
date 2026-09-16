@@ -72,13 +72,16 @@
     <Compile Include="Util\DateTimeExtensions.fs" />
     <Compile Include="Util\Extensions.fs" />
     <Compile Include="Util\ReactHooks.fs" />
+    <Compile Include="JsBindings\Clipboard.fs" />
     <Compile Include="JsBindings\Virtual.fs" />
     <Compile Include="JsBindings\FloatingUI.fs" />
     <Compile Include="JsBindings\DndKit.fs" />
     <Compile Include="ARCtrl\TermCollection.fs" />
     <Compile Include="ARCtrl\Helper.fs" />
     <Compile Include="ARCtrl\ArcIO.fs" />
+    <Compile Include="ARCtrl\EmptyColumnJson.fs" />
     <Compile Include="ARCtrl\Json.fs" />
+    <Compile Include="ARCtrl\EmptyColumnJson.test.fs" />
     <Compile Include="ARCtrl\Types\CompositeCellDiscriminate.fs" />
     <Compile Include="ARCtrl\Types\CompositeHeaderDiscriminate.fs" />
     <Compile Include="ARCtrl\ArcTable.fs" />
@@ -86,7 +89,11 @@
     <Compile Include="ARCtrl\Extensions\OntologyAnnotation.fs" />
     <Compile Include="ARCtrl\Extensions\CompositeHeader.fs" />
     <Compile Include="ARCtrl\Extensions\CompositeCell.fs" />
-    <Compile Include="ARCtrl\Extensions\ArcTable.fs" />
+    <Compile Include="ClipboardContract\Types.fs" />
+      <Compile Include="ClipboardContract\Contract.fs" />
+      <Compile Include="ARCtrl\ClipboardCodec.fs" />
+      <Compile Include="ClipboardContract\Actions.fs" />
+      <Compile Include="ARCtrl\Extensions\ArcTable.fs" />
     <Compile Include="ARCtrl\Extensions\DataFile.fs" />
     <Compile Include="ARCtrl\Extensions\DataMap.fs" />
     <Compile Include="ARCtrl\Extensions\Template.fs" />
@@ -158,6 +165,7 @@
     <Compile Include="Composite\AnnotationTable\AnnotationTable.fs" />
     <Compile Include="Composite\AnnotationTable\ResetTableConfirmationModal.fs" />
     <Compile Include="Composite\DataMapTable\Types.fs" />
+    <Compile Include="Composite\DataMapTable\ClipboardTarget.fs" />
     <Compile Include="Composite\DataMapTable\Helper.fs" />
     <Compile Include="Composite\DataMapTable\DataMapContextMenu.fs" />
     <Compile Include="Composite\DataMapTable\DataMapTable.fs" />

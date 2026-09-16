@@ -20,6 +20,8 @@ type private Selector =
     static member Actionbar
         (setNewArcModalIsOpen: bool -> unit, onArcError: string -> unit, setSelectorIsOpen: bool -> unit)
         =
+        let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+
         Actionbar.Main(
             [|
                 ButtonInfo.create (
@@ -36,8 +38,15 @@ type private Selector =
                         openArc onArcError |> Promise.start
                         setSelectorIsOpen false
                 )
+                ButtonInfo.create (
+                    "swt:fluent--cloud-beaker-24-regular swt:size-5",
+                    "Download ARC from DataHub",
+                    fun _ ->
+                        pageStateCtx.setState (Some PageState.DataHubBrowser)
+                        setSelectorIsOpen false
+                )
             |],
-            2,
+            3,
             keepContextMenuPortalLocal = true
         )
 

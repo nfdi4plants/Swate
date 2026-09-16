@@ -4,6 +4,7 @@ open ARCtrl
 open Fable.Core
 open Feliz
 open Swate.Components
+open Swate.Components.Composite.DataMapTable.ClipboardTarget
 open Swate.Components.JsBindings
 open Swate.Components.Shared
 open Swate.Components.Primitive
@@ -110,13 +111,12 @@ module private FilePickerWidgetHelper =
         | Some(InsertTarget.DataMap selection) ->
             match nextArcFile.TryGetDataMap() with
             | Some dataMap ->
-                dataMap.PasteTabText(
-                    {|
-                        x = selection.xStart
-                        y = selection.yStart
-                    |},
-                    String.concat System.Environment.NewLine paths
-                )
+                let anchor: CellCoordinate = {|
+                    x = selection.xStart
+                    y = selection.yStart
+                |}
+
+                dataMap.PasteTabText(anchor, [| anchor |], String.concat System.Environment.NewLine paths)
 
                 setArcFile nextArcFile
             | None -> ()
