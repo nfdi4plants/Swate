@@ -951,18 +951,29 @@ Vitest.describe (
                 try
                     let vault = ArcVault(TestHelpers.testWindow ())
                     vault.path <- Some folderPath
-                    let mutable watcherStartCount = 0
 
                     try
-                        do! vault.Startup(startFileWatcher = (fun () -> watcherStartCount <- watcherStartCount + 1))
+                        do! vault.Startup()
                     with _ ->
                         ()
 
-                    Vitest.expect(watcherStartCount).toBe (0)
+                    Vitest.expect(vault.watcher).toEqual (None)
                     do! TestHelpers.removeDirectoryAsync folderPath
                 with error ->
                     do! TestHelpers.removeDirectoryAsync folderPath
                     return raise error
             }
+        )
+
+        Vitest.test (
+            "ClearArc resets the window title",
+            fun () ->
+                let vault = ArcVault(TestHelpers.testWindow ())
+                vault.SetArc(ARC("LoadedArc"))
+
+                vault.ClearArc()
+
+                Vitest.expect(vault.arc).toEqual (None)
+                Vitest.expect(vault.window.title).toBe ("Swate")
         )
 )

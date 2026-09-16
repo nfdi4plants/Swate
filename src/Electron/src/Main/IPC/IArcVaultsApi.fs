@@ -188,22 +188,28 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
         fun () -> promise {
             let window = dialogParentFromIpcEvent event
 
-            let! r =
-                dialog.showOpenDialog (
-                    ?window = window,
-                    properties = [|
-                        Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
-                    |]
-                )
+            try
+                let! r =
+                    dialog.showOpenDialog (
+                        ?window = window,
+                        properties = [|
+                            Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
+                        |]
+                    )
 
-            if r.canceled then
-                return Ok None
-            elif r.filePaths.Length <> 1 then
-                return Error(exn "Not exactly one path")
-            else
-                match! openArcAtPath event (Array.exactlyOne r.filePaths) with
-                | Ok disposition -> return Ok(Some(ArcOpenDisposition.path disposition))
-                | Error error -> return Error error
+                if r.canceled then
+                    return Ok None
+                elif r.filePaths.Length <> 1 then
+                    let error = exn "Not exactly one path"
+                    showArcOpenError window (String.concat ", " r.filePaths) error
+                    return Error error
+                else
+                    match! openArcAtPath event (Array.exactlyOne r.filePaths) with
+                    | Ok disposition -> return Ok(Some(ArcOpenDisposition.path disposition))
+                    | Error error -> return Error error
+            with error ->
+                showArcOpenError window "" error
+                return Error error
         }
     openARCByPath =
         fun (arcPath: string) -> promise {

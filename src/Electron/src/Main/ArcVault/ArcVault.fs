@@ -89,7 +89,9 @@ type ArcVault(window: BrowserWindow) =
         this.arc <- Some arc
         this.window.title <- arc.Identifier
 
-    member this.ClearArc() = this.arc <- None
+    member this.ClearArc() =
+        this.arc <- None
+        this.window.title <- "Swate"
 
     /// Sets the dirty marker for unsaved in-memory ARC mutations.
     member this.RefreshHasUnsavedArcChangesFlag() =
@@ -424,13 +426,9 @@ module ArcVaultExtensions =
         }
 
         /// This functions should be called once, when an vault is first started with a path
-        member this.Startup(?startFileWatcher: unit -> unit) = promise {
+        member this.Startup() = promise {
             do! this.LoadArc()
-
-            match startFileWatcher with
-            | Some start -> start ()
-            | None -> this.StartFileWatcher()
-
+            this.StartFileWatcher()
             this.window.title <- this.arc.Value.Identifier
         }
 
@@ -756,7 +754,6 @@ type ArcVaults() =
         with error ->
             // The normal close lifecycle is registered only for successfully initialized vaults.
             // Clean up directly so a failed open cannot leave an empty window or orphaned entry.
-            do! vault.StopFileWatcher()
             this.Vaults.Remove(id) |> ignore
 
             if not (window.isDestroyed ()) then
