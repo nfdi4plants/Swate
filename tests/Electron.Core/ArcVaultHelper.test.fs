@@ -439,6 +439,27 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "payload watcher prunes descendants until their directory is explicitly expanded",
+            fun () ->
+                let mutable expandedDirectories = Set.singleton "studies/S1"
+                let isExpanded path = expandedDirectories.Contains path
+
+                Vitest
+                    .expect(shouldIgnoreForPayloadWatcher "C:/arc" isExpanded "C:/arc/studies/S1/dataset")
+                    .toBe (false)
+
+                Vitest
+                    .expect(shouldIgnoreForPayloadWatcher "C:/arc" isExpanded "C:/arc/studies/S1/dataset/raw.bin")
+                    .toBe (true)
+
+                expandedDirectories <- expandedDirectories.Add "studies/S1/dataset"
+
+                Vitest
+                    .expect(shouldIgnoreForPayloadWatcher "C:/arc" isExpanded "C:/arc/studies/S1/dataset/raw.bin")
+                    .toBe (false)
+        )
+
+        Vitest.test (
             "waitForFileWatcherReady resolves from the native ready event",
             fun () -> promise {
                 let mutable readyCallback: (unit -> unit) option = None
