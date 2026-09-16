@@ -723,13 +723,14 @@ type ArcVaults() =
         )
 
     member this.RegisterVault() : Fable.Core.JS.Promise<int> = promise {
-        let! window = createWindow ()
+        let window = createWindow ()
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
 
         this.OnCloseWindow(window, vault, id)
 
+        do! loadWindow window
         window.focus ()
         swatelogfn id "Register window"
 
@@ -737,7 +738,7 @@ type ArcVaults() =
     }
 
     member this.RegisterVaultWithArc(path: string) = promise {
-        let! window = createWindow ()
+        let window = createWindow ()
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
@@ -747,6 +748,7 @@ type ArcVaults() =
 
             this.OnCloseWindow(window, vault, id)
 
+            do! loadWindow window
             window.focus ()
             swatelogfn id "Register window"
 
@@ -763,7 +765,7 @@ type ArcVaults() =
     }
 
     member this.RegisterVaultWithNewArc(path: string, newIdentifier: string) : Fable.Core.JS.Promise<int> = promise {
-        let! window = createWindow ()
+        let window = createWindow ()
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
@@ -772,6 +774,7 @@ type ArcVaults() =
 
         this.OnCloseWindow(window, vault, id)
 
+        do! loadWindow window
         window.focus ()
         swatelogfn id "Register window"
 
