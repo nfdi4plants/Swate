@@ -352,13 +352,16 @@ let shouldIgnoreForArcStructureWatcher (arcPath: string) (path: string) (stats: 
             | [| _ |] -> false
             | [| zone; _ |] when isArcZone zone -> false
             | [| zone; _; _ |] when isArcZone zone ->
-                statsAvailable && not isDirectory && not (isArcModelReadContractPath relativePath)
+                statsAvailable
+                && not isDirectory
+                && not (isArcModelReadContractPath relativePath)
             | _ -> true
 
 let createWatcherOptions
     (cwd: string)
     (usePolling: bool option)
-    (ignored: U4<string, ResizeArray<string>, string -> bool, string -> Filesystem.Stats -> bool>) =
+    (ignored: U4<string, ResizeArray<string>, string -> bool, string -> Filesystem.Stats -> bool>)
+    =
 
     // Native Windows file events can keep handles that block app-initiated folder renames.
     let usePolling =
@@ -382,7 +385,10 @@ let createWatcherOptions
 
 let createFileWatcher (path: string) (usePolling: bool option) =
     let ignoreFn = shouldIgnoreForArcStructureWatcher path
-    let ignored: U4<string, ResizeArray<string>, string -> bool, string -> Filesystem.Stats -> bool> = !^ignoreFn
+
+    let ignored: U4<string, ResizeArray<string>, string -> bool, string -> Filesystem.Stats -> bool> =
+        !^ignoreFn
+
     let watcherOptions = createWatcherOptions path usePolling ignored
 
     let watcher = Chokidar.Chokidar.watch (path, watcherOptions)

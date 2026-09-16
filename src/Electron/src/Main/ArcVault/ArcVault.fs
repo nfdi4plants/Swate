@@ -317,6 +317,7 @@ module ArcVaultExtensions =
                     |> Seq.toArray
 
                 let ignoreFn = fun (path: string) -> shouldIgnoreWatcherPath path
+
                 let ignored: U4<string, ResizeArray<string>, string -> bool, string -> Filesystem.Stats -> bool> =
                     !^ignoreFn
 
@@ -921,12 +922,12 @@ module ArcVaultExtensions =
             this.Vaults.Values
             |> Seq.tryFind (fun v -> v.path |> Option.exists (fun vaultPath -> PathHelpers.pathsEqual vaultPath path))
 
-    // ── ARC Lifecycle Controller ──────────────────────────────────────────
+        // ── ARC Lifecycle Controller ──────────────────────────────────────────
         // All open/create/focus decisions are made here.
         // IPC handlers should delegate to these methods.
 
         /// Open an existing ARC at the given path.
-    /// Decision: already-open → focus, calling window empty → open there, else → new window.
+        /// Decision: already-open → focus, calling window empty → open there, else → new window.
         member this.OpenOrFocusArc(callingWindowId: int, arcPath: string) = promise {
             let normalizedArcPath = PathHelpers.normalizePath arcPath
 
@@ -948,7 +949,7 @@ module ArcVaultExtensions =
         }
 
         /// Create a new ARC at the given path with the given identifier.
-    /// Decision: path already open → focus, calling window empty → create there, else → new window.
+        /// Decision: path already open → focus, calling window empty → create there, else → new window.
         member this.CreateOrFocusArc(callingWindowId: int, arcPath: string, identifier: string) = promise {
             let normalizedArcPath = PathHelpers.normalizePath arcPath
 

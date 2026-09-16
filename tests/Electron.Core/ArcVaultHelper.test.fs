@@ -129,8 +129,7 @@ Vitest.describe (
                 let ignored: U4<string, ResizeArray<string>, string -> bool, string -> Stats -> bool> =
                     unbox (fun (_: string) -> false)
 
-                let expandedDirectoryOptions =
-                    createWatcherOptions "C:/arc" (Some true) ignored
+                let expandedDirectoryOptions = createWatcherOptions "C:/arc" (Some true) ignored
 
                 Vitest.expect(expandedDirectoryOptions.depth).toEqual (None)
                 Vitest.expect(expandedDirectoryOptions.usePolling).toEqual (Some true)
@@ -144,31 +143,18 @@ Vitest.describe (
                 let directoryStats =
                     createObj [ "isDirectory" ==> (fun () -> true) ] |> unbox<Stats>
 
-                let fileStats =
-                    createObj [ "isDirectory" ==> (fun () -> false) ] |> unbox<Stats>
+                let fileStats = createObj [ "isDirectory" ==> (fun () -> false) ] |> unbox<Stats>
 
                 Vitest
-                    .expect(
-                        shouldIgnoreForArcStructureWatcher
-                            "C:/arc"
-                            "C:/arc/studies/S1/isa.study.xlsx"
-                            fileStats
-                    )
+                    .expect(shouldIgnoreForArcStructureWatcher "C:/arc" "C:/arc/studies/S1/isa.study.xlsx" fileStats)
                     .toBe (false)
 
                 Vitest
-                    .expect(
-                        shouldIgnoreForArcStructureWatcher "C:/arc" "C:/arc/studies/S1/dataset" directoryStats
-                    )
+                    .expect(shouldIgnoreForArcStructureWatcher "C:/arc" "C:/arc/studies/S1/dataset" directoryStats)
                     .toBe (false)
 
                 Vitest
-                    .expect(
-                        shouldIgnoreForArcStructureWatcher
-                            "C:/arc"
-                            "C:/arc/studies/S1/dataset/data.raw"
-                            fileStats
-                    )
+                    .expect(shouldIgnoreForArcStructureWatcher "C:/arc" "C:/arc/studies/S1/dataset/data.raw" fileStats)
                     .toBe (true)
         )
 
