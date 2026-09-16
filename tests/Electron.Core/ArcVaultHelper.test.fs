@@ -259,6 +259,44 @@ let private lifecycleTestWindow id isDestroyed onSend =
     ]
     |> unbox<BrowserWindow>
 
+let private registrationTestWindow id =
+    let mutable destroyed = false
+    let send: obj = emitJsExpr () "((..._args) => {})"
+
+    let window =
+        createObj [
+            "id" ==> id
+            "title" ==> ""
+            "isDestroyed" ==> (fun () -> destroyed)
+            "destroy" ==> (fun () -> destroyed <- true)
+            "focus" ==> ignore
+            "webContents" ==> createObj [ "send" ==> send ]
+        ]
+        |> unbox<BrowserWindow>
+
+    window, (fun () -> destroyed)
+
+let private expectRegistrationLoadFailure
+    (expectedError: exn)
+    (vaults: ArcVaults)
+    (windowId: int)
+    (isDestroyed: unit -> bool)
+    (registration: unit -> JS.Promise<int>)
+    =
+    promise {
+        let mutable capturedError: exn option = None
+
+        try
+            let! _ = registration ()
+            ()
+        with error ->
+            capturedError <- Some error
+
+        Vitest.expect(capturedError).toEqual (Some expectedError)
+        Vitest.expect(vaults.Vaults.ContainsKey(windowId)).toBe (false)
+        Vitest.expect(isDestroyed ()).toBe (true)
+    }
+
 let private mkdirRecursiveAsync (directoryPath: string) = promise {
     let! _ = mkdirAsync directoryPath (MkdirOptions(recursive = true))
     return ()
@@ -338,6 +376,95 @@ Vitest.describe (
                 vaults.BroadcastRecentARCs()
 
                 Vitest.expect(aliveWindowSendCount).toBe (1)
+        )
+
+        Vitest.test (
+            "RegisterVault cleans up when renderer loading fails",
+            fun () -> promise {
+                let windowId = 11
+                let window, isDestroyed = registrationTestWindow windowId
+                let loadError = exn "Expected renderer load failure"
+
+                let vaults =
+                    ArcVaults(
+                        windowFactory = (fun () -> window),
+                        windowLoader = (fun _ -> JS.Constructors.Promise.reject loadError)
+                    )
+
+                do! expectRegistrationLoadFailure loadError vaults windowId isDestroyed vaults.RegisterVault
+            }
+        )
+
+        Vitest.test (
+            "RegisterVaultWithArc stops the watcher and cleans up when renderer loading fails",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-registration-open-"
+                    "Existing ARC"
+                    ignore
+                    (fun arcPath -> promise {
+                        let windowId = 12
+                        let window, isDestroyed = registrationTestWindow windowId
+                        let loadError = exn "Expected renderer load failure"
+                        let mutable initializedVault: ArcVault option = None
+                        let mutable vaultsRef: ArcVaults option = None
+
+                        let vaults =
+                            ArcVaults(
+                                windowFactory = (fun () -> window),
+                                windowLoader =
+                                    (fun _ ->
+                                        initializedVault <- vaultsRef.Value.TryGetVault(windowId)
+                                        JS.Constructors.Promise.reject loadError
+                                    )
+                            )
+
+                        vaultsRef <- Some vaults
+
+                        do!
+                            expectRegistrationLoadFailure
+                                loadError
+                                vaults
+                                windowId
+                                isDestroyed
+                                (fun () -> vaults.RegisterVaultWithArc arcPath)
+
+                        Vitest.expect(initializedVault.IsSome).toBe (true)
+                        Vitest.expect(initializedVault.Value.watcher.IsNone).toBe (true)
+                    })
+        )
+
+        Vitest.test (
+            "RegisterVaultWithNewArc cleans up when renderer loading fails",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-registration-create-"
+
+                try
+                    let windowId = 13
+                    let window, isDestroyed = registrationTestWindow windowId
+                    let loadError = exn "Expected renderer load failure"
+
+                    let vaults =
+                        ArcVaults(
+                            windowFactory = (fun () -> window),
+                            windowLoader = (fun _ -> JS.Constructors.Promise.reject loadError)
+                        )
+
+                    let arcPath = join [| rootPath; "new-arc" |]
+
+                    do!
+                        expectRegistrationLoadFailure
+                            loadError
+                            vaults
+                            windowId
+                            isDestroyed
+                            (fun () -> vaults.RegisterVaultWithNewArc(arcPath, "New ARC"))
+
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
         )
 
         Vitest.test (
@@ -974,6 +1101,6 @@ Vitest.describe (
                 vault.ClearArc()
 
                 Vitest.expect(vault.arc).toEqual (None)
-                Vitest.expect(vault.window.title).toBe ("Swate")
+                Vitest.expect(vault.window.title).toBe (Swate.Electron.Shared.ApplicationVersion.windowTitle None)
         )
 )

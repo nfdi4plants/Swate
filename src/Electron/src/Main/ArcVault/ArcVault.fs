@@ -588,7 +588,11 @@ module ArcOpenDisposition =
         | ArcOpenDisposition.CreatedInNewWindow p -> p
 
 
-type ArcVaults() =
+type ArcVaults(?windowFactory: unit -> BrowserWindow, ?windowLoader: BrowserWindow -> Fable.Core.JS.Promise<unit>) =
+
+    let createVaultWindow = defaultArg windowFactory Main.ArcVaultHelper.createWindow
+    let loadVaultWindow = defaultArg windowLoader Main.ArcVaultHelper.loadWindow
+
     /// Key is window.id
     member val Vaults = Dictionary<int, ArcVault>() with get
 
@@ -722,63 +726,74 @@ type ArcVaults() =
             this.DisposeVault(id)
         )
 
+    member private this.CleanupFailedRegistration(window: BrowserWindow, vault: ArcVault, id: int) = promise {
+        do! vault.StopFileWatcher()
+        this.Vaults.Remove(id) |> ignore
+
+        if not (window.isDestroyed ()) then
+            window.destroy ()
+    }
+
     member this.RegisterVault() : Fable.Core.JS.Promise<int> = promise {
-        let window = createWindow ()
+        let window = createVaultWindow ()
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
 
-        this.OnCloseWindow(window, vault, id)
+        try
+            do! loadVaultWindow window
 
-        do! loadWindow window
-        window.focus ()
-        swatelogfn id "Register window"
+            this.OnCloseWindow(window, vault, id)
 
-        return id
+            window.focus ()
+            swatelogfn id "Register window"
+
+            return id
+        with error ->
+            do! this.CleanupFailedRegistration(window, vault, id)
+            return raise error
     }
 
     member this.RegisterVaultWithArc(path: string) = promise {
-        let window = createWindow ()
+        let window = createVaultWindow ()
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
 
         try
             do! vault.OpenARC(path)
+            do! loadVaultWindow window
 
             this.OnCloseWindow(window, vault, id)
 
-            do! loadWindow window
             window.focus ()
             swatelogfn id "Register window"
 
             return id
         with error ->
-            // The normal close lifecycle is registered only for successfully initialized vaults.
-            // Clean up directly so a failed open cannot leave an empty window or orphaned entry.
-            this.Vaults.Remove(id) |> ignore
-
-            if not (window.isDestroyed ()) then
-                window.destroy ()
-
+            do! this.CleanupFailedRegistration(window, vault, id)
             return raise error
     }
 
     member this.RegisterVaultWithNewArc(path: string, newIdentifier: string) : Fable.Core.JS.Promise<int> = promise {
-        let window = createWindow ()
+        let window = createVaultWindow ()
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
 
-        do! vault.CreateARC(path, newIdentifier)
+        try
+            do! vault.CreateARC(path, newIdentifier)
+            do! loadVaultWindow window
 
-        this.OnCloseWindow(window, vault, id)
+            this.OnCloseWindow(window, vault, id)
 
-        do! loadWindow window
-        window.focus ()
-        swatelogfn id "Register window"
+            window.focus ()
+            swatelogfn id "Register window"
 
-        return id
+            return id
+        with error ->
+            do! this.CleanupFailedRegistration(window, vault, id)
+            return raise error
     }
 
     member this.OpenARCInVault(windowId: int, path: string) = promise {
