@@ -302,6 +302,8 @@
     <Compile Include="Page\ValidationPackageBrowser\Types.fs" />
     <Compile Include="Page\ValidationPackageBrowser\Helper.fs" />
     <Compile Include="Page\ValidationPackageBrowser\Helper.test.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\ValidationPackagesYaml.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\ValidationPackagesYaml.test.fs" />
     <Compile Include="Page\ValidationPackageBrowser\Context.fs" />
     <Compile Include="Page\ValidationPackageBrowser\SearchField.fs" />
     <Compile Include="Page\ValidationPackageBrowser\PackageRow.fs" />
