@@ -91,7 +91,7 @@ type ArcVault(window: BrowserWindow) =
 
     member this.ClearArc() =
         this.arc <- None
-        this.window.title <- "Swate"
+        this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle None
 
     /// Sets the dirty marker for unsaved in-memory ARC mutations.
     member this.RefreshHasUnsavedArcChangesFlag() =
