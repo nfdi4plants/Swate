@@ -5,37 +5,13 @@ module Main.ArcVaultFileTree
 
 open System.Collections.Generic
 open ARCtrl
-open Fable.Electron.Remoting.Main
 open Main
 open Main.ArcVault
 open Main.ArcVaultHelper
-open Main.Bindings
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.IPCTypes
-
-let private createControllerContext (vault: ArcVault) =
-    let sendMsgApi =
-        Remoting.createIpc ()
-        |> Remoting.withWindow vault.window
-        |> Remoting.buildProxySender<IArcFileWatcherApi>
-
-    createFileWatcherControllerContext
-        vault
-        (fun () ->
-            vault.CreatePendingFileWatcherSchedulerContext sendMsgApi
-            |> FileWatcherOperations.schedulePendingEvents
-        )
-
-let private restartPayloadWatcher (vault: ArcVault) arcPath =
-    FileWatcherOperations.restartPayloadWatcher
-        arcPath
-        None
-        vault.expandedDirectoryPaths
-        (fun () -> vault.payloadWatcher)
-        (fun value -> vault.payloadWatcher <- value)
-        (fun () -> createControllerContext vault)
 
 type ArcVault with
 
@@ -67,15 +43,15 @@ type ArcVault with
                         this.expandedDirectoryPaths <- this.expandedDirectoryPaths.Add relativePath
 
                         try
-                            do! restartPayloadWatcher this arcPath
+                            do! this.RestartPayloadWatcher arcPath
                         with watcherError ->
                             this.expandedDirectoryPaths <- this.expandedDirectoryPaths.Remove relativePath
-                            do! restartPayloadWatcher this arcPath
+                            do! this.RestartPayloadWatcher arcPath
                             return raise watcherError
 
                     let! refreshedFileTree = refreshFileTreeSubtree arcPath absolutePath this.fileTree
                     this.SetFileTree refreshedFileTree
                 elif this.expandedDirectoryPaths.Contains relativePath then
                     this.expandedDirectoryPaths <- this.expandedDirectoryPaths.Remove relativePath
-                    do! restartPayloadWatcher this arcPath
+                    do! this.RestartPayloadWatcher arcPath
         })

@@ -45,7 +45,6 @@
     <Compile Include="ArcVault\Types.fs" />
     <Compile Include="ArcVault\ArcVaultHelper.fs" />
     <Compile Include="ArcVault\WatcherHelpers.fs" />
-    <Compile Include="ArcVault\FileWatcherOperations.fs" />
     <Compile Include="ArcVault\FileImportAuthorization.fs" />
     <Compile Include="ArcVault\FileImportCoordinator.fs" />
     <Compile Include="ArcVault\ArcVault.fs" />

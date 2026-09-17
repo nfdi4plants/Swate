@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🐛 Fixed
+
+-   Speed up large ARCs by avoiding repeated Git LFS metadata scans and limiting payload monitoring to folders currently expanded in the File Explorer #1340.
+
 ## 2.3.1 - 2026-09-16
 
 ### 🐛 Fixed
@@ -47,7 +51,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🐛 Fixed
 
--   Speed up large ARCs by avoiding repeated Git LFS metadata scans and limiting payload monitoring to folders currently expanded in the File Explorer #1340.
 -   Keep the ARC selector at a stable width and truncate long ARC names, and close its dropdown only after direct or overflow actions are invoked without dismissing the overflow menu prematurely.
 -   Recognize annotation-table column headers correctly when pasting tabular data.
 -   Paste DataMap values into the selected column instead of shifting them one column to the right.

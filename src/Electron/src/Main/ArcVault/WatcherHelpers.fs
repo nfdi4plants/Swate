@@ -1,5 +1,5 @@
 /// Pure and reusable file-watcher event, path, and ARC-structure reconciliation helpers.
-/// Stateful watcher lifecycle and scheduling belong in FileWatcherOperations.
+/// Stateful watcher lifecycle and scheduling belong to ArcVault.
 module Main.WatcherHelpers
 
 open System
