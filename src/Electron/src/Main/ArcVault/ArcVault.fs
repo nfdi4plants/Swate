@@ -118,6 +118,29 @@ type ArcVault(window: BrowserWindow) =
             if valueIsChanging then
                 sendArcHasUnsavedChangesUpdate hasNewChanges this.window
 
+let private createFileWatcherControllerContext
+    (vault: ArcVault)
+    (schedulePendingEvents: unit -> unit)
+    : WatcherHelpers.FileWatcherControllerContext =
+    {
+        ArcPath = fun () -> vault.path
+        Watcher = fun () -> vault.watcher
+        ImportedPaths = vault.importedFileWatcherPaths
+        IsActiveImport = fun () -> vault.activeFileImport.IsSome
+        IsArcMergeEligible = fun () -> vault.IsFileWatcherArcMergeEligible
+        PendingEvents = vault.fileWatcherPendingEvents
+        PendingArcMergeEvents = vault.fileWatcherPendingArcMergeEvents
+        SchedulePendingEvents = schedulePendingEvents
+        LogEvent = fun eventName path -> swatelogfn vault.window.id "File change detected: %s on %s" eventName path
+        LogReconciliationError =
+            fun relativePath reconciliationError ->
+                swatelogfn
+                    vault.window.id
+                    "Unable to reconcile ARC watcher scope '%s': %s"
+                    relativePath
+                    reconciliationError.Message
+    }
+
 
 [<AutoOpen>]
 module ArcVaultExtensions =
@@ -307,37 +330,6 @@ module ArcVaultExtensions =
 
                 this.fileWatcherReloadArcTimeout <- Some timeoutId
 
-        member private this.FileEventController(sendMsgApi: IArcFileWatcherApi) =
-            fun (eventName: string) (path: string) ->
-                swatelogfn this.window.id "File change detected: %s on %s" eventName path
-
-                if WatcherHelpers.eventNameEquals Chokidar.Events.AddDir eventName then
-                    match this.path, this.watcher with
-                    | Some arcPath, Some watcher ->
-                        match tryGetWatcherRelativePath arcPath path with
-                        | Some relativePath when isArcStructureWatchScopePath relativePath ->
-                            watcher.add (PathHelpers.normalizeCanonicalRelativePath relativePath) |> ignore
-                        | _ -> ()
-                    | _ -> ()
-
-                WatcherHelpers.queueFileWatcherEvent
-                    (fun event ->
-                        let importedPathKey =
-                            PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant())
-
-                        let isImportedPath = this.importedFileWatcherPaths.Remove importedPathKey
-
-                        not isImportedPath
-                        && (this.activeFileImport.IsSome || this.IsFileWatcherArcMergeEligible)
-                    )
-                    this.path
-                    this.fileWatcherPendingEvents
-                    this.fileWatcherPendingArcMergeEvents
-                    eventName
-                    path
-
-                this.SchedulePendingFileWatcherEvents sendMsgApi
-
         member private this.EnsurePayloadWatcher(arcPath: string, ?usePolling: bool) = promise {
             if this.payloadWatcher.IsNone && this.expandedDirectoryPaths.Count > 0 then
                 let watchedPaths =
@@ -363,7 +355,12 @@ module ArcVaultExtensions =
                     |> Remoting.withWindow this.window
                     |> Remoting.buildProxySender<IArcFileWatcherApi>
 
-                watcher.on (Chokidar.Events.All, this.FileEventController sendMsgApi) |> ignore
+                let controllerContext =
+                    createFileWatcherControllerContext this (fun () -> this.SchedulePendingFileWatcherEvents sendMsgApi)
+
+                watcher.on (Chokidar.Events.All, WatcherHelpers.fileEventController controllerContext)
+                |> ignore
+
                 this.payloadWatcher <- Some watcher
 
                 try
@@ -561,7 +558,14 @@ module ArcVaultExtensions =
                         |> Remoting.withWindow this.window
                         |> Remoting.buildProxySender<IArcFileWatcherApi>
 
-                    watcher.on (Chokidar.Events.All, this.FileEventController sendMsgApi) |> ignore
+                    let controllerContext =
+                        createFileWatcherControllerContext
+                            this
+                            (fun () -> this.SchedulePendingFileWatcherEvents sendMsgApi)
+
+                    watcher.on (Chokidar.Events.All, WatcherHelpers.fileEventController controllerContext)
+                    |> ignore
+
                     this.watcher <- Some watcher
             else
                 swatefailfn this.window.id "No path set for StartFileWatcher."
@@ -572,6 +576,11 @@ module ArcVaultExtensions =
 
             if shouldWaitForReady then
                 do! waitForFileWatcherReady this.watcher.Value
+
+                // Close the snapshot-to-ready race without depending on Chokidar to replay paths
+                // discovered during an initial scan with ignoreInitial enabled.
+                let! structuralEvents = reconcileArcStructureScope this.path.Value ""
+                WatcherHelpers.attachArcStructureScopes this.watcher structuralEvents
         }
 
         member this.ClearPendingFileWatcherState() =

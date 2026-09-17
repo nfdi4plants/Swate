@@ -462,6 +462,34 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "structural reconciliation finds canonical metadata without entering payload directories",
+            fun () -> promise {
+                let! arcPath = TestHelpers.createTempDirectoryAsync "swate-structure-reconcile-"
+                let entityPath = join [| arcPath; "studies"; "NewStudy" |]
+                let datasetPath = join [| entityPath; "dataset" |]
+
+                try
+                    do! mkdirRecursiveAsync datasetPath
+                    do! writeTextFileAsync (join [| entityPath; "isa.study.xlsx" |]) "metadata"
+                    do! writeTextFileAsync (join [| datasetPath; "raw.bin" |]) "payload"
+
+                    let! events = reconcileArcStructureScope arcPath "studies"
+
+                    Vitest.expect(events |> Array.contains ("addDir", "studies/NewStudy")).toBe (true)
+
+                    Vitest.expect(events |> Array.contains ("add", "studies/NewStudy/isa.study.xlsx")).toBe (true)
+
+                    Vitest.expect(events |> Array.contains ("addDir", "studies/NewStudy/dataset")).toBe (true)
+
+                    Vitest.expect(events |> Array.exists (fun (_, path) -> path.EndsWith("raw.bin"))).toBe (false)
+                    do! TestHelpers.removeDirectoryAsync arcPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync arcPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
             "waitForFileWatcherReady resolves from the native ready event",
             fun () -> promise {
                 let mutable readyCallback: (unit -> unit) option = None
@@ -723,6 +751,51 @@ Vitest.describe (
                             do! writeTextFileAsync collapsedAgainFilePath "collapsed again"
                             do! waitForWatcherBatch ()
                             Vitest.expect(vault.fileTree.ContainsKey collapsedAgainFilePath).toBe (false)
+                            do! vault.StopFileWatcher()
+                        with error ->
+                            do! vault.StopFileWatcher()
+                            return raise error
+                    })
+        )
+
+        Vitest.test (
+            "populated entity directories are reconciled when added after startup",
+            watcherTestOptions,
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-populated-entity-watcher-"
+                    "PopulatedEntityWatcherArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let sourceArcPath = join [| dirname arcPath; "source-arc" |]
+                        let sourceArc = ARC("SourceArc")
+                        sourceArc.AddStudy(ArcStudy("NewStudy"))
+                        do! sourceArc.WriteAsync sourceArcPath
+
+                        let sourceStudyPath = join [| sourceArcPath; "studies"; "NewStudy" |]
+                        let targetStudyPath = join [| arcPath; "studies"; "NewStudy" |]
+
+                        let targetMetadataPath =
+                            join [| targetStudyPath; "isa.study.xlsx" |] |> PathHelpers.normalizePath
+
+                        let vault = ArcVault(TestHelpers.testWindow ())
+
+                        try
+                            do! vault.OpenARC arcPath
+                            do! renameAsync sourceStudyPath targetStudyPath
+
+                            do!
+                                Fable.Core.JS.Constructors.Promise.Create(fun resolve _ ->
+                                    Fable.Core.JS.setTimeout (fun () -> resolve ()) 6000 |> ignore
+                                )
+
+                            Vitest.expect(vault.arc.Value.ContainsStudy("NewStudy")).toBe (true)
+
+                            Vitest
+                                .expect(vault.fileTree.ContainsKey(PathHelpers.normalizePath targetStudyPath))
+                                .toBe (true)
+
+                            Vitest.expect(vault.fileTree.ContainsKey targetMetadataPath).toBe (true)
                             do! vault.StopFileWatcher()
                         with error ->
                             do! vault.StopFileWatcher()

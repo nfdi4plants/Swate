@@ -488,6 +488,88 @@ let isArcStructureWatchScopePath (relativePath: string) =
     | [| zone; _ |] -> isArcZone zone
     | _ -> false
 
+/// Shallowly discovers the watcher-equivalent events needed to reconcile a structural scope.
+/// Zone reconciliation visits only direct entity directories; entity reconciliation visits only
+/// their direct children, so payload directory contents are never enumerated.
+let reconcileArcStructureScope (arcPath: string) (relativeScopePath: string) =
+    let addEvent relativePath =
+        Chokidar.Events.Add.ToString(), relativePath
+
+    let addDirectoryEvent relativePath =
+        Chokidar.Events.AddDir.ToString(), relativePath
+
+    let readDirectory relativePath = promise {
+        try
+            let absolutePath = ArcPathHelper.combine arcPath relativePath
+            return! Filesystem.readdirWithTypesAsync absolutePath (Filesystem.ReaddirOptions(withFileTypes = true))
+        with _ ->
+            return [||]
+    }
+
+    let reconcileEntity zone entity = promise {
+        let entityPath =
+            ArcPathHelper.combine zone entity |> PathHelpers.normalizeCanonicalRelativePath
+
+        let! entries = readDirectory entityPath
+
+        return
+            entries
+            |> Array.choose (fun entry ->
+                let relativePath =
+                    ArcPathHelper.combine entityPath entry.name
+                    |> PathHelpers.normalizeCanonicalRelativePath
+
+                if entry.isDirectory () then
+                    Some(addDirectoryEvent relativePath)
+                elif entry.isFile () && isArcModelReadContractPath relativePath then
+                    Some(addEvent relativePath)
+                else
+                    None
+            )
+    }
+
+    let reconcileZone zone = promise {
+        let! entries = readDirectory zone
+        let entityDirectories = entries |> Array.filter (fun entry -> entry.isDirectory ())
+        let events = ResizeArray<string * string>()
+
+        for entity in entityDirectories do
+            let entityPath =
+                ArcPathHelper.combine zone entity.name
+                |> PathHelpers.normalizeCanonicalRelativePath
+
+            events.Add(addDirectoryEvent entityPath)
+            let! entityEvents = reconcileEntity zone entity.name
+            events.AddRange entityEvents
+
+        return events.ToArray()
+    }
+
+    promise {
+        match getNonEmptyPathParts relativeScopePath with
+        | [||] ->
+            let events = ResizeArray<string * string>()
+
+            for zone in
+                [|
+                    ArcPathHelper.StudiesFolderName
+                    ArcPathHelper.AssaysFolderName
+                    ArcPathHelper.WorkflowsFolderName
+                    ArcPathHelper.RunsFolderName
+                |] do
+                let absoluteZonePath = ArcPathHelper.combine arcPath zone
+
+                if Filesystem.existsSync absoluteZonePath then
+                    events.Add(addDirectoryEvent zone)
+                    let! zoneEvents = reconcileZone zone
+                    events.AddRange zoneEvents
+
+            return events.ToArray()
+        | [| zone |] when isArcZone zone -> return! reconcileZone zone
+        | [| zone; entity |] when isArcZone zone -> return! reconcileEntity zone entity
+        | _ -> return [||]
+    }
+
 let createFileWatcher (path: string) (usePolling: bool option) =
     let ignoreFn = shouldIgnoreForArcStructureWatcher path
 
