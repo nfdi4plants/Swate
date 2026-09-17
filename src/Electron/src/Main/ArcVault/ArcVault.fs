@@ -10,6 +10,7 @@ open Fable.Electron.Remoting.Main
 open Main
 open Main.ARCtrlExtensions
 open Main.Bindings
+open Main.Bindings.Path
 open Main.ArcMerge
 open Main.ArcVaultHelper
 open Main.FileImportCoordinator
@@ -48,8 +49,8 @@ type ArcVault(window: BrowserWindow) =
     member val fileTree: Dictionary<string, FileEntry> = Dictionary<string, FileEntry>() with get, set
     member val watcher: Chokidar.IWatcher option = None with get, set
     member val payloadWatcher: Chokidar.IWatcher option = None with get, set
-    /// Expanded payload directories keyed by their normalized relative path.
-    member val expandedDirectoryPaths: Map<string, string> = Map.empty with get, set
+    /// Expanded payload directories stored as normalized relative paths.
+    member val expandedDirectoryPaths: Set<string> = Set.empty with get, set
     member val fileWatcherReloadArcTimeout: int option = None with get, set
     member val fileWatcherPendingEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
     member val fileWatcherPendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
@@ -118,7 +119,7 @@ type ArcVault(window: BrowserWindow) =
             if valueIsChanging then
                 sendArcHasUnsavedChangesUpdate hasNewChanges this.window
 
-let private createFileWatcherControllerContext
+let createFileWatcherControllerContext
     (vault: ArcVault)
     (schedulePendingEvents: unit -> unit)
     : WatcherHelpers.FileWatcherControllerContext =
@@ -189,7 +190,7 @@ module ArcVaultExtensions =
             | None -> ()
             | Some arcPath ->
                 let events = WatcherHelpers.coalesceEventsByPath events
-                let nextFileTree = copyFileTree this.fileTree
+                let nextFileTree = Dictionary<string, FileEntry>(this.fileTree)
                 let mutable hasFileTreeChanges = false
 
                 let hasFileUpserts =
@@ -216,8 +217,10 @@ module ArcVaultExtensions =
                         then
                             let! entry = getFileEntry event.AbsolutePath
 
+                            let normalizedRootPath = resolve [| arcPath |] |> PathHelpers.normalizePath
+
                             let changedFile =
-                                withFileEntryLfsMetadata (normalizeRootPath arcPath) lfsPathIndex.Value entry
+                                withFileEntryLfsMetadata normalizedRootPath lfsPathIndex.Value entry
 
                             upsertFileEntryInPlace changedFile nextFileTree
                             hasFileTreeChanges <- true
@@ -232,11 +235,30 @@ module ArcVaultExtensions =
                             if WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName then
                                 this.expandedDirectoryPaths <-
                                     this.expandedDirectoryPaths
-                                    |> Map.filter (fun _ path ->
+                                    |> Set.filter (fun path ->
                                         not (PathHelpers.isSameOrDescendantPath path event.RelativePath)
                                     )
 
-                                do! this.RestartPayloadWatcher arcPath
+                                do!
+                                    FileWatcherOperations.restartPayloadWatcher
+                                        arcPath
+                                        None
+                                        this.expandedDirectoryPaths
+                                        (fun () -> this.payloadWatcher)
+                                        (fun value -> this.payloadWatcher <- value)
+                                        (fun () ->
+                                            let sendMsgApi =
+                                                Remoting.createIpc ()
+                                                |> Remoting.withWindow this.window
+                                                |> Remoting.buildProxySender<IArcFileWatcherApi>
+
+                                            createFileWatcherControllerContext
+                                                this
+                                                (fun () ->
+                                                    this.CreatePendingFileWatcherSchedulerContext sendMsgApi
+                                                    |> FileWatcherOperations.schedulePendingEvents
+                                                )
+                                        )
 
                             removePathAndDescendantsInPlace event.AbsolutePath nextFileTree
                             hasFileTreeChanges <- true
@@ -266,129 +288,34 @@ module ArcVaultExtensions =
                 swatelogfn this.window.id "Unable to merge ARC after file watcher event: %s" mergeError.Message
         }
 
-        member private this.SchedulePendingFileWatcherEvents(sendMsgApi: IArcFileWatcherApi) =
-            if not this.isFileWatcherInitializing && this.fileWatcherPendingEvents.Count > 0 then
-                match this.fileWatcherReloadArcTimeout with
-                | Some timeoutId -> Fable.Core.JS.clearTimeout timeoutId
-                | None -> sendMsgApi.IsLoadingChanges true
+        member internal this.CreatePendingFileWatcherSchedulerContext(sendMsgApi: IArcFileWatcherApi) =
+            let applyPendingEvents
+                (pendingEvents: ArcVaultFileSystemEvent list)
+                (pendingArcMergeEvents: ArcVaultFileSystemEvent list)
+                =
+                this.fileTreeWorkQueue.EnqueueFileTreeWork(fun () -> promise {
+                    if not pendingArcMergeEvents.IsEmpty && not this.isBusyWriting then
+                        do! this.TriggerArcInMemoryMergeOnFileWatcherEvents(pendingArcMergeEvents)
 
-                let timeoutId =
-                    Fable.Core.JS.setTimeout
-                        (fun () ->
-                            this.fileWatcherReloadArcTimeout <- None
+                    do! this.ApplyWatcherFileTreeEvents pendingEvents
+                })
 
-                            if this.isBusyWriting && this.activeFileImport.IsSome then
-                                this.SchedulePendingFileWatcherEvents sendMsgApi
-                            else
-                                let pendingEvents =
-                                    this.fileWatcherPendingEvents
-                                    |> Seq.toList
-                                    |> WatcherHelpers.coalesceEventsByPath
-
-                                let pendingArcMergeEvents =
-                                    this.fileWatcherPendingArcMergeEvents
-                                    |> Seq.toList
-                                    |> WatcherHelpers.coalesceEventsByPath
-
-                                this.fileWatcherPendingEvents.Clear()
-                                this.fileWatcherPendingArcMergeEvents.Clear()
-                                this.fileWatcherQueuedBatchCount <- this.fileWatcherQueuedBatchCount + 1
-
-                                promise {
-                                    try
-                                        try
-                                            do!
-                                                this.fileTreeWorkQueue.EnqueueFileTreeWork(fun () -> promise {
-                                                    if
-                                                        not pendingArcMergeEvents.IsEmpty && not this.isBusyWriting
-                                                    then
-                                                        do!
-                                                            this.TriggerArcInMemoryMergeOnFileWatcherEvents(
-                                                                pendingArcMergeEvents
-                                                            )
-
-                                                    do! this.ApplyWatcherFileTreeEvents pendingEvents
-                                                })
-                                        with ex ->
-                                            swatelogfn
-                                                this.window.id
-                                                "Scheduled ARC and file-tree update failed: %s"
-                                                ex.Message
-                                    finally
-                                        this.fileWatcherQueuedBatchCount <- this.fileWatcherQueuedBatchCount - 1
-
-                                    if
-                                        this.fileWatcherQueuedBatchCount = 0
-                                        && this.fileWatcherReloadArcTimeout.IsNone
-                                        && this.fileWatcherPendingEvents.Count = 0
-                                    then
-                                        sendMsgApi.IsLoadingChanges false
-                                }
-                                |> Promise.start
-                        )
-                        500
-
-                this.fileWatcherReloadArcTimeout <- Some timeoutId
-
-        member private this.EnsurePayloadWatcher(arcPath: string, ?usePolling: bool) = promise {
-            if this.payloadWatcher.IsNone && this.expandedDirectoryPaths.Count > 0 then
-                let watchedPaths =
-                    this.expandedDirectoryPaths.Values
-                    |> Seq.map PathHelpers.normalizeCanonicalRelativePath
-                    |> Seq.toArray
-
-                let ignoreFn =
-                    fun (path: string) (_stats: Filesystem.Stats) ->
-                        shouldIgnoreForPayloadWatcher arcPath this.expandedDirectoryPaths.ContainsKey path
-
-                let ignored
-                    : U4<string, ResizeArray<string>, string -> bool, System.Func<string, Filesystem.Stats, bool>> =
-                    !^(System.Func<string, Filesystem.Stats, bool>(ignoreFn))
-
-                // Every expanded directory is an independent shallow scope. Chokidar may observe its
-                // immediate child directories, but depth 0 prevents traversal into their descendants.
-                let watcherOptions = createWatcherOptions arcPath usePolling ignored (Some 0)
-                let watcher = Chokidar.Chokidar.watch (watchedPaths, watcherOptions)
-
-                let sendMsgApi =
-                    Remoting.createIpc ()
-                    |> Remoting.withWindow this.window
-                    |> Remoting.buildProxySender<IArcFileWatcherApi>
-
-                let controllerContext =
-                    createFileWatcherControllerContext this (fun () -> this.SchedulePendingFileWatcherEvents sendMsgApi)
-
-                watcher.on (Chokidar.Events.All, WatcherHelpers.fileEventController controllerContext)
-                |> ignore
-
-                this.payloadWatcher <- Some watcher
-
-                try
-                    do! waitForFileWatcherReady watcher
-                with watcherError ->
-                    this.payloadWatcher <- None
-
-                    try
-                        do! watcher.close ()
-                    with _ ->
-                        ()
-
-                    return raise watcherError
-        }
-
-        member private this.RestartPayloadWatcher(arcPath: string, ?usePolling: bool) = promise {
-            match this.payloadWatcher with
-            | Some watcher ->
-                this.payloadWatcher <- None
-
-                try
-                    do! watcher.close ()
-                with _ ->
-                    ()
-            | None -> ()
-
-            do! this.EnsurePayloadWatcher(arcPath, ?usePolling = usePolling)
-        }
+            {
+                FileWatcherOperations.PendingSchedulerContext.IsInitializing = fun () -> this.isFileWatcherInitializing
+                IsBusyWriting = fun () -> this.isBusyWriting
+                HasActiveImport = fun () -> this.activeFileImport.IsSome
+                PendingEvents = this.fileWatcherPendingEvents
+                PendingArcMergeEvents = this.fileWatcherPendingArcMergeEvents
+                GetTimeout = fun () -> this.fileWatcherReloadArcTimeout
+                SetTimeout = fun value -> this.fileWatcherReloadArcTimeout <- value
+                ChangeQueuedBatchCount =
+                    fun difference -> this.fileWatcherQueuedBatchCount <- this.fileWatcherQueuedBatchCount + difference
+                GetQueuedBatchCount = fun () -> this.fileWatcherQueuedBatchCount
+                ApplyPendingEvents = applyPendingEvents
+                SetLoadingChanges = sendMsgApi.IsLoadingChanges
+                LogError =
+                    fun ex -> swatelogfn this.window.id "Scheduled ARC and file-tree update failed: %s" ex.Message
+            }
 
         /// Applies an ARC content DTO to the in-memory ARC and marks the vault dirty.
         member this.UpdateArcByFileContentDTO(request: FileContentDTO) : Result<unit, exn> =
@@ -493,48 +420,6 @@ module ArcVaultExtensions =
 
             sendMsg.fileTreeUpdate rendererFileTree
 
-        member this.GetRendererFileTreeSnapshot() = promise {
-            match this.path with
-            | None -> return Dictionary<string, FileEntry>()
-            | Some arcPath ->
-                if this.fileTree.Count = 0 then
-                    let! fileTree = getFileTree arcPath
-                    this.fileTree <- fileTree
-
-                return toRendererFileTree arcPath this.fileTree.Values
-        }
-
-        /// Activates live monitoring for an expanded directory, or stops it when collapsed.
-        /// Expansion also replaces the potentially stale subtree before it is displayed.
-        member this.SetFileTreeDirectoryExpanded(relativePath: string, isExpanded: bool) =
-            this.fileTreeWorkQueue.EnqueueFileTreeWork(fun () -> promise {
-                match this.path with
-                | None -> return raise (arcNotOpenError ())
-                | Some arcPath ->
-                    let relativePath = PathHelpers.normalizeCanonicalRelativePath relativePath
-                    let key = relativePath
-
-                    let absolutePath =
-                        ArcPathHelper.combine arcPath relativePath |> PathHelpers.normalizePath
-
-                    if isExpanded then
-                        if not (this.expandedDirectoryPaths.ContainsKey key) then
-                            this.expandedDirectoryPaths <- this.expandedDirectoryPaths.Add(key, relativePath)
-
-                            try
-                                do! this.RestartPayloadWatcher arcPath
-                            with watcherError ->
-                                this.expandedDirectoryPaths <- this.expandedDirectoryPaths.Remove key
-                                do! this.RestartPayloadWatcher arcPath
-                                return raise watcherError
-
-                        let! refreshedFileTree = refreshFileTreeSubtree arcPath absolutePath this.fileTree
-                        this.SetFileTree refreshedFileTree
-                    elif this.expandedDirectoryPaths.ContainsKey key then
-                        this.expandedDirectoryPaths <- this.expandedDirectoryPaths.Remove key
-                        do! this.RestartPayloadWatcher arcPath
-            })
-
         member this.LoadArc() = promise {
             if this.path.IsSome then
                 match! ARC.LoadAsyncSwateZeroByteRepair this.path.Value with
@@ -561,7 +446,10 @@ module ArcVaultExtensions =
                     let controllerContext =
                         createFileWatcherControllerContext
                             this
-                            (fun () -> this.SchedulePendingFileWatcherEvents sendMsgApi)
+                            (fun () ->
+                                this.CreatePendingFileWatcherSchedulerContext sendMsgApi
+                                |> FileWatcherOperations.schedulePendingEvents
+                            )
 
                     watcher.on (Chokidar.Events.All, WatcherHelpers.fileEventController controllerContext)
                     |> ignore
@@ -569,19 +457,6 @@ module ArcVaultExtensions =
                     this.watcher <- Some watcher
             else
                 swatefailfn this.window.id "No path set for StartFileWatcher."
-
-        member private this.StartFileWatcherAndWaitUntilReady(?usePolling: bool) = promise {
-            let shouldWaitForReady = this.watcher.IsNone
-            this.StartFileWatcher(?usePolling = usePolling)
-
-            if shouldWaitForReady then
-                do! waitForFileWatcherReady this.watcher.Value
-
-                // Close the snapshot-to-ready race without depending on Chokidar to replay paths
-                // discovered during an initial scan with ignoreInitial enabled.
-                let! structuralEvents = reconcileArcStructureScope this.path.Value ""
-                WatcherHelpers.attachArcStructureScopes this.watcher structuralEvents
-        }
 
         member this.ClearPendingFileWatcherState() =
             this.fileWatcherReloadArcTimeout |> Option.iter Fable.Core.JS.clearTimeout
@@ -610,7 +485,7 @@ module ArcVaultExtensions =
             | None -> ()
 
             this.payloadWatcher <- None
-            this.expandedDirectoryPaths <- Map.empty
+            this.expandedDirectoryPaths <- Set.empty
             this.ClearPendingFileWatcherState()
         }
 
@@ -619,7 +494,13 @@ module ArcVaultExtensions =
             this.isFileWatcherInitializing <- true
 
             try
-                do! this.StartFileWatcherAndWaitUntilReady()
+                do!
+                    FileWatcherOperations.startAndWaitUntilReady
+                        (fun () -> this.watcher)
+                        (fun usePolling -> this.StartFileWatcher(?usePolling = usePolling))
+                        this.path.Value
+                        None
+
                 do! this.LoadArc()
                 let! fileTree = getFileTree this.path.Value
 
@@ -640,7 +521,8 @@ module ArcVaultExtensions =
                     |> Remoting.withWindow this.window
                     |> Remoting.buildProxySender<IArcFileWatcherApi>
 
-                this.SchedulePendingFileWatcherEvents sendMsgApi
+                this.CreatePendingFileWatcherSchedulerContext sendMsgApi
+                |> FileWatcherOperations.schedulePendingEvents
             with startupError ->
                 this.isFileWatcherInitializing <- false
                 do! this.StopFileWatcher()
@@ -699,17 +581,36 @@ module ArcVaultExtensions =
             | Some currentPath ->
                 let hadWatcher = this.watcher.IsSome
 
-                let expandedRelativePaths = this.expandedDirectoryPaths.Values |> Seq.toArray
+                let expandedRelativePaths = this.expandedDirectoryPaths |> Seq.toArray
 
                 let restoreWatchers arcPath = promise {
                     this.StartFileWatcher()
 
                     this.expandedDirectoryPaths <-
                         expandedRelativePaths
-                        |> Array.map (fun path -> PathHelpers.normalizeCanonicalRelativePath path, path)
-                        |> Map.ofArray
+                        |> Array.map PathHelpers.normalizeCanonicalRelativePath
+                        |> Set.ofArray
 
-                    do! this.EnsurePayloadWatcher arcPath
+                    do!
+                        FileWatcherOperations.ensurePayloadWatcher
+                            arcPath
+                            None
+                            this.expandedDirectoryPaths
+                            (fun () -> this.payloadWatcher)
+                            (fun value -> this.payloadWatcher <- value)
+                            (fun () ->
+                                let sendMsgApi =
+                                    Remoting.createIpc ()
+                                    |> Remoting.withWindow this.window
+                                    |> Remoting.buildProxySender<IArcFileWatcherApi>
+
+                                createFileWatcherControllerContext
+                                    this
+                                    (fun () ->
+                                        this.CreatePendingFileWatcherSchedulerContext sendMsgApi
+                                        |> FileWatcherOperations.schedulePendingEvents
+                                    )
+                            )
                 }
 
                 if hadWatcher then

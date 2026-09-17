@@ -3,7 +3,6 @@ module Renderer.Components.LeftSidebar.FileExplorer.FileTreeMaterialization
 open Swate.Components.Shared
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.IPCTypes
 
 type MaterializedState = {
     ArcScopeId: string option
@@ -16,12 +15,6 @@ let materialize path state = {
     state with
         Paths = state.Paths.Add(PathHelpers.normalizePath path)
 }
-
-let tryCreateDirectoryExpansionRequest (path: string) (isExpanded: bool) =
-    Some {
-        relativePath = path
-        isExpanded = isExpanded
-    }
 
 let rec private collectDirectoryPaths (node: FileTreeNode) (directoryPaths: Set<string>) =
     if node.isDirectory then

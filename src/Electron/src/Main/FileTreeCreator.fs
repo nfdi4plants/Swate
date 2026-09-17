@@ -29,11 +29,6 @@ type FileTreeWorkQueue(onPreviousError: exn -> unit) =
         currentWork <- nextWork
         nextWork
 
-let normalizeRootPath (path: string) =
-    resolve [| path |] |> PathHelpers.normalizePath
-
-let private shouldIgnoreDirName (name: string) = name = ".git"
-
 let private shouldIgnorePath (path: string) =
     let normalizedPath = PathHelpers.normalizeSeparators path
     let tempXlsxPattern = """\.~\$.*\.xlsx$"""
@@ -76,25 +71,6 @@ let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary
 
     rendererFileTree
 
-/// Remove a path and all descendants from a file tree dictionary using normalized ancestor checks.
-let removePathAndDescendants
-    (targetPath: string)
-    (fileTree: Dictionary<string, FileEntry>)
-    : Dictionary<string, FileEntry> =
-    let normalizedTargetPath = PathHelpers.normalizePath targetPath
-    let nextTree = Dictionary<string, FileEntry>(fileTree)
-
-    if String.IsNullOrWhiteSpace normalizedTargetPath then
-        nextTree
-    else
-        let keysToRemove =
-            nextTree.Keys
-            |> Seq.filter (fun path -> PathHelpers.isSameOrDescendantPath path normalizedTargetPath)
-            |> Seq.toArray
-
-        keysToRemove |> Array.iter (fun path -> nextTree.Remove(path) |> ignore)
-        nextTree
-
 /// Removes a path and all descendants from a mutable file-tree snapshot.
 let removePathAndDescendantsInPlace (targetPath: string) (fileTree: Dictionary<string, FileEntry>) =
     let normalizedTargetPath = PathHelpers.normalizePath targetPath
@@ -106,14 +82,6 @@ let removePathAndDescendantsInPlace (targetPath: string) (fileTree: Dictionary<s
             |> Seq.toArray
 
         keysToRemove |> Array.iter (fun path -> fileTree.Remove(path) |> ignore)
-
-/// Add or replace a single file tree entry without mutating the current snapshot.
-let upsertFileEntry (entry: FileEntry) (fileTree: Dictionary<string, FileEntry>) : Dictionary<string, FileEntry> =
-    let nextTree = Dictionary<string, FileEntry>(fileTree)
-    nextTree.[entry.path] <- entry
-    nextTree
-
-let copyFileTree (fileTree: Dictionary<string, FileEntry>) = Dictionary<string, FileEntry>(fileTree)
 
 let upsertFileEntryInPlace (entry: FileEntry) (fileTree: Dictionary<string, FileEntry>) = fileTree.[entry.path] <- entry
 
@@ -131,11 +99,17 @@ let refreshFileTreeEntry
     promise {
         let absolutePath = join [| arcPath; relativePath |]
         let! entry = getFileEntry absolutePath
-        return upsertFileEntry entry fileTree
+
+        let updatedTree =
+            let nextTree = Dictionary<string, FileEntry>(fileTree)
+            upsertFileEntryInPlace entry nextTree
+            nextTree
+
+        return updatedTree
     }
 
 let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
-    let normalizedRepoRoot = normalizeRootPath repoRoot
+    let normalizedRepoRoot = resolve [| repoRoot |] |> PathHelpers.normalizePath
     let! entry = getFileEntry path
 
     if entry.isDirectory then
@@ -146,7 +120,8 @@ let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
 }
 
 let private scanFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise {
-    let scanRoot = normalizeRootPath path
+    let scanRoot = resolve [| path |] |> PathHelpers.normalizePath
+
     let! rootStats = statAsync scanRoot
     let rootIsDir = rootStats.isDirectory ()
 
@@ -174,7 +149,7 @@ let private scanFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> 
                 let isDir = dirent.isDirectory ()
 
                 if isDir then
-                    if not (shouldIgnoreDirName name) then
+                    if not (name = ".git") then
                         let fullPath = join [| currentDir; name |] |> PathHelpers.normalizeSeparators
                         entries.Add(FileEntry.create (name, fullPath, true, None))
                         stack.Add(fullPath)
@@ -190,7 +165,8 @@ let private scanFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> 
 
 /// Finds all files and subfolders below a path and enriches them relative to the repository root.
 let getFileEntriesInSubtree (repoRoot: string) (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise {
-    let normalizedRepoRoot = normalizeRootPath repoRoot
+    let normalizedRepoRoot = resolve [| repoRoot |] |> PathHelpers.normalizePath
+
     let! scannedEntries = scanFileEntries path
     let! lfsPathIndex = tryGetLsFilesByRelativePath normalizedRepoRoot
     return withFileEntriesLfsMetadata normalizedRepoRoot lfsPathIndex scannedEntries
@@ -204,7 +180,7 @@ let refreshFileTreeSubtree
     : Fable.Core.JS.Promise<Dictionary<string, FileEntry>> =
     promise {
         let! entries = getFileEntriesInSubtree repoRoot path
-        let nextTree = copyFileTree fileTree
+        let nextTree = Dictionary<string, FileEntry>(fileTree)
         removePathAndDescendantsInPlace path nextTree
         entries |> Array.iter (fun entry -> upsertFileEntryInPlace entry nextTree)
         return nextTree

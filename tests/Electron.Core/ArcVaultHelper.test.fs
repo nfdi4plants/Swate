@@ -6,6 +6,7 @@ open Fable.Core.JsInterop
 open Fable.Electron.Main
 open Main.ARCtrlExtensions
 open Main.ArcVault
+open Main.ArcVaultFileTree
 open Main.ArcVaultHelper
 open Main.ArcVaultTypes
 open Main.Bindings.Filesystem
@@ -1207,7 +1208,7 @@ Vitest.describe (
                                 Vitest.expect(vault.expandedDirectoryPaths.Count).toBe (1)
 
                                 Vitest
-                                    .expect(vault.expandedDirectoryPaths.Values |> Seq.exactlyOne)
+                                    .expect(vault.expandedDirectoryPaths |> Seq.exactlyOne)
                                     .toBe ("studies/S1/dataset")
 
                             do! vault.StopFileWatcher()

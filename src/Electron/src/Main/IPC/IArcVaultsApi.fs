@@ -1,6 +1,7 @@
 module Main.IPC.ArcVaultsApi
 
 open System
+open System.Collections.Generic
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
@@ -752,9 +753,12 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             let absoluteDataMapPath =
                                                 Main.Bindings.Path.join [| arcPath; normalizedDataMapPath |]
 
-                                            vault.SetFileTree(
-                                                removePathAndDescendants absoluteDataMapPath vault.fileTree
-                                            )
+                                            let updatedFileTree =
+                                                let nextTree = Dictionary<string, FileEntry>(vault.fileTree)
+                                                removePathAndDescendantsInPlace absoluteDataMapPath nextTree
+                                                nextTree
+
+                                            vault.SetFileTree(updatedFileTree)
 
                                             return Ok()
                                     finally

@@ -355,14 +355,12 @@ let isFileWatcherPathIgnored (path: string) =
     || isLegacyDataMapPath normalizedPath
     || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryImportPattern)
 
-let private isArcZone segment =
-    [
-        ArcPathHelper.StudiesFolderName
-        ArcPathHelper.AssaysFolderName
-        ArcPathHelper.WorkflowsFolderName
-        ArcPathHelper.RunsFolderName
-    ]
-    |> List.exists (PathHelpers.pathsEqual segment)
+let private arcStructureZones = [|
+    ArcPathHelper.StudiesFolderName
+    ArcPathHelper.AssaysFolderName
+    ArcPathHelper.WorkflowsFolderName
+    ArcPathHelper.RunsFolderName
+|]
 
 let tryGetWatcherRelativePath arcPath path =
     match tryGetRepoRelativePathOrRoot arcPath path with
@@ -389,8 +387,8 @@ let shouldIgnoreForArcStructureWatcher (arcPath: string) (path: string) (stats: 
             match segments with
             | [||] -> false
             | [| _ |] -> false
-            | [| zone; _ |] when isArcZone zone -> false
-            | [| zone; _; _ |] when isArcZone zone ->
+            | [| zone; _ |] when arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone) -> false
+            | [| zone; _; _ |] when arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone) ->
                 statsAvailable
                 && not isDirectory
                 && not (isArcModelReadContractPath relativePath)
@@ -450,12 +448,7 @@ let createArcStructureWatcherPaths (arcPath: string) =
     let rootPath = "."
 
     let structuralPaths =
-        [|
-            ArcPathHelper.StudiesFolderName
-            ArcPathHelper.AssaysFolderName
-            ArcPathHelper.WorkflowsFolderName
-            ArcPathHelper.RunsFolderName
-        |]
+        arcStructureZones
         |> Array.collect (fun zone ->
             let absoluteZonePath = ArcPathHelper.combine arcPath zone
 
@@ -484,8 +477,8 @@ let createArcStructureWatcherPaths (arcPath: string) =
 
 let isArcStructureWatchScopePath (relativePath: string) =
     match getNonEmptyPathParts relativePath with
-    | [| zone |] -> isArcZone zone
-    | [| zone; _ |] -> isArcZone zone
+    | [| zone |] -> arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone)
+    | [| zone; _ |] -> arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone)
     | _ -> false
 
 /// Shallowly discovers the watcher-equivalent events needed to reconcile a structural scope.
@@ -550,13 +543,7 @@ let reconcileArcStructureScope (arcPath: string) (relativeScopePath: string) =
         | [||] ->
             let events = ResizeArray<string * string>()
 
-            for zone in
-                [|
-                    ArcPathHelper.StudiesFolderName
-                    ArcPathHelper.AssaysFolderName
-                    ArcPathHelper.WorkflowsFolderName
-                    ArcPathHelper.RunsFolderName
-                |] do
+            for zone in arcStructureZones do
                 let absoluteZonePath = ArcPathHelper.combine arcPath zone
 
                 if Filesystem.existsSync absoluteZonePath then
@@ -565,8 +552,9 @@ let reconcileArcStructureScope (arcPath: string) (relativeScopePath: string) =
                     events.AddRange zoneEvents
 
             return events.ToArray()
-        | [| zone |] when isArcZone zone -> return! reconcileZone zone
-        | [| zone; entity |] when isArcZone zone -> return! reconcileEntity zone entity
+        | [| zone |] when arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone) -> return! reconcileZone zone
+        | [| zone; entity |] when arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone) ->
+            return! reconcileEntity zone entity
         | _ -> return [||]
     }
 

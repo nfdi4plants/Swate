@@ -10,6 +10,7 @@ open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
+open Swate.Electron.Shared.IPCTypes
 open Feliz
 open Fable.Core
 open ARCtrl
@@ -250,11 +251,13 @@ type FileTree =
                 | Some path -> setMaterializedState (fun _ -> materialize path reconciledMaterializedState)
                 | None -> ()
 
-            match
-                item.Path
-                |> Option.bind (fun path -> tryCreateDirectoryExpansionRequest path willExpand)
-            with
-            | Some request ->
+            match item.Path with
+            | Some path ->
+                let request: FileTreeDirectoryExpansionRequest = {
+                    relativePath = path
+                    isExpanded = willExpand
+                }
+
                 let reportExpansionError (error: exn) =
                     errorModal.enqueue (
                         ErrorModalRequest.create (
@@ -271,7 +274,7 @@ type FileTree =
                 }
                 |> Promise.catch reportExpansionError
                 |> Promise.start
-            | _ -> ()
+            | None -> ()
 
         let openDialog dialog =
             setIsDialogBusy false

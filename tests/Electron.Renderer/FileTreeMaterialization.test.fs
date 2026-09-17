@@ -48,31 +48,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "creates expansion requests independently of directory depth",
-            fun () ->
-                Vitest
-                    .expect(
-                        tryCreateDirectoryExpansionRequest "studies/S1" true
-                        |> Option.map _.relativePath
-                    )
-                    .toEqual (Some "studies/S1")
-
-                Vitest
-                    .expect(
-                        tryCreateDirectoryExpansionRequest "studies/S1/dataset" true
-                        |> Option.map _.isExpanded
-                    )
-                    .toEqual (Some true)
-
-                Vitest
-                    .expect(
-                        tryCreateDirectoryExpansionRequest "studies/S1/dataset" false
-                        |> Option.map _.isExpanded
-                    )
-                    .toEqual (Some false)
-        )
-
-        Vitest.test (
             "maps an unmaterialized non-empty directory without children or expansion state",
             fun () ->
                 let directory =
