@@ -364,7 +364,7 @@ let private isArcZone segment =
     ]
     |> List.exists (PathHelpers.pathsEqual segment)
 
-let private tryGetWatcherRelativePath arcPath path =
+let tryGetWatcherRelativePath arcPath path =
     match tryGetRepoRelativePathOrRoot arcPath path with
     | Some relativePath -> Some relativePath
     | None when
@@ -416,6 +416,7 @@ let createWatcherOptions
     (cwd: string)
     (usePolling: bool option)
     (ignored: U4<string, ResizeArray<string>, string -> bool, System.Func<string, Filesystem.Stats, bool>>)
+    (depth: int option)
     =
 
     // Native Windows file events can keep handles that block app-initiated folder renames.
@@ -431,12 +432,61 @@ let createWatcherOptions
                 ignoreInitial = true,
                 usePolling = true,
                 interval = 200,
-                binaryInterval = 400
+                binaryInterval = 400,
+                ?depth = depth
             )
         else
-            Chokidar.WatchOptions(cwd = cwd, awaitWriteFinish = true, ignored = ignored, ignoreInitial = true)
+            Chokidar.WatchOptions(
+                cwd = cwd,
+                awaitWriteFinish = true,
+                ignored = ignored,
+                ignoreInitial = true,
+                ?depth = depth
+            )
 
     watcherOptions
+
+let createArcStructureWatcherPaths (arcPath: string) =
+    let rootPath = "."
+
+    let structuralPaths =
+        [|
+            ArcPathHelper.StudiesFolderName
+            ArcPathHelper.AssaysFolderName
+            ArcPathHelper.WorkflowsFolderName
+            ArcPathHelper.RunsFolderName
+        |]
+        |> Array.collect (fun zone ->
+            let absoluteZonePath = ArcPathHelper.combine arcPath zone
+
+            if Filesystem.existsSync absoluteZonePath then
+                let entityPaths =
+                    Filesystem.readdirSync absoluteZonePath
+                    |> Array.choose (fun entry ->
+                        let relativePath = ArcPathHelper.combine zone entry
+                        let absolutePath = ArcPathHelper.combine arcPath relativePath
+
+                        try
+                            if Filesystem.statSync(absolutePath).isDirectory () then
+                                Some(PathHelpers.normalizeCanonicalRelativePath relativePath)
+                            else
+                                None
+                        with _ ->
+                            None
+                    )
+
+                Array.append [| zone |] entityPaths
+            else
+                [||]
+        )
+
+    Array.append [| rootPath |] structuralPaths
+
+let isArcStructureWatchScopePath (relativePath: string) =
+    match getNonEmptyPathParts relativePath with
+    | [| zone |] -> isArcZone zone
+    | [| zone; _ |] -> isArcZone zone
+    | _ -> false
 
 let createFileWatcher (path: string) (usePolling: bool option) =
     let ignoreFn = shouldIgnoreForArcStructureWatcher path
@@ -444,9 +494,10 @@ let createFileWatcher (path: string) (usePolling: bool option) =
     let ignored: U4<string, ResizeArray<string>, string -> bool, System.Func<string, Filesystem.Stats, bool>> =
         !^(System.Func<string, Filesystem.Stats, bool>(ignoreFn))
 
-    let watcherOptions = createWatcherOptions path usePolling ignored
+    let watcherOptions = createWatcherOptions path usePolling ignored (Some 0)
 
-    let watcher = Chokidar.Chokidar.watch (path, watcherOptions)
+    let watcher =
+        Chokidar.Chokidar.watch (createArcStructureWatcherPaths path, watcherOptions)
 
     watcher
 

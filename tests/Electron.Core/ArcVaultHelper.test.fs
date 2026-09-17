@@ -404,17 +404,19 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "watcher options do not limit traversal depth",
+            "watcher options support explicit shallow scopes",
             fun () ->
                 let ignored: U4<string, ResizeArray<string>, string -> bool, System.Func<string, Stats, bool>> =
                     unbox (fun (_: string) -> false)
 
-                let expandedDirectoryOptions = createWatcherOptions "C:/arc" (Some true) ignored
+                let recursiveOptions = createWatcherOptions "C:/arc" (Some true) ignored None
+                let shallowOptions = createWatcherOptions "C:/arc" (Some true) ignored (Some 0)
 
-                Vitest.expect(expandedDirectoryOptions.depth).toEqual (None)
-                Vitest.expect(expandedDirectoryOptions.usePolling).toEqual (Some true)
-                Vitest.expect(expandedDirectoryOptions.interval).toEqual (Some 200)
-                Vitest.expect(expandedDirectoryOptions.binaryInterval).toEqual (Some 400)
+                Vitest.expect(recursiveOptions.depth).toEqual (None)
+                Vitest.expect(shallowOptions.depth).toEqual (Some 0)
+                Vitest.expect(shallowOptions.usePolling).toEqual (Some true)
+                Vitest.expect(shallowOptions.interval).toEqual (Some 200)
+                Vitest.expect(shallowOptions.binaryInterval).toEqual (Some 400)
         )
 
         Vitest.test (
@@ -661,7 +663,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "expanded payload directories receive live updates only until collapsed",
+            "expanded directories are shallow watcher scopes until nested expansion",
             watcherTestOptions,
             fun () ->
                 TestHelpers.withTempArcWith
@@ -670,23 +672,21 @@ Vitest.describe (
                     ignore
                     (fun arcPath -> promise {
                         let expandedDirectory = join [| arcPath; "studies"; "S1"; "dataset" |]
-                        let secondExpandedDirectory = join [| arcPath; "studies"; "S1"; "dataset-two" |]
 
-                        let liveFilePath =
-                            join [| expandedDirectory; "live.txt" |] |> PathHelpers.normalizePath
-
-                        let secondLiveFilePath =
-                            join [| secondExpandedDirectory; "live.txt" |] |> PathHelpers.normalizePath
+                        let initialFilePath =
+                            join [| expandedDirectory; "raw.bin" |] |> PathHelpers.normalizePath
 
                         let collapsedFilePath =
-                            join [| expandedDirectory; "collapsed.txt" |] |> PathHelpers.normalizePath
+                            join [| expandedDirectory; "while-collapsed.txt" |] |> PathHelpers.normalizePath
 
-                        let stillLiveFilePath =
-                            join [| secondExpandedDirectory; "still-live.txt" |]
-                            |> PathHelpers.normalizePath
+                        let liveFilePath =
+                            join [| expandedDirectory; "while-expanded.txt" |] |> PathHelpers.normalizePath
+
+                        let collapsedAgainFilePath =
+                            join [| expandedDirectory; "collapsed-again.txt" |] |> PathHelpers.normalizePath
 
                         do! mkdirRecursiveAsync expandedDirectory
-                        do! mkdirRecursiveAsync secondExpandedDirectory
+                        do! writeTextFileAsync initialFilePath "initial"
 
                         let vault = ArcVault(TestHelpers.testWindow ())
 
@@ -697,25 +697,32 @@ Vitest.describe (
 
                         try
                             do! vault.OpenARC arcPath
-                            do! vault.SetFileTreeDirectoryExpanded("studies/S1/dataset", true)
-                            do! vault.SetFileTreeDirectoryExpanded("studies/S1/dataset-two", true)
+                            do! vault.SetFileTreeDirectoryExpanded("studies/S1", true)
                             Vitest.expect(vault.payloadWatcher.IsSome).toBe (true)
+                            Vitest.expect(vault.expandedDirectoryPaths.Count).toBe (1)
+
+                            Vitest
+                                .expect(vault.fileTree.ContainsKey(PathHelpers.normalizePath expandedDirectory))
+                                .toBe (true)
+
+                            do! writeTextFileAsync collapsedFilePath "collapsed"
+                            do! waitForWatcherBatch ()
+                            Vitest.expect(vault.fileTree.ContainsKey collapsedFilePath).toBe (false)
+
+                            do! vault.SetFileTreeDirectoryExpanded("studies/S1/dataset", true)
                             Vitest.expect(vault.expandedDirectoryPaths.Count).toBe (2)
+                            Vitest.expect(vault.fileTree.ContainsKey collapsedFilePath).toBe (true)
 
                             do! writeTextFileAsync liveFilePath "live"
-                            do! writeTextFileAsync secondLiveFilePath "live"
                             do! waitForWatcherBatch ()
                             Vitest.expect(vault.fileTree.ContainsKey liveFilePath).toBe (true)
-                            Vitest.expect(vault.fileTree.ContainsKey secondLiveFilePath).toBe (true)
 
                             do! vault.SetFileTreeDirectoryExpanded("studies/S1/dataset", false)
                             Vitest.expect(vault.expandedDirectoryPaths.Count).toBe (1)
 
-                            do! writeTextFileAsync collapsedFilePath "collapsed"
-                            do! writeTextFileAsync stillLiveFilePath "still live"
+                            do! writeTextFileAsync collapsedAgainFilePath "collapsed again"
                             do! waitForWatcherBatch ()
-                            Vitest.expect(vault.fileTree.ContainsKey collapsedFilePath).toBe (false)
-                            Vitest.expect(vault.fileTree.ContainsKey stillLiveFilePath).toBe (true)
+                            Vitest.expect(vault.fileTree.ContainsKey collapsedAgainFilePath).toBe (false)
                             do! vault.StopFileWatcher()
                         with error ->
                             do! vault.StopFileWatcher()

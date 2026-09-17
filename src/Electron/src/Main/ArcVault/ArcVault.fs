@@ -311,6 +311,15 @@ module ArcVaultExtensions =
             fun (eventName: string) (path: string) ->
                 swatelogfn this.window.id "File change detected: %s on %s" eventName path
 
+                if WatcherHelpers.eventNameEquals Chokidar.Events.AddDir eventName then
+                    match this.path, this.watcher with
+                    | Some arcPath, Some watcher ->
+                        match tryGetWatcherRelativePath arcPath path with
+                        | Some relativePath when isArcStructureWatchScopePath relativePath ->
+                            watcher.add (PathHelpers.normalizeCanonicalRelativePath relativePath) |> ignore
+                        | _ -> ()
+                    | _ -> ()
+
                 WatcherHelpers.queueFileWatcherEvent
                     (fun event ->
                         let importedPathKey =
@@ -344,7 +353,9 @@ module ArcVaultExtensions =
                     : U4<string, ResizeArray<string>, string -> bool, System.Func<string, Filesystem.Stats, bool>> =
                     !^(System.Func<string, Filesystem.Stats, bool>(ignoreFn))
 
-                let watcherOptions = createWatcherOptions arcPath usePolling ignored
+                // Every expanded directory is an independent shallow scope. Chokidar may observe its
+                // immediate child directories, but depth 0 prevents traversal into their descendants.
+                let watcherOptions = createWatcherOptions arcPath usePolling ignored (Some 0)
                 let watcher = Chokidar.Chokidar.watch (watchedPaths, watcherOptions)
 
                 let sendMsgApi =

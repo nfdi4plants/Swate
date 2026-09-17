@@ -53,6 +53,9 @@ let unlinkSync (path: string) : unit = jsNative
 [<Import("readdirSync", "fs")>]
 let readdirSync (path: string) : string array = jsNative
 
+[<Import("statSync", "fs")>]
+let statSync (path: string) : Stats = jsNative
+
 [<Import("mkdir", "fs/promises")>]
 let mkdirAsync (path: string) (options: MkdirOptions) : JS.Promise<obj> = jsNative
 
