@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Swate.Electron.Shared.GitTypes
+open Main.Bindings.Abort
 open Main.Bindings.SimpleGit
 open Main.Git.GitAuthAdapter
 

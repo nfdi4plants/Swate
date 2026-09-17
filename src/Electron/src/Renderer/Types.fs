@@ -29,6 +29,7 @@ type PageState =
     | GitUnsupportedPage of GitUnsupportedPageData
     | ErrorPage of string
     | DataHubBrowser
+    | ValidationPackageBrowser
     | SettingsPage
 
     static member fromFileContentDTO(dto: FileContentDTO) : PageState =

@@ -1,8 +1,8 @@
-module internal Swate.Components.Tests.ValidationPackageSelector.Helper
+module internal Swate.Components.Tests.ValidationPackageBrowser.Helper
 
 open ARCtrl.ValidationPackages
-open Swate.Components.Composite.ValidationPackageSelector.Helper
-open Swate.Components.Composite.ValidationPackageSelector.Types
+open Swate.Components.Page.ValidationPackageBrowser.Helper
+open Swate.Components.Page.ValidationPackageBrowser.Types
 open Vitest
 open ARCtrl.Helper.SemVer
 
@@ -43,7 +43,6 @@ type ValidationPackageDTO with
             PatchVersion = defaultArg patchVersion 0
             PreReleaseVersionSuffix = defaultArg preReleaseVersionSuffix ""
             BuildMetadataVersionSuffix = defaultArg buildMetadataVersionSuffix ""
-            PackageContent = [||]
             ReleaseDate = System.DateTime.UtcNow
             Tags = defaultArg tags [||]
             ReleaseNotes = ""
@@ -394,6 +393,98 @@ Vitest.describe (
                 let config = mkConfig [| "A", Some "1.0.0"; "Legacy", Some "1.0.0" |]
                 let pkgs = [| ValidationPackageDTO.mkDefault (name = "A") |]
                 Vitest.expect(unlistedNames config pkgs).toEqual [| "Legacy" |]
+        )
+)
+
+Vitest.describe (
+    "latestVersions",
+    fun () ->
+
+        Vitest.test (
+            "returns one package per name",
+            fun () ->
+                let pkgs = [|
+                    ValidationPackageDTO.mkDefault (name = "A", majorVersion = 1, minorVersion = 0, patchVersion = 0)
+                    ValidationPackageDTO.mkDefault (name = "A", majorVersion = 1, minorVersion = 1, patchVersion = 0)
+                    ValidationPackageDTO.mkDefault (name = "B", majorVersion = 2, minorVersion = 0, patchVersion = 0)
+                |]
+
+                Vitest.expect(latestVersions pkgs |> Array.map (fun p -> p.Name) |> Array.sort).toEqual [| "A"; "B" |]
+        )
+
+        Vitest.test (
+            "keeps the highest version of each package",
+            fun () ->
+                let pkgs = [|
+                    ValidationPackageDTO.mkDefault (name = "A", majorVersion = 1, minorVersion = 0, patchVersion = 0)
+                    ValidationPackageDTO.mkDefault (name = "A", majorVersion = 1, minorVersion = 2, patchVersion = 0)
+                    ValidationPackageDTO.mkDefault (name = "A", majorVersion = 1, minorVersion = 1, patchVersion = 9)
+                |]
+
+                let result = latestVersions pkgs
+
+                Vitest.expect(result).toHaveLength 1
+                Vitest.expect(toVersionString result.[0]).toBe "1.2.0"
+        )
+
+        Vitest.test (
+            "works regardless of input order",
+            fun () ->
+                let latest =
+                    ValidationPackageDTO.mkDefault (name = "A", majorVersion = 2, minorVersion = 0, patchVersion = 0)
+
+                let older =
+                    ValidationPackageDTO.mkDefault (name = "A", majorVersion = 1, minorVersion = 5, patchVersion = 0)
+
+                Vitest.expect(latestVersions [| older; latest |] |> Array.map toVersionString).toEqual [| "2.0.0" |]
+                Vitest.expect(latestVersions [| latest; older |] |> Array.map toVersionString).toEqual [| "2.0.0" |]
+        )
+
+        Vitest.test (
+            "prefers a release version over a pre-release version",
+            fun () ->
+                let release =
+                    ValidationPackageDTO.mkDefault (name = "A", majorVersion = 1, minorVersion = 0, patchVersion = 0)
+
+                let prerelease =
+                    ValidationPackageDTO.mkDefault (
+                        name = "A",
+                        majorVersion = 1,
+                        minorVersion = 0,
+                        patchVersion = 0,
+                        preReleaseVersionSuffix = "alpha.1"
+                    )
+
+                Vitest.expect(latestVersions [| prerelease; release |] |> Array.map toVersionString).toEqual [|
+                    "1.0.0"
+                |]
+
+                Vitest.expect(latestVersions [| release; prerelease |] |> Array.map toVersionString).toEqual [|
+                    "1.0.0"
+                |]
+        )
+
+        Vitest.test (
+            "represents an ordinary release without empty prerelease or build identifiers",
+            fun () ->
+                let version = (ValidationPackageDTO.mkDefault ()).ToSemVer()
+
+                Vitest.expect(version.PreRelease).toEqual None
+                Vitest.expect(version.Metadata).toEqual None
+        )
+
+        Vitest.test (
+            "keeps the current package when the candidate version is not a valid SemVer",
+            fun () ->
+                let current =
+                    ValidationPackageDTO.mkDefault (name = "A", majorVersion = 1, minorVersion = 0, patchVersion = 0)
+
+                let invalid = {
+                    current with
+                        PreReleaseVersionSuffix = "!!invalid!!"
+                }
+
+                Vitest.expect(latestVersions [| current; invalid |] |> Array.map toVersionString).toEqual [| "1.0.0" |]
         )
 )
 

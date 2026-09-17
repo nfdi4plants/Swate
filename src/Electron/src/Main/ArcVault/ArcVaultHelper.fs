@@ -141,6 +141,33 @@ let swatelogfn id fmt =
 let swatefailfn id fmt =
     Printf.kprintf (fun s -> failwith ("[Swate-" + string id + "] " + s)) fmt
 
+/// Serializes ARC merge operations through a single FIFO owner. Individual operation failures
+/// reject their caller's promise without terminating the queue processor.
+type internal ArcMergeQueue(windowId: int) =
+
+    let mailbox =
+        MailboxProcessor.Start(fun inbox ->
+            let rec processNext () = async {
+                let! operation = inbox.Receive()
+                do! operation () |> Async.AwaitPromise
+                return! processNext ()
+            }
+
+            processNext ()
+        )
+
+    member _.Enqueue<'T>(operation: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+        JS.Constructors.Promise.Create(fun resolve reject ->
+            mailbox.Post(fun () -> promise {
+                try
+                    let! result = operation ()
+                    resolve result
+                with error ->
+                    swatelogfn windowId "Queued ARC merge failed: %s" error.Message
+                    reject error
+            })
+        )
+
 type OpenArcRootRenamePlan = {
     SourcePath: string
     TargetPath: string
@@ -279,7 +306,7 @@ let createWindow () = promise {
 
     let mainWindowOptions =
         BrowserWindowConstructorOptions(
-            title = "Swate",
+            title = Swate.Electron.Shared.ApplicationVersion.windowTitle None,
             icon = (windowIconPath |> U2.Case2),
             width = int screenSize.width,
             height = int screenSize.height,
@@ -318,16 +345,17 @@ let shouldUsePollingByDefault (platform: string) =
 let private currentNodePlatform () : string =
     emitJsExpr () "process.platform" |> unbox<string>
 
+let isFileWatcherPathIgnored (path: string) =
+    let normalizedPath = PathHelpers.normalizeSeparators path
+    let tempXlsxPattern = """\.~\$.*\.xlsx$"""
+    let temporaryImportPattern = """(^|/)\.swate-import-[0-9a-fA-F]{32}(/|$)"""
+
+    System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
+    || isGitMetadataPath normalizedPath
+    || isLegacyDataMapPath normalizedPath
+    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryImportPattern)
+
 let createFileWatcher (path: string) (usePolling: bool option) =
-
-    let ignoreFn =
-        fun (path: string) ->
-            let normalizedPath = PathHelpers.normalizeSeparators path
-            let tempXlsxPattern = """\.~\$.*\.xlsx$"""
-
-            System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
-            || isGitMetadataPath normalizedPath
-            || isLegacyDataMapPath normalizedPath
 
     // Native Windows file events can keep handles that block app-initiated folder renames.
     let usePolling =
@@ -338,14 +366,19 @@ let createFileWatcher (path: string) (usePolling: bool option) =
             Chokidar.WatchOptions(
                 cwd = path,
                 awaitWriteFinish = true,
-                ignored = !^ignoreFn,
+                ignored = !^isFileWatcherPathIgnored,
                 ignoreInitial = true,
                 usePolling = true,
                 interval = 200,
                 binaryInterval = 400
             )
         else
-            Chokidar.WatchOptions(cwd = path, awaitWriteFinish = true, ignored = !^ignoreFn, ignoreInitial = true)
+            Chokidar.WatchOptions(
+                cwd = path,
+                awaitWriteFinish = true,
+                ignored = !^isFileWatcherPathIgnored,
+                ignoreInitial = true
+            )
 
     let watcher = Chokidar.Chokidar.watch (path, watcherOptions)
 

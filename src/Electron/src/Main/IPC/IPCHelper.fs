@@ -43,3 +43,14 @@ module IPCHelper =
             finally
                 vault.isBusyWriting <- false
         }
+
+    let withExclusiveBusyWriting
+        (vault: ArcVault)
+        (operation: unit -> JS.Promise<Result<'T, exn>>)
+        : JS.Promise<Result<'T, exn>> =
+        if vault.isBusyWriting then
+            JS.Constructors.Promise.resolve (
+                Error(exn "Swate is still saving another change. Please wait a moment and try again.")
+            )
+        else
+            withBusyWriting vault operation

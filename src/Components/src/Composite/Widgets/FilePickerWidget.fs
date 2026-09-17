@@ -4,6 +4,7 @@ open ARCtrl
 open Fable.Core
 open Feliz
 open Swate.Components
+open Swate.Components.Composite.DataMapTable.ClipboardTarget
 open Swate.Components.JsBindings
 open Swate.Components.Shared
 open Swate.Components.Primitive
@@ -91,15 +92,16 @@ module private FilePickerWidgetHelper =
             let columnIndex = selection.xStart
             let mutable rowIndex = selection.yStart
 
+            // GetCellAt also resolves cells that were never stored, for example the Input and
+            // Output cells of a freshly imported template row, which TryGetCellAt reports as missing.
             let cellsToInsert = [|
                 for path in paths do
-                    match nextTable.TryGetCellAt(columnIndex, rowIndex) with
-                    | Some cell ->
+                    if columnIndex < nextTable.ColumnCount && rowIndex < nextTable.RowCount then
+                        let cell = nextTable.GetCellAt(columnIndex, rowIndex)
                         let nextCell = cell.UpdateMainField path
                         let coordinate: CellCoordinate = {| x = columnIndex; y = rowIndex |}
                         coordinate, nextCell
                         rowIndex <- rowIndex + 1
-                    | None -> ()
             |]
 
             if cellsToInsert.Length = 0 then
@@ -110,13 +112,12 @@ module private FilePickerWidgetHelper =
         | Some(InsertTarget.DataMap selection) ->
             match nextArcFile.TryGetDataMap() with
             | Some dataMap ->
-                dataMap.PasteTabText(
-                    {|
-                        x = selection.xStart
-                        y = selection.yStart
-                    |},
-                    String.concat System.Environment.NewLine paths
-                )
+                let anchor: CellCoordinate = {|
+                    x = selection.xStart
+                    y = selection.yStart
+                |}
+
+                dataMap.PasteTabText(anchor, [| anchor |], String.concat System.Environment.NewLine paths)
 
                 setArcFile nextArcFile
             | None -> ()

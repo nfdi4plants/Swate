@@ -103,3 +103,24 @@ type CreateFileSystemItemRequest = {
     name: string
     kind: FileSystemItemKind
 }
+
+type ImportExternalFilesRequest = {
+    requestId: string
+    targetRelativePath: string
+    authorizationId: string
+}
+
+[<RequireQualifiedAccess>]
+type ImportExternalFilesResult =
+    | Completed
+    | Cancelled
+
+[<RequireQualifiedAccess>]
+type FileImportPhase =
+    | Copying
+    | Finalizing
+
+type ActiveFileImportState = {
+    requestId: string
+    phase: FileImportPhase
+}

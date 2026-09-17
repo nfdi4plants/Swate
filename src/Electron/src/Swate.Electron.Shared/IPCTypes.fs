@@ -5,6 +5,7 @@ open Fable.Core
 open Swate.Components.Api.GitLabApi
 open Swate.Components.Composite.Authentication.Types
 open Swate.Components.Page.DataHub.DataHubTypes
+open Swate.Components.Page.ValidationPackageBrowser.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.DTOs.NoteSearchDto
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
@@ -32,6 +33,12 @@ type ITemplateApi = {
 }
 
 /// Two Way Bridge: Renderer <-> Main
+/// PackageContent is intentionally omitted from ValidationPackageDTO to avoid moving large payloads over IPC.
+type IValidationPackageIPC = {
+    getAllPackages: unit -> JS.Promise<Result<ValidationPackageDTO[], exn>>
+}
+
+/// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
     /// Open ARC via folder dialog. Main decides: current window / new window / focus existing.
     openARC: unit -> JS.Promise<Result<string option, exn>>
@@ -48,8 +55,11 @@ type IArcVaultsApi = {
 
     pickArcPaths: unit -> JS.Promise<Result<string[], exn>>
     pickDirectory: unit -> JS.Promise<Result<string, exn>>
-    pickAbsolutePaths: unit -> JS.Promise<Result<string[], exn>>
+    pickAbsolutePaths: unit -> JS.Promise<Result<string option, exn>>
     pickExternalTextFiles: unit -> JS.Promise<Result<ImportedTextFile[], exn>>
+    tryImportExternalFiles: ImportExternalFilesRequest -> JS.Promise<Result<ImportExternalFilesResult, exn>>
+    cancelImportExternalFiles: string -> JS.Promise<Result<unit, exn>>
+    getActiveFileImport: unit -> JS.Promise<Result<ActiveFileImportState option, exn>>
     getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
     pathExists: string -> JS.Promise<Result<bool, exn>>
     openFile: string -> JS.Promise<Result<FileContentDTO, exn>>
@@ -152,6 +162,10 @@ module MainToRendererIpc =
 
     type IFileTreeRendererApi = {
         fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
+    }
+
+    type IFileImportRendererApi = {
+        fileImportStateUpdate: ActiveFileImportState option -> unit
     }
 
     type IGitProgressRendererApi = {

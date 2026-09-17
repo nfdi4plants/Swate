@@ -9,11 +9,13 @@ Remoting.createIpc () |> Remoting.buildTwoWayBridge<IGitApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IGitLabApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IAuthApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<ITemplateApi>
+Remoting.createIpc () |> Remoting.buildTwoWayBridge<IValidationPackageIPC>
 
 Remoting.createIpc () |> Remoting.buildBridge<IPathChangeRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IRecentArcsRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IAuthAccountsRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IFileTreeRendererApi>
+Remoting.createIpc () |> Remoting.buildBridge<IFileImportRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IGitProgressRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IGitRepositoryRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IGitLfsProgressRendererApi>

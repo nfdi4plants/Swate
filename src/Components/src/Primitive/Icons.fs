@@ -76,6 +76,7 @@ type Icons =
 
     static member FileImport() =
         Html.i [
+            prop.className "swt:rotate-180"
             prop.dangerouslySetInnerHTML
                 """<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"><path fill="currentColor" d="M20 14V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4h-7v3l-5-4l5-4v3zM13 4l5 5h-5z"/></svg>"""
         ]

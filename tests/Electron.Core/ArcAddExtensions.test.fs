@@ -128,6 +128,65 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "recreating a deleted DataMap does not restore deleted data",
+            fun () ->
+                withTempArc
+                    (fun arc ->
+                        let dataMap = DataMap.init ()
+                        dataMap.DataContexts.Add(DataContext(label = "Deleted data"))
+
+                        let assay = ArcAssay("DataMapAssay")
+                        assay.DataMap <- Some dataMap
+                        arc.AddAssay assay
+                    )
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+                        let parentInfo = DatamapParentInfo.create "DataMapAssay" DataMapParent.Assay
+
+                        match! arc.TryDeleteDataMapAsync(arcPath, parentInfo) with
+                        | Error error -> failwith error.Message
+                        | Ok() -> ()
+
+                        let emptyDataMap = DataMap.init ()
+                        Vitest.expect(emptyDataMap.DataContexts.Count).toBe (0)
+
+                        let request =
+                            FileContentDTO.fromArcFile (ArcFiles.DataMap(Some parentInfo, emptyDataMap))
+                            |> expectSome
+                            <| "Expected DataMap DTO."
+
+                        let requestedArcFile =
+                            FileContentDTO.toArcFile request |> expectSome <| "Expected request."
+
+                        let requestedDataMap =
+                            requestedArcFile.TryGetDataMap() |> expectSome <| "Expected requested DataMap."
+
+                        Vitest.expect(requestedDataMap.DataContexts.Count).toBe (0)
+
+                        match! arc.TryAddArcFileAsync(arcPath, requestedArcFile, false) with
+                        | Error errors -> failwith (PathHelpers.formatContractErrors errors)
+                        | Ok _ -> ()
+
+                        let recreatedDataMap =
+                            arc.GetAssay("DataMapAssay").DataMap |> expectSome <| "Expected DataMap."
+
+                        Vitest.expect(recreatedDataMap.DataContexts.Count).toBe (0)
+
+                        let! reloadedArc = loadArcAsync arcPath
+
+                        let persistedDataMap =
+                            reloadedArc.GetAssay("DataMapAssay").DataMap |> expectSome
+                            <| "Expected persisted DataMap."
+
+                        let containsDeletedData =
+                            persistedDataMap.DataContexts
+                            |> Seq.exists (fun context -> context.Label = Some "Deleted data")
+
+                        Vitest.expect(containsDeletedData).toBe (false)
+                    })
+        )
+
+        Vitest.test (
             "adding a DataMap does not persist unrelated dirty in-memory changes",
             fun () ->
                 withTempArc

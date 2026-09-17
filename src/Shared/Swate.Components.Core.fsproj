@@ -21,6 +21,7 @@
     <Compile Include="PathHelpers.fs" />
     <Compile Include="GitLfsRules.fs" />
     <Compile Include="Database.fs" />
+    <Compile Include="ARCtrl\DataMapCopyWorkaround.fs" />
     <Compile Include="ARCtrl.Helper.fs" />
     <Compile Include="DTOs\AdvancedSearch.fs" />
     <Compile Include="DTOs\ParentTermQuery.fs" />
