@@ -12,6 +12,30 @@ type ArcTable with
         let c = this.GetCellAt(index).GetEmptyCellFixed()
         this.SetCellAt(cellIndex.x - 1, cellIndex.y - 1, c)
 
+    /// <summary>
+    /// Appends empty rows like <c>AddRowsEmpty</c>, but new cells in unitized columns
+    /// inherit the unit of the last existing row instead of starting without one.
+    /// </summary>
+    member this.AddRowsEmptyKeepingUnits(rowCount: int) =
+        let previousRowCount = this.RowCount
+
+        let unitsByColumn =
+            if previousRowCount = 0 then
+                [||]
+            else
+                [|
+                    for columnIndex in 0 .. this.ColumnCount - 1 do
+                        match this.TryGetCellAt(columnIndex, previousRowCount - 1) with
+                        | Some(CompositeCell.Unitized(_, unit)) when not (unit.isEmpty ()) -> columnIndex, unit
+                        | _ -> ()
+                |]
+
+        this.AddRowsEmpty rowCount
+
+        for columnIndex, unit in unitsByColumn do
+            for rowIndex in previousRowCount .. this.RowCount - 1 do
+                this.SetCellAt(columnIndex, rowIndex, CompositeCell.Unitized("", unit.Copy()), true)
+
     member this.SetCellsAt(cells: (CellCoordinate * CompositeCell)[]) =
         let columns = cells |> Array.groupBy (fun (index, cell) -> index)
 

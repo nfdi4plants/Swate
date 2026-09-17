@@ -253,7 +253,7 @@ type Main =
         let addRowsWithCount rowCount =
             match tryGetAddRowsTarget () with
             | Some(AddRowsTarget.Table table) ->
-                table.AddRowsEmpty rowCount
+                table.AddRowsEmptyKeepingUnits rowCount
                 setArcFileState (ArcFiles.refreshRef arcFileState)
             | Some(AddRowsTarget.DataMap dataMap) ->
                 dataMap.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
@@ -497,6 +497,18 @@ type Main =
                         )
 
                         template.Table.AddRowsEmpty(1)
+
+                        // A unitized parameter lets stories cover the "With Units" import mode.
+                        template.Table.AddColumn(
+                            CompositeHeader.Parameter(OntologyAnnotation("Temperature", "NCIT", "NCIT:C25206")),
+                            ResizeArray [
+                                CompositeCell.createUnitized (
+                                    "21",
+                                    OntologyAnnotation("degree celsius", "UO", "UO:0000027")
+                                )
+                            ]
+                        )
+
                         template.Version <- "1.0.0"
                         template
 
