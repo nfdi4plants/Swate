@@ -248,7 +248,10 @@ Vitest.describe (
                 tree.Add("C:/arc/assays/AB", createFileEntry "C:/arc/assays/AB" true)
                 tree.Add("C:/arc/assays/AB/isa.assay.xlsx", createFileEntry "C:/arc/assays/AB/isa.assay.xlsx" false)
 
-                let updatedTree = FileTreeCreator.removePathAndDescendants "C:/arc/assays/A" tree
+                let updatedTree =
+                    let nextTree = Dictionary<string, FileEntry>(tree)
+                    FileTreeCreator.removePathAndDescendantsInPlace "C:/arc/assays/A" nextTree
+                    nextTree
 
                 Vitest.expect(updatedTree.ContainsKey("C:/arc/assays/A")).toBe (false)
                 Vitest.expect(updatedTree.ContainsKey("C:/arc/assays/A/isa.assay.xlsx")).toBe (false)
@@ -288,7 +291,10 @@ Vitest.describe (
                 tree.Add("C:/arc/other.bin", createFileEntry "C:/arc/other.bin" false None)
 
                 let updatedTree =
-                    FileTreeCreator.upsertFileEntry (createFileEntry "C:/arc/data.bin" false (Some pointerInfo)) tree
+                    let fileEntry = createFileEntry "C:/arc/data.bin" false (Some pointerInfo)
+                    let nextTree = Dictionary<string, FileEntry>(tree)
+                    FileTreeCreator.upsertFileEntryInPlace fileEntry nextTree
+                    nextTree
 
                 Vitest.expect(updatedTree.Count).toBe (2)
                 Vitest.expect(updatedTree.["C:/arc/data.bin"].lfs).toEqual (Some pointerInfo)
@@ -302,7 +308,10 @@ Vitest.describe (
                 tree.Add("C:/arc/data.bin", createFileEntry "C:/arc/data.bin" false None)
 
                 let updatedTree =
-                    FileTreeCreator.upsertFileEntry (createFileEntry "C:/arc/data.bin" false (Some pointerInfo)) tree
+                    let fileEntry = createFileEntry "C:/arc/data.bin" false (Some pointerInfo)
+                    let nextTree = Dictionary<string, FileEntry>(tree)
+                    FileTreeCreator.upsertFileEntryInPlace fileEntry nextTree
+                    nextTree
 
                 Vitest.expect(tree.["C:/arc/data.bin"].lfs).toEqual (None)
                 Vitest.expect(updatedTree.["C:/arc/data.bin"].lfs).toEqual (Some pointerInfo)

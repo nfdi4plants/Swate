@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🐛 Fixed
+
+-   Speed up large ARCs by avoiding repeated Git LFS metadata scans and limiting payload monitoring to folders currently expanded in the File Explorer #1340.
+
 ## 2.3.1 - 2026-09-16
 
 ### 🐛 Fixed

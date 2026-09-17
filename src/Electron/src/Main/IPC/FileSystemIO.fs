@@ -3,6 +3,7 @@ module Main.IPC.FileSystemIO
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Main.Bindings.Filesystem
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
@@ -92,6 +93,22 @@ let pathExistsAsync (absolutePath: string) : JS.Promise<bool> = promise {
         return true
     else
         return! ARCtrl.FileSystemHelper.directoryExistsAsync absolutePath
+}
+
+/// Resolves and validates an existing ARC-relative directory for subtree refreshes.
+let tryResolveExistingArcDirectoryPath (arcPath: string) (relativePath: string) : JS.Promise<Result<string, exn>> = promise {
+    match tryResolveArcRelativePath arcPath relativePath with
+    | Error pathError -> return Error pathError
+    | Ok absolutePath ->
+        try
+            let! stats = statAsync absolutePath
+
+            if stats.isDirectory () then
+                return Ok absolutePath
+            else
+                return Error(exn $"Path '{relativePath}' is not a directory.")
+        with _ ->
+            return Error(exn $"Path '{relativePath}' does not exist.")
 }
 
 let mkdirAsync (directoryPath: string) : JS.Promise<unit> =
@@ -641,7 +658,9 @@ module ArcFileSystemHelper =
 
                     if
                         sourceIsDirectory
-                        && PathHelpers.isSameOrDescendantPath genericMovePlan.TargetPath genericMovePlan.SourcePath
+                        && PathHelpers.isSameOrDescendantPathForFsComparison
+                            genericMovePlan.TargetPath
+                            genericMovePlan.SourcePath
                     then
                         return Error(exn "Move target must not be inside the source path.")
                     else
@@ -659,7 +678,9 @@ module ArcFileSystemHelper =
                             | Error removeError -> return Error removeError
                             | Ok() -> return! moveToTargetAsync ()
                         | false, _ when
-                            PathHelpers.isSameOrDescendantPath genericMovePlan.TargetPath genericMovePlan.SourcePath
+                            PathHelpers.isSameOrDescendantPathForFsComparison
+                                genericMovePlan.TargetPath
+                                genericMovePlan.SourcePath
                             ->
                             return!
                                 moveFileIntoDescendantPathOnDisk

@@ -39,7 +39,7 @@ module PathHelpers =
 
         String.IsNullOrWhiteSpace normalizedAncestorPath
         || normalizedPath = normalizedAncestorPath
-        || normalizedPath.StartsWith(normalizedAncestorPath + "/", StringComparison.OrdinalIgnoreCase)
+        || normalizedPath.StartsWith(normalizedAncestorPath + "/", StringComparison.Ordinal)
 
     let isSameOrDescendantPathForFsComparison (path: string) (ancestorPath: string) =
         let normalizedPath = normalizePathForFsComparison path
@@ -57,7 +57,7 @@ module PathHelpers =
 
         if normalizeForComparison normalizedPath = normalizeForComparison normalizedSourcePath then
             Some normalizedTargetPath
-        elif isSameOrDescendantPath normalizedPath normalizedSourcePath then
+        elif isSameOrDescendantPathForFsComparison normalizedPath normalizedSourcePath then
             Some(normalizedTargetPath + normalizedPath.Substring(normalizedSourcePath.Length))
         else
             None

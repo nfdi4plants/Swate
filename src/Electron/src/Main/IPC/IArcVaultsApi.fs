@@ -1,6 +1,7 @@
 module Main.IPC.ArcVaultsApi
 
 open System
+open System.Collections.Generic
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
@@ -555,6 +556,29 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    setFileTreeDirectoryExpanded =
+        fun (request: FileTreeDirectoryExpansionRequest) -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            if request.isExpanded then
+                                match! tryResolveExistingArcDirectoryPath vault.path.Value request.relativePath with
+                                | Error pathError -> return Error pathError
+                                | Ok _ ->
+                                    do! vault.SetFileTreeDirectoryExpanded(request.relativePath, true)
+                                    return Ok()
+                            else
+                                match tryResolveArcRelativePath vault.path.Value request.relativePath with
+                                | Error pathError -> return Error pathError
+                                | Ok _ ->
+                                    do! vault.SetFileTreeDirectoryExpanded(request.relativePath, false)
+                                    return Ok()
+                        })
+            with e ->
+                return Error e
+        }
     pathExists =
         fun (relativePath: string) ->
             runLoadedArcPathAction
@@ -581,7 +605,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             if vault.fileTree.Count > 0 then
                                 promise { return vault.fileTree.Values |> Seq.toArray }
                             else
-                                getFileEntries arcPath
+                                getFileEntriesInSubtree arcPath arcPath
 
                         let! notes = Main.NoteSearchReader.readNotes arcPath fileEntries
                         return Ok(notes |> Array.map NoteSearchNoteDto.ofNote)
@@ -729,9 +753,12 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             let absoluteDataMapPath =
                                                 Main.Bindings.Path.join [| arcPath; normalizedDataMapPath |]
 
-                                            vault.SetFileTree(
-                                                removePathAndDescendants absoluteDataMapPath vault.fileTree
-                                            )
+                                            let updatedFileTree =
+                                                let nextTree = Dictionary<string, FileEntry>(vault.fileTree)
+                                                removePathAndDescendantsInPlace absoluteDataMapPath nextTree
+                                                nextTree
+
+                                            vault.SetFileTree(updatedFileTree)
 
                                             return Ok()
                                     finally

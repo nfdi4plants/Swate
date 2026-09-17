@@ -6,7 +6,9 @@ open Fable.Core.JsInterop
 open Fable.Electron.Main
 open Main.ARCtrlExtensions
 open Main.ArcVault
+open Main.ArcVaultFileTree
 open Main.ArcVaultHelper
+open Main.ArcVaultTypes
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Main.Notes.NoteConstants
@@ -19,6 +21,8 @@ open Vitest
 module FileImportCoordinator = Main.FileImportCoordinator
 module WatcherHelpers = Main.WatcherHelpers
 module Abort = Main.Bindings.Abort
+
+let private watcherTestOptions = TestOptions(timeout = 20000)
 
 let private runFileImport
     (vault: ArcVault)
@@ -121,7 +125,6 @@ Vitest.describe (
                     }
 
                 Vitest.expect(vault.activeFileImport.Value.State.phase = FileImportPhase.Copying).toBe (false)
-
                 Vitest.expect(vault.activeFileImport.Value.State.phase).toEqual (FileImportPhase.Finalizing)
 
                 finishImport ()
@@ -242,7 +245,6 @@ Vitest.describe (
                 Vitest.expect(continued).toBe (true)
             }
         )
-
 )
 
 let private lifecycleTestWindow id isDestroyed onSend =
@@ -400,6 +402,406 @@ Vitest.describe (
                 Vitest.expect(shouldUsePollingByDefault "WIN32").toBe (true)
                 Vitest.expect(shouldUsePollingByDefault "linux").toBe (false)
                 Vitest.expect(shouldUsePollingByDefault "darwin").toBe (false)
+        )
+
+        Vitest.test (
+            "watcher options support explicit shallow scopes",
+            fun () ->
+                let ignored: U4<string, ResizeArray<string>, string -> bool, System.Func<string, Stats, bool>> =
+                    unbox (fun (_: string) -> false)
+
+                let recursiveOptions = createWatcherOptions "C:/arc" (Some true) ignored None
+                let shallowOptions = createWatcherOptions "C:/arc" (Some true) ignored (Some 0)
+
+                Vitest.expect(recursiveOptions.depth).toEqual (None)
+                Vitest.expect(shallowOptions.depth).toEqual (Some 0)
+                Vitest.expect(shallowOptions.usePolling).toEqual (Some true)
+                Vitest.expect(shallowOptions.interval).toEqual (Some 200)
+                Vitest.expect(shallowOptions.binaryInterval).toEqual (Some 400)
+        )
+
+        Vitest.test (
+            "permanent watcher keeps ARC structure but prunes payload descendants",
+            fun () ->
+                let directoryStats =
+                    createObj [ "isDirectory" ==> (fun () -> true) ] |> unbox<Stats>
+
+                let fileStats = createObj [ "isDirectory" ==> (fun () -> false) ] |> unbox<Stats>
+
+                Vitest
+                    .expect(shouldIgnoreForArcStructureWatcher "C:/arc" "C:/arc/studies/S1/isa.study.xlsx" fileStats)
+                    .toBe (false)
+
+                Vitest
+                    .expect(shouldIgnoreForArcStructureWatcher "C:/arc" "C:/arc/studies/S1/dataset" directoryStats)
+                    .toBe (false)
+
+                Vitest
+                    .expect(shouldIgnoreForArcStructureWatcher "C:/arc" "C:/arc/studies/S1/dataset/data.raw" fileStats)
+                    .toBe (true)
+        )
+
+        Vitest.test (
+            "payload watcher prunes descendants until their directory is explicitly expanded",
+            fun () ->
+                let mutable expandedDirectories = Set.singleton "studies/S1"
+                let isExpanded path = expandedDirectories.Contains path
+
+                Vitest
+                    .expect(shouldIgnoreForPayloadWatcher "C:/arc" isExpanded "C:/arc/studies/S1/dataset")
+                    .toBe (false)
+
+                Vitest
+                    .expect(shouldIgnoreForPayloadWatcher "C:/arc" isExpanded "C:/arc/studies/S1/dataset/raw.bin")
+                    .toBe (true)
+
+                expandedDirectories <- expandedDirectories.Add "studies/S1/dataset"
+
+                Vitest
+                    .expect(shouldIgnoreForPayloadWatcher "C:/arc" isExpanded "C:/arc/studies/S1/dataset/raw.bin")
+                    .toBe (false)
+        )
+
+        Vitest.test (
+            "structural reconciliation finds canonical metadata without entering payload directories",
+            fun () -> promise {
+                let! arcPath = TestHelpers.createTempDirectoryAsync "swate-structure-reconcile-"
+                let entityPath = join [| arcPath; "studies"; "NewStudy" |]
+                let datasetPath = join [| entityPath; "dataset" |]
+
+                try
+                    do! mkdirRecursiveAsync datasetPath
+                    do! writeTextFileAsync (join [| entityPath; "isa.study.xlsx" |]) "metadata"
+                    do! writeTextFileAsync (join [| datasetPath; "raw.bin" |]) "payload"
+
+                    let! events = reconcileArcStructureScope arcPath "studies"
+
+                    Vitest.expect(events |> Array.contains ("addDir", "studies/NewStudy")).toBe (true)
+
+                    Vitest.expect(events |> Array.contains ("add", "studies/NewStudy/isa.study.xlsx")).toBe (true)
+
+                    Vitest.expect(events |> Array.contains ("addDir", "studies/NewStudy/dataset")).toBe (true)
+
+                    Vitest.expect(events |> Array.exists (fun (_, path) -> path.EndsWith("raw.bin"))).toBe (false)
+                    do! TestHelpers.removeDirectoryAsync arcPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync arcPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "waitForFileWatcherReady resolves from the native ready event",
+            fun () -> promise {
+                let mutable readyCallback: (unit -> unit) option = None
+
+                let watcher =
+                    createObj [
+                        "on"
+                        ==> (fun (eventName: obj) (callback: obj) ->
+                            if string eventName = "ready" then
+                                readyCallback <- Some(unbox callback)
+
+                            null
+                        )
+                    ]
+                    |> unbox<Main.Bindings.Chokidar.IWatcher>
+
+                let ready = waitForFileWatcherReady watcher
+                Vitest.expect(readyCallback.IsSome).toBe (true)
+                readyCallback.Value()
+                do! ready
+            }
+        )
+
+        Vitest.test (
+            "file-tree work is serialized in enqueue order",
+            fun () -> promise {
+                let vault = ArcVault(TestHelpers.testWindow ())
+                let order = ResizeArray<string>()
+
+                let delayedFirst =
+                    vault.fileTreeWorkQueue.EnqueueFileTreeWork(fun () -> promise {
+                        order.Add "first-start"
+
+                        do!
+                            Fable.Core.JS.Constructors.Promise.Create(fun resolve _ ->
+                                Fable.Core.JS.setTimeout (fun () -> resolve ()) 20 |> ignore
+                            )
+
+                        order.Add "first-end"
+                    })
+
+                let second =
+                    vault.fileTreeWorkQueue.EnqueueFileTreeWork(fun () -> promise { order.Add "second" })
+
+                do! delayedFirst
+                do! second
+                Vitest.expect(order.ToArray()).toEqual ([| "first-start"; "first-end"; "second" |])
+            }
+        )
+
+        Vitest.test (
+            "watcher batches normalize separators but preserve case-distinct paths",
+            fun () ->
+                let createEvent eventName relativePath : ArcVaultFileSystemEvent = {
+                    EventName = eventName
+                    RelativePath = relativePath
+                    AbsolutePath = $"C:/arc/{relativePath}"
+                }
+
+                let coalesced =
+                    [
+                        createEvent "add" "data/File.txt"
+                        createEvent "change" "other.txt"
+                        createEvent "unlink" "data\\File.txt"
+                        createEvent "change" "data/file.txt"
+                    ]
+                    |> WatcherHelpers.coalesceEventsByPath
+
+                Vitest.expect(coalesced.Length).toBe (3)
+                Vitest.expect(coalesced.[0].RelativePath).toBe ("other.txt")
+                Vitest.expect(coalesced.[1].EventName).toBe ("unlink")
+                Vitest.expect(coalesced.[2].RelativePath).toBe ("data/file.txt")
+        )
+
+        Vitest.test (
+            "only ARCtrl read-contract paths and entity-directory deletions request ARC merges",
+            fun () ->
+                let createEvent eventName relativePath : ArcVaultFileSystemEvent = {
+                    EventName = eventName
+                    RelativePath = relativePath
+                    AbsolutePath = $"C:/arc/{relativePath}"
+                }
+
+                [
+                    "change", "isa.investigation.xlsx"
+                    "change", "studies/S1/isa.study.xlsx"
+                    "change", "workflows/W1/workflow.cwl"
+                    "change", "runs/R1/run.cwl"
+                    "change", "runs/R1/run.yml"
+                    "unlinkDir", "assays/A1"
+                ]
+                |> List.iter (fun (eventName, path) ->
+                    Vitest.expect(WatcherHelpers.isArcMergeRelevant (createEvent eventName path)).toBe (true)
+                )
+
+                [
+                    "change", "studies/S1/dataset/raw.bin"
+                    "add", "notes/readme.md"
+                    "unlinkDir", "studies/S1/dataset"
+                ]
+                |> List.iter (fun (eventName, path) ->
+                    Vitest.expect(WatcherHelpers.isArcMergeRelevant (createEvent eventName path)).toBe (false)
+                )
+        )
+
+        Vitest.test (
+            "directory refresh validation rejects traversal, missing paths, and files",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-refresh-validation-"
+
+                try
+                    let directoryPath = join [| rootPath; "payload" |]
+                    let filePath = join [| rootPath; "payload.txt" |]
+                    do! mkdirRecursiveAsync directoryPath
+                    do! writeTextFileAsync filePath "payload"
+
+                    match! Main.IPC.FileSystemIO.tryResolveExistingArcDirectoryPath rootPath "payload" with
+                    | Error error -> failwith error.Message
+                    | Ok resolved -> Vitest.expect(PathHelpers.pathsEqual resolved directoryPath).toBe (true)
+
+                    match! Main.IPC.FileSystemIO.tryResolveExistingArcDirectoryPath rootPath "../outside" with
+                    | Ok _ -> failwith "Expected traversal to be rejected."
+                    | Error error -> Vitest.expect(error.Message).toContain ("traversal")
+
+                    match! Main.IPC.FileSystemIO.tryResolveExistingArcDirectoryPath rootPath "missing" with
+                    | Ok _ -> failwith "Expected a missing directory to be rejected."
+                    | Error error -> Vitest.expect(error.Message).toContain ("does not exist")
+
+                    match! Main.IPC.FileSystemIO.tryResolveExistingArcDirectoryPath rootPath "payload.txt" with
+                    | Ok _ -> failwith "Expected a file refresh request to be rejected."
+                    | Error error -> Vitest.expect(error.Message).toContain ("not a directory")
+
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "OpenARC waits for watcher startup and installs the ARC and eager file tree",
+            watcherTestOptions,
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-watcher-startup-"
+                    "WatcherStartupArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let vault = ArcVault(TestHelpers.testWindow ())
+
+                        try
+                            do! vault.OpenARC arcPath
+                            Vitest.expect(vault.watcher.IsSome).toBe (true)
+                            Vitest.expect(vault.arc.Value.Identifier).toBe ("WatcherStartupArc")
+                            Vitest.expect(vault.fileTree.Count).toBeGreaterThan (0)
+                            Vitest.expect(vault.isFileWatcherInitializing).toBe (false)
+                            do! vault.StopFileWatcher()
+                        with error ->
+                            do! vault.StopFileWatcher()
+                            return raise error
+                    })
+        )
+
+        Vitest.test (
+            "failed ARC startup closes the watcher and clears pending state",
+            watcherTestOptions,
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-watcher-startup-failure-"
+                let invalidArcPath = join [| rootPath; "not-an-arc" |]
+                do! mkdirRecursiveAsync invalidArcPath
+                let vault = ArcVault(TestHelpers.testWindow ())
+
+                vault.fileWatcherPendingEvents.Add {
+                    EventName = "change"
+                    RelativePath = "payload.txt"
+                    AbsolutePath = join [| invalidArcPath; "payload.txt" |]
+                }
+
+                try
+                    let mutable startupFailed = false
+
+                    try
+                        do! vault.OpenARC invalidArcPath
+                    with _ ->
+                        startupFailed <- true
+
+                    Vitest.expect(startupFailed).toBe (true)
+                    Vitest.expect(vault.watcher).toEqual (None)
+                    Vitest.expect(vault.path).toEqual (None)
+                    Vitest.expect(vault.arc).toEqual (None)
+                    Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (0)
+                    Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (0)
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! vault.StopFileWatcher()
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "expanded directories are shallow watcher scopes until nested expansion",
+            watcherTestOptions,
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-expanded-directory-watcher-"
+                    "ExpandedDirectoryWatcherArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let expandedDirectory = join [| arcPath; "studies"; "S1"; "dataset" |]
+
+                        let initialFilePath =
+                            join [| expandedDirectory; "raw.bin" |] |> PathHelpers.normalizePath
+
+                        let collapsedFilePath =
+                            join [| expandedDirectory; "while-collapsed.txt" |] |> PathHelpers.normalizePath
+
+                        let liveFilePath =
+                            join [| expandedDirectory; "while-expanded.txt" |] |> PathHelpers.normalizePath
+
+                        let collapsedAgainFilePath =
+                            join [| expandedDirectory; "collapsed-again.txt" |] |> PathHelpers.normalizePath
+
+                        do! mkdirRecursiveAsync expandedDirectory
+                        do! writeTextFileAsync initialFilePath "initial"
+
+                        let vault = ArcVault(TestHelpers.testWindow ())
+
+                        let waitForWatcherBatch () =
+                            Fable.Core.JS.Constructors.Promise.Create(fun resolve _ ->
+                                Fable.Core.JS.setTimeout (fun () -> resolve ()) 4500 |> ignore
+                            )
+
+                        try
+                            do! vault.OpenARC arcPath
+                            do! vault.SetFileTreeDirectoryExpanded("studies/S1", true)
+                            Vitest.expect(vault.payloadWatcher.IsSome).toBe (true)
+                            Vitest.expect(vault.expandedDirectoryPaths.Count).toBe (1)
+
+                            Vitest
+                                .expect(vault.fileTree.ContainsKey(PathHelpers.normalizePath expandedDirectory))
+                                .toBe (true)
+
+                            do! writeTextFileAsync collapsedFilePath "collapsed"
+                            do! waitForWatcherBatch ()
+                            Vitest.expect(vault.fileTree.ContainsKey collapsedFilePath).toBe (false)
+
+                            do! vault.SetFileTreeDirectoryExpanded("studies/S1/dataset", true)
+                            Vitest.expect(vault.expandedDirectoryPaths.Count).toBe (2)
+                            Vitest.expect(vault.fileTree.ContainsKey collapsedFilePath).toBe (true)
+
+                            do! writeTextFileAsync liveFilePath "live"
+                            do! waitForWatcherBatch ()
+                            Vitest.expect(vault.fileTree.ContainsKey liveFilePath).toBe (true)
+
+                            do! vault.SetFileTreeDirectoryExpanded("studies/S1/dataset", false)
+                            Vitest.expect(vault.expandedDirectoryPaths.Count).toBe (1)
+
+                            do! writeTextFileAsync collapsedAgainFilePath "collapsed again"
+                            do! waitForWatcherBatch ()
+                            Vitest.expect(vault.fileTree.ContainsKey collapsedAgainFilePath).toBe (false)
+                            do! vault.StopFileWatcher()
+                        with error ->
+                            do! vault.StopFileWatcher()
+                            return raise error
+                    })
+        )
+
+        Vitest.test (
+            "populated entity directories are reconciled when added after startup",
+            watcherTestOptions,
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-populated-entity-watcher-"
+                    "PopulatedEntityWatcherArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let sourceArcPath = join [| dirname arcPath; "source-arc" |]
+                        let sourceArc = ARC("SourceArc")
+                        sourceArc.AddStudy(ArcStudy("NewStudy"))
+                        do! sourceArc.WriteAsync sourceArcPath
+
+                        let sourceStudyPath = join [| sourceArcPath; "studies"; "NewStudy" |]
+                        let targetStudyPath = join [| arcPath; "studies"; "NewStudy" |]
+
+                        let targetMetadataPath =
+                            join [| targetStudyPath; "isa.study.xlsx" |] |> PathHelpers.normalizePath
+
+                        let vault = ArcVault(TestHelpers.testWindow ())
+
+                        try
+                            do! vault.OpenARC arcPath
+                            do! renameAsync sourceStudyPath targetStudyPath
+
+                            do!
+                                Fable.Core.JS.Constructors.Promise.Create(fun resolve _ ->
+                                    Fable.Core.JS.setTimeout (fun () -> resolve ()) 6000 |> ignore
+                                )
+
+                            Vitest.expect(vault.arc.Value.ContainsStudy("NewStudy")).toBe (true)
+
+                            Vitest
+                                .expect(vault.fileTree.ContainsKey(PathHelpers.normalizePath targetStudyPath))
+                                .toBe (true)
+
+                            Vitest.expect(vault.fileTree.ContainsKey targetMetadataPath).toBe (true)
+                            do! vault.StopFileWatcher()
+                        with error ->
+                            do! vault.StopFileWatcher()
+                            return raise error
+                    })
         )
 
         Vitest.test (
@@ -779,6 +1181,40 @@ Vitest.describe (
 
                             let! reloadedArc = TestHelpers.loadArcAsync targetPath
                             Vitest.expect(reloadedArc.Identifier).toBe ("RenameRootArc")
+                    })
+        )
+
+        Vitest.test (
+            "RenameOpenArcRoot restores expanded-directory watchers under the renamed root",
+            watcherTestOptions,
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-rename-expanded-watcher-"
+                    "RenameExpandedWatcherArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let expandedDirectory = join [| arcPath; "studies"; "S1"; "dataset" |]
+                        do! mkdirRecursiveAsync expandedDirectory
+                        let vault = ArcVault(TestHelpers.testWindow ())
+
+                        try
+                            do! vault.OpenARC arcPath
+                            do! vault.SetFileTreeDirectoryExpanded("studies/S1/dataset", true)
+
+                            match! vault.RenameOpenArcRoot "renamed-expanded-watcher" with
+                            | Error error -> failwith error.Message
+                            | Ok renamedPath ->
+                                Vitest.expect(vault.payloadWatcher.IsSome).toBe (true)
+                                Vitest.expect(vault.expandedDirectoryPaths.Count).toBe (1)
+
+                                Vitest
+                                    .expect(vault.expandedDirectoryPaths |> Seq.exactlyOne)
+                                    .toBe ("studies/S1/dataset")
+
+                            do! vault.StopFileWatcher()
+                        with error ->
+                            do! vault.StopFileWatcher()
+                            return raise error
                     })
         )
 

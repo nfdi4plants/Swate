@@ -158,6 +158,14 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "isSameOrDescendantPath preserves case-sensitive path identity",
+            fun () ->
+                Vitest.expect(PathHelpers.isSameOrDescendantPath "data/File/nested" "data\\File").toBe (true)
+                Vitest.expect(PathHelpers.isSameOrDescendantPath "data/file/nested" "data/File").toBe (false)
+                Vitest.expect(PathHelpers.isSameOrDescendantPath "data/file" "data/File").toBe (false)
+        )
+
+        Vitest.test (
             "isSameOrDescendantPathForFsComparison is case-insensitive and normalized",
             fun () ->
                 Vitest
