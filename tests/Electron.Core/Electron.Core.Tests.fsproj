@@ -34,6 +34,7 @@
     <Compile Include="ProvenanceGroupingReader.test.fs" />
     <Compile Include="ProvenanceGroupingState.test.fs" />
     <Compile Include="SecureAuthStore.test.fs" />
+    <Compile Include="VersionControlComposition.test.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Electron\src\Main\Main.fsproj" />

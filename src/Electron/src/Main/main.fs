@@ -13,6 +13,10 @@ app
         // Restore persisted auth before any IPC handlers fire
         Main.Auth.AuthService.tryRestoreFromStorage ()
 
+        // The provider catalog needs the settings root and the restored accounts.
+        Main.VersionControl.VersionControlRuntime.createProduction ()
+        |> Main.VersionControl.VersionControlRuntime.initialize
+
         ARC_VAULTS.RegisterVault() |> ignore
 
         Remoting.createIpc () |> Remoting.fromIpcMainEvent IPC.IGitApi.api

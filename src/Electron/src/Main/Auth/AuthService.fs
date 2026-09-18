@@ -204,6 +204,13 @@ let tryGetTokenForHost (host: string) : string option =
                 None
         )
 
+/// Usable token of one stored account, by local account id.
+let tryGetTokenForAccount (localSwateAccountId: string) : string option =
+    accounts
+    |> Map.tryFind localSwateAccountId
+    |> Option.filter canUseToken
+    |> Option.map _.Token
+
 /// Commit identity of an account user.
 /// The GitLab username is preferred over the display name so commits link to the account;
 /// accounts stored before usernames were persisted fall back to the display name.
