@@ -5,7 +5,6 @@
 /// Swate's own writes, and they refresh the file tree afterwards.
 module Main.IPC.IVersionControlApi
 
-open System.Collections.Generic
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
@@ -130,43 +129,12 @@ let private withSession
                 tracked.Complete()
     }
 
-/// Nested busy scopes per vault window. The vault flag is a plain boolean, so the
-/// depth is counted here and the flag only drops when the outermost mutation ends.
-let private busyDepth = Dictionary<int, int>()
-
 let private withBusyWritingNested (vault: ArcVault) (operation: unit -> JS.Promise<'T>) : JS.Promise<'T> =
-    // The depth is updated before the promise builder starts: a statement inside the
-    // builder runs one microtask later, and the operation must be registered before
-    // the IPC call returns to the renderer.
-    let key = vault.window.id
+    withBusyWritingScope vault operation
 
-    let depth =
-        match busyDepth.TryGetValue key with
-        | true, current -> current
-        | _ -> 0
-
-    busyDepth[key] <- depth + 1
-
-    if depth = 0 then
-        vault.isBusyWriting <- true
-
-    let release () =
-        let remaining = busyDepth[key] - 1
-
-        if remaining <= 0 then
-            busyDepth.Remove key |> ignore
-            vault.isBusyWriting <- false
-        else
-            busyDepth[key] <- remaining
-
-    promise {
-        try
-            return! operation ()
-        finally
-            release ()
-    }
-
-let private resultChangedState (result: Result<OperationResultDto<'U>, exn>) =
+/// Whether a result reports a change of the workspace, which is when the file tree
+/// is refreshed after a mutation.
+let resultChangedState (result: Result<OperationResultDto<'U>, exn>) =
     match result with
     | Ok(OperationResultDto.Succeeded outcome) -> outcome.Effect = OperationEffectDto.Performed
     | Ok(OperationResultDto.PartiallySucceeded _) -> true
@@ -252,7 +220,7 @@ let private persistProvisionedBinding
     (result: OperationResult<WorkspaceBinding>)
     : OperationResult<WorkspaceBinding> =
     let persistFailure (message: string) = {
-        OperationFailure.create ProviderError "binding_not_persisted" message with
+        OperationFailure.create ProviderError VersionControlCodes.BindingNotPersisted message with
             StateChanged = true
             Retryable = true
             RecoveryAction =
@@ -421,7 +389,19 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                             | Succeeded _ ->
                                                 // The open session keeps the location it was opened with.
                                                 return! host.ReopenSession(arcPath, context)
-                                            | PartiallySucceeded(_, failure) -> return Failed failure
+                                            | PartiallySucceeded(_, failure) when
+                                                failure.Code = VersionControlCodes.BindingNotPersisted
+                                                ->
+                                                return Failed failure
+                                            | PartiallySucceeded(_, failure) ->
+                                                // The binding is persisted, so the session is reopened and
+                                                // the provider's partial failure rides along.
+                                                let! reopened = host.ReopenSession(arcPath, context)
+
+                                                return
+                                                    match reopened with
+                                                    | Succeeded outcome -> PartiallySucceeded(outcome, failure)
+                                                    | other -> other
                                             | Failed failure -> return Failed failure
                                     })
 
@@ -479,6 +459,8 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                         return
                             match failure with
                             | Some error when error.Category = Canceled -> Failed error
+                            | _ when context.Cancellation.IsCancellationRequested() ->
+                                OperationResult.canceled "The dependency check was canceled."
                             | Some error ->
                                 PartiallySucceeded(
                                     OperationOutcome.performed statuses,
@@ -896,8 +878,9 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     (fun service context -> service.GetRepositoryWebUrl context))
                 id
     // Removes a stale provider lock only while this operation is the only one of the
-    // session, then refreshes and returns the status. The removed files are listed in
-    // Details because they are not repository paths.
+    // session, then refreshes and returns the status. Removed files are reported as
+    // warnings whose message is the absolute path, because they are not repository
+    // paths and a success outcome has no other field for them.
     clearStaleLock =
         fun request ->
             withMutatingSession
@@ -948,7 +931,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                             removed
                                             |> Array.map (fun path -> {
                                                 Code = "lock_removed"
-                                                Message = $"Removed the stale lock {path}."
+                                                Message = path
                                             })
                                 }
                             | other -> other

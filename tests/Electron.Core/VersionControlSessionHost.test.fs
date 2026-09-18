@@ -332,6 +332,13 @@ let private registerVault (windowId: int) (arcPath: string) =
 
 let private request (operationId: string) : OperationRequestDto = { OperationId = operationId }
 
+/// Restores of the fake core provider wait on these gates, keyed by the first path.
+let private restoreGates =
+    System.Collections.Generic.Dictionary<string, JS.Promise<unit>>()
+
+[<Emit("(() => { let resolve; const promise = new Promise((r) => { resolve = r; }); return [promise, resolve]; })()")>]
+let private deferred () : JS.Promise<unit> * (unit -> unit) = jsNative
+
 /// Two fake providers: "fake.core" owns coreOnlyRoot and opens a core-only session,
 /// "fake.broken" owns failingRoot, fails to open and reports a failing dependency check.
 let private fakeProviderRuntime
@@ -372,7 +379,16 @@ let private fakeProviderRuntime
         PreflightSwitchRef = fun _ _ -> unsupported ()
         SwitchRef = fun _ _ -> unsupported ()
         CreateRevision = fun _ _ -> unsupported ()
-        RestorePaths = fun _ _ -> unsupported ()
+        RestorePaths =
+            fun restoreRequest _ -> async {
+                // A restore waits until the test releases its first path, so two
+                // restores can overlap and the busy flag can be observed in between.
+                match restoreRequest.Paths |> Array.tryHead |> Option.map RepositoryPath.value with
+                | Some path when restoreGates.ContainsKey path ->
+                    do! Async.AwaitPromise restoreGates.[path]
+                    return OperationResult.succeeded ()
+                | _ -> return OperationResult.succeeded ()
+            }
         GetDiffSummary = fun _ -> async { return OperationResult.succeeded { Entries = [||] } }
     }
 
@@ -398,15 +414,33 @@ let private fakeProviderRuntime
                 fun adoptRequest _ -> async {
                     return OperationResult.succeeded (bindingFor id adoptRequest.WorkspaceRoot)
                 }
-            Bind = fun _ _ -> unsupported ()
+            Bind =
+                fun bindRequest _ -> async {
+                    // A partial bind: the location is retargeted, but the provider reports a
+                    // failure of a later step, so the host must still reopen the session.
+                    let binding = {
+                        bindingFor id bindRequest.WorkspaceRoot with
+                            Location = bindRequest.Location
+                    }
+
+                    return
+                        PartiallySucceeded(
+                            OperationOutcome.performed binding,
+                            {
+                                OperationFailure.create ProviderError "fake_bind_partial" "The fake fetch failed." with
+                                    StateChanged = true
+                            }
+                        )
+                }
             Open = fun binding _ -> async { return openResult binding }
             CheckDependencies = fun _ -> async { return dependencies }
             InstallDependency = fun _ _ -> unsupported ()
         }
 
+    // Registered under the git id so an https location resolves to it.
     let coreFactory =
         factory
-            "fake.core"
+            "git"
             coreOnlyRoot
             (fun binding ->
                 OperationResult.succeeded (
@@ -584,6 +618,7 @@ Vitest.describe (
                     Vitest.expect(outcome.Effect).toEqual OperationEffectDto.Performed
                     Vitest.expect(outcome.AffectedPaths).toEqual [||]
                     Vitest.expect(outcome.Warnings |> Array.map _.Code).toEqual [| "lock_removed" |]
+                    Vitest.expect(outcome.Warnings |> Array.map _.Message).toEqual [| lockPath |]
                     Vitest.expect(Main.Bindings.Filesystem.existsSync lockPath).toBe false
                     Vitest.expect(outcome.Value.ActiveConflictSession).toEqual None
 
@@ -741,6 +776,117 @@ Vitest.describe (
                             Vitest.expect(failure.Code).toBe "check_failed"
                         | other -> failwith $"Expected a partial dependency report, got {other}"
                     finally
+                        WorkspaceSessionHost.initialize fixture.Host
+                })
+        )
+
+        Vitest.test (
+            "a partial bind reopens the session over the persisted binding and keeps the provider failure",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let coreOnlyRoot = join [| fixture.Root; "core-bind" |]
+
+                    Main.Bindings.Filesystem.mkdirSync
+                        coreOnlyRoot
+                        (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    let failingRoot = join [| fixture.Root; "failing-bind" |]
+
+                    Main.Bindings.Filesystem.mkdirSync
+                        failingRoot
+                        (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    let fakeRuntime = fakeProviderRuntime coreOnlyRoot failingRoot
+                    let fakeHost = WorkspaceSessionHost.WorkspaceSessionHost(fakeRuntime)
+                    WorkspaceSessionHost.initialize fakeHost
+
+                    try
+                        registerVault 53 coreOnlyRoot |> ignore
+                        let api = Main.IPC.IVersionControlApi.api (ipcEvent 53)
+                        let! before = api.getSessionInfo (request "info-before-bind")
+                        let sessionBefore = (expectDtoValue "session before bind" before).Value
+
+                        let! bound =
+                            api.bindWorkspace {
+                                OperationId = "bind-partial"
+                                ProviderLocation = "https://example.invalid/partial.git"
+                                DisplayName = None
+                            }
+
+                        match bound with
+                        | Ok(OperationResultDto.PartiallySucceeded(outcome, failure)) ->
+                            Vitest.expect(outcome.Value.SessionId).not.toBe sessionBefore.SessionId
+
+                            Vitest
+                                .expect(outcome.Value.Location |> Option.map _.ProviderLocation)
+                                .toEqual (Some "https://example.invalid/partial.git")
+
+                            Vitest.expect(failure.Code).toBe "fake_bind_partial"
+                        | other -> failwith $"Expected a partial bind, got {other}"
+
+                        Vitest
+                            .expect(
+                                fakeRuntime.Bindings.TryFind coreOnlyRoot
+                                |> Option.map (fun binding -> binding.Location.ProviderLocation)
+                            )
+                            .toEqual (Some "https://example.invalid/partial.git")
+                    finally
+                        WorkspaceSessionHost.initialize fixture.Host
+                })
+        )
+
+        Vitest.test (
+            "overlapping mutations keep the vault busy until the last one ends",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let coreOnlyRoot = join [| fixture.Root; "core-overlap" |]
+
+                    Main.Bindings.Filesystem.mkdirSync
+                        coreOnlyRoot
+                        (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    let failingRoot = join [| fixture.Root; "failing-overlap" |]
+
+                    Main.Bindings.Filesystem.mkdirSync
+                        failingRoot
+                        (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    let fakeHost =
+                        WorkspaceSessionHost.WorkspaceSessionHost(fakeProviderRuntime coreOnlyRoot failingRoot)
+
+                    WorkspaceSessionHost.initialize fakeHost
+
+                    try
+                        let vault = registerVault 52 coreOnlyRoot
+                        let api = Main.IPC.IVersionControlApi.api (ipcEvent 52)
+                        let firstGate, releaseFirst = deferred ()
+                        let secondGate, releaseSecond = deferred ()
+                        restoreGates.["first.txt"] <- firstGate
+                        restoreGates.["second.txt"] <- secondGate
+
+                        let first =
+                            api.restorePaths {
+                                OperationId = "restore-first"
+                                Paths = [| "first.txt" |]
+                                ExpectedWorkspaceVersion = "v1"
+                            }
+
+                        let second =
+                            api.restorePaths {
+                                OperationId = "restore-second"
+                                Paths = [| "second.txt" |]
+                                ExpectedWorkspaceVersion = "v1"
+                            }
+
+                        Vitest.expect(vault.isBusyWriting).toBe true
+                        releaseFirst ()
+                        let! _ = first
+                        Vitest.expect(vault.isBusyWriting).toBe true
+                        releaseSecond ()
+                        let! _ = second
+                        Vitest.expect(vault.isBusyWriting).toBe false
+                    finally
+                        restoreGates.Clear()
                         WorkspaceSessionHost.initialize fixture.Host
                 })
         )

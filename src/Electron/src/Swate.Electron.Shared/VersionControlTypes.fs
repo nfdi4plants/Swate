@@ -87,11 +87,10 @@ type VersionControlProgressDto = {
 }
 
 /// Stable codes the renderer routes on, listed here so nothing spells them inline.
-/// IdentityMissing through OperationCanceled and the Recovery codes are produced by the
-/// library. ServiceUnavailable through LockRemovalRefused are produced by the Swate
-/// main process (session host and IPC handler), StoragePolicyBlocked by the renderer
-/// when the DataHub ruleset refuses a storage policy change.
+/// Each group below names its producer.
 module VersionControlCodes =
+
+    // Produced by the library (failure codes of its providers).
 
     [<Literal>]
     let IdentityMissing = "identity_missing"
@@ -120,6 +119,7 @@ module VersionControlCodes =
     [<Literal>]
     let OperationCanceled = "operation_canceled"
 
+    // Produced by the Swate main process (session host and IPC handler).
     [<Literal>]
     let ServiceUnavailable = "service_unavailable"
 
@@ -136,11 +136,16 @@ module VersionControlCodes =
     let LocationUnsupported = "location_unsupported"
 
     [<Literal>]
-    let StoragePolicyBlocked = "storage_policy_blocked"
-
-    [<Literal>]
     let LockRemovalRefused = "lock_removal_refused"
 
+    [<Literal>]
+    let BindingNotPersisted = "binding_not_persisted"
+
+    // Produced by the renderer when the DataHub ruleset refuses a storage policy change.
+    [<Literal>]
+    let StoragePolicyBlocked = "storage_policy_blocked"
+
+    /// Recovery action codes, all produced by the library.
     module Recovery =
 
         [<Literal>]

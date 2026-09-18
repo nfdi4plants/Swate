@@ -121,7 +121,8 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
             | PartiallySucceeded(outcome, _) ->
                 match runtime.Bindings.Save outcome.Value with
                 | Ok() -> return! openBinding factory outcome.Value context
-                | Error message -> return Failed(OperationFailure.create ProviderError "binding_not_persisted" message)
+                | Error message ->
+                    return Failed(OperationFailure.create ProviderError VersionControlCodes.BindingNotPersisted message)
             | Failed failure -> return Failed failure
         | ProviderComposition.AmbiguousVault candidates -> return Failed(ambiguousFailure candidates)
         | ProviderComposition.UnmanagedVault diagnostics -> return Failed(unmanagedFailure workspaceRoot diagnostics)
@@ -139,7 +140,10 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
     /// Returns the open session for the root, or resolves the root, adopts it when
     /// exactly one provider owns it, persists the binding and opens the session.
     /// Concurrent callers for one root share a single open, so a vault never ends up
-    /// with two sessions.
+    /// with two sessions. The shared open runs without cancellation, because a cancel
+    /// of one caller must not fail the others, and it reports progress to the first
+    /// caller only. Opening is short (a probe and a session construction), so both
+    /// limits are acceptable.
     member _.OpenSession(workspaceRoot: string, context: OperationContext) : Async<OperationResult<HostedSession>> = async {
         match tryFindSession workspaceRoot with
         | Some hosted -> return OperationResult.succeeded hosted
@@ -150,9 +154,12 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
                 match pendingOpens.TryGetValue key with
                 | true, inFlight -> inFlight
                 | _ ->
+                    let openContext =
+                        OperationContext.create context.OperationId OperationCancellation.none context.ReportProgress
+
                     let inFlight = promise {
                         try
-                            return! resolveAndOpen workspaceRoot context |> Async.StartAsPromise
+                            return! resolveAndOpen workspaceRoot openContext |> Async.StartAsPromise
                         finally
                             pendingOpens.Remove key |> ignore
                     }

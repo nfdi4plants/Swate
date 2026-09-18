@@ -207,6 +207,33 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "resultChangedState is true for a performed success, a partial success and a state-changing failure only",
+            fun () ->
+                let changed = Main.IPC.IVersionControlApi.resultChangedState
+
+                Vitest.expect(changed (Ok(OperationResultDto.Succeeded outcome))).toBe true
+
+                Vitest
+                    .expect(
+                        changed (
+                            Ok(
+                                OperationResultDto.Succeeded {
+                                    outcome with
+                                        Effect = OperationEffectDto.NoOp None
+                                }
+                            )
+                        )
+                    )
+                    .toBe
+                    false
+
+                Vitest.expect(changed (Ok(OperationResultDto.PartiallySucceeded(outcome, canceled)))).toBe true
+                Vitest.expect(changed (Ok(OperationResultDto.Failed canceled))).toBe true
+                Vitest.expect(changed (Ok(OperationResultDto.Failed { canceled with StateChanged = false }))).toBe false
+                Vitest.expect(changed (Error(exn "transport"))).toBe false
+        )
+
+        Vitest.test (
             "map, tryValue, tryFailure and recoveryCode follow the three shapes",
             fun () ->
                 let mapped =
