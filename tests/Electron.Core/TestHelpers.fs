@@ -19,9 +19,19 @@ let createTempDirectoryAsync (tempPrefix: string) : JS.Promise<string> =
 
     fsPromisesDynamic?mkdtemp (prefix) |> unbox<JS.Promise<string>>
 
+/// A process killed by a canceled operation can hold the directory for a moment, so
+/// the removal retries before giving up.
 let removeDirectoryAsync (path: string) : JS.Promise<unit> = promise {
     let! _ =
-        fsPromisesDynamic?rm (path, createObj [ "recursive" ==> true; "force" ==> true ])
+        fsPromisesDynamic?rm (
+            path,
+            createObj [
+                "recursive" ==> true
+                "force" ==> true
+                "maxRetries" ==> 10
+                "retryDelay" ==> 200
+            ]
+        )
         |> unbox<JS.Promise<obj>>
 
     return ()

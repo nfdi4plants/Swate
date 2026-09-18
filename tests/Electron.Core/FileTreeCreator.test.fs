@@ -3,7 +3,13 @@ module ElectronCore.FileTreeCreatorTests
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Main
 open Main.Bindings.Path
+open Main.VersionControl
+open Swate.Components.Composite.Authentication.Types
+open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.VersionControlTypes
+open VersionControlService.Abstractions
 open Vitest
 
 module FileTreeCreator = Main.FileTreeCreator
@@ -81,6 +87,42 @@ let private expectGitOk<'T> (operationName: string) (result: GitService.GitResul
     | Ok value -> value
     | Error failure -> failwith $"{operationName} failed ({failure.Kind}): {failure.Message}"
 
+let private expectHexObjectId (largeObject: LargeObjectState) =
+    Vitest.expect(largeObject.objectId.IsSome).toBe (true)
+
+    let objectId = largeObject.objectId |> Option.get
+    Vitest.expect(objectId.Length).toBe (64)
+    Vitest.expect(System.Text.RegularExpressions.Regex.IsMatch(objectId, "^[0-9a-fA-F]{64}$")).toBe (true)
+
+let private noAccounts: DataHubStrategies.DataHubAccountSource = {
+    GetState = fun () -> AuthStateDto.Empty
+    TryGetTokenForAccount = fun _ -> None
+    TryGetTokenForHost = fun _ -> None
+}
+
+let private memoryBindings () =
+    let mutable content: string option = None
+
+    WorkspaceBindingStore.create
+        CaseInsensitive
+        (fun () -> content)
+        (fun next ->
+            content <- Some next
+            Ok()
+        )
+
+let private createRuntime (settingsRoot: string) : VersionControlRuntime.VersionControlRuntime = {
+    Catalog =
+        ProviderComposition.createCatalog [
+            ProviderComposition.createGitFactory noAccounts
+            ProviderComposition.createLakeFsFactory
+                (ProviderComposition.lakeFsOptions settingsRoot CaseInsensitive)
+                VersionControlService.LakeFs.LakeFsCredentials.unconfigured
+        ]
+    Bindings = memoryBindings ()
+    PathCaseSensitivity = CaseInsensitive
+}
+
 let private withTempRepository
     (testBody: TempRepositoryContext -> Fable.Core.JS.Promise<unit>)
     : Fable.Core.JS.Promise<unit> =
@@ -91,14 +133,24 @@ let private withTempRepository
             let repoPath = join [| rootPath; "repo" |]
             let! initResult = GitProvisioningService.initRepository repoPath
             let normalizedRepoPath = expectGitOk "git init" initResult
+            let runtime = createRuntime rootPath
+            let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
+            WorkspaceSessionHost.initialize host
+            VersionControlRuntime.initialize runtime
 
-            do!
-                testBody {
-                    RootPath = rootPath
-                    RepoPath = normalizedRepoPath
-                }
+            try
+                do!
+                    testBody {
+                        RootPath = rootPath
+                        RepoPath = normalizedRepoPath
+                    }
 
-            do! removeDirectoryAsync rootPath
+                do! host.CloseAll() |> Async.StartAsPromise
+                do! removeDirectoryAsync rootPath
+            with error ->
+                do! host.CloseAll() |> Async.StartAsPromise
+                do! removeDirectoryAsync rootPath
+                return raise error
         with error ->
             do! removeDirectoryAsync rootPath
             return raise error
@@ -108,16 +160,16 @@ Vitest.describe (
     "FileTreeCreator LFS metadata",
     fun () ->
         Vitest.test (
-            "getFileEntries annotates staged LFS files from git lfs ls-files -j",
+            "getFileEntries annotates materialized and pointer large objects",
             fileTreeCreatorTestOptions,
             fun () -> promise {
                 do!
                     withTempRepository (fun context -> promise {
-                        let gitattributesPath = join [| context.RepoPath; ".gitattributes" |]
                         let pointerFilePath = join [| context.RepoPath; "pointer.psd" |]
                         let downloadedFilePath = join [| context.RepoPath; "downloaded.psd" |]
 
-                        do! writeUtf8FileAsync gitattributesPath "*.psd filter=lfs diff=lfs merge=lfs -text\n"
+                        let! _ = runGitAsync context.RepoPath [| "lfs"; "install"; "--local" |]
+                        let! _ = runGitAsync context.RepoPath [| "lfs"; "track"; "*.psd" |]
                         do! writeUtf8FileAsync pointerFilePath "Pointer-like content.\n"
                         do! writeUtf8FileAsync downloadedFilePath "Hydrated-like content.\n"
 
@@ -130,6 +182,11 @@ Vitest.describe (
                             |]
 
                         ()
+
+                        let! pointerContents =
+                            runGitAsync context.RepoPath [| "lfs"; "pointer"; "--file"; pointerFilePath |]
+
+                        do! writeUtf8FileAsync pointerFilePath pointerContents
 
                         let! entries = FileTreeCreator.getFileEntries context.RepoPath
 
@@ -145,27 +202,23 @@ Vitest.describe (
                                 normalizeSlashes entry.path = normalizeSlashes downloadedFilePath
                             )
 
-                        Vitest.expect(pointerEntry.lfs.IsSome).toBe (true)
-                        Vitest.expect(downloadedEntry.lfs.IsSome).toBe (true)
+                        Vitest.expect(pointerEntry.largeObject.IsSome).toBe (true)
+                        Vitest.expect(downloadedEntry.largeObject.IsSome).toBe (true)
 
-                        let pointerLfs = pointerEntry.lfs |> Option.get
-                        let downloadedLfs = downloadedEntry.lfs |> Option.get
+                        let pointerLargeObject = pointerEntry.largeObject |> Option.get
+                        let downloadedLargeObject = downloadedEntry.largeObject |> Option.get
 
-                        Vitest.expect(pointerLfs.name).toBe ("pointer.psd")
-                        Vitest.expect(pointerLfs.size).toBeGreaterThan (0)
-                        Vitest.expect(pointerLfs.checkout).toBe (true)
-                        Vitest.expect(pointerLfs.downloaded).toBe (true)
-                        Vitest.expect(pointerLfs.``oid_type``).toBe ("sha256")
-                        Vitest.expect(pointerLfs.oid.Length).toBe (64)
-                        Vitest.expect(pointerLfs.version).toBe ("https://git-lfs.github.com/spec/v1")
+                        Vitest.expect(pointerLargeObject.path).toBe ("pointer.psd")
+                        Vitest.expect(pointerLargeObject.sizeBytes |> Option.get).toBeGreaterThan (0)
+                        Vitest.expect(pointerLargeObject.isMaterialized).toBe (false)
+                        Vitest.expect(pointerLargeObject.isLocallyAvailable).toBe (true)
+                        expectHexObjectId pointerLargeObject
 
-                        Vitest.expect(downloadedLfs.name).toBe ("downloaded.psd")
-                        Vitest.expect(downloadedLfs.size).toBeGreaterThan (0)
-                        Vitest.expect(downloadedLfs.checkout).toBe (true)
-                        Vitest.expect(downloadedLfs.downloaded).toBe (true)
-                        Vitest.expect(downloadedLfs.``oid_type``).toBe ("sha256")
-                        Vitest.expect(downloadedLfs.oid.Length).toBe (64)
-                        Vitest.expect(downloadedLfs.version).toBe ("https://git-lfs.github.com/spec/v1")
+                        Vitest.expect(downloadedLargeObject.path).toBe ("downloaded.psd")
+                        Vitest.expect(downloadedLargeObject.sizeBytes |> Option.get).toBeGreaterThan (0)
+                        Vitest.expect(downloadedLargeObject.isMaterialized).toBe (true)
+                        Vitest.expect(downloadedLargeObject.isLocallyAvailable).toBe (true)
+                        expectHexObjectId downloadedLargeObject
                     })
             }
         )
@@ -176,10 +229,10 @@ Vitest.describe (
             fun () -> promise {
                 do!
                     withTempRepository (fun context -> promise {
-                        let gitattributesPath = join [| context.RepoPath; ".gitattributes" |]
                         let pointerFilePath = join [| context.RepoPath; "single-pointer.psd" |]
 
-                        do! writeUtf8FileAsync gitattributesPath "*.psd filter=lfs diff=lfs merge=lfs -text\n"
+                        let! _ = runGitAsync context.RepoPath [| "lfs"; "install"; "--local" |]
+                        let! _ = runGitAsync context.RepoPath [| "lfs"; "track"; "*.psd" |]
                         do! writeUtf8FileAsync pointerFilePath "Single tracked content.\n"
                         let! _ = runGitAsync context.RepoPath [| "add"; ".gitattributes"; "single-pointer.psd" |]
                         ()
@@ -187,26 +240,28 @@ Vitest.describe (
                         let! enrichedEntry =
                             FileTreeCreator.getFileEntryWithLfsMetadata context.RepoPath pointerFilePath
 
-                        Vitest.expect(enrichedEntry.lfs.IsSome).toBe (true)
-                        let lfsInfo = enrichedEntry.lfs |> Option.get
+                        Vitest.expect(enrichedEntry.largeObject.IsSome).toBe (true)
+                        let largeObject = enrichedEntry.largeObject |> Option.get
 
-                        Vitest.expect(lfsInfo.name).toBe ("single-pointer.psd")
-                        Vitest.expect(lfsInfo.checkout).toBe (true)
-                        Vitest.expect(lfsInfo.``oid_type``).toBe ("sha256")
+                        Vitest.expect(largeObject.path).toBe ("single-pointer.psd")
+                        Vitest.expect(largeObject.sizeBytes |> Option.get).toBeGreaterThan (0)
+                        Vitest.expect(largeObject.isMaterialized).toBe (true)
+                        Vitest.expect(largeObject.isLocallyAvailable).toBe (true)
+                        expectHexObjectId largeObject
                     })
             }
         )
 
         Vitest.test (
-            "files absent from ls-files -j keep lfs metadata None",
+            "files absent from large-object listing keep metadata None",
             fileTreeCreatorTestOptions,
             fun () -> promise {
                 do!
                     withTempRepository (fun context -> promise {
-                        let gitattributesPath = join [| context.RepoPath; ".gitattributes" |]
                         let untrackedLfsPath = join [| context.RepoPath; "untracked.psd" |]
 
-                        do! writeUtf8FileAsync gitattributesPath "*.psd filter=lfs diff=lfs merge=lfs -text\n"
+                        let! _ = runGitAsync context.RepoPath [| "lfs"; "install"; "--local" |]
+                        let! _ = runGitAsync context.RepoPath [| "lfs"; "track"; "*.psd" |]
                         do! writeUtf8FileAsync untrackedLfsPath "Untracked file content.\n"
                         let! _ = runGitAsync context.RepoPath [| "add"; ".gitattributes" |]
                         ()
@@ -214,13 +269,13 @@ Vitest.describe (
                         let! enrichedEntry =
                             FileTreeCreator.getFileEntryWithLfsMetadata context.RepoPath untrackedLfsPath
 
-                        Vitest.expect(enrichedEntry.lfs).toEqual (None)
+                        Vitest.expect(enrichedEntry.largeObject).toEqual (None)
                     })
             }
         )
 
         Vitest.test (
-            "no LFS files (files=null) keeps entries without lfs metadata",
+            "no large objects keeps entries without metadata",
             fileTreeCreatorTestOptions,
             fun () -> promise {
                 do!
@@ -234,7 +289,7 @@ Vitest.describe (
                             entries
                             |> Array.find (fun entry -> normalizeSlashes entry.path = normalizeSlashes plainFilePath)
 
-                        Vitest.expect(plainEntry.lfs).toEqual (None)
+                        Vitest.expect(plainEntry.largeObject).toEqual (None)
                     })
             }
         )

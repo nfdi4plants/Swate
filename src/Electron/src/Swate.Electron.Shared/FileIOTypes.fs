@@ -13,11 +13,21 @@ type GitLfsLsFileInfo = {
     version: string
 }
 
+/// A large object of the workspace (for Git a file tracked with LFS): whether its
+/// content is present in the file and in the local store, its size and object id.
+type LargeObjectState = {
+    path: string
+    sizeBytes: float option
+    isMaterialized: bool
+    isLocallyAvailable: bool
+    objectId: string option
+}
+
 type FileEntry = {
     name: string
     isDirectory: bool
     path: string
-    lfs: GitLfsLsFileInfo option
+    largeObject: LargeObjectState option
 }
 
 [<AutoOpen>]
@@ -30,18 +40,21 @@ module FileEntryExtensions =
 
     type FileEntry with
 
-        static member create(name: string, path: string, isDirectory: bool, ?lfs: GitLfsLsFileInfo option) : FileEntry = {
-            name = name
-            path = path
-            isDirectory = isDirectory
-            lfs = defaultArg lfs None
-        }
+        static member create
+            (name: string, path: string, isDirectory: bool, ?largeObject: LargeObjectState option)
+            : FileEntry =
+            {
+                name = name
+                path = path
+                isDirectory = isDirectory
+                largeObject = defaultArg largeObject None
+            }
 
 type FileTreeNode = {
     name: string
     isDirectory: bool
     path: string
-    lfs: GitLfsLsFileInfo option
+    largeObject: LargeObjectState option
     children: Dictionary<string, FileTreeNode>
 } with
 
@@ -51,13 +64,13 @@ type FileTreeNode = {
             isDirectory: bool,
             path: string,
             children: Dictionary<string, FileTreeNode>,
-            ?lfs: GitLfsLsFileInfo option
+            ?largeObject: LargeObjectState option
         ) =
         {
             name = name
             isDirectory = isDirectory
             path = path
-            lfs = defaultArg lfs None
+            largeObject = defaultArg largeObject None
             children = children
         }
 

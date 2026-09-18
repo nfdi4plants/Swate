@@ -115,26 +115,24 @@ Vitest.describe (
         Vitest.test (
             "preserves Git LFS ls-files metadata from FileEntry to root FileTreeNode",
             fun () ->
-                let lfsInfo: GitLfsLsFileInfo = {
-                    name = "arc/sample.bin"
-                    size = 2048.0
-                    checkout = false
-                    downloaded = false
-                    ``oid_type`` = "sha256"
-                    oid = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-                    version = "https://git-lfs.github.com/spec/v1"
+                let largeObject: LargeObjectState = {
+                    path = "arc/sample.bin"
+                    sizeBytes = Some 2048.0
+                    isMaterialized = false
+                    isLocallyAvailable = false
+                    objectId = Some "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                 }
 
                 let rootEntry: FileEntry = {
                     name = "arc"
                     isDirectory = true
                     path = "C:/arc"
-                    lfs = Some lfsInfo
+                    largeObject = Some largeObject
                 }
 
                 let rootNode = toFileTreeNode [| rootEntry |]
 
-                Vitest.expect(rootNode.lfs).toEqual (Some lfsInfo)
+                Vitest.expect(rootNode.largeObject).toEqual (Some largeObject)
         )
 
         Vitest.test (
@@ -234,7 +232,7 @@ Vitest.describe (
                 |> Swate.Components.Shared.PathHelpers.getFileName
             isDirectory = isDirectory
             path = path
-            lfs = None
+            largeObject = None
         }
 
         Vitest.test (
@@ -260,24 +258,22 @@ Vitest.describe (
 Vitest.describe (
     "FileTreeCreator.upsertFileEntry",
     fun () ->
-        let createFileEntry path isDirectory lfs = {
+        let createFileEntry path isDirectory largeObject = {
             name =
                 path
                 |> Swate.Components.Shared.PathHelpers.normalizePath
                 |> Swate.Components.Shared.PathHelpers.getFileName
             isDirectory = isDirectory
             path = path
-            lfs = lfs
+            largeObject = largeObject
         }
 
-        let pointerInfo: GitLfsLsFileInfo = {
-            name = "data.bin"
-            size = 128.0
-            checkout = false
-            downloaded = false
-            ``oid_type`` = "sha256"
-            oid = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-            version = "https://git-lfs.github.com/spec/v1"
+        let pointerInfo: LargeObjectState = {
+            path = "data.bin"
+            sizeBytes = Some 128.0
+            isMaterialized = false
+            isLocallyAvailable = false
+            objectId = Some "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         }
 
         Vitest.test (
@@ -291,7 +287,7 @@ Vitest.describe (
                     FileTreeCreator.upsertFileEntry (createFileEntry "C:/arc/data.bin" false (Some pointerInfo)) tree
 
                 Vitest.expect(updatedTree.Count).toBe (2)
-                Vitest.expect(updatedTree.["C:/arc/data.bin"].lfs).toEqual (Some pointerInfo)
+                Vitest.expect(updatedTree.["C:/arc/data.bin"].largeObject).toEqual (Some pointerInfo)
                 Vitest.expect(updatedTree.ContainsKey("C:/arc/other.bin")).toBe (true)
         )
 
@@ -304,7 +300,7 @@ Vitest.describe (
                 let updatedTree =
                     FileTreeCreator.upsertFileEntry (createFileEntry "C:/arc/data.bin" false (Some pointerInfo)) tree
 
-                Vitest.expect(tree.["C:/arc/data.bin"].lfs).toEqual (None)
-                Vitest.expect(updatedTree.["C:/arc/data.bin"].lfs).toEqual (Some pointerInfo)
+                Vitest.expect(tree.["C:/arc/data.bin"].largeObject).toEqual (None)
+                Vitest.expect(updatedTree.["C:/arc/data.bin"].largeObject).toEqual (Some pointerInfo)
         )
 )

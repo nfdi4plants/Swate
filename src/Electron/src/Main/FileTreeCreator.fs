@@ -3,12 +3,14 @@ module Main.FileTreeCreator
 
 open System
 open System.Collections.Generic
+open Fable.Core
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
-open Main.Git.GitLfsService
+open Main.VersionControl
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
+open VersionControlService.Abstractions
 
 let normalizeRootPath (path: string) =
     resolve [| path |] |> PathHelpers.normalizePath
@@ -22,10 +24,49 @@ let private shouldIgnorePath (path: string) =
     System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
     || isLegacyDataMapPath normalizedPath
 
-/// Enriches a single file entry with Git LFS metadata from `git lfs ls-files -j`.
+let private tryListLargeObjects (repoRoot: string) : Fable.Core.JS.Promise<Map<string, LargeObjectState>> = promise {
+    try
+        let context = OperationContext.detached "file-tree-objects"
+
+        let! opened =
+            WorkspaceSessionHost.get().OpenSession(repoRoot, context)
+            |> Async.StartAsPromise
+
+        match opened with
+        | Succeeded outcome
+        | PartiallySucceeded(outcome, _) ->
+            match outcome.Value.Session.ObjectMaterialization with
+            | None -> return Map.empty
+            | Some materialization ->
+                let! listed = materialization.ListObjects context |> Async.StartAsPromise
+
+                match listed with
+                | Succeeded outcome
+                | PartiallySucceeded(outcome, _) ->
+                    return
+                        outcome.Value
+                        |> Array.map (fun (objectState: ObjectState) ->
+                            let path = RepositoryPath.value objectState.Path
+
+                            path,
+                            {
+                                path = path
+                                sizeBytes = objectState.SizeBytes
+                                isMaterialized = objectState.IsMaterialized
+                                isLocallyAvailable = objectState.IsLocallyAvailable
+                                objectId = objectState.ObjectId
+                            }
+                        )
+                        |> Map.ofArray
+                | Failed _ -> return Map.empty
+        | Failed _ -> return Map.empty
+    with _ ->
+        return Map.empty
+}
+
 let private withFileEntryLfsMetadata
     (repoRoot: string)
-    (lfsFilesByRelativePath: Dictionary<string, GitLfsLsFileInfo>)
+    (largeObjectsByRelativePath: Map<string, LargeObjectState>)
     (entry: FileEntry)
     : FileEntry =
     if entry.isDirectory then
@@ -35,18 +76,21 @@ let private withFileEntryLfsMetadata
         | Some relativePath ->
             let normalizedRelativePath = PathHelpers.normalizeSeparators relativePath
 
-            match tryFindLsFileInfoByRelativePath lfsFilesByRelativePath normalizedRelativePath with
-            | Some lfsInfo -> { entry with lfs = Some lfsInfo }
-            | None -> { entry with lfs = None }
-        | None -> { entry with lfs = None }
+            match Map.tryFind normalizedRelativePath largeObjectsByRelativePath with
+            | Some largeObject -> {
+                entry with
+                    largeObject = Some largeObject
+              }
+            | None -> { entry with largeObject = None }
+        | None -> { entry with largeObject = None }
 
-/// Enriches file entries with Git LFS metadata from `git lfs ls-files -j`.
 let private withFileEntriesLfsMetadata
     (repoRoot: string)
-    (lfsFilesByRelativePath: Dictionary<string, GitLfsLsFileInfo>)
+    (largeObjectsByRelativePath: Map<string, LargeObjectState>)
     (entries: FileEntry[])
     : FileEntry[] =
-    entries |> Array.map (withFileEntryLfsMetadata repoRoot lfsFilesByRelativePath)
+    entries
+    |> Array.map (withFileEntryLfsMetadata repoRoot largeObjectsByRelativePath)
 
 /// Build the renderer snapshot using ARC-relative dictionary keys and FileEntry paths.
 let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary<string, FileEntry> =
@@ -110,8 +154,8 @@ let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
     if entry.isDirectory then
         return entry
     else
-        let! lfsFilesByRelativePath = tryGetLsFilesByRelativePath normalizedRepoRoot
-        return withFileEntryLfsMetadata normalizedRepoRoot lfsFilesByRelativePath entry
+        let! largeObjectsByRelativePath = tryListLargeObjects normalizedRepoRoot
+        return withFileEntryLfsMetadata normalizedRepoRoot largeObjectsByRelativePath entry
 }
 
 /// Finds all files and subfolders of the given filepath
@@ -157,8 +201,8 @@ let getFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise
             )
 
         let scannedEntries = entries.ToArray()
-        let! lfsFilesByRelativePath = tryGetLsFilesByRelativePath repoRoot
-        return withFileEntriesLfsMetadata repoRoot lfsFilesByRelativePath scannedEntries
+        let! largeObjectsByRelativePath = tryListLargeObjects repoRoot
+        return withFileEntriesLfsMetadata repoRoot largeObjectsByRelativePath scannedEntries
 }
 
 /// Scans a path and builds its keyed file tree.
