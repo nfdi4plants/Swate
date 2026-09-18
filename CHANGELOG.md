@@ -20,6 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -   Show a native error message instead of crashing or silently failing when a selected folder is not a valid ARC.
 
+## 2.3.1 - 2026-09-16
+
+### 🐛 Fixed
+
+-   Let the File Picker insert paths into the Input and Output cells of a table created from a template import, instead of failing silently because those cells were never stored.
+-   Keep the unit of unitized columns when adding rows with **Add Rows**, so values typed into new rows of a template imported **With Units** no longer need the unit set through the Details view.
+
+## 2.3.0 - 2026-09-16
+
+### ✨ Added
+
+-   Add Validation Package Browser for managing and browsing validation packages. It can be opened from the the sidebar (by @Freymaurer)
+
 ## 2.2.0 - 2026-09-16
 
 ### ✨ Added
