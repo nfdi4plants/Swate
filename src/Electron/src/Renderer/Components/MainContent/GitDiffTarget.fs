@@ -1,10 +1,10 @@
 module Renderer.Components.MainContent.GitDiffTarget
 
 open Feliz
-open Swate.Electron.Shared.GitTypes
+open Renderer.Types
 
 [<ReactComponent>]
-let Main (diffData: GitDiffViewDataDto) =
+let Main (diffData: VersionControlDiffPage) =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
 
     Html.div [

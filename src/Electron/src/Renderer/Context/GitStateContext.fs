@@ -9,8 +9,8 @@ open Renderer.Types
 open Swate.Components.Page.GitSidebarTypes
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
-open Swate.Electron.Shared.GitTypes
 open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.VersionControlTypes
 
 open Renderer.Context.GitWorkflow
 
@@ -25,7 +25,7 @@ type GitStateController = {
     updateFromOnline: unit -> unit
     primarySaveSelection: GitSidebarCommitSelectionRequest -> unit
     primarySaveAll: string -> unit
-    cloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<string, string>>
+    cloneRepository: CloneWorkspaceRequestDto -> JS.Promise<Result<string, string>>
     commitSelection: GitSidebarCommitSelectionRequest -> unit
     commitAll: string -> unit
     discardSelection: string[] -> unit
@@ -38,63 +38,133 @@ type GitStateController = {
     createBranch: GitSidebarCreateBranchRequest -> unit
     switchBranch: string -> unit
     selectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>
-    confirmMergeResolution: GitConfirmMergeResolutionRequest -> unit
+    confirmMergeResolution: GitMergeResolutionRequest -> unit
+    finalizeMerge: unit -> unit
+    abandonMerge: unit -> unit
     pruneLfsCache: unit -> unit
     dedupLfsStorage: unit -> unit
 }
 
 module private Helper =
 
-    let mapDiffPageResult (_requestedPath: string) =
-        function
-        | Ok(GitPageLoadResultDto.Loaded diffData) -> Ok(PageState.GitDiffPage diffData)
-        | Ok(GitPageLoadResultDto.Unsupported unsupportedPage) -> Ok(PageState.GitUnsupportedPage unsupportedPage)
-        | Error message -> Error message
+    let private operationRequest () : OperationRequestDto = {
+        OperationId = Renderer.VersionControlApiClient.newOperationId ()
+    }
 
-    let mapMergeConflictPageResult (_requestedPath: string) =
-        function
-        | Ok(GitPageLoadResultDto.Loaded mergeData) -> Ok(PageState.GitMergeConflictPage mergeData)
-        | Ok(GitPageLoadResultDto.Unsupported unsupportedPage) -> Ok(PageState.GitUnsupportedPage unsupportedPage)
-        | Error message -> Error message
+    let private pathRequest (path: string) : ObjectPathRequestDto = {
+        OperationId = Renderer.VersionControlApiClient.newOperationId ()
+        Path = path
+    }
+
+    let private unsupportedPage (path: string) (reason: string option) =
+        Ok(PageState.GitUnsupportedPage { Path = path; Reason = reason })
+
+    /// A diff page needs the committed base, the current file and the word diff. The
+    /// current content comes from the vault file itself, the rest from the provider.
+    let loadDiffPage (requestedPath: string) : JS.Promise<Result<PageState, string>> = promise {
+        let! baseContent = Renderer.VersionControlApiClient.getBaseContent (pathRequest requestedPath)
+        let! wordDiff = Renderer.VersionControlApiClient.getWordDiff (pathRequest requestedPath)
+        let! currentFile = Api.ipcArcVaultApi.openFile requestedPath
+
+        let contentOf (result: Result<OperationResultDto<ContentViewDto>, string>) =
+            match result with
+            | Error message -> Error message
+            | Ok(OperationResultDto.Failed failure) when failure.Category = FailureCategoryDto.Unsupported ->
+                Ok(ContentViewDto.Unsupported(Some failure.Message))
+            | Ok(OperationResultDto.Failed failure) -> Error(failureMessage failure)
+            | Ok result ->
+                OperationResultDto.tryValue result
+                |> Option.defaultValue (ContentViewDto.Unsupported None)
+                |> Ok
+
+        match contentOf baseContent, contentOf wordDiff with
+        | Error message, _
+        | _, Error message -> return Error message
+        | Ok(ContentViewDto.Unsupported reason), _
+        | _, Ok(ContentViewDto.Unsupported reason) -> return unsupportedPage requestedPath reason
+        | Ok(ContentViewDto.Text previous), Ok(ContentViewDto.Text wordDiffText) ->
+            let current =
+                match currentFile with
+                | Ok dto -> dto.content
+                | Error _ -> ""
+
+            return
+                Ok(
+                    PageState.GitDiffPage {
+                        Path = requestedPath
+                        PreviousContent = previous
+                        CurrentContent = current
+                        WordDiffText = wordDiffText
+                    }
+                )
+    }
+
+    /// The conflict page carries the handle and the workspace token the preview was
+    /// taken with, so the confirmation is checked against exactly that state.
+    let loadConflictPage
+        (conflict: ConflictSessionSummaryDto)
+        (workspaceVersion: string)
+        (requestedPath: string)
+        : JS.Promise<Result<PageState, string>> =
+        promise {
+            match conflict.Items |> Array.tryFind (fun item -> item.Path = requestedPath) with
+            | None -> return Error $"'{requestedPath}' is not part of the open conflict session anymore."
+            | Some item ->
+                match item.CombinedPreview with
+                | Some(ContentViewDto.Text content) when item.SupportsResolvedContent ->
+                    return
+                        Ok(
+                            PageState.GitMergeConflictPage {
+                                Path = requestedPath
+                                ConflictContent = content
+                                Handle = conflict.Handle
+                                WorkspaceVersion = workspaceVersion
+                            }
+                        )
+                | Some(ContentViewDto.Unsupported reason) -> return unsupportedPage requestedPath reason
+                | _ ->
+                    return unsupportedPage requestedPath (Some "The provider offers no text preview for this conflict.")
+        }
 
     let dependencies (reportError: GitErrorNotification -> unit) : GitDependencies = {
-        getGitStatus = Renderer.GitApiClient.getGitStatus
-        getGitBranches = Renderer.GitApiClient.getGitBranches
-        getOriginRemoteRepositoryWebUrl = Renderer.GitApiClient.getOriginRepositoryWebUrl
-        getGitLfsSettings = Renderer.GitApiClient.getGitLfsSettings
-        loadDiffPage =
-            fun requestedPath -> promise {
-                let! result = Renderer.GitApiClient.getGitDiffViewData requestedPath
-                return mapDiffPageResult requestedPath result
-            }
-        loadMergeConflictPage =
-            fun requestedPath -> promise {
-                let! result = Renderer.GitApiClient.getGitMergeConflictViewData requestedPath
-                return mapMergeConflictPageResult requestedPath result
-            }
-        initGitRepository = Renderer.GitApiClient.gitInitRepository
+        getSessionInfo = Renderer.VersionControlApiClient.getSessionInfo
+        getStatus = Renderer.VersionControlApiClient.getStatus
+        listRefs = Renderer.VersionControlApiClient.listRefs
+        getRepositoryWebUrl = Renderer.VersionControlApiClient.getRepositoryWebUrl
+        getStoragePolicySettings = Renderer.VersionControlApiClient.getStoragePolicySettings
+        setStoragePolicySettings = Renderer.VersionControlApiClient.setStoragePolicySettings
+        loadDiffPage = loadDiffPage
+        loadConflictPage = loadConflictPage
+        initializeWorkspace = Renderer.VersionControlApiClient.initializeWorkspace
+        bindWorkspace = Renderer.VersionControlApiClient.bindWorkspace
+        createRemoteProject = Api.ipcGitLabApi.createProject
         renameOpenArcRoot =
             fun newName -> promise {
                 let! result = Api.ipcArcVaultApi.renameOpenArcRoot newName
                 return result |> Result.mapError _.Message
             }
-        installGitLfs = Renderer.GitApiClient.installGitLfs
-        previewGitPull = Renderer.GitApiClient.previewGitPull
-        gitFetch = Renderer.GitApiClient.gitFetch
-        gitPull = Renderer.GitApiClient.gitPull
-        gitPush = Renderer.GitApiClient.gitPush
-        gitCancelOperation = Renderer.GitApiClient.gitCancelOperation
-        gitCloneRepository = Renderer.GitApiClient.gitCloneRepository
-        createBranch = Renderer.GitApiClient.createBranch
-        checkoutBranch = Renderer.GitApiClient.checkoutBranch
-        gitStagePaths = Renderer.GitApiClient.gitStagePaths
-        gitUnstagePaths = Renderer.GitApiClient.gitUnstagePaths
-        gitDiscardPaths = Renderer.GitApiClient.gitDiscardPaths
-        gitCommit = Renderer.GitApiClient.gitCommit
-        setGitLfsSettings = Renderer.GitApiClient.setGitLfsSettings
-        gitLfsPrune = Renderer.GitApiClient.gitLfsPrune
-        gitLfsDedup = Renderer.GitApiClient.gitLfsDedup
-        confirmGitMergeResolution = Renderer.GitApiClient.confirmGitMergeResolution
+        checkDependencies = Renderer.VersionControlApiClient.checkDependencies
+        installDependency = Renderer.VersionControlApiClient.installDependency
+        refreshSynchronization = Renderer.VersionControlApiClient.refreshSynchronization
+        previewUpdate = Renderer.VersionControlApiClient.previewUpdate
+        update = Renderer.VersionControlApiClient.update
+        publish = Renderer.VersionControlApiClient.publish
+        cancelOperation = Renderer.VersionControlApiClient.cancelOperation
+        cloneWorkspace = Renderer.VersionControlApiClient.cloneWorkspace
+        createRef = Renderer.VersionControlApiClient.createRef
+        switchRef = Renderer.VersionControlApiClient.switchRef
+        createRevision = Renderer.VersionControlApiClient.createRevision
+        restorePaths = Renderer.VersionControlApiClient.restorePaths
+        getActiveConflictSession = Renderer.VersionControlApiClient.getActiveConflictSession
+        resolveConflict = Renderer.VersionControlApiClient.resolveConflict
+        finalizeConflict = Renderer.VersionControlApiClient.finalizeConflict
+        cancelConflict = Renderer.VersionControlApiClient.cancelConflict
+        listObjects = Renderer.VersionControlApiClient.listObjects
+        materializeObject = Renderer.VersionControlApiClient.materializeObject
+        pruneStorage = Renderer.VersionControlApiClient.pruneStorage
+        deduplicateStorage = Renderer.VersionControlApiClient.deduplicateStorage
+        clearStaleLock = Renderer.VersionControlApiClient.clearStaleLock
+        newOperationId = Renderer.VersionControlApiClient.newOperationId
         confirmLfsPrune = fun message -> window.confirm message
         confirmInstall = fun message -> window.confirm message
         reportError = reportError
@@ -127,6 +197,8 @@ let GitStateCtx =
             switchBranch = fun _ -> ()
             selectChange = fun _ -> promise { return Ok() }
             confirmMergeResolution = fun _ -> ()
+            finalizeMerge = fun () -> ()
+            abandonMerge = fun () -> ()
             pruneLfsCache = fun () -> ()
             dedupLfsStorage = fun () -> ()
         }
@@ -181,7 +253,7 @@ let GitStateCtxProvider (children: ReactElement) =
     let primarySaveAll (message: string) =
         dispatch (PrimarySaveAllRequested message)
 
-    let cloneRepository (request: GitCloneRepositoryRequest) =
+    let cloneRepository (request: CloneWorkspaceRequestDto) =
         Promise.create (fun resolve _reject -> dispatch (CloneRequested(request, resolve)))
 
     let commitSelection (request: GitSidebarCommitSelectionRequest) =
@@ -218,8 +290,12 @@ let GitStateCtxProvider (children: ReactElement) =
     let selectChange (change: GitSidebarChange) =
         Promise.create (fun resolve _reject -> dispatch (SelectChangeRequested(change, resolve)))
 
-    let confirmMergeResolutionAction request =
+    let confirmMergeResolutionAction (request: GitMergeResolutionRequest) =
         dispatch (ConfirmMergeResolutionRequested request)
+
+    let finalizeMerge () = dispatch FinalizeMergeRequested
+
+    let abandonMerge () = dispatch AbandonMergeRequested
 
     let pruneLfsCache () = dispatch PruneLfsCacheRequested
 
@@ -254,6 +330,8 @@ let GitStateCtxProvider (children: ReactElement) =
                 switchBranch = switchBranchTo
                 selectChange = selectChange
                 confirmMergeResolution = confirmMergeResolutionAction
+                finalizeMerge = finalizeMerge
+                abandonMerge = abandonMerge
                 pruneLfsCache = pruneLfsCache
                 dedupLfsStorage = dedupLfsStorage
             }),

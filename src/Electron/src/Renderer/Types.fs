@@ -4,7 +4,7 @@ module Renderer.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
-open Swate.Electron.Shared.GitTypes
+open Swate.Electron.Shared.VersionControlTypes
 open Swate.Components.Page.ArcFileEditor.Types
 
 [<RequireQualifiedAccess>]
@@ -12,7 +12,26 @@ type LeftSidebarPage =
     | FileExplorer
     | Git
 
-type GitUnsupportedPageData = GitUnsupportedContentDto
+/// A text diff of one changed file: the committed base, the current file and the
+/// provider's word diff.
+type VersionControlDiffPage = {
+    Path: string
+    PreviousContent: string
+    CurrentContent: string
+    WordDiffText: string
+}
+
+/// A conflicted file with the provider's combined preview. The handle and the
+/// workspace token are the ones the preview was taken with, so a confirmation is
+/// checked against exactly that state.
+type VersionControlConflictPage = {
+    Path: string
+    ConflictContent: string
+    Handle: ConflictSessionHandleDto
+    WorkspaceVersion: string
+}
+
+type GitUnsupportedPageData = { Path: string; Reason: string option }
 
 [<RequireQualifiedAccess>]
 type PageState =
@@ -24,8 +43,8 @@ type PageState =
     | NotesDraftPage
     | NotesSearchPage
     | ProvenanceGroupingPage
-    | GitDiffPage of GitDiffViewDataDto
-    | GitMergeConflictPage of GitMergeConflictViewDataDto
+    | GitDiffPage of VersionControlDiffPage
+    | GitMergeConflictPage of VersionControlConflictPage
     | GitUnsupportedPage of GitUnsupportedPageData
     | ErrorPage of string
     | DataHubBrowser

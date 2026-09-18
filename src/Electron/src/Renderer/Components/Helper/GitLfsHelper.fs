@@ -1,51 +1,58 @@
+/// Large-object actions of the file explorer over the provider-neutral storage
+/// policy and materialization services. The DataHub ruleset (isa.*.xlsx never in
+/// large-object storage, dataset files always) is checked here before the provider is
+/// asked, so a refused toggle never reaches the repository.
 module Renderer.Components.Helper.GitLfsHelper
 
-open System
 open Fable.Core
-open Swate.Electron.Shared.GitTypes
+open Swate.Components.Shared
+open Swate.Electron.Shared.VersionControlTypes
+
+let private operationId () =
+    Renderer.VersionControlApiClient.newOperationId ()
+
+let private toUnitResult (result: Result<OperationResultDto<unit>, string>) : Result<unit, string> =
+    match result with
+    | Error message -> Error message
+    | Ok(OperationResultDto.Succeeded _) -> Ok()
+    | Ok(OperationResultDto.PartiallySucceeded(_, failure))
+    | Ok(OperationResultDto.Failed failure) -> Error(Renderer.Context.GitWorkflow.failureMessage failure)
+
+/// The size is not known here, so the size rule is left to the context menu, which
+/// has it. The path rules are checked for both directions.
+let tryGetToggleBlockedReason (relativePath: string) (markAsLfs: bool) =
+    GitLfsRules.tryGetToggleBlockedReason relativePath None markAsLfs
 
 let runToggleLfsMark (relativePath: string) (markAsLfs: bool) : JS.Promise<Result<unit, string>> = promise {
-    let request: GitLfsRequest = {
-        RequestId = Guid.NewGuid().ToString()
-        RepoPath = ""
-        Command =
-            if markAsLfs then
-                GitLfsCommand.Track
-            else
-                GitLfsCommand.Untrack
-        FilePath = Some relativePath
-        TimeoutMs = Some 10000
-    }
+    match tryGetToggleBlockedReason relativePath markAsLfs with
+    | Some reason -> return Error reason
+    | None ->
+        let! result =
+            Renderer.VersionControlApiClient.setPathStoragePolicy {
+                OperationId = operationId ()
+                Path = PathHelpers.normalizeSeparators relativePath
+                UseLargeObjectStorage = markAsLfs
+            }
 
-    let! result = Api.ipcArcVaultApi.runGitLfs request
-
-    return
-        match result with
-        | Ok _ -> Ok()
-        | Error exn -> Error exn.Message
+        return toUnitResult result
 }
 
 let runFreeLocalLfsCopy (relativePath: string) : JS.Promise<Result<unit, string>> = promise {
-    let request: GitLfsFileRequest = { Path = relativePath }
+    let! result =
+        Renderer.VersionControlApiClient.dematerializeObject {
+            OperationId = operationId ()
+            Path = PathHelpers.normalizeSeparators relativePath
+        }
 
-    let! result = Renderer.GitApiClient.gitLfsFreeLocalCopy request
-
-    return
-        match result with
-        | Ok operation when operation.Success -> Ok()
-        | Ok operation -> Error(operation.Message |> Option.defaultValue "Git LFS cleanup failed.")
-        | Error message -> Error message
+    return toUnitResult result
 }
 
-let runDownloadLfsFile (relativePath: string) = promise {
+let runDownloadLfsFile (relativePath: string) : JS.Promise<Result<unit, string>> = promise {
+    let! result =
+        Renderer.VersionControlApiClient.materializeObject {
+            OperationId = operationId ()
+            Path = PathHelpers.normalizeSeparators relativePath
+        }
 
-    let request: GitLfsFileRequest = { Path = relativePath }
-
-    let! result = Renderer.GitApiClient.gitLfsDownloadFile request
-
-    return
-        match result with
-        | Ok operation when operation.Success -> Ok()
-        | Ok operation -> Error(operation.Message |> Option.defaultValue "Git LFS download failed.")
-        | Error message -> Error message
+    return toUnitResult result
 }

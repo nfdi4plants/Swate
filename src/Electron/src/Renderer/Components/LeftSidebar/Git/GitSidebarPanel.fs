@@ -5,8 +5,38 @@ open Feliz
 open Renderer.Components.Helper.ArcVaultHelper
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
+open Swate.Electron.Shared.VersionControlTypes
 
-let mutable private gitVersionCheckStarted = false
+let mutable private dependencyCheckStarted = false
+
+/// The message shown when a version control dependency is missing or too old. The
+/// library decides what is required (Git 2.38, Git LFS 3.7 and the LFS filter
+/// configuration) and says how to fix it.
+let dependencyProblemMessage (statuses: DependencyStatusDto[]) : string option =
+    let problems =
+        statuses
+        |> Array.filter (fun status -> not status.Installed || not status.Compatible)
+        |> Array.map (fun status ->
+            let state =
+                if not status.Installed then
+                    "is not installed"
+                else
+                    match status.Version with
+                    | Some version -> $"version {version} is not supported"
+                    | None -> "is not supported"
+
+            let remediation =
+                status.Remediation
+                |> Option.map (fun text -> $" {text}")
+                |> Option.defaultValue ""
+
+            $"{status.Component} {state}.{remediation}"
+        )
+
+    if problems.Length = 0 then
+        None
+    else
+        Some(String.concat "\n" problems)
 
 /// Remote transfer operations run cancellable git processes, so the cancel button is offered for all of them.
 let private isCancellableBusyOperation (busyOperation: Renderer.Context.GitWorkflow.GitBusyOperation) =
@@ -31,15 +61,32 @@ let Main () =
         createErrorModalCallback errorCtx.enqueue "Error opening ARC" appStateCtx
 
     React.useEffectOnce (fun () ->
-        if not gitVersionCheckStarted then
-            gitVersionCheckStarted <- true
+        if not dependencyCheckStarted then
+            dependencyCheckStarted <- true
 
-            Renderer.GitApiClient.checkGitVersions ()
-            |> Promise.map (
-                function
-                | Ok() -> ()
-                | Error message ->
+            Renderer.VersionControlApiClient.checkDependencies {
+                OperationId = Renderer.VersionControlApiClient.newOperationId ()
+            }
+            |> Promise.map (fun result ->
+                let statuses =
+                    match result with
+                    | Ok(OperationResultDto.Succeeded outcome)
+                    | Ok(OperationResultDto.PartiallySucceeded(outcome, _)) -> outcome.Value
+                    | _ -> [||]
+
+                match result, dependencyProblemMessage statuses with
+                | _, Some message ->
+                    errorCtx.enqueue (ErrorModalRequest.create (message, title = "Version control dependencies"))
+                | Ok(OperationResultDto.Failed failure), None ->
+                    errorCtx.enqueue (
+                        ErrorModalRequest.create (
+                            Renderer.Context.GitWorkflow.failureMessage failure,
+                            title = "Could not verify Git installation"
+                        )
+                    )
+                | Error message, None ->
                     errorCtx.enqueue (ErrorModalRequest.create (message, title = "Could not verify Git installation"))
+                | _ -> ()
             )
             |> ignore
     )
