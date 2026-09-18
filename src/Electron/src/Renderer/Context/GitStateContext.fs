@@ -39,17 +39,11 @@ type GitStateController = {
     switchBranch: string -> unit
     selectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>
     confirmMergeResolution: GitMergeResolutionRequest -> unit
-    finalizeMerge: unit -> unit
-    abandonMerge: unit -> unit
     pruneLfsCache: unit -> unit
     dedupLfsStorage: unit -> unit
 }
 
 module private Helper =
-
-    let private operationRequest () : OperationRequestDto = {
-        OperationId = Renderer.VersionControlApiClient.newOperationId ()
-    }
 
     let private pathRequest (path: string) : ObjectPathRequestDto = {
         OperationId = Renderer.VersionControlApiClient.newOperationId ()
@@ -83,20 +77,18 @@ module private Helper =
         | Ok(ContentViewDto.Unsupported reason), _
         | _, Ok(ContentViewDto.Unsupported reason) -> return unsupportedPage requestedPath reason
         | Ok(ContentViewDto.Text previous), Ok(ContentViewDto.Text wordDiffText) ->
-            let current =
-                match currentFile with
-                | Ok dto -> dto.content
-                | Error _ -> ""
-
-            return
-                Ok(
-                    PageState.GitDiffPage {
-                        Path = requestedPath
-                        PreviousContent = previous
-                        CurrentContent = current
-                        WordDiffText = wordDiffText
-                    }
-                )
+            match currentFile with
+            | Error error -> return Error $"Could not read the current content of '{requestedPath}': {error.Message}"
+            | Ok dto ->
+                return
+                    Ok(
+                        PageState.GitDiffPage {
+                            Path = requestedPath
+                            PreviousContent = previous
+                            CurrentContent = dto.content
+                            WordDiffText = wordDiffText
+                        }
+                    )
     }
 
     /// The conflict page carries the handle and the workspace token the preview was
@@ -155,7 +147,6 @@ module private Helper =
         switchRef = Renderer.VersionControlApiClient.switchRef
         createRevision = Renderer.VersionControlApiClient.createRevision
         restorePaths = Renderer.VersionControlApiClient.restorePaths
-        getActiveConflictSession = Renderer.VersionControlApiClient.getActiveConflictSession
         resolveConflict = Renderer.VersionControlApiClient.resolveConflict
         finalizeConflict = Renderer.VersionControlApiClient.finalizeConflict
         cancelConflict = Renderer.VersionControlApiClient.cancelConflict
@@ -197,8 +188,6 @@ let GitStateCtx =
             switchBranch = fun _ -> ()
             selectChange = fun _ -> promise { return Ok() }
             confirmMergeResolution = fun _ -> ()
-            finalizeMerge = fun () -> ()
-            abandonMerge = fun () -> ()
             pruneLfsCache = fun () -> ()
             dedupLfsStorage = fun () -> ()
         }
@@ -293,10 +282,6 @@ let GitStateCtxProvider (children: ReactElement) =
     let confirmMergeResolutionAction (request: GitMergeResolutionRequest) =
         dispatch (ConfirmMergeResolutionRequested request)
 
-    let finalizeMerge () = dispatch FinalizeMergeRequested
-
-    let abandonMerge () = dispatch AbandonMergeRequested
-
     let pruneLfsCache () = dispatch PruneLfsCacheRequested
 
     let dedupLfsStorage () = dispatch DedupLfsStorageRequested
@@ -330,8 +315,6 @@ let GitStateCtxProvider (children: ReactElement) =
                 switchBranch = switchBranchTo
                 selectChange = selectChange
                 confirmMergeResolution = confirmMergeResolutionAction
-                finalizeMerge = finalizeMerge
-                abandonMerge = abandonMerge
                 pruneLfsCache = pruneLfsCache
                 dedupLfsStorage = dedupLfsStorage
             }),

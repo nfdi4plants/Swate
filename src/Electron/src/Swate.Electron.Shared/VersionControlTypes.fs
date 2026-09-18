@@ -141,6 +141,10 @@ module VersionControlCodes =
     [<Literal>]
     let BindingNotPersisted = "binding_not_persisted"
 
+    /// The IPC call itself failed before a structured result existed.
+    [<Literal>]
+    let TransportError = "transport_error"
+
     // Produced by the renderer when the DataHub ruleset refuses a storage policy change.
     [<Literal>]
     let StoragePolicyBlocked = "storage_policy_blocked"

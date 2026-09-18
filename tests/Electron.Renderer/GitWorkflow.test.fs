@@ -369,7 +369,6 @@ let private defaultDependencies: GitDependencies = {
     switchRef = fun _ -> unexpectedPromise "switchRef"
     createRevision = fun _ -> unexpectedPromise "createRevision"
     restorePaths = fun _ -> unexpectedPromise "restorePaths"
-    getActiveConflictSession = fun _ -> unexpectedPromise "getActiveConflictSession"
     resolveConflict = fun _ -> unexpectedPromise "resolveConflict"
     finalizeConflict = fun _ -> unexpectedPromise "finalizeConflict"
     cancelConflict = fun _ -> unexpectedPromise "cancelConflict"
@@ -460,30 +459,59 @@ Vitest.describe (
         Vitest.test (
             "prepareCommitAll snapshots distinct changed paths from the current model",
             fun () ->
-                let prepared = prepareCommitAll runningState "save"
-                Vitest.expect(prepared.NormalizedMessage).toBe ("save")
+                let state = {
+                    GitState.Empty with
+                        ChangedFiles = [|
+                            changedFile "a.txt" "M" " " false
+                            changedFile "b.txt" "M" " " false
+                            changedFile "a.txt" "M" " " false
+                        |]
+                }
+
+                let prepared = prepareCommitAll state "  save everything  "
+
+                Vitest.expect(prepared.NormalizedMessage).toBe ("save everything")
+                Vitest.expect(prepared.PathsToCommit).toEqual ([| "a.txt"; "b.txt" |])
+                Vitest.expect(prepared.BusyOperation).toEqual (GitBusyOperation.CommittingAllChanges)
         )
 
         Vitest.test (
-            "prepareCommitSelection snapshots already staged paths before rewriting the stage",
+            "prepareCommitSelection keeps the selected paths exact and drops duplicates and empty entries",
             fun () ->
                 let prepared =
-                    prepareCommitSelection runningState {
+                    prepareCommitSelection {
                         Message = " save "
-                        Paths = [| " leading-space.txt"; "b.txt"; "b.txt" |]
+                        Paths = [| " leading-space.txt"; "b.txt"; ""; "b.txt" |]
                     }
 
+                Vitest.expect(prepared.NormalizedMessage).toBe ("save")
                 Vitest.expect(prepared.PathsToCommit).toEqual ([| " leading-space.txt"; "b.txt" |])
+                Vitest.expect(prepared.BusyOperation).toEqual (GitBusyOperation.CommittingSelectedChanges)
         )
 
         Vitest.test (
             "buildUpdatedLfsSettings keeps untouched values from the current model snapshot",
             fun () ->
+                let state = {
+                    GitState.Empty with
+                        LfsAutoTrackThresholdMb = 7
+                        DownloadLargeFiles = true
+                }
+
                 Vitest
-                    .expect(buildUpdatedLfsSettings runningState (Some 4) None)
+                    .expect(buildUpdatedLfsSettings state (Some 4) None)
                     .toEqual (
                         {
                             AutoPolicyThresholdMb = Some 4
+                            MaterializeLargeObjects = true
+                        }
+                    )
+
+                Vitest
+                    .expect(buildUpdatedLfsSettings state None (Some false))
+                    .toEqual (
+                        {
+                            AutoPolicyThresholdMb = Some 7
                             MaterializeLargeObjects = false
                         }
                     )
@@ -1692,6 +1720,8 @@ Vitest.describe (
                     | [| WriteRequested Push |] -> update deps ignore retryMessages[0] stateAfterRename
                     | _ -> failwith "Expected push to be retried after renaming the ARC root."
 
+                Vitest.expect(stateAfterRename.PendingPublishAfterRefresh).toBe (false)
+
                 let! pushMessages = collectMessages pushCmd
 
                 let finalState, finishCmd =
@@ -1712,6 +1742,13 @@ Vitest.describe (
         Vitest.test (
             "PublishRenameCompleted still retries push when path-change update arrives first",
             fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        getStatus = fun _ -> promise { return Ok(succeeded (statusForBranch "main")) }
+                        listRefs = fun _ -> promise { return Ok(succeeded [| localBranch "main" true true |]) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
                 let state = {
                     GitState.Empty with
                         CurrentArcPath = Some "C:/work/Existing ARC"
@@ -1726,23 +1763,38 @@ Vitest.describe (
                 }
 
                 let stateAfterPathChange, pathChangeCmd =
-                    update defaultDependencies ignore (ArcPathChanged(Some "C:/work/Renamed ARC")) state
+                    update deps ignore (ArcPathChanged(Some "C:/work/Renamed ARC")) state
 
-                let! _ = collectMessages pathChangeCmd
+                let! pathChangeMessages = collectMessages pathChangeCmd
 
                 let stateAfterRenameCompletion, retryCmd =
-                    update
-                        defaultDependencies
-                        ignore
-                        (PublishRenameCompleted(7, Ok "C:/work/Renamed ARC"))
-                        stateAfterPathChange
+                    update deps ignore (PublishRenameCompleted(7, Ok "C:/work/Renamed ARC")) stateAfterPathChange
 
                 let! retryMessages = collectMessages retryCmd
+
+                // The refresh started by the path change loads the workspace token, and only
+                // then does the publish run.
+                let refreshingState, refreshCmd =
+                    match pathChangeMessages with
+                    | [| RefreshRequested |] -> update deps ignore RefreshRequested stateAfterRenameCompletion
+                    | _ -> failwith "Expected the path change to start a refresh."
+
+                let! refreshMessages = collectMessages refreshCmd
+
+                let refreshedState, afterRefreshCmd =
+                    match refreshMessages with
+                    | [| (RefreshCompleted _ as message) |] -> update deps ignore message refreshingState
+                    | _ -> failwith "Expected the refresh to complete."
+
+                let! afterRefreshMessages = collectMessages afterRefreshCmd
 
                 Vitest.expect(stateAfterPathChange.ArcSessionId).not.toBe (7)
                 Vitest.expect(stateAfterRenameCompletion.CurrentArcPath).toEqual (Some "C:/work/Renamed ARC")
                 Vitest.expect(stateAfterRenameCompletion.ErrorNotice).toEqual (None)
-                Vitest.expect(retryMessages).toEqual ([| WriteRequested Push |])
+                Vitest.expect(retryMessages).toEqual ([||])
+                Vitest.expect(stateAfterRenameCompletion.PendingPublishAfterRefresh).toBe (true)
+                Vitest.expect(refreshedState.PendingPublishAfterRefresh).toBe (false)
+                Vitest.expect(afterRefreshMessages).toEqual ([| WriteRequested Push |])
             }
         )
 
@@ -1823,7 +1875,11 @@ Vitest.describe (
 
                 Vitest.expect(nextState.BusyOperation).toEqual (None)
                 Vitest.expect(nextState.CurrentProgress).toEqual (None)
-                Vitest.expect(nextState.ErrorNotice).toEqual (Some "Git LFS installation is required to continue.")
+
+                Vitest
+                    .expect(nextState.ErrorNotice)
+                    .toEqual (Some "The version control dependency 'git-lfs-configuration' is required to continue.")
+
                 Vitest.expect(currentRunStatus nextState).toEqual (None)
             }
         )
@@ -1834,7 +1890,7 @@ Vitest.describe (
                 let state = {
                     GitState.Empty with
                         CurrentArcPath = Some "C:/arc-a"
-                        BusyOperation = Some GitBusyOperation.InstallingGitLfs
+                        BusyOperation = Some(GitBusyOperation.InstallingDependency "git-lfs-configuration")
                         CurrentProgress = Some(sidebarProgress "installing" 75.)
                         InstallRetryState = GitInstallRetryState.InstallingForRetry GitBusyOperation.PushingToRemote
                 }
@@ -3088,6 +3144,509 @@ Vitest.describe (
                 Vitest.expect(finalState.ErrorNotice).toEqual (None)
             }
         )
+
+        Vitest.test (
+            "A stale workspace token refreshes and retries the write once",
+            fun () -> promise {
+                let requests = ResizeArray<CreateRevisionRequestDto>()
+
+                let deps = {
+                    defaultDependencies with
+                        createRevision =
+                            fun request ->
+                                requests.Add request
+
+                                if requests.Count = 1 then
+                                    promise {
+                                        return
+                                            Ok(
+                                                failed
+                                                    Concurrency
+                                                    VersionControlCodes.PreconditionFailed
+                                                    "workspace version is stale"
+                                            )
+                                    }
+                                else
+                                    promise { return Ok(succeeded "revision-2") }
+                        getStatus =
+                            fun _ -> promise {
+                                return
+                                    Ok(
+                                        succeeded {
+                                            cleanStatus with
+                                                WorkspaceVersion = "v2"
+                                        }
+                                    )
+                            }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let state = {
+                    runningState with
+                        ChangedFiles = [| changedFile "a.txt" "M" " " false |]
+                }
+
+                let model, command = update deps ignore (CommitAllRequested "save") state
+                let! messages = collectMessages command
+                let requested, writeCmd = update deps ignore messages[0] model
+                let! completion = collectMessages writeCmd
+
+                let finalState, _ =
+                    match completion with
+                    | [| WriteCompleted(_, _, CommitAll _, Ok(Completed _)) |] ->
+                        update deps ignore completion[0] requested
+                    | _ -> failwith "Expected the retried commit to complete."
+
+                Vitest.expect(requests.Count).toBe (2)
+                Vitest.expect(requests[0].ExpectedWorkspaceVersion).toBe ("v1")
+                Vitest.expect(requests[1].ExpectedWorkspaceVersion).toBe ("v2")
+                Vitest.expect(finalState.ErrorNotice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A workspace token that is stale twice reports the failure",
+            fun () -> promise {
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+                let mutable calls = 0
+
+                let deps = {
+                    defaultDependencies with
+                        reportError = reportedErrors.Add
+                        createRevision =
+                            fun _ ->
+                                calls <- calls + 1
+
+                                promise {
+                                    return Ok(failed Concurrency VersionControlCodes.PreconditionFailed "still stale")
+                                }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let state = {
+                    runningState with
+                        ChangedFiles = [| changedFile "a.txt" "M" " " false |]
+                }
+
+                let model, command = update deps ignore (CommitAllRequested "save") state
+                let! messages = collectMessages command
+                let requested, writeCmd = update deps ignore messages[0] model
+                let! completion = collectMessages writeCmd
+                let finalState, finishCmd = update deps ignore completion[0] requested
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(calls).toBe (2)
+                Vitest.expect(finalState.BusyOperation).toEqual (None)
+                Vitest.expect(finalState.ErrorNotice).toEqual (Some "still stale")
+                Vitest.expect(reportedErrors.Count).toBe (1)
+            }
+        )
+
+        Vitest.test (
+            "A conflict session reported by a commit opens the first conflicted item",
+            fun () -> promise {
+                let conflicted = conflictedStatus [| "conflict.txt" |]
+
+                let deps = {
+                    defaultDependencies with
+                        createRevision =
+                            fun _ -> promise {
+                                return
+                                    Ok(
+                                        failed
+                                            Conflict
+                                            VersionControlCodes.ConflictSessionActive
+                                            "a conflict session is open"
+                                    )
+                            }
+                        getStatus = fun _ -> promise { return Ok(succeeded conflicted) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                        loadConflictPage = fun _ _ path -> promise { return Ok(diffPage path) }
+                }
+
+                let state = {
+                    runningState with
+                        ChangedFiles = [| changedFile "a.txt" "M" " " false |]
+                }
+
+                let model, command = update deps ignore (CommitAllRequested "save") state
+                let! messages = collectMessages command
+                let requested, writeCmd = update deps ignore messages[0] model
+                let! completion = collectMessages writeCmd
+
+                let finalState, _ =
+                    match completion with
+                    | [| WriteCompleted(_,
+                                        _,
+                                        CommitAll _,
+                                        Ok(Completed(UnitSuccess(_, GitPageChange.Set _, Some(Some "conflict.txt"), _, _)))) |] ->
+                        update deps ignore completion[0] requested
+                    | _ -> failwith "Expected the conflict page of the first conflicted item."
+
+                Vitest.expect(finalState.ActiveConflict.IsSome).toBe (true)
+                Vitest.expect(finalState.SelectedChangePath).toEqual (Some "conflict.txt")
+                Vitest.expect(finalState.ErrorNotice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A primary save whose update opens a conflict session keeps the publish for after the merge",
+            fun () -> promise {
+                let conflicted = conflictedStatus [| "conflict.txt" |]
+                let sync = cleanStatus.Synchronization.Value
+                let mutable updated = false
+                let mutable publishCalls = 0
+
+                let preview = {
+                    ChangedPaths = [||]
+                    OverlappingPaths = [||]
+                    HasDataLossRisk = false
+                    WouldCreateConflictSession = false
+                }
+
+                let deps = {
+                    defaultDependencies with
+                        createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
+                        previewUpdate = fun _ -> promise { return Ok(succeeded preview) }
+                        update =
+                            fun _ ->
+                                updated <- true
+
+                                promise {
+                                    return
+                                        Ok(
+                                            OperationResultDto.PartiallySucceeded(
+                                                operation sync,
+                                                makeFailure
+                                                    Conflict
+                                                    VersionControlCodes.ConflictsDetected
+                                                    "conflicts detected"
+                                                    None
+                                                    [| "conflict.txt" |]
+                                            )
+                                        )
+                                }
+                        publish =
+                            fun _ ->
+                                publishCalls <- publishCalls + 1
+                                promise { return Ok(succeeded sync) }
+                        getStatus =
+                            fun _ -> promise {
+                                return Ok(succeeded (if updated then conflicted else statusForBranch "main"))
+                            }
+                        listRefs = fun _ -> promise { return Ok(succeeded [| localBranch "main" true true |]) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                        loadConflictPage = fun _ _ path -> promise { return Ok(diffPage path) }
+                }
+
+                let state = {
+                    runningState with
+                        ChangedFiles = [| changedFile "a.txt" "M" " " false |]
+                }
+
+                let model, command = update deps ignore (PrimarySaveAllRequested "save") state
+                let! messages = collectMessages command
+                let requested, writeCmd = update deps ignore messages[0] model
+                let! completion = collectMessages writeCmd
+
+                let finalState, finishCmd =
+                    match completion with
+                    | [| WriteCompleted(_, _, PrimarySave _, Ok(Completed(UnitSuccess(_, GitPageChange.Set _, _, _, _)))) |] ->
+                        update deps ignore completion[0] requested
+                    | _ -> failwith "Expected the conflict page after the update inside the save."
+
+                let! finishMessages = collectMessages finishCmd
+
+                Vitest.expect(publishCalls).toBe (0)
+                Vitest.expect(finalState.ActiveConflict.IsSome).toBe (true)
+                Vitest.expect(finalState.PendingPostMergePush).toBe (true)
+
+                Vitest
+                    .expect(finalState.WarningNotice)
+                    .toEqual (Some "Changes were saved locally. Online sync is still pending.")
+
+                Vitest.expect(finishMessages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
+            "Cancel before the started event uses the id allocated at request time",
+            fun () -> promise {
+                let publishIds = ResizeArray<string>()
+                let cancelKeys = ResizeArray<OperationKeyDto>()
+                let mutable ids = 0
+
+                let deps = {
+                    defaultDependencies with
+                        newOperationId =
+                            fun () ->
+                                ids <- ids + 1
+                                $"op-{ids}"
+                        publish =
+                            fun request ->
+                                publishIds.Add request.OperationId
+                                promise { return Ok(succeeded cleanStatus.Synchronization.Value) }
+                        cancelOperation =
+                            fun key ->
+                                cancelKeys.Add key
+                                promise { return Ok true }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let requested, writeCmd = update deps ignore (WriteRequested Push) runningState
+
+                let canceling, cancelCmd =
+                    update deps ignore CancelCurrentOperationRequested requested
+
+                let! cancelMessages = collectMessages cancelCmd
+                let! _ = collectMessages writeCmd
+
+                Vitest.expect(requested.CurrentOperation).toEqual (Some { SessionId = ""; OperationId = "op-1" })
+                Vitest.expect(canceling.WarningNotice).toEqual (Some "Canceling operation...")
+                Vitest.expect(cancelKeys |> Seq.toArray).toEqual ([| { SessionId = ""; OperationId = "op-1" } |])
+                Vitest.expect(publishIds |> Seq.toArray).toEqual ([| "op-1" |])
+                Vitest.expect(cancelMessages).toEqual ([| CancelCurrentOperationCompleted(Ok true) |])
+            }
+        )
+
+        Vitest.test (
+            "A refused cancel is reported instead of leaving the canceling notice",
+            fun () -> promise {
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
+                let deps = {
+                    defaultDependencies with
+                        reportError = reportedErrors.Add
+                }
+
+                let state = {
+                    runningState with
+                        BusyOperation = Some GitBusyOperation.PushingToRemote
+                        WarningNotice = Some "Canceling operation..."
+                }
+
+                let nextState, cmd =
+                    update deps ignore (CancelCurrentOperationCompleted(Ok false)) state
+
+                let! _ = collectMessages cmd
+
+                Vitest.expect(nextState.WarningNotice).toEqual (None)
+                Vitest.expect(nextState.ErrorNotice).toEqual (Some "Could not cancel the Git operation.")
+                Vitest.expect(reportedErrors.Count).toBe (1)
+            }
+        )
+
+        Vitest.test (
+            "Primary save without an online service stops after the local commit",
+            fun () -> promise {
+                let localOnly = {
+                    sessionInfo with
+                        Services = {
+                            sessionInfo.Services with
+                                Synchronization = false
+                        }
+                }
+
+                let deps = {
+                    defaultDependencies with
+                        getSessionInfo = fun _ -> promise { return Ok(succeeded localOnly) }
+                        createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let state = {
+                    runningState with
+                        ChangedFiles = [| changedFile "a.txt" "M" " " false |]
+                }
+
+                let model, command = update deps ignore (PrimarySaveAllRequested "save") state
+                let! messages = collectMessages command
+                let requested, writeCmd = update deps ignore messages[0] model
+                let! completion = collectMessages writeCmd
+
+                let finalState, _ =
+                    match completion with
+                    | [| WriteCompleted(_, _, PrimarySave _, Ok(Completed _)) |] ->
+                        update deps ignore completion[0] requested
+                    | _ -> failwith "Expected the local save to complete."
+
+                Vitest.expect(finalState.ErrorNotice).toEqual (None)
+
+                Vitest
+                    .expect(finalState.WarningNotice)
+                    .toEqual (
+                        Some
+                            "Changes were saved locally. This workspace provider does not support online synchronization."
+                    )
+            }
+        )
+
+        Vitest.test (
+            "A publish whose bind fails resumes without creating a second project",
+            fun () -> promise {
+                let sync = cleanStatus.Synchronization.Value
+                let mutable projectCalls = 0
+                let mutable bindCalls = 0
+                let mutable publishCalls = 0
+
+                let deps = {
+                    defaultDependencies with
+                        publish =
+                            fun _ ->
+                                publishCalls <- publishCalls + 1
+
+                                if publishCalls = 1 then
+                                    promise {
+                                        return
+                                            Ok(
+                                                failed
+                                                    Validation
+                                                    VersionControlCodes.PublishTargetMissing
+                                                    "publish target missing"
+                                            )
+                                    }
+                                else
+                                    promise { return Ok(succeeded sync) }
+                        createRemoteProject =
+                            fun _ ->
+                                projectCalls <- projectCalls + 1
+                                promise { return Ok remoteProject }
+                        bindWorkspace =
+                            fun _ ->
+                                bindCalls <- bindCalls + 1
+
+                                if bindCalls = 1 then
+                                    promise { return Ok(failed ProviderError "bind_failed" "bind failed") }
+                                else
+                                    promise { return Ok(succeeded sessionInfo) }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let requested, writeCmd = update deps ignore (WriteRequested Push) runningState
+                let! completion = collectMessages writeCmd
+
+                let incomplete, incompleteCmd =
+                    match completion with
+                    | [| WriteCompleted(_, _, Push, Ok(ProvisioningIncomplete _)) |] ->
+                        update deps ignore completion[0] requested
+                    | _ -> failwith "Expected the failed bind to leave the provisioning incomplete."
+
+                let! incompleteMessages = collectMessages incompleteCmd
+
+                let refreshing, refreshCmd =
+                    match incompleteMessages with
+                    | [| RefreshRequested |] -> update deps ignore RefreshRequested incomplete
+                    | _ -> failwith "Expected a refresh after the incomplete provisioning."
+
+                let! refreshMessages = collectMessages refreshCmd
+                let refreshed, _ = update deps ignore refreshMessages[0] refreshing
+
+                let retried, retryCmd = update deps ignore (WriteRequested Push) refreshed
+                let! retryCompletion = collectMessages retryCmd
+
+                let finalState, _ =
+                    match retryCompletion with
+                    | [| WriteCompleted(_, _, Push, Ok(Completed _)) |] -> update deps ignore retryCompletion[0] retried
+                    | _ -> failwith "Expected the retried publish to complete."
+
+                Vitest
+                    .expect(incomplete.ProvisionedRemote)
+                    .toEqual (
+                        Some {
+                            RemoteUrl = remoteProject.http_url_to_repo
+                            ProjectName = "arc"
+                            IsBound = false
+                        }
+                    )
+
+                Vitest.expect(incomplete.ErrorNotice).toEqual (Some "bind failed")
+                Vitest.expect(refreshed.WarningNotice).toEqual (Some "bind failed")
+                Vitest.expect(projectCalls).toBe (1)
+                Vitest.expect(bindCalls).toBe (2)
+                Vitest.expect(publishCalls).toBe (2)
+                Vitest.expect(finalState.ProvisionedRemote).toEqual (None)
+                Vitest.expect(finalState.ErrorNotice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A recovery offer does not start a refresh, dismissing it does",
+            fun () -> promise {
+                let canceled =
+                    makeFailure
+                        Canceled
+                        VersionControlCodes.OperationCanceled
+                        "Update was canceled."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RestoreWorkspace
+                            Instructions = None
+                        })
+                        [| "a.txt" |]
+
+                let deps = {
+                    defaultDependencies with
+                        update = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
+                }
+
+                let requested, writeCmd = update deps ignore (WriteRequested Pull) runningState
+                let! completion = collectMessages writeCmd
+
+                let offered, offerCmd =
+                    match completion with
+                    | [| WriteCompleted(_,
+                                        _,
+                                        Pull,
+                                        Ok(RequiresRecovery(GitPendingRecovery.RestoreInterruptedPaths _, _))) |] ->
+                        update deps ignore completion[0] requested
+                    | _ -> failwith "Expected the restore offer."
+
+                let! offerMessages = collectMessages offerCmd
+
+                let canceling, cancelCmd =
+                    update deps ignore CancelPendingRemoteActionRequested offered
+
+                let! cancelMessages = collectMessages cancelCmd
+
+                let dismissed, dismissCmd =
+                    match cancelMessages with
+                    | [| DismissRecoveryRequested |] -> update deps ignore DismissRecoveryRequested canceling
+                    | _ -> failwith "Expected the dismissal."
+
+                let! dismissMessages = collectMessages dismissCmd
+
+                Vitest.expect(offered.BusyOperation).toEqual (None)
+                Vitest.expect(offered.PendingConfirmation.IsSome).toBe (true)
+                Vitest.expect(offerMessages).toEqual ([||])
+                Vitest.expect(dismissed.PendingRecovery).toEqual (None)
+                Vitest.expect(dismissMessages).toEqual ([| RefreshRequested |])
+            }
+        )
+
+        Vitest.test (
+            "RefreshRequested is dropped while a write is in flight",
+            fun () -> promise {
+                let state = {
+                    runningState with
+                        BusyOperation = Some GitBusyOperation.PushingToRemote
+                }
+
+                let nextState, cmd = update defaultDependencies ignore RefreshRequested state
+                let! messages = collectMessages cmd
+
+                Vitest.expect(nextState).toEqual (state)
+                Vitest.expect(messages).toEqual ([||])
+            }
+        )
 )
 
 Vitest.describe (
@@ -3111,11 +3670,6 @@ Vitest.describe (
                 "GitState.Empty defaults DownloadLargeFiles to false until settings load",
                 fun () -> Vitest.expect(GitState.Empty.DownloadLargeFiles).toBe (false)
             )
-
-        Vitest.test (
-            "shouldPublishCurrentBranchFirst is true when the current branch has no upstream or matching remote",
-            fun () -> Vitest.expect(shouldPublishCurrentBranchFirst runningState).toBe (false)
-        )
 
         Vitest.test (
             "ConfirmMergeResolutionRequested ignores a second request while another conflict is still confirming",
