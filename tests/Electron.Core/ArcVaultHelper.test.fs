@@ -20,6 +20,13 @@ module FileImportCoordinator = Main.FileImportCoordinator
 module WatcherHelpers = Main.WatcherHelpers
 module Abort = Main.Bindings.Abort
 
+let private electronMock: obj = import "__electronMock" "electron"
+
+let private resetElectronMock () = electronMock?reset () |> ignore
+
+let private setBrowserWindowFactory (factory: obj -> obj) =
+    electronMock?setBrowserWindowFactory (factory) |> ignore
+
 let private runFileImport
     (vault: ArcVault)
     (requestId, operation: Main.Bindings.Abort.IAbortSignal -> JS.Promise<Result<ImportExternalFilesResult, exn>>)
@@ -259,6 +266,57 @@ let private lifecycleTestWindow id isDestroyed onSend =
     ]
     |> unbox<BrowserWindow>
 
+let private registrationTestWindow id (loadError: exn) onLoad =
+    let mutable destroyed = false
+    let send: obj = emitJsExpr () "((..._args) => {})"
+    let noop: obj = emitJsExpr () "((..._args) => {})"
+
+    let failLoad (_: string) =
+        onLoad ()
+        JS.Constructors.Promise.reject loadError
+
+    let window =
+        createObj [
+            "id" ==> id
+            "title" ==> ""
+            "isDestroyed" ==> (fun () -> destroyed)
+            "destroy" ==> (fun () -> destroyed <- true)
+            "focus" ==> ignore
+            "loadFile" ==> failLoad
+            "loadURL" ==> failLoad
+            "webContents"
+            ==> createObj [
+                "send" ==> send
+                "setWindowOpenHandler" ==> noop
+                "on" ==> noop
+                "openDevTools" ==> noop
+            ]
+        ]
+        |> unbox<BrowserWindow>
+
+    window, (fun () -> destroyed)
+
+let private expectRegistrationLoadFailure
+    (expectedError: exn)
+    (vaults: ArcVaults)
+    (windowId: int)
+    (isDestroyed: unit -> bool)
+    (registration: unit -> JS.Promise<int>)
+    =
+    promise {
+        let mutable capturedError: exn option = None
+
+        try
+            let! _ = registration ()
+            ()
+        with error ->
+            capturedError <- Some error
+
+        Vitest.expect(capturedError).toEqual (Some expectedError)
+        Vitest.expect(vaults.Vaults.ContainsKey(windowId)).toBe (false)
+        Vitest.expect(isDestroyed ()).toBe (true)
+    }
+
 let private mkdirRecursiveAsync (directoryPath: string) = promise {
     let! _ = mkdirAsync directoryPath (MkdirOptions(recursive = true))
     return ()
@@ -292,6 +350,8 @@ let private addDataMapToAllEntityTypes (arc: ARC) =
 Vitest.describe (
     "ArcVaultHelper",
     fun () ->
+        Vitest.afterEach (fun () -> resetElectronMock ())
+
         Vitest.test (
             "DataMap add synchronization preserves the persisted static-hash baseline",
             fun () ->
@@ -338,6 +398,88 @@ Vitest.describe (
                 vaults.BroadcastRecentARCs()
 
                 Vitest.expect(aliveWindowSendCount).toBe (1)
+        )
+
+        Vitest.test (
+            "RegisterVault cleans up when renderer loading fails",
+            fun () -> promise {
+                let windowId = 11
+                let loadError = exn "Expected renderer load failure"
+                let window, isDestroyed = registrationTestWindow windowId loadError ignore
+                setBrowserWindowFactory (fun _ -> window :> obj)
+
+                let vaults = ArcVaults()
+
+                do! expectRegistrationLoadFailure loadError vaults windowId isDestroyed vaults.RegisterVault
+            }
+        )
+
+        Vitest.test (
+            "RegisterVaultWithArc stops the watcher and cleans up when renderer loading fails",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-registration-open-"
+                    "Existing ARC"
+                    ignore
+                    (fun arcPath -> promise {
+                        let windowId = 12
+                        let loadError = exn "Expected renderer load failure"
+                        let mutable initializedVault: ArcVault option = None
+                        let mutable vaultsRef: ArcVaults option = None
+
+                        let window, isDestroyed =
+                            registrationTestWindow
+                                windowId
+                                loadError
+                                (fun () -> initializedVault <- vaultsRef.Value.TryGetVault(windowId))
+
+                        let vaults = ArcVaults()
+
+                        setBrowserWindowFactory (fun _ -> window :> obj)
+
+                        vaultsRef <- Some vaults
+
+                        do!
+                            expectRegistrationLoadFailure
+                                loadError
+                                vaults
+                                windowId
+                                isDestroyed
+                                (fun () -> vaults.RegisterVaultWithArc arcPath)
+
+                        Vitest.expect(initializedVault.IsSome).toBe (true)
+                        Vitest.expect(initializedVault.Value.watcher.IsNone).toBe (true)
+                    })
+        )
+
+        Vitest.test (
+            "RegisterVaultWithNewArc cleans up when renderer loading fails",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-registration-create-"
+
+                try
+                    let windowId = 13
+                    let loadError = exn "Expected renderer load failure"
+                    let window, isDestroyed = registrationTestWindow windowId loadError ignore
+                    setBrowserWindowFactory (fun _ -> window :> obj)
+
+                    let vaults = ArcVaults()
+
+                    let arcPath = join [| rootPath; "new-arc" |]
+
+                    do!
+                        expectRegistrationLoadFailure
+                            loadError
+                            vaults
+                            windowId
+                            isDestroyed
+                            (fun () -> vaults.RegisterVaultWithNewArc(arcPath, "New ARC"))
+
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
         )
 
         Vitest.test (
@@ -916,5 +1058,64 @@ Vitest.describe (
 
                         Vitest.expect(loadedArc.GetRun("Run With DataMap").DataMap.Value.StaticHash).not.toBe (0)
                     })
+        )
+
+        Vitest.test (
+            "OpenARC restores an empty vault after opening a non-ARC folder fails",
+            fun () -> promise {
+                let! folderPath = TestHelpers.createTempDirectoryAsync "swate-open-invalid-arc-"
+
+                try
+                    let vault = ArcVault(TestHelpers.testWindow ())
+                    let mutable failed = false
+
+                    try
+                        do! vault.OpenARC folderPath
+                    with _ ->
+                        failed <- true
+
+                    Vitest.expect(failed).toBe (true)
+                    Vitest.expect(vault.path).toEqual (None)
+                    Vitest.expect(vault.arc).toEqual (None)
+                    Vitest.expect(vault.watcher).toEqual (None)
+                    do! TestHelpers.removeDirectoryAsync folderPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync folderPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "Startup does not start a watcher when ARC loading fails",
+            fun () -> promise {
+                let! folderPath = TestHelpers.createTempDirectoryAsync "swate-invalid-arc-startup-"
+
+                try
+                    let vault = ArcVault(TestHelpers.testWindow ())
+                    vault.path <- Some folderPath
+
+                    try
+                        do! vault.Startup()
+                    with _ ->
+                        ()
+
+                    Vitest.expect(vault.watcher).toEqual (None)
+                    do! TestHelpers.removeDirectoryAsync folderPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync folderPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "ClearArc resets the window title",
+            fun () ->
+                let vault = ArcVault(TestHelpers.testWindow ())
+                vault.SetArc(ARC("LoadedArc"))
+
+                vault.ClearArc()
+
+                Vitest.expect(vault.arc).toEqual (None)
+                Vitest.expect(vault.window.title).toBe (Swate.Electron.Shared.ApplicationVersion.windowTitle None)
         )
 )

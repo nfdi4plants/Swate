@@ -123,45 +123,99 @@ let private notifyGitRepositoryInitialized (arcPath: string) =
         |> fun rendererApi -> rendererApi.gitRepositoryInitialized arcPath
     )
 
+let private showArcOpenError (window: BaseWindow option) (arcPath: string) (error: exn) =
+    let options =
+        Dialog.ShowMessageBoxSync.Options(
+            "The ARC could not be opened.",
+            ``type`` = Enums.Dialog.ShowMessageBoxSync.Options.Type.Error,
+            title = "Could not open ARC",
+            detail = $"Folder: {arcPath}\n\n{error.Message}"
+        )
+
+    dialog.showMessageBoxSync (?window = window, options = options) |> ignore
+
+let private validateArcRoot (arcPath: string) = promise {
+    let investigationPath =
+        ARCtrl.ArcPathHelper.combine arcPath ARCtrl.ArcPathHelper.InvestigationFileName
+
+    let! investigationExists = pathExistsAsync investigationPath
+
+    if investigationExists then
+        return Ok()
+    else
+        return
+            Error(
+                exn
+                    $"The folder does not contain the required ARC investigation file '{ARCtrl.ArcPathHelper.InvestigationFileName}'."
+            )
+}
+
+let private openArcAtPath (event: IpcMainInvokeEvent) (requestedPath: string) = promise {
+    let window = dialogParentFromIpcEvent event
+
+    let reportError arcPath error =
+        showArcOpenError window arcPath error
+        Error error
+
+    let normalizedPathResult =
+        try
+            Ok(PathHelpers.normalizePath requestedPath)
+        with error ->
+            Error error
+
+    match normalizedPathResult with
+    | Error error -> return reportError requestedPath error
+    | Ok arcPath ->
+        try
+            let! arcPathExists = pathExistsAsync arcPath
+
+            if not arcPathExists then
+                return reportError arcPath (exn $"The ARC cannot be found at location: '{arcPath}'.")
+            else
+                match! validateArcRoot arcPath with
+                | Error error -> return reportError arcPath error
+                | Ok() ->
+                    let windowId = windowIdFromIpcEvent event
+                    let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
+                    return Ok disposition
+        with error ->
+            return reportError arcPath error
+}
+
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
 let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
     openARC =
         fun () -> promise {
             let window = dialogParentFromIpcEvent event
 
-            let! r =
-                dialog.showOpenDialog (
-                    ?window = window,
-                    properties = [|
-                        Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
-                    |]
-                )
+            try
+                let! r =
+                    dialog.showOpenDialog (
+                        ?window = window,
+                        properties = [|
+                            Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
+                        |]
+                    )
 
-            if r.canceled then
-                return Ok None
-            elif r.filePaths.Length <> 1 then
-                return Error(exn "Not exactly one path")
-            else
-                let arcPath = r.filePaths |> Array.exactlyOne |> PathHelpers.normalizePath
-
-                let windowId = windowIdFromIpcEvent event
-                let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
-                return Ok(Some(ArcOpenDisposition.path disposition))
+                if r.canceled then
+                    return Ok None
+                elif r.filePaths.Length <> 1 then
+                    let error = exn "Not exactly one path"
+                    showArcOpenError window (String.concat ", " r.filePaths) error
+                    return Error error
+                else
+                    match! openArcAtPath event (Array.exactlyOne r.filePaths) with
+                    | Ok disposition -> return Ok(Some(ArcOpenDisposition.path disposition))
+                    | Error error -> return Error error
+            with error ->
+                showArcOpenError window "" error
+                return Error error
         }
     openARCByPath =
         fun (arcPath: string) -> promise {
-            try
-                let arcPath = PathHelpers.normalizePath arcPath
-                let! arcPathExists = pathExistsAsync arcPath
-
-                if not arcPathExists then
-                    return Error(exn $"The ARC cannot be found at location: '{arcPath}'.")
-                else
-                    let windowId = windowIdFromIpcEvent event
-                    let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
-                    return Ok(ArcOpenDisposition.path disposition)
-            with e ->
-                return Error e
+            match! openArcAtPath event arcPath with
+            | Ok disposition -> return Ok(ArcOpenDisposition.path disposition)
+            | Error error -> return Error error
         }
     createARC =
         fun (request: CreateArcRequest) -> promise {

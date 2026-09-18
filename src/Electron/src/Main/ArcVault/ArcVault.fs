@@ -89,6 +89,10 @@ type ArcVault(window: BrowserWindow) =
         this.arc <- Some arc
         this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle (Some arc.Identifier)
 
+    member this.ClearArc() =
+        this.arc <- None
+        this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle None
+
     /// Sets the dirty marker for unsaved in-memory ARC mutations.
     member this.RefreshHasUnsavedArcChangesFlag() =
         // Use this value to only send updates to the renderer when the dirty state actually changes. This avoids redundant updates.
@@ -423,8 +427,8 @@ module ArcVaultExtensions =
 
         /// This functions should be called once, when an vault is first started with a path
         member this.Startup() = promise {
-            this.StartFileWatcher()
             do! this.LoadArc()
+            this.StartFileWatcher()
             this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle (Some this.arc.Value.Identifier)
         }
 
@@ -441,8 +445,18 @@ module ArcVaultExtensions =
 
                 swatelogfn this.window.id "path: %s" normalizedPath
                 this.path <- Some normalizedPath
-                do! this.Startup()
-                sendMsg.pathChange (Some normalizedPath)
+
+                try
+                    do! this.Startup()
+                    sendMsg.pathChange (Some normalizedPath)
+                with error ->
+                    // The path is assigned before loading so ARCtrl can use it. Restore the empty-vault state
+                    // when startup fails; otherwise the window remains bound to a path that was never opened.
+                    do! this.StopFileWatcher()
+                    this.path <- None
+                    this.ClearArc()
+                    this.fileTree.Clear()
+                    return raise error
         }
 
         member this.CreateARC(path: string, identifier: string) = promise {
@@ -575,6 +589,7 @@ module ArcOpenDisposition =
 
 
 type ArcVaults() =
+
     /// Key is window.id
     member val Vaults = Dictionary<int, ArcVault>() with get
 
@@ -708,49 +723,74 @@ type ArcVaults() =
             this.DisposeVault(id)
         )
 
+    member private this.CleanupFailedRegistration(window: BrowserWindow, vault: ArcVault, id: int) = promise {
+        do! vault.StopFileWatcher()
+        this.Vaults.Remove(id) |> ignore
+
+        if not (window.isDestroyed ()) then
+            window.destroy ()
+    }
+
     member this.RegisterVault() : Fable.Core.JS.Promise<int> = promise {
-        let! window = createWindow ()
+        let window = createWindow ()
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
 
-        this.OnCloseWindow(window, vault, id)
+        try
+            do! loadWindow window
 
-        window.focus ()
-        swatelogfn id "Register window"
+            this.OnCloseWindow(window, vault, id)
 
-        return id
+            window.focus ()
+            swatelogfn id "Register window"
+
+            return id
+        with error ->
+            do! this.CleanupFailedRegistration(window, vault, id)
+            return raise error
     }
 
     member this.RegisterVaultWithArc(path: string) = promise {
-        let! window = createWindow ()
+        let window = createWindow ()
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
-        do! vault.OpenARC(path)
 
-        this.OnCloseWindow(window, vault, id)
+        try
+            do! vault.OpenARC(path)
+            do! loadWindow window
 
-        window.focus ()
-        swatelogfn id "Register window"
+            this.OnCloseWindow(window, vault, id)
 
-        return id
+            window.focus ()
+            swatelogfn id "Register window"
+
+            return id
+        with error ->
+            do! this.CleanupFailedRegistration(window, vault, id)
+            return raise error
     }
 
     member this.RegisterVaultWithNewArc(path: string, newIdentifier: string) : Fable.Core.JS.Promise<int> = promise {
-        let! window = createWindow ()
+        let window = createWindow ()
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
 
-        do! vault.CreateARC(path, newIdentifier)
+        try
+            do! vault.CreateARC(path, newIdentifier)
+            do! loadWindow window
 
-        this.OnCloseWindow(window, vault, id)
+            this.OnCloseWindow(window, vault, id)
 
-        window.focus ()
-        swatelogfn id "Register window"
+            window.focus ()
+            swatelogfn id "Register window"
 
-        return id
+            return id
+        with error ->
+            do! this.CleanupFailedRegistration(window, vault, id)
+            return raise error
     }
 
     member this.OpenARCInVault(windowId: int, path: string) = promise {

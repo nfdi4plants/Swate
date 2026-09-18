@@ -1,9 +1,21 @@
 const noop = () => {};
 let fromWebContentsMock: ((webContents: unknown) => unknown) | undefined;
+let browserWindowFactoryMock: ((options: unknown) => object) | undefined;
+
+// Electron Forge supplies these globals to the main process at build time.
+Object.assign(globalThis, {
+    MAIN_WINDOW_VITE_DEV_SERVER_URL: undefined,
+    MAIN_WINDOW_VITE_NAME: "main_window",
+    __dirname: "",
+});
 
 export const __electronMock = {
     reset: () => {
         fromWebContentsMock = undefined;
+        browserWindowFactoryMock = undefined;
+    },
+    setBrowserWindowFactory: (handler: (options: unknown) => object) => {
+        browserWindowFactoryMock = handler;
     },
     setBrowserWindowFromWebContents: (handler: (webContents: unknown) => unknown) => {
         fromWebContentsMock = handler;
@@ -32,6 +44,12 @@ export const safeStorage = {
 };
 
 export class BrowserWindow {
+    constructor(options: unknown) {
+        if (browserWindowFactoryMock) {
+            Object.assign(this, browserWindowFactoryMock(options));
+        }
+    }
+
     static getAllWindows = () => [];
     static fromWebContents = (webContents: unknown) => fromWebContentsMock?.(webContents);
 }

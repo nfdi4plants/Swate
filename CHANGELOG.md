@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🐛 Fixed
+
+-   Show a native error message instead of crashing or silently failing when a selected folder is not a valid ARC.
+
 ## 2.3.1 - 2026-09-16
 
 ### 🐛 Fixed
