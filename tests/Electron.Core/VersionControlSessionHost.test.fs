@@ -892,6 +892,36 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "the DataHub ruleset blocks a storage policy change before the provider runs",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    registerVault 47 fixture.RepoRoot |> ignore
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 47)
+
+                    let! metadata =
+                        api.setPathStoragePolicy {
+                            OperationId = "policy-isa"
+                            Path = "isa.investigation.xlsx"
+                            UseLargeObjectStorage = true
+                        }
+
+                    let metadataFailure = expectDtoFailure "isa policy" metadata
+                    Vitest.expect(metadataFailure.Category).toEqual FailureCategoryDto.Validation
+                    Vitest.expect(metadataFailure.Code).toBe VersionControlCodes.StoragePolicyBlocked
+
+                    let! dataset =
+                        api.setPathStoragePolicy {
+                            OperationId = "policy-dataset"
+                            Path = "assays/a/dataset/raw.bin"
+                            UseLargeObjectStorage = false
+                        }
+
+                    let datasetFailure = expectDtoFailure "dataset policy" dataset
+                    Vitest.expect(datasetFailure.Code).toBe VersionControlCodes.StoragePolicyBlocked
+                })
+        )
+
+        Vitest.test (
             "an unmanaged vault folder reports a structured not found failure",
             fun () ->
                 withFixture (fun fixture -> promise {

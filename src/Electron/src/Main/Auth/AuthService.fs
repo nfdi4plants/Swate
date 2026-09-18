@@ -173,7 +173,7 @@ let private getAuthStateDto () : AuthStateDto = {
 let private canUseToken (accountState: AccountState) =
     accountState.Summary.TokenStatus <> TokenStatus.Invalid
 
-/// Try to get token for a given host (used by GitTokenProvider).
+/// Try to get token for a given host.
 /// Policy: active account first, then any account matching the host.
 let tryGetTokenForHost (host: string) : string option =
     // 1. Check active account
@@ -229,77 +229,6 @@ let commitNameAndEmail (user: AuthUserDto) : string * string =
         | _ -> user.Email
 
     name, email
-
-/// Commit identity of an account user for the legacy Git path.
-/// Tests call this directly because it decides which identity ends up in a commit.
-let commitIdentityOfUser (user: AuthUserDto) : Main.Git.GitTokenProvider.GitCommitIdentity =
-    let name, email = commitNameAndEmail user
-    { Name = name; Email = email }
-
-/// Commit identity for a commit that will be pushed to the given host (used by GitIdentityProvider).
-/// Policy: the account matching the host, preferring the active one, so the author links on the hub
-/// being pushed to. With no host known (no remote yet) the active account is used, since publishing
-/// targets its hub. A known host that matches no stored account yields None — the injected `-c`
-/// entries outrank every git config level, so stamping an unrelated account would silently override
-/// an identity the user may have configured for that hub themselves. Unlike token lookup, token
-/// validity is ignored: an expired token cannot authenticate, but its account's email still links
-/// commits. The GitLab username is preferred over the display name so commits link to the account;
-/// accounts stored before usernames were persisted fall back to the display name.
-let tryGetCommitIdentity (host: string option) : Main.Git.GitTokenProvider.GitCommitIdentity option =
-    let selectedAccountState =
-        match host with
-        | None -> getActiveAccountState ()
-        | Some host ->
-            let matchesHost (accountState: AccountState) =
-                String.Equals(
-                    SecureAuthStore.extractHost accountState.Summary.User.TargetDataHub,
-                    host,
-                    StringComparison.OrdinalIgnoreCase
-                )
-
-            getActiveAccountState ()
-            |> Option.filter matchesHost
-            |> Option.orElseWith (fun () ->
-                accounts
-                |> Map.tryPick (fun _ accountState -> if matchesHost accountState then Some accountState else None)
-            )
-
-    selectedAccountState
-    |> Option.map _.Summary.User
-    |> Option.map commitIdentityOfUser
-
-let private refreshTokenProvider () =
-    Main.Git.GitTokenProvider.setTokenProvider {
-        TryGetAccessToken = fun host -> promise { return tryGetTokenForHost host }
-    }
-
-    Main.Git.GitTokenProvider.setIdentityProvider {
-        TryGetCommitIdentity = fun host -> promise { return tryGetCommitIdentity host }
-    }
-
-    Main.Git.GitTokenProvider.RemoteProvisioning.setProvider {
-        CreateProject =
-            fun projectName -> promise {
-                match
-                    getActiveAccountState ()
-                    |> Option.filter canUseToken
-                    |> Option.map (fun accountState -> accountState.Summary.User, accountState.Token)
-                with
-                | None ->
-                    return
-                        Error "No usable DataHub account is signed in. Sign in before publishing this local repository."
-                | Some(user, token) when String.IsNullOrWhiteSpace user.TargetDataHub ->
-                    return Error "The active DataHub account has no DataHub endpoint configured."
-                | Some(user, token) ->
-                    let! projectResult =
-                        Swate.Components.Api.GitLabApi.GitLabApi.CreateProject(user.TargetDataHub, token, projectName)
-
-                    return
-                        projectResult
-                        |> Result.map _.http_url_to_repo
-                        |> Result.mapError _.GitLabErrorToString
-            }
-    }
 
 /// Get the current in-memory auth state for the active account.
 let getState () : AuthStateDto =
@@ -421,7 +350,6 @@ let signIn (request: AuthSignInRequest) : JS.Promise<AuthResult> = promise {
                         activeLocalSwateAccountId <- Some user.LocalSwateAccountId
                         persistActiveSelection ()
                         invalidateRevalidationWindow ()
-                        refreshTokenProvider ()
                         let authStateDto = getState ()
                         return toAuthResult (Ok authStateDto)
 }
@@ -434,7 +362,6 @@ let signOut () : unit =
         accounts <- accounts |> Map.remove id
         reconcileActiveAccountInvariant ()
         invalidateRevalidationWindow ()
-        refreshTokenProvider ()
     | None -> ()
 
 /// Set a different account as active.
@@ -444,7 +371,6 @@ let setActiveAccount (localSwateAccountId: string) : AuthStateDto =
         activeLocalSwateAccountId <- Some localSwateAccountId
         persistActiveSelection ()
         invalidateRevalidationWindow ()
-        refreshTokenProvider ()
     | None -> ()
 
     getState ()
@@ -456,7 +382,6 @@ let removeAccount (localSwateAccountId: string) : unit =
 
     reconcileActiveAccountInvariant ()
     invalidateRevalidationWindow ()
-    refreshTokenProvider ()
 
 /// Rotate PAT for a specific account and replace the stored token.
 let rotatePersonalAccessToken (localSwateAccountId: string) : JS.Promise<Result<AuthStateDto, AuthFailure>> = promise {
@@ -502,7 +427,6 @@ let rotatePersonalAccessToken (localSwateAccountId: string) : JS.Promise<Result<
                 accounts <- accounts |> Map.add localSwateAccountId updatedAccountState
                 persistAccountState localSwateAccountId updatedAccountState
                 invalidateRevalidationWindow ()
-                refreshTokenProvider ()
 
                 return Ok(getState ())
 }
@@ -616,7 +540,6 @@ let revalidate () : JS.Promise<AuthResult * bool> = promise {
 
             accounts <- nextAccounts
             reconcileActiveAccountInvariant ()
-            refreshTokenProvider ()
 
             let authStateDto = getState ()
 
@@ -673,6 +596,3 @@ let tryRestoreFromStorage () : unit =
     activeLocalSwateAccountId <- SecureAuthStore.getActiveLocalSwateAccountId ()
 
     reconcileActiveAccountInvariant ()
-
-    if not accounts.IsEmpty then
-        refreshTokenProvider ()

@@ -13,8 +13,6 @@ open VersionControlService.Abstractions
 open Vitest
 
 module FileTreeCreator = Main.FileTreeCreator
-module GitProvisioningService = Main.Git.GitProvisioningService
-module GitService = Main.Git.GitService
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private osDynamic: obj = importAll "os"
@@ -82,11 +80,6 @@ let private runGitAsync (repoPath: string) (args: string[]) : Fable.Core.JS.Prom
     return output
 }
 
-let private expectGitOk<'T> (operationName: string) (result: GitService.GitResult<'T>) : 'T =
-    match result with
-    | Ok value -> value
-    | Error failure -> failwith $"{operationName} failed ({failure.Kind}): {failure.Message}"
-
 let private expectHexObjectId (largeObject: LargeObjectState) =
     Vitest.expect(largeObject.objectId.IsSome).toBe (true)
 
@@ -131,9 +124,25 @@ let private withTempRepository
 
         try
             let repoPath = join [| rootPath; "repo" |]
-            let! initResult = GitProvisioningService.initRepository repoPath
-            let normalizedRepoPath = expectGitOk "git init" initResult
             let runtime = createRuntime rootPath
+            let gitFactory = ProviderComposition.createGitFactory noAccounts
+
+            let! initialized =
+                gitFactory.Initialize
+                    {
+                        TargetPath = repoPath
+                        Location = None
+                    }
+                    (OperationContext.detached "file-tree-init")
+                |> Async.StartAsPromise
+
+            let binding =
+                match initialized with
+                | Succeeded outcome -> outcome.Value
+                | PartiallySucceeded(_, failure) ->
+                    failwith $"git init partially succeeded ({failure.Code}): {failure.Message}"
+                | Failed failure -> failwith $"git init failed ({failure.Code}): {failure.Message}"
+
             let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
             WorkspaceSessionHost.initialize host
             VersionControlRuntime.initialize runtime
@@ -142,7 +151,7 @@ let private withTempRepository
                 do!
                     testBody {
                         RootPath = rootPath
-                        RepoPath = normalizedRepoPath
+                        RepoPath = binding.WorkspaceRoot
                     }
 
                 do! host.CloseAll() |> Async.StartAsPromise

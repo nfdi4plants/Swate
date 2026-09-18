@@ -3,16 +3,6 @@ module Swate.Electron.Shared.FileIOTypes
 open System.Collections.Generic
 open Fable.Core
 
-type GitLfsLsFileInfo = {
-    name: string
-    size: float
-    checkout: bool
-    downloaded: bool
-    ``oid_type``: string
-    oid: string
-    version: string
-}
-
 /// A large object of the workspace (for Git a file tracked with LFS): whether its
 /// content is present in the file and in the local store, its size and object id.
 type LargeObjectState = {

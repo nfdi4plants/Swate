@@ -9,7 +9,6 @@ open Swate.Components.Shared
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
-open Swate.Electron.Shared.GitTypes
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.DTOs.NoteSearchDto
@@ -23,6 +22,8 @@ open Main.IPC.Delete
 open Main.IPC.Rename
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
 open Main.IPC.FileSystemIO
+open Main.VersionControl
+open VersionControlService.Abstractions
 
 let private refreshVaultFileTree (vault: ArcVault) = promise {
     match vault.path with
@@ -101,19 +102,6 @@ let private runLoadedArcPathAction
             return Error e
     }
 
-let private initGitRepositoryForCreatedArcDisposition
-    (initRepository: string -> JS.Promise<Main.Git.GitService.GitResult<string>>)
-    (initGit: bool)
-    (disposition: ArcOpenDisposition)
-    : JS.Promise<Main.Git.GitService.GitResult<string option>> =
-    promise {
-        match initGit, disposition.CreatedArcPath with
-        | true, Some createdArcPath ->
-            let! initResult = initRepository createdArcPath
-            return initResult |> Result.map (fun _ -> Some createdArcPath)
-        | _ -> return Ok None
-    }
-
 let private notifyGitRepositoryInitialized (arcPath: string) =
     ARC_VAULTS.TryGetVaultByPath arcPath
     |> Option.iter (fun vault ->
@@ -189,18 +177,30 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 let windowId = windowIdFromIpcEvent event
                 let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, request.identifier)
 
-                match!
-                    initGitRepositoryForCreatedArcDisposition
-                        Main.Git.GitProvisioningService.initRepository
-                        request.initGit
-                        disposition
-                with
-                | Error failure ->
-                    Swate.Components.console.log (
-                        $"Git init failed for '{ArcOpenDisposition.path disposition}': {failure.Message}"
-                    )
-                | Ok(Some initializedArcPath) -> notifyGitRepositoryInitialized initializedArcPath
-                | Ok None -> ()
+                if request.initGit then
+                    match disposition.CreatedArcPath with
+                    | Some createdArcPath ->
+                        match WorkspaceSessionHost.tryCurrent () with
+                        | None -> Swate.Components.console.log "Version control runtime is unavailable."
+                        | Some host ->
+                            let context =
+                                OperationContext.create
+                                    (System.Guid.NewGuid().ToString())
+                                    OperationCancellation.none
+                                    ignore
+
+                            let! initResult =
+                                IVersionControlApi.initializeLocalWorkspace host createdArcPath context
+                                |> Async.StartAsPromise
+
+                            match initResult with
+                            | Failed failure ->
+                                Swate.Components.console.log (
+                                    $"Git init failed for '{ArcOpenDisposition.path disposition}': {failure.Message}"
+                                )
+                            | Succeeded _
+                            | PartiallySucceeded _ -> notifyGitRepositoryInitialized createdArcPath
+                    | None -> ()
 
                 return Ok(ArcOpenDisposition.path disposition)
         }
@@ -902,37 +902,6 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         return Error(exn $"Could not read file {relativePath}: {e.Message}")
             | _ -> return Error(arcNotOpenError ())
         }
-    runGitLfs =
-        fun (request: GitLfsRequest) -> promise {
-            let windowId = windowIdFromIpcEvent event
-
-            match ARC_VAULTS.TryGetVault(windowId) with
-            | None -> return Error(exn $"The ARC for window id {windowId} should exist")
-            | Some vault ->
-                match vault.path with
-                | None -> return Error(arcNotOpenError ())
-                | Some arcPath ->
-                    match Main.Git.GitLfsService.validateTrackingRulesetRequest request.Command request.FilePath with
-                    | Error blockedReason -> return Error(exn blockedReason)
-                    | Ok() ->
-
-                        // Always enforce the active ARC root to avoid running against arbitrary repos.
-                        let enforcedRequest = { request with RepoPath = arcPath }
-                        let! result = GitLfs.runChannel vault.window enforcedRequest
-
-                        match result with
-                        | Error e ->
-                            Swate.Components.console.log ($"Error: {e.Message}")
-                            return Error e
-                        | Ok successResult ->
-                            match enforcedRequest.Command with
-                            | Track
-                            | Untrack -> do! refreshVaultFileTree vault
-                            | _ -> ()
-
-                            return Ok successResult
-        }
-    cancelGitLfs = fun (requestId: string) -> GitLfs.cancelChannel requestId
     resolveCloseRequest =
         fun (decision: IPCTypesHelper.SaveBeforeQuitDecision) -> promise {
             try

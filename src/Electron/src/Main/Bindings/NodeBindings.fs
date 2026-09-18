@@ -5,6 +5,22 @@ open Fable.Core.JsInterop
 
 let childProcessDynamic: obj = importAll "node:child_process"
 
+[<Emit("$0.execFile($1, $2, $3, $4)")>]
+let execFile
+    (childProcess: obj)
+    (file: string)
+    (arguments: string[])
+    (options: obj)
+    (callback: obj -> obj -> obj -> unit)
+    : obj =
+    jsNative
+
+[<Emit("$0 && typeof $0.code === 'number' ? $0.code : -1")>]
+let execFileErrorExitCode (error: obj) : int = jsNative
+
+[<Emit("$0 && $0.message ? $0.message : String($0)")>]
+let execFileErrorMessage (error: obj) : string = jsNative
+
 [<Emit("process.platform")>]
 let processPlatform () : string = jsNative
 

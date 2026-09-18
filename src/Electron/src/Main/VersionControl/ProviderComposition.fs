@@ -38,6 +38,7 @@ let createGitFactory (source: DataHubStrategies.DataHubAccountSource) : Provider
         GitWorkspaceSession.GitSessionHooks.none
         (DataHubStrategies.createCredentialStrategy source)
         (DataHubStrategies.createIdentityStrategy source)
+    |> LegacySettingsMigration.wrapGitFactory
 
 let lakeFsOptions
     (settingsRoot: string)

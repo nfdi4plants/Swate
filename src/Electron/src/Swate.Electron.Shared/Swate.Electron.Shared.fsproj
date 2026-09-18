@@ -11,7 +11,6 @@
     <Compile Include="ARCtrlJsonObject.fs" />
     <Compile Include="FileIOTypes.fs" />
     <Compile Include="AuthTypes.fs" />
-    <Compile Include="GitTypes.fs" />
     <Compile Include="VersionControlTypes.fs" />
     <Compile Include="ApplicationVersion.fs" />
     <Compile Include="IPCTypes.fs" />

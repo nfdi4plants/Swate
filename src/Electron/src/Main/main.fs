@@ -23,7 +23,6 @@ app
 
         ARC_VAULTS.RegisterVault() |> ignore
 
-        Remoting.createIpc () |> Remoting.fromIpcMainEvent IPC.IGitApi.api
         Remoting.createIpc () |> Remoting.fromIpcMainEvent IPC.IVersionControlApi.api
         Remoting.createIpc () |> Remoting.fromValue IPC.IGitLabApi.api
         Remoting.createIpc () |> Remoting.fromIpcMainEvent IPC.ArcVaultsApi.api

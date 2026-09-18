@@ -5,7 +5,6 @@ open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IArcVaultsApi>
-Remoting.createIpc () |> Remoting.buildTwoWayBridge<IGitApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IVersionControlApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IGitLabApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IAuthApi>
@@ -17,9 +16,7 @@ Remoting.createIpc () |> Remoting.buildBridge<IRecentArcsRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IAuthAccountsRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IFileTreeRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IFileImportRendererApi>
-Remoting.createIpc () |> Remoting.buildBridge<IGitProgressRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IGitRepositoryRendererApi>
-Remoting.createIpc () |> Remoting.buildBridge<IGitLfsProgressRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IVersionControlRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IHasUnsavedArcChangesRendererApi>
 

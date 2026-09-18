@@ -243,6 +243,30 @@ let private persistProvisionedBinding
         | Error message -> PartiallySucceeded(outcome, persistFailure message)
     | Failed failure -> Failed failure
 
+let initializeLocalWorkspace
+    (host: WorkspaceSessionHost.WorkspaceSessionHost)
+    (targetPath: string)
+    (context: OperationContext)
+    : Async<OperationResult<WorkspaceBinding>> =
+    async {
+        match tryFactoryFor host ProviderComposition.defaultProviderId with
+        | None ->
+            return
+                validationFailed
+                    VersionControlCodes.LocationUnsupported
+                    "The default version control provider is not registered."
+        | Some factory ->
+            let! initialized =
+                factory.Initialize
+                    {
+                        TargetPath = targetPath
+                        Location = None
+                    }
+                    context
+
+            return persistProvisionedBinding host initialized
+    }
+
 /// A provisioning step that produced a binding. The binding is persisted before the
 /// caller sees the result so a crash after provisioning still leaves the vault bound.
 let private provision
@@ -333,26 +357,17 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             let host = WorkspaceSessionHost.get ()
             let bridge = tryBridgeFromEvent event
 
-            provision
-                host
-                bridge
-                request.OperationId
-                (fun context -> async {
-                    match tryFactoryFor host ProviderComposition.defaultProviderId with
-                    | None ->
-                        return
-                            validationFailed
-                                VersionControlCodes.LocationUnsupported
-                                "The default version control provider is not registered."
-                    | Some factory ->
-                        return!
-                            factory.Initialize
-                                {
-                                    TargetPath = request.TargetPath
-                                    Location = None
-                                }
-                                context
-                })
+            promise {
+                let! result =
+                    runTracked
+                        host
+                        bridge
+                        ""
+                        request.OperationId
+                        (fun context -> initializeLocalWorkspace host request.TargetPath context)
+
+                return Ok(Mappings.result (fun (binding: WorkspaceBinding) -> binding.WorkspaceRoot) result)
+            }
     // Bind changes the vault's repository configuration, so it runs as a mutation of
     // the open vault and refreshes the tree afterwards.
     bindWorkspace =
@@ -836,6 +851,9 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                         service.SetSettings (Mappings.storageSettingsFromDto request.Settings) context
                     ))
                 id
+    // The DataHub ruleset is checked here as well as in the renderer, because the main
+    // process is the trust boundary. The size rule needs the object size, which the
+    // renderer checks from the file tree.
     setPathStoragePolicy =
         fun request ->
             withMutatingSession
@@ -846,9 +864,19 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     _.StoragePolicy
                     "storage policies"
                     (fun service context ->
-                        withPath
-                            request.Path
-                            (fun path -> service.SetPathPolicy path request.UseLargeObjectStorage context)
+                        match
+                            Swate.Components.Shared.GitLfsRules.tryGetToggleBlockedReason
+                                request.Path
+                                None
+                                request.UseLargeObjectStorage
+                        with
+                        | Some reason -> async {
+                            return validationFailed VersionControlCodes.StoragePolicyBlocked reason
+                          }
+                        | None ->
+                            withPath
+                                request.Path
+                                (fun path -> service.SetPathPolicy path request.UseLargeObjectStorage context)
                     ))
                 id
     pruneStorage =

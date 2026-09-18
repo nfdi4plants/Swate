@@ -11,7 +11,6 @@ open Swate.Electron.Shared.DTOs.NoteSearchDto
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
 open AuthTypes
 open FileIOTypes
-open GitTypes
 open VersionControlTypes
 
 module IPCTypesHelper =
@@ -85,44 +84,7 @@ type IArcVaultsApi = {
     movePath: MovePathRequest -> JS.Promise<Result<unit, exn>>
     renameOpenArcRoot: string -> JS.Promise<Result<string, exn>>
     writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
-    runGitLfs: GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
-    cancelGitLfs: string -> JS.Promise<Result<string, exn>>
     resolveCloseRequest: SaveBeforeQuitDecision -> JS.Promise<Result<unit, exn>>
-}
-
-/// Two Way Bridge: Renderer <-> Main
-type IGitApi = {
-    checkGitVersions: unit -> JS.Promise<Result<unit, exn>>
-    getGitStatus: unit -> JS.Promise<Result<GitStatusDto, exn>>
-    getGitBranches: unit -> JS.Promise<Result<GitBranchRefDto[], exn>>
-    getOriginRepositoryWebUrl: unit -> JS.Promise<Result<string option, exn>>
-    getGitLfsSettings: unit -> JS.Promise<Result<GitLfsSettingsDto, exn>>
-    previewGitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitPullPreflightResult, exn>>
-    getGitDiffSummary: unit -> JS.Promise<Result<GitDiffSummaryDto, exn>>
-    getGitWordDiff: GitPathspecRequest -> JS.Promise<Result<string, exn>>
-    getGitDiffViewData: string -> JS.Promise<Result<GitPageLoadResultDto<GitDiffViewDataDto>, exn>>
-    getGitMergeConflictViewData: string -> JS.Promise<Result<GitPageLoadResultDto<GitMergeConflictViewDataDto>, exn>>
-    installGitLfs: unit -> JS.Promise<Result<GitOperationResult, exn>>
-    gitFetch: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitPush: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitCancelOperation: GitCancelOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitInitRepository: string -> JS.Promise<Result<GitOperationResult, exn>>
-    gitAddRemote: GitRemoteConfigRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitCloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitStagePaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitUnstagePaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitDiscardPaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitCommit: GitCommitRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    setGitLfsSettings: GitLfsSettingsDto -> JS.Promise<Result<GitOperationResult, exn>>
-    gitLfsPrune: unit -> JS.Promise<Result<GitOperationResult, exn>>
-    gitLfsDedup: unit -> JS.Promise<Result<GitOperationResult, exn>>
-    gitLfsDownloadFile: GitLfsFileRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitLfsFreeLocalCopy: GitLfsFileRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    createBranch: GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    checkoutBranch: GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    confirmGitMergeResolution:
-        GitConfirmMergeResolutionRequest -> JS.Promise<Result<GitConfirmMergeResolutionResult, exn>>
 }
 
 /// Two Way Bridge: Renderer <-> Main
@@ -217,16 +179,8 @@ module MainToRendererIpc =
         fileImportStateUpdate: ActiveFileImportState option -> unit
     }
 
-    type IGitProgressRendererApi = {
-        gitProgressUpdate: GitProgressDto -> unit
-    }
-
     type IGitRepositoryRendererApi = {
         gitRepositoryInitialized: string -> unit
-    }
-
-    type IGitLfsProgressRendererApi = {
-        gitLfsProgressUpdate: GitLfsProgressDto -> unit
     }
 
     type IVersionControlRendererApi = {

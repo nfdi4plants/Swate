@@ -141,6 +141,104 @@ let private fakeFactory (id: string) (root: string option) : ProviderFactory =
         InstallDependency = fun _ _ -> unsupported ()
     }
 
+[<Emit("require('node:child_process').execFileSync($0, $1, { cwd: $2, stdio: 'pipe' }).toString()")>]
+let private execFileSync (_file: string) (_args: string[]) (_cwd: string) : string = jsNative
+
+[<Emit("(() => { try { require('node:child_process').execFileSync($0, $1, { cwd: $2, stdio: 'pipe' }); return 0; } catch (error) { return error.status || -1; } })()")>]
+let private execFileSyncExitCode (_file: string) (_args: string[]) (_cwd: string) : int = jsNative
+
+let private git (cwd: string) (args: string list) =
+    execFileSync "git" (List.toArray args) cwd
+
+let private gitExitCode (cwd: string) (args: string list) =
+    execFileSyncExitCode "git" (List.toArray args) cwd
+
+let private setGitConfig (repoPath: string) (key: string) (value: string) =
+    git repoPath [ "config"; "--local"; key; value ] |> ignore
+
+let private expectGitConfigUnset (repoPath: string) (key: string) =
+    Vitest.expect(gitExitCode repoPath [ "config"; "--local"; "--get"; key ]).toBe 1
+
+let private createLegacySettingsRepository () : Fable.Core.JS.Promise<string * string> = promise {
+    let! root = createTempDirectoryAsync "swate-vc-legacy-settings-"
+    let repo = Main.Bindings.Path.join [| root; "repo" |]
+
+    Main.Bindings.Filesystem.mkdirSync repo (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+    git repo [ "init"; "--initial-branch=main" ] |> ignore
+    return root, repo
+}
+
+let private openGitSession (repoPath: string) : Fable.Core.JS.Promise<WorkspaceSession> = promise {
+    let factory = ProviderComposition.createGitFactory (source AuthStateDto.Empty [])
+
+    let! adopted =
+        factory.Adopt
+            {
+                WorkspaceRoot = repoPath
+                ConnectionProfileId = None
+            }
+            (OperationContext.detached "legacy-settings-adopt")
+        |> Async.StartAsPromise
+
+    let binding =
+        match adopted with
+        | Succeeded outcome
+        | PartiallySucceeded(outcome, _) -> outcome.Value
+        | Failed failure -> failwith $"Git adoption failed ({failure.Code}): {failure.Message}"
+
+    let! opened =
+        factory.Open binding (OperationContext.detached "legacy-settings-open")
+        |> Async.StartAsPromise
+
+    match opened with
+    | Succeeded outcome
+    | PartiallySucceeded(outcome, _) -> return outcome.Value
+    | Failed failure -> return failwith $"Git open failed ({failure.Code}): {failure.Message}"
+}
+
+let private getStorageSettings (session: WorkspaceSession) : Fable.Core.JS.Promise<StoragePolicySettings> = promise {
+    let storagePolicy =
+        session.StoragePolicy
+        |> Option.defaultWith (fun () -> failwith "Git session has no storage policy service.")
+
+    let! result =
+        storagePolicy.GetSettings(OperationContext.detached "legacy-settings-read")
+        |> Async.StartAsPromise
+
+    match result with
+    | Succeeded outcome
+    | PartiallySucceeded(outcome, _) -> return outcome.Value
+    | Failed failure -> return failwith $"Storage settings read failed ({failure.Code}): {failure.Message}"
+}
+
+let private withGitSession
+    (repoPath: string)
+    (body: WorkspaceSession -> Fable.Core.JS.Promise<'T>)
+    : Fable.Core.JS.Promise<'T> =
+    promise {
+        let! session = openGitSession repoPath
+
+        try
+            let! result = body session
+            do! session.Close() |> Async.StartAsPromise
+            return result
+        with error ->
+            do! session.Close() |> Async.StartAsPromise
+            return raise error
+    }
+
+let private withLegacySettingsRepository (body: string -> Fable.Core.JS.Promise<unit>) : Fable.Core.JS.Promise<unit> = promise {
+    let! root, repo = createLegacySettingsRepository ()
+
+    try
+        do! body repo
+        do! removeDirectoryAsync root
+    with error ->
+        do! removeDirectoryAsync root
+        return raise error
+}
+
 Vitest.describe (
     "DataHub identity strategy",
     fun () ->
@@ -616,5 +714,80 @@ Vitest.describe (
                     do! removeDirectoryAsync root
                     return raise error
             }
+        )
+)
+
+[<Literal>]
+let private legacyAutoTrackThresholdKey = "swate.lfs.autotrackthresholdmb"
+
+[<Literal>]
+let private legacyDownloadLargeFilesKey = "swate.lfs.downloadlargefiles"
+
+[<Literal>]
+let private libraryAutoTrackThresholdKey =
+    "versioncontrolservice.lfs.autotrackthresholdmb"
+
+Vitest.describe (
+    "legacy settings migration",
+    fun () ->
+        Vitest.test (
+            "maps valid legacy settings into the storage policy and removes the old keys",
+            fun () ->
+                withLegacySettingsRepository (fun repo -> promise {
+                    setGitConfig repo legacyAutoTrackThresholdKey "9"
+                    setGitConfig repo legacyDownloadLargeFilesKey "true"
+
+                    do!
+                        withGitSession
+                            repo
+                            (fun session -> promise {
+                                let! settings = getStorageSettings session
+                                Vitest.expect(settings.AutoPolicyThresholdMb).toEqual (Some 9)
+                                Vitest.expect(settings.MaterializeLargeObjects).toBe true
+                                expectGitConfigUnset repo legacyAutoTrackThresholdKey
+                                expectGitConfigUnset repo legacyDownloadLargeFilesKey
+                            })
+                })
+        )
+
+        Vitest.test (
+            "uses the library default for an invalid legacy threshold and removes the old keys",
+            fun () ->
+                withLegacySettingsRepository (fun repo -> promise {
+                    let! freshSettings = withGitSession repo getStorageSettings
+
+                    setGitConfig repo legacyAutoTrackThresholdKey "abc"
+                    setGitConfig repo legacyDownloadLargeFilesKey "false"
+
+                    do!
+                        withGitSession
+                            repo
+                            (fun session -> promise {
+                                let! settings = getStorageSettings session
+                                Vitest.expect(settings).toEqual freshSettings
+                                expectGitConfigUnset repo legacyAutoTrackThresholdKey
+                                expectGitConfigUnset repo legacyDownloadLargeFilesKey
+                            })
+                })
+        )
+
+        Vitest.test (
+            "preserves an existing library threshold and removes the old keys",
+            fun () ->
+                withLegacySettingsRepository (fun repo -> promise {
+                    setGitConfig repo libraryAutoTrackThresholdKey "4"
+                    setGitConfig repo legacyAutoTrackThresholdKey "9"
+                    setGitConfig repo legacyDownloadLargeFilesKey "true"
+
+                    do!
+                        withGitSession
+                            repo
+                            (fun session -> promise {
+                                let! settings = getStorageSettings session
+                                Vitest.expect(settings.AutoPolicyThresholdMb).toEqual (Some 4)
+                                expectGitConfigUnset repo legacyAutoTrackThresholdKey
+                                expectGitConfigUnset repo legacyDownloadLargeFilesKey
+                            })
+                })
         )
 )
