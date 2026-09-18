@@ -13,9 +13,13 @@ app
         // Restore persisted auth before any IPC handlers fire
         Main.Auth.AuthService.tryRestoreFromStorage ()
 
-        // The provider catalog needs the settings root and the restored accounts.
-        Main.VersionControl.VersionControlRuntime.createProduction ()
-        |> Main.VersionControl.VersionControlRuntime.initialize
+        // The provider catalog needs the settings root, which exists only once the app is
+        // ready. A failure here must not take the IPC registrations below with it.
+        try
+            Main.VersionControl.VersionControlRuntime.createProduction ()
+            |> Main.VersionControl.VersionControlRuntime.initialize
+        with error ->
+            Browser.Dom.console.error ("Version control runtime initialization failed", error.Message)
 
         ARC_VAULTS.RegisterVault() |> ignore
 

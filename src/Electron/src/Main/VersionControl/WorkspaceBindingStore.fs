@@ -15,16 +15,28 @@ let bindingsSettingsFileName = "version-control-bindings.json"
 type IWorkspaceBindingStore =
     abstract TryFind: workspaceRoot: string -> WorkspaceBinding option
     abstract Save: WorkspaceBinding -> Result<unit, string>
-    abstract Remove: workspaceRoot: string -> unit
+    abstract Remove: workspaceRoot: string -> Result<unit, string>
     abstract List: unit -> WorkspaceBinding[]
 
-/// A decode failure, never an exception, so a bad provider id counts as a damaged entry.
+/// Fails as a decode error, never as an exception, so a bad provider id counts as a
+/// damaged entry and the other entries survive.
 let private providerIdDecoder: Decoder<ProviderId> =
     Decode.string
     |> Decode.andThen (fun value ->
         match ProviderId.tryCreate value with
         | Ok providerId -> Decode.succeed providerId
         | Error message -> Decode.fail message
+    )
+
+/// Entries written by a newer schema are skipped instead of handed to a provider.
+let private schemaVersionDecoder: Decoder<int> =
+    Decode.int
+    |> Decode.andThen (fun version ->
+        if version > WorkspaceBinding.CurrentSchemaVersion then
+            Decode.fail
+                $"Binding schema version {version} is newer than the supported {WorkspaceBinding.CurrentSchemaVersion}."
+        else
+            Decode.succeed version
     )
 
 let private locationDecoder: Decoder<RepositoryLocation> =
@@ -37,7 +49,7 @@ let private locationDecoder: Decoder<RepositoryLocation> =
 
 let private bindingDecoder: Decoder<WorkspaceBinding> =
     Decode.object (fun get -> {
-        SchemaVersion = get.Required.Field "schemaVersion" Decode.int
+        SchemaVersion = get.Required.Field "schemaVersion" schemaVersionDecoder
         ProviderId = get.Required.Field "providerId" providerIdDecoder
         WorkspaceRoot = get.Required.Field "workspaceRoot" Decode.string
         ProviderStateRef = get.Optional.Field "providerStateRef" Decode.string
@@ -96,11 +108,11 @@ let rootsEqual (sensitivity: PathCaseSensitivity) (left: string) (right: string)
     String.Equals(ProviderResolver.normalizePath left, ProviderResolver.normalizePath right, comparison)
 
 /// A store over caller-supplied read and write functions, so tests and the settings
-/// folder share one implementation.
+/// folder share one implementation. The write function reports its own failure.
 let create
     (sensitivity: PathCaseSensitivity)
     (read: unit -> string option)
-    (write: string -> unit)
+    (write: string -> Result<unit, string>)
     : IWorkspaceBindingStore =
     let load () =
         read () |> Option.map deserialize |> Option.defaultValue [||]
@@ -108,22 +120,29 @@ let create
     let sameRoot (workspaceRoot: string) (binding: WorkspaceBinding) =
         rootsEqual sensitivity binding.WorkspaceRoot workspaceRoot
 
+    let persist (bindings: WorkspaceBinding[]) =
+        try
+            write (serialize bindings)
+        with error ->
+            Error $"Could not persist the workspace bindings: {error.Message}"
+
     { new IWorkspaceBindingStore with
         member _.TryFind workspaceRoot =
             load () |> Array.tryFind (sameRoot workspaceRoot)
 
         member _.Save binding =
-            try
-                let others = load () |> Array.filter (sameRoot binding.WorkspaceRoot >> not)
+            let others = load () |> Array.filter (sameRoot binding.WorkspaceRoot >> not)
 
-                write (serialize (Array.append others [| binding |]))
-                Ok()
-            with error ->
-                Error $"Could not persist the workspace binding: {error.Message}"
+            persist (Array.append others [| binding |])
 
         member _.Remove workspaceRoot =
-            let remaining = load () |> Array.filter (sameRoot workspaceRoot >> not)
-            write (serialize remaining)
+            let current = load ()
+            let remaining = current |> Array.filter (sameRoot workspaceRoot >> not)
+
+            if remaining.Length = current.Length then
+                Ok()
+            else
+                persist remaining
 
         member _.List() = load ()
     }
@@ -133,4 +152,4 @@ let createSettingsStore (sensitivity: PathCaseSensitivity) : IWorkspaceBindingSt
     create
         sensitivity
         (fun () -> Main.SettingsStore.tryReadSettingsFile bindingsSettingsFileName)
-        (fun content -> Main.SettingsStore.writeSettingsFileAtomic bindingsSettingsFileName content)
+        (fun content -> Main.SettingsStore.tryWriteSettingsFileAtomic bindingsSettingsFileName content)

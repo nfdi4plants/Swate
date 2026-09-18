@@ -211,23 +211,30 @@ let tryGetTokenForAccount (localSwateAccountId: string) : string option =
     |> Option.filter canUseToken
     |> Option.map _.Token
 
-/// Commit identity of an account user.
-/// The GitLab username is preferred over the display name so commits link to the account;
-/// accounts stored before usernames were persisted fall back to the display name.
-/// The commit email is preferred over the primary email so GitLab's
-/// "use a private email in commits" setting is respected; GitLab links noreply addresses too.
-/// Tests call this directly because it decides which identity ends up in a commit.
-let commitIdentityOfUser (user: AuthUserDto) : Main.Git.GitTokenProvider.GitCommitIdentity = {
-    Name =
+/// Name and email a commit by this account carries. The GitLab username links the
+/// commit to the account, and the display name is used only for accounts stored before
+/// usernames were persisted. The commit email wins over the primary email so GitLab's
+/// "use a private email in commits" setting is respected. GitLab links noreply
+/// addresses too.
+let commitNameAndEmail (user: AuthUserDto) : string * string =
+    let name =
         if String.IsNullOrWhiteSpace user.Username then
             user.Name
         else
             user.Username
-    Email =
+
+    let email =
         match user.CommitEmail with
         | Some commitEmail when not (String.IsNullOrWhiteSpace commitEmail) -> commitEmail
         | _ -> user.Email
-}
+
+    name, email
+
+/// Commit identity of an account user for the legacy Git path.
+/// Tests call this directly because it decides which identity ends up in a commit.
+let commitIdentityOfUser (user: AuthUserDto) : Main.Git.GitTokenProvider.GitCommitIdentity =
+    let name, email = commitNameAndEmail user
+    { Name = name; Email = email }
 
 /// Commit identity for a commit that will be pushed to the given host (used by GitIdentityProvider).
 /// Policy: the account matching the host, preferring the active one, so the author links on the hub
@@ -298,6 +305,10 @@ let private refreshTokenProvider () =
 let getState () : AuthStateDto =
     reconcileActiveAccountInvariant ()
     getAuthStateDto ()
+
+/// The in-memory auth state without reconciling or persisting anything. Version
+/// control strategies read through this on every git command.
+let peekState () : AuthStateDto = getAuthStateDto ()
 
 /// List all stored account summaries.
 let listAccounts () : AccountSummary array = (getState ()).StoredAccounts

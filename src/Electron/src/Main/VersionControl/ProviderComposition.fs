@@ -28,7 +28,7 @@ let currentPathCaseSensitivity () =
     pathCaseSensitivityForPlatform (Main.Bindings.Node.processPlatform ())
 
 let dataHubAccountSource: DataHubStrategies.DataHubAccountSource = {
-    GetState = Main.Auth.AuthService.getState
+    GetState = Main.Auth.AuthService.peekState
     TryGetTokenForAccount = Main.Auth.AuthService.tryGetTokenForAccount
     TryGetTokenForHost = Main.Auth.AuthService.tryGetTokenForHost
 }
@@ -60,9 +60,9 @@ let createCatalog (factories: ProviderFactory list) : ProviderResolver.ProviderC
     | Error message -> failwith message
 
 /// The production catalog: Git over the DataHub accounts, lakeFS without any
-/// configured connection until lakeFS accounts exist in Swate.
-let createProductionCatalog () : ProviderResolver.ProviderCatalog =
-    let sensitivity = currentPathCaseSensitivity ()
+/// configured connection until lakeFS accounts exist in Swate. The caller passes the
+/// path case sensitivity it also hands to the resolver and the binding store.
+let createProductionCatalog (sensitivity: PathCaseSensitivity) : ProviderResolver.ProviderCatalog =
     let settingsRoot = Main.SettingsStore.getSettingsRootPath ()
 
     createCatalog [
@@ -110,11 +110,20 @@ let tryCreateLocation (providerLocation: string) (displayName: string option) : 
 
 /// Lock files a killed provider process can leave behind in a workspace. The library
 /// reports such a lock with the recovery code remove_index_lock and refuses to delete
-/// it. Swate is the only writer in a vault window, so it removes the lock itself once
-/// its own operations are idle.
+/// it because it cannot prove who owns the lock. Swate can: it is the only process
+/// that runs git in a vault window, so once its own operations are idle the lock is
+/// stale. Only a plain repository (a .git directory) is handled here. A .git file
+/// (linked worktree or submodule) keeps its git directory elsewhere, and for those the
+/// lock is left to the user together with the library's instructions.
 let staleLockPaths (providerId: ProviderId) (workspaceRoot: string) : string[] =
-    if ProviderId.value providerId = WellKnownProviderIds.Git then
-        [| join [| workspaceRoot; ".git"; "index.lock" |] |]
+    let gitDirectory = join [| workspaceRoot; ".git" |]
+
+    if
+        providerId = gitProviderId
+        && Main.Bindings.Filesystem.existsSync gitDirectory
+        && (VersionControlService.Runtime.Node.FileSystem.lstatSync gitDirectory).isDirectory ()
+    then
+        [| join [| gitDirectory; "index.lock" |] |]
     else
         [||]
 

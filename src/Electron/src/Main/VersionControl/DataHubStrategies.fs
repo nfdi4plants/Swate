@@ -1,6 +1,6 @@
 /// Git provider strategies backed by the DataHub account store. The library asks
 /// for a credential per host and for a revision identity per operation. Both lookups
-/// are pure reads over the in-memory account state and never throw.
+/// read the in-memory account state without writing anything and never throw.
 module Main.VersionControl.DataHubStrategies
 
 open System
@@ -21,36 +21,17 @@ type DataHubAccountSource = {
     TryGetTokenForHost: string -> string option
 }
 
-/// Lowercased DNS host of a DataHub base URL. Invalid URLs fall back to the trimmed
-/// lowercased text so a malformed account never matches a real host by accident.
+/// The same host rule the token lookup in AuthService applies.
 let hostOfDataHub (targetDataHub: string) : string =
-    let mutable uri = Unchecked.defaultof<Uri>
-
-    if
-        Uri.TryCreate(targetDataHub, UriKind.Absolute, &uri)
-        && not (String.IsNullOrWhiteSpace uri.Host)
-    then
-        uri.Host.Trim().ToLowerInvariant()
-    else
-        targetDataHub.Trim().ToLowerInvariant()
+    Main.Auth.SecureAuthStore.extractHost targetDataHub
 
 let private hostMatches (host: string) (account: AccountSummary) =
     String.Equals(hostOfDataHub account.User.TargetDataHub, host, StringComparison.OrdinalIgnoreCase)
 
-/// Commits carry the GitLab username so they link to the account, and the display
-/// name only when no username was stored. The commit email wins over the primary
-/// email so a private noreply address configured on GitLab is respected.
-let identityOfUser (user: AuthUserDto) : RevisionIdentity = {
-    Name =
-        if String.IsNullOrWhiteSpace user.Username then
-            user.Name
-        else
-            user.Username
-    Email =
-        match user.CommitEmail with
-        | Some commitEmail when not (String.IsNullOrWhiteSpace commitEmail) -> commitEmail
-        | _ -> user.Email
-}
+/// The identity rule lives in AuthService so the legacy path and this one agree.
+let identityOfUser (user: AuthUserDto) : RevisionIdentity =
+    let name, email = Main.Auth.AuthService.commitNameAndEmail user
+    { Name = name; Email = email }
 
 /// Picks the account whose identity a revision should carry.
 /// A connection profile names a stored account directly and wins when that account

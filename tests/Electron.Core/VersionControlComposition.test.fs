@@ -47,19 +47,35 @@ let private state (active: AccountSummary option) (stored: AccountSummary list) 
     StoredAccounts = List.toArray stored
 }
 
-let private source (authState: AuthStateDto) (tokens: (string * string) list) : DataHubStrategies.DataHubAccountSource = {
-    GetState = fun () -> authState
-    TryGetTokenForAccount = fun localId -> tokens |> List.tryFind (fun (id, _) -> id = localId) |> Option.map snd
-    TryGetTokenForHost =
-        fun host ->
-            authState.StoredAccounts
-            |> Array.tryFind (fun candidate -> DataHubStrategies.hostOfDataHub candidate.User.TargetDataHub = host)
-            |> Option.bind (fun candidate ->
-                tokens
-                |> List.tryFind (fun (id, _) -> id = candidate.User.LocalSwateAccountId)
-                |> Option.map snd
-            )
-}
+/// Mirrors AuthService.tryGetTokenForHost: the active account wins when its host
+/// matches, then any stored account for the host, compared without regard to case.
+let private source (authState: AuthStateDto) (tokens: (string * string) list) : DataHubStrategies.DataHubAccountSource =
+    let tokenOf (candidate: AccountSummary) =
+        tokens
+        |> List.tryFind (fun (id, _) -> id = candidate.User.LocalSwateAccountId)
+        |> Option.map snd
+
+    let hostMatches (host: string) (candidate: AccountSummary) =
+        System.String.Equals(
+            DataHubStrategies.hostOfDataHub candidate.User.TargetDataHub,
+            host,
+            System.StringComparison.OrdinalIgnoreCase
+        )
+
+    {
+        GetState = fun () -> authState
+        TryGetTokenForAccount = fun localId -> tokens |> List.tryFind (fun (id, _) -> id = localId) |> Option.map snd
+        TryGetTokenForHost =
+            fun host ->
+                authState.ActiveAccount
+                |> Option.filter (hostMatches host)
+                |> Option.bind tokenOf
+                |> Option.orElseWith (fun () ->
+                    authState.StoredAccounts
+                    |> Array.tryFind (hostMatches host)
+                    |> Option.bind tokenOf
+                )
+    }
 
 let private identityRequest (host: string option) (profile: string option) : RevisionIdentityRequest = {
     WorkspaceRoot = "C:/arcs/demo"
@@ -89,7 +105,41 @@ let private bindingFor (providerId: ProviderId) (root: string) : WorkspaceBindin
 
 let private memoryStore (sensitivity: PathCaseSensitivity) =
     let mutable content: string option = None
-    WorkspaceBindingStore.create sensitivity (fun () -> content) (fun next -> content <- Some next)
+
+    WorkspaceBindingStore.create
+        sensitivity
+        (fun () -> content)
+        (fun next ->
+            content <- Some next
+            Ok()
+        )
+
+let private failingStore () =
+    WorkspaceBindingStore.create CaseInsensitive (fun () -> None) (fun _ -> Error "disk full")
+
+let private fakeFactory (id: string) (root: string option) : ProviderFactory =
+    let providerId = ProviderId.tryCreate id |> Result.defaultWith failwith
+
+    let unsupported () = async { return Failed(OperationFailure.create Unsupported "operation_not_supported" "fake") }
+
+    {
+        Id = providerId
+        Probe =
+            fun _ -> async {
+                return
+                    match root with
+                    | Some detected -> Detected(detected, 50, None)
+                    | None -> NotDetected
+            }
+        VerifyLocation = fun _ _ -> unsupported ()
+        Initialize = fun _ _ -> unsupported ()
+        Clone = fun _ _ -> unsupported ()
+        Adopt = fun _ _ -> unsupported ()
+        Bind = fun _ _ -> unsupported ()
+        Open = fun _ _ -> unsupported ()
+        CheckDependencies = fun _ -> async { return OperationResult.succeeded [||] }
+        InstallDependency = fun _ _ -> unsupported ()
+    }
 
 Vitest.describe (
     "DataHub identity strategy",
@@ -221,6 +271,23 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "two accounts on one host: the active account supplies the credential",
+            fun () ->
+                let secondGitLab =
+                    account "acc-gitlab-2" "https://GIT.nfdi4plants.org/" "second" "second@example.org" None
+
+                let tokens = [ "acc-gitlab", "glpat-1"; "acc-gitlab-2", "glpat-2" ]
+
+                let credential =
+                    DataHubStrategies.resolveCredential
+                        (source (state (Some secondGitLab) [ gitLab; secondGitLab ]) tokens)
+                        "git.nfdi4plants.org"
+                        None
+
+                Vitest.expect(credential |> Option.map _.Secret).toEqual (Some "glpat-2")
+        )
+
+        Vitest.test (
             "the connection profile is only used for its own host",
             fun () ->
                 let tokens = [ "acc-gitlab", "glpat-1"; "acc-other", "glpat-2" ]
@@ -284,7 +351,7 @@ Vitest.describe (
                 Vitest.expect(store.List().Length).toBe 1
                 Vitest.expect(store.TryFind "C:/arcs/demo" |> Option.map _.ProviderId).toEqual (Some lakeFsProviderId)
 
-                store.Remove "C:/arcs/demo"
+                Vitest.expect(store.Remove "C:/arcs/demo").toEqual (Ok())
                 Vitest.expect(store.List().Length).toBe 0
         )
 
@@ -302,6 +369,23 @@ Vitest.describe (
         Vitest.test (
             "unreadable content yields an empty store instead of an exception",
             fun () -> Vitest.expect(WorkspaceBindingStore.deserialize "{ not json").toEqual [||]
+        )
+
+        Vitest.test (
+            "a write failure is reported by Save, and Remove does not write when nothing matched",
+            fun () ->
+                let store = failingStore ()
+                Vitest.expect(store.Save(bindingFor gitProviderId "C:/arcs/demo")).toEqual (Error "disk full")
+                Vitest.expect(store.Remove "C:/arcs/demo").toEqual (Ok())
+        )
+
+        Vitest.test (
+            "an entry from a newer schema version is skipped",
+            fun () ->
+                let binding = bindingFor gitProviderId "C:/arcs/demo"
+                let serialized = WorkspaceBindingStore.serialize [| binding |]
+                let newer = serialized.Replace("\"schemaVersion\": 1", "\"schemaVersion\": 2")
+                Vitest.expect(WorkspaceBindingStore.deserialize newer).toEqual [||]
         )
 
         Vitest.test (
@@ -353,6 +437,109 @@ Vitest.describe (
                 Vitest.expect(ProviderComposition.pathCaseSensitivityForPlatform "win32").toEqual CaseInsensitive
                 Vitest.expect(ProviderComposition.pathCaseSensitivityForPlatform "darwin").toEqual CaseInsensitive
                 Vitest.expect(ProviderComposition.pathCaseSensitivityForPlatform "linux").toEqual CaseSensitive
+        )
+
+        Vitest.test (
+            "the runtime serves what was installed",
+            fun () ->
+                let runtime: VersionControlRuntime.VersionControlRuntime = {
+                    Catalog = catalog ()
+                    Bindings = memoryStore CaseInsensitive
+                    PathCaseSensitivity = CaseInsensitive
+                }
+
+                VersionControlRuntime.initialize runtime
+
+                Vitest
+                    .expect(
+                        ProviderResolver.factories (VersionControlRuntime.get ()).Catalog
+                        |> Array.length
+                    )
+                    .toBe
+                    2
+        )
+
+        Vitest.test (
+            "locations map to the provider that understands them",
+            fun () ->
+                let ok location =
+                    match ProviderComposition.tryCreateLocation location (Some "Demo") with
+                    | Ok created -> ProviderId.value created.ProviderId, created.ProviderLocation
+                    | Error message -> failwith message
+
+                Vitest
+                    .expect(ok " https://git.nfdi4plants.org/carol/demo.git ")
+                    .toEqual ("git", "https://git.nfdi4plants.org/carol/demo.git")
+
+                Vitest.expect(ok "ssh://git@git.nfdi4plants.org/carol/demo.git" |> fst).toBe "git"
+                Vitest.expect(ok "lakefs://repo/main" |> fst).toBe "lakefs"
+
+                for refused in
+                    [
+                        ""
+                        "http://insecure.example/repo.git"
+                        "file:///tmp/repo"
+                        "git@host:repo.git"
+                    ] do
+                    Vitest.expect((ProviderComposition.tryCreateLocation refused None).IsOk).toBe false
+        )
+
+        Vitest.test (
+            "stale lock paths exist only for a plain git directory",
+            fun () -> promise {
+                let! root = createTempDirectoryAsync "swate-vc-locks-"
+
+                try
+                    let plainRepo = Main.Bindings.Path.join [| root; "plain" |]
+                    let worktree = Main.Bindings.Path.join [| root; "worktree" |]
+
+                    let mkdir (path: string) =
+                        Main.Bindings.Filesystem.mkdirSync
+                            path
+                            (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    mkdir (Main.Bindings.Path.join [| plainRepo; ".git" |])
+                    mkdir worktree
+
+                    Main.Bindings.Filesystem.writeFileSync
+                        (Main.Bindings.Path.join [| worktree; ".git" |])
+                        "gitdir: elsewhere"
+                        Main.Bindings.Filesystem.TextEncoding.Utf8
+
+                    let expectedLock = Main.Bindings.Path.join [| plainRepo; ".git"; "index.lock" |]
+                    Vitest.expect(ProviderComposition.staleLockPaths gitProviderId plainRepo).toEqual [| expectedLock |]
+                    Vitest.expect(ProviderComposition.staleLockPaths gitProviderId worktree).toEqual [||]
+                    Vitest.expect(ProviderComposition.staleLockPaths lakeFsProviderId plainRepo).toEqual [||]
+                    do! removeDirectoryAsync root
+                with error ->
+                    do! removeDirectoryAsync root
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "two providers claiming the same root make the vault ambiguous",
+            fun () -> promise {
+                let root = "C:/arcs/ambiguous"
+
+                let providers =
+                    ProviderComposition.createCatalog [
+                        fakeFactory "fake.one" (Some root)
+                        fakeFactory "fake.two" (Some root)
+                    ]
+
+                let! resolution =
+                    ProviderComposition.resolveVault providers (memoryStore CaseInsensitive) CaseInsensitive root
+                    |> Async.StartAsPromise
+
+                match resolution with
+                | ProviderComposition.AmbiguousVault candidates ->
+                    Vitest
+                        .expect(candidates |> Array.map (fun c -> ProviderId.value c.ProviderId) |> Array.sort)
+                        .toEqual
+                        [| "fake.one"; "fake.two" |]
+                | other -> failwith $"Expected an ambiguous vault, got {other}"
+            }
         )
 
         Vitest.test (
