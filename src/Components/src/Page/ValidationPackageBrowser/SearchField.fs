@@ -1,9 +1,9 @@
-namespace Swate.Components.Composite.ValidationPackageSelector
+namespace Swate.Components.Page.ValidationPackageBrowser
 
 open Fable.Core
 open Feliz
 open Swate.Components
-open Swate.Components.Composite.ValidationPackageSelector.Context
+open Swate.Components.Page.ValidationPackageBrowser.Context
 open Swate.Components.Primitive.Popover
 open Types
 

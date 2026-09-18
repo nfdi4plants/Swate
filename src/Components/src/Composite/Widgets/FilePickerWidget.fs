@@ -92,15 +92,16 @@ module private FilePickerWidgetHelper =
             let columnIndex = selection.xStart
             let mutable rowIndex = selection.yStart
 
+            // GetCellAt also resolves cells that were never stored, for example the Input and
+            // Output cells of a freshly imported template row, which TryGetCellAt reports as missing.
             let cellsToInsert = [|
                 for path in paths do
-                    match nextTable.TryGetCellAt(columnIndex, rowIndex) with
-                    | Some cell ->
+                    if columnIndex < nextTable.ColumnCount && rowIndex < nextTable.RowCount then
+                        let cell = nextTable.GetCellAt(columnIndex, rowIndex)
                         let nextCell = cell.UpdateMainField path
                         let coordinate: CellCoordinate = {| x = columnIndex; y = rowIndex |}
                         coordinate, nextCell
                         rowIndex <- rowIndex + 1
-                    | None -> ()
             |]
 
             if cellsToInsert.Length = 0 then
