@@ -108,14 +108,17 @@ let rootsEqual (sensitivity: PathCaseSensitivity) (left: string) (right: string)
     String.Equals(ProviderResolver.normalizePath left, ProviderResolver.normalizePath right, comparison)
 
 /// A store over caller-supplied read and write functions, so tests and the settings
-/// folder share one implementation. The write function reports its own failure.
+/// folder share one implementation. A throwing reader counts as an empty store and a
+/// throwing writer as a failed save.
 let create
     (sensitivity: PathCaseSensitivity)
     (read: unit -> string option)
     (write: string -> Result<unit, string>)
     : IWorkspaceBindingStore =
     let load () =
-        read () |> Option.map deserialize |> Option.defaultValue [||]
+        try
+            read () |> Option.map deserialize |> Option.defaultValue [||]
+        with _ -> [||]
 
     let sameRoot (workspaceRoot: string) (binding: WorkspaceBinding) =
         rootsEqual sensitivity binding.WorkspaceRoot workspaceRoot

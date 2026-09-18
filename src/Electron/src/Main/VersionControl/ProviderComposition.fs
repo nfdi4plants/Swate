@@ -114,15 +114,16 @@ let tryCreateLocation (providerLocation: string) (displayName: string option) : 
 /// that runs git in a vault window, so once its own operations are idle the lock is
 /// stale. Only a plain repository (a .git directory) is handled here. A .git file
 /// (linked worktree or submodule) keeps its git directory elsewhere, and for those the
-/// lock is left to the user together with the library's instructions.
+/// lock is left to the user together with the library's instructions. This reads the
+/// filesystem once to tell the two cases apart.
 let staleLockPaths (providerId: ProviderId) (workspaceRoot: string) : string[] =
     let gitDirectory = join [| workspaceRoot; ".git" |]
 
-    if
-        providerId = gitProviderId
-        && Main.Bindings.Filesystem.existsSync gitDirectory
-        && (VersionControlService.Runtime.Node.FileSystem.lstatSync gitDirectory).isDirectory ()
-    then
+    let isPlainGitDirectory () =
+        VersionControlService.Runtime.Node.FileSystem.tryLstatSync gitDirectory
+        |> Option.exists (fun stats -> stats.isDirectory ())
+
+    if providerId = gitProviderId && isPlainGitDirectory () then
         [| join [| gitDirectory; "index.lock" |] |]
     else
         [||]
