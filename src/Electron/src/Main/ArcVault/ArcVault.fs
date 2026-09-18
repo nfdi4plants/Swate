@@ -500,7 +500,17 @@ module ArcVaultExtensions =
                     this.path <- Some renamedPath
 
                     match Main.VersionControl.WorkspaceSessionHost.tryCurrent () with
-                    | Some host -> do! host.WorkspaceRenamed(currentPath, renamedPath) |> Async.StartAsPromise
+                    | Some host ->
+                        let! moved = host.WorkspaceRenamed(currentPath, renamedPath) |> Async.StartAsPromise
+
+                        match moved with
+                        | Ok() -> ()
+                        | Error message ->
+                            swatelogfn
+                                this.window.id
+                                "ARC folder was renamed to '%s', but its version control binding could not follow: %s"
+                                renamedPath
+                                message
                     | None -> ()
 
                     if this.arc.IsNone then

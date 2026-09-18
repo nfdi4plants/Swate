@@ -176,6 +176,27 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "concurrent opens of one root share a single session",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let first =
+                        fixture.Host.OpenSession(fixture.RepoRoot, detached "open-a")
+                        |> Async.StartAsPromise
+
+                    let second =
+                        fixture.Host.OpenSession(fixture.RepoRoot, detached "open-b")
+                        |> Async.StartAsPromise
+
+                    let! firstResult = first
+                    let! secondResult = second
+                    let firstSession = expectValue "first open" firstResult
+                    let secondSession = expectValue "second open" secondResult
+                    Vitest.expect(secondSession.SessionId).toBe firstSession.SessionId
+                    Vitest.expect(fixture.Host.RunningOperationIds firstSession.SessionId).toEqual [||]
+                })
+        )
+
+        Vitest.test (
             "a renamed vault closes its session and its binding follows the new root",
             fun () ->
                 withFixture (fun fixture -> promise {
@@ -186,9 +207,11 @@ Vitest.describe (
                     let hosted = expectValue "open" opened
                     let renamedRoot = join [| fixture.Root; "renamed" |]
 
-                    do!
+                    let! moved =
                         fixture.Host.WorkspaceRenamed(fixture.RepoRoot, renamedRoot)
                         |> Async.StartAsPromise
+
+                    Vitest.expect(moved).toEqual (Ok())
 
                     Vitest.expect(fixture.Host.TryGetSessionById hosted.SessionId).toEqual None
                     Vitest.expect(fixture.Runtime.Bindings.TryFind fixture.RepoRoot).toEqual None
@@ -231,6 +254,14 @@ Vitest.describe (
 
                     Vitest.expect(fixture.Host.IsIdle "session-a").toBe false
                     Vitest.expect(fixture.Host.Cancel("session-b", "op-1")).toBe false
+
+                    // An operation whose session is not known yet counts as busy for every
+                    // session and can be canceled with any session id.
+                    let unassigned = fixture.Host.BeginOperation("", "op-unassigned", ignore)
+                    Vitest.expect(fixture.Host.IsIdle "session-b").toBe false
+                    Vitest.expect(fixture.Host.Cancel("session-b", "op-unassigned")).toBe true
+                    unassigned.Complete()
+                    Vitest.expect(fixture.Host.IsIdle "session-b").toBe true
                     Vitest.expect(tracked.Context.Cancellation.IsCancellationRequested()).toBe false
                     Vitest.expect(fixture.Host.Cancel("", "op-1")).toBe true
                     Vitest.expect(tracked.Context.Cancellation.IsCancellationRequested()).toBe true
@@ -300,6 +331,116 @@ let private registerVault (windowId: int) (arcPath: string) =
     vault
 
 let private request (operationId: string) : OperationRequestDto = { OperationId = operationId }
+
+/// Two fake providers: "fake.core" owns coreOnlyRoot and opens a core-only session,
+/// "fake.broken" owns failingRoot, fails to open and reports a failing dependency check.
+let private fakeProviderRuntime
+    (coreOnlyRoot: string)
+    (failingRoot: string)
+    : VersionControlRuntime.VersionControlRuntime =
+    let providerId id =
+        ProviderId.tryCreate id |> Result.defaultWith failwith
+
+    let unsupported () = async { return Failed(OperationFailure.create Unsupported "operation_not_supported" "fake") }
+
+    let bindingFor id root : WorkspaceBinding = {
+        SchemaVersion = WorkspaceBinding.CurrentSchemaVersion
+        ProviderId = providerId id
+        WorkspaceRoot = root
+        ProviderStateRef = None
+        Location = {
+            ProviderId = providerId id
+            DisplayName = None
+            ProviderLocation = root
+            ConnectionProfileId = None
+        }
+        ConnectionProfileId = None
+    }
+
+    let coreStatus: WorkspaceStatus = {
+        CurrentRef = None
+        WorkspaceVersion = "v1"
+        Changes = [||]
+        ActiveConflictSession = None
+        Synchronization = None
+    }
+
+    let core: CoreVersionControl = {
+        GetStatus = fun _ -> async { return OperationResult.succeeded coreStatus }
+        ListRefs = fun _ -> async { return OperationResult.succeeded [||] }
+        CreateRef = fun _ _ -> unsupported ()
+        PreflightSwitchRef = fun _ _ -> unsupported ()
+        SwitchRef = fun _ _ -> unsupported ()
+        CreateRevision = fun _ _ -> unsupported ()
+        RestorePaths = fun _ _ -> unsupported ()
+        GetDiffSummary = fun _ -> async { return OperationResult.succeeded { Entries = [||] } }
+    }
+
+    let factory
+        id
+        root
+        (openResult: WorkspaceBinding -> OperationResult<WorkspaceSession>)
+        (dependencies: OperationResult<DependencyStatus[]>)
+        : ProviderFactory =
+        {
+            Id = providerId id
+            Probe =
+                fun path -> async {
+                    // The resolver probes with a normalized path; the fixture root is a native path.
+                    let detected = WorkspaceBindingStore.rootsEqual CaseInsensitive path root
+
+                    return if detected then Detected(root, 50, None) else NotDetected
+                }
+            VerifyLocation = fun _ _ -> unsupported ()
+            Initialize = fun _ _ -> unsupported ()
+            Clone = fun _ _ -> unsupported ()
+            Adopt =
+                fun adoptRequest _ -> async {
+                    return OperationResult.succeeded (bindingFor id adoptRequest.WorkspaceRoot)
+                }
+            Bind = fun _ _ -> unsupported ()
+            Open = fun binding _ -> async { return openResult binding }
+            CheckDependencies = fun _ -> async { return dependencies }
+            InstallDependency = fun _ _ -> unsupported ()
+        }
+
+    let coreFactory =
+        factory
+            "fake.core"
+            coreOnlyRoot
+            (fun binding ->
+                OperationResult.succeeded (
+                    WorkspaceSession.createCoreOnly
+                        {
+                            ProviderId = binding.ProviderId
+                            WorkspaceRoot = binding.WorkspaceRoot
+                            Location = Some binding.Location
+                        }
+                        core
+                )
+            )
+            (OperationResult.succeeded [|
+                {
+                    Component = "fake-tool"
+                    Installed = true
+                    Version = Some "1.0"
+                    Compatible = true
+                    Remediation = None
+                }
+            |])
+
+    let brokenFactory =
+        factory
+            "fake.broken"
+            failingRoot
+            (fun _ -> Failed(OperationFailure.create DependencyMissing "tool_missing" "The fake tool is missing."))
+            (Failed(OperationFailure.create ProviderError "check_failed" "The fake check failed."))
+
+    {
+        Catalog = ProviderComposition.createCatalog [ coreFactory; brokenFactory ]
+        Bindings = memoryBindings ()
+        PathCaseSensitivity = CaseInsensitive
+    }
 
 Vitest.describe (
     "Version control IPC over a git vault",
@@ -440,13 +581,16 @@ Vitest.describe (
 
                     let! cleared = api.clearStaleLock (request "clear-lock")
                     let outcome = expectDtoValue "clear lock" cleared
-                    Vitest.expect(outcome.AffectedPaths).toEqual [| lockPath |]
+                    Vitest.expect(outcome.Effect).toEqual OperationEffectDto.Performed
+                    Vitest.expect(outcome.AffectedPaths).toEqual [||]
+                    Vitest.expect(outcome.Warnings |> Array.map _.Code).toEqual [| "lock_removed" |]
                     Vitest.expect(Main.Bindings.Filesystem.existsSync lockPath).toBe false
                     Vitest.expect(outcome.Value.ActiveConflictSession).toEqual None
 
                     let! again = api.clearStaleLock (request "clear-lock-2")
                     let noOp = expectDtoValue "clear lock again" again
-                    Vitest.expect(noOp.AffectedPaths).toEqual [||]
+                    Vitest.expect(noOp.Warnings).toEqual [||]
+                    Vitest.expect(noOp.Effect).toEqual (OperationEffectDto.NoOp(Some "no stale lock"))
 
                     let session =
                         fixture.Host.TryGetSession fixture.RepoRoot
@@ -458,6 +602,146 @@ Vitest.describe (
                     let failure = expectDtoFailure "refused lock removal" refused
                     Vitest.expect(failure.Code).toBe VersionControlCodes.LockRemovalRefused
                     Vitest.expect(failure.Retryable).toBe true
+                })
+        )
+
+        Vitest.test (
+            "bind persists the new location and reopens the session under a new id",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    registerVault 47 fixture.RepoRoot |> ignore
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 47)
+
+                    let! before = api.getSessionInfo (request "info-before")
+                    let sessionBefore = (expectDtoValue "session before bind" before).Value
+
+                    let! bound =
+                        api.bindWorkspace {
+                            OperationId = "bind"
+                            ProviderLocation = "https://example.invalid/never/reached.git"
+                            DisplayName = Some "reached"
+                        }
+
+                    let sessionAfter = (expectDtoValue "bind" bound).Value
+                    Vitest.expect(sessionAfter.SessionId).not.toBe sessionBefore.SessionId
+
+                    Vitest
+                        .expect(sessionAfter.Location |> Option.map _.ProviderLocation)
+                        .toEqual (Some "https://example.invalid/never/reached.git")
+
+                    let persisted =
+                        fixture.Runtime.Bindings.TryFind fixture.RepoRoot
+                        |> Option.defaultWith (fun () -> failwith "binding missing")
+
+                    Vitest.expect(persisted.Location.ProviderLocation).toBe "https://example.invalid/never/reached.git"
+
+                    Vitest.expect(git fixture.RepoRoot [ "remote"; "get-url"; "origin" ] |> _.Trim()).toBe
+                        "https://example.invalid/never/reached.git"
+                })
+        )
+
+        Vitest.test (
+            "a mutation marks the vault busy while it runs and releases it on failure",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let vault = registerVault 48 fixture.RepoRoot
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 48)
+                    Vitest.expect(vault.isBusyWriting).toBe false
+
+                    let running =
+                        api.restorePaths {
+                            OperationId = "restore-stale"
+                            Paths = [| "base.txt" |]
+                            ExpectedWorkspaceVersion = "stale"
+                        }
+
+                    Vitest.expect(vault.isBusyWriting).toBe true
+                    let! result = running
+                    expectDtoFailure "stale restore" result |> ignore
+                    Vitest.expect(vault.isBusyWriting).toBe false
+                })
+        )
+
+        Vitest.test (
+            "an unparseable expected target revision or base ref is a validation failure, never dropped",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    registerVault 49 fixture.RepoRoot |> ignore
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 49)
+                    let! status = api.getStatus (request "status")
+                    let version = (expectDtoValue "status" status).Value.WorkspaceVersion
+
+                    let! published =
+                        api.publish {
+                            OperationId = "publish-bad-revision"
+                            ExpectedWorkspaceVersion = version
+                            ExpectedTargetRevision = Some "   "
+                        }
+
+                    let publishFailure = expectDtoFailure "publish with blank revision" published
+                    Vitest.expect(publishFailure.Category).toEqual FailureCategoryDto.Validation
+                    Vitest.expect(publishFailure.Code).toBe "invalid_revision"
+
+                    let! created =
+                        api.createRef {
+                            OperationId = "branch-bad-base"
+                            Name = "feature"
+                            BaseRef = Some ""
+                            SwitchTo = false
+                            ExpectedWorkspaceVersion = version
+                        }
+
+                    let refFailure = expectDtoFailure "create ref with blank base" created
+                    Vitest.expect(refFailure.Code).toBe "invalid_ref"
+                    Vitest.expect(git fixture.RepoRoot [ "branch"; "--list"; "feature" ] |> _.Trim()).toBe ""
+                })
+        )
+
+        Vitest.test (
+            "an absent optional service is reported with a stable code and an open failure keeps its provider code",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let coreOnlyRoot = join [| fixture.Root; "core-only" |]
+
+                    Main.Bindings.Filesystem.mkdirSync
+                        coreOnlyRoot
+                        (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    let failingRoot = join [| fixture.Root; "failing" |]
+
+                    Main.Bindings.Filesystem.mkdirSync
+                        failingRoot
+                        (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    let fakeRuntime = fakeProviderRuntime coreOnlyRoot failingRoot
+                    let fakeHost = WorkspaceSessionHost.WorkspaceSessionHost(fakeRuntime)
+                    WorkspaceSessionHost.initialize fakeHost
+
+                    try
+                        registerVault 50 coreOnlyRoot |> ignore
+                        let api = Main.IPC.IVersionControlApi.api (ipcEvent 50)
+                        let! url = api.getRepositoryWebUrl (request "url")
+                        let failure = expectDtoFailure "web url without browser service" url
+                        Vitest.expect(failure.Category).toEqual FailureCategoryDto.Unsupported
+                        Vitest.expect(failure.Code).toBe VersionControlCodes.ServiceUnavailable
+
+                        registerVault 51 failingRoot |> ignore
+                        let failingApi = Main.IPC.IVersionControlApi.api (ipcEvent 51)
+                        let! info = failingApi.getSessionInfo (request "info-failing")
+                        let openFailure = expectDtoFailure "open of a failing provider" info
+                        Vitest.expect(openFailure.Category).toEqual FailureCategoryDto.DependencyMissing
+                        Vitest.expect(openFailure.Code).toBe "tool_missing"
+                        Vitest.expect(openFailure.Details.[0]).toBe "The workspace session could not be opened."
+
+                        let! dependencies = failingApi.checkDependencies (request "deps")
+
+                        match dependencies with
+                        | Ok(OperationResultDto.PartiallySucceeded(outcome, failure)) ->
+                            Vitest.expect(outcome.Value |> Array.map _.Component).toEqual [| "fake-tool" |]
+                            Vitest.expect(failure.Code).toBe "check_failed"
+                        | other -> failwith $"Expected a partial dependency report, got {other}"
+                    finally
+                        WorkspaceSessionHost.initialize fixture.Host
                 })
         )
 

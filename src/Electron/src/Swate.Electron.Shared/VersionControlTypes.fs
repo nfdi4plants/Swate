@@ -86,8 +86,11 @@ type VersionControlProgressDto = {
     DisplayMessage: string option
 }
 
-/// Stable codes the renderer routes on. They are the library's codes, listed here so
-/// the renderer never spells them inline.
+/// Stable codes the renderer routes on, listed here so nothing spells them inline.
+/// IdentityMissing through OperationCanceled and the Recovery codes are produced by the
+/// library. ServiceUnavailable through LockRemovalRefused are produced by the Swate
+/// main process (session host and IPC handler), StoragePolicyBlocked by the renderer
+/// when the DataHub ruleset refuses a storage policy change.
 module VersionControlCodes =
 
     [<Literal>]
@@ -277,8 +280,7 @@ type UpdatePreviewDto = {
     WouldCreateConflictSession: bool
 }
 
-/// Materialization state of one lazily hydrated object (a Git LFS pointer or a lakeFS
-/// object that has not been downloaded).
+/// Materialization state of one large object whose content may not be downloaded yet.
 type ObjectStateDto = {
     Path: string
     IsMaterialized: bool
@@ -466,10 +468,11 @@ module OperationResultDto =
         | OperationResultDto.PartiallySucceeded(outcome, _) -> Some outcome.Value
         | OperationResultDto.Failed _ -> None
 
+    /// True for a canceled failure and for a partial success whose failure is the
+    /// cancellation, such as a clone whose large-object download was canceled.
     let isCanceled (result: OperationResultDto<'T>) =
-        match result with
-        | OperationResultDto.Failed failure -> failure.Category = FailureCategoryDto.Canceled
-        | _ -> false
+        tryFailure result
+        |> Option.exists (fun failure -> failure.Category = FailureCategoryDto.Canceled)
 
     let recoveryCode (failure: OperationFailureDto) =
         failure.RecoveryAction |> Option.map _.Code

@@ -1,5 +1,7 @@
 /// Thin renderer client over the provider-neutral version control IPC. It turns the
 /// transport error into a string and leaves the structured operation result intact.
+/// Every call takes the request with its operation id, so the caller owns the id it
+/// may need to cancel the operation before the main process reports anything back.
 module Renderer.VersionControlApiClient
 
 open System
@@ -14,14 +16,13 @@ let private call (invoke: unit -> JS.Promise<Result<'T, exn>>) : JS.Promise<Resu
     return result |> Result.mapError _.Message
 }
 
-/// A fresh operation id. The renderer picks it so it can cancel the operation before
-/// the main process has reported anything back.
+/// A fresh operation id.
 let newOperationId () = Guid.NewGuid().ToString()
 
-let private request () : OperationRequestDto = { OperationId = newOperationId () }
+/// A request without payload for the given operation id.
+let request (operationId: string) : OperationRequestDto = { OperationId = operationId }
 
-let getSessionInfo () =
-    call (fun () -> api.getSessionInfo (request ()))
+let getSessionInfo (dto: OperationRequestDto) = call (fun () -> api.getSessionInfo dto)
 
 let cloneWorkspace (dto: CloneWorkspaceRequestDto) = call (fun () -> api.cloneWorkspace dto)
 
@@ -33,17 +34,15 @@ let bindWorkspace (dto: BindWorkspaceRequestDto) = call (fun () -> api.bindWorks
 let cancelOperation (key: OperationKeyDto) =
     call (fun () -> api.cancelOperation key)
 
-let checkDependencies () =
-    call (fun () -> api.checkDependencies (request ()))
+let checkDependencies (dto: OperationRequestDto) =
+    call (fun () -> api.checkDependencies dto)
 
 let installDependency (dto: InstallDependencyRequestDto) =
     call (fun () -> api.installDependency dto)
 
-let getStatus () =
-    call (fun () -> api.getStatus (request ()))
+let getStatus (dto: OperationRequestDto) = call (fun () -> api.getStatus dto)
 
-let listRefs () =
-    call (fun () -> api.listRefs (request ()))
+let listRefs (dto: OperationRequestDto) = call (fun () -> api.listRefs dto)
 
 let createRef (dto: CreateRefRequestDto) = call (fun () -> api.createRef dto)
 
@@ -56,8 +55,7 @@ let createRevision (dto: CreateRevisionRequestDto) = call (fun () -> api.createR
 
 let restorePaths (dto: RestorePathsRequestDto) = call (fun () -> api.restorePaths dto)
 
-let getDiffSummary () =
-    call (fun () -> api.getDiffSummary (request ()))
+let getDiffSummary (dto: OperationRequestDto) = call (fun () -> api.getDiffSummary dto)
 
 let getTextDiff (dto: ObjectPathRequestDto) = call (fun () -> api.getTextDiff dto)
 
@@ -74,8 +72,8 @@ let update (dto: UpdateRequestDto) = call (fun () -> api.update dto)
 
 let publish (dto: PublishRequestDto) = call (fun () -> api.publish dto)
 
-let getActiveConflictSession () =
-    call (fun () -> api.getActiveConflictSession (request ()))
+let getActiveConflictSession (dto: OperationRequestDto) =
+    call (fun () -> api.getActiveConflictSession dto)
 
 let resolveConflict (dto: ResolveConflictRequestDto) =
     call (fun () -> api.resolveConflict dto)
@@ -85,8 +83,7 @@ let finalizeConflict (dto: FinalizeConflictRequestDto) =
 
 let cancelConflict (dto: CancelConflictRequestDto) = call (fun () -> api.cancelConflict dto)
 
-let listObjects () =
-    call (fun () -> api.listObjects (request ()))
+let listObjects (dto: OperationRequestDto) = call (fun () -> api.listObjects dto)
 
 let materializeObject (dto: ObjectPathRequestDto) =
     call (fun () -> api.materializeObject dto)
@@ -94,8 +91,8 @@ let materializeObject (dto: ObjectPathRequestDto) =
 let dematerializeObject (dto: ObjectPathRequestDto) =
     call (fun () -> api.dematerializeObject dto)
 
-let getStoragePolicySettings () =
-    call (fun () -> api.getStoragePolicySettings (request ()))
+let getStoragePolicySettings (dto: OperationRequestDto) =
+    call (fun () -> api.getStoragePolicySettings dto)
 
 let setStoragePolicySettings (dto: StoragePolicySettingsRequestDto) =
     call (fun () -> api.setStoragePolicySettings dto)
@@ -108,7 +105,7 @@ let pruneStorage (dto: OperationRequestDto) = call (fun () -> api.pruneStorage d
 let deduplicateStorage (dto: OperationRequestDto) =
     call (fun () -> api.deduplicateStorage dto)
 
-let getRepositoryWebUrl () =
-    call (fun () -> api.getRepositoryWebUrl (request ()))
+let getRepositoryWebUrl (dto: OperationRequestDto) =
+    call (fun () -> api.getRepositoryWebUrl dto)
 
 let clearStaleLock (dto: OperationRequestDto) = call (fun () -> api.clearStaleLock dto)

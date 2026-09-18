@@ -5,6 +5,7 @@
 /// Swate's own writes, and they refresh the file tree afterwards.
 module Main.IPC.IVersionControlApi
 
+open System.Collections.Generic
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
@@ -47,20 +48,17 @@ let private serviceUnavailable (service: string) : OperationResult<'T> =
             $"The workspace provider does not offer {service}."
     )
 
-/// A session that could not be opened keeps its resolution code (unmanaged or
-/// ambiguous) and otherwise reports that the provider refused to open it.
-let private sessionUnavailable (failure: OperationFailure) : OperationFailure =
-    if
-        failure.Code = VersionControlCodes.WorkspaceUnmanaged
-        || failure.Code = VersionControlCodes.WorkspaceAmbiguous
-    then
-        failure
-    else
-        {
-            failure with
-                Code = VersionControlCodes.SessionUnavailable
-                Details = Array.append [| $"provider code: {failure.Code}" |] failure.Details
-        }
+/// A session that could not be opened keeps the provider's category and code. A detail
+/// line marks that the failure came from opening the session, not from the operation.
+let private sessionUnavailable (failure: OperationFailure) : OperationFailure = {
+    failure with
+        Details = Array.append [| "The workspace session could not be opened." |] failure.Details
+}
+
+/// A provider or strategy that throws is reported as a structured failure, so the
+/// renderer's result contract holds even then.
+let private unexpectedFailure (error: exn) : OperationFailure =
+    OperationFailure.createRedacted ProviderError "unexpected_exception" error.Message
 
 let private failedDto (failure: OperationFailure) : OperationResultDto<'T> =
     OperationResultDto.Failed(Mappings.failure failure)
@@ -68,7 +66,8 @@ let private failedDto (failure: OperationFailure) : OperationResultDto<'T> =
 let private validationFailed (code: string) (message: string) : OperationResult<'T> =
     Failed(OperationFailure.create Validation code message)
 
-/// Runs one tracked operation against a session-independent target.
+/// Runs one tracked operation against a session-independent target. The operation is
+/// registered and announced before any await, and every exception becomes a failure.
 let private runTracked
     (host: WorkspaceSessionHost.WorkspaceSessionHost)
     (bridge: RendererBridge)
@@ -78,17 +77,20 @@ let private runTracked
     : JS.Promise<OperationResult<'T>> =
     promise {
         let tracked = host.BeginOperation(sessionId, operationId, bridge.Progress)
-        bridge.Started tracked.Key
 
         try
-            return! operation tracked.Context |> Async.StartAsPromise
+            try
+                bridge.Started tracked.Key
+                return! operation tracked.Context |> Async.StartAsPromise
+            with error ->
+                return Failed(unexpectedFailure error)
         finally
             tracked.Complete()
     }
 
 /// Opens the vault session of the calling window and runs the operation in it. The
-/// operation is registered before the first await, so a cancel that arrives right
-/// after the call started is honored even while the session is still opening.
+/// operation is registered and announced before the first await, so a cancel that
+/// arrives right after the call started is honored even while the session opens.
 let private withSession
     (event: IpcMainInvokeEvent)
     (operationId: string)
@@ -110,25 +112,66 @@ let private withSession
             let tracked = host.BeginOperation(knownSessionId, operationId, bridge.Progress)
 
             try
-                let! opened = host.OpenSession(arcPath, tracked.Context) |> Async.StartAsPromise
+                try
+                    bridge.Started tracked.Key
+                    let! opened = host.OpenSession(arcPath, tracked.Context) |> Async.StartAsPromise
 
-                match opened with
-                | Succeeded outcome
-                | PartiallySucceeded(outcome, _) ->
-                    let hosted = outcome.Value
-                    host.AssignSession(operationId, hosted.SessionId)
-
-                    bridge.Started {
-                        SessionId = hosted.SessionId
-                        OperationId = operationId
-                    }
-
-                    let! result = operation hosted tracked.Context |> Async.StartAsPromise
-                    return Ok(Mappings.result mapValue result)
-                | Failed failure -> return Ok(failedDto (sessionUnavailable failure))
+                    match opened with
+                    | Succeeded outcome
+                    | PartiallySucceeded(outcome, _) ->
+                        let hosted = outcome.Value
+                        host.AssignSession(operationId, hosted.SessionId)
+                        let! result = operation hosted tracked.Context |> Async.StartAsPromise
+                        return Ok(Mappings.result mapValue result)
+                    | Failed failure -> return Ok(failedDto (sessionUnavailable failure))
+                with error ->
+                    return Ok(failedDto (unexpectedFailure error))
             finally
                 tracked.Complete()
     }
+
+/// Nested busy scopes per vault window. The vault flag is a plain boolean, so the
+/// depth is counted here and the flag only drops when the outermost mutation ends.
+let private busyDepth = Dictionary<int, int>()
+
+let private withBusyWritingNested (vault: ArcVault) (operation: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+    // The depth is updated before the promise builder starts: a statement inside the
+    // builder runs one microtask later, and the operation must be registered before
+    // the IPC call returns to the renderer.
+    let key = vault.window.id
+
+    let depth =
+        match busyDepth.TryGetValue key with
+        | true, current -> current
+        | _ -> 0
+
+    busyDepth[key] <- depth + 1
+
+    if depth = 0 then
+        vault.isBusyWriting <- true
+
+    let release () =
+        let remaining = busyDepth[key] - 1
+
+        if remaining <= 0 then
+            busyDepth.Remove key |> ignore
+            vault.isBusyWriting <- false
+        else
+            busyDepth[key] <- remaining
+
+    promise {
+        try
+            return! operation ()
+        finally
+            release ()
+    }
+
+let private resultChangedState (result: Result<OperationResultDto<'U>, exn>) =
+    match result with
+    | Ok(OperationResultDto.Succeeded outcome) -> outcome.Effect = OperationEffectDto.Performed
+    | Ok(OperationResultDto.PartiallySucceeded _) -> true
+    | Ok(OperationResultDto.Failed failure) -> failure.StateChanged
+    | Error _ -> false
 
 /// Same as withSession, with the vault marked busy for the duration and the file tree
 /// refreshed afterwards when the operation changed the workspace.
@@ -144,19 +187,12 @@ let private withMutatingSession
         | Error error -> return Error error
         | Ok(vault, arcPath) ->
             return!
-                withBusyWriting
+                withBusyWritingNested
                     vault
                     (fun () -> promise {
                         let! result = withSession event operationId operation mapValue
 
-                        let changed =
-                            match result with
-                            | Ok(OperationResultDto.Succeeded outcome) -> outcome.Effect = OperationEffectDto.Performed
-                            | Ok(OperationResultDto.PartiallySucceeded _) -> true
-                            | Ok(OperationResultDto.Failed failure) -> failure.StateChanged
-                            | Error _ -> false
-
-                        if refreshTree && changed then
+                        if refreshTree && resultChangedState result then
                             let! fileTree = getFileTree arcPath
                             vault.SetFileTree fileTree
 
@@ -190,13 +226,54 @@ let private withProviderRef (value: string) (call: ProviderRef -> Async<Operatio
     | Ok reference -> call reference
     | Error failure -> async { return Failed failure }
 
+/// An optional ref or revision the renderer sent is either valid or a validation
+/// failure. It is never dropped, because the provider treats these values as exact.
+let private withOptionalProviderRef (value: string option) (call: ProviderRef option -> Async<OperationResult<'T>>) =
+    match value with
+    | None -> call None
+    | Some text -> withProviderRef text (Some >> call)
+
+let private withOptionalRevision (value: string option) (call: RevisionId option -> Async<OperationResult<'T>>) =
+    match value with
+    | None -> call None
+    | Some text ->
+        match Mappings.tryRevisionId text with
+        | Ok revision -> call (Some revision)
+        | Error failure -> async { return Failed failure }
+
 let private tryFactoryFor (host: WorkspaceSessionHost.WorkspaceSessionHost) (providerId: ProviderId) =
     ProviderResolver.tryGetFactory host.Runtime.Catalog providerId
 
-let private persistBinding (host: WorkspaceSessionHost.WorkspaceSessionHost) (binding: WorkspaceBinding) =
-    match host.Runtime.Bindings.Save binding with
-    | Ok() -> Succeeded(OperationOutcome.performed binding)
-    | Error message -> Failed(OperationFailure.create ProviderError "binding_not_persisted" message)
+/// Persists a binding the provider produced. When the store fails after the provider
+/// already changed state, the result is a partial success with StateChanged and a
+/// recovery action, never a plain failure.
+let private persistProvisionedBinding
+    (host: WorkspaceSessionHost.WorkspaceSessionHost)
+    (result: OperationResult<WorkspaceBinding>)
+    : OperationResult<WorkspaceBinding> =
+    let persistFailure (message: string) = {
+        OperationFailure.create ProviderError "binding_not_persisted" message with
+            StateChanged = true
+            Retryable = true
+            RecoveryAction =
+                Some {
+                    Code = "reopen_workspace"
+                    Instructions =
+                        Some
+                            "The workspace was provisioned but its binding could not be saved. Open the workspace again so it is bound."
+                }
+    }
+
+    match result with
+    | Succeeded outcome ->
+        match host.Runtime.Bindings.Save outcome.Value with
+        | Ok() -> Succeeded outcome
+        | Error message -> PartiallySucceeded(outcome, persistFailure message)
+    | PartiallySucceeded(outcome, failure) ->
+        match host.Runtime.Bindings.Save outcome.Value with
+        | Ok() -> PartiallySucceeded(outcome, failure)
+        | Error message -> PartiallySucceeded(outcome, persistFailure message)
+    | Failed failure -> Failed failure
 
 /// A provisioning step that produced a binding. The binding is persisted before the
 /// caller sees the result so a crash after provisioning still leaves the vault bound.
@@ -215,17 +292,7 @@ let private provision
                 operationId
                 (fun context -> async {
                     let! provisioned = run context
-
-                    match provisioned with
-                    | Succeeded outcome ->
-                        match persistBinding host outcome.Value with
-                        | Succeeded _ -> return Succeeded outcome
-                        | other -> return other
-                    | PartiallySucceeded(outcome, failure) ->
-                        match persistBinding host outcome.Value with
-                        | Succeeded _ -> return PartiallySucceeded(outcome, failure)
-                        | other -> return other
-                    | Failed failure -> return Failed failure
+                    return persistProvisionedBinding host provisioned
                 })
 
         return Ok(Mappings.result (fun (binding: WorkspaceBinding) -> binding.WorkspaceRoot) result)
@@ -238,7 +305,27 @@ let private removeExistingFile (path: string) =
     else
         false
 
+let private locationFor
+    (host: WorkspaceSessionHost.WorkspaceSessionHost)
+    (providerLocation: string)
+    (displayName: string option)
+    =
+    match ProviderComposition.tryCreateLocation providerLocation displayName with
+    | Error message -> Error(OperationFailure.create Validation VersionControlCodes.LocationUnsupported message)
+    | Ok location ->
+        match tryFactoryFor host location.ProviderId with
+        | Some factory -> Ok(location, factory)
+        | None ->
+            Error(
+                OperationFailure.create
+                    Validation
+                    VersionControlCodes.LocationUnsupported
+                    $"No provider is registered for '{ProviderId.value location.ProviderId}'."
+            )
+
 let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
+    // Opening the session adopts an unbound workspace and persists its binding. That
+    // side effect is intended: the first read of a vault is what binds it.
     getSessionInfo =
         fun request ->
             withSession
@@ -256,34 +343,22 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 bridge
                 request.OperationId
                 (fun context -> async {
-                    match ProviderComposition.tryCreateLocation request.ProviderLocation request.DisplayName with
-                    | Error message -> return validationFailed VersionControlCodes.LocationUnsupported message
-                    | Ok location ->
-                        match tryFactoryFor host location.ProviderId with
-                        | None ->
-                            return
-                                validationFailed
-                                    VersionControlCodes.LocationUnsupported
-                                    $"No provider is registered for '{ProviderId.value location.ProviderId}'."
-                        | Some factory ->
-                            let targetRef =
+                    match locationFor host request.ProviderLocation request.DisplayName with
+                    | Error failure -> return Failed failure
+                    | Ok(location, factory) ->
+                        return!
+                            withOptionalProviderRef
                                 request.TargetRef
-                                |> Option.map ProviderRef.tryCreate
-                                |> Option.bind (
-                                    function
-                                    | Ok reference -> Some reference
-                                    | Error _ -> None
+                                (fun targetRef ->
+                                    factory.Clone
+                                        {
+                                            Location = location
+                                            TargetPath = request.TargetPath
+                                            TargetRef = targetRef
+                                            MaterializeAllObjects = request.MaterializeAllObjects
+                                        }
+                                        context
                                 )
-
-                            return!
-                                factory.Clone
-                                    {
-                                        Location = location
-                                        TargetPath = request.TargetPath
-                                        TargetRef = targetRef
-                                        MaterializeAllObjects = request.MaterializeAllObjects
-                                    }
-                                    context
                 })
     initializeWorkspace =
         fun request ->
@@ -310,68 +385,69 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                 }
                                 context
                 })
+    // Bind changes the vault's repository configuration, so it runs as a mutation of
+    // the open vault and refreshes the tree afterwards.
     bindWorkspace =
         fun request -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
-            | Ok(_, arcPath) ->
+            | Ok(vault, arcPath) ->
                 let host = WorkspaceSessionHost.get ()
                 let bridge = tryBridgeFromEvent event
 
-                let! bound =
-                    runTracked
-                        host
-                        bridge
-                        ""
-                        request.OperationId
-                        (fun context -> async {
-                            match
-                                ProviderComposition.tryCreateLocation request.ProviderLocation request.DisplayName
-                            with
-                            | Error message -> return validationFailed VersionControlCodes.LocationUnsupported message
-                            | Ok location ->
-                                match tryFactoryFor host location.ProviderId with
-                                | None ->
-                                    return
-                                        validationFailed
-                                            VersionControlCodes.LocationUnsupported
-                                            $"No provider is registered for '{ProviderId.value location.ProviderId}'."
-                                | Some factory ->
-                                    let! bindResult =
-                                        factory.Bind
-                                            {
-                                                WorkspaceRoot = arcPath
-                                                Location = location
-                                            }
-                                            context
+                return!
+                    withBusyWritingNested
+                        vault
+                        (fun () -> promise {
+                            let! bound =
+                                runTracked
+                                    host
+                                    bridge
+                                    ""
+                                    request.OperationId
+                                    (fun context -> async {
+                                        match locationFor host request.ProviderLocation request.DisplayName with
+                                        | Error failure -> return Failed failure
+                                        | Ok(location, factory) ->
+                                            let! bindResult =
+                                                factory.Bind
+                                                    {
+                                                        WorkspaceRoot = arcPath
+                                                        Location = location
+                                                    }
+                                                    context
 
-                                    match bindResult with
-                                    | Succeeded outcome ->
-                                        match persistBinding host outcome.Value with
-                                        | Succeeded _ ->
-                                            // The open session keeps the location it was opened with.
-                                            let! reopened = host.ReopenSession(arcPath, context)
-                                            return reopened
-                                        | Failed failure -> return Failed failure
-                                        | PartiallySucceeded(_, failure) -> return Failed failure
-                                    | PartiallySucceeded(_, failure)
-                                    | Failed failure -> return Failed failure
+                                            match persistProvisionedBinding host bindResult with
+                                            | Succeeded _ ->
+                                                // The open session keeps the location it was opened with.
+                                                return! host.ReopenSession(arcPath, context)
+                                            | PartiallySucceeded(_, failure) -> return Failed failure
+                                            | Failed failure -> return Failed failure
+                                    })
+
+                            let result =
+                                Ok(
+                                    Mappings.result
+                                        (fun (hosted: WorkspaceSessionHost.HostedSession) ->
+                                            Mappings.sessionInfo hosted.SessionId hosted.Session
+                                        )
+                                        bound
+                                )
+
+                            if resultChangedState result then
+                                let! fileTree = getFileTree arcPath
+                                vault.SetFileTree fileTree
+
+                            return result
                         })
-
-                return
-                    Ok(
-                        Mappings.result
-                            (fun (hosted: WorkspaceSessionHost.HostedSession) ->
-                                Mappings.sessionInfo hosted.SessionId hosted.Session
-                            )
-                            bound
-                    )
         }
     cancelOperation =
         fun key -> promise {
             let host = WorkspaceSessionHost.get ()
             return Ok(host.Cancel(key.SessionId, key.OperationId))
         }
+    // Every registered provider reports its components. A provider whose check fails
+    // does not hide the others: its failure rides along as the partial failure.
     checkDependencies =
         fun request -> promise {
             let host = WorkspaceSessionHost.get ()
@@ -389,22 +465,41 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                         let mutable failure: OperationFailure option = None
 
                         for factory in factories do
-                            if failure.IsNone then
-                                let! checked = factory.CheckDependencies context
+                            if not (context.Cancellation.IsCancellationRequested()) then
+                                let! reported = factory.CheckDependencies context
 
-                                match checked with
+                                match reported with
                                 | Succeeded outcome
                                 | PartiallySucceeded(outcome, _) -> statuses <- Array.append statuses outcome.Value
-                                | Failed error -> failure <- Some error
+                                | Failed error when error.Category = Canceled -> failure <- Some error
+                                | Failed error ->
+                                    if failure.IsNone then
+                                        failure <- Some error
 
                         return
                             match failure with
-                            | Some error -> Failed error
+                            | Some error when error.Category = Canceled -> Failed error
+                            | Some error ->
+                                PartiallySucceeded(
+                                    OperationOutcome.performed statuses,
+                                    {
+                                        error with
+                                            StateChanged = false
+                                            RecoveryAction =
+                                                Some {
+                                                    Code = "check_dependencies"
+                                                    Instructions =
+                                                        Some "One provider could not report its dependencies."
+                                                }
+                                    }
+                                )
                             | None -> OperationResult.succeeded statuses
                     })
 
             return Ok(Mappings.result (Array.map Mappings.dependencyStatus) result)
         }
+    // The first provider that does not answer Unsupported owns the component, whether
+    // its installation succeeded or failed.
     installDependency =
         fun request -> promise {
             let host = WorkspaceSessionHost.get ()
@@ -417,19 +512,16 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     ""
                     request.OperationId
                     (fun context -> async {
-                        // The first provider that supports the component installs it.
                         let factories = ProviderResolver.factories host.Runtime.Catalog
                         let mutable outcome: OperationResult<DependencyStatus> option = None
 
                         for factory in factories do
-                            match outcome with
-                            | Some(Succeeded _) -> ()
-                            | _ ->
+                            if outcome.IsNone then
                                 let! installed = factory.InstallDependency request.Component context
 
-                                match installed, outcome with
-                                | Failed failure, Some _ when failure.Category = Unsupported -> ()
-                                | result, _ -> outcome <- Some result
+                                match installed with
+                                | Failed failure when failure.Category = Unsupported -> ()
+                                | result -> outcome <- Some result
 
                         return
                             outcome
@@ -459,23 +551,18 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 request.OperationId
                 request.SwitchTo
                 (fun hosted context ->
-                    let baseRef =
+                    withOptionalProviderRef
                         request.BaseRef
-                        |> Option.map ProviderRef.tryCreate
-                        |> Option.bind (
-                            function
-                            | Ok reference -> Some reference
-                            | Error _ -> None
+                        (fun baseRef ->
+                            hosted.Session.Core.CreateRef
+                                {
+                                    Name = request.Name
+                                    BaseRef = baseRef
+                                    SwitchTo = request.SwitchTo
+                                    ExpectedWorkspaceVersion = request.ExpectedWorkspaceVersion
+                                }
+                                context
                         )
-
-                    hosted.Session.Core.CreateRef
-                        {
-                            Name = request.Name
-                            BaseRef = baseRef
-                            SwitchTo = request.SwitchTo
-                            ExpectedWorkspaceVersion = request.ExpectedWorkspaceVersion
-                        }
-                        context
                 )
                 Mappings.logicalRef
     preflightSwitchRef =
@@ -632,21 +719,16 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     _.Synchronization
                     "synchronization"
                     (fun service context ->
-                        let expectedTarget =
+                        withOptionalRevision
                             request.ExpectedTargetRevision
-                            |> Option.map RevisionId.tryCreate
-                            |> Option.bind (
-                                function
-                                | Ok revision -> Some revision
-                                | Error _ -> None
+                            (fun expectedTarget ->
+                                service.Publish
+                                    {
+                                        ExpectedWorkspaceVersion = request.ExpectedWorkspaceVersion
+                                        ExpectedTargetRevision = expectedTarget
+                                    }
+                                    context
                             )
-
-                        service.Publish
-                            {
-                                ExpectedWorkspaceVersion = request.ExpectedWorkspaceVersion
-                                ExpectedTargetRevision = expectedTarget
-                            }
-                            context
                     ))
                 Mappings.synchronizationState
     getActiveConflictSession =
@@ -813,6 +895,9 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     "a repository browser"
                     (fun service context -> service.GetRepositoryWebUrl context))
                 id
+    // Removes a stale provider lock only while this operation is the only one of the
+    // session, then refreshes and returns the status. The removed files are listed in
+    // Details because they are not repository paths.
     clearStaleLock =
         fun request ->
             withMutatingSession
@@ -822,7 +907,6 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 (fun hosted context -> async {
                     let host = WorkspaceSessionHost.get ()
 
-                    // The operation that carries this request is the only one allowed to run.
                     let otherOperations =
                         host.RunningOperationIds hosted.SessionId
                         |> Array.filter (fun id -> id <> request.OperationId)
@@ -855,12 +939,17 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                             | Succeeded outcome ->
                                 Succeeded {
                                     outcome with
-                                        AffectedPaths = removed
                                         Effect =
                                             if removed.Length > 0 then
                                                 Performed
                                             else
                                                 NoOp(Some "no stale lock")
+                                        Warnings =
+                                            removed
+                                            |> Array.map (fun path -> {
+                                                Code = "lock_removed"
+                                                Message = $"Removed the stale lock {path}."
+                                            })
                                 }
                             | other -> other
                 })

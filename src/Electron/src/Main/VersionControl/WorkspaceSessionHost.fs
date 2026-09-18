@@ -5,6 +5,7 @@ module Main.VersionControl.WorkspaceSessionHost
 
 open System
 open System.Collections.Generic
+open Fable.Core
 open Swate.Electron.Shared.VersionControlTypes
 open VersionControlService.Abstractions
 
@@ -50,10 +51,28 @@ let private unmanagedFailure (workspaceRoot: string) (diagnostics: OperationFail
         AffectedPaths = [| workspaceRoot |]
 }
 
+let private withValue (value: 'U) (outcome: OperationOutcome<'T>) : OperationOutcome<'U> = {
+    Value = value
+    Effect = outcome.Effect
+    Warnings = outcome.Warnings
+    AffectedPaths = outcome.AffectedPaths
+    ResultingRevision = outcome.ResultingRevision
+    ResultingWorkspaceVersion = outcome.ResultingWorkspaceVersion
+    Publication = outcome.Publication
+}
+
 type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) =
 
     let sessions = Dictionary<string, HostedSession>()
     let operations = Dictionary<string, RunningOperation>()
+    let pendingOpens = Dictionary<string, JS.Promise<OperationResult<HostedSession>>>()
+
+    let normalizeRoot (workspaceRoot: string) =
+        let normalized = ProviderResolver.normalizePath workspaceRoot
+
+        match runtime.PathCaseSensitivity with
+        | CaseSensitive -> normalized
+        | CaseInsensitive -> normalized.ToLowerInvariant()
 
     let sameRoot (left: string) (right: string) =
         WorkspaceBindingStore.rootsEqual runtime.PathCaseSensitivity left right
@@ -65,8 +84,7 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
     let openBinding (factory: ProviderFactory) (binding: WorkspaceBinding) (context: OperationContext) = async {
         let! opened = factory.Open binding context
 
-        match opened with
-        | Succeeded outcome ->
+        let host (outcome: OperationOutcome<WorkspaceSession>) =
             let hosted = {
                 SessionId = Guid.NewGuid().ToString()
                 Binding = binding
@@ -75,19 +93,38 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
             }
 
             sessions[hosted.SessionId] <- hosted
+            withValue hosted outcome
 
-            return
-                Succeeded {
-                    Value = hosted
-                    Effect = outcome.Effect
-                    Warnings = outcome.Warnings
-                    AffectedPaths = outcome.AffectedPaths
-                    ResultingRevision = outcome.ResultingRevision
-                    ResultingWorkspaceVersion = outcome.ResultingWorkspaceVersion
-                    Publication = outcome.Publication
-                }
-        | PartiallySucceeded(_, failure)
+        match opened with
+        | Succeeded outcome -> return Succeeded(host outcome)
+        | PartiallySucceeded(outcome, failure) -> return PartiallySucceeded(host outcome, failure)
         | Failed failure -> return Failed failure
+    }
+
+    let resolveAndOpen (workspaceRoot: string) (context: OperationContext) = async {
+        let! resolution =
+            ProviderComposition.resolveVault runtime.Catalog runtime.Bindings runtime.PathCaseSensitivity workspaceRoot
+
+        match resolution with
+        | ProviderComposition.BoundVault(binding, factory) -> return! openBinding factory binding context
+        | ProviderComposition.AdoptableVault(factory, candidate) ->
+            let! adopted =
+                factory.Adopt
+                    {
+                        WorkspaceRoot = candidate.Root
+                        ConnectionProfileId = None
+                    }
+                    context
+
+            match adopted with
+            | Succeeded outcome
+            | PartiallySucceeded(outcome, _) ->
+                match runtime.Bindings.Save outcome.Value with
+                | Ok() -> return! openBinding factory outcome.Value context
+                | Error message -> return Failed(OperationFailure.create ProviderError "binding_not_persisted" message)
+            | Failed failure -> return Failed failure
+        | ProviderComposition.AmbiguousVault candidates -> return Failed(ambiguousFailure candidates)
+        | ProviderComposition.UnmanagedVault diagnostics -> return Failed(unmanagedFailure workspaceRoot diagnostics)
     }
 
     member _.Runtime = runtime
@@ -101,51 +138,44 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
 
     /// Returns the open session for the root, or resolves the root, adopts it when
     /// exactly one provider owns it, persists the binding and opens the session.
+    /// Concurrent callers for one root share a single open, so a vault never ends up
+    /// with two sessions.
     member _.OpenSession(workspaceRoot: string, context: OperationContext) : Async<OperationResult<HostedSession>> = async {
         match tryFindSession workspaceRoot with
         | Some hosted -> return OperationResult.succeeded hosted
         | None ->
-            let! resolution =
-                ProviderComposition.resolveVault
-                    runtime.Catalog
-                    runtime.Bindings
-                    runtime.PathCaseSensitivity
-                    workspaceRoot
+            let key = normalizeRoot workspaceRoot
 
-            match resolution with
-            | ProviderComposition.BoundVault(binding, factory) -> return! openBinding factory binding context
-            | ProviderComposition.AdoptableVault(factory, candidate) ->
-                let! adopted =
-                    factory.Adopt
-                        {
-                            WorkspaceRoot = candidate.Root
-                            ConnectionProfileId = None
-                        }
-                        context
+            let pending =
+                match pendingOpens.TryGetValue key with
+                | true, inFlight -> inFlight
+                | _ ->
+                    let inFlight = promise {
+                        try
+                            return! resolveAndOpen workspaceRoot context |> Async.StartAsPromise
+                        finally
+                            pendingOpens.Remove key |> ignore
+                    }
 
-                match adopted with
-                | Succeeded outcome ->
-                    match runtime.Bindings.Save outcome.Value with
-                    | Ok() -> return! openBinding factory outcome.Value context
-                    | Error message ->
-                        return Failed(OperationFailure.create ProviderError "binding_not_persisted" message)
-                | PartiallySucceeded(_, failure)
-                | Failed failure -> return Failed failure
-            | ProviderComposition.AmbiguousVault candidates -> return Failed(ambiguousFailure candidates)
-            | ProviderComposition.UnmanagedVault diagnostics ->
-                return Failed(unmanagedFailure workspaceRoot diagnostics)
+                    pendingOpens[key] <- inFlight
+                    inFlight
+
+            return! Async.AwaitPromise pending
     }
 
     member _.CloseSession(workspaceRoot: string) : Async<unit> = async {
-        match tryFindSession workspaceRoot with
-        | Some hosted ->
+        let matching =
+            sessions.Values
+            |> Seq.filter (fun hosted -> sameRoot hosted.Binding.WorkspaceRoot workspaceRoot)
+            |> Seq.toArray
+
+        for hosted in matching do
             sessions.Remove hosted.SessionId |> ignore
 
             try
                 do! hosted.Session.Close()
             with _ ->
                 ()
-        | None -> ()
     }
 
     /// Closes and reopens the session over the binding stored for the root. Used after
@@ -157,16 +187,17 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
 
     /// A vault folder was renamed on disk. The open session (if any) is closed and the
     /// persisted binding follows the new root verbatim, so the next open resolves it
-    /// without probing again.
-    member this.WorkspaceRenamed(previousRoot: string, newRoot: string) : Async<unit> = async {
+    /// without probing again. The new entry is written before the old one is removed,
+    /// so a failure in between never loses the binding.
+    member this.WorkspaceRenamed(previousRoot: string, newRoot: string) : Async<Result<unit, string>> = async {
         do! this.CloseSession previousRoot
 
         match runtime.Bindings.TryFind previousRoot with
+        | None -> return Ok()
         | Some binding ->
-            runtime.Bindings.Remove previousRoot |> ignore
-
-            runtime.Bindings.Save { binding with WorkspaceRoot = newRoot } |> ignore
-        | None -> ()
+            match runtime.Bindings.Save { binding with WorkspaceRoot = newRoot } with
+            | Error message -> return Error message
+            | Ok() -> return runtime.Bindings.Remove previousRoot
     }
 
     member _.CloseAll() : Async<unit> = async {
@@ -182,7 +213,7 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
 
     /// Registers an operation before any library call so a cancel that arrives before
     /// the first progress event still lands. Operations without a session (clone,
-    /// initialize) register with an empty session id.
+    /// initialize, or a session still opening) register with an empty session id.
     member _.BeginOperation
         (sessionId: string, operationId: string, reportProgress: VersionControlProgressDto -> unit)
         : TrackedOperation =
@@ -218,19 +249,24 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
         | true, running -> operations[operationId] <- { running with SessionId = sessionId }
         | _ -> ()
 
-    /// Cancels a tracked operation. An empty session id matches any session, which is
-    /// what the renderer sends before it has learned the session of a new operation.
+    /// Cancels a tracked operation. An empty session id on either side matches: the
+    /// renderer may not know the session yet, and an operation may not have one.
     member _.Cancel(sessionId: string, operationId: string) : bool =
         match operations.TryGetValue operationId with
-        | true, running when String.IsNullOrEmpty sessionId || running.SessionId = sessionId ->
+        | true, running when
+            String.IsNullOrEmpty sessionId
+            || String.IsNullOrEmpty running.SessionId
+            || running.SessionId = sessionId
+            ->
             running.Source.Cancel()
             true
         | _ -> false
 
-    /// Operation ids currently running under one session.
+    /// Operation ids that may be running under one session. An operation whose session
+    /// is not assigned yet counts too, because it may end up in this session.
     member _.RunningOperationIds(sessionId: string) : string[] =
         operations
-        |> Seq.filter (fun entry -> entry.Value.SessionId = sessionId)
+        |> Seq.filter (fun entry -> String.IsNullOrEmpty entry.Value.SessionId || entry.Value.SessionId = sessionId)
         |> Seq.map (fun entry -> entry.Key)
         |> Seq.toArray
 
