@@ -46,6 +46,8 @@
     <Compile Include="VersionControl\WorkspaceBindingStore.fs" />
     <Compile Include="VersionControl\ProviderComposition.fs" />
     <Compile Include="VersionControl\VersionControlRuntime.fs" />
+    <Compile Include="VersionControl\Mappings.fs" />
+    <Compile Include="VersionControl\WorkspaceSessionHost.fs" />
     <Compile Include="ArcVault\Types.fs" />
     <Compile Include="ArcVault\ArcVaultHelper.fs" />
     <Compile Include="ArcVault\WatcherHelpers.fs" />
@@ -59,6 +61,7 @@
     <Compile Include="IPC\Delete.fs" />
     <Compile Include="IPC\Rename.fs" />
     <Compile Include="IPC\IGitApi.fs" />
+    <Compile Include="IPC\IVersionControlApi.fs" />
     <Compile Include="IPC\IGitLabApi.fs" />
     <Compile Include="IPC\IArcVaultsApi.fs" />
     <Compile Include="IPC\IAuthApi.fs" />

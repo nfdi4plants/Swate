@@ -12,6 +12,7 @@ open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
 open AuthTypes
 open FileIOTypes
 open GitTypes
+open VersionControlTypes
 
 module IPCTypesHelper =
 
@@ -125,6 +126,54 @@ type IGitApi = {
 }
 
 /// Two Way Bridge: Renderer <-> Main
+/// Provider-neutral version control over the active vault. Every call names an
+/// operation id so the renderer can cancel it, and every result keeps the library's
+/// structured outcome.
+type IVersionControlApi = {
+    getSessionInfo: OperationRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceSessionInfoDto>, exn>>
+    cloneWorkspace: CloneWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<string>, exn>>
+    initializeWorkspace: InitializeWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<string>, exn>>
+    bindWorkspace: BindWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceSessionInfoDto>, exn>>
+    cancelOperation: OperationKeyDto -> JS.Promise<Result<bool, exn>>
+    checkDependencies: OperationRequestDto -> JS.Promise<Result<OperationResultDto<DependencyStatusDto[]>, exn>>
+    installDependency: InstallDependencyRequestDto -> JS.Promise<Result<OperationResultDto<DependencyStatusDto>, exn>>
+    getStatus: OperationRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceStatusDto>, exn>>
+    listRefs: OperationRequestDto -> JS.Promise<Result<OperationResultDto<LogicalRefDto[]>, exn>>
+    createRef: CreateRefRequestDto -> JS.Promise<Result<OperationResultDto<LogicalRefDto>, exn>>
+    preflightSwitchRef: SwitchRefRequestDto -> JS.Promise<Result<OperationResultDto<SwitchPreflightDto>, exn>>
+    switchRef: SwitchRefRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceStatusDto>, exn>>
+    createRevision: CreateRevisionRequestDto -> JS.Promise<Result<OperationResultDto<string>, exn>>
+    restorePaths: RestorePathsRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
+    getDiffSummary: OperationRequestDto -> JS.Promise<Result<OperationResultDto<DiffSummaryDto>, exn>>
+    getTextDiff: ObjectPathRequestDto -> JS.Promise<Result<OperationResultDto<ContentViewDto>, exn>>
+    getWordDiff: ObjectPathRequestDto -> JS.Promise<Result<OperationResultDto<ContentViewDto>, exn>>
+    getBaseContent: ObjectPathRequestDto -> JS.Promise<Result<OperationResultDto<ContentViewDto>, exn>>
+    refreshSynchronization: OperationRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, exn>>
+    previewUpdate: OperationRequestDto -> JS.Promise<Result<OperationResultDto<UpdatePreviewDto>, exn>>
+    update: UpdateRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, exn>>
+    publish: PublishRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, exn>>
+    getActiveConflictSession:
+        OperationRequestDto -> JS.Promise<Result<OperationResultDto<ConflictSessionSummaryDto option>, exn>>
+    resolveConflict:
+        ResolveConflictRequestDto -> JS.Promise<Result<OperationResultDto<ConflictResolutionOutcomeDto>, exn>>
+    finalizeConflict: FinalizeConflictRequestDto -> JS.Promise<Result<OperationResultDto<string option>, exn>>
+    cancelConflict: CancelConflictRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
+    listObjects: OperationRequestDto -> JS.Promise<Result<OperationResultDto<ObjectStateDto[]>, exn>>
+    materializeObject: ObjectPathRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
+    dematerializeObject: ObjectPathRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
+    getStoragePolicySettings:
+        OperationRequestDto -> JS.Promise<Result<OperationResultDto<StoragePolicySettingsDto>, exn>>
+    setStoragePolicySettings: StoragePolicySettingsRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
+    setPathStoragePolicy: PathStoragePolicyRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
+    pruneStorage: OperationRequestDto -> JS.Promise<Result<OperationResultDto<string>, exn>>
+    deduplicateStorage: OperationRequestDto -> JS.Promise<Result<OperationResultDto<string>, exn>>
+    getRepositoryWebUrl: OperationRequestDto -> JS.Promise<Result<OperationResultDto<string option>, exn>>
+    /// Removes a stale provider lock left by a killed process, only while no operation
+    /// of this session runs, then refreshes and returns the status.
+    clearStaleLock: OperationRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceStatusDto>, exn>>
+}
+
+/// Two Way Bridge: Renderer <-> Main
 type IGitLabApi = {
     loadAllRepos: ExploreRepoQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
     loadMostStarredRepos: ExploreMostStarredQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
@@ -178,6 +227,11 @@ module MainToRendererIpc =
 
     type IGitLfsProgressRendererApi = {
         gitLfsProgressUpdate: GitLfsProgressDto -> unit
+    }
+
+    type IVersionControlRendererApi = {
+        versionControlProgress: VersionControlProgressDto -> unit
+        versionControlOperationStarted: OperationKeyDto -> unit
     }
 
     type IHasUnsavedArcChangesRendererApi = {

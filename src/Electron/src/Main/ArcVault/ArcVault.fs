@@ -499,6 +499,10 @@ module ArcVaultExtensions =
                 | Ok renamedPath ->
                     this.path <- Some renamedPath
 
+                    match Main.VersionControl.WorkspaceSessionHost.tryCurrent () with
+                    | Some host -> do! host.WorkspaceRenamed(currentPath, renamedPath) |> Async.StartAsPromise
+                    | None -> ()
+
                     if this.arc.IsNone then
                         try
                             do! this.LoadArc()
@@ -608,6 +612,11 @@ type ArcVaults() =
         | true, vault ->
             vault.StopFileWatcher() |> Promise.start
             this.Vaults.Remove(id) |> ignore
+
+            match Main.VersionControl.WorkspaceSessionHost.tryCurrent (), vault.path with
+            | Some host, Some path -> host.CloseSession path |> Async.StartAsPromise |> Promise.start
+            | _ -> ()
+
             vault.path |> Option.iter (fun p -> RECENT_ARCS.Inactivate(p) |> ignore)
             this.BroadcastRecentARCs()
             printfn $"[Swate] Removed vault '{id}'"

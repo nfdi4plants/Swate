@@ -11,6 +11,7 @@
     <Compile Include="IpcReceiver.fs" />
     <Compile Include="MainSyncedState.fs" />
     <Compile Include="GitApiClient.fs" />
+    <Compile Include="VersionControlApiClient.fs" />
     <Compile Include="Context\AppStateContext.fs" />
     <Compile Include="Context\PageStateContext.fs" />
     <Compile Include="Context\FileStateContext.fs" />

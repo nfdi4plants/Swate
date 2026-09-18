@@ -35,6 +35,8 @@
     <Compile Include="ProvenanceGroupingState.test.fs" />
     <Compile Include="SecureAuthStore.test.fs" />
     <Compile Include="VersionControlComposition.test.fs" />
+    <Compile Include="VersionControlMappings.test.fs" />
+    <Compile Include="VersionControlSessionHost.test.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Electron\src\Main\Main.fsproj" />
