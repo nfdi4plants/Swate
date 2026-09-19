@@ -20,7 +20,7 @@ let private toUnitResult (result: Result<OperationResultDto<unit>, string>) : Re
 
 /// The size is not known here, so the size rule is left to the context menu, which
 /// has it. The path rules are checked for both directions.
-let tryGetToggleBlockedReason (relativePath: string) (markAsLfs: bool) =
+let private tryGetToggleBlockedReason (relativePath: string) (markAsLfs: bool) =
     GitLfsRules.tryGetToggleBlockedReason relativePath None markAsLfs
 
 let runToggleLfsMark (relativePath: string) (markAsLfs: bool) : JS.Promise<Result<unit, string>> = promise {

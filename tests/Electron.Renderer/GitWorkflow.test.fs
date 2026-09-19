@@ -1184,6 +1184,7 @@ Vitest.describe (
             "Discard sends restorePaths with the exact paths and the current workspace version",
             fun () -> promise {
                 let mutable captured = None
+                let pageStates = ResizeArray<PageState option>()
 
                 let deps = {
                     defaultDependencies with
@@ -1191,16 +1192,32 @@ Vitest.describe (
                             fun request ->
                                 captured <- Some request
                                 promise { return Ok(succeeded ()) }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let model, command =
-                    update deps ignore (DiscardSelectionRequested [| " leading.txt"; "b.txt"; "b.txt" |]) runningState
+                    update deps pageStates.Add (DiscardSelectionRequested [| " leading.txt"; "b.txt"; "b.txt" |]) {
+                        runningState with
+                            SelectedChangePath = Some "b.txt"
+                    }
 
                 let! messages = collectMessages command
-                let model, write = update deps ignore messages[0] model
-                let! _ = collectMessages write
+                let requested, write = update deps pageStates.Add messages[0] model
+                let! completion = collectMessages write
+
+                let finalState, finishCmd =
+                    match completion with
+                    | [| WriteCompleted(_, _, DiscardSelection _, Ok(Completed _)) |] ->
+                        update deps pageStates.Add completion[0] requested
+                    | _ -> failwith "Expected discard to complete successfully."
+
+                let! _ = collectMessages finishCmd
                 Vitest.expect(captured.Value.Paths).toEqual ([| " leading.txt"; "b.txt" |])
                 Vitest.expect(captured.Value.ExpectedWorkspaceVersion).toBe ("v1")
+                Vitest.expect(pageStates |> Seq.toArray).toEqual ([| None |])
+                Vitest.expect(finalState.SelectedChangePath).toEqual (None)
             }
         )
 
@@ -1607,6 +1624,56 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "A clone runs under the operation id allocated for cancellation",
+            fun () -> promise {
+                let mutable capturedRequest = None
+                let mutable canceledKey = None
+                let reply (_: Result<string, string>) = ()
+
+                let cloneRequest = {
+                    OperationId = "caller-op"
+                    ProviderLocation = "https://gitlab.example/carol/my-arc.git"
+                    DisplayName = Some "my-arc"
+                    TargetPath = "C:/clone-target"
+                    TargetRef = None
+                    MaterializeAllObjects = true
+                }
+
+                let deps = {
+                    defaultDependencies with
+                        newOperationId = fun () -> "allocated-op"
+                        cloneWorkspace =
+                            fun request ->
+                                capturedRequest <- Some request
+                                promise { return Ok(succeeded "C:/clone-target") }
+                        cancelOperation =
+                            fun key ->
+                                canceledKey <- Some key
+                                promise { return Ok true }
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested(Clone(cloneRequest, reply))) GitState.Empty
+
+                let _, cancelCmd =
+                    update deps ignore CancelCurrentOperationRequested stateAfterRequest
+
+                let! _ = collectMessages cancelCmd
+                let! completionMessages = collectMessages requestCmd
+
+                match completionMessages with
+                | [| WriteCompleted(_, _, Clone _, Ok(Completed(CloneSuccess root))) |] ->
+                    Vitest.expect(root).toBe ("C:/clone-target")
+                | _ -> failwith "Expected clone to complete successfully."
+
+                Vitest.expect(capturedRequest.Value.OperationId).toBe ("allocated-op")
+                Vitest.expect(capturedRequest.Value.OperationId).not.toBe (cloneRequest.OperationId)
+                Vitest.expect(canceledKey.Value.OperationId).toBe (capturedRequest.Value.OperationId)
+                Vitest.expect(canceledKey.Value.OperationId).not.toBe (cloneRequest.OperationId)
+            }
+        )
+
+        Vitest.test (
             "clone progress updates the current run status while the start-page clone is busy",
             fun () -> promise {
                 let reply (_: Result<string, string>) = ()
@@ -1915,6 +1982,36 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "A stale-version completion of a superseded write is ignored",
+            fun () -> promise {
+                let model = {
+                    runningState with
+                        WriteRequestId = 2
+                        BusyOperation = Some GitBusyOperation.DiscardingSelectedChanges
+                        ErrorNotice = Some "keep this notice"
+                }
+
+                let nextState, cmd =
+                    update
+                        defaultDependencies
+                        ignore
+                        (WriteCompleted(
+                            model.ArcSessionId,
+                            model.WriteRequestId - 1,
+                            DiscardSelection [| "a.txt" |],
+                            Ok(StaleWorkspaceVersion "old")
+                        ))
+                        model
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(nextState.BusyOperation).toEqual (model.BusyOperation)
+                Vitest.expect(nextState.ErrorNotice).toEqual (model.ErrorNotice)
+                Vitest.expect(messages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
             "WriteCompleted ignores stale non-clone writes without follow-up callback work",
             fun () -> promise {
                 let state = {
@@ -2212,6 +2309,65 @@ Vitest.describe (
                 Vitest.expect(cancelMessages).toEqual ([||])
                 Vitest.expect(stateAfterCancel.PendingConfirmation).toEqual (None)
                 Vitest.expect(stateAfterCancel.WarningNotice |> Option.defaultValue "").toContain ("saved locally")
+            }
+        )
+
+        Vitest.test (
+            "A recovery attached to a pending confirmation becomes a warning and is not parked",
+            fun () -> promise {
+                let partial =
+                    makeFailure
+                        Canceled
+                        VersionControlCodes.OperationCanceled
+                        "Large-file hydration was canceled."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RetryMaterialization
+                            Instructions = None
+                        })
+                        [||]
+
+                let prepared = {
+                    BusyOperation = GitBusyOperation.CommittingAllChanges
+                    NormalizedMessage = "Save"
+                    PathsToCommit = [| "README.md" |]
+                }
+
+                let dialog = {
+                    Title = "Merge confirmation"
+                    Message = "Confirm the merge."
+                    ConfirmLabel = "Confirm"
+                    CancelLabel = "Cancel"
+                }
+
+                let state = {
+                    runningState with
+                        BusyOperation = Some prepared.BusyOperation
+                        WriteRequestId = 1
+                }
+
+                let nextState, cmd =
+                    update
+                        defaultDependencies
+                        ignore
+                        (WriteCompleted(
+                            state.ArcSessionId,
+                            state.WriteRequestId,
+                            PrimarySave prepared,
+                            Ok(
+                                CompletedWithPendingRemoteConfirmation(
+                                    UnitSuccess(refreshed cleanStatus, GitPageChange.NoChange, None, None, Some partial),
+                                    dialog,
+                                    GitPendingRemoteAction.FinalizeMerge
+                                )
+                            )
+                        ))
+                        state
+
+                let! _ = collectMessages cmd
+
+                Vitest.expect(nextState.PendingRecovery).toEqual (None)
+                Vitest.expect(nextState.PendingConfirmation).toEqual (Some dialog)
+                Vitest.expect(nextState.WarningNotice).toEqual (Some(failureMessage partial))
             }
         )
 
@@ -2686,6 +2842,124 @@ Vitest.describe (
 
                 Vitest.expect(finalState.ActiveConflict.IsSome).toBe (true)
                 Vitest.expect(finalMessages).toEqual ([| WriteRequested AbandonMerge |])
+            }
+        )
+
+        Vitest.test (
+            "A canceled fetch that left an index lock offers the clear lock dialog",
+            fun () -> promise {
+                let canceled =
+                    makeFailure
+                        Canceled
+                        VersionControlCodes.OperationCanceled
+                        "Fetch was canceled."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RemoveIndexLock
+                            Instructions = None
+                        })
+                        [||]
+
+                let deps = {
+                    defaultDependencies with
+                        refreshSynchronization = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested Fetch) runningState
+
+                let! completionMessages = collectMessages requestCmd
+
+                let nextState, finishCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, Fetch, Ok(RequiresRecovery(GitPendingRecovery.ClearStaleLock _, _))) |] ->
+                        update deps ignore completionMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected clear-lock recovery after the canceled fetch."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(nextState.PendingRecovery).toEqual (Some(GitPendingRecovery.ClearStaleLock None))
+                Vitest.expect(nextState.PendingConfirmation.IsSome).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "A canceled publish with a refresh recovery refreshes and keeps the warning",
+            fun () -> promise {
+                let canceled =
+                    makeFailure
+                        Canceled
+                        VersionControlCodes.OperationCanceled
+                        "Publish was canceled after changing the workspace."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RefreshWorkspace
+                            Instructions = None
+                        })
+                        [||]
+
+                let deps = {
+                    defaultDependencies with
+                        publish = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested Push) runningState
+
+                let! completionMessages = collectMessages requestCmd
+
+                let nextState, finishCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, Push, Ok(Completed _)) |] ->
+                        update deps ignore completionMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected refresh recovery after the canceled publish."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(nextState.WarningNotice).toEqual (Some(failureMessage canceled))
+                Vitest.expect(nextState.ErrorNotice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A canceled fetch that needs inspection reports it after a refresh",
+            fun () -> promise {
+                let canceled =
+                    makeFailure
+                        Canceled
+                        VersionControlCodes.OperationCanceled
+                        "Fetch was canceled while inspecting the workspace."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.InspectWorkspace
+                            Instructions = None
+                        })
+                        [||]
+
+                let deps = {
+                    defaultDependencies with
+                        refreshSynchronization = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested Fetch) runningState
+
+                let! completionMessages = collectMessages requestCmd
+
+                let nextState, finishCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, Fetch, Ok(CompletedWithPendingRemoteFailure(_, message))) |] ->
+                        Vitest.expect(message).toBe (failureMessage canceled)
+                        update deps ignore completionMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected inspection failure after the canceled fetch."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(nextState.ErrorNotice).toEqual (Some(failureMessage canceled))
+                Vitest.expect(nextState.PendingConfirmation).toEqual (None)
             }
         )
 
@@ -3246,6 +3520,47 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "A precondition failure outside the concurrency category is an error, not a retry",
+            fun () -> promise {
+                let mutable calls = 0
+
+                let deps = {
+                    defaultDependencies with
+                        createRevision =
+                            fun _ ->
+                                calls <- calls + 1
+                                promise { return Ok(failed Validation VersionControlCodes.PreconditionFailed "bad") }
+                        reportError = fun _ -> ()
+                }
+
+                let state = {
+                    runningState with
+                        ChangedFiles = [| changedFile "a.txt" "M" " " false |]
+                }
+
+                let model, command = update deps ignore (CommitAllRequested "save") state
+                let! messages = collectMessages command
+
+                let requested, writeCmd =
+                    match messages with
+                    | [| WriteRequested(CommitAll _) |] -> update deps ignore messages[0] model
+                    | _ -> failwith "Expected the commit-all write request."
+
+                let! completion = collectMessages writeCmd
+
+                let finalState, finishCmd =
+                    match completion with
+                    | [| WriteCompleted(_, _, CommitAll _, Error "bad") |] -> update deps ignore completion[0] requested
+                    | _ -> failwith "Expected the validation failure."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(calls).toBe (1)
+                Vitest.expect(finalState.ErrorNotice).toEqual (Some "bad")
+            }
+        )
+
+        Vitest.test (
             "A stale discard is not repeated and reports the refreshed state",
             fun () -> promise {
                 let restoreRequests = ResizeArray<RestorePathsRequestDto>()
@@ -3431,13 +3746,7 @@ Vitest.describe (
                         ActiveConflict = Some conflict
                 }
 
-                let model, command = update deps ignore AbandonMergeRequested state
-                let! messages = collectMessages command
-
-                let requested, writeCmd =
-                    match messages with
-                    | [| WriteRequested AbandonMerge |] -> update deps ignore messages[0] model
-                    | _ -> failwith "Expected the abandon-merge write request."
+                let requested, writeCmd = update deps ignore (WriteRequested AbandonMerge) state
 
                 let! completion = collectMessages writeCmd
 
@@ -3991,18 +4300,46 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "RefreshRequested is dropped while a write is in flight",
+            "A refresh requested during a write runs when the write completes",
             fun () -> promise {
-                let state = {
-                    runningState with
-                        BusyOperation = Some GitBusyOperation.PushingToRemote
+                let deps = {
+                    defaultDependencies with
+                        refreshSynchronization =
+                            fun _ -> promise { return Ok(succeeded cleanStatus.Synchronization.Value) }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
-                let nextState, cmd = update defaultDependencies ignore RefreshRequested state
-                let! messages = collectMessages cmd
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested Fetch) runningState
 
-                Vitest.expect(nextState).toEqual (state)
-                Vitest.expect(messages).toEqual ([||])
+                let pendingState, pendingCmd = update deps ignore RefreshRequested stateAfterRequest
+                let! pendingMessages = collectMessages pendingCmd
+                let! completionMessages = collectMessages requestCmd
+
+                let finalState, finishCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, Fetch, Ok(Completed _)) |] ->
+                        update deps ignore completionMessages[0] pendingState
+                    | _ -> failwith "Expected the fetch to complete successfully."
+
+                let! finishMessages = collectMessages finishCmd
+
+                Vitest.expect(pendingMessages).toEqual ([||])
+                Vitest.expect(pendingState.RefreshPending).toBe (true)
+                Vitest.expect(finalState.RefreshPending).toBe (false)
+
+                Vitest
+                    .expect(
+                        finishMessages
+                        |> Array.exists (
+                            function
+                            | RefreshRequested -> true
+                            | _ -> false
+                        )
+                    )
+                    .toBe (true)
             }
         )
 )
