@@ -102,6 +102,9 @@ module VersionControlCodes =
     let TargetUnreachable = "target_unreachable"
 
     [<Literal>]
+    let NetworkFailure = "network_failure"
+
+    [<Literal>]
     let ConfiguredTargetInvalid = "configured_target_invalid"
 
     [<Literal>]

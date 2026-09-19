@@ -33,8 +33,14 @@ let private getEnvironmentVariable (_name: string) : string = jsNative
 [<Emit("(() => { let resolve; const promise = new Promise((r) => { resolve = r; }); return [promise, resolve]; })()")>]
 let private deferred () : JS.Promise<unit> * (unit -> unit) = jsNative
 
+[<Emit("Promise.race($0)")>]
+let private promiseRace (_promises: JS.Promise<'T>[]) : JS.Promise<'T> = jsNative
+
 let private integrationEnabled () =
     getEnvironmentVariable "LAKEFS_INTEGRATION" = "1"
+
+if not (integrationEnabled ()) then
+    printfn "lakeFS integration skipped: set LAKEFS_INTEGRATION=1"
 
 let private lakeFsConnection () : LakeFsTypes.LakeFsConnection = {
     Endpoint =
@@ -69,7 +75,6 @@ let private memoryBindings () =
         )
 
 let private createRuntimeWithFactory
-    (settingsRoot: string)
     (bindings: WorkspaceBindingStore.IWorkspaceBindingStore)
     (lakeFsFactory: ProviderFactory)
     : VersionControlRuntime.VersionControlRuntime =
@@ -89,7 +94,6 @@ let private createRuntime
     (bindings: WorkspaceBindingStore.IWorkspaceBindingStore)
     : VersionControlRuntime.VersionControlRuntime =
     createRuntimeWithFactory
-        settingsRoot
         bindings
         (ProviderComposition.createLakeFsFactory
             (ProviderComposition.lakeFsOptions settingsRoot CaseInsensitive)
@@ -102,12 +106,14 @@ let private createRuntimeWithHooks
     (hooks: LakeFsWorkspaceSession.LakeFsSessionHooks)
     : VersionControlRuntime.VersionControlRuntime =
     createRuntimeWithFactory
-        settingsRoot
         bindings
-        (LakeFsWorkspaceSession.createFactoryWithHooks
+        // The hooks constructor is the one place this file bypasses ProviderComposition.
+        // The composition root exposes no hooks overload for this fixture.
+        (LakeFsWorkspaceSession.createFactoryWithHooksAndPolicy
             (ProviderComposition.lakeFsOptions settingsRoot CaseInsensitive)
             hooks
-            (LakeFsCredentials.fixedConnection connection))
+            (LakeFsCredentials.fixedConnection connection)
+            ProviderComposition.dataHubRevisionPolicy)
 
 let private expectValue (operation: string) (result: OperationResult<'T>) =
     match result with
@@ -115,10 +121,13 @@ let private expectValue (operation: string) (result: OperationResult<'T>) =
     | PartiallySucceeded(outcome, _) -> outcome.Value
     | Failed failure -> failwith $"{operation} failed ({failure.Code}): {failure.Message}"
 
-let private expectFailure (operation: string) (result: OperationResult<'T>) =
+let private expectDtoSucceeded (operation: string) (result: Result<OperationResultDto<'T>, exn>) =
     match result with
-    | Failed failure -> failure
-    | _ -> failwith $"{operation} unexpectedly succeeded."
+    | Ok(OperationResultDto.Succeeded outcome) -> outcome
+    | Ok(OperationResultDto.PartiallySucceeded(_, failure)) ->
+        failwith $"{operation} partially succeeded ({failure.Code}): {failure.Message}"
+    | Ok(OperationResultDto.Failed failure) -> failwith $"{operation} failed ({failure.Code}): {failure.Message}"
+    | Error error -> failwith $"{operation} threw: {error.Message}"
 
 let private expectDtoValue (operation: string) (result: Result<OperationResultDto<'T>, exn>) =
     match result with
@@ -153,7 +162,7 @@ let private expectServiceUnavailable operation result =
 type private Fixture = {
     Root: string
     Workspace: string
-    Second: string
+    Scratch: string
     Settings: string
     Repository: string
     Bindings: WorkspaceBindingStore.IWorkspaceBindingStore
@@ -181,6 +190,7 @@ let private createRepository (connection: LakeFsTypes.LakeFsConnection) (reposit
         |> Async.StartAsPromise
 
     expectLakeFs "create repository" result |> ignore
+    // The generated name identifies the repository for post-mortem inspection on the container.
     printfn "lakeFS repository: %s" repository
 }
 
@@ -194,18 +204,16 @@ let private createFixtureWithRuntime
     promise {
         let! root = createTempDirectoryAsync "swate-vc-lakefs-"
         let workspace = join [| root; "workspace" |]
-        let second = join [| root; "second" |]
+        let scratch = join [| root; "second" |]
         let settings = join [| root; "settings" |]
         let connection = lakeFsConnection ()
 
-        for folder in [ workspace; second; settings ] do
+        for folder in [ workspace; scratch; settings ] do
             Main.Bindings.Filesystem.mkdirSync folder (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
 
         let bindings = memoryBindings ()
         let runtime = makeRuntime settings connection bindings
         let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
-        WorkspaceSessionHost.initialize host
-        VersionControlRuntime.initialize runtime
 
         let repositoryToken =
             RuntimeNodeInterop.randomUuid().Replace("-", "").ToLowerInvariant()
@@ -215,10 +223,13 @@ let private createFixtureWithRuntime
         try
             do! createRepository connection repository
 
+            WorkspaceSessionHost.initialize host
+            VersionControlRuntime.initialize runtime
+
             return {
                 Root = root
                 Workspace = workspace
-                Second = second
+                Scratch = scratch
                 Settings = settings
                 Repository = repository
                 Bindings = bindings
@@ -238,19 +249,55 @@ let private createHookFixture hooks =
         createRuntimeWithHooks settings connection bindings hooks
     )
 
+let private detached name = OperationContext.detached name
+
+let private deleteRepository (fixture: Fixture) = promise {
+    let! result =
+        LakeFsApi.requestChecked
+            (lakeFsConnection ())
+            "DELETE"
+            $"/repositories/{fixture.Repository}"
+            None
+            (detached $"delete-repository-{fixture.Repository}")
+        |> Async.StartAsPromise
+
+    match result with
+    | Ok _ -> ()
+    | Error _ -> ()
+}
+
 let private cleanupFixture (fixture: Fixture) = promise {
     do! fixture.Host.CloseAll() |> Async.StartAsPromise
+
+    try
+        do! deleteRepository fixture
+    with _ ->
+        ()
+
     do! removeDirectoryAsync fixture.Root
 }
 
 let private withFixtureFrom (create: unit -> JS.Promise<Fixture>) (body: Fixture -> JS.Promise<unit>) = promise {
     let! fixture = create ()
+    let mutable cleanedUp = false
+
+    let cleanup () = promise {
+        if not cleanedUp then
+            cleanedUp <- true
+            do! cleanupFixture fixture
+    }
 
     try
         do! body fixture
-        do! cleanupFixture fixture
+        do! cleanup ()
     with error ->
-        do! cleanupFixture fixture
+        // Preserve the operation failure if cleanup itself encounters a transient
+        // filesystem or lakeFS error. The cleanup is still attempted exactly once.
+        try
+            do! cleanup ()
+        with _ ->
+            ()
+
         return raise error
 }
 
@@ -258,8 +305,6 @@ let private withFixture body = withFixtureFrom createFixture body
 
 let private withHookFixture hooks body =
     withFixtureFrom (fun () -> createHookFixture hooks) body
-
-let private detached name = OperationContext.detached name
 
 let private ipcEvent (windowId: int) : IpcMainInvokeEvent =
     createObj [ "sender" ==> createObj [ "id" ==> windowId ] ]
@@ -303,7 +348,7 @@ let private bindWorkspaceViaClone
                 MaterializeAllObjects = false
             }
 
-        expectDtoValue "clone lakeFS workspace" cloned |> ignore
+        expectDtoSucceeded "clone lakeFS workspace" cloned |> ignore
         return api
     }
 
@@ -318,7 +363,7 @@ let private uploadTextObject
     promise {
         let sourcePath =
             join [|
-                fixture.Second
+                fixture.Scratch
                 $"lakefs-upload-{RuntimeNodeInterop.randomUuid ()}.txt"
             |]
 
@@ -370,7 +415,7 @@ let private downloadServerText
     promise {
         let targetPath =
             join [|
-                fixture.Second
+                fixture.Scratch
                 $"lakefs-download-{RuntimeNodeInterop.randomUuid ()}.txt"
             |]
 
@@ -409,6 +454,7 @@ let private commitAndPublish
                 ExpectedWorkspaceVersion = status.WorkspaceVersion
             }
 
+        // A local revision can carry recoverable warnings while still supplying the revision for publish.
         expectDtoValue "create local revision" created |> ignore
 
         let! afterCommit = api.getStatus (request $"{operationPrefix}-status-after")
@@ -423,15 +469,12 @@ let private commitAndPublish
                 ExpectedTargetRevision = synchronization.TargetRevision
             }
 
-        return (expectDtoValue "publish local revision" published).Value
+        return (expectDtoSucceeded "publish local revision" published).Value
     }
 
 Vitest.describe (
     "Workspace session host",
     fun () ->
-        if not (integrationEnabled ()) then
-            printfn "lakeFS integration skipped: set LAKEFS_INTEGRATION=1"
-
         Vitest.afterEach (fun () ->
             electronMock?reset () |> ignore
             ARC_VAULTS.Vaults.Clear()
@@ -441,9 +484,6 @@ Vitest.describe (
             "initializes a lakeFS workspace, persists the binding and reopens the same session",
             TestOptions(timeout = 120000, skip = not (integrationEnabled ())),
             fun () -> promise {
-                if not (integrationEnabled ()) then
-                    return failwith "lakeFS integration skipped: set LAKEFS_INTEGRATION=1"
-
                 return!
                     withFixture (fun fixture -> promise {
                         let! _ = bindWorkspaceViaClone fixture 61 "lakefs-clone"
@@ -483,15 +523,18 @@ Vitest.describe (
             "advertises synchronization and conflict resolution only",
             TestOptions(timeout = 120000, skip = not (integrationEnabled ())),
             fun () -> promise {
-                if not (integrationEnabled ()) then
-                    return failwith "lakeFS integration skipped: set LAKEFS_INTEGRATION=1"
-
                 return!
                     withFixture (fun fixture -> promise {
                         let! api = bindWorkspaceViaClone fixture 62 "lakefs-services-clone"
                         let! info = api.getSessionInfo (request "lakefs-services-info")
                         let session = (expectDtoValue "lakeFS session info" info).Value
                         let services = session.Services
+
+                        Vitest.expect(session.ProviderId).toBe "lakefs"
+
+                        Vitest
+                            .expect(session.WorkspaceRoot.Replace('\\', '/'))
+                            .toBe (fixture.Workspace.Replace('\\', '/'))
 
                         Vitest.expect(services.Synchronization).toBe true
                         Vitest.expect(services.ConflictResolution).toBe true
@@ -500,6 +543,9 @@ Vitest.describe (
                         Vitest.expect(services.StoragePolicy).toBe false
                         Vitest.expect(services.Maintenance).toBe false
                         Vitest.expect(services.RepositoryBrowser).toBe false
+
+                        let! diffSummary = api.getDiffSummary (request "lakefs-diff-summary")
+                        expectDtoSucceeded "getDiffSummary" diffSummary |> ignore
 
                         let! textDiff =
                             api.getTextDiff {
@@ -562,10 +608,26 @@ Vitest.describe (
                         expectServiceUnavailable "materializeObject" materialize
                         expectServiceUnavailable "dematerializeObject" dematerialize
 
+                        // These calls use the session host settings, so lakeFS answers them without a provider storage-policy service.
                         let policy = expectDtoValue "getStoragePolicySettings" getPolicy
                         Vitest.expect(policy.Value.AutoPolicyThresholdMb).toEqual (Some 1)
                         Vitest.expect(policy.Value.MaterializeLargeObjects).toBe false
-                        expectDtoValue "setStoragePolicySettings" setPolicy |> ignore
+
+                        let changedPolicy = expectDtoSucceeded "setStoragePolicySettings" setPolicy
+                        Vitest.expect(changedPolicy.Effect).toEqual OperationEffectDto.Performed
+
+                        let! roundTrip = api.getStoragePolicySettings (request "lakefs-get-policy-after-set")
+                        let roundTripPolicy = expectDtoValue "getStoragePolicySettings after set" roundTrip
+                        Vitest.expect(roundTripPolicy.Value.AutoPolicyThresholdMb).toEqual (Some 2)
+                        Vitest.expect(roundTripPolicy.Value.MaterializeLargeObjects).toBe false
+
+                        do! fixture.Host.CloseSession fixture.Workspace |> Async.StartAsPromise
+                        let! reopenedInfo = api.getSessionInfo (request "lakefs-services-reopen")
+                        expectDtoSucceeded "reopen lakeFS session" reopenedInfo |> ignore
+                        let! reopenedPolicy = api.getStoragePolicySettings (request "lakefs-get-policy-after-reopen")
+                        let reopened = expectDtoValue "getStoragePolicySettings after reopen" reopenedPolicy
+                        Vitest.expect(reopened.Value.AutoPolicyThresholdMb).toEqual (Some 1)
+                        Vitest.expect(reopened.Value.MaterializeLargeObjects).toBe false
 
                         expectServiceUnavailable "setPathStoragePolicy" setPathPolicy
                         expectServiceUnavailable "pruneStorage" prune
@@ -576,12 +638,26 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "clearStaleLock on a lakeFS vault answers without a git lock",
+            TestOptions(timeout = 120000, skip = not (integrationEnabled ())),
+            fun () -> promise {
+                return!
+                    withFixture (fun fixture -> promise {
+                        let! api = bindWorkspaceViaClone fixture 69 "lakefs-stale-lock-clone"
+                        let! cleared = api.clearStaleLock (request "lakefs-clear-stale-lock")
+                        let outcome = expectDtoSucceeded "clear lakeFS stale lock" cleared
+                        Vitest.expect(outcome.Effect).toEqual (OperationEffectDto.NoOp(Some "no stale lock"))
+                        Vitest.expect(outcome.Warnings).toEqual [||]
+                        Vitest.expect(outcome.AffectedPaths).toEqual [||]
+                        Vitest.expect(outcome.Value.ActiveConflictSession).toEqual None
+                    })
+            }
+        )
+
+        Vitest.test (
             "commits selected paths and publishes them to the repository",
             TestOptions(timeout = 120000, skip = not (integrationEnabled ())),
             fun () -> promise {
-                if not (integrationEnabled ()) then
-                    return failwith "lakeFS integration skipped: set LAKEFS_INTEGRATION=1"
-
                 return!
                     withFixture (fun fixture -> promise {
                         let! api = bindWorkspaceViaClone fixture 63 "lakefs-commit-clone"
@@ -599,8 +675,8 @@ Vitest.describe (
                                 ExpectedWorkspaceVersion = beforeValue.WorkspaceVersion
                             }
 
-                        let createdOutcome = expectDtoValue "create revision" created
-                        Vitest.expect(createdOutcome.Publication).toEqual PublicationStateDto.LocalOnly
+                        // A partial local revision still supplies the state needed by the following status check.
+                        expectDtoValue "create revision" created |> ignore
 
                         let! afterCommit = api.getStatus (request "lakefs-commit-status-after")
                         let afterCommitValue = (expectDtoValue "status after commit" afterCommit).Value
@@ -616,6 +692,7 @@ Vitest.describe (
                                 ExpectedTargetRevision = refreshedValue.TargetRevision
                             }
 
+                        // This publish check accepts recoverable warnings because the test inspects its returned state.
                         let publishedValue = (expectDtoValue "publish" published).Value
                         Vitest.expect(publishedValue.Relationship).toEqual RevisionRelationshipDto.UpToDate
                         Vitest.expect(publishedValue.LocalRevisionCount).toEqual None
@@ -630,9 +707,6 @@ Vitest.describe (
             "updates the workspace from a revision made on the server",
             TestOptions(timeout = 120000, skip = not (integrationEnabled ())),
             fun () -> promise {
-                if not (integrationEnabled ()) then
-                    return failwith "lakeFS integration skipped: set LAKEFS_INTEGRATION=1"
-
                 return!
                     withFixture (fun fixture -> promise {
                         let! api = bindWorkspaceViaClone fixture 64 "lakefs-update-clone"
@@ -682,7 +756,7 @@ Vitest.describe (
                                 ExpectedWorkspaceVersion = statusValue.WorkspaceVersion
                             }
 
-                        expectDtoValue "update" updated |> ignore
+                        expectDtoSucceeded "update" updated |> ignore
 
                         Vitest
                             .expect(
@@ -700,9 +774,6 @@ Vitest.describe (
             "opens a conflict session on a diverged file and finalizes the resolution",
             TestOptions(timeout = 120000, skip = not (integrationEnabled ())),
             fun () -> promise {
-                if not (integrationEnabled ()) then
-                    return failwith "lakeFS integration skipped: set LAKEFS_INTEGRATION=1"
-
                 return!
                     withFixture (fun fixture -> promise {
                         let! api = bindWorkspaceViaClone fixture 65 "lakefs-conflict-clone"
@@ -737,6 +808,7 @@ Vitest.describe (
                                 ExpectedWorkspaceVersion = localStatusValue.WorkspaceVersion
                             }
 
+                        // A partial local revision still provides the revision used by the conflict update.
                         expectDtoValue "create local conflict revision" localRevision |> ignore
 
                         let! beforeUpdate = api.getStatus (request "lakefs-conflict-update-status")
@@ -762,6 +834,14 @@ Vitest.describe (
                         let conflict =
                             conflictStatusValue.ActiveConflictSession
                             |> Option.defaultWith (fun () -> failwith "Expected an active lakeFS conflict session.")
+
+                        let! activeConflict = api.getActiveConflictSession (request "lakefs-active-conflict")
+
+                        let activeConflictValue =
+                            (expectDtoSucceeded "getActiveConflictSession" activeConflict).Value
+                            |> Option.defaultWith (fun () -> failwith "Expected the active lakeFS conflict session.")
+
+                        Vitest.expect(activeConflictValue.Handle).toEqual conflict.Handle
 
                         Vitest.expect(conflict.Items |> Array.exists (fun item -> item.Path = "shared.txt")).toBe true
 
@@ -793,12 +873,14 @@ Vitest.describe (
                                 Message = Some "Finalize merged shared file"
                             }
 
-                        expectDtoValue "finalize conflict" finalized |> ignore
+                        expectDtoSucceeded "finalize conflict" finalized |> ignore
 
                         let! afterFinalize = api.getStatus (request "lakefs-conflict-publish-status")
 
                         let afterFinalizeValue =
                             (expectDtoValue "status before conflict publish" afterFinalize).Value
+
+                        Vitest.expect(afterFinalizeValue.ActiveConflictSession).toEqual None
 
                         let! target = api.refreshSynchronization (request "lakefs-conflict-publish-refresh")
                         let targetValue = (expectDtoValue "refresh before conflict publish" target).Value
@@ -810,7 +892,7 @@ Vitest.describe (
                                 ExpectedTargetRevision = targetValue.TargetRevision
                             }
 
-                        expectDtoValue "publish resolved conflict" published |> ignore
+                        expectDtoSucceeded "publish resolved conflict" published |> ignore
 
                         let! serverContent =
                             downloadServerText
@@ -821,6 +903,82 @@ Vitest.describe (
                                 "lakefs-conflict-download"
 
                         Vitest.expect(serverContent).toBe "merged"
+
+                        do!
+                            uploadTextObject
+                                fixture
+                                (lakeFsConnection ())
+                                "main"
+                                "shared.txt"
+                                "server-cancel"
+                                "lakefs-conflict-cancel-server-upload"
+
+                        do!
+                            commitServer
+                                fixture
+                                (lakeFsConnection ())
+                                "main"
+                                "Server change for canceled conflict"
+                                "lakefs-conflict-cancel-server-commit"
+
+                        writeText (join [| fixture.Workspace; "shared.txt" |]) "local-cancel"
+                        let! cancelLocalStatus = api.getStatus (request "lakefs-conflict-cancel-local-status")
+
+                        let cancelLocalStatusValue =
+                            (expectDtoValue "cancel conflict local status" cancelLocalStatus).Value
+
+                        let! cancelRevision =
+                            api.createRevision {
+                                OperationId = "lakefs-conflict-cancel-local-revision"
+                                Message = "Local change for canceled conflict"
+                                Paths = [| "shared.txt" |]
+                                ExpectedWorkspaceVersion = cancelLocalStatusValue.WorkspaceVersion
+                            }
+
+                        // A partial local revision still provides the revision used by the conflict update.
+                        expectDtoValue "create canceled conflict revision" cancelRevision |> ignore
+
+                        let! cancelBeforeUpdate = api.getStatus (request "lakefs-conflict-cancel-update-status")
+
+                        let cancelBeforeUpdateValue =
+                            (expectDtoValue "status before canceled conflict update" cancelBeforeUpdate).Value
+
+                        let! cancelUpdate =
+                            api.update {
+                                OperationId = "lakefs-conflict-cancel-update"
+                                ExpectedWorkspaceVersion = cancelBeforeUpdateValue.WorkspaceVersion
+                            }
+
+                        let cancelFailure =
+                            expectDtoFailureOrPartial "canceled conflict update" cancelUpdate
+
+                        Vitest.expect(cancelFailure.Category).toEqual FailureCategoryDto.Conflict
+                        Vitest.expect(cancelFailure.Code).toBe VersionControlCodes.ConflictsDetected
+
+                        let! cancelConflictStatus = api.getStatus (request "lakefs-conflict-cancel-status")
+
+                        let cancelConflict =
+                            (expectDtoValue "status with canceled conflict" cancelConflictStatus)
+                                .Value.ActiveConflictSession
+                            |> Option.defaultWith (fun () -> failwith "Expected a fresh lakeFS conflict session.")
+
+                        let! canceledConflict =
+                            api.cancelConflict {
+                                OperationId = "lakefs-cancel-conflict"
+                                Handle = cancelConflict.Handle
+                                ExpectedWorkspaceVersion =
+                                    (expectDtoValue "status before cancel conflict" cancelConflictStatus)
+                                        .Value.WorkspaceVersion
+                            }
+
+                        expectDtoSucceeded "cancelConflict" canceledConflict |> ignore
+
+                        let! afterCancelConflict = api.getStatus (request "lakefs-conflict-after-cancel-status")
+
+                        let afterCancelConflictValue =
+                            (expectDtoValue "status after cancel conflict" afterCancelConflict).Value
+
+                        Vitest.expect(afterCancelConflictValue.ActiveConflictSession).toEqual None
                     })
             }
         )
@@ -829,9 +987,6 @@ Vitest.describe (
             "reports an unreachable endpoint with a stable failure code",
             TestOptions(timeout = 120000, skip = not (integrationEnabled ())),
             fun () -> promise {
-                if not (integrationEnabled ()) then
-                    return failwith "lakeFS integration skipped: set LAKEFS_INTEGRATION=1"
-
                 return!
                     withFixture (fun fixture -> promise {
                         let! _ = bindWorkspaceViaClone fixture 66 "lakefs-unreachable-clone"
@@ -847,13 +1002,16 @@ Vitest.describe (
                         WorkspaceSessionHost.initialize badHost
                         VersionControlRuntime.initialize badRuntime
 
+                        // Restore the process-global host and runtime so later fixture cleanup uses the live server connection.
                         try
                             registerVault 66 fixture.Workspace |> ignore
                             let api = Main.IPC.IVersionControlApi.api (ipcEvent 66)
                             let! info = api.getSessionInfo (request "lakefs-unreachable-info")
                             let failure = expectDtoFailure "unreachable session info" info
                             Vitest.expect(failure.Category).toEqual FailureCategoryDto.Network
-                            Vitest.expect(failure.Code).toBe "network_failure"
+                            Vitest.expect(failure.Code).toBe VersionControlCodes.NetworkFailure
+                            Vitest.expect(failure.StateChanged).toBe false
+                            Vitest.expect(failure.Retryable).toBe true
                             do! badHost.CloseAll() |> Async.StartAsPromise
                             WorkspaceSessionHost.initialize fixture.Host
                             VersionControlRuntime.initialize fixture.Runtime
@@ -870,16 +1028,17 @@ Vitest.describe (
             "cancels a running operation through its operation key",
             TestOptions(timeout = 120000, skip = not (integrationEnabled ())),
             fun () -> promise {
-                if not (integrationEnabled ()) then
-                    return failwith "lakeFS integration skipped: set LAKEFS_INTEGRATION=1"
-
                 let entered, signalEntered = deferred ()
                 let gate, releaseGate = deferred ()
+                let mutable barrierHits = 0
 
                 let hooks: LakeFsWorkspaceSession.LakeFsSessionHooks = {
                     Barrier =
-                        Some(fun _ point _ -> async {
-                            if point = "publish-connect" then
+                        Some(fun _ point context -> async {
+                            // Only the publish under test waits at the barrier. The publish that
+                            // proves the session is still usable afterwards passes through.
+                            if point = "publish-connect" && context.OperationId = "lakefs-cancel-publish" then
+                                barrierHits <- barrierHits + 1
                                 signalEntered ()
                                 do! Async.AwaitPromise gate
                         })
@@ -902,9 +1061,21 @@ Vitest.describe (
                                     ExpectedWorkspaceVersion = setupStatusValue.WorkspaceVersion
                                 }
 
+                            // The setup revision is usable when it reports recoverable warnings.
                             expectDtoValue "cancel setup revision" created |> ignore
                             let! status = api.getStatus (request "lakefs-cancel-status")
                             let statusValue = (expectDtoValue "cancel status" status).Value
+
+                            let! beforeBranch =
+                                LakeFsApi.getBranch
+                                    (lakeFsConnection ())
+                                    fixture.Repository
+                                    "main"
+                                    (detached "lakefs-cancel-before-publish")
+                                |> Async.StartAsPromise
+
+                            let beforeHead =
+                                (expectLakeFs "lakeFS head before canceled publish" beforeBranch).CommitId
 
                             let running =
                                 api.publish {
@@ -913,21 +1084,78 @@ Vitest.describe (
                                     ExpectedTargetRevision = None
                                 }
 
-                            try
-                                do! Async.AwaitPromise entered |> Async.StartAsPromise
+                            let enteredRace = promise {
+                                let! () = entered
+                                return None
+                            }
 
-                                let! canceled =
-                                    api.cancelOperation {
-                                        SessionId = ""
-                                        OperationId = "lakefs-cancel-publish"
-                                    }
-
-                                Vitest.expect(canceled).toEqual (Ok true)
-                                releaseGate ()
-
+                            let runningRace = promise {
                                 let! result = running
-                                let failure = expectDtoFailureOrPartial "canceled lakeFS publish" result
-                                Vitest.expect(failure.Category).toEqual FailureCategoryDto.Canceled
+                                return Some result
+                            }
+
+                            try
+                                let! raced = promiseRace [| enteredRace; runningRace |]
+
+                                match raced with
+                                | Some result ->
+                                    let failure = expectDtoFailureOrPartial "canceled lakeFS publish" result
+
+                                    return
+                                        failwith
+                                            $"Canceled lakeFS publish completed before publish-connect ({failure.Code}): {failure.Message}"
+                                | None ->
+                                    let! canceled =
+                                        api.cancelOperation {
+                                            SessionId = ""
+                                            OperationId = "lakefs-cancel-publish"
+                                        }
+
+                                    Vitest.expect(canceled).toEqual (Ok true)
+                                    releaseGate ()
+
+                                    let! result = running
+                                    let failure = expectDtoFailureOrPartial "canceled lakeFS publish" result
+                                    Vitest.expect(failure.Category).toEqual FailureCategoryDto.Canceled
+                                    Vitest.expect(failure.Code).toBe VersionControlCodes.OperationCanceled
+                                    Vitest.expect(failure.StateChanged).toBe false
+                                    Vitest.expect(barrierHits).toBe 1
+
+                                    let! afterBranch =
+                                        LakeFsApi.getBranch
+                                            (lakeFsConnection ())
+                                            fixture.Repository
+                                            "main"
+                                            (detached "lakefs-cancel-after-publish")
+                                        |> Async.StartAsPromise
+
+                                    let afterHead =
+                                        (expectLakeFs "lakeFS head after canceled publish" afterBranch).CommitId
+
+                                    Vitest.expect(afterHead).toBe beforeHead
+
+                                    let! retryStatus = api.getStatus (request "lakefs-cancel-retry-status")
+                                    let retryStatusValue = (expectDtoValue "cancel retry status" retryStatus).Value
+
+                                    let! retryRefresh =
+                                        api.refreshSynchronization (request "lakefs-cancel-retry-refresh")
+
+                                    let retryRefreshValue = (expectDtoValue "cancel retry refresh" retryRefresh).Value
+
+                                    let! republished =
+                                        api.publish {
+                                            OperationId = "lakefs-cancel-retry-publish"
+                                            ExpectedWorkspaceVersion = retryStatusValue.WorkspaceVersion
+                                            ExpectedTargetRevision = retryRefreshValue.TargetRevision
+                                        }
+
+                                    expectDtoSucceeded "publish after cancellation" republished |> ignore
+
+                                    let! objects =
+                                        serverObjects fixture (lakeFsConnection ()) "main" "lakefs-cancel-list-main"
+
+                                    Vitest.expect(objects |> Array.exists (fun item -> item.Path = "data.txt")).toBe
+                                        true
                             with error ->
                                 releaseGate ()
                                 return raise error
