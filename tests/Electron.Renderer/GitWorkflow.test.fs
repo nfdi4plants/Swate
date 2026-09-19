@@ -636,6 +636,8 @@ Vitest.describe (
                             GitState.Empty with
                                 CurrentArcPath = Some "C:/arc-b"
                                 ArcSessionId = 1
+                                RefreshRequestId = 1
+                                PageLoadRequestId = 1
                         }
                     )
 
@@ -1057,6 +1059,8 @@ Vitest.describe (
                             GitState.Empty with
                                 CurrentArcPath = Some "C:/arc-b"
                                 ArcSessionId = 1
+                                RefreshRequestId = 1
+                                PageLoadRequestId = 1
                         }
                     )
 
@@ -2018,7 +2022,19 @@ Vitest.describe (
                 Vitest.expect(stateAfterPathChange.ArcSessionId).not.toBe (7)
                 Vitest.expect(stateAfterRenameCompletion.CurrentArcPath).toEqual (Some "C:/work/Renamed ARC")
                 Vitest.expect(stateAfterRenameCompletion.ErrorNotice).toEqual (None)
-                Vitest.expect(retryMessages).toEqual ([||])
+                Vitest.expect(retryMessages.Length).toBe (1)
+
+                Vitest
+                    .expect(
+                        retryMessages
+                        |> Array.exists (
+                            function
+                            | RefreshRequested -> true
+                            | _ -> false
+                        )
+                    )
+                    .toBe (true)
+
                 Vitest.expect(stateAfterRenameCompletion.PendingPublishAfterRefresh).toBe (true)
                 Vitest.expect(refreshedState.PendingPublishAfterRefresh).toBe (false)
                 Vitest.expect(afterRefreshMessages).toEqual ([| WriteRequested Push |])
@@ -2071,6 +2087,8 @@ Vitest.describe (
                             GitState.Empty with
                                 CurrentArcPath = Some "C:/arc-b"
                                 ArcSessionId = 1
+                                RefreshRequestId = 1
+                                PageLoadRequestId = 1
                         }
                     )
             }
@@ -3949,6 +3967,163 @@ Vitest.describe (
                         )
                     )
                     .toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "A stale finalize of a merge is not repeated",
+            fun () -> promise {
+                let mutable calls = 0
+                let conflict = (conflictedStatus [| "conflict.txt" |]).ActiveConflictSession.Value
+
+                let deps = {
+                    defaultDependencies with
+                        finalizeConflict =
+                            fun _ ->
+                                calls <- calls + 1
+
+                                promise {
+                                    return
+                                        Ok(
+                                            failed
+                                                Concurrency
+                                                VersionControlCodes.PreconditionFailed
+                                                "workspace version is stale"
+                                        )
+                                }
+                }
+
+                let state = {
+                    runningState with
+                        ActiveConflict = Some conflict
+                }
+
+                let requested, writeCmd = update deps ignore (WriteRequested FinalizeMerge) state
+
+                let! completion = collectMessages writeCmd
+
+                let finalState, finishCmd =
+                    match completion with
+                    | [| WriteCompleted(_, _, FinalizeMerge, Ok(StaleWorkspaceVersion _)) |] ->
+                        update deps ignore completion[0] requested
+                    | _ -> failwith "Expected the stale finalize completion."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(calls).toBe (1)
+                Vitest.expect(finalState.BusyOperation).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A refresh of the previous ARC is ignored after the path changed",
+            fun () -> promise {
+                let state = {
+                    runningState with
+                        CurrentArcPath = Some "C:/arc-a"
+                        RefreshRequestId = 1
+                }
+
+                let afterPathChange, pathCmd =
+                    update defaultDependencies ignore (ArcPathChanged(Some "C:/arc-b")) state
+
+                let! pathMessages = collectMessages pathCmd
+
+                let hasRefresh =
+                    pathMessages
+                    |> Array.exists (
+                        function
+                        | RefreshRequested -> true
+                        | _ -> false
+                    )
+
+                if not hasRefresh then
+                    failwith "Expected the path change to request a refresh."
+
+                let refreshing, _ =
+                    update defaultDependencies ignore RefreshRequested afterPathChange
+
+                let finalState, _ =
+                    update defaultDependencies ignore (RefreshCompleted(1, Error "old ARC failure")) refreshing
+
+                Vitest.expect(finalState.ErrorNotice).toEqual (None)
+                Vitest.expect(finalState.CurrentArcPath).toEqual (Some "C:/arc-b")
+            }
+        )
+
+        Vitest.test (
+            "A rename reply that arrives after the refresh finished still publishes",
+            fun () -> promise {
+                let state = {
+                    runningState with
+                        CurrentArcPath = Some "C:/renamed-arc"
+                        ArcSessionId = runningState.ArcSessionId + 1
+                        RefreshState = GitRefreshState.Idle
+                }
+
+                let nextState, cmd =
+                    update
+                        defaultDependencies
+                        ignore
+                        (PublishRenameCompleted(runningState.ArcSessionId, Ok "C:/renamed-arc"))
+                        state
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(nextState.PendingPublishAfterRefresh).toBe (true)
+
+                Vitest
+                    .expect(
+                        messages
+                        |> Array.exists (
+                            function
+                            | RefreshRequested -> true
+                            | _ -> false
+                        )
+                    )
+                    .toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "A dependency install becomes the cancel target while it runs",
+            fun () -> promise {
+                let requests = ResizeArray<InstallDependencyRequestDto>()
+
+                let deps = {
+                    defaultDependencies with
+                        installDependency =
+                            fun request ->
+                                requests.Add request
+
+                                promise {
+                                    return
+                                        Ok(
+                                            succeeded {
+                                                Component = "git-lfs-configuration"
+                                                Installed = true
+                                                Version = None
+                                                Compatible = true
+                                                Remediation = None
+                                            }
+                                        )
+                                }
+                }
+
+                let nextState, cmd =
+                    update
+                        deps
+                        ignore
+                        (WriteInstallPromptAnswered(runningState.ArcSessionId, Push, "git-lfs-configuration", true))
+                        runningState
+
+                let! _ = collectMessages cmd
+
+                Vitest.expect(requests.Count).toBe (1)
+
+                Vitest
+                    .expect(nextState.CurrentOperation |> Option.map _.OperationId)
+                    .toEqual (Some requests[0].OperationId)
             }
         )
 

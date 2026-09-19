@@ -1902,13 +1902,15 @@ let private executeWriteAttemptOnce (deps: GitDependencies) (state: GitState) (w
 
 /// Writes that change the working tree from a state the user reviewed are not replayed
 /// against a workspace that moved in between. A discard or a restore would drop content
-/// the user has not seen. An update would run without its preview, and an abandoned
-/// merge would lose edits made since the refresh.
+/// the user has not seen. An update would run without its preview. Finalizing or
+/// abandoning a merge would act on whichever conflict session the refresh found, which
+/// is not the one the user reviewed.
 let private replaysAfterStaleToken =
     function
     | DiscardSelection _
     | RestoreInterruptedPaths _
     | Pull
+    | FinalizeMerge
     | AbandonMerge -> false
     | _ -> true
 
@@ -2188,6 +2190,10 @@ let private updateCore
             GitState.Empty with
                 CurrentArcPath = arcPath
                 ArcSessionId = nextArcSessionId model
+                // The request counters keep counting across ARCs. Resetting them let a
+                // refresh or a page load of the previous ARC match an id of the new one.
+                RefreshRequestId = nextRefreshRequestId model
+                PageLoadRequestId = nextPageLoadRequestId model
                 PendingPublishAfterRefresh = pendingPublishAfterRefresh
                 PendingPublishForPath = None
         }
@@ -2696,15 +2702,16 @@ let private updateCore
     | PublishRenameCompleted(sessionId, Ok renamedPath) when
         sessionId <> model.ArcSessionId && model.CurrentArcPath = Some renamedPath
         ->
-        // The path change already reset the model and started a refresh. The publish
-        // runs once that refresh has loaded the workspace token.
+        // The path change already reset the model. Its refresh may still be running or
+        // may have finished before this reply, so a refresh is asked for either way and
+        // the publish runs when it has loaded the workspace token.
         {
             clearBusy model with
                 PendingPublishRename = None
                 ErrorNotice = None
                 PendingPublishAfterRefresh = true
         },
-        Cmd.none
+        Cmd.ofMsg RefreshRequested
     | PublishRenameCompleted(sessionId, _) when sessionId <> model.ArcSessionId -> model, Cmd.none
     | PublishRenameCompleted(_, Error message) ->
         {
@@ -2895,18 +2902,27 @@ let private updateCore
 
         let installing = GitBusyOperation.InstallingDependency componentName
 
+        // The install is the operation that runs now, so the cancel button targets it
+        // instead of the write that asked for the dependency.
+        let installOperationId = deps.newOperationId ()
+
         let nextModel = {
             model with
                 InstallRetryState = GitInstallRetryState.InstallingForRetry busyOperation
                 BusyOperation = Some installing
                 BusyNotice = busyNoticeFromOperation installing
+                CurrentOperation =
+                    Some {
+                        SessionId = ""
+                        OperationId = installOperationId
+                    }
         }
 
         let cmd =
             Cmd.OfPromise.either
                 deps.installDependency
                 {
-                    OperationId = deps.newOperationId ()
+                    OperationId = installOperationId
                     Component = componentName
                 }
                 (fun installResult -> WriteInstallCompleted(sessionId, writeRequest, installResult))
