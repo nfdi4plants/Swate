@@ -5,7 +5,6 @@ module Main.VersionControl.WorkspaceSessionHost
 
 open System
 open System.Collections.Generic
-open Browser.Dom
 open Fable.Core
 open Main.VersionControl.VersionControlSettings
 open Swate.Electron.Shared.VersionControlTypes
@@ -103,25 +102,33 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
                 let! applied =
                     policy.SetSettings (VersionControlSettings.toStoragePolicySettings hosted.Settings) context
 
-                match applied with
-                | Failed failure ->
-                    console.error (
-                        $"Could not apply default version-control settings ({failure.Code}): {failure.Message}"
-                    )
-                | Succeeded _
-                | PartiallySucceeded _ -> ()
-            | None -> ()
+                let settingsFailure =
+                    match applied with
+                    | Failed failure
+                    | PartiallySucceeded(_, failure) ->
+                        Browser.Dom.console.error (
+                            $"Could not apply default version-control settings ({failure.Code}): {failure.Message}"
+                        )
 
-            sessions[hosted.SessionId] <- hosted
-            return withValue hosted outcome
+                        Some failure
+                    | Succeeded _ -> None
+
+                sessions[hosted.SessionId] <- hosted
+                return withValue hosted outcome, settingsFailure
+            | None ->
+                sessions[hosted.SessionId] <- hosted
+                return withValue hosted outcome, None
         }
 
         match opened with
         | Succeeded outcome ->
-            let! initialized = initializeSettings outcome
-            return Succeeded initialized
+            let! (initialized, settingsFailure) = initializeSettings outcome
+
+            match settingsFailure with
+            | Some failure -> return PartiallySucceeded(initialized, failure)
+            | None -> return Succeeded initialized
         | PartiallySucceeded(outcome, failure) ->
-            let! initialized = initializeSettings outcome
+            let! (initialized, _) = initializeSettings outcome
             return PartiallySucceeded(initialized, failure)
         | Failed failure -> return Failed failure
     }
@@ -173,7 +180,7 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
         async {
             match VersionControlSettings.validate settings with
             | Error reason ->
-                return Failed(OperationFailure.create Validation VersionControlCodes.StoragePolicyBlocked reason)
+                return Failed(OperationFailure.create Validation VersionControlCodes.InvalidLfsThreshold reason)
             | Ok settings ->
                 match tryFindSession workspaceRoot with
                 | None ->
@@ -192,10 +199,12 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
 
                         match result with
                         | Failed _ -> return result
-                        | Succeeded _
-                        | PartiallySucceeded _ ->
+                        | Succeeded outcome ->
                             sessions[hosted.SessionId] <- { hosted with Settings = settings }
-                            return OperationResult.succeeded ()
+                            return Succeeded(withValue () outcome)
+                        | PartiallySucceeded(outcome, failure) ->
+                            sessions[hosted.SessionId] <- { hosted with Settings = settings }
+                            return PartiallySucceeded(withValue () outcome, failure)
                     | None ->
                         sessions[hosted.SessionId] <- { hosted with Settings = settings }
                         return OperationResult.succeeded ()
@@ -349,6 +358,9 @@ let mutable private current: WorkspaceSessionHost option = None
 /// The process-wide host over the current runtime. Tests replace it with a host over
 /// their own runtime.
 let initialize (host: WorkspaceSessionHost) = current <- Some host
+
+/// Only tests call this to exercise lazy host construction.
+let resetForTests () = current <- None
 
 let get () : WorkspaceSessionHost =
     match current with

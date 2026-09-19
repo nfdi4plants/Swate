@@ -208,16 +208,6 @@ let objectState (state: ObjectState) : ObjectStateDto = {
     ObjectId = state.ObjectId
 }
 
-let storageSettings (settings: StoragePolicySettings) : StoragePolicySettingsDto = {
-    AutoPolicyThresholdMb = settings.AutoPolicyThresholdMb
-    MaterializeLargeObjects = settings.MaterializeLargeObjects
-}
-
-let storageSettingsFromDto (settings: StoragePolicySettingsDto) : StoragePolicySettings = {
-    AutoPolicyThresholdMb = settings.AutoPolicyThresholdMb
-    MaterializeLargeObjects = settings.MaterializeLargeObjects
-}
-
 let dependencyStatus (status: DependencyStatus) : DependencyStatusDto = {
     Component = status.Component
     Installed = status.Installed

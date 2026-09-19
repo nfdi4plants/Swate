@@ -353,7 +353,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "object state, storage settings and dependency status map field by field",
+            "object state and dependency status map field by field",
             fun () ->
                 let objectState =
                     Mappings.objectState {
@@ -371,13 +371,6 @@ Vitest.describe (
                     SizeBytes = Some 42.0
                     ObjectId = Some "sha256:abc"
                 }
-
-                let settings: StoragePolicySettingsDto = {
-                    AutoPolicyThresholdMb = Some 4
-                    MaterializeLargeObjects = true
-                }
-
-                Vitest.expect(Mappings.storageSettings (Mappings.storageSettingsFromDto settings)).toEqual settings
 
                 Vitest
                     .expect(

@@ -429,9 +429,10 @@ let private deferred () : JS.Promise<unit> * (unit -> unit) = jsNative
 
 /// Two fake providers: "fake.core" owns coreOnlyRoot and opens a core-only session,
 /// "fake.broken" owns failingRoot, fails to open and reports a failing dependency check.
-let private fakeProviderRuntime
+let private fakeProviderRuntimeWithStoragePolicy
     (coreOnlyRoot: string)
     (failingRoot: string)
+    (storagePolicy: StoragePolicyService option)
     : VersionControlRuntime.VersionControlRuntime =
     let providerId id =
         ProviderId.tryCreate id |> Result.defaultWith failwith
@@ -531,7 +532,7 @@ let private fakeProviderRuntime
             "git"
             coreOnlyRoot
             (fun binding ->
-                OperationResult.succeeded (
+                let session =
                     WorkspaceSession.createCoreOnly
                         {
                             ProviderId = binding.ProviderId
@@ -539,7 +540,16 @@ let private fakeProviderRuntime
                             Location = Some binding.Location
                         }
                         core
-                )
+
+                let session =
+                    match storagePolicy with
+                    | Some policy -> {
+                        session with
+                            StoragePolicy = Some policy
+                      }
+                    | None -> session
+
+                OperationResult.succeeded session
             )
             (OperationResult.succeeded [|
                 {
@@ -564,6 +574,9 @@ let private fakeProviderRuntime
         PathCaseSensitivity = CaseInsensitive
     }
 
+let private fakeProviderRuntime coreOnlyRoot failingRoot =
+    fakeProviderRuntimeWithStoragePolicy coreOnlyRoot failingRoot None
+
 Vitest.describe (
     "Version control IPC over a git vault",
     fun () ->
@@ -584,8 +597,9 @@ Vitest.describe (
 
                 let runtime = createRuntime settingsRoot
                 let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
-                WorkspaceSessionHost.initialize host
                 VersionControlRuntime.initialize runtime
+                WorkspaceSessionHost.resetForTests ()
+                Vitest.expect(WorkspaceSessionHost.tryCurrent ()).toEqual None
 
                 registerEmptyVault 60 |> ignore
                 let dialogSpy = Vitest.vi.spyOn (electron?dialog, "showOpenDialog")
@@ -596,25 +610,95 @@ Vitest.describe (
                     Vitest.vi.restoreAllMocks ()
                     electronMock?reset () |> ignore
                     ARC_VAULTS.Vaults.Clear()
+
+                    match WorkspaceSessionHost.tryCurrent () with
+                    | Some currentHost -> do! currentHost.CloseAll() |> Async.StartAsPromise
+                    | None -> ()
+
                     do! host.CloseAll() |> Async.StartAsPromise
                     do! removeDirectoryAsync root
                 }
 
                 try
-                    let api = Main.IPC.ArcVaultsApi.api (ipcEvent 60)
+                    try
+                        let api = Main.IPC.ArcVaultsApi.api (ipcEvent 60)
 
-                    let! created = api.createARC { identifier = "fresh"; initGit = true }
+                        let! created = api.createARC { identifier = "fresh"; initGit = true }
 
-                    match created with
-                    | Ok createdPath ->
-                        Vitest.expect(Main.Bindings.Filesystem.existsSync (join [| createdPath; ".git" |])).toBe true
-                    | Error error -> return raise error
-                with error ->
+                        match created with
+                        | Ok createdPath ->
+                            Vitest.expect(Main.Bindings.Filesystem.existsSync (join [| createdPath; ".git" |])).toBe
+                                true
+
+                            match WorkspaceSessionHost.tryCurrent () with
+                            | Some _ -> ()
+                            | None -> failwith "The workspace session host was not built lazily."
+                        | Error error -> return raise error
+                    with error ->
+                        do! cleanup ()
+                        return raise error
+
                     do! cleanup ()
-                    return raise error
-
-                do! cleanup ()
+                finally
+                    WorkspaceSessionHost.initialize host
             }
+        )
+
+        Vitest.test (
+            "an open whose default settings push fails is reported as partial",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let coreOnlyRoot = join [| fixture.Root; "core-default-settings-failure" |]
+                    let failingRoot = join [| fixture.Root; "failing-default-settings" |]
+
+                    for folder in [ coreOnlyRoot; failingRoot ] do
+                        Main.Bindings.Filesystem.mkdirSync
+                            folder
+                            (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    let settingsFailure =
+                        OperationFailure.create
+                            ProviderError
+                            "fake_default_settings_failed"
+                            "The fake provider rejected the default settings."
+
+                    let storagePolicy: StoragePolicyService = {
+                        SetPathPolicy =
+                            fun _ _ _ -> async {
+                                return Failed(OperationFailure.create Unsupported "operation_not_supported" "fake")
+                            }
+                        GetSettings =
+                            fun _ -> async {
+                                return
+                                    OperationResult.succeeded {
+                                        AutoPolicyThresholdMb = Some 1
+                                        MaterializeLargeObjects = false
+                                    }
+                            }
+                        SetSettings = fun _ _ -> async { return Failed settingsFailure }
+                    }
+
+                    let fakeRuntime =
+                        fakeProviderRuntimeWithStoragePolicy coreOnlyRoot failingRoot (Some storagePolicy)
+
+                    let fakeHost = WorkspaceSessionHost.WorkspaceSessionHost(fakeRuntime)
+                    WorkspaceSessionHost.initialize fakeHost
+
+                    try
+                        let! opened =
+                            fakeHost.OpenSession(coreOnlyRoot, detached "open-default-settings-failure")
+                            |> Async.StartAsPromise
+
+                        match opened with
+                        | PartiallySucceeded(_, failure) -> Vitest.expect(failure.Code).toBe settingsFailure.Code
+                        | other -> failwith $"Expected a partial open, got {other}"
+
+                        let settings = fakeHost.GetSettings coreOnlyRoot
+                        Vitest.expect(settings.AutoTrackThresholdMb).toBe 1
+                        Vitest.expect(settings.DownloadLargeFiles).toBe false
+                    finally
+                        WorkspaceSessionHost.initialize fixture.Host
+                })
         )
 
         Vitest.test (
@@ -875,7 +959,7 @@ Vitest.describe (
                             }
 
                         let failure = expectDtoFailure $"set invalid policy {threshold}" refused
-                        Vitest.expect(failure.Code).toBe VersionControlCodes.StoragePolicyBlocked
+                        Vitest.expect(failure.Code).toBe VersionControlCodes.InvalidLfsThreshold
 
                         let! current = api.getStoragePolicySettings (request $"get-after-invalid-{threshold}")
                         let settings = expectDtoValue "get storage policy after invalid change" current
@@ -1451,6 +1535,32 @@ Vitest.describe (
                             None
 
                     Vitest.expect(attributesAfter).toEqual attributesBefore
+                })
+        )
+
+        Vitest.test (
+            "a traversal path is refused before the file system is read",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    registerVault 59 fixture.RepoRoot |> ignore
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 59)
+                    let outsidePath = join [| fixture.Root; "outside.bin" |]
+                    writeText outsidePath (String.replicate (26 * 1024 * 1024) "x")
+
+                    let expectedCode =
+                        match RepositoryPath.tryCreate "../outside.bin" with
+                        | Error _ -> "invalid_path"
+                        | Ok _ -> failwith "Expected the traversal path to be refused."
+
+                    let! result =
+                        api.setPathStoragePolicy {
+                            OperationId = "policy-traversal"
+                            Path = "../outside.bin"
+                            UseLargeObjectStorage = false
+                        }
+
+                    let failure = expectDtoFailure "traversal policy" result
+                    Vitest.expect(failure.Code).toBe expectedCode
                 })
         )
 

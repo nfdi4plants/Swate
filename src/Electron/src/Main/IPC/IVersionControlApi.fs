@@ -914,22 +914,23 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 (fun hosted context ->
                     match hosted.Session.StoragePolicy with
                     | None -> async { return serviceUnavailable "storage policies" }
-                    | Some service -> async {
-                        let! fileSize = tryGetRegularFileSize hosted.Binding.WorkspaceRoot request.Path
+                    | Some service ->
+                        withPath
+                            request.Path
+                            (fun path -> async {
+                                let relativePath = RepositoryPath.value path
+                                let! fileSize = tryGetRegularFileSize hosted.Binding.WorkspaceRoot relativePath
 
-                        match
-                            Swate.Components.Shared.GitLfsRules.tryGetToggleBlockedReason
-                                request.Path
-                                fileSize
-                                request.UseLargeObjectStorage
-                        with
-                        | Some reason -> return validationFailed VersionControlCodes.StoragePolicyBlocked reason
-                        | None ->
-                            return!
-                                withPath
-                                    request.Path
-                                    (fun path -> service.SetPathPolicy path request.UseLargeObjectStorage context)
-                      }
+                                match
+                                    Swate.Components.Shared.GitLfsRules.tryGetToggleBlockedReason
+                                        relativePath
+                                        fileSize
+                                        request.UseLargeObjectStorage
+                                with
+                                | Some reason ->
+                                    return validationFailed VersionControlCodes.StoragePolicyBlocked reason
+                                | None -> return! service.SetPathPolicy path request.UseLargeObjectStorage context
+                            })
                 )
                 id
     pruneStorage =

@@ -122,6 +122,9 @@ module VersionControlCodes =
     [<Literal>]
     let BaseContentNotFound = "base_content_not_found"
 
+    [<Literal>]
+    let InvalidLfsThreshold = "invalid_lfs_threshold"
+
     // Produced by the Swate main process (session host and IPC handler).
     [<Literal>]
     let ServiceUnavailable = "service_unavailable"
