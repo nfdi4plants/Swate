@@ -1619,9 +1619,9 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
                 // The local commit already succeeded, so the saved-locally outcome stays.
                 return! pendingPrimarySaveRemoteFailureAsync deps message
             | Error(PublishFailure.Routed(RoutedFailure.RefreshAfterCancel message)) ->
-                return! routedToOutcome deps (RoutedFailure.RefreshAfterCancel message)
+                return! pendingPrimarySaveRemoteFailureAsync deps message
             | Error(PublishFailure.Routed(RoutedFailure.InspectAfterCancel message)) ->
-                return! routedToOutcome deps (RoutedFailure.InspectAfterCancel message)
+                return! pendingPrimarySaveRemoteFailureAsync deps message
             | Error(PublishFailure.Routed(RoutedFailure.ConflictSession failure)) ->
                 return! completeAfterUpdateAsync deps (Some failure) (Some pendingPrimarySaveWarning)
         }
@@ -1686,8 +1686,9 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
                         | RoutedFailure.Recovery(recovery, message) -> return Ok(RequiresRecovery(recovery, message))
                         | RoutedFailure.ConflictSession failure ->
                             return! completeAfterUpdateAsync deps (Some failure) (Some pendingPrimarySaveWarning)
-                        | RoutedFailure.RefreshAfterCancel _
-                        | RoutedFailure.InspectAfterCancel _ -> return! routedToOutcome deps routed
+                        | RoutedFailure.RefreshAfterCancel message
+                        | RoutedFailure.InspectAfterCancel message ->
+                            return! pendingPrimarySaveRemoteFailureAsync deps message
                         | RoutedFailure.Cancelled message
                         | RoutedFailure.DependencyInstall message
                         | RoutedFailure.StaleWorkspace message
@@ -2745,6 +2746,7 @@ let private updateCore
         let nextModel = {
             writeErrorModel message model with
                 PendingPostMergePush = false
+                RefreshPending = false
         }
 
         nextModel,
@@ -2797,9 +2799,7 @@ let private updateCore
             reportWriteErrorCmd deps writeRequest message
         ]
     | WriteCompleted(_, _, writeRequest, Ok(RequiresRecovery(recovery, message))) ->
-        // No refresh while the offer is open: a refresh would mark the sidebar busy and
-        // drop the recovery the user confirms in the meantime. The recovery refreshes
-        // when it runs, and a dismissal refreshes as well.
+        // The recovery offer stays open. A refresh requested meanwhile runs after the offer is resolved.
         let nextModel = {
             clearBusy model with
                 ErrorNotice = None
@@ -3026,7 +3026,7 @@ let private updateCore
             followUp
         ]
 
-/// The wrapper keeps refresh requests behind writes. It releases one when the write clears BusyOperation.
+/// The wrapper holds a refresh until the write finishes and any open confirmation is resolved.
 let update
     (deps: GitDependencies)
     (setPageState: PageState option -> unit)
@@ -3035,7 +3035,11 @@ let update
     : GitState * Cmd<Msg> =
     let next, cmd = updateCore deps setPageState msg model
 
-    if next.RefreshPending && next.BusyOperation.IsNone then
+    if
+        next.RefreshPending
+        && next.BusyOperation.IsNone
+        && next.PendingConfirmation.IsNone
+    then
         { next with RefreshPending = false }, Cmd.batch [ cmd; Cmd.ofMsg RefreshRequested ]
     else
         next, cmd

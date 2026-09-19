@@ -2417,6 +2417,79 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "A primary save whose publish is canceled with a refresh recovery keeps the saved-locally notice",
+            fun () -> promise {
+                let canceled =
+                    makeFailure
+                        Canceled
+                        VersionControlCodes.OperationCanceled
+                        "Publish was canceled."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RefreshWorkspace
+                            Instructions = None
+                        })
+                        [||]
+
+                let preview = {
+                    ChangedPaths = [||]
+                    OverlappingPaths = [||]
+                    HasDataLossRisk = false
+                    WouldCreateConflictSession = false
+                }
+
+                let sync = cleanStatus.Synchronization.Value
+
+                let deps = {
+                    defaultDependencies with
+                        createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
+                        previewUpdate = fun _ -> promise { return Ok(succeeded preview) }
+                        update = fun _ -> promise { return Ok(succeeded sync) }
+                        publish = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let state = {
+                    runningState with
+                        ChangedFiles = [| changedFile "README.md" "M" " " false |]
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (PrimarySaveAllRequested "Save locally first") state
+
+                let! requestMessages = collectMessages requestCmd
+
+                let stateAfterWrite, finishCmd =
+                    match requestMessages with
+                    | [| WriteRequested(PrimarySave _) |] -> update deps ignore requestMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected the primary save request."
+
+                let! completionMessages = collectMessages finishCmd
+
+                let nextState, completionCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_,
+                                        _,
+                                        PrimarySave _,
+                                        Ok(CompletedWithPendingRemoteFailure(UnitSuccess(_, _, _, Some warning, None),
+                                                                             message))) |] ->
+                        Vitest.expect(warning).toBe ("Changes were saved locally. Online sync is still pending.")
+                        Vitest.expect(message).toBe (failureMessage canceled)
+                        update deps ignore completionMessages[0] stateAfterWrite
+                    | _ -> failwith "Expected a saved-locally outcome after publish was canceled."
+
+                let! finishMessages = collectMessages completionCmd
+
+                Vitest.expect(finishMessages).toEqual ([||])
+
+                Vitest
+                    .expect(nextState.WarningNotice)
+                    .toEqual (Some "Changes were saved locally. Online sync is still pending.")
+            }
+        )
+
+        Vitest.test (
             "UpdateFromOnlineRequested opens a confirmation dialog instead of pulling when preflight predicts merge resolution",
             fun () -> promise {
                 let deps = {
@@ -3612,15 +3685,25 @@ Vitest.describe (
                     | _ -> failwith "Expected the discard write request."
 
                 let! completion = collectMessages writeCmd
+                let requestedWithPending = { requested with RefreshPending = true }
 
                 let finalState, finishCmd, completedMessage =
                     match completion with
                     | [| WriteCompleted(_, _, DiscardSelection _, Ok(StaleWorkspaceVersion message)) |] ->
-                        let nextState, command = update deps ignore completion[0] requested
+                        let nextState, command = update deps ignore completion[0] requestedWithPending
                         nextState, command, message
                     | _ -> failwith "Expected the stale discard completion."
 
                 let! finishMessages = collectMessages finishCmd
+
+                let refreshCount =
+                    finishMessages
+                    |> Array.filter (
+                        function
+                        | RefreshRequested -> true
+                        | _ -> false
+                    )
+                    |> Array.length
 
                 Vitest.expect(restoreRequests.Count).toBe (1)
 
@@ -3630,18 +3713,9 @@ Vitest.describe (
 
                 Vitest.expect(finalState.BusyOperation).toEqual (None)
                 Vitest.expect(finalState.ErrorNotice).toEqual (Some completedMessage)
+                Vitest.expect(finalState.RefreshPending).toBe (false)
                 Vitest.expect(reportedErrors.Count).toBe (1)
-
-                Vitest
-                    .expect(
-                        finishMessages
-                        |> Array.exists (
-                            function
-                            | RefreshRequested -> true
-                            | _ -> false
-                        )
-                    )
-                    .toBe (true)
+                Vitest.expect(refreshCount).toBe (1)
             }
         )
 
@@ -4340,6 +4414,73 @@ Vitest.describe (
                         )
                     )
                     .toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "A refresh requested during a write waits until the recovery offer is resolved",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        refreshSynchronization =
+                            fun _ -> promise {
+                                return
+                                    Ok(
+                                        OperationResultDto.Failed(
+                                            makeFailure
+                                                Canceled
+                                                VersionControlCodes.OperationCanceled
+                                                "lock"
+                                                (Some {
+                                                    Code = VersionControlCodes.Recovery.RemoveIndexLock
+                                                    Instructions = None
+                                                })
+                                                [||]
+                                        )
+                                    )
+                            }
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested Fetch) runningState
+
+                let pendingState, pendingCmd = update deps ignore RefreshRequested stateAfterRequest
+                let! pendingMessages = collectMessages pendingCmd
+                let! completionMessages = collectMessages requestCmd
+
+                let recoveryState, finishCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_,
+                                        _,
+                                        Fetch,
+                                        Ok(RequiresRecovery(GitPendingRecovery.ClearStaleLock None, "lock"))) |] ->
+                        update deps ignore completionMessages[0] pendingState
+                    | _ -> failwith "Expected the fetch to offer lock recovery."
+
+                let! finishMessages = collectMessages finishCmd
+
+                let dismissedState, dismissCmd =
+                    update deps ignore CancelPendingRemoteActionRequested recoveryState
+
+                let! dismissMessages = collectMessages dismissCmd
+
+                let refreshCount =
+                    dismissMessages
+                    |> Array.filter (
+                        function
+                        | RefreshRequested -> true
+                        | _ -> false
+                    )
+                    |> Array.length
+
+                Vitest.expect(pendingMessages).toEqual ([||])
+                Vitest.expect(pendingState.RefreshPending).toBe (true)
+                Vitest.expect(finishMessages).toEqual ([||])
+                Vitest.expect(recoveryState.RefreshPending).toBe (true)
+                Vitest.expect(recoveryState.PendingConfirmation.IsSome).toBe (true)
+                Vitest.expect(dismissedState.RefreshPending).toBe (false)
+
+                Vitest.expect(refreshCount).toBe (1)
             }
         )
 )
