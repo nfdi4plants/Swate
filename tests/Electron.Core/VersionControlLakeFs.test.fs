@@ -204,7 +204,7 @@ let private createFixtureWithRuntime
     promise {
         let! root = createTempDirectoryAsync "swate-vc-lakefs-"
         let workspace = join [| root; "workspace" |]
-        let scratch = join [| root; "second" |]
+        let scratch = join [| root; "scratch" |]
         let settings = join [| root; "settings" |]
         let connection = lakeFsConnection ()
 
@@ -771,7 +771,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "opens a conflict session on a diverged file and finalizes the resolution",
+            "opens a conflict session on a diverged file, finalizes the resolution, and abandons a second one",
             TestOptions(timeout = 120000, skip = not (integrationEnabled ())),
             fun () -> promise {
                 return!
