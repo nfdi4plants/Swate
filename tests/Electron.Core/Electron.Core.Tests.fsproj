@@ -34,6 +34,7 @@
     <Compile Include="VersionControlComposition.test.fs" />
     <Compile Include="VersionControlMappings.test.fs" />
     <Compile Include="VersionControlSessionHost.test.fs" />
+    <Compile Include="VersionControlLakeFs.test.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Electron\src\Main\Main.fsproj" />
