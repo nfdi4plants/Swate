@@ -2705,7 +2705,11 @@ let private updateCore
         { model with PendingRecovery = None }, Cmd.ofMsg (WriteRequested RetryMaterialization)
     | DismissRecoveryRequested ->
         // The offer is gone, so the sidebar catches up with what the canceled step left.
-        { model with PendingRecovery = None },
+        {
+            model with
+                PendingRecovery = None
+                RefreshPending = false
+        },
         (if model.CurrentArcPath.IsSome then
              Cmd.ofMsg RefreshRequested
          else
@@ -3027,6 +3031,7 @@ let private updateCore
         ]
 
 /// The wrapper holds a refresh until the write finishes and any open confirmation is resolved.
+/// It also waits for the pending recovery to be handled.
 let update
     (deps: GitDependencies)
     (setPageState: PageState option -> unit)
@@ -3039,6 +3044,7 @@ let update
         next.RefreshPending
         && next.BusyOperation.IsNone
         && next.PendingConfirmation.IsNone
+        && next.PendingRecovery.IsNone
     then
         { next with RefreshPending = false }, Cmd.batch [ cmd; Cmd.ofMsg RefreshRequested ]
     else

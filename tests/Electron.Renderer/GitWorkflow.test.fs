@@ -4374,6 +4374,156 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "A refresh requested during a write does not swallow a confirmed recovery",
+            fun () -> promise {
+                let canceled =
+                    makeFailure
+                        Canceled
+                        VersionControlCodes.OperationCanceled
+                        "restore"
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RestoreWorkspace
+                            Instructions = None
+                        })
+                        [| "a.txt" |]
+
+                let mutable restoredPaths = None
+
+                let deps = {
+                    defaultDependencies with
+                        refreshSynchronization = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
+                        restorePaths =
+                            fun request ->
+                                restoredPaths <- Some request.Paths
+                                promise { return Ok(succeeded ()) }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested Fetch) runningState
+
+                let pendingState, pendingCmd = update deps ignore RefreshRequested stateAfterRequest
+                let! pendingMessages = collectMessages pendingCmd
+                let! completionMessages = collectMessages requestCmd
+
+                let recoveryState, recoveryCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_,
+                                        _,
+                                        Fetch,
+                                        Ok(RequiresRecovery(GitPendingRecovery.RestoreInterruptedPaths {
+                                                                                                           AffectedPaths = [| "a.txt" |]
+                                                                                                           Instructions = None
+                                                                                                       },
+                                                            "restore"))) |] ->
+                        update deps ignore completionMessages[0] pendingState
+                    | _ -> failwith "Expected restore recovery after the canceled fetch."
+
+                let! recoveryMessages = collectMessages recoveryCmd
+
+                let confirmedState, confirmCmd =
+                    update deps ignore ConfirmPendingRemoteActionRequested recoveryState
+
+                let! confirmMessages = collectMessages confirmCmd
+
+                let intermediateState, intermediateCmd =
+                    match confirmMessages with
+                    | [| RestoreInterruptedPathsRequested |] -> update deps ignore confirmMessages[0] confirmedState
+                    | _ -> failwith "Expected the confirmed recovery to dispatch the restore request."
+
+                let! intermediateMessages = collectMessages intermediateCmd
+
+                let restoreRequestedState, restoreWriteCmd =
+                    match intermediateMessages with
+                    | [| WriteRequested(RestoreInterruptedPaths [| "a.txt" |]); RefreshRequested |] ->
+                        update deps ignore intermediateMessages[0] intermediateState
+                    | _ -> failwith "Expected the restore write and its queued refresh."
+
+                let heldState, heldRefreshCmd =
+                    update deps ignore intermediateMessages[1] restoreRequestedState
+
+                let! heldRefreshMessages = collectMessages heldRefreshCmd
+                let! _ = collectMessages restoreWriteCmd
+
+                Vitest.expect(pendingMessages).toEqual ([||])
+                Vitest.expect(recoveryMessages).toEqual ([||])
+                Vitest.expect(recoveryState.RefreshPending).toBe (true)
+                Vitest.expect(recoveryState.PendingConfirmation.IsSome).toBe (true)
+                Vitest.expect(heldRefreshMessages).toEqual ([||])
+                Vitest.expect(heldState.BusyOperation).toEqual (Some GitBusyOperation.RestoringInterruptedPaths)
+                Vitest.expect(heldState.RefreshPending).toBe (true)
+                Vitest.expect(restoredPaths).toEqual (Some [| "a.txt" |])
+            }
+        )
+
+        Vitest.test (
+            "Dismissing a recovery offer with a pending refresh refreshes once",
+            fun () -> promise {
+                let canceled =
+                    makeFailure
+                        Canceled
+                        VersionControlCodes.OperationCanceled
+                        "restore"
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RestoreWorkspace
+                            Instructions = None
+                        })
+                        [| "a.txt" |]
+
+                let deps = {
+                    defaultDependencies with
+                        refreshSynchronization = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested Fetch) runningState
+
+                let pendingState, pendingCmd = update deps ignore RefreshRequested stateAfterRequest
+                let! pendingMessages = collectMessages pendingCmd
+                let! completionMessages = collectMessages requestCmd
+
+                let recoveryState, recoveryCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_,
+                                        _,
+                                        Fetch,
+                                        Ok(RequiresRecovery(GitPendingRecovery.RestoreInterruptedPaths _, "restore"))) |] ->
+                        update deps ignore completionMessages[0] pendingState
+                    | _ -> failwith "Expected restore recovery after the canceled fetch."
+
+                let! recoveryMessages = collectMessages recoveryCmd
+
+                let cancelingState, cancelCmd =
+                    update deps ignore CancelPendingRemoteActionRequested recoveryState
+
+                let! cancelMessages = collectMessages cancelCmd
+
+                let dismissedState, dismissCmd =
+                    match cancelMessages with
+                    | [| DismissRecoveryRequested |] -> update deps ignore cancelMessages[0] cancelingState
+                    | _ -> failwith "Expected dismissal to dispatch DismissRecoveryRequested."
+
+                let! dismissMessages = collectMessages dismissCmd
+
+                let refreshCount =
+                    Array.append cancelMessages dismissMessages
+                    |> Array.filter (
+                        function
+                        | RefreshRequested -> true
+                        | _ -> false
+                    )
+                    |> Array.length
+
+                Vitest.expect(pendingMessages).toEqual ([||])
+                Vitest.expect(recoveryMessages).toEqual ([||])
+                Vitest.expect(dismissedState.RefreshPending).toBe (false)
+                Vitest.expect(refreshCount).toBe (1)
+            }
+        )
+
+        Vitest.test (
             "A refresh requested during a write runs when the write completes",
             fun () -> promise {
                 let deps = {
@@ -4459,13 +4609,20 @@ Vitest.describe (
 
                 let! finishMessages = collectMessages finishCmd
 
-                let dismissedState, dismissCmd =
+                let cancelingState, cancelCmd =
                     update deps ignore CancelPendingRemoteActionRequested recoveryState
+
+                let! cancelMessages = collectMessages cancelCmd
+
+                let dismissedState, dismissCmd =
+                    match cancelMessages with
+                    | [| DismissRecoveryRequested |] -> update deps ignore cancelMessages[0] cancelingState
+                    | _ -> failwith "Expected recovery dismissal."
 
                 let! dismissMessages = collectMessages dismissCmd
 
                 let refreshCount =
-                    dismissMessages
+                    Array.append cancelMessages dismissMessages
                     |> Array.filter (
                         function
                         | RefreshRequested -> true
