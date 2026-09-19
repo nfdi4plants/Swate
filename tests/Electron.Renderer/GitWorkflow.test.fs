@@ -793,6 +793,46 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "The refresh reads the settings for a session without a storage policy service",
+            fun () -> promise {
+                let sessionWithoutStoragePolicy = {
+                    sessionInfo with
+                        Services = {
+                            sessionInfo.Services with
+                                StoragePolicy = false
+                        }
+                }
+
+                let deps = {
+                    defaultDependencies with
+                        getSessionInfo = fun _ -> promise { return Ok(succeeded sessionWithoutStoragePolicy) }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded [| localBranch "main" true true |]) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 3 true)) }
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc-a"
+                }
+
+                let requestingState, requestCmd = update deps ignore RefreshRequested state
+                let! requestMessages = collectMessages requestCmd
+
+                let nextState, nextCmd =
+                    match requestMessages with
+                    | [| (RefreshCompleted _ as message) |] -> update deps ignore message requestingState
+                    | _ -> failwith "Expected refresh completion message."
+
+                let! nextMessages = collectMessages nextCmd
+
+                Vitest.expect(nextState.LfsAutoTrackThresholdMb).toBe (3)
+                Vitest.expect(nextState.DownloadLargeFiles).toBe (true)
+                Vitest.expect(nextMessages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
             "RefreshRequested keeps refresh successful when origin repository URL lookup fails",
             fun () -> promise {
                 let deps = {
@@ -1144,6 +1184,45 @@ Vitest.describe (
                         Some {
                             SessionId = "s-1"
                             OperationId = "op-1"
+                        }
+                    )
+            }
+        )
+
+        Vitest.test (
+            "A started operation the workflow did not allocate does not become the cancel target",
+            fun () -> promise {
+                let requested, _ =
+                    update defaultDependencies ignore (WriteRequested Fetch) runningState
+
+                let afterUnrelated, _ =
+                    update
+                        defaultDependencies
+                        ignore
+                        (OperationStarted {
+                            SessionId = "s"
+                            OperationId = "explorer-materialize"
+                        })
+                        requested
+
+                let afterOwned, _ =
+                    update
+                        defaultDependencies
+                        ignore
+                        (OperationStarted {
+                            SessionId = "s"
+                            OperationId = "op-1/2"
+                        })
+                        afterUnrelated
+
+                Vitest.expect(afterUnrelated.CurrentOperation).toEqual (Some { SessionId = ""; OperationId = "op-1" })
+
+                Vitest
+                    .expect(afterOwned.CurrentOperation)
+                    .toEqual (
+                        Some {
+                            SessionId = "s"
+                            OperationId = "op-1/2"
                         }
                     )
             }
@@ -1743,7 +1822,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "SubmitPublishRenameRequested renames the active ARC root before retrying push",
+            "SubmitPublishRenameRequested defers push until the renamed ARC path is refreshed",
             fun () -> promise {
                 let renamedNames = ResizeArray<string>()
 
@@ -1774,35 +1853,116 @@ Vitest.describe (
 
                 let! renameMessages = collectMessages renameCmd
 
-                let stateAfterRename, retryCmd =
+                let stateAfterRename, completionCmd =
                     match renameMessages with
                     | [| PublishRenameCompleted(_, Ok "C:/work/Renamed ARC") |] ->
                         update deps ignore renameMessages[0] stateAfterSubmit
                     | _ -> failwith "Expected rename completion to be dispatched."
 
-                let! retryMessages = collectMessages retryCmd
+                let! completionMessages = collectMessages completionCmd
 
-                let stateAfterRetry, pushCmd =
-                    match retryMessages with
-                    | [| WriteRequested Push |] -> update deps ignore retryMessages[0] stateAfterRename
-                    | _ -> failwith "Expected push to be retried after renaming the ARC root."
+                let stateAfterPathChange, pathChangeCmd =
+                    update deps ignore (ArcPathChanged(Some "C:/work/Renamed ARC")) stateAfterRename
 
-                Vitest.expect(stateAfterRename.PendingPublishAfterRefresh).toBe (false)
+                let! pathChangeMessages = collectMessages pathChangeCmd
+
+                let refreshingState, refreshCmd =
+                    match pathChangeMessages with
+                    | [| RefreshRequested |] -> update deps ignore RefreshRequested stateAfterPathChange
+                    | _ -> failwith "Expected the path change to start a refresh."
+
+                let! refreshMessages = collectMessages refreshCmd
+
+                let refreshedState, afterRefreshCmd =
+                    match refreshMessages with
+                    | [| (RefreshCompleted _ as message) |] -> update deps ignore message refreshingState
+                    | _ -> failwith "Expected the refresh to complete."
+
+                let! afterRefreshMessages = collectMessages afterRefreshCmd
+
+                Vitest.expect(renamedNames |> Seq.toArray).toEqual ([| "Renamed ARC" |])
+                Vitest.expect(stateAfterSubmit.BusyOperation).toEqual (Some GitBusyOperation.RenamingRepository)
+                Vitest.expect(stateAfterRename.PendingPublishRename).toEqual (None)
+                Vitest.expect(stateAfterRename.PendingPublishForPath).toEqual (Some "C:/work/Renamed ARC")
+                Vitest.expect(completionMessages).toEqual ([||])
+                Vitest.expect(stateAfterPathChange.PendingPublishAfterRefresh).toBe (true)
+                Vitest.expect(stateAfterPathChange.PendingPublishForPath).toEqual (None)
+                Vitest.expect(refreshedState.PendingPublishAfterRefresh).toBe (false)
+                Vitest.expect(afterRefreshMessages).toEqual ([| WriteRequested Push |])
+
+                let stateAfterPush, pushCmd =
+                    match afterRefreshMessages with
+                    | [| WriteRequested Push |] -> update deps ignore afterRefreshMessages[0] refreshedState
+                    | _ -> failwith "Expected push to start after the refresh."
 
                 let! pushMessages = collectMessages pushCmd
 
                 let finalState, finishCmd =
                     match pushMessages with
                     | [| WriteCompleted(_, _, Push, Ok(Completed _)) |] ->
-                        update deps ignore pushMessages[0] stateAfterRetry
+                        update deps ignore pushMessages[0] stateAfterPush
                     | _ -> failwith "Expected retried push to complete successfully."
 
                 let! _ = collectMessages finishCmd
 
-                Vitest.expect(renamedNames |> Seq.toArray).toEqual ([| "Renamed ARC" |])
-                Vitest.expect(stateAfterSubmit.BusyOperation).toEqual (Some GitBusyOperation.RenamingRepository)
-                Vitest.expect(stateAfterRename.PendingPublishRename).toEqual (None)
                 Vitest.expect(finalState.ErrorNotice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "PublishRenameCompleted before the path change defers the publish until the refresh of the new path",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        getStatus = fun _ -> promise { return Ok(succeeded (statusForBranch "main")) }
+                        listRefs = fun _ -> promise { return Ok(succeeded [| localBranch "main" true true |]) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/work/Existing ARC"
+                        ArcSessionId = 7
+                        BusyOperation = Some GitBusyOperation.RenamingRepository
+                        BusyNotice = Some "Renaming ARC"
+                        PendingPublishRename =
+                            Some {
+                                CurrentName = "Existing ARC"
+                                Message = "A DataHub repository named 'Existing ARC' already exists."
+                            }
+                }
+
+                let afterRename, renameCmd =
+                    update deps ignore (PublishRenameCompleted(7, Ok "C:/work/Renamed ARC")) state
+
+                let! renameMessages = collectMessages renameCmd
+
+                Vitest.expect(renameMessages).toEqual ([||])
+                Vitest.expect(afterRename.PendingPublishForPath).toEqual (Some "C:/work/Renamed ARC")
+
+                let afterPathChange, pathChangeCmd =
+                    update deps ignore (ArcPathChanged(Some "C:/work/Renamed ARC")) afterRename
+
+                let! pathChangeMessages = collectMessages pathChangeCmd
+
+                Vitest.expect(afterPathChange.PendingPublishAfterRefresh).toBe (true)
+                Vitest.expect(afterPathChange.PendingPublishForPath).toEqual (None)
+                Vitest.expect(pathChangeMessages).toEqual ([| RefreshRequested |])
+
+                let refreshingState, refreshCmd =
+                    update deps ignore pathChangeMessages[0] afterPathChange
+
+                let! refreshMessages = collectMessages refreshCmd
+
+                let refreshedState, afterRefreshCmd =
+                    match refreshMessages with
+                    | [| (RefreshCompleted _ as message) |] -> update deps ignore message refreshingState
+                    | _ -> failwith "Expected the refresh to complete."
+
+                let! afterRefreshMessages = collectMessages afterRefreshCmd
+
+                Vitest.expect(refreshedState.PendingPublishAfterRefresh).toBe (false)
+                Vitest.expect(afterRefreshMessages).toEqual ([| WriteRequested Push |])
             }
         )
 

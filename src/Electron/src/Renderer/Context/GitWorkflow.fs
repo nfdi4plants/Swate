@@ -116,6 +116,7 @@ type GitState = {
     /// A publish that waits until the refresh of a renamed ARC root has loaded the
     /// workspace token.
     PendingPublishAfterRefresh: bool
+    PendingPublishForPath: string option
     LfsAutoTrackThresholdMb: int
     DownloadLargeFiles: bool
     RepositoryAvailability: GitRepositoryAvailability
@@ -166,6 +167,7 @@ type GitState = {
         PendingRecovery = None
         ProvisionedRemote = None
         PendingPublishAfterRefresh = false
+        PendingPublishForPath = None
         LfsAutoTrackThresholdMb = 1
         DownloadLargeFiles = false
         RepositoryAvailability = GitRepositoryAvailability.Ready
@@ -871,14 +873,10 @@ let private refreshAllAsync (deps: GitDependencies) = promise {
         let! statusResult = toResult (deps.getStatus (request deps))
         let! refsResult = toResult (deps.listRefs (request deps))
 
-        let! settingsResult =
-            if session.Services.StoragePolicy then
-                promise {
-                    let! result = toResult (deps.getStoragePolicySettings (request deps))
-                    return Some(result |> Result.map (fun (outcome, _) -> outcome.Value))
-                }
-            else
-                promise { return None }
+        let! settingsResult = promise {
+            let! result = toResult (deps.getStoragePolicySettings (request deps))
+            return Some(result |> Result.map (fun (outcome, _) -> outcome.Value))
+        }
 
         let! webUrl =
             if session.Services.RepositoryBrowser then
@@ -2101,17 +2099,28 @@ let private resolveStaleWriteCompletedCmd writeRequest result =
 /// requested, so a cancel that lands before the started event still reaches it.
 let private withFirstOperationId (deps: GitDependencies) (operationId: string) =
     let handedOut = ref false
+    let nextSuffix = ref 1
 
     {
         deps with
             newOperationId =
                 fun () ->
                     if handedOut.Value then
-                        deps.newOperationId ()
+                        let suffix = nextSuffix.Value
+                        nextSuffix.Value <- suffix + 1
+                        $"{operationId}/{suffix}"
                     else
                         handedOut.Value <- true
                         operationId
     }
+
+let private operationRootId (operationId: string) =
+    let separatorIndex = operationId.IndexOf "/"
+
+    if separatorIndex < 0 then
+        operationId
+    else
+        operationId.Substring(0, separatorIndex)
 
 let private writeCmd
     (deps: GitDependencies)
@@ -2150,18 +2159,37 @@ let private updateCore
         Cmd.none
     | SetCurrentProgress _ -> { model with CurrentProgress = None }, Cmd.none
     | OperationStarted key when model.BusyOperation.IsSome ->
-        {
-            model with
-                CurrentOperation = Some key
-        },
-        Cmd.none
+        match model.CurrentOperation with
+        | Some currentOperation ->
+            let rootOperationId = operationRootId currentOperation.OperationId
+
+            let belongsToWrite =
+                key.OperationId = rootOperationId
+                || key.OperationId.StartsWith(rootOperationId + "/", StringComparison.Ordinal)
+
+            if belongsToWrite then
+                {
+                    model with
+                        CurrentOperation = Some key
+                },
+                Cmd.none
+            else
+                model, Cmd.none
+        | None -> model, Cmd.none
     | OperationStarted _ -> model, Cmd.none
     | ArcPathChanged arcPath when arcPath = model.CurrentArcPath -> model, Cmd.none
     | ArcPathChanged arcPath ->
+        let pendingPublishAfterRefresh =
+            match model.PendingPublishForPath, arcPath with
+            | Some pendingPath, Some nextPath -> Swate.Components.Shared.PathHelpers.pathsEqual pendingPath nextPath
+            | _ -> false
+
         let nextModel = {
             GitState.Empty with
                 CurrentArcPath = arcPath
                 ArcSessionId = nextArcSessionId model
+                PendingPublishAfterRefresh = pendingPublishAfterRefresh
+                PendingPublishForPath = None
         }
 
         let cmd =
@@ -2651,6 +2679,20 @@ let private updateCore
                     (fun err -> PublishRenameCompleted(model.ArcSessionId, Error(string err)))
 
             nextModel, cmd
+    | PublishRenameCompleted(sessionId, Ok renamedPath) when
+        sessionId = model.ArcSessionId
+        && not (
+            model.CurrentArcPath
+            |> Option.exists (fun currentPath -> Swate.Components.Shared.PathHelpers.pathsEqual currentPath renamedPath)
+        )
+        ->
+        {
+            clearBusy model with
+                PendingPublishRename = None
+                PendingPublishForPath = Some renamedPath
+                ErrorNotice = None
+        },
+        Cmd.none
     | PublishRenameCompleted(sessionId, Ok renamedPath) when
         sessionId <> model.ArcSessionId && model.CurrentArcPath = Some renamedPath
         ->
