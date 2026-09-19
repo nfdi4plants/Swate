@@ -93,6 +93,12 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
             ()
     }
 
+    /// Keeps a settings value only while that same session is still open. A close that
+    /// lands while the provider call runs must not be undone by its continuation.
+    let storeSettingsIfLive (hosted: HostedSession) (settings: VersionControlSettings) =
+        if sessions.ContainsKey hosted.SessionId then
+            sessions[hosted.SessionId] <- { hosted with Settings = settings }
+
     let openBinding (factory: ProviderFactory) (binding: WorkspaceBinding) (context: OperationContext) = async {
         let! opened = factory.Open binding context
 
@@ -109,8 +115,21 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
             // Provider repository keys only mirror them.
             match hosted.Session.StoragePolicy with
             | Some policy ->
-                let! applied =
-                    policy.SetSettings (VersionControlSettings.toStoragePolicySettings hosted.Settings) context
+                // A provider that throws here must not lose the session it just opened,
+                // so the exception becomes an ordinary failure of the settings push.
+                let! applied = async {
+                    try
+                        return!
+                            policy.SetSettings (VersionControlSettings.toStoragePolicySettings hosted.Settings) context
+                    with error ->
+                        return
+                            Failed(
+                                OperationFailure.createRedacted
+                                    ProviderError
+                                    VersionControlCodes.UnexpectedException
+                                    error.Message
+                            )
+                }
 
                 let settingsFailure =
                     match applied with
@@ -221,13 +240,13 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
                         match result with
                         | Failed _ -> return result
                         | Succeeded outcome ->
-                            sessions[hosted.SessionId] <- { hosted with Settings = settings }
+                            storeSettingsIfLive hosted settings
                             return Succeeded(withValue () outcome)
                         | PartiallySucceeded(outcome, failure) ->
-                            sessions[hosted.SessionId] <- { hosted with Settings = settings }
+                            storeSettingsIfLive hosted settings
                             return PartiallySucceeded(withValue () outcome, failure)
                     | None ->
-                        sessions[hosted.SessionId] <- { hosted with Settings = settings }
+                        storeSettingsIfLive hosted settings
                         return OperationResult.succeeded ()
         }
 

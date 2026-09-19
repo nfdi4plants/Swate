@@ -878,6 +878,148 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "a settings change that completes after the session was closed does not resurrect it",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let coreOnlyRoot = join [| fixture.Root; "settings-after-close" |]
+                    let failingRoot = join [| fixture.Root; "settings-after-close-failing" |]
+
+                    for folder in [ coreOnlyRoot; failingRoot ] do
+                        Main.Bindings.Filesystem.mkdirSync
+                            folder
+                            (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    let gate, releaseGate = deferred ()
+                    let mutable calls = 0
+
+                    let storagePolicy: StoragePolicyService = {
+                        SetPathPolicy =
+                            fun _ _ _ -> async {
+                                return Failed(OperationFailure.create Unsupported "operation_not_supported" "fake")
+                            }
+                        GetSettings =
+                            fun _ -> async {
+                                return
+                                    OperationResult.succeeded {
+                                        AutoPolicyThresholdMb = Some 1
+                                        MaterializeLargeObjects = false
+                                    }
+                            }
+                        SetSettings =
+                            fun _ _ -> async {
+                                calls <- calls + 1
+
+                                // The push of the defaults at open answers at once. The
+                                // explicit change waits, so the close lands during it.
+                                if calls > 1 then
+                                    do! Async.AwaitPromise gate
+
+                                return OperationResult.succeeded ()
+                            }
+                    }
+
+                    let fakeRuntime =
+                        fakeProviderRuntimeWithStoragePolicy coreOnlyRoot failingRoot (Some storagePolicy)
+
+                    let fakeHost = WorkspaceSessionHost.WorkspaceSessionHost(fakeRuntime)
+                    WorkspaceSessionHost.initialize fakeHost
+
+                    try
+                        let! opened =
+                            fakeHost.OpenSession(coreOnlyRoot, detached "open-before-settings-close")
+                            |> Async.StartAsPromise
+
+                        expectValue "open before the settings change" opened |> ignore
+
+                        let changing =
+                            fakeHost.SetSettings(
+                                coreOnlyRoot,
+                                {
+                                    AutoTrackThresholdMb = 9
+                                    DownloadLargeFiles = true
+                                },
+                                detached "settings-during-close"
+                            )
+                            |> Async.StartAsPromise
+
+                        do! fakeHost.CloseSession coreOnlyRoot |> Async.StartAsPromise
+                        releaseGate ()
+                        let! changed = changing
+
+                        match changed with
+                        | Failed failure -> failwith $"Expected the provider call to succeed, got {failure.Code}"
+                        | _ -> ()
+
+                        Vitest.expect(fakeHost.TryGetSession coreOnlyRoot).toEqual None
+                        let settings = fakeHost.GetSettings coreOnlyRoot
+                        Vitest.expect(settings.AutoTrackThresholdMb).toBe 1
+                        Vitest.expect(settings.DownloadLargeFiles).toBe false
+                    finally
+                        WorkspaceSessionHost.initialize fixture.Host
+                })
+        )
+
+        Vitest.test (
+            "the first call after a partial open reports the settings failure once",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let coreOnlyRoot = join [| fixture.Root; "partial-open-ipc" |]
+                    let failingRoot = join [| fixture.Root; "partial-open-ipc-failing" |]
+
+                    for folder in [ coreOnlyRoot; failingRoot ] do
+                        Main.Bindings.Filesystem.mkdirSync
+                            folder
+                            (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    let settingsFailure =
+                        OperationFailure.create
+                            ProviderError
+                            "fake_default_settings_failed"
+                            "The fake provider rejected the default settings."
+
+                    let storagePolicy: StoragePolicyService = {
+                        SetPathPolicy =
+                            fun _ _ _ -> async {
+                                return Failed(OperationFailure.create Unsupported "operation_not_supported" "fake")
+                            }
+                        GetSettings =
+                            fun _ -> async {
+                                return
+                                    OperationResult.succeeded {
+                                        AutoPolicyThresholdMb = Some 1
+                                        MaterializeLargeObjects = false
+                                    }
+                            }
+                        SetSettings = fun _ _ -> async { return Failed settingsFailure }
+                    }
+
+                    let fakeRuntime =
+                        fakeProviderRuntimeWithStoragePolicy coreOnlyRoot failingRoot (Some storagePolicy)
+
+                    let fakeHost = WorkspaceSessionHost.WorkspaceSessionHost(fakeRuntime)
+                    WorkspaceSessionHost.initialize fakeHost
+
+                    try
+                        registerVault 52 coreOnlyRoot |> ignore
+                        let api = Main.IPC.IVersionControlApi.api (ipcEvent 52)
+                        let! first = api.getSessionInfo (request "info-partial-open")
+
+                        match first with
+                        | Ok(OperationResultDto.PartiallySucceeded(_, failure)) ->
+                            Vitest.expect(failure.Code).toBe settingsFailure.Code
+                        | other -> failwith $"Expected a partial session info, got {other}"
+
+                        let! second = api.getSessionInfo (request "info-after-partial-open")
+
+                        match second with
+                        | Ok(OperationResultDto.Succeeded _) -> ()
+                        | other -> failwith $"Expected the reused session to succeed, got {other}"
+                    finally
+                        WorkspaceSessionHost.initialize fixture.Host
+                })
+        )
+
+        Vitest.test (
             "session info, status, selected revision, publish and refresh run through the package",
             fun () ->
                 withFixture (fun fixture -> promise {

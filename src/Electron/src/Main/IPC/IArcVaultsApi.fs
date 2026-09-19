@@ -852,28 +852,36 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         match tryResolveArcRelativePath arcPath request.path with
                         | Error pathError -> return Error pathError
                         | Ok absolutePath ->
-                            vault.isBusyWriting <- true
+                            // The shared scope counts nesting, so a write that overlaps a
+                            // version control operation does not clear the busy flag under it.
+                            return!
+                                IPCHelper.withBusyWritingScope
+                                    vault
+                                    (fun () -> promise {
+                                        match request.fileType with
+                                        | FileContentType.FileContentTypeIsPlainTextVariant ->
+                                            let directoryPath = path.dirname absolutePath
+                                            do! ARCtrl.FileSystemHelper.createDirectoryAsync directoryPath
 
-                            try
-                                match request.fileType with
-                                | FileContentType.FileContentTypeIsPlainTextVariant ->
-                                    let directoryPath = path.dirname absolutePath
-                                    do! ARCtrl.FileSystemHelper.createDirectoryAsync directoryPath
-                                    do! ARCtrl.FileSystemHelper.writeFileTextAsync absolutePath request.content
-                                    do! refreshVaultFileTree vault
-                                    return Ok()
-                                | FileContentType.CLI ->
-                                    return Error(exn "Direct writing of CLI files is not supported.")
-                                | FileContentType.FileContentTypeIsISAFileVariant ->
-                                    return
-                                        Error(
-                                            exn
-                                                "Direct writing of ARC content files is not supported. Use saveArcFile for these file types to ensure ARC integrity."
-                                        )
-                                | _ ->
-                                    return Error(exn $"Unsupported file content type for writing: {request.fileType}")
-                            finally
-                                vault.isBusyWriting <- false
+                                            do! ARCtrl.FileSystemHelper.writeFileTextAsync absolutePath request.content
+
+                                            do! refreshVaultFileTree vault
+                                            return Ok()
+                                        | FileContentType.CLI ->
+                                            return Error(exn "Direct writing of CLI files is not supported.")
+                                        | FileContentType.FileContentTypeIsISAFileVariant ->
+                                            return
+                                                Error(
+                                                    exn
+                                                        "Direct writing of ARC content files is not supported. Use saveArcFile for these file types to ensure ARC integrity."
+                                                )
+                                        | _ ->
+                                            return
+                                                Error(
+                                                    exn
+                                                        $"Unsupported file content type for writing: {request.fileType}"
+                                                )
+                                    })
             with e ->
                 return Error e
         }

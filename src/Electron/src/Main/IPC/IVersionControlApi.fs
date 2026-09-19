@@ -122,12 +122,25 @@ let private withSession
                     let! opened = host.OpenSession(arcPath, tracked.Context) |> Async.StartAsPromise
 
                     match opened with
-                    | Succeeded outcome
-                    | PartiallySucceeded(outcome, _) ->
+                    | Succeeded outcome ->
                         let hosted = outcome.Value
                         host.AssignSession(operationId, hosted.SessionId)
                         let! result = operation hosted tracked.Context |> Async.StartAsPromise
                         return Ok(Mappings.result mapValue result)
+                    | PartiallySucceeded(outcome, openFailure) ->
+                        // Only a fresh open is partial, a reuse is not, so the failure of
+                        // the open (a rejected settings push, say) reaches the renderer
+                        // once, on the call that opened the session.
+                        let hosted = outcome.Value
+                        host.AssignSession(operationId, hosted.SessionId)
+                        let! result = operation hosted tracked.Context |> Async.StartAsPromise
+
+                        let merged =
+                            match result with
+                            | Succeeded valueOutcome -> PartiallySucceeded(valueOutcome, openFailure)
+                            | other -> other
+
+                        return Ok(Mappings.result mapValue merged)
                     | Failed failure -> return Ok(failedDto (sessionUnavailable failure))
                 with error ->
                     return Ok(failedDto (unexpectedFailure error))
@@ -383,9 +396,8 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             | Ok(vault, arcPath) ->
                 let host = WorkspaceSessionHost.get ()
                 let bridge = tryBridgeFromEvent event
-                let savedSettings = host.GetSettings arcPath
 
-                let restoreSavedSettings context = async {
+                let restoreSavedSettings savedSettings context = async {
                     try
                         let! restored = host.SetSettings(arcPath, savedSettings, context)
 
@@ -403,13 +415,16 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 }
 
                 let reopenWithSavedSettings context = async {
+                    // Read the values right before the close, so a change acknowledged
+                    // while the bind ran is the one restored afterwards.
+                    let savedSettings = host.GetSettings arcPath
                     let! reopened = host.ReopenSession(arcPath, context)
 
                     match reopened with
                     | Succeeded _
                     | PartiallySucceeded _ ->
                         if savedSettings <> VersionControlSettings.defaults then
-                            do! restoreSavedSettings context
+                            do! restoreSavedSettings savedSettings context
                     | _ -> ()
 
                     return reopened
