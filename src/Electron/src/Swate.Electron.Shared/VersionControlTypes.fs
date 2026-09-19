@@ -119,6 +119,9 @@ module VersionControlCodes =
     [<Literal>]
     let OperationCanceled = "operation_canceled"
 
+    [<Literal>]
+    let BaseContentNotFound = "base_content_not_found"
+
     // Produced by the Swate main process (session host and IPC handler).
     [<Literal>]
     let ServiceUnavailable = "service_unavailable"

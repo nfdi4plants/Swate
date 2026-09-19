@@ -53,43 +53,16 @@ module private Helper =
     let private unsupportedPage (path: string) (reason: string option) =
         Ok(PageState.GitUnsupportedPage { Path = path; Reason = reason })
 
-    /// A diff page needs the committed base, the current file and the word diff. The
-    /// current content comes from the vault file itself, the rest from the provider.
-    let loadDiffPage (requestedPath: string) : JS.Promise<Result<PageState, string>> = promise {
-        let! baseContent = Renderer.VersionControlApiClient.getBaseContent (pathRequest requestedPath)
-        let! wordDiff = Renderer.VersionControlApiClient.getWordDiff (pathRequest requestedPath)
-        let! currentFile = Api.ipcArcVaultApi.openFile requestedPath
-
-        let contentOf (result: Result<OperationResultDto<ContentViewDto>, string>) =
-            match result with
-            | Error message -> Error message
-            | Ok(OperationResultDto.Failed failure) when failure.Category = FailureCategoryDto.Unsupported ->
-                Ok(ContentViewDto.Unsupported(Some failure.Message))
-            | Ok(OperationResultDto.Failed failure) -> Error(failureMessage failure)
-            | Ok result ->
-                OperationResultDto.tryValue result
-                |> Option.defaultValue (ContentViewDto.Unsupported None)
-                |> Ok
-
-        match contentOf baseContent, contentOf wordDiff with
-        | Error message, _
-        | _, Error message -> return Error message
-        | Ok(ContentViewDto.Unsupported reason), _
-        | _, Ok(ContentViewDto.Unsupported reason) -> return unsupportedPage requestedPath reason
-        | Ok(ContentViewDto.Text previous), Ok(ContentViewDto.Text wordDiffText) ->
-            match currentFile with
-            | Error error -> return Error $"Could not read the current content of '{requestedPath}': {error.Message}"
-            | Ok dto ->
-                return
-                    Ok(
-                        PageState.GitDiffPage {
-                            Path = requestedPath
-                            PreviousContent = previous
-                            CurrentContent = dto.content
-                            WordDiffText = wordDiffText
-                        }
-                    )
-    }
+    /// The current content comes from the vault file itself, the rest from the provider.
+    let loadDiffPage (change: GitSidebarChange) : JS.Promise<Result<PageState, string>> =
+        GitDiffPageLoader.load
+            (fun path -> Renderer.VersionControlApiClient.getBaseContent (pathRequest path))
+            (fun path -> Renderer.VersionControlApiClient.getWordDiff (pathRequest path))
+            (fun path -> promise {
+                let! file = Api.ipcArcVaultApi.openFile path
+                return file |> Result.map _.content |> Result.mapError _.Message
+            })
+            change
 
     /// The conflict page carries the handle and the workspace token the preview was
     /// taken with, so the confirmation is checked against exactly that state.

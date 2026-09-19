@@ -351,7 +351,7 @@ type GitDependencies = {
     getStoragePolicySettings:
         OperationRequestDto -> JS.Promise<Result<OperationResultDto<StoragePolicySettingsDto>, string>>
     setStoragePolicySettings: StoragePolicySettingsRequestDto -> JS.Promise<Result<OperationResultDto<unit>, string>>
-    loadDiffPage: string -> JS.Promise<Result<PageState, string>>
+    loadDiffPage: GitSidebarChange -> JS.Promise<Result<PageState, string>>
     loadConflictPage: ConflictSessionSummaryDto -> string -> string -> JS.Promise<Result<PageState, string>>
     initializeWorkspace: InitializeWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<string>, string>>
     bindWorkspace: BindWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceSessionInfoDto>, string>>
@@ -921,16 +921,91 @@ let private runInitRepositoryAsync (deps: GitDependencies) (arcPath: string) = p
     | Ok _ -> return Ok { WarningMessage = None }
 }
 
+/// Builds the diff page from the provider's base content and word diff plus the
+/// current file. Exposed with its readers as parameters so the tests can drive it.
+module GitDiffPageLoader =
+
+    let private unsupportedPage (path: string) (reason: string option) =
+        Ok(PageState.GitUnsupportedPage { Path = path; Reason = reason })
+
+    let private contentOf (result: Result<OperationResultDto<ContentViewDto>, string>) =
+        match result with
+        | Error message -> Error message
+        | Ok(OperationResultDto.Failed failure) when failure.Category = FailureCategoryDto.Unsupported ->
+            Ok(ContentViewDto.Unsupported(Some failure.Message))
+        | Ok(OperationResultDto.Failed failure) -> Error(failureMessage failure)
+        | Ok result ->
+            OperationResultDto.tryValue result
+            |> Option.defaultValue (ContentViewDto.Unsupported None)
+            |> Ok
+
+    /// An added file has no committed base and a deleted file has no current content.
+    /// Either side is shown as empty text. A change with neither side is an error.
+    let load
+        (getBaseContent: string -> JS.Promise<Result<OperationResultDto<ContentViewDto>, string>>)
+        (getWordDiff: string -> JS.Promise<Result<OperationResultDto<ContentViewDto>, string>>)
+        (readCurrentContent: string -> JS.Promise<Result<string, string>>)
+        (change: GitSidebarChange)
+        : JS.Promise<Result<PageState, string>> =
+        promise {
+            let requestedPath = change.Path
+            let isDeleted = change.IndexStatus = "D" || change.WorkingTreeStatus = "D"
+            let! baseContent = getBaseContent requestedPath
+            let! wordDiff = getWordDiff requestedPath
+
+            let! currentContent =
+                if isDeleted then
+                    promise { return Ok None }
+                else
+                    promise {
+                        let! content = readCurrentContent requestedPath
+                        return content |> Result.map Some
+                    }
+
+            let baseView =
+                match baseContent with
+                | Ok(OperationResultDto.Failed failure) when failure.Code = VersionControlCodes.BaseContentNotFound ->
+                    Ok None
+                | other -> contentOf other |> Result.map Some
+
+            match baseView, contentOf wordDiff with
+            | Error message, _
+            | _, Error message -> return Error message
+            | Ok(Some(ContentViewDto.Unsupported reason)), _
+            | _, Ok(ContentViewDto.Unsupported reason) -> return unsupportedPage requestedPath reason
+            | Ok previous, Ok(ContentViewDto.Text wordDiffText) ->
+                let previousText =
+                    match previous with
+                    | Some(ContentViewDto.Text text) -> Some text
+                    | _ -> None
+
+                match currentContent with
+                | Error message -> return Error $"Could not read the current content of '{requestedPath}': {message}"
+                | Ok None when previousText.IsNone ->
+                    return Error $"'{requestedPath}' has no content on either side of the diff."
+                | Ok current ->
+                    return
+                        Ok(
+                            PageState.GitDiffPage {
+                                Path = requestedPath
+                                PreviousContent = previousText |> Option.defaultValue ""
+                                CurrentContent = current |> Option.defaultValue ""
+                                WordDiffText = wordDiffText
+                            }
+                        )
+        }
+
 let private loadPageAsync
     (deps: GitDependencies)
     (activeConflict: ConflictSessionSummaryDto option)
     (workspaceVersion: string option)
-    (path: string)
-    (isConflicted: bool)
+    (change: GitSidebarChange)
     =
     promise {
+        let path = change.Path
+
         let! result =
-            match isConflicted, activeConflict, workspaceVersion with
+            match change.IsConflicted, activeConflict, workspaceVersion with
             | true, Some conflict, Some version -> deps.loadConflictPage conflict version path
             | true, _, _ -> promise {
                 // The status says the path conflicts but the session is not in the model: reload it
@@ -941,10 +1016,10 @@ let private loadPageAsync
                 | Ok(outcome, _) ->
                     match outcome.Value.ActiveConflictSession with
                     | Some conflict -> return! deps.loadConflictPage conflict outcome.Value.WorkspaceVersion path
-                    | None -> return! deps.loadDiffPage path
+                    | None -> return! deps.loadDiffPage change
                 | Error failure -> return Error(failureMessage failure)
               }
-            | false, _, _ -> deps.loadDiffPage path
+            | false, _, _ -> deps.loadDiffPage change
 
         return result |> Result.map GitPageChange.Set
     }
@@ -1834,13 +1909,31 @@ let private executeWriteAttemptOnce (deps: GitDependencies) (state: GitState) (w
     | RetryMaterialization -> return! runRetryMaterializationAttemptAsync deps
 }
 
+/// Writes that change the working tree from a state the user reviewed are not replayed
+/// against a workspace that moved in between. A discard or a restore would drop content
+/// the user has not seen. An update would run without its preview, and an abandoned
+/// merge would lose edits made since the refresh.
+let private replaysAfterStaleToken =
+    function
+    | DiscardSelection _
+    | RestoreInterruptedPaths _
+    | Pull
+    | AbandonMerge -> false
+    | _ -> true
+
+let private staleWithoutReplayMessage =
+    "The workspace changed since it was last refreshed, so the action was not repeated. Review the current changes and try again."
+
 /// A stale workspace token that left the workspace unchanged is the normal outcome
 /// when the workspace moved between the refresh and the click. The state is refreshed
-/// and the write runs once more against the current token.
+/// and the write runs once more against the current token, unless replaying it could
+/// discard content the user has not reviewed.
 let private executeWriteAttempt (deps: GitDependencies) (state: GitState) (writeRequest: WriteRequest) = promise {
     let! first = executeWriteAttemptOnce deps state writeRequest
 
     match first with
+    | Ok(StaleWorkspaceVersion _) when not (replaysAfterStaleToken writeRequest) ->
+        return Ok(StaleWorkspaceVersion staleWithoutReplayMessage)
     | Ok(StaleWorkspaceVersion _) ->
         let! refreshResult = refreshAllAsync deps
 
@@ -2219,7 +2312,7 @@ let update
         let cmd =
             Cmd.OfPromise.either
                 (fun (deps: GitDependencies, change: GitSidebarChange) ->
-                    loadPageAsync deps model.ActiveConflict model.WorkspaceVersion change.Path change.IsConflicted
+                    loadPageAsync deps model.ActiveConflict model.WorkspaceVersion change
                 )
                 (deps, change)
                 (fun result -> SelectChangeCompleted(requestId, change.Path, reply, result))
@@ -2653,7 +2746,8 @@ let update
 
         nextModel, writeCmd deps model writeRequest model.ArcSessionId writeRequestId operationId
     | WriteCompleted(_, _, writeRequest, Ok(StaleWorkspaceVersion message)) ->
-        // Only reached when the retry after a refresh was stale again.
+        // Reached when the retry after a refresh was stale again, or when the write is
+        // one that is never replayed. The refresh shows the state the user has to review.
         let nextModel = {
             writeErrorModel message model with
                 PendingPostMergePush = false
@@ -2663,6 +2757,7 @@ let update
         Cmd.batch [
             resolveCloneReplyCmd writeRequest (Error message)
             reportWriteErrorCmd deps writeRequest message
+            Cmd.ofMsg RefreshRequested
         ]
     | WriteCompleted(sessionId, writeRequestId, writeRequest, result) when
         sessionId <> model.ArcSessionId || writeRequestId <> model.WriteRequestId

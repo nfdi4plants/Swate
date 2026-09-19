@@ -3246,6 +3246,364 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "A stale discard is not repeated and reports the refreshed state",
+            fun () -> promise {
+                let restoreRequests = ResizeArray<RestorePathsRequestDto>()
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
+                let deps = {
+                    defaultDependencies with
+                        restorePaths =
+                            fun request ->
+                                restoreRequests.Add request
+
+                                promise {
+                                    return
+                                        Ok(
+                                            failed
+                                                Concurrency
+                                                VersionControlCodes.PreconditionFailed
+                                                "workspace version is stale"
+                                        )
+                                }
+                        getStatus =
+                            fun _ -> promise {
+                                return
+                                    Ok(
+                                        succeeded {
+                                            cleanStatus with
+                                                WorkspaceVersion = "v2"
+                                        }
+                                    )
+                            }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                        reportError = reportedErrors.Add
+                }
+
+                let state = {
+                    runningState with
+                        ChangedFiles = [| changedFile "a.txt" "M" " " false |]
+                }
+
+                let model, command =
+                    update deps ignore (DiscardSelectionRequested [| "a.txt" |]) state
+
+                let! messages = collectMessages command
+
+                let requested, writeCmd =
+                    match messages with
+                    | [| WriteRequested(DiscardSelection [| "a.txt" |]) |] -> update deps ignore messages[0] model
+                    | _ -> failwith "Expected the discard write request."
+
+                let! completion = collectMessages writeCmd
+
+                let finalState, finishCmd, completedMessage =
+                    match completion with
+                    | [| WriteCompleted(_, _, DiscardSelection _, Ok(StaleWorkspaceVersion message)) |] ->
+                        let nextState, command = update deps ignore completion[0] requested
+                        nextState, command, message
+                    | _ -> failwith "Expected the stale discard completion."
+
+                let! finishMessages = collectMessages finishCmd
+
+                Vitest.expect(restoreRequests.Count).toBe (1)
+
+                Vitest
+                    .expect(completedMessage.StartsWith("The workspace changed since it was last refreshed"))
+                    .toBe (true)
+
+                Vitest.expect(finalState.BusyOperation).toEqual (None)
+                Vitest.expect(finalState.ErrorNotice).toEqual (Some completedMessage)
+                Vitest.expect(reportedErrors.Count).toBe (1)
+
+                Vitest
+                    .expect(
+                        finishMessages
+                        |> Array.exists (
+                            function
+                            | RefreshRequested -> true
+                            | _ -> false
+                        )
+                    )
+                    .toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "A stale update is not repeated without a new preview",
+            fun () -> promise {
+                let updateRequests = ResizeArray<UpdateRequestDto>()
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
+                let deps = {
+                    defaultDependencies with
+                        update =
+                            fun request ->
+                                updateRequests.Add request
+
+                                promise {
+                                    return
+                                        Ok(
+                                            failed
+                                                Concurrency
+                                                VersionControlCodes.PreconditionFailed
+                                                "workspace version is stale"
+                                        )
+                                }
+                        getStatus =
+                            fun _ -> promise {
+                                return
+                                    Ok(
+                                        succeeded {
+                                            cleanStatus with
+                                                WorkspaceVersion = "v2"
+                                        }
+                                    )
+                            }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                        reportError = reportedErrors.Add
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested Pull) runningState
+
+                let! completionMessages = collectMessages requestCmd
+
+                let finalState, finishCmd, completedMessage =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, Pull, Ok(StaleWorkspaceVersion message)) |] ->
+                        let nextState, command = update deps ignore completionMessages[0] stateAfterRequest
+                        nextState, command, message
+                    | _ -> failwith "Expected the stale update completion."
+
+                let! finishMessages = collectMessages finishCmd
+
+                Vitest.expect(updateRequests.Count).toBe (1)
+
+                Vitest
+                    .expect(completedMessage.StartsWith("The workspace changed since it was last refreshed"))
+                    .toBe (true)
+
+                Vitest.expect(finalState.BusyOperation).toEqual (None)
+                Vitest.expect(finalState.ErrorNotice).toEqual (Some completedMessage)
+                Vitest.expect(reportedErrors.Count).toBe (1)
+
+                Vitest
+                    .expect(
+                        finishMessages
+                        |> Array.exists (
+                            function
+                            | RefreshRequested -> true
+                            | _ -> false
+                        )
+                    )
+                    .toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "A stale abandon of a merge is not repeated",
+            fun () -> promise {
+                let mutable calls = 0
+                let conflict = (conflictedStatus [| "conflict.txt" |]).ActiveConflictSession.Value
+
+                let deps = {
+                    defaultDependencies with
+                        cancelConflict =
+                            fun _ ->
+                                calls <- calls + 1
+
+                                promise {
+                                    return
+                                        Ok(
+                                            failed
+                                                Concurrency
+                                                VersionControlCodes.PreconditionFailed
+                                                "workspace version is stale"
+                                        )
+                                }
+                }
+
+                let state = {
+                    runningState with
+                        ActiveConflict = Some conflict
+                }
+
+                let model, command = update deps ignore AbandonMergeRequested state
+                let! messages = collectMessages command
+
+                let requested, writeCmd =
+                    match messages with
+                    | [| WriteRequested AbandonMerge |] -> update deps ignore messages[0] model
+                    | _ -> failwith "Expected the abandon-merge write request."
+
+                let! completion = collectMessages writeCmd
+
+                let finalState, finishCmd =
+                    match completion with
+                    | [| WriteCompleted(_, _, AbandonMerge, Ok(StaleWorkspaceVersion _)) |] ->
+                        update deps ignore completion[0] requested
+                    | _ -> failwith "Expected the stale abandon completion."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(calls).toBe (1)
+                Vitest.expect(finalState.BusyOperation).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A stale restore of interrupted paths is not repeated",
+            fun () -> promise {
+                let affectedPaths = [| "a.txt" |]
+                let mutable restoreCalls = 0
+
+                let canceled =
+                    makeFailure
+                        Canceled
+                        VersionControlCodes.OperationCanceled
+                        "Update was canceled."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RestoreWorkspace
+                            Instructions = Some "Restore the interrupted files."
+                        })
+                        affectedPaths
+
+                let deps = {
+                    defaultDependencies with
+                        update = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
+                        restorePaths =
+                            fun _ ->
+                                restoreCalls <- restoreCalls + 1
+
+                                promise {
+                                    return
+                                        Ok(
+                                            failed
+                                                Concurrency
+                                                VersionControlCodes.PreconditionFailed
+                                                "workspace version is stale"
+                                        )
+                                }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested Pull) runningState
+
+                let! completionMessages = collectMessages requestCmd
+
+                let recoveryState, recoveryCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_,
+                                        _,
+                                        Pull,
+                                        Ok(RequiresRecovery(GitPendingRecovery.RestoreInterruptedPaths _, _))) |] ->
+                        update deps ignore completionMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected the restore recovery."
+
+                let! _ = collectMessages recoveryCmd
+
+                let confirmedState, confirmCmd =
+                    update deps ignore ConfirmPendingRemoteActionRequested recoveryState
+
+                let! confirmMessages = collectMessages confirmCmd
+
+                let restoreState, restoreCmd =
+                    match confirmMessages with
+                    | [| RestoreInterruptedPathsRequested |] -> update deps ignore confirmMessages[0] confirmedState
+                    | _ -> failwith "Expected the restore confirmation."
+
+                let! restoreMessages = collectMessages restoreCmd
+
+                let requestedState, writeCmd =
+                    match restoreMessages with
+                    | [| WriteRequested(RestoreInterruptedPaths [| "a.txt" |]) |] ->
+                        update deps ignore restoreMessages[0] restoreState
+                    | _ -> failwith "Expected the restore write request."
+
+                let! completion = collectMessages writeCmd
+
+                let finalState, finishCmd =
+                    match completion with
+                    | [| WriteCompleted(_, _, RestoreInterruptedPaths _, Ok(StaleWorkspaceVersion _)) |] ->
+                        update deps ignore completion[0] requestedState
+                    | _ -> failwith "Expected the stale restore completion."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(restoreCalls).toBe (1)
+                Vitest.expect(finalState.BusyOperation).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A stale branch switch is retried once against the refreshed token",
+            fun () -> promise {
+                let requests = ResizeArray<SwitchRefRequestDto>()
+
+                let deps = {
+                    defaultDependencies with
+                        switchRef =
+                            fun request ->
+                                requests.Add request
+
+                                if requests.Count = 1 then
+                                    promise {
+                                        return
+                                            Ok(
+                                                failed
+                                                    Concurrency
+                                                    VersionControlCodes.PreconditionFailed
+                                                    "workspace version is stale"
+                                            )
+                                    }
+                                else
+                                    promise { return Ok(succeeded cleanStatus) }
+                        getStatus =
+                            fun _ -> promise {
+                                return
+                                    Ok(
+                                        succeeded {
+                                            cleanStatus with
+                                                WorkspaceVersion = "v2"
+                                        }
+                                    )
+                            }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let state = {
+                    runningState with
+                        Refs = [| localBranch "feature" false false |]
+                }
+
+                let model, command = update deps ignore (SwitchBranchRequested "feature") state
+                let! messages = collectMessages command
+                let requested, writeCmd = update deps ignore messages[0] model
+                let! completion = collectMessages writeCmd
+
+                let finalState, finishCmd =
+                    match completion with
+                    | [| WriteCompleted(_, _, SwitchBranch "feature", Ok(Completed _)) |] ->
+                        update deps ignore completion[0] requested
+                    | _ -> failwith "Expected the retried branch switch to complete."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(requests.Count).toBe (2)
+                Vitest.expect(requests[0].ExpectedWorkspaceVersion).toBe ("v1")
+                Vitest.expect(requests[1].ExpectedWorkspaceVersion).toBe ("v2")
+                Vitest.expect(finalState.ErrorNotice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
             "A conflict session reported by a commit opens the first conflicted item",
             fun () -> promise {
                 let conflicted = conflictedStatus [| "conflict.txt" |]
@@ -4997,6 +5355,149 @@ Vitest.describe (
                 Vitest.expect(legacyCard.className.Contains("swt:border")).toBe (false)
 
                 cleanup ()
+            }
+        )
+)
+
+Vitest.describe (
+    "GitDiffPageLoader",
+    fun () ->
+        let change path index : GitSidebarChange = {
+            Path = path
+            OriginalPath = None
+            IndexStatus = index
+            WorkingTreeStatus = "."
+            IsConflicted = false
+        }
+
+        Vitest.test (
+            "An added file shows an empty previous side",
+            fun () -> promise {
+                let path = "new.txt"
+
+                let getBaseContent =
+                    fun _ -> promise { return Ok(failed NotFound VersionControlCodes.BaseContentNotFound "absent") }
+
+                let getWordDiff = fun _ -> promise { return Ok(succeeded (ContentViewDto.Text "")) }
+
+                let readCurrentContent = fun _ -> promise { return Ok "new content" }
+
+                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "A")
+
+                match result with
+                | Ok(PageState.GitDiffPage page) ->
+                    Vitest.expect(page.PreviousContent).toBe ("")
+                    Vitest.expect(page.CurrentContent).toBe ("new content")
+                | _ -> failwith "Expected an added-file diff page."
+            }
+        )
+
+        Vitest.test (
+            "A deleted file shows an empty current side without reading the file",
+            fun () -> promise {
+                let path = "deleted.txt"
+                let mutable currentRead = false
+
+                let getBaseContent =
+                    fun _ -> promise { return Ok(succeeded (ContentViewDto.Text "old")) }
+
+                let getWordDiff =
+                    fun _ -> promise { return Ok(succeeded (ContentViewDto.Text "-old")) }
+
+                let readCurrentContent =
+                    fun _ ->
+                        currentRead <- true
+                        promise { return Ok "must not be read" }
+
+                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "D")
+
+                match result with
+                | Ok(PageState.GitDiffPage page) ->
+                    Vitest.expect(page.PreviousContent).toBe ("old")
+                    Vitest.expect(page.CurrentContent).toBe ("")
+                    Vitest.expect(currentRead).toBe (false)
+                | _ -> failwith "Expected a deleted-file diff page."
+            }
+        )
+
+        Vitest.test (
+            "A change with neither side is an error",
+            fun () -> promise {
+                let path = "empty.txt"
+
+                let getBaseContent =
+                    fun _ -> promise { return Ok(failed NotFound VersionControlCodes.BaseContentNotFound "absent") }
+
+                let getWordDiff = fun _ -> promise { return Ok(succeeded (ContentViewDto.Text "")) }
+
+                let readCurrentContent = fun _ -> promise { return Ok "must not be read" }
+
+                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "D")
+
+                match result with
+                | Error message -> Vitest.expect(message.Contains(path)).toBe (true)
+                | _ -> failwith "Expected a missing-content error."
+            }
+        )
+
+        Vitest.test (
+            "A failed read of the current file is an error",
+            fun () -> promise {
+                let path = "changed.txt"
+
+                let getBaseContent =
+                    fun _ -> promise { return Ok(succeeded (ContentViewDto.Text "old")) }
+
+                let getWordDiff = fun _ -> promise { return Ok(succeeded (ContentViewDto.Text "")) }
+
+                let readCurrentContent = fun _ -> promise { return Error "EACCES" }
+
+                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "M")
+
+                match result with
+                | Error message -> Vitest.expect(message.Contains("EACCES")).toBe (true)
+                | _ -> failwith "Expected a current-content read error."
+            }
+        )
+
+        Vitest.test (
+            "A base failure other than not found is an error",
+            fun () -> promise {
+                let path = "failed-base.txt"
+
+                let getBaseContent =
+                    fun _ -> promise { return Ok(failed ProviderError "git_failure" "boom") }
+
+                let getWordDiff = fun _ -> promise { return Ok(succeeded (ContentViewDto.Text "")) }
+
+                let readCurrentContent = fun _ -> promise { return Ok "x" }
+
+                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "M")
+
+                match result with
+                | Error message -> Vitest.expect(message.Contains("boom")).toBe (true)
+                | _ -> failwith "Expected a base-content error."
+            }
+        )
+
+        Vitest.test (
+            "An unsupported word diff opens the unsupported page",
+            fun () -> promise {
+                let path = "binary.dat"
+
+                let getBaseContent =
+                    fun _ -> promise { return Ok(succeeded (ContentViewDto.Text "a")) }
+
+                let getWordDiff =
+                    fun _ -> promise { return Ok(failed Unsupported "binary" "binary content") }
+
+                let readCurrentContent = fun _ -> promise { return Ok "b" }
+
+                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "M")
+
+                match result with
+                | Ok(PageState.GitUnsupportedPage _) -> ()
+                | _ -> failwith "Expected an unsupported diff page."
             }
         )
 )
