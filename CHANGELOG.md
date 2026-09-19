@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🔄 Changed
 
--   Run all Git operations of the Electron app through the provider-neutral VersionControlService library instead of the built-in Git implementation. Failures are routed by category and code, a canceled update offers a structured recovery, and repository settings of earlier versions (`swate.lfs.*`) move to the library keys once. Swate now requires Git 2.38 or newer and Git LFS 3.7 or newer.
+-   Run all Git operations of the Electron app through the provider-neutral VersionControlService library instead of the built-in Git implementation. Failures are routed by category and code, a canceled update offers a structured recovery, and the Git LFS settings live under the library's own repository keys (the `swate.lfs.*` keys of earlier versions are no longer read). ARC metadata workbooks (`isa.*.xlsx`) are never stored as Git LFS pointers, and dataset files and files above 25 MB always are. Swate now requires Git 2.38 or newer and Git LFS 3.7 or newer.
 
 ## 2.3.1 - 2026-09-16
 

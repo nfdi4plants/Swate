@@ -58,9 +58,9 @@ Routing is structural. Code that decides what to do next keys on `Category`, `Co
 
 Categories: `Validation`, `NotFound`, `Concurrency`, `Authentication`, `Authorization`, `DependencyMissing`, `Network`, `Timeout`, `Canceled`, `Conflict`, `Unsupported`, `ProviderError`.
 
-Codes the renderer handles are literals in `VersionControlCodes` (`VersionControlTypes.fs`). Library codes include `identity_missing`, `publish_target_missing`, `target_unreachable`, `precondition_failed`, `conflicts_detected`, `conflict_session_active`, `target_not_empty` and `operation_canceled`. Swate host codes include `service_unavailable` (the provider has no such optional service), `session_unavailable`, `workspace_unmanaged`, `workspace_ambiguous`, `location_unsupported`, `lock_removal_refused` and `binding_not_persisted`.
+Codes the renderer handles are literals in `VersionControlCodes` (`VersionControlTypes.fs`). Library codes include `identity_missing`, `publish_target_missing`, `target_unreachable`, `precondition_failed`, `conflicts_detected`, `conflict_session_active`, `target_not_empty` and `operation_canceled`. Swate host codes include `service_unavailable` (the provider has no such optional service), `session_unavailable`, `workspace_unmanaged`, `workspace_ambiguous`, `location_unsupported`, `lock_removal_refused`, `binding_not_persisted`, `transport_error` (the IPC call failed before a structured result existed) and `storage_policy_blocked` (the DataHub ruleset refused a change or a save, see section 8).
 
-Recovery codes (`VersionControlCodes.Recovery`) tell the renderer which dialog to open after a canceled or partial operation: `remove_index_lock`, `restore_workspace`, `refresh_workspace`, `inspect_workspace`, `abort_merge`, `retry_materialization`, `resolve_conflict_session`, `refresh_conflict_session`, `remove_clone_target`.
+Recovery codes (`VersionControlCodes.Recovery`) tell the renderer which dialog to open after a canceled or partial operation: `remove_index_lock`, `restore_workspace`, `refresh_workspace`, `inspect_workspace`, `abort_merge`, `retry_materialization`, `reconcile_materialization`, `reconcile_index`, `resolve_conflict_session`, `refresh_conflict_session`, `remove_clone_target`.
 
 Helpers on `OperationResultDto` (`map`, `tryValue`, `tryFailure`, `isCanceled`, `recoveryCode`) cover the common checks.
 
@@ -95,7 +95,6 @@ Primary save in the sidebar: `createRevision` with the exact selected paths, ref
 
 - `DataHubStrategies.fs`: the credential strategy (token of the account matching the target host, the active account when no host is known, `None` when nobody is signed in) and the identity strategy (commit name and email of that account). Strategies are cheap and side effect free.
 - `WorkspaceBindingStore.fs`: the persisted `WorkspaceBinding` per vault root in the app settings, with tolerant decoding.
-- `LegacySettingsMigration.fs`: moves the repository settings of the previous Swate Git implementation (`swate.lfs.*` keys) to the library storage policy once, when a Git session opens.
 - `ProviderComposition.fs`: factories, catalog, provider ids, location parsing (`https://` and `ssh://` locations belong to Git, `lakefs://` to lakeFS) and the stale lock paths.
 - `VersionControlRuntime.fs`: the process wide runtime (catalog, binding store, resolver).
 - `Mappings.fs`: library types to DTOs and back, plus path, ref and revision validation.
@@ -123,17 +122,17 @@ The Git factory receives a `GitCredentialStrategy` and a `GitIdentityStrategy` b
 
 The library exposes large objects through the object materialization and storage policy services. For Git that is Git LFS.
 
-Settings live in local repository config under the library keys `versioncontrolservice.lfs.autotrackthresholdmb` (positive whole MiB, default 1) and `versioncontrolservice.lfs.materializelargeobjects`. The sidebar edits them through `setStoragePolicySettings` with `AutoPolicyThresholdMb = Some n`. A value of zero or less fails with `invalid_lfs_threshold`. Repositories created by earlier Swate versions carry `swate.lfs.autotrackthresholdmb` and `swate.lfs.downloadlargefiles`. `LegacySettingsMigration` copies valid values to the library keys when the session opens for the first time, unless the library keys already exist, and removes the legacy keys afterwards.
+The threshold for automatic large-object storage and the preference to download large objects are settings of the Electron app, not of the repository. Every session starts from the defaults (1 MiB, no download). The main process keeps the current values in memory per open session and pushes them into the provider when the session opens, so for Git the library keys `versioncontrolservice.lfs.autotrackthresholdmb` and `versioncontrolservice.lfs.materializelargeobjects` in the local repository config only mirror the app values. The sidebar reads them through `getStoragePolicySettings` and changes them through `setStoragePolicySettings`; a change lasts for the open session and is gone when the ARC is opened again. The main process refuses a threshold below 1 MB or above 100 MB with `storage_policy_blocked`. lakeFS has no storage policy service, so the values are held by the main process only and the download preference feeds the clone request. Repositories created by earlier Swate versions may still carry `swate.lfs.autotrackthresholdmb` and `swate.lfs.downloadlargefiles` in their local config. Swate does not read them any more.
 
 Renderer state starts with `DownloadLargeFiles = false` until the settings are loaded.
 
 Manual marking follows the DataHub ruleset in `src/Shared/GitLfsRules.fs`:
 
-- `isa.*.xlsx` metadata files must never be tracked with Git LFS. They cannot be marked manually and are exempt from automatic tracking.
+- `isa.*.xlsx` metadata files must never be tracked with Git LFS. They cannot be marked manually, and a save never turns them into pointers: the composition root hands every provider factory one `RevisionPolicyStrategy` built from the ruleset (`Inline` for metadata files, `LargeObject` for files below a `dataset` folder and for files above 25 MB, `Automatic` otherwise). The Git provider applies it inside its revision transaction and writes the attribute rules it needs; the lakeFS provider accepts the strategy and ignores it. A metadata file that still holds a Git LFS pointer is refused with `inline_content_not_materialized` and the recovery `retry_materialization` until it is downloaded.
 - Files below a `dataset` folder must stay tracked and cannot be unmarked.
 - Files larger than 25 MB must stay tracked and cannot be unmarked.
 
-The file tree context menu disables blocked toggles, `GitLfsHelper` checks the rules again before calling `setPathStoragePolicy`, and the main process rejects a blocked request with `storage_policy_blocked`.
+The file tree context menu disables blocked toggles, `GitLfsHelper` checks the rules again before calling `setPathStoragePolicy`, and the main process reads the file size itself and rejects a blocked request with `storage_policy_blocked`.
 
 File actions of the explorer: "Download LFS file" calls `materializeObject`, "Free local LFS copy" calls `dematerializeObject`. Both need a clean file. "Clean LFS Cache" (`pruneStorage`) and "Reduce LFS Storage" (`deduplicateStorage`) need a clean working tree. Deduplication can fail on file systems without copy on write support, which is expected and shown to the user.
 

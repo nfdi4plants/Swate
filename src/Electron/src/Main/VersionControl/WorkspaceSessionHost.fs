@@ -5,7 +5,9 @@ module Main.VersionControl.WorkspaceSessionHost
 
 open System
 open System.Collections.Generic
+open Browser.Dom
 open Fable.Core
+open Main.VersionControl.VersionControlSettings
 open Swate.Electron.Shared.VersionControlTypes
 open VersionControlService.Abstractions
 
@@ -14,6 +16,7 @@ type HostedSession = {
     Binding: WorkspaceBinding
     Factory: ProviderFactory
     Session: WorkspaceSession
+    Settings: VersionControlSettings
 }
 
 /// A registered operation: its context for the library call and the completion
@@ -84,20 +87,42 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
     let openBinding (factory: ProviderFactory) (binding: WorkspaceBinding) (context: OperationContext) = async {
         let! opened = factory.Open binding context
 
-        let host (outcome: OperationOutcome<WorkspaceSession>) =
+        let initializeSettings (outcome: OperationOutcome<WorkspaceSession>) = async {
             let hosted = {
                 SessionId = Guid.NewGuid().ToString()
                 Binding = binding
                 Factory = factory
                 Session = outcome.Value
+                Settings = VersionControlSettings.defaults
             }
 
+            // The app owns these values. Every session starts from the defaults.
+            // Provider repository keys only mirror them.
+            match hosted.Session.StoragePolicy with
+            | Some policy ->
+                let! applied =
+                    policy.SetSettings (VersionControlSettings.toStoragePolicySettings hosted.Settings) context
+
+                match applied with
+                | Failed failure ->
+                    console.error (
+                        $"Could not apply default version-control settings ({failure.Code}): {failure.Message}"
+                    )
+                | Succeeded _
+                | PartiallySucceeded _ -> ()
+            | None -> ()
+
             sessions[hosted.SessionId] <- hosted
-            withValue hosted outcome
+            return withValue hosted outcome
+        }
 
         match opened with
-        | Succeeded outcome -> return Succeeded(host outcome)
-        | PartiallySucceeded(outcome, failure) -> return PartiallySucceeded(host outcome, failure)
+        | Succeeded outcome ->
+            let! initialized = initializeSettings outcome
+            return Succeeded initialized
+        | PartiallySucceeded(outcome, failure) ->
+            let! initialized = initializeSettings outcome
+            return PartiallySucceeded(initialized, failure)
         | Failed failure -> return Failed failure
     }
 
@@ -136,6 +161,45 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
         match sessions.TryGetValue sessionId with
         | true, hosted -> Some hosted
         | _ -> None
+
+    member _.GetSettings(workspaceRoot: string) : VersionControlSettings =
+        tryFindSession workspaceRoot
+        |> Option.map (fun hosted -> hosted.Settings)
+        |> Option.defaultValue VersionControlSettings.defaults
+
+    member _.SetSettings
+        (workspaceRoot: string, settings: VersionControlSettings, context: OperationContext)
+        : Async<OperationResult<unit>> =
+        async {
+            match VersionControlSettings.validate settings with
+            | Error reason ->
+                return Failed(OperationFailure.create Validation VersionControlCodes.StoragePolicyBlocked reason)
+            | Ok settings ->
+                match tryFindSession workspaceRoot with
+                | None ->
+                    return
+                        Failed(
+                            OperationFailure.create
+                                NotFound
+                                VersionControlCodes.SessionUnavailable
+                                "The workspace session is not open."
+                        )
+                | Some hosted ->
+                    match hosted.Session.StoragePolicy with
+                    | Some policy ->
+                        let! result =
+                            policy.SetSettings (VersionControlSettings.toStoragePolicySettings settings) context
+
+                        match result with
+                        | Failed _ -> return result
+                        | Succeeded _
+                        | PartiallySucceeded _ ->
+                            sessions[hosted.SessionId] <- { hosted with Settings = settings }
+                            return OperationResult.succeeded ()
+                    | None ->
+                        sessions[hosted.SessionId] <- { hosted with Settings = settings }
+                        return OperationResult.succeeded ()
+        }
 
     /// Returns the open session for the root, or resolves the root, adopts it when
     /// exactly one provider owns it, persists the binding and opens the session.

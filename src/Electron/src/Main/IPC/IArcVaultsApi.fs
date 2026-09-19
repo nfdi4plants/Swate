@@ -177,17 +177,12 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 let windowId = windowIdFromIpcEvent event
                 let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, request.identifier)
 
-                if request.initGit then
-                    match disposition.CreatedArcPath with
-                    | Some createdArcPath ->
-                        match WorkspaceSessionHost.tryCurrent () with
-                        | None -> Swate.Components.console.log "Version control runtime is unavailable."
-                        | Some host ->
-                            let context =
-                                OperationContext.create
-                                    (System.Guid.NewGuid().ToString())
-                                    OperationCancellation.none
-                                    ignore
+                let! initializationResult =
+                    if request.initGit then
+                        match disposition.CreatedArcPath with
+                        | Some createdArcPath -> promise {
+                            let host = WorkspaceSessionHost.get ()
+                            let context = OperationContext.detached "create-arc-initialize"
 
                             let! initResult =
                                 IVersionControlApi.initializeLocalWorkspace host createdArcPath context
@@ -195,14 +190,23 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                             match initResult with
                             | Failed failure ->
-                                Swate.Components.console.log (
-                                    $"Git init failed for '{ArcOpenDisposition.path disposition}': {failure.Message}"
-                                )
+                                return
+                                    Error(
+                                        exn
+                                            $"The ARC was created, but its Git repository could not be initialized: {failure.Message}"
+                                    )
                             | Succeeded _
-                            | PartiallySucceeded _ -> notifyGitRepositoryInitialized createdArcPath
-                    | None -> ()
+                            | PartiallySucceeded _ ->
+                                notifyGitRepositoryInitialized createdArcPath
+                                return Ok()
+                          }
+                        | None -> promise { return Ok() }
+                    else
+                        promise { return Ok() }
 
-                return Ok(ArcOpenDisposition.path disposition)
+                match initializationResult with
+                | Error error -> return Error error
+                | Ok() -> return Ok(ArcOpenDisposition.path disposition)
         }
     ensureNotesFolder =
         fun () -> promise {

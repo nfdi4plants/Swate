@@ -13,6 +13,10 @@ open Vitest
 open ElectronCore.TestHelpers
 
 let private electronMock: obj = import "__electronMock" "electron"
+let private electron: obj = importAll "electron"
+
+[<Emit("$0.mockResolvedValue($1)")>]
+let private mockResolvedValue (mock: obj) (value: obj) : unit = jsNative
 
 [<Emit("require('node:child_process').execFileSync($0, $1, { cwd: $2, stdio: 'pipe' }).toString()")>]
 let private execFile (_file: string) (_args: string[]) (_cwd: string) : string = jsNative
@@ -98,8 +102,18 @@ let private createFixture () = promise {
 
     git remoteRoot [ "init"; "--bare"; "--initial-branch=main" ] |> ignore
     git repoRoot [ "init"; "--initial-branch=main" ] |> ignore
+    git repoRoot [ "lfs"; "install"; "--local" ] |> ignore
     git repoRoot [ "config"; "user.name"; "Fixture" ] |> ignore
     git repoRoot [ "config"; "user.email"; "fixture@example.org" ] |> ignore
+
+    git repoRoot [
+        "config"
+        "--local"
+        "versioncontrolservice.lfs.autotrackthresholdmb"
+        "1"
+    ]
+    |> ignore
+
     writeText (join [| repoRoot; "base.txt" |]) "base\n"
     git repoRoot [ "add"; "base.txt" ] |> ignore
     git repoRoot [ "commit"; "-m"; "base" ] |> ignore
@@ -172,6 +186,63 @@ Vitest.describe (
                     let reopened = expectValue "reopen" third
                     Vitest.expect(reopened.SessionId).not.toBe hosted.SessionId
                     Vitest.expect(reopened.Binding).toEqual persisted
+                })
+        )
+
+        Vitest.test (
+            "a fresh git session starts from the default settings and pushes them into the provider",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    git fixture.RepoRoot [
+                        "config"
+                        "--local"
+                        "versioncontrolservice.lfs.autotrackthresholdmb"
+                        "42"
+                    ]
+                    |> ignore
+
+                    git fixture.RepoRoot [
+                        "config"
+                        "--local"
+                        "versioncontrolservice.lfs.materializelargeobjects"
+                        "true"
+                    ]
+                    |> ignore
+
+                    let! opened =
+                        fixture.Host.OpenSession(fixture.RepoRoot, detached "open-default-settings")
+                        |> Async.StartAsPromise
+
+                    expectValue "open" opened |> ignore
+                    let settings = fixture.Host.GetSettings fixture.RepoRoot
+                    Vitest.expect(settings.AutoTrackThresholdMb).toBe 1
+                    Vitest.expect(settings.DownloadLargeFiles).toBe false
+
+                    Vitest
+                        .expect(
+                            git fixture.RepoRoot [
+                                "config"
+                                "--local"
+                                "--get"
+                                "versioncontrolservice.lfs.autotrackthresholdmb"
+                            ]
+                            |> _.Trim()
+                        )
+                        .toBe
+                        "1"
+
+                    Vitest
+                        .expect(
+                            git fixture.RepoRoot [
+                                "config"
+                                "--local"
+                                "--get"
+                                "versioncontrolservice.lfs.materializelargeobjects"
+                            ]
+                            |> _.Trim()
+                        )
+                        .toBe
+                        "false"
                 })
         )
 
@@ -318,6 +389,23 @@ let private registerVault (windowId: int) (arcPath: string) =
     window?id <- windowId
     let vault = ArcVault(window)
     vault.path <- Some arcPath
+    ARC_VAULTS.Vaults.[windowId] <- vault
+
+    electronMock?setBrowserWindowFromWebContents (fun (webContents: obj) ->
+        if unbox<int> webContents?id = windowId then
+            box window
+        else
+            null
+    )
+    |> ignore
+
+    vault
+
+let private registerEmptyVault (windowId: int) =
+    let window = testWindow ()
+    window?id <- windowId
+    window?isDestroyed <- fun () -> false
+    let vault = ArcVault(window)
     ARC_VAULTS.Vaults.[windowId] <- vault
 
     electronMock?setBrowserWindowFromWebContents (fun (webContents: obj) ->
@@ -485,6 +573,51 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "creating an ARC on a fresh process initializes its repository through a lazily built host",
+            fun () -> promise {
+                let! root = createTempDirectoryAsync "swate-vc-arc-create-"
+                let settingsRoot = join [| root; "settings" |]
+                let container = join [| root; "container" |]
+
+                for folder in [ settingsRoot; container ] do
+                    Main.Bindings.Filesystem.mkdirSync folder (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                let runtime = createRuntime settingsRoot
+                let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
+                WorkspaceSessionHost.initialize host
+                VersionControlRuntime.initialize runtime
+
+                registerEmptyVault 60 |> ignore
+                let dialogSpy = Vitest.vi.spyOn (electron?dialog, "showOpenDialog")
+
+                mockResolvedValue dialogSpy (createObj [ "canceled" ==> false; "filePaths" ==> [| container |] ])
+
+                let cleanup () = promise {
+                    Vitest.vi.restoreAllMocks ()
+                    electronMock?reset () |> ignore
+                    ARC_VAULTS.Vaults.Clear()
+                    do! host.CloseAll() |> Async.StartAsPromise
+                    do! removeDirectoryAsync root
+                }
+
+                try
+                    let api = Main.IPC.ArcVaultsApi.api (ipcEvent 60)
+
+                    let! created = api.createARC { identifier = "fresh"; initGit = true }
+
+                    match created with
+                    | Ok createdPath ->
+                        Vitest.expect(Main.Bindings.Filesystem.existsSync (join [| createdPath; ".git" |])).toBe true
+                    | Error error -> return raise error
+                with error ->
+                    do! cleanup ()
+                    return raise error
+
+                do! cleanup ()
+            }
+        )
+
+        Vitest.test (
             "session info, status, selected revision, publish and refresh run through the package",
             fun () ->
                 withFixture (fun fixture -> promise {
@@ -542,6 +675,300 @@ Vitest.describe (
 
                     Vitest.expect(git fixture.RemoteRoot [ "log"; "-1"; "--format=%s"; "main" ] |> _.Trim()).toBe
                         "Add assay"
+                })
+        )
+
+        Vitest.test (
+            "a save keeps a metadata workbook above the threshold out of Git LFS",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    registerVault 61 fixture.RepoRoot |> ignore
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 61)
+                    let metadataPath = "studies/s1/isa.study.xlsx"
+                    let largePlainPath = "studies/s1/resources/data.bin"
+
+                    Main.Bindings.Filesystem.mkdirSync
+                        (join [| fixture.RepoRoot; "studies"; "s1"; "resources" |])
+                        (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    writeText (join [| fixture.RepoRoot; metadataPath |]) (String.replicate (2 * 1024 * 1024) "m")
+                    writeText (join [| fixture.RepoRoot; largePlainPath |]) (String.replicate (2 * 1024 * 1024) "d")
+
+                    let! status = api.getStatus (request "policy-status")
+                    let version = (expectDtoValue "policy status" status).Value.WorkspaceVersion
+
+                    let! created =
+                        api.createRevision {
+                            OperationId = "policy-metadata-and-resource"
+                            Message = "Save DataHub files"
+                            Paths = [| metadataPath; largePlainPath |]
+                            ExpectedWorkspaceVersion = version
+                        }
+
+                    expectDtoValue "save DataHub files" created |> ignore
+
+                    Vitest.expect(git fixture.RepoRoot [ "cat-file"; "-s"; $"HEAD:{metadataPath}" ] |> _.Trim()).toBe
+                        "2097152"
+
+                    let largeContent =
+                        git fixture.RepoRoot [ "cat-file"; "-p"; $"HEAD:{largePlainPath}" ]
+
+                    Vitest.expect(largeContent.StartsWith("version https://git-lfs.github.com/spec/v1")).toBe true
+                })
+        )
+
+        Vitest.test (
+            "a save stores a small dataset file as a large object",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    registerVault 62 fixture.RepoRoot |> ignore
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 62)
+                    let datasetPath = "assays/a1/dataset/raw.bin"
+
+                    Main.Bindings.Filesystem.mkdirSync
+                        (join [| fixture.RepoRoot; "assays"; "a1"; "dataset" |])
+                        (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    writeText (join [| fixture.RepoRoot; datasetPath |]) (String.replicate 100 "r")
+
+                    let! status = api.getStatus (request "dataset-status")
+                    let version = (expectDtoValue "dataset status" status).Value.WorkspaceVersion
+
+                    let! created =
+                        api.createRevision {
+                            OperationId = "policy-dataset"
+                            Message = "Save dataset file"
+                            Paths = [| datasetPath |]
+                            ExpectedWorkspaceVersion = version
+                        }
+
+                    expectDtoValue "save dataset file" created |> ignore
+
+                    let datasetContent =
+                        git fixture.RepoRoot [ "cat-file"; "-p"; $"HEAD:{datasetPath}" ]
+
+                    let attributes = git fixture.RepoRoot [ "cat-file"; "-p"; "HEAD:.gitattributes" ]
+
+                    Vitest.expect(datasetContent.StartsWith("version https://git-lfs.github.com/spec/v1")).toBe true
+
+                    Vitest.expect(attributes.Contains(datasetPath)).toBe true
+                })
+        )
+
+        Vitest.test (
+            "a metadata workbook that still holds a pointer is refused with the materialization recovery",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    registerVault 63 fixture.RepoRoot |> ignore
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 63)
+                    let metadataPath = "isa.assay.xlsx"
+
+                    let pointer =
+                        "version https://git-lfs.github.com/spec/v1\noid sha256:"
+                        + String.replicate 64 "0"
+                        + "\nsize 5\n"
+
+                    writeText (join [| fixture.RepoRoot; metadataPath |]) pointer
+
+                    let! status = api.getStatus (request "pointer-status")
+                    let version = (expectDtoValue "pointer status" status).Value.WorkspaceVersion
+
+                    let! created =
+                        api.createRevision {
+                            OperationId = "policy-pointer-metadata"
+                            Message = "Reject metadata pointer"
+                            Paths = [| metadataPath |]
+                            ExpectedWorkspaceVersion = version
+                        }
+
+                    let failure = expectDtoFailure "metadata pointer save" created
+                    Vitest.expect(failure.Code).toBe "inline_content_not_materialized"
+                    Vitest.expect(failure.RecoveryAction |> Option.map _.Code).toEqual (Some "retry_materialization")
+                    Vitest.expect(failure.AffectedPaths |> Array.contains metadataPath).toBe true
+
+                    let commits = git fixture.RepoRoot [ "log"; "--oneline" ] |> _.Trim()
+
+                    Vitest.expect(commits.Split([| '\n' |], System.StringSplitOptions.RemoveEmptyEntries).Length).toBe
+                        1
+
+                    Vitest.expect(commits.EndsWith(" base")).toBe true
+                })
+        )
+
+        Vitest.test (
+            "setStoragePolicySettings changes the open session and the provider",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    registerVault 54 fixture.RepoRoot |> ignore
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 54)
+
+                    let! setPolicy =
+                        api.setStoragePolicySettings {
+                            OperationId = "set-session-policy"
+                            Settings = {
+                                AutoPolicyThresholdMb = Some 9
+                                MaterializeLargeObjects = true
+                            }
+                        }
+
+                    expectDtoValue "set storage policy" setPolicy |> ignore
+
+                    Vitest
+                        .expect(
+                            git fixture.RepoRoot [
+                                "config"
+                                "--local"
+                                "--get"
+                                "versioncontrolservice.lfs.autotrackthresholdmb"
+                            ]
+                            |> _.Trim()
+                        )
+                        .toBe
+                        "9"
+
+                    Vitest
+                        .expect(
+                            git fixture.RepoRoot [
+                                "config"
+                                "--local"
+                                "--get"
+                                "versioncontrolservice.lfs.materializelargeobjects"
+                            ]
+                            |> _.Trim()
+                        )
+                        .toBe
+                        "true"
+
+                    let! current = api.getStoragePolicySettings (request "get-session-policy")
+                    let settings = expectDtoValue "get storage policy" current
+                    Vitest.expect(settings.Value.AutoPolicyThresholdMb).toEqual (Some 9)
+                    Vitest.expect(settings.Value.MaterializeLargeObjects).toBe true
+                })
+        )
+
+        Vitest.test (
+            "a threshold outside the allowed range is refused before anything changes",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    registerVault 55 fixture.RepoRoot |> ignore
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 55)
+
+                    let! initial =
+                        api.setStoragePolicySettings {
+                            OperationId = "set-initial-policy"
+                            Settings = {
+                                AutoPolicyThresholdMb = Some 9
+                                MaterializeLargeObjects = true
+                            }
+                        }
+
+                    expectDtoValue "set initial storage policy" initial |> ignore
+
+                    let checkInvalid threshold = promise {
+                        let! refused =
+                            api.setStoragePolicySettings {
+                                OperationId = $"set-invalid-policy-{threshold}"
+                                Settings = {
+                                    AutoPolicyThresholdMb = Some threshold
+                                    MaterializeLargeObjects = false
+                                }
+                            }
+
+                        let failure = expectDtoFailure $"set invalid policy {threshold}" refused
+                        Vitest.expect(failure.Code).toBe VersionControlCodes.StoragePolicyBlocked
+
+                        let! current = api.getStoragePolicySettings (request $"get-after-invalid-{threshold}")
+                        let settings = expectDtoValue "get storage policy after invalid change" current
+                        Vitest.expect(settings.Value.AutoPolicyThresholdMb).toEqual (Some 9)
+                        Vitest.expect(settings.Value.MaterializeLargeObjects).toBe true
+
+                        Vitest
+                            .expect(
+                                git fixture.RepoRoot [
+                                    "config"
+                                    "--local"
+                                    "--get"
+                                    "versioncontrolservice.lfs.autotrackthresholdmb"
+                                ]
+                                |> _.Trim()
+                            )
+                            .toBe
+                            "9"
+
+                        Vitest
+                            .expect(
+                                git fixture.RepoRoot [
+                                    "config"
+                                    "--local"
+                                    "--get"
+                                    "versioncontrolservice.lfs.materializelargeobjects"
+                                ]
+                                |> _.Trim()
+                            )
+                            .toBe
+                            "true"
+                    }
+
+                    do! checkInvalid 0
+                    do! checkInvalid 101
+                })
+        )
+
+        Vitest.test (
+            "a closed and reopened session starts from the defaults again",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    registerVault 56 fixture.RepoRoot |> ignore
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 56)
+
+                    let! changed =
+                        api.setStoragePolicySettings {
+                            OperationId = "set-before-reopen"
+                            Settings = {
+                                AutoPolicyThresholdMb = Some 9
+                                MaterializeLargeObjects = true
+                            }
+                        }
+
+                    expectDtoValue "set before reopen" changed |> ignore
+                    do! fixture.Host.CloseSession fixture.RepoRoot |> Async.StartAsPromise
+
+                    let! reopened =
+                        fixture.Host.OpenSession(fixture.RepoRoot, detached "open-after-close")
+                        |> Async.StartAsPromise
+
+                    expectValue "reopen" reopened |> ignore
+
+                    let! current = api.getStoragePolicySettings (request "get-after-reopen")
+                    let settings = expectDtoValue "get after reopen" current
+                    Vitest.expect(settings.Value.AutoPolicyThresholdMb).toEqual (Some 1)
+                    Vitest.expect(settings.Value.MaterializeLargeObjects).toBe false
+
+                    Vitest
+                        .expect(
+                            git fixture.RepoRoot [
+                                "config"
+                                "--local"
+                                "--get"
+                                "versioncontrolservice.lfs.autotrackthresholdmb"
+                            ]
+                            |> _.Trim()
+                        )
+                        .toBe
+                        "1"
+
+                    Vitest
+                        .expect(
+                            git fixture.RepoRoot [
+                                "config"
+                                "--local"
+                                "--get"
+                                "versioncontrolservice.lfs.materializelargeobjects"
+                            ]
+                            |> _.Trim()
+                        )
+                        .toBe
+                        "false"
                 })
         )
 
@@ -676,6 +1103,40 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "a bind reopen keeps the session settings",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    registerVault 57 fixture.RepoRoot |> ignore
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 57)
+
+                    let! changed =
+                        api.setStoragePolicySettings {
+                            OperationId = "set-before-bind"
+                            Settings = {
+                                AutoPolicyThresholdMb = Some 9
+                                MaterializeLargeObjects = true
+                            }
+                        }
+
+                    expectDtoValue "set before bind" changed |> ignore
+
+                    let! bound =
+                        api.bindWorkspace {
+                            OperationId = "bind-with-settings"
+                            ProviderLocation = "https://example.invalid/never/reached.git"
+                            DisplayName = Some "reached"
+                        }
+
+                    expectDtoValue "bind with settings" bound |> ignore
+
+                    let! current = api.getStoragePolicySettings (request "get-after-bind")
+                    let settings = expectDtoValue "get after bind" current
+                    Vitest.expect(settings.Value.AutoPolicyThresholdMb).toEqual (Some 9)
+                    Vitest.expect(settings.Value.MaterializeLargeObjects).toBe true
+                })
+        )
+
+        Vitest.test (
             "a mutation marks the vault busy while it runs and releases it on failure",
             fun () ->
                 withFixture (fun fixture -> promise {
@@ -775,6 +1236,55 @@ Vitest.describe (
                             Vitest.expect(outcome.Value |> Array.map _.Component).toEqual [| "fake-tool" |]
                             Vitest.expect(failure.Code).toBe "check_failed"
                         | other -> failwith $"Expected a partial dependency report, got {other}"
+                    finally
+                        WorkspaceSessionHost.initialize fixture.Host
+                })
+        )
+
+        Vitest.test (
+            "getStoragePolicySettings answers from the session settings for a provider without a storage policy",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let coreOnlyRoot = join [| fixture.Root; "core-settings" |]
+
+                    Main.Bindings.Filesystem.mkdirSync
+                        coreOnlyRoot
+                        (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    let failingRoot = join [| fixture.Root; "failing-settings" |]
+
+                    Main.Bindings.Filesystem.mkdirSync
+                        failingRoot
+                        (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    let fakeRuntime = fakeProviderRuntime coreOnlyRoot failingRoot
+                    let fakeHost = WorkspaceSessionHost.WorkspaceSessionHost(fakeRuntime)
+                    WorkspaceSessionHost.initialize fakeHost
+
+                    try
+                        registerVault 58 coreOnlyRoot |> ignore
+                        let api = Main.IPC.IVersionControlApi.api (ipcEvent 58)
+
+                        let! initial = api.getStoragePolicySettings (request "fake-get-default-policy")
+                        let initialSettings = expectDtoValue "get fake provider defaults" initial
+                        Vitest.expect(initialSettings.Value.AutoPolicyThresholdMb).toEqual (Some 1)
+                        Vitest.expect(initialSettings.Value.MaterializeLargeObjects).toBe false
+
+                        let! changed =
+                            api.setStoragePolicySettings {
+                                OperationId = "fake-set-policy"
+                                Settings = {
+                                    AutoPolicyThresholdMb = Some 4
+                                    MaterializeLargeObjects = false
+                                }
+                            }
+
+                        expectDtoValue "set fake provider policy" changed |> ignore
+
+                        let! current = api.getStoragePolicySettings (request "fake-get-policy")
+                        let currentSettings = expectDtoValue "get fake provider policy" current
+                        Vitest.expect(currentSettings.Value.AutoPolicyThresholdMb).toEqual (Some 4)
+                        Vitest.expect(currentSettings.Value.MaterializeLargeObjects).toBe false
                     finally
                         WorkspaceSessionHost.initialize fixture.Host
                 })
@@ -897,6 +1407,17 @@ Vitest.describe (
                 withFixture (fun fixture -> promise {
                     registerVault 47 fixture.RepoRoot |> ignore
                     let api = Main.IPC.IVersionControlApi.api (ipcEvent 47)
+                    let attributesPath = join [| fixture.RepoRoot; ".gitattributes" |]
+
+                    let attributesBefore =
+                        if Main.Bindings.Filesystem.existsSync attributesPath then
+                            Some(
+                                Main.Bindings.Filesystem.readFileSync
+                                    attributesPath
+                                    Main.Bindings.Filesystem.TextEncoding.Utf8
+                            )
+                        else
+                            None
 
                     let! metadata =
                         api.setPathStoragePolicy {
@@ -918,6 +1439,77 @@ Vitest.describe (
 
                     let datasetFailure = expectDtoFailure "dataset policy" dataset
                     Vitest.expect(datasetFailure.Code).toBe VersionControlCodes.StoragePolicyBlocked
+
+                    let attributesAfter =
+                        if Main.Bindings.Filesystem.existsSync attributesPath then
+                            Some(
+                                Main.Bindings.Filesystem.readFileSync
+                                    attributesPath
+                                    Main.Bindings.Filesystem.TextEncoding.Utf8
+                            )
+                        else
+                            None
+
+                    Vitest.expect(attributesAfter).toEqual attributesBefore
+                })
+        )
+
+        Vitest.test (
+            "a file above 25 MB cannot be unmarked in the main process",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    registerVault 48 fixture.RepoRoot |> ignore
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 48)
+                    let bigPath = join [| fixture.RepoRoot; "big.bin" |]
+                    writeText bigPath (String.replicate (26 * 1024 * 1024) "x")
+
+                    let! marked =
+                        api.setPathStoragePolicy {
+                            OperationId = "policy-big-mark"
+                            Path = "big.bin"
+                            UseLargeObjectStorage = true
+                        }
+
+                    expectDtoValue "mark big file" marked |> ignore
+
+                    let! unmarked =
+                        api.setPathStoragePolicy {
+                            OperationId = "policy-big-unmark"
+                            Path = "big.bin"
+                            UseLargeObjectStorage = false
+                        }
+
+                    let failure = expectDtoFailure "unmark big file" unmarked
+                    Vitest.expect(failure.Code).toBe VersionControlCodes.StoragePolicyBlocked
+                })
+        )
+
+        Vitest.test (
+            "a small file outside the dataset folder can be unmarked",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    registerVault 49 fixture.RepoRoot |> ignore
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 49)
+                    let smallPath = join [| fixture.RepoRoot; "small.bin" |]
+                    writeText smallPath (String.replicate 1024 "x")
+
+                    let! marked =
+                        api.setPathStoragePolicy {
+                            OperationId = "policy-small-mark"
+                            Path = "small.bin"
+                            UseLargeObjectStorage = true
+                        }
+
+                    expectDtoValue "mark small file" marked |> ignore
+
+                    let! unmarked =
+                        api.setPathStoragePolicy {
+                            OperationId = "policy-small-unmark"
+                            Path = "small.bin"
+                            UseLargeObjectStorage = false
+                        }
+
+                    expectDtoValue "unmark small file" unmarked |> ignore
                 })
         )
 

@@ -28,7 +28,8 @@ let hostOfDataHub (targetDataHub: string) : string =
 let private hostMatches (host: string) (account: AccountSummary) =
     String.Equals(hostOfDataHub account.User.TargetDataHub, host, StringComparison.OrdinalIgnoreCase)
 
-/// The identity rule lives in AuthService so the legacy path and this one agree.
+/// AuthService selects the account identity, including its name and email. The
+/// provider and sidebar then agree on the author.
 let identityOfUser (user: AuthUserDto) : RevisionIdentity =
     let name, email = Main.Auth.AuthService.commitNameAndEmail user
     { Name = name; Email = email }

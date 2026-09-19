@@ -11,6 +11,7 @@ open Fable.Electron.Main
 open Fable.Electron.Remoting.Main
 open Main
 open Main.VersionControl
+open Main.VersionControl.VersionControlSettings
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.VersionControlTypes
@@ -64,6 +65,11 @@ let private failedDto (failure: OperationFailure) : OperationResultDto<'T> =
 
 let private validationFailed (code: string) (message: string) : OperationResult<'T> =
     Failed(OperationFailure.create Validation code message)
+
+let private storagePolicySettingsDto (settings: VersionControlSettings) : StoragePolicySettingsDto = {
+    AutoPolicyThresholdMb = Some settings.AutoTrackThresholdMb
+    MaterializeLargeObjects = settings.DownloadLargeFiles
+}
 
 /// Runs one tracked operation against a session-independent target. The operation is
 /// registered and announced before any await, and every exception becomes a failure.
@@ -184,6 +190,20 @@ let private withPath (path: string) (call: RepositoryPath -> Async<OperationResu
     | Ok repositoryPath -> call repositoryPath
     | Error failure -> async { return Failed failure }
 
+let private tryGetRegularFileSize (workspaceRoot: string) (relativePath: string) : Async<int64 option> = async {
+    try
+        let! stats =
+            Main.Bindings.Filesystem.statAsync (Main.Bindings.Path.join [| workspaceRoot; relativePath |])
+            |> Async.AwaitPromise
+
+        if stats.isFile () then
+            return Some(int64 stats.size)
+        else
+            return None
+    with _ ->
+        return None
+}
+
 let private withPaths (paths: string[]) (call: RepositoryPath[] -> Async<OperationResult<'T>>) =
     match Mappings.tryRepositoryPaths paths with
     | Ok repositoryPaths -> call repositoryPaths
@@ -267,8 +287,7 @@ let initializeLocalWorkspace
             return persistProvisionedBinding host initialized
     }
 
-/// A provisioning step that produced a binding. The binding is persisted before the
-/// caller sees the result so a crash after provisioning still leaves the vault bound.
+/// Runs a provisioning operation and maps its binding to the workspace root.
 let private provision
     (host: WorkspaceSessionHost.WorkspaceSessionHost)
     (bridge: RendererBridge)
@@ -276,16 +295,7 @@ let private provision
     (run: OperationContext -> Async<OperationResult<WorkspaceBinding>>)
     : JS.Promise<Result<OperationResultDto<string>, exn>> =
     promise {
-        let! result =
-            runTracked
-                host
-                bridge
-                ""
-                operationId
-                (fun context -> async {
-                    let! provisioned = run context
-                    return persistProvisionedBinding host provisioned
-                })
+        let! result = runTracked host bridge "" operationId run
 
         return Ok(Mappings.result (fun (binding: WorkspaceBinding) -> binding.WorkspaceRoot) result)
     }
@@ -335,10 +345,10 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 bridge
                 request.OperationId
                 (fun context -> async {
-                    match locationFor host request.ProviderLocation request.DisplayName with
-                    | Error failure -> return Failed failure
-                    | Ok(location, factory) ->
-                        return!
+                    let! cloned =
+                        match locationFor host request.ProviderLocation request.DisplayName with
+                        | Error failure -> async { return Failed failure }
+                        | Ok(location, factory) ->
                             withOptionalProviderRef
                                 request.TargetRef
                                 (fun targetRef ->
@@ -351,23 +361,19 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                         }
                                         context
                                 )
+
+                    return persistProvisionedBinding host cloned
                 })
     initializeWorkspace =
         fun request ->
             let host = WorkspaceSessionHost.get ()
             let bridge = tryBridgeFromEvent event
 
-            promise {
-                let! result =
-                    runTracked
-                        host
-                        bridge
-                        ""
-                        request.OperationId
-                        (fun context -> initializeLocalWorkspace host request.TargetPath context)
-
-                return Ok(Mappings.result (fun (binding: WorkspaceBinding) -> binding.WorkspaceRoot) result)
-            }
+            provision
+                host
+                bridge
+                request.OperationId
+                (fun context -> initializeLocalWorkspace host request.TargetPath context)
     // Bind changes the vault's repository configuration, so it runs as a mutation of
     // the open vault and refreshes the tree afterwards.
     bindWorkspace =
@@ -377,6 +383,37 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             | Ok(vault, arcPath) ->
                 let host = WorkspaceSessionHost.get ()
                 let bridge = tryBridgeFromEvent event
+                let savedSettings = host.GetSettings arcPath
+
+                let restoreSavedSettings context = async {
+                    try
+                        let! restored = host.SetSettings(arcPath, savedSettings, context)
+
+                        match restored with
+                        | Failed failure ->
+                            Browser.Dom.console.error (
+                                $"Could not restore version-control settings after binding ({failure.Code}): {failure.Message}"
+                            )
+                        | Succeeded _
+                        | PartiallySucceeded _ -> ()
+                    with error ->
+                        Browser.Dom.console.error (
+                            $"Could not restore version-control settings after binding: {error.Message}"
+                        )
+                }
+
+                let reopenWithSavedSettings context = async {
+                    let! reopened = host.ReopenSession(arcPath, context)
+
+                    match reopened with
+                    | Succeeded _
+                    | PartiallySucceeded _ ->
+                        if savedSettings <> VersionControlSettings.defaults then
+                            do! restoreSavedSettings context
+                    | _ -> ()
+
+                    return reopened
+                }
 
                 return!
                     withBusyWritingNested
@@ -403,7 +440,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                             match persistProvisionedBinding host bindResult with
                                             | Succeeded _ ->
                                                 // The open session keeps the location it was opened with.
-                                                return! host.ReopenSession(arcPath, context)
+                                                return! reopenWithSavedSettings context
                                             | PartiallySucceeded(_, failure) when
                                                 failure.Code = VersionControlCodes.BindingNotPersisted
                                                 ->
@@ -411,7 +448,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                             | PartiallySucceeded(_, failure) ->
                                                 // The binding is persisted, so the session is reopened and
                                                 // the provider's partial failure rides along.
-                                                let! reopened = host.ReopenSession(arcPath, context)
+                                                let! reopened = reopenWithSavedSettings context
 
                                                 return
                                                     match reopened with
@@ -836,48 +873,64 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             withSession
                 event
                 request.OperationId
-                (withService _.StoragePolicy "storage policies" (fun service context -> service.GetSettings context))
-                Mappings.storageSettings
+                (fun hosted _ -> async {
+                    let host = WorkspaceSessionHost.get ()
+
+                    return
+                        OperationResult.succeeded (
+                            storagePolicySettingsDto (host.GetSettings hosted.Binding.WorkspaceRoot)
+                        )
+                })
+                id
     setStoragePolicySettings =
         fun request ->
             withMutatingSession
                 event
                 request.OperationId
                 false
-                (withService
-                    _.StoragePolicy
-                    "storage policies"
-                    (fun service context ->
-                        service.SetSettings (Mappings.storageSettingsFromDto request.Settings) context
-                    ))
+                (fun hosted context ->
+                    let host = WorkspaceSessionHost.get ()
+                    let current = host.GetSettings hosted.Binding.WorkspaceRoot
+
+                    let settings = {
+                        AutoTrackThresholdMb =
+                            request.Settings.AutoPolicyThresholdMb
+                            |> Option.defaultValue current.AutoTrackThresholdMb
+                        DownloadLargeFiles = request.Settings.MaterializeLargeObjects
+                    }
+
+                    host.SetSettings(hosted.Binding.WorkspaceRoot, settings, context)
+                )
                 id
     // The DataHub ruleset is checked here as well as in the renderer, because the main
-    // process is the trust boundary. The size rule needs the object size, which the
-    // renderer checks from the file tree.
+    // process is the trust boundary. The main process reads the file size from the
+    // workspace before checking the size rule.
     setPathStoragePolicy =
         fun request ->
             withMutatingSession
                 event
                 request.OperationId
                 true
-                (withService
-                    _.StoragePolicy
-                    "storage policies"
-                    (fun service context ->
+                (fun hosted context ->
+                    match hosted.Session.StoragePolicy with
+                    | None -> async { return serviceUnavailable "storage policies" }
+                    | Some service -> async {
+                        let! fileSize = tryGetRegularFileSize hosted.Binding.WorkspaceRoot request.Path
+
                         match
                             Swate.Components.Shared.GitLfsRules.tryGetToggleBlockedReason
                                 request.Path
-                                None
+                                fileSize
                                 request.UseLargeObjectStorage
                         with
-                        | Some reason -> async {
-                            return validationFailed VersionControlCodes.StoragePolicyBlocked reason
-                          }
+                        | Some reason -> return validationFailed VersionControlCodes.StoragePolicyBlocked reason
                         | None ->
-                            withPath
-                                request.Path
-                                (fun path -> service.SetPathPolicy path request.UseLargeObjectStorage context)
-                    ))
+                            return!
+                                withPath
+                                    request.Path
+                                    (fun path -> service.SetPathPolicy path request.UseLargeObjectStorage context)
+                      }
+                )
                 id
     pruneStorage =
         fun request ->

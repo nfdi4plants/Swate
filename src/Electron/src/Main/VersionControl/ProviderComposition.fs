@@ -33,12 +33,31 @@ let dataHubAccountSource: DataHubStrategies.DataHubAccountSource = {
     TryGetTokenForHost = Main.Auth.AuthService.tryGetTokenForHost
 }
 
+/// The DataHub ruleset as the library's revision policy: metadata workbooks stay plain
+/// content, dataset files and files above 25 MB are large objects, everything else
+/// follows the automatic threshold. Metadata wins over the other two rules.
+let dataHubRevisionPolicy: RevisionPolicyStrategy = {
+    ResolvePathPolicy =
+        fun request ->
+            let path = RepositoryPath.value request.Path
+
+            if Swate.Components.Shared.GitLfsRules.isIsaMetadataFile path then
+                RevisionPathPolicy.Inline
+            elif
+                Swate.Components.Shared.GitLfsRules.isInDatasetFolder path
+                || request.SizeInBytes > float Swate.Components.Shared.GitLfsRules.maxNonLfsFileSizeBytes
+            then
+                RevisionPathPolicy.LargeObject
+            else
+                RevisionPathPolicy.Automatic
+}
+
 let createGitFactory (source: DataHubStrategies.DataHubAccountSource) : ProviderFactory =
-    GitWorkspaceSession.createFactoryWithCredentialsAndIdentity
+    GitWorkspaceSession.createFactoryWithCredentialsIdentityAndPolicy
         GitWorkspaceSession.GitSessionHooks.none
         (DataHubStrategies.createCredentialStrategy source)
         (DataHubStrategies.createIdentityStrategy source)
-    |> LegacySettingsMigration.wrapGitFactory
+        dataHubRevisionPolicy
 
 let lakeFsOptions
     (settingsRoot: string)
@@ -53,7 +72,7 @@ let createLakeFsFactory
     (options: LakeFsProviderOptions.LakeFsProviderOptions)
     (credentials: LakeFsCredentials.LakeFsCredentialStrategy)
     : ProviderFactory =
-    LakeFsWorkspaceSession.createFactory options credentials
+    LakeFsWorkspaceSession.createFactoryWithPolicy options credentials dataHubRevisionPolicy
 
 let createCatalog (factories: ProviderFactory list) : ProviderResolver.ProviderCatalog =
     match ProviderResolver.tryCreateCatalog factories with
