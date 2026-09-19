@@ -190,11 +190,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                             match initResult with
                             | Failed failure ->
-                                return
-                                    Error(
-                                        exn
-                                            $"The ARC was created, but its Git repository could not be initialized: {failure.Message}"
-                                    )
+                                Browser.Dom.console.error (
+                                    $"The ARC was created, but its Git repository could not be initialized: {failure.Code}: {failure.Message}"
+                                )
+
+                                return Ok()
                             | Succeeded _
                             | PartiallySucceeded _ ->
                                 notifyGitRepositoryInitialized createdArcPath

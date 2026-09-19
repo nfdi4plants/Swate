@@ -253,7 +253,7 @@ let conflictResolutionFromDto (resolution: ConflictResolutionDto) : ConflictReso
 
 /// A validation failure for a path the renderer sent that the library would reject.
 let invalidPathFailure (path: string) (message: string) : OperationFailure = {
-    OperationFailure.create Validation "invalid_path" message with
+    OperationFailure.create Validation VersionControlCodes.InvalidPath message with
         AffectedPaths = [| path |]
 }
 
@@ -276,8 +276,8 @@ let tryRepositoryPaths (paths: string[]) : Result<RepositoryPath[], OperationFai
 
 let tryProviderRef (value: string) : Result<ProviderRef, OperationFailure> =
     ProviderRef.tryCreate value
-    |> Result.mapError (OperationFailure.create Validation "invalid_ref")
+    |> Result.mapError (OperationFailure.create Validation VersionControlCodes.InvalidRef)
 
 let tryRevisionId (value: string) : Result<RevisionId, OperationFailure> =
     RevisionId.tryCreate value
-    |> Result.mapError (OperationFailure.create Validation "invalid_revision")
+    |> Result.mapError (OperationFailure.create Validation VersionControlCodes.InvalidRevision)

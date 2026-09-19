@@ -1,5 +1,6 @@
 module Main.Main
 
+open Fable.Core
 open Fable.Electron
 open Fable.Electron.Remoting.Main
 open Main
@@ -42,4 +43,14 @@ app.onWindowAllClosed (fun () ->
     app.quit ()
 )
 
-app.onBeforeQuit (fun _ -> Browser.Dom.console.log ("Quitting"))
+app.onBeforeQuit (fun _ ->
+    Browser.Dom.console.log ("Quitting")
+
+    match Main.VersionControl.WorkspaceSessionHost.tryCurrent () with
+    | Some host ->
+        host.CloseAll()
+        |> Async.StartAsPromise
+        |> Promise.catch (fun _ -> ())
+        |> Promise.start
+    | None -> ()
+)

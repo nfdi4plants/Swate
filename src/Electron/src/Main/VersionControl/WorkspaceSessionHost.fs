@@ -68,6 +68,7 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
     let sessions = Dictionary<string, HostedSession>()
     let operations = Dictionary<string, RunningOperation>()
     let pendingOpens = Dictionary<string, JS.Promise<OperationResult<HostedSession>>>()
+    let closeRequested = HashSet<string>()
 
     let normalizeRoot (workspaceRoot: string) =
         let normalized = ProviderResolver.normalizePath workspaceRoot
@@ -82,6 +83,15 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
     let tryFindSession (workspaceRoot: string) =
         sessions.Values
         |> Seq.tryFind (fun hosted -> sameRoot hosted.Binding.WorkspaceRoot workspaceRoot)
+
+    let closeHostedSession (hosted: HostedSession) = async {
+        sessions.Remove hosted.SessionId |> ignore
+
+        try
+            do! hosted.Session.Close()
+        with _ ->
+            ()
+    }
 
     let openBinding (factory: ProviderFactory) (binding: WorkspaceBinding) (context: OperationContext) = async {
         let! opened = factory.Open binding context
@@ -113,11 +123,8 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
                         Some failure
                     | Succeeded _ -> None
 
-                sessions[hosted.SessionId] <- hosted
                 return withValue hosted outcome, settingsFailure
-            | None ->
-                sessions[hosted.SessionId] <- hosted
-                return withValue hosted outcome, None
+            | None -> return withValue hosted outcome, None
         }
 
         match opened with
@@ -128,8 +135,22 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
             | Some failure -> return PartiallySucceeded(initialized, failure)
             | None -> return Succeeded initialized
         | PartiallySucceeded(outcome, failure) ->
-            let! (initialized, _) = initializeSettings outcome
-            return PartiallySucceeded(initialized, failure)
+            let! (initialized, settingsFailure) = initializeSettings outcome
+
+            match settingsFailure with
+            | Some settingsFailure ->
+                return
+                    PartiallySucceeded(
+                        initialized,
+                        {
+                            failure with
+                                Details =
+                                    Array.append failure.Details [|
+                                        $"{settingsFailure.Code}: {settingsFailure.Message}"
+                                    |]
+                        }
+                    )
+            | None -> return PartiallySucceeded(initialized, failure)
         | Failed failure -> return Failed failure
     }
 
@@ -232,9 +253,42 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
 
                     let inFlight = promise {
                         try
-                            return! resolveAndOpen workspaceRoot openContext |> Async.StartAsPromise
+                            let! opened = resolveAndOpen workspaceRoot openContext |> Async.StartAsPromise
+                            let shouldClose = closeRequested.Remove key
+
+                            match opened with
+                            | Succeeded outcome ->
+                                if shouldClose then
+                                    do! closeHostedSession outcome.Value |> Async.StartAsPromise
+
+                                    return
+                                        Failed(
+                                            OperationFailure.create
+                                                NotFound
+                                                VersionControlCodes.SessionUnavailable
+                                                "The workspace session is not open."
+                                        )
+                                else
+                                    sessions[outcome.Value.SessionId] <- outcome.Value
+                                    return opened
+                            | PartiallySucceeded(outcome, _) ->
+                                if shouldClose then
+                                    do! closeHostedSession outcome.Value |> Async.StartAsPromise
+
+                                    return
+                                        Failed(
+                                            OperationFailure.create
+                                                NotFound
+                                                VersionControlCodes.SessionUnavailable
+                                                "The workspace session is not open."
+                                        )
+                                else
+                                    sessions[outcome.Value.SessionId] <- outcome.Value
+                                    return opened
+                            | Failed _ -> return opened
                         finally
                             pendingOpens.Remove key |> ignore
+                            closeRequested.Remove key |> ignore
                     }
 
                     pendingOpens[key] <- inFlight
@@ -244,18 +298,18 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
     }
 
     member _.CloseSession(workspaceRoot: string) : Async<unit> = async {
+        let key = normalizeRoot workspaceRoot
+
+        if pendingOpens.ContainsKey key then
+            closeRequested.Add key |> ignore
+
         let matching =
             sessions.Values
             |> Seq.filter (fun hosted -> sameRoot hosted.Binding.WorkspaceRoot workspaceRoot)
             |> Seq.toArray
 
         for hosted in matching do
-            sessions.Remove hosted.SessionId |> ignore
-
-            try
-                do! hosted.Session.Close()
-            with _ ->
-                ()
+            do! closeHostedSession hosted
     }
 
     /// Closes and reopens the session over the binding stored for the root. Used after

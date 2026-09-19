@@ -58,7 +58,7 @@ let private sessionUnavailable (failure: OperationFailure) : OperationFailure = 
 /// A provider or strategy that throws is reported as a structured failure, so the
 /// renderer's result contract holds even then.
 let private unexpectedFailure (error: exn) : OperationFailure =
-    OperationFailure.createRedacted ProviderError "unexpected_exception" error.Message
+    OperationFailure.createRedacted ProviderError VersionControlCodes.UnexpectedException error.Message
 
 let private failedDto (failure: OperationFailure) : OperationResultDto<'T> =
     OperationResultDto.Failed(Mappings.failure failure)
@@ -245,7 +245,7 @@ let private persistProvisionedBinding
             Retryable = true
             RecoveryAction =
                 Some {
-                    Code = "reopen_workspace"
+                    Code = VersionControlCodes.Recovery.ReopenWorkspace
                     Instructions =
                         Some
                             "The workspace was provisioned but its binding could not be saved. Open the workspace again so it is bound."
@@ -521,7 +521,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                             StateChanged = false
                                             RecoveryAction =
                                                 Some {
-                                                    Code = "check_dependencies"
+                                                    Code = VersionControlCodes.Recovery.CheckDependencies
                                                     Instructions =
                                                         Some "One provider could not report its dependencies."
                                                 }
@@ -641,7 +641,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             withMutatingSession
                 event
                 request.OperationId
-                false
+                true
                 (fun hosted context ->
                     withPaths
                         request.Paths
@@ -1012,7 +1012,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                         Warnings =
                                             removed
                                             |> Array.map (fun path -> {
-                                                Code = "lock_removed"
+                                                Code = VersionControlCodes.LockRemoved
                                                 Message = path
                                             })
                                 }

@@ -403,7 +403,7 @@ Vitest.describe (
                 | Ok _ -> failwith "Expected the backslash path to be refused."
                 | Error failure ->
                     Vitest.expect(failure.Category).toEqual Validation
-                    Vitest.expect(failure.Code).toBe "invalid_path"
+                    Vitest.expect(failure.Code).toBe VersionControlCodes.InvalidPath
                     Vitest.expect(failure.AffectedPaths).toEqual [| "assays\\b\\isa.assay.xlsx" |]
         )
 

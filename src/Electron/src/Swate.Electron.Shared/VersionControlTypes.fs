@@ -145,7 +145,22 @@ module VersionControlCodes =
     let LocationUnsupported = "location_unsupported"
 
     [<Literal>]
+    let UnexpectedException = "unexpected_exception"
+
+    [<Literal>]
     let LockRemovalRefused = "lock_removal_refused"
+
+    [<Literal>]
+    let LockRemoved = "lock_removed"
+
+    [<Literal>]
+    let InvalidPath = "invalid_path"
+
+    [<Literal>]
+    let InvalidRef = "invalid_ref"
+
+    [<Literal>]
+    let InvalidRevision = "invalid_revision"
 
     [<Literal>]
     let BindingNotPersisted = "binding_not_persisted"
@@ -188,6 +203,12 @@ module VersionControlCodes =
 
         [<Literal>]
         let InspectWorkspace = "inspect_workspace"
+
+        [<Literal>]
+        let ReopenWorkspace = "reopen_workspace"
+
+        [<Literal>]
+        let CheckDependencies = "check_dependencies"
 
         [<Literal>]
         let AbortMerge = "abort_merge"

@@ -85,7 +85,7 @@ promise {
 }
 ```
 
-The status carries `WorkspaceVersion`, an opaque optimistic concurrency token. Mutations (`createRevision`, `restorePaths`, `update`, `publish`, `switchRef`) send it back as `ExpectedWorkspaceVersion`. A stale token fails with `precondition_failed` and `StateChanged = false`, and the workflow refreshes and retries once.
+The status carries `WorkspaceVersion`, an opaque optimistic concurrency token. Mutations (`createRevision`, `restorePaths`, `update`, `publish`, `switchRef`) send it back as `ExpectedWorkspaceVersion`. A stale token fails with `precondition_failed` in the `Concurrency` category and `StateChanged = false`. The workflow then refreshes and runs the write once more for commits, saves, publishes, branch creation and switching, settings and merge finalization. It never replays a discard, a restore of interrupted paths, an update or an abandoned merge, because those would act on content the user has not reviewed; they report the stale state and refresh instead.
 
 Primary save in the sidebar: `createRevision` with the exact selected paths, refresh, then either `publish` directly (no target or no tracking ref yet) or `previewUpdate`, a confirmation when the preview predicts a conflict session or data loss, `update`, and `publish`. A `publish` that fails with `publish_target_missing` creates the project on the DataHub through `IGitLabApi.createProject`, binds the workspace with `bindWorkspace` and publishes again. A `target_unreachable` failure is an outage and never triggers provisioning.
 

@@ -427,6 +427,15 @@ let private restoreGates =
 [<Emit("(() => { let resolve; const promise = new Promise((r) => { resolve = r; }); return [promise, resolve]; })()")>]
 let private deferred () : JS.Promise<unit> * (unit -> unit) = jsNative
 
+let private openGates =
+    System.Collections.Generic.Dictionary<string, JS.Promise<unit>>()
+
+let private openStartResolvers =
+    System.Collections.Generic.Dictionary<string, unit -> unit>()
+
+let private partialOpenFailures =
+    System.Collections.Generic.Dictionary<string, OperationFailure>()
+
 /// Two fake providers: "fake.core" owns coreOnlyRoot and opens a core-only session,
 /// "fake.broken" owns failingRoot, fails to open and reports a failing dependency check.
 let private fakeProviderRuntimeWithStoragePolicy
@@ -521,7 +530,27 @@ let private fakeProviderRuntimeWithStoragePolicy
                             }
                         )
                 }
-            Open = fun binding _ -> async { return openResult binding }
+            Open =
+                fun binding _ -> async {
+                    let rootKey = ProviderResolver.normalizePath binding.WorkspaceRoot
+
+                    match openStartResolvers.TryGetValue rootKey with
+                    | true, signal ->
+                        signal ()
+                        openStartResolvers.Remove rootKey |> ignore
+                    | _ -> ()
+
+                    match openGates.TryGetValue rootKey with
+                    | true, gate -> do! Async.AwaitPromise gate
+                    | _ -> ()
+
+                    let result = openResult binding
+
+                    match partialOpenFailures.TryGetValue rootKey, result with
+                    | (true, failure), Succeeded outcome -> return PartiallySucceeded(outcome, failure)
+                    | (true, failure), PartiallySucceeded(outcome, _) -> return PartiallySucceeded(outcome, failure)
+                    | _, result -> return result
+                }
             CheckDependencies = fun _ -> async { return dependencies }
             InstallDependency = fun _ _ -> unsupported ()
         }
@@ -645,6 +674,72 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "an ARC whose repository initialization fails is still created",
+            fun () -> promise {
+                let! root = createTempDirectoryAsync "swate-vc-arc-init-failure-"
+                let settingsRoot = join [| root; "settings" |]
+                let container = join [| root; "container" |]
+                let identifier = "failed-init"
+
+                let expectedArcPath =
+                    ARCtrl.ArcPathHelper.combine container identifier
+                    |> Swate.Components.Shared.PathHelpers.normalizePath
+
+                for folder in [ settingsRoot; container ] do
+                    Main.Bindings.Filesystem.mkdirSync folder (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                let runtime = fakeProviderRuntime expectedArcPath (join [| root; "unused" |])
+                let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
+                VersionControlRuntime.initialize runtime
+                WorkspaceSessionHost.resetForTests ()
+
+                registerEmptyVault 64 |> ignore
+                let dialogSpy = Vitest.vi.spyOn (electron?dialog, "showOpenDialog")
+
+                mockResolvedValue dialogSpy (createObj [ "canceled" ==> false; "filePaths" ==> [| container |] ])
+
+                let cleanup () = promise {
+                    Vitest.vi.restoreAllMocks ()
+                    electronMock?reset () |> ignore
+                    ARC_VAULTS.Vaults.Clear()
+
+                    match WorkspaceSessionHost.tryCurrent () with
+                    | Some currentHost -> do! currentHost.CloseAll() |> Async.StartAsPromise
+                    | None -> ()
+
+                    do! host.CloseAll() |> Async.StartAsPromise
+                    do! removeDirectoryAsync root
+                }
+
+                try
+                    try
+                        let api = Main.IPC.ArcVaultsApi.api (ipcEvent 64)
+
+                        let! created =
+                            api.createARC {
+                                identifier = identifier
+                                initGit = true
+                            }
+
+                        match created with
+                        | Ok createdPath ->
+                            Vitest.expect(createdPath).toBe expectedArcPath
+                            Vitest.expect(Main.Bindings.Filesystem.existsSync createdPath).toBe true
+
+                            Vitest.expect(Main.Bindings.Filesystem.existsSync (join [| createdPath; ".git" |])).toBe
+                                false
+                        | Error error -> return raise error
+                    with error ->
+                        do! cleanup ()
+                        return raise error
+
+                    do! cleanup ()
+                finally
+                    WorkspaceSessionHost.initialize host
+            }
+        )
+
+        Vitest.test (
             "an open whose default settings push fails is reported as partial",
             fun () ->
                 withFixture (fun fixture -> promise {
@@ -661,6 +756,12 @@ Vitest.describe (
                             ProviderError
                             "fake_default_settings_failed"
                             "The fake provider rejected the default settings."
+
+                    let partialOpenFailure =
+                        OperationFailure.create
+                            ProviderError
+                            "fake_open_partial"
+                            "The fake provider opened with a warning."
 
                     let storagePolicy: StoragePolicyService = {
                         SetPathPolicy =
@@ -696,7 +797,82 @@ Vitest.describe (
                         let settings = fakeHost.GetSettings coreOnlyRoot
                         Vitest.expect(settings.AutoTrackThresholdMb).toBe 1
                         Vitest.expect(settings.DownloadLargeFiles).toBe false
+
+                        do! fakeHost.CloseSession coreOnlyRoot |> Async.StartAsPromise
+                        partialOpenFailures.[ProviderResolver.normalizePath coreOnlyRoot] <- partialOpenFailure
+
+                        let! partialOpened =
+                            fakeHost.OpenSession(coreOnlyRoot, detached "open-partial-default-settings-failure")
+                            |> Async.StartAsPromise
+
+                        match partialOpened with
+                        | PartiallySucceeded(_, failure) ->
+                            Vitest.expect(failure.Code).toBe partialOpenFailure.Code
+
+                            Vitest
+                                .expect(
+                                    failure.Details
+                                    |> Array.exists (fun detail -> detail.Contains settingsFailure.Code)
+                                )
+                                .toBe
+                                true
+                        | other -> failwith $"Expected a partial open with combined failures, got {other}"
                     finally
+                        partialOpenFailures.Remove(ProviderResolver.normalizePath coreOnlyRoot)
+                        |> ignore
+
+                        WorkspaceSessionHost.initialize fixture.Host
+                })
+        )
+
+        Vitest.test (
+            "a close that arrives during an open closes the session when the open completes",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let root = join [| fixture.Root; "close-during-open" |]
+                    Main.Bindings.Filesystem.mkdirSync root (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    let openGate, releaseOpen = deferred ()
+                    let openStarted, signalOpenStarted = deferred ()
+
+                    let fakeRuntime =
+                        fakeProviderRuntime root (join [| fixture.Root; "unused-close-root" |])
+
+                    let fakeHost = WorkspaceSessionHost.WorkspaceSessionHost(fakeRuntime)
+                    let rootKey = ProviderResolver.normalizePath root
+                    openGates.[rootKey] <- openGate
+                    openStartResolvers.[rootKey] <- signalOpenStarted
+                    WorkspaceSessionHost.initialize fakeHost
+
+                    try
+                        let opening =
+                            fakeHost.OpenSession(root, detached "open-close-race") |> Async.StartAsPromise
+
+                        let! _ = openStarted
+                        do! fakeHost.CloseSession root |> Async.StartAsPromise
+                        Vitest.expect(fakeHost.TryGetSession root).toEqual None
+
+                        releaseOpen ()
+                        let! opened = opening
+                        let failure = expectFailure "open after close request" opened
+                        Vitest.expect(failure.Code).toBe VersionControlCodes.SessionUnavailable
+                        Vitest.expect(fakeHost.TryGetSession root).toEqual None
+
+                        openGates.Remove rootKey |> ignore
+
+                        let! reopened =
+                            fakeHost.OpenSession(root, detached "open-after-close-race")
+                            |> Async.StartAsPromise
+
+                        let reopened = expectValue "reopen after close race" reopened
+                        Vitest.expect(reopened.SessionId).not.toBe ""
+
+                        Vitest
+                            .expect(fakeHost.TryGetSession root |> Option.map _.SessionId)
+                            .toEqual (Some reopened.SessionId)
+                    finally
+                        openGates.Remove rootKey |> ignore
+                        openStartResolvers.Remove rootKey |> ignore
                         WorkspaceSessionHost.initialize fixture.Host
                 })
         )
@@ -805,7 +981,7 @@ Vitest.describe (
             "a save stores a small dataset file as a large object",
             fun () ->
                 withFixture (fun fixture -> promise {
-                    registerVault 62 fixture.RepoRoot |> ignore
+                    let vault = registerVault 62 fixture.RepoRoot
                     let api = Main.IPC.IVersionControlApi.api (ipcEvent 62)
                     let datasetPath = "assays/a1/dataset/raw.bin"
 
@@ -832,10 +1008,19 @@ Vitest.describe (
                         git fixture.RepoRoot [ "cat-file"; "-p"; $"HEAD:{datasetPath}" ]
 
                     let attributes = git fixture.RepoRoot [ "cat-file"; "-p"; "HEAD:.gitattributes" ]
+                    let datasetAbsolutePath = join [| fixture.RepoRoot; datasetPath |]
+
+                    let datasetEntry =
+                        vault.fileTree.Values
+                        |> Seq.tryFind (fun entry ->
+                            Swate.Components.Shared.PathHelpers.pathsEqual entry.path datasetAbsolutePath
+                        )
+                        |> Option.defaultWith (fun () -> failwith "The refreshed file tree omitted the dataset file.")
 
                     Vitest.expect(datasetContent.StartsWith("version https://git-lfs.github.com/spec/v1")).toBe true
 
                     Vitest.expect(attributes.Contains(datasetPath)).toBe true
+                    Vitest.expect(datasetEntry.largeObject.IsSome).toBe true
                 })
         )
 
@@ -1128,7 +1313,7 @@ Vitest.describe (
                     let outcome = expectDtoValue "clear lock" cleared
                     Vitest.expect(outcome.Effect).toEqual OperationEffectDto.Performed
                     Vitest.expect(outcome.AffectedPaths).toEqual [||]
-                    Vitest.expect(outcome.Warnings |> Array.map _.Code).toEqual [| "lock_removed" |]
+                    Vitest.expect(outcome.Warnings |> Array.map _.Code).toEqual [| VersionControlCodes.LockRemoved |]
                     Vitest.expect(outcome.Warnings |> Array.map _.Message).toEqual [| lockPath |]
                     Vitest.expect(Main.Bindings.Filesystem.existsSync lockPath).toBe false
                     Vitest.expect(outcome.Value.ActiveConflictSession).toEqual None
@@ -1260,7 +1445,7 @@ Vitest.describe (
 
                     let publishFailure = expectDtoFailure "publish with blank revision" published
                     Vitest.expect(publishFailure.Category).toEqual FailureCategoryDto.Validation
-                    Vitest.expect(publishFailure.Code).toBe "invalid_revision"
+                    Vitest.expect(publishFailure.Code).toBe VersionControlCodes.InvalidRevision
 
                     let! created =
                         api.createRef {
@@ -1272,7 +1457,7 @@ Vitest.describe (
                         }
 
                     let refFailure = expectDtoFailure "create ref with blank base" created
-                    Vitest.expect(refFailure.Code).toBe "invalid_ref"
+                    Vitest.expect(refFailure.Code).toBe VersionControlCodes.InvalidRef
                     Vitest.expect(git fixture.RepoRoot [ "branch"; "--list"; "feature" ] |> _.Trim()).toBe ""
                 })
         )
@@ -1549,7 +1734,7 @@ Vitest.describe (
 
                     let expectedCode =
                         match RepositoryPath.tryCreate "../outside.bin" with
-                        | Error _ -> "invalid_path"
+                        | Error _ -> VersionControlCodes.InvalidPath
                         | Ok _ -> failwith "Expected the traversal path to be refused."
 
                     let! result =
