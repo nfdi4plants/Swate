@@ -385,7 +385,8 @@ module ArcVaultExtensions =
             if this.path.IsSome then
                 match! ARC.LoadAsyncSwateZeroByteRepair this.path.Value with
                 | Error e -> swatefailfn this.window.id "Unable to load ARC: %s" (PathHelpers.formatContractErrors e)
-                | Ok _ when this.window.isDestroyed () -> return raise (exn "The ARC window was closed while the ARC was loading.")
+                | Ok _ when this.window.isDestroyed () ->
+                    return raise (exn "The ARC window was closed while the ARC was loading.")
                 | Ok arc ->
                     this.SetArc(arc)
                     this.RefreshHasUnsavedArcChangesFlag()
