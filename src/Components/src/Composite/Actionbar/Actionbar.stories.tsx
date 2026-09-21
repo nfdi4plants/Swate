@@ -69,6 +69,12 @@ export const KeyboardOpensOverflowAndSelectsAction: Story = {
     const menu = await screen.findByRole('menu');
     expect(menu).toBeInTheDocument();
 
+    // The floating focus manager moves focus into the menu after opening. Wait for
+    // it so the following keystrokes always reach the menu's list navigation.
+    await waitFor(() => {
+      expect(menu.contains(document.activeElement)).toBe(true);
+    });
+
     await userEvent.keyboard('o{Enter}');
     await waitFor(() => {
       expect(canvas.getByTestId('action-result')).toHaveTextContent('open');

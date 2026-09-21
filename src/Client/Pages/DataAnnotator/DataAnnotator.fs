@@ -7,6 +7,7 @@ open Model
 open Messages
 open Feliz
 open Swate.Components
+open Swate.Components.Shared
 open Swate.Components.Composite.Table
 open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Page.ArcFileEditor.Helper
@@ -33,9 +34,13 @@ type DataAnnotator =
         | Some arcFile ->
             match tryGetDataAnnotatorDestination (model.SpreadsheetModel.ActiveView, arcFile) with
             | Result.Ok destination ->
+                let mutateArcFile (update: ArcFiles -> unit) =
+                    update arcFile
+                    setArcFile arcFile
+
                 Swate.Components.Composite.Widgets.DataAnnotator.DataAnnotator.Main(
                     destination,
-                    applyDataAnnotatorInputToArcFile (destination, arcFile, setArcFile)
+                    applyDataAnnotatorInputToArcFile (destination, arcFile, mutateArcFile)
                 )
             | Result.Error message ->
                 Html.div [

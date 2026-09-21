@@ -4,6 +4,7 @@ open Elmish
 open Feliz
 open Feliz.UseElmish
 open Renderer.Components
+open Renderer.Components.Helper
 open Renderer.Types
 open Swate.Components
 open Swate.Components.Composite.Layout
@@ -237,25 +238,30 @@ let Main () =
                     Renderer.Context.PageStateContext.PageStateCtx.Provider(
                         pageCtx,
                         ErrorModalProvider.ErrorModalProvider(
-                            Renderer.Context.AuthStateContext.Provider(
-                                Renderer.Context.GitStateContext.GitStateCtxProvider(
-                                    Swate
-                                        .Components
-                                        .Composite
-                                        .AnnotationTable
-                                        .AnnotationTableContextProvider
-                                        .AnnotationTableContextProvider(
-                                            Layout.Main(
-                                                children =
-                                                    React.Fragment [|
-                                                        children
-                                                        CloseWindowController.CloseWindowController()
-                                                    |],
-                                                navbar = Renderer.Components.Navbar.Main(),
-                                                ?leftSidebar = leftSidebar,
-                                                ?leftActions = leftActions
+                            Renderer.Context.ArcStateContext.ArcStateProvider(
+                                (fun arcFile ->
+                                    ArcFileApiHelper.withArcFileRequest arcFile Api.ipcArcVaultApi.setArcFileInMemory
+                                ),
+                                Renderer.Context.AuthStateContext.Provider(
+                                    Renderer.Context.GitStateContext.GitStateCtxProvider(
+                                        Swate
+                                            .Components
+                                            .Composite
+                                            .AnnotationTable
+                                            .AnnotationTableContextProvider
+                                            .AnnotationTableContextProvider(
+                                                Layout.Main(
+                                                    children =
+                                                        React.Fragment [|
+                                                            children
+                                                            CloseWindowController.CloseWindowController()
+                                                        |],
+                                                    navbar = Renderer.Components.Navbar.Main(),
+                                                    ?leftSidebar = leftSidebar,
+                                                    ?leftActions = leftActions
+                                                )
                                             )
-                                        )
+                                    )
                                 )
                             ),
                             ?scopeId = currentArcScopeId

@@ -12,31 +12,13 @@ open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
 
 [<ReactComponent>]
-let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
-    let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+let ArcFilePreviewTarget (requestedView: ActiveView option) =
+    let arcStateCtx = Renderer.Context.ArcStateContext.useArcStateCtx ()
     let errorModal = useErrorModalCtx ()
 
-    let setArcFilePageState nextRequestedView (nextArcFile: ArcFiles) =
-        pageStateCtx.setState (Some(Renderer.Types.PageState.ArcFilePage(nextArcFile, nextRequestedView)))
+    let arcFile = arcStateCtx.arcFile
 
-    let commitArcFile (nextArcFile: ArcFiles) =
-        publishAndPersistArcFile
-            nextArcFile
-            (setArcFilePageState requestedView)
-            (fun arcFile -> ArcFileApiHelper.withArcFileRequest arcFile Api.ipcArcVaultApi.setArcFileInMemory)
-        |> Promise.map (fun result ->
-            match result with
-            | Ok() -> ()
-            | Error exn ->
-                errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not update ARC in memory"))
-        )
-        |> Promise.start
-
-    let mutateArcFile (update: ArcFiles -> unit) =
-        update arcFile
-        commitArcFile arcFile
-
-    let replaceArcFile (nextArcFile: ArcFiles) = commitArcFile nextArcFile
+    React.useEffectOnce (fun () -> fun () -> arcStateCtx.clear ())
 
     let runDataMapMutation (errorTitle: string) (operation: Fable.Core.JS.Promise<Result<unit, exn>>) =
         promise {
@@ -46,22 +28,6 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
         }
         |> Promise.catch (fun exn -> errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = errorTitle)))
         |> Promise.start
-
-    let addDataMap () =
-        match arcFile.TryGetDataMapParentInfo() with
-        | None -> ()
-        | Some parentInfo ->
-            ArcFileApiHelper.withArcFileRequest
-                (ArcFiles.DataMap(Some parentInfo, ARCtrl.DataMap.init ()))
-                Api.ipcArcVaultApi.addArcFile
-            |> runDataMapMutation "DataMap could not be added"
-
-    let deleteDataMap () =
-        match arcFile.TryGetDataMapParentInfo() |> Option.map DatamapParentInfo.toPath with
-        | None -> ()
-        | Some path ->
-            Api.ipcArcVaultApi.deletePath path
-            |> runDataMapMutation "DataMap could not be deleted"
 
     let pickFilePaths =
         React.useCallback (
@@ -80,37 +46,66 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
     let importJson =
         React.useCallback (
             (fun (request: JsonImportRequest) -> promise {
-                return!
-                    importJsonRequestIntoCurrentTarget
-                        arcFile
-                        request
-                        (setArcFilePageState requestedView)
-                        (fun arcfile ->
-                            ArcFileApiHelper.withArcFileRequest arcfile Api.ipcArcVaultApi.setArcFileInMemory
-                        )
+                match arcFile with
+                | None -> return Error(exn "No ARC file is open.")
+                | Some currentArcFile ->
+                    return!
+                        importJsonRequestIntoCurrentTarget
+                            currentArcFile
+                            request
+                            arcStateCtx.mutate
+                            arcStateCtx.replace
             }),
-            [| box arcFile; box pageStateCtx |]
+            [| box arcFile; box arcStateCtx |]
         )
 
-    Html.div [
-        prop.key (string (editorKey arcFile requestedView))
-        prop.className "swt:contents"
-        prop.children [
-            Swate.Components.Page.ArcFileEditor.Main.ArcFileEditor(
-                arcFile,
-                mutateArcFile,
-                replaceArcFile,
-                pickFilePaths,
-                addDataMap,
-                deleteDataMap,
-                startingActiveView = (requestedView |> Option.defaultValue ActiveView.Metadata),
-                onImportJson = importJson,
-                onError =
-                    (fun message ->
-                        errorModal.enqueue (
-                            ErrorModalRequest.create (message, title = "Could not update ARC file editor")
+    match arcFile with
+    | Some arcFile ->
+        let addDataMap () =
+            match arcFile.TryGetDataMapParentInfo() with
+            | None -> ()
+            | Some parentInfo ->
+                ArcFileApiHelper.withArcFileRequest
+                    (ArcFiles.DataMap(Some parentInfo, ARCtrl.DataMap.init ()))
+                    Api.ipcArcVaultApi.addArcFile
+                |> runDataMapMutation "DataMap could not be added"
+
+        let deleteDataMap () =
+            match arcFile.TryGetDataMapParentInfo() |> Option.map DatamapParentInfo.toPath with
+            | None -> ()
+            | Some path ->
+                Api.ipcArcVaultApi.deletePath path
+                |> runDataMapMutation "DataMap could not be deleted"
+
+        Html.div [
+            prop.key (string (editorKey arcFile requestedView))
+            prop.className "swt:contents"
+            prop.children [
+                Swate.Components.Page.ArcFileEditor.Main.ArcFileEditor(
+                    arcFile,
+                    arcStateCtx.mutate,
+                    arcStateCtx.replace,
+                    pickFilePaths,
+                    addDataMap,
+                    deleteDataMap,
+                    startingActiveView = (requestedView |> Option.defaultValue ActiveView.Metadata),
+                    onImportJson = importJson,
+                    onError =
+                        (fun message ->
+                            errorModal.enqueue (
+                                ErrorModalRequest.create (message, title = "Could not update ARC file editor")
+                            )
                         )
-                    )
-            )
+                )
+            ]
         ]
-    ]
+    | None ->
+        Html.div [
+            prop.className "swt:contents"
+            prop.children [
+                Html.div [
+                    prop.className "swt:flex-1 swt:flex swt:justify-center swt:items-center"
+                    prop.text "No ARC file is loaded."
+                ]
+            ]
+        ]

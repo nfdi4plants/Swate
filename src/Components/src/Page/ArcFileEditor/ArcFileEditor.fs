@@ -308,21 +308,11 @@ type Main =
         let activeView, setActiveView =
             React.useState (startingActiveView |> Option.defaultValue ActiveView.Metadata)
 
-        let arcFileState, mutateStore, setStore, _ = useMutableArcFilesStore arcFile
-
-        let mutate (update: ArcFiles -> unit) =
-            mutateArcFile update
-            mutateStore (fun _ -> ())
-
-        let replace (nextArcFile: ArcFiles) =
-            setStore nextArcFile
-            replaceArcFile nextArcFile
-
         let setArcFileState (nextArcFile: ArcFiles) =
-            if obj.ReferenceEquals(nextArcFile, arcFileState) then
-                mutate (fun _ -> ())
+            if obj.ReferenceEquals(nextArcFile, arcFile) then
+                mutateArcFile (fun _ -> ())
             else
-                replace nextArcFile
+                replaceArcFile nextArcFile
 
         // The ARC file is caller-owned and can be replaced independently of this component.
         // Keep the internally owned view valid when the available file views change.
@@ -388,17 +378,17 @@ type Main =
         let widgetElements = {|
             buildingBlock =
                 Main.LazyLoaderWithMessage(
-                    LazyComponents.LazyBuildingBlockWidget(arcFile, activeTableIndex, mutate),
+                    LazyComponents.LazyBuildingBlockWidget(arcFile, activeTableIndex, mutateArcFile),
                     "Loading Building Block Widget..."
                 )
             template =
                 Main.LazyLoaderWithMessage(
-                    LazyComponents.LazyTemplateWidget(arcFile, activeTableIndex, mutate),
+                    LazyComponents.LazyTemplateWidget(arcFile, activeTableIndex, mutateArcFile),
                     "Loading Template Widget..."
                 )
             filePicker =
                 Main.LazyLoaderWithMessage(
-                    LazyComponents.LazyFilePickerWidget(arcFile, activeTableIndex, mutate, pickPaths),
+                    LazyComponents.LazyFilePickerWidget(arcFile, activeTableIndex, mutateArcFile, pickPaths),
                     "Loading File Picker Widget..."
                 )
             dataAnnotator =
@@ -407,7 +397,7 @@ type Main =
                     Main.LazyLoaderWithMessage(
                         LazyComponents.LazyDataAnnotator(
                             destination,
-                            Helper.applyDataAnnotatorInputToArcFile (destination, arcFile, setArcFileState),
+                            Helper.applyDataAnnotatorInputToArcFile (destination, arcFile, mutateArcFile),
                             onError = onError
                         ),
                         "Loading Data Annotator Widget..."
@@ -442,11 +432,11 @@ type Main =
                     Html.div [
                         prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
                         prop.children [
-                            Main.ArcFileContentView(activeView, arcFileState, setArcFileState)
+                            Main.ArcFileContentView(activeView, arcFile, setArcFileState)
                         ]
                     ]
-                    Main.AddRowsFooter(activeView, arcFileState, setArcFileState)
-                    ArcFileFooterTabs.Main(arcFileState, activeView, setActiveView, setArcFileState, onDeleteDataMap)
+                    Main.AddRowsFooter(activeView, arcFile, setArcFileState)
+                    ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFileState, onDeleteDataMap)
                 ]
             ]
 
@@ -498,20 +488,8 @@ type Main =
                 startAssay
             )
 
-        let (arcFile: ArcFiles), setArcFileState =
-            React.useState (ArcFiles.Assay(startAssay))
-
-        let arcFileVersion, setArcFileVersion = React.useState 0
-
-        let publishArcFile (nextArcFile: ArcFiles) =
-            setArcFileState nextArcFile
-            setArcFileVersion (arcFileVersion + 1)
-
-        let mutateArcFile (update: ArcFiles -> unit) =
-            update arcFile
-            publishArcFile arcFile
-
-        let replaceArcFile (nextArcFile: ArcFiles) = publishArcFile nextArcFile
+        let (arcFile: ArcFiles), mutateArcFile, replaceArcFile, _ =
+            useMutableStore (ArcFiles.Assay(startAssay))
 
         let loadTemplates =
             fun () ->

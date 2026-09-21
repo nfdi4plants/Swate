@@ -102,12 +102,15 @@ let Main =
             let dataMap = DataMap.init ()
             assay.DataMap <- Some dataMap
             let arcFile = ArcFiles.Assay assay
-            let mutable nextArcFile = None
+            let mutable mutatedArcFile = None
 
             Swate.Components.Page.ArcFileEditor.Helper.applyDataAnnotatorInputToArcFile
                 (ComponentDataAnnotatorTypes.AnnotationDestination.DataMap dataMap,
                  arcFile,
-                 (fun value -> nextArcFile <- Some value))
+                 (fun update ->
+                     update arcFile
+                     mutatedArcFile <- Some arcFile
+                 ))
                 {
                     Selectors = [| "row=2" |]
                     FileName = "test.csv"
@@ -119,17 +122,14 @@ let Main =
             |> Result.defaultWith failwith
             |> ignore
 
-            let nextDataMap = nextArcFile.Value.TryGetDataMap().Value
+            let nextDataMap = mutatedArcFile.Value.TryGetDataMap().Value
 
             Expect.equal
                 nextDataMap.DataContexts.[0].FilePath
                 (Some "./assays/MyAssay/dataset/test.csv")
                 "DataMap file paths must be relative to the ARC root."
 
-            Expect.equal
-                dataMap.DataContexts.Count
-                0
-                "Submitting must not mutate the DataMap currently rendered by React."
+            Expect.equal dataMap.DataContexts.Count 1 "Submitting must mutate the open DataMap in place."
 
         testCase "creates ARC-root-relative paths for every DataMap parent"
         <| fun _ ->
@@ -167,12 +167,15 @@ let Main =
             let assay = ArcAssay.init "MyAssay"
             assay.AddTable table
             let arcFile = ArcFiles.Assay assay
-            let mutable nextArcFile = None
+            let mutable mutatedArcFile = None
 
             Swate.Components.Page.ArcFileEditor.Helper.applyDataAnnotatorInputToArcFile
                 (ComponentDataAnnotatorTypes.AnnotationDestination.Table table,
                  arcFile,
-                 (fun value -> nextArcFile <- Some value))
+                 (fun update ->
+                     update arcFile
+                     mutatedArcFile <- Some arcFile
+                 ))
                 {
                     Selectors = [| "row=2" |]
                     FileName = "test.csv"
@@ -186,7 +189,7 @@ let Main =
             |> Result.defaultWith failwith
             |> ignore
 
-            let outputColumn = nextArcFile.Value.Tables().[0].GetOutputColumn()
+            let outputColumn = mutatedArcFile.Value.Tables().[0].GetOutputColumn()
 
             Expect.equal
                 outputColumn.Cells.[0].AsData.FilePath

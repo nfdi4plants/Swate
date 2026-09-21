@@ -95,8 +95,7 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                                 "swt:flex-1 swt:min-w-0 swt:min-h-0 swt:flex swt:justify-center swt:items-center"
                             prop.children [ Renderer.Components.InitState.InitState() ]
                         ]
-                    | Some _, Some(PageState.ArcFilePage(arcFile, requestedView)) ->
-                        ArcFilePreviewTarget(arcFile, requestedView)
+                    | Some _, Some(PageState.ArcFilePage requestedView) -> ArcFilePreviewTarget(requestedView)
                     | Some _, Some(PageState.MarkdownPage content) ->
                         React.Suspense(
                             [ LazyComponents.LazyMarkdownEditorTarget(content) ],

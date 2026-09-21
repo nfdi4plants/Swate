@@ -43,6 +43,7 @@ type FileTree =
     static member FileTree(rootContextMenuRef: IRefValue<Browser.Types.HTMLElement option>) =
 
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+        let arcStateCtx = Renderer.Context.ArcStateContext.useArcStateCtx ()
         let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
         let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
         let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
@@ -138,8 +139,7 @@ type FileTree =
 
         let withStartingView activeView =
             function
-            | Renderer.Types.PageState.ArcFilePage(arcFile, _) ->
-                Renderer.Types.PageState.ArcFilePage(arcFile, Some activeView)
+            | Renderer.Types.PageState.ArcFilePage _ -> Renderer.Types.PageState.ArcFilePage(Some activeView)
             | pageState -> pageState
 
         let tryGetArcEntityWorkbookName (path: string) =
@@ -168,7 +168,7 @@ type FileTree =
                     if isArcEntityDirectory item then
                         match tryGetArcEntityWorkbookName selectedPath with
                         | Some workbookName ->
-                            let! result = openView $"{selectedPath}/{workbookName}"
+                            let! result = openView arcStateCtx.replace $"{selectedPath}/{workbookName}"
 
                             result
                             |> Result.map (
@@ -185,7 +185,7 @@ type FileTree =
                     if Swate.Components.Page.FileExplorer.Helper.needsLfsDownload item then
                         pageStateCtx.setState None
                     else
-                        let! result = openView selectedPath
+                        let! result = openView arcStateCtx.replace selectedPath
                         applyPreviewResult item.Name result
             }
             |> Promise.start
@@ -200,12 +200,17 @@ type FileTree =
                 )
 
             promise {
-                match! openView path with
+                match! openView arcStateCtx.replace path with
                 | Ok pageState -> pageStateCtx.setState (Some(transformPageState pageState))
                 | Error errorMessage -> applyReloadError errorMessage
             }
             |> Promise.catch (fun exn -> applyReloadError exn.Message)
             |> Promise.start
+
+        let openArcRequestedView =
+            match pageStateCtx.state with
+            | Some(Renderer.Types.PageState.ArcFilePage requestedView) -> requestedView
+            | _ -> None
 
         React.useEffect (
             (fun () ->
@@ -213,14 +218,15 @@ type FileTree =
                     match
                         FileExplorerStateReconciliation.tryGetDataMapMismatchReload
                             fileStateCtx.state.FileTree
-                            pageStateCtx.state
+                            arcStateCtx.arcFile
+                            openArcRequestedView
                     with
                     | Some(parentPath, requestedView) ->
                         reloadPreviewAfterFileTreeUpdate
                             parentPath
                             (function
-                            | Renderer.Types.PageState.ArcFilePage(nextArcFile, _) ->
-                                Renderer.Types.PageState.ArcFilePage(nextArcFile, requestedView)
+                            | Renderer.Types.PageState.ArcFilePage _ ->
+                                Renderer.Types.PageState.ArcFilePage(requestedView)
                             | pageState -> pageState
                             )
                     | None when
@@ -298,7 +304,7 @@ type FileTree =
             errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create file or folder"))
 
         let reloadPreviewByPath (path: string) : JS.Promise<Result<unit, string>> = promise {
-            let! openResult = openView path
+            let! openResult = openView arcStateCtx.replace path
 
             match openResult with
             | Ok pageState ->
@@ -345,7 +351,9 @@ type FileTree =
                             let selectedPath = PathHelpers.normalizePath createdArcFileDto.path
                             fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                            let pageState = Renderer.Types.PageState.fromFileContentDTO createdArcFileDto
+                            let pageState =
+                                Renderer.Types.PageState.fromFileContentDTO (createdArcFileDto, arcStateCtx.replace)
+
                             pageStateCtx.setState (Some pageState)
 
                             closeDialog ()
@@ -386,12 +394,16 @@ type FileTree =
 
                                     match openResult with
                                     | Ok dto ->
-                                        let pageState = Renderer.Types.PageState.fromFileContentDTO dto
+                                        let pageState =
+                                            Renderer.Types.PageState.fromFileContentDTO (dto, arcStateCtx.replace)
+
                                         pageStateCtx.setState (Some pageState)
                                     | Error _ ->
                                         let dto = FileContentDTO.create FileContentType.PlainText "" selectedPath
 
-                                        let pageState = Renderer.Types.PageState.fromFileContentDTO dto
+                                        let pageState =
+                                            Renderer.Types.PageState.fromFileContentDTO (dto, arcStateCtx.replace)
+
                                         pageStateCtx.setState (Some pageState)
                                 | FileSystemItemKind.Folder -> pageStateCtx.setState None
 
@@ -492,7 +504,7 @@ type FileTree =
                     {
                         pendingRenameDraft = activeRenameDraft
                         selectedTreePath = fileStateCtx.state.Selection.TreePath
-                        pageState = pageStateCtx.state
+                        openArcFile = arcStateCtx.arcFile
                         closeRenameModal = closeDialog
                         setIsRenaming = setIsDialogBusy
                         setSelection = fileStateCtx.setSelection

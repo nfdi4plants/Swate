@@ -21,6 +21,7 @@ let NotesDraftTarget () =
 
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
+    let arcStateCtx = Renderer.Context.ArcStateContext.useArcStateCtx ()
 
     let availableNotesTargets =
         React.useMemo (
@@ -76,10 +77,14 @@ let NotesDraftTarget () =
 
             match previewResult with
             | Ok previewData ->
-                let pageState = Renderer.Types.PageState.fromFileContentDTO previewData
+                let pageState =
+                    Renderer.Types.PageState.fromFileContentDTO (previewData, arcStateCtx.replace)
+
                 pageStateCtx.setState (Some pageState)
             | Result.Error _ ->
-                let pageState = Renderer.Types.PageState.fromFileContentDTO request
+                let pageState =
+                    Renderer.Types.PageState.fromFileContentDTO (request, arcStateCtx.replace)
+
                 pageStateCtx.setState (Some pageState)
     }
 

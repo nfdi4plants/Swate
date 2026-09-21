@@ -51,8 +51,6 @@ type MutableStore<'T>(initialValue: 'T) =
 let useMutableStore (initialValue: 'T) : ('T * (('T -> unit) -> unit) * ('T -> unit) * int) =
     let storeRef = React.useRef (MutableStore(initialValue))
 
-    storeRef.current.Replace(initialValue)
-
     let snapshot =
         React.useSyncExternalStore (
             storeRef.current.Subscribe,

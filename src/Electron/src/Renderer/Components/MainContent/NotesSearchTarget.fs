@@ -13,6 +13,7 @@ let NotesSearchTarget () =
 
     let pageCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let fileTreeCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
+    let arcStateCtx = Renderer.Context.ArcStateContext.useArcStateCtx ()
     let notes, setNotes = React.useState ([]: Note list)
 
     let isLoading, setIsLoading = React.useState true
@@ -55,7 +56,9 @@ let NotesSearchTarget () =
                 let selectedPath = PathHelpers.normalizePath relativePath
                 fileTreeCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                let pageState = Renderer.Types.PageState.fromFileContentDTO dto
+                let pageState =
+                    Renderer.Types.PageState.fromFileContentDTO (dto, arcStateCtx.replace)
+
                 pageCtx.setState (Some pageState)
             | Result.Error exn ->
                 fileTreeCtx.setSelection (ArcSelection.clearExplorerNode fileTreeCtx.state.Selection)

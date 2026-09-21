@@ -13,6 +13,7 @@ let LandingDraftTarget () =
 
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
+    let arcStateCtx = Renderer.Context.ArcStateContext.useArcStateCtx ()
     let landingDraft, setLandingDraft = React.useState LandingDraft.init
     let landingUiState, setLandingUiState = React.useState LandingUiState.init
 
@@ -24,7 +25,9 @@ let LandingDraftTarget () =
 
                 fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                let pageState = Renderer.Types.PageState.fromFileContentDTO response
+                let pageState =
+                    Renderer.Types.PageState.fromFileContentDTO (response, arcStateCtx.replace)
+
                 pageStateCtx.setState (Some pageState)
 
                 setLandingDraft LandingDraft.init

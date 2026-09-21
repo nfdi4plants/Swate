@@ -16,7 +16,7 @@ type GitUnsupportedPageData = GitUnsupportedContentDto
 
 [<RequireQualifiedAccess>]
 type PageState =
-    | ArcFilePage of arcFile: ArcFiles * requestedView: ActiveView option
+    | ArcFilePage of requestedView: ActiveView option
     | MarkdownPage of string
     | TextPage of string
     | UnknownPage
@@ -32,7 +32,7 @@ type PageState =
     | ValidationPackageBrowser
     | SettingsPage
 
-    static member fromFileContentDTO(dto: FileContentDTO) : PageState =
+    static member fromFileContentDTO(dto: FileContentDTO, publishArcFile: ArcFiles -> unit) : PageState =
         match dto.fileType with
         | FileContentType.Markdown -> PageState.MarkdownPage dto.content
         | FileContentType.FileContentTypeIsPlainTextVariant -> PageState.TextPage dto.content
@@ -41,6 +41,8 @@ type PageState =
 
             match arcfile with
             | Some arcFile ->
+                publishArcFile arcFile
+
                 let normalizedPath = PathHelpers.normalizePath dto.path
 
                 if
@@ -49,7 +51,7 @@ type PageState =
                         System.StringComparison.OrdinalIgnoreCase
                     )
                 then
-                    PageState.ArcFilePage(arcFile, Some ActiveView.DataMap)
+                    PageState.ArcFilePage(Some ActiveView.DataMap)
                 elif normalizedPath.EndsWith(".xlsx", System.StringComparison.OrdinalIgnoreCase) then
                     let startingView =
                         if arcFile.Tables().Count > 0 then
@@ -57,9 +59,9 @@ type PageState =
                         else
                             ActiveView.Metadata
 
-                    PageState.ArcFilePage(arcFile, Some startingView)
+                    PageState.ArcFilePage(Some startingView)
                 else
-                    PageState.ArcFilePage(arcFile, None)
+                    PageState.ArcFilePage None
             | None ->
                 PageState.ErrorPage
                     $"Failed to parse ARC file: {dto.path} - {dto.fileType} - unsupported format or corrupted content."

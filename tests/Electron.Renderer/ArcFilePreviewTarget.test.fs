@@ -72,103 +72,35 @@ Vitest.describe (
 
                 Vitest.expect(ActiveView.Forward(afterDeletion, activeAfterReorder)).toEqual (ActiveView.Table 0)
         )
-
-        Vitest.test (
-            "keeps the editor remount key stable for same-reference in-place mutations",
-            fun () ->
-                let arcFile, _ = createAssayArcFile [| "Table" |]
-                let keyBefore = editorKey arcFile (Some(ActiveView.Table 0))
-
-                arcFile.Tables().[0].AddColumn(CompositeHeader.Comment "Mutated in place")
-
-                Vitest.expect(editorKey arcFile (Some(ActiveView.Table 0))).toEqual (keyBefore)
-        )
-)
-
-Vitest.describe (
-    "ArcFilePreviewTarget same-reference mutation commits",
-    fun () ->
-        Vitest.test (
-            "publishes the mutated reference to page state and persists it in memory",
-            fun () -> promise {
-                let currentArcFile, _ = createAssayArcFile [| "Existing" |]
-                let publishedArcFiles = ResizeArray<ArcFiles>()
-                let persistedArcFiles = ResizeArray<ArcFiles>()
-
-                currentArcFile.Tables().[0].AddColumn(CompositeHeader.Comment "In-place")
-
-                let! result =
-                    publishAndPersistArcFile
-                        currentArcFile
-                        (fun nextArcFile -> publishedArcFiles.Add nextArcFile)
-                        (fun nextArcFile -> promise {
-                            persistedArcFiles.Add nextArcFile
-                            return Ok()
-                        })
-
-                match result with
-                | Error exn -> failwith $"Expected same-reference commit to succeed: {exn.Message}"
-                | Ok() -> ()
-
-                Vitest.expect(publishedArcFiles.Count).toBe (1)
-                Vitest.expect(persistedArcFiles.Count).toBe (1)
-                Vitest.expect(System.Object.ReferenceEquals(publishedArcFiles.[0], currentArcFile)).toBe (true)
-                Vitest.expect(System.Object.ReferenceEquals(persistedArcFiles.[0], currentArcFile)).toBe (true)
-                Vitest.expect(publishedArcFiles.[0].Tables().[0].ColumnCount).toBe (1)
-            }
-        )
-
-        Vitest.test (
-            "persistence errors surface without losing the page state publication",
-            fun () -> promise {
-                let currentArcFile, _ = createAssayArcFile [| "Existing" |]
-                let publishedArcFiles = ResizeArray<ArcFiles>()
-
-                let! result =
-                    publishAndPersistArcFile
-                        currentArcFile
-                        (fun nextArcFile -> publishedArcFiles.Add nextArcFile)
-                        (fun _ -> promise { return Error(exn "IPC unavailable") })
-
-                match result with
-                | Ok() -> failwith "Expected persistence failure to surface."
-                | Error exn -> Vitest.expect(exn.Message).toContain ("IPC unavailable")
-
-                Vitest.expect(publishedArcFiles.Count).toBe (1)
-            }
-        )
 )
 
 Vitest.describe (
     "ArcFilePreviewTarget JSON import",
     fun () ->
         Vitest.test (
-            "rejects replacing an Assay editor with Study JSON",
+            "rejects replacing an Assay editor with Study JSON without committing",
             fun () -> promise {
                 let currentArcFile, _ = createAssayArcFile [||]
 
                 let importedStudy =
                     ArcStudy.init "ImportedStudy" |> fun study -> ArcFiles.Study(study, [])
 
-                let mutable publishedArcFile: ArcFiles option = None
-                let mutable inMemoryUpdated = false
+                let mutable mutated = false
+                let mutable replaced = false
 
                 let! result =
                     importJsonRequestIntoCurrentTarget
                         currentArcFile
                         (jsonImportRequest importedStudy)
-                        (fun nextArcFile -> publishedArcFile <- Some nextArcFile)
-                        (fun _ -> promise {
-                            inMemoryUpdated <- true
-                            return Ok()
-                        })
+                        (fun _ -> mutated <- true)
+                        (fun _ -> replaced <- true)
 
                 match result with
                 | Ok() -> failwith "Expected mismatched JSON import to fail."
                 | Error exn -> Vitest.expect(exn.Message).toContain ("Cannot import study JSON")
 
-                Vitest.expect(publishedArcFile.IsNone).toBe (true)
-                Vitest.expect(inMemoryUpdated).toBe (false)
+                Vitest.expect(mutated).toBe (false)
+                Vitest.expect(replaced).toBe (false)
             }
         )
 
@@ -195,7 +127,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "successful table import appends tables with unique names and invokes in-memory ARC update",
+            "successful table import appends tables in place and commits through mutate",
             fun () -> promise {
                 let currentArcFile, currentAssay =
                     createAssayArcFile [| "Existing"; "Duplicate"; "Duplicate 1" |]
@@ -204,43 +136,69 @@ Vitest.describe (
                 importedAssay.AddTable(ArcTable.init "Duplicate")
                 importedAssay.AddTable(ArcTable.init "Fresh")
                 let importedFile = ArcFiles.Assay importedAssay
-                let publishedArcFiles = ResizeArray<ArcFiles>()
-                let inMemoryUpdates = ResizeArray<ArcFiles>()
+                let mutatedArcFiles = ResizeArray<ArcFiles>()
+                let mutable replaced = false
 
                 let! result =
                     importJsonRequestIntoCurrentTarget
                         currentArcFile
                         (jsonImportRequest importedFile)
-                        (fun nextArcFile -> publishedArcFiles.Add nextArcFile)
-                        (fun nextArcFile -> promise {
-                            inMemoryUpdates.Add nextArcFile
-                            return Ok()
-                        })
+                        (fun update ->
+                            update currentArcFile
+                            mutatedArcFiles.Add currentArcFile
+                        )
+                        (fun _ -> replaced <- true)
 
                 match result with
                 | Error exn -> failwith $"Expected JSON import to succeed: {exn.Message}"
                 | Ok() -> ()
 
-                Vitest.expect(publishedArcFiles.Count).toBe (1)
-                Vitest.expect(inMemoryUpdates.Count).toBe (1)
+                Vitest.expect(mutatedArcFiles.Count).toBe (1)
+                Vitest.expect(System.Object.ReferenceEquals(mutatedArcFiles.[0], currentArcFile)).toBe (true)
+                Vitest.expect(replaced).toBe (false)
 
-                match publishedArcFiles.[0], inMemoryUpdates.[0] with
-                | ArcFiles.Assay publishedAssay, ArcFiles.Assay inMemoryAssay ->
-                    Vitest.expect(publishedAssay.Identifier).toBe ("TestAssay")
-                    Vitest.expect(inMemoryAssay.Identifier).toBe ("TestAssay")
+                let expectedNames = [|
+                    "Existing"
+                    "Duplicate"
+                    "Duplicate 1"
+                    "Duplicate 2"
+                    "Fresh"
+                |]
 
-                    let expectedNames = [|
-                        "Existing"
-                        "Duplicate"
-                        "Duplicate 1"
-                        "Duplicate 2"
-                        "Fresh"
-                    |]
+                Vitest.expect(currentAssay.Tables |> Seq.map _.Name |> Seq.toArray).toEqual (expectedNames)
+            }
+        )
 
-                    Vitest.expect(publishedAssay.Tables |> Seq.map _.Name |> Seq.toArray).toEqual (expectedNames)
-                    Vitest.expect(inMemoryAssay.Tables |> Seq.map _.Name |> Seq.toArray).toEqual (expectedNames)
-                    Vitest.expect(currentAssay.Tables |> Seq.map _.Name |> Seq.toArray).toEqual (expectedNames)
-                | _ -> failwith "Expected imported Assay to be published and sent to in-memory update."
+        Vitest.test (
+            "DataMap import replaces the open arc file through replace",
+            fun () -> promise {
+                let parentInfo = DatamapParentInfo.create "assay-parent" DataMapParent.Assay
+                let currentArcFile = ArcFiles.DataMap(Some parentInfo, DataMap.init ())
+                let importedDataMap = DataMap.init ()
+                importedDataMap.DataContexts.Add(DataContext())
+                let importedFile = ArcFiles.DataMap(None, importedDataMap)
+                let mutable mutated = false
+                let replacedArcFiles = ResizeArray<ArcFiles>()
+
+                let! result =
+                    importJsonRequestIntoCurrentTarget
+                        currentArcFile
+                        (jsonImportRequest importedFile)
+                        (fun _ -> mutated <- true)
+                        (fun nextArcFile -> replacedArcFiles.Add nextArcFile)
+
+                match result with
+                | Error exn -> failwith $"Expected DataMap import to succeed: {exn.Message}"
+                | Ok() -> ()
+
+                Vitest.expect(mutated).toBe (false)
+                Vitest.expect(replacedArcFiles.Count).toBe (1)
+
+                match replacedArcFiles.[0] with
+                | ArcFiles.DataMap(importedParentInfo, preparedDataMap) ->
+                    Vitest.expect(importedParentInfo).toEqual (Some parentInfo)
+                    Vitest.expect(preparedDataMap.DataContexts.Count).toBe (1)
+                | _ -> failwith "Expected the replaced arc file to remain a DataMap."
             }
         )
 )

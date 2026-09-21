@@ -245,14 +245,10 @@ Vitest.describe (
         Vitest.test (
             "shouldResetPageStateAfterSelectionRemoval only resets file-preview states",
             fun () ->
-                let workflowArcFile =
-                    ArcWorkflow.init "DeletePreviewWorkflow"
-                    |> Swate.Components.Shared.ARCtrlHelper.ArcFiles.Workflow
-
                 Vitest
                     .expect(
                         FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval (
-                            Some(RendererPageState.ArcFilePage(workflowArcFile, None))
+                            Some(RendererPageState.ArcFilePage None)
                         )
                     )
                     .toBe (true)
@@ -316,15 +312,20 @@ Vitest.describe (
                 let assay = ArcAssay.init "DataMapAssay"
                 assay.DataMap <- Some(DataMap.init ())
 
-                let pageState =
-                    Some(RendererPageState.ArcFilePage(ArcFiles.Assay assay, Some ActiveView.DataMap))
+                let openArcFile = Some(ArcFiles.Assay assay)
+                let requestedView = Some ActiveView.DataMap
 
                 let fileTreeWithDataMap = [|
                     FileEntry.create ("isa.datamap.xlsx", "assays/DataMapAssay/isa.datamap.xlsx", false, None)
                 |]
 
                 Vitest
-                    .expect(FileExplorerStateReconciliation.tryGetDataMapMismatchReload fileTreeWithDataMap pageState)
+                    .expect(
+                        FileExplorerStateReconciliation.tryGetDataMapMismatchReload
+                            fileTreeWithDataMap
+                            openArcFile
+                            requestedView
+                    )
                     .toEqual (None)
 
                 let fileTree = [|
@@ -333,28 +334,37 @@ Vitest.describe (
                 |]
 
                 Vitest
-                    .expect(FileExplorerStateReconciliation.tryGetDataMapMismatchReload fileTree pageState)
+                    .expect(
+                        FileExplorerStateReconciliation.tryGetDataMapMismatchReload fileTree openArcFile requestedView
+                    )
                     .toEqual (Some("assays/DataMapAssay/isa.assay.xlsx", Some ActiveView.Metadata))
 
                 assay.DataMap <- None
 
                 Vitest
-                    .expect(FileExplorerStateReconciliation.tryGetDataMapMismatchReload fileTreeWithDataMap pageState)
+                    .expect(
+                        FileExplorerStateReconciliation.tryGetDataMapMismatchReload
+                            fileTreeWithDataMap
+                            openArcFile
+                            requestedView
+                    )
                     .toEqual (Some("assays/DataMapAssay/isa.assay.xlsx", Some ActiveView.DataMap))
 
-                let standaloneDataMapPage =
+                let standaloneDataMapArcFile =
                     Some(
-                        RendererPageState.ArcFilePage(
-                            ArcFiles.DataMap(
-                                Some(DatamapParentInfo.create "DataMapAssay" DataMapParent.Assay),
-                                DataMap.init ()
-                            ),
-                            Some ActiveView.DataMap
+                        ArcFiles.DataMap(
+                            Some(DatamapParentInfo.create "DataMapAssay" DataMapParent.Assay),
+                            DataMap.init ()
                         )
                     )
 
                 Vitest
-                    .expect(FileExplorerStateReconciliation.tryGetDataMapMismatchReload fileTree standaloneDataMapPage)
+                    .expect(
+                        FileExplorerStateReconciliation.tryGetDataMapMismatchReload
+                            fileTree
+                            standaloneDataMapArcFile
+                            requestedView
+                    )
                     .toEqual (None)
         )
 
@@ -367,15 +377,18 @@ Vitest.describe (
                     path = "notes/my-note.md"
                 |}
 
-                let pageState = RendererPageState.fromFileContentDTO dto
+                let publishedArcFiles = ResizeArray<ArcFiles>()
+                let pageState = RendererPageState.fromFileContentDTO (dto, publishedArcFiles.Add)
 
                 match pageState with
                 | RendererPageState.MarkdownPage markdownContent -> Vitest.expect(markdownContent).toBe ("# My Note")
                 | _ -> failwith "Expected MarkdownPage for markdown file content DTO."
+
+                Vitest.expect(publishedArcFiles.Count).toBe (0)
         )
 
         Vitest.test (
-            "fromFileContentDTO opens an ARC workbook without tables on Metadata",
+            "fromFileContentDTO publishes and opens an ARC workbook without tables on Metadata",
             fun () ->
                 let dto =
                     Swate.Electron.Shared.FileIOHelper.FileContentDTO.fromArcFile (
@@ -383,13 +396,17 @@ Vitest.describe (
                     )
                     |> Option.defaultWith (fun () -> failwith "Expected an assay DTO.")
 
-                match RendererPageState.fromFileContentDTO dto with
-                | RendererPageState.ArcFilePage(_, Some ActiveView.Metadata) -> ()
+                let publishedArcFiles = ResizeArray<ArcFiles>()
+
+                match RendererPageState.fromFileContentDTO (dto, publishedArcFiles.Add) with
+                | RendererPageState.ArcFilePage(Some ActiveView.Metadata) -> ()
                 | _ -> failwith "Expected the Metadata starting view."
+
+                Vitest.expect(publishedArcFiles.Count).toBe (1)
         )
 
         Vitest.test (
-            "fromFileContentDTO opens an ARC workbook with tables on its first table",
+            "fromFileContentDTO publishes and opens an ARC workbook with tables on its first table",
             fun () ->
                 let assay = ArcAssay.init "assay"
                 assay.AddTable(ArcTable.init "table")
@@ -398,13 +415,17 @@ Vitest.describe (
                     Swate.Electron.Shared.FileIOHelper.FileContentDTO.fromArcFile (ArcFiles.Assay assay)
                     |> Option.defaultWith (fun () -> failwith "Expected an assay DTO.")
 
-                match RendererPageState.fromFileContentDTO dto with
-                | RendererPageState.ArcFilePage(_, Some(ActiveView.Table 0)) -> ()
+                let publishedArcFiles = ResizeArray<ArcFiles>()
+
+                match RendererPageState.fromFileContentDTO (dto, publishedArcFiles.Add) with
+                | RendererPageState.ArcFilePage(Some(ActiveView.Table 0)) -> ()
                 | _ -> failwith "Expected the first table starting view."
+
+                Vitest.expect(publishedArcFiles.Count).toBe (1)
         )
 
         Vitest.test (
-            "fromFileContentDTO opens a DataMap workbook on DataMap",
+            "fromFileContentDTO publishes and opens a DataMap workbook on DataMap",
             fun () ->
                 let parent = DatamapParentInfo.create "assay" DataMapParent.Assay
 
@@ -414,24 +435,25 @@ Vitest.describe (
                     )
                     |> Option.defaultWith (fun () -> failwith "Expected a DataMap DTO.")
 
-                match RendererPageState.fromFileContentDTO dto with
-                | RendererPageState.ArcFilePage(_, Some ActiveView.DataMap) -> ()
+                let publishedArcFiles = ResizeArray<ArcFiles>()
+
+                match RendererPageState.fromFileContentDTO (dto, publishedArcFiles.Add) with
+                | RendererPageState.ArcFilePage(Some ActiveView.DataMap) -> ()
                 | _ -> failwith "Expected the DataMap starting view."
+
+                Vitest.expect(publishedArcFiles.Count).toBe (1)
         )
 
         Vitest.test (
             "a redirected DataMap sidebar click opens the owning workbook on DataMap",
             fun () ->
-                let assay = ArcAssay.init "assay"
-                assay.AddTable(ArcTable.init "table")
-
                 let pageState =
-                    RendererPageState.ArcFilePage(ArcFiles.Assay assay, Some(ActiveView.Table 0))
+                    RendererPageState.ArcFilePage(Some(ActiveView.Table 0))
                     |> Renderer.Components.Helper.ArcViewSelection.applyRequestedPathView
                         "assays/assay/isa.datamap.xlsx"
 
                 match pageState with
-                | RendererPageState.ArcFilePage(_, Some ActiveView.DataMap) -> ()
+                | RendererPageState.ArcFilePage(Some ActiveView.DataMap) -> ()
                 | _ -> failwith "Expected the redirected DataMap click to select the DataMap view."
         )
 

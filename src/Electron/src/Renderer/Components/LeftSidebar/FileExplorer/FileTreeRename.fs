@@ -16,7 +16,7 @@ module FileTreeRenameWorkflow =
     type ConfirmRenameConfig = {
         pendingRenameDraft: ArcRenameDraft option
         selectedTreePath: string option
-        pageState: Renderer.Types.PageState option
+        openArcFile: ArcFiles option
         closeRenameModal: unit -> unit
         setIsRenaming: bool -> unit
         setSelection: ArcSelection -> unit
@@ -26,16 +26,10 @@ module FileTreeRenameWorkflow =
         enqueueError: ErrorModalRequest -> unit
     }
 
-    let private tryRemapActiveArcFilePath
-        (sourcePath: string)
-        (targetPath: string)
-        (pageState: Renderer.Types.PageState option)
-        =
-        match pageState with
-        | Some(Renderer.Types.PageState.ArcFilePage(arcFile, _)) ->
-            arcFile.TryGetRelativePath()
-            |> Option.bind (PathHelpers.tryRemapPathPrefix sourcePath targetPath)
-        | _ -> None
+    let private tryRemapActiveArcFilePath (sourcePath: string) (targetPath: string) (openArcFile: ArcFiles option) =
+        openArcFile
+        |> Option.bind (fun arcFile -> arcFile.TryGetRelativePath())
+        |> Option.bind (PathHelpers.tryRemapPathPrefix sourcePath targetPath)
 
     let requestRenameItem
         (setPendingRenameDraft: ArcRenameDraft option -> unit)
@@ -81,7 +75,9 @@ module FileTreeRenameWorkflow =
                                     config.setSelection (ArcSelection.forTreePath (Some remappedSelectionPath))
                                 )
 
-                                match tryRemapActiveArcFilePath renameDraft.SourcePath targetPath config.pageState with
+                                match
+                                    tryRemapActiveArcFilePath renameDraft.SourcePath targetPath config.openArcFile
+                                with
                                 | Some remappedArcFilePath ->
                                     let! reloadResult = config.reloadPreviewByPath remappedArcFilePath
 

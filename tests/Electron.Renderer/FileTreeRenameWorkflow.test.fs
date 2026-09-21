@@ -146,13 +146,13 @@ let private createRenameWorkflowProbe () = {
 let private createConfirmRenameConfig
     renameDraft
     selectedTreePath
-    pageState
+    (openArcFile: ArcFiles option)
     (probe: RenameWorkflowProbe)
     : RenameWorkflow.ConfirmRenameConfig =
     {
         pendingRenameDraft = Some renameDraft
         selectedTreePath = Some selectedTreePath
-        pageState = pageState
+        openArcFile = openArcFile
         closeRenameModal = fun () -> probe.Closed <- true
         setIsRenaming = ignore
         setSelection = fun selection -> probe.RenamedSelection <- Some selection
@@ -369,7 +369,7 @@ Vitest.describe (
                     createConfirmRenameConfig
                         renameDraft
                         "assays/OldAssay/notes/protocol.md"
-                        (Some(Renderer.Types.PageState.ArcFilePage(ArcFiles.Assay(ArcAssay.init "OldAssay"), None)))
+                        (Some(ArcFiles.Assay(ArcAssay.init "OldAssay")))
                         probe
 
                 RenameWorkflow.confirmRenameItem config "NewAssay"
@@ -393,11 +393,7 @@ Vitest.describe (
                 let probe = createRenameWorkflowProbe ()
 
                 let config =
-                    createConfirmRenameConfig
-                        renameDraft
-                        "assays/AssayA/protocols/old.txt"
-                        (Some(Renderer.Types.PageState.TextPage "old content"))
-                        probe
+                    createConfirmRenameConfig renameDraft "assays/AssayA/protocols/old.txt" None probe
 
                 RenameWorkflow.confirmRenameItem config "new.txt"
                 do! waitUntil ((fun () -> probe.RenameRequest.IsSome && probe.Closed), 50)

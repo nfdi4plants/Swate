@@ -176,7 +176,7 @@ module Import =
                         targetTables.AddTable(copyTableWithName nextName sourceTable)
                         usedNames <- usedNames.Add nextName
 
-                    Ok(ArcFiles.refreshRef currentArcFile)
+                    Ok currentArcFile
             | _ -> Ok importedArcFile
 
     let tryParseFromJsonString

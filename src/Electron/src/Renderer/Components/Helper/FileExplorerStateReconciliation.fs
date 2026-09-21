@@ -28,10 +28,10 @@ let private resetsWhenSelectionIsRemoved =
 let shouldResetPageStateAfterSelectionRemoval (pageState: PageState option) =
     pageState |> Option.exists resetsWhenSelectionIsRemoved
 
-let tryGetDataMapMismatchReload (fileTree: FileEntry[]) (pageState: PageState option) =
-    match pageState with
-    | Some(PageState.ArcFilePage(ArcFiles.DataMap _, _)) -> None
-    | Some(PageState.ArcFilePage(arcFile, requestedView)) ->
+let tryGetDataMapMismatchReload (fileTree: FileEntry[]) (arcFile: ArcFiles option) (requestedView: ActiveView option) =
+    match arcFile with
+    | Some(ArcFiles.DataMap _) -> None
+    | Some arcFile ->
         match arcFile.TryGetDataMapParentInfo() with
         | Some parentInfo ->
             let treeHasDataMap =
@@ -52,7 +52,7 @@ let tryGetDataMapMismatchReload (fileTree: FileEntry[]) (pageState: PageState op
                     PathHelpers.normalizePath parentPath, nextRequestedView
                 )
         | None -> None
-    | _ -> None
+    | None -> None
 
 let private reloadsWhenSelectedFileChanges =
     function
