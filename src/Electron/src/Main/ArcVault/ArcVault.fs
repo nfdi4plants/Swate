@@ -428,8 +428,14 @@ module ArcVaultExtensions =
         /// This functions should be called once, when an vault is first started with a path
         member this.Startup() = promise {
             do! this.LoadArc()
-            this.StartFileWatcher()
-            this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle (Some this.arc.Value.Identifier)
+
+            if this.window.isDestroyed () then
+                return raise (exn "The ARC window was closed while the ARC was loading.")
+            else
+                this.StartFileWatcher()
+
+                this.window.title <-
+                    Swate.Electron.Shared.ApplicationVersion.windowTitle (Some this.arc.Value.Identifier)
         }
 
         member this.OpenARC(path: string) = promise {
@@ -720,7 +726,10 @@ type ArcVaults() =
             vault.isWaitingForImportCleanup <- false
             vault.isCloseRequestPending <- false
             vault.isCloseApproved <- false
-            this.DisposeVault(id)
+
+            match this.TryGetVault(id) with
+            | Some registeredVault when obj.ReferenceEquals(registeredVault, vault) -> this.DisposeVault(id)
+            | _ -> ()
         )
 
     member private this.CleanupFailedRegistration(window: BrowserWindow, vault: ArcVault, id: int) = promise {
@@ -736,11 +745,10 @@ type ArcVaults() =
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
+        this.OnCloseWindow(window, vault, id)
 
         try
             do! loadWindow window
-
-            this.OnCloseWindow(window, vault, id)
 
             window.focus ()
             swatelogfn id "Register window"
@@ -764,12 +772,11 @@ type ArcVaults() =
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
+        this.OnCloseWindow(window, vault, id)
 
         try
             do! loadWindow window
             do! vault.OpenARC(path)
-
-            this.OnCloseWindow(window, vault, id)
 
             window.focus ()
             swatelogfn id "Register window"
@@ -814,12 +821,11 @@ type ArcVaults() =
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
+        this.OnCloseWindow(window, vault, id)
 
         try
             do! vault.CreateARC(path, newIdentifier)
             do! loadWindow window
-
-            this.OnCloseWindow(window, vault, id)
 
             window.focus ()
             swatelogfn id "Register window"
