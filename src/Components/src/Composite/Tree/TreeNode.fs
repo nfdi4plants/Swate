@@ -25,7 +25,7 @@ type TreeNode =
             onToggle: unit -> unit,
             onSelect: MouseEvent -> unit
         ) =
-        let config = useTreeCtx<'T> ()
+        let config = useTreeCtx ()
         let nodeProps = TreeItem.props node
 
         let renderProps =
@@ -78,7 +78,7 @@ type TreeNode =
 
         let leadingContent =
             match config.Leading with
-            | Some leading -> leading renderProps
+            | Some leading -> leading (box renderProps)
             | None ->
                 match nodeProps.leading with
                 | Some leading -> leading
@@ -97,7 +97,7 @@ type TreeNode =
             | Some renderNode ->
                 Html.div [
                     prop.className "swt:min-w-0 swt:flex-1 swt:text-left"
-                    prop.children [ renderNode renderProps ]
+                    prop.children [ renderNode (box renderProps) ]
                 ]
             | None ->
                 Html.span [
@@ -117,7 +117,7 @@ type TreeNode =
 
         let trailingContent =
             match config.Trailing with
-            | Some trailing -> trailing renderProps
+            | Some trailing -> trailing (box renderProps)
             | None ->
                 match nodeProps.trailing with
                 | Some trailing -> trailing
@@ -156,11 +156,11 @@ type TreeNode =
             ?onFocus: unit -> unit,
             ?onKeyDown: KeyboardEvent -> unit
         ) =
-        let config = useTreeCtx<'T> ()
+        let config = useTreeCtx ()
         let node = row.node
         let nodeProps = TreeItem.props node
         let nodeId = nodeProps.id
-        let canSelect = not config.SelectionDisabled && config.IsNodeSelectable node
+        let canSelect = not config.SelectionDisabled && config.IsNodeSelectable(box node)
         let onToggle = defaultArg onToggle ignore
         let onSelect = defaultArg onSelect ignore
         let onFocus = defaultArg onFocus ignore

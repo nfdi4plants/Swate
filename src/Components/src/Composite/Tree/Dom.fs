@@ -8,30 +8,29 @@ open Feliz
 let private InteractiveElementSelector =
     "a[href],button,input,select,textarea,[role='button'],[role='link'],[contenteditable='true']"
 
-[<Emit("$0.target && $0.target.closest ? $0.target.closest('[data-tree-node-id]') : null")>]
-let private closestTreeNodeElement (_event: MouseEvent) : HTMLElement = jsNative
+type private Css =
+    abstract escape: string -> string
 
-[<Emit("$0.querySelector('[data-tree-node-id=\"' + CSS.escape($1) + '\"]')")>]
-let private queryTreeNodeElement (_root: HTMLElement) (_nodeId: string) : HTMLElement = jsNative
+[<Global("CSS")>]
+let private css: Css = jsNative
 
 [<Emit("requestAnimationFrame($0)")>]
 let private requestAnimationFrame (_callback: unit -> unit) : int = jsNative
 
 let tryGetNodeId (event: MouseEvent) =
-    let element = closestTreeNodeElement event
+    let target = event.target :?> Element
 
-    if isNull element then
-        None
-    else
-        element.getAttribute "data-tree-node-id" |> Option.ofObj
+    target.closest "[data-tree-node-id]"
+    |> Option.bind (fun element -> element.getAttribute "data-tree-node-id" |> Option.ofObj)
 
 let focusNode (treeRef: IRefValue<HTMLElement option>) nodeId =
     match treeRef.current with
     | Some root ->
-        let element = queryTreeNodeElement root nodeId
+        let selector = $"[data-tree-node-id=\"{css.escape nodeId}\"]"
+        let element = root.querySelector selector
 
         if not (isNull element) then
-            element.focus ()
+            (element :?> HTMLElement).focus ()
     | None -> ()
 
 let focusNodeAfterRender treeRef nodeId =

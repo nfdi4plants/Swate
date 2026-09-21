@@ -28,6 +28,39 @@ let private isLoadStillPending nodeId requestId loadedChildren =
     | Some state -> state.Status = TreeLazyLoadStatus.Loading && state.RequestId = Some requestId
     | None -> false
 
+let private settleLoadRequest
+    (source: TreeDataSource<'T>)
+    (activeRequestIdsRef: IRefValue<Map<string, int>>)
+    (setLoadedChildren: (Map<string, TreeLoadState<'T>> -> Map<string, TreeLoadState<'T>>) -> unit)
+    (setExpandedIds: (Set<string> -> Set<string>) -> unit)
+    (onError: exn -> unit)
+    (node: TreeItem<'T>)
+    nodeId
+    requestId
+    =
+    promise {
+        try
+            let! children = source.getTreeItems (Some node)
+
+            setLoadedChildren (fun current ->
+                if isLoadStillPending nodeId requestId current then
+                    withLoaded nodeId children current
+                else
+                    current
+            )
+        with ex ->
+            if isRequestCurrent activeRequestIdsRef nodeId requestId then
+                setLoadedChildren (fun current ->
+                    if isLoadStillPending nodeId requestId current then
+                        withLoadError nodeId ex.Message current
+                    else
+                        current
+                )
+
+                setExpandedIds (fun current -> current |> Set.remove nodeId)
+                onError ex
+    }
+
 let loadBranchChildren
     (dataSource: TreeDataSource<'T> option)
     (activeRequestIdsRef: IRefValue<Map<string, int>>)
@@ -39,7 +72,7 @@ let loadBranchChildren
     (node: TreeItem<'T>)
     =
     promise {
-        let nodeId = TreeItem.id node
+        let nodeId = TreeItem.getId node
 
         match
             dataSource, directChildren loadedChildren node, isLoadActive activeRequestIdsRef nodeId loadedChildren
@@ -60,26 +93,16 @@ let loadBranchChildren
             )
 
             try
-                try
-                    let! children = source.getTreeItems (Some node)
-
-                    setLoadedChildren (fun current ->
-                        if isLoadStillPending nodeId requestId current then
-                            withLoaded nodeId children current
-                        else
-                            current
-                    )
-                with ex ->
-                    if isRequestCurrent activeRequestIdsRef nodeId requestId then
-                        setLoadedChildren (fun current ->
-                            if isLoadStillPending nodeId requestId current then
-                                withLoadError nodeId ex.Message current
-                            else
-                                current
-                        )
-
-                        setExpandedIds (fun current -> current |> Set.remove nodeId)
-                        onError ex
+                do!
+                    settleLoadRequest
+                        source
+                        activeRequestIdsRef
+                        setLoadedChildren
+                        setExpandedIds
+                        onError
+                        node
+                        nodeId
+                        requestId
             finally
                 markLoadFinished activeRequestIdsRef nodeId requestId
         | _ -> ()
@@ -96,8 +119,8 @@ let expandNode
     (onError: exn -> unit)
     (node: TreeItem<'T>)
     =
-    if canExpand node then
-        let nodeId = TreeItem.id node
+    if TreeItem.isBranch node then
+        let nodeId = TreeItem.getId node
         setExpandedIds (toggleExpanded nodeId)
 
         if not (expandedIds |> Set.contains nodeId) then
@@ -125,7 +148,7 @@ let internal selectNode
     (node: TreeItem<'T>)
     intent
     =
-    let nodeId = TreeItem.id node
+    let nodeId = TreeItem.getId node
     setActiveId (Some nodeId)
 
     match intent with
@@ -152,31 +175,22 @@ let focusNode (focusController: TreeFocusController<'T>) index nodeId =
 
 let tryFocusById (focusController: TreeFocusController<'T>) nodeId =
     focusController.Lookup.VisibleNodes
-    |> Array.tryFindIndex (fun row -> TreeItem.id row.node = nodeId)
+    |> Array.tryFindIndex (fun row -> TreeItem.getId row.node = nodeId)
     |> Option.iter (fun index -> focusNode focusController index nodeId)
 
 let focusByDelta focusController focusedId delta =
     moveFocus delta focusedId focusController.Lookup.VisibleNodes
     |> Option.iter (tryFocusById focusController)
 
-let focusFirst focusController =
-    focusController.Lookup.VisibleNodes
-    |> Array.tryHead
-    |> Option.iter (fun row -> tryFocusById focusController (TreeItem.id row.node))
-
 let focusLast focusController =
     focusController.Lookup.VisibleNodes
     |> Array.tryLast
-    |> Option.iter (fun row -> tryFocusById focusController (TreeItem.id row.node))
-
-let focusFirstChild focusController nodeId =
-    focusController.Lookup.VisibleNodes
-    |> Array.tryFind (fun row -> row.parentId = Some nodeId)
-    |> Option.iter (fun row -> tryFocusById focusController (TreeItem.id row.node))
+    |> Option.iter (fun row -> tryFocusById focusController (TreeItem.getId row.node))
 
 let collapseOrFocusParent focusController expandedIds setExpandedIds nodeId =
     if expandedIds |> Set.contains nodeId then
         setExpandedIds (fun current -> current |> Set.remove nodeId)
     else
-        parentOf nodeId focusController.Lookup
+        focusController.Lookup.Parents
+        |> Map.tryFind nodeId
         |> Option.iter (tryFocusById focusController)

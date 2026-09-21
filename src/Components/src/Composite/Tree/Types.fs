@@ -56,14 +56,14 @@ module internal TreeItem =
         | Leaf props
         | Branch(props, _) -> props
 
-    let id item = (props item).id
+    let getId item = (props item).id
 
     let isBranch item =
         match item with
         | Branch _ -> true
         | Leaf _ -> false
 
-    let children item =
+    let tryGetChildren item =
         match item with
         | Leaf _ -> None
         | Branch(_, children) -> children
@@ -135,21 +135,14 @@ type TreeStyleFn<'T> = TreeItem<'T> option -> string[] -> string[]
 /// Builds context-menu entries for a tree node target, or for the tree root when no node is targeted.
 type TreeContextMenuEvent<'T> = delegate of MouseEvent * TreeItem<'T> option -> ContextMenuItem[]
 
-/// Context value shared by tree subcomponents that need access to tree-level configuration.
-type TreeContextValue<'T> = {
-    DataSource: TreeDataSource<'T> option
+/// Context value shared by tree-node presentation components.
+type TreeContextValue = {
     SelectionDisabled: bool
-    IsNodeSelectable: TreeItem<'T> -> bool
-    EnableVirtualization: bool
-    EstimateNodeHeight: int
-    OnContextMenu: TreeContextMenuEvent<'T> option
-    RenderNode: (TreeRenderProps<'T> -> ReactElement) option
-    Leading: (TreeRenderProps<'T> -> ReactElement) option
-    Trailing: (TreeRenderProps<'T> -> ReactElement) option
-    StyleFn: TreeStyleFn<'T> option
-    OnError: exn -> unit
-    ApiRef: IRefValue<TreeApi option> option
-    AriaLabel: string
+    IsNodeSelectable: obj -> bool
+    RenderNode: (obj -> ReactElement) option
+    Leading: (obj -> ReactElement) option
+    Trailing: (obj -> ReactElement) option
+    StyleFn: (obj option -> string[] -> string[]) option
     Debug: bool
 }
 

@@ -4,13 +4,22 @@ open Browser.Types
 open Fable.Core
 open Feliz
 open Swate.Components
-open Swate.Components.Composite.Tree.Context
 open Swate.Components.Composite.Tree.Dom
 open Swate.Components.Composite.Tree.State
 open Swate.Components.Composite.Tree.Types
 
-let private toSet (values: string[] option) =
-    values |> Option.map Set.ofArray |> Option.defaultValue Set.empty
+type private TreeNodeActionState<'T> = {
+    DataSource: TreeDataSource<'T> option
+    IsSelectionDisabled: bool
+    IsNodeSelectable: TreeItem<'T> -> bool
+    Lookup: TreeRowLookup<'T>
+    FocusedId: string option
+    SelectionMode: TreeSelectionMode
+    ScrollToIndex: int -> unit
+    SetSelection: Set<string> -> unit
+    TreeState: TreeState<'T>
+    OnError: exn -> unit
+}
 
 let private normalizeSelection selectionMode selectedIds =
     match selectionMode with
@@ -38,7 +47,7 @@ let useTreeState
     (defaultSelectedIds: string[] option)
     =
     let expandedIds, setExpandedIds =
-        React.useStateWithUpdater (toSet defaultExpandedIds)
+        React.useStateWithUpdater (defaultExpandedIds |> Option.map Set.ofArray |> Option.defaultValue Set.empty)
 
     let selectedIds, setSelectedIds =
         React.useStateWithUpdater (toSelectionSet selectionMode defaultSelectedIds)
@@ -105,7 +114,7 @@ let useTreeApi
                         TreeApi(
                             (fun nodeId ->
                                 activeRequestIdsRef.current <- activeRequestIdsRef.current |> Map.remove nodeId
-                                setLoadedChildren (invalidateNode nodeId)
+                                setLoadedChildren (Map.remove nodeId)
                                 setExpandedIds (fun current -> current |> Set.remove nodeId)
                             ),
                             (fun () ->
@@ -134,127 +143,146 @@ let internal useTreeNodeActions
     (selectionMode: TreeSelectionMode)
     (effectiveSelectedIdsRef: IRefValue<Set<string>>)
     (setSelection: Set<string> -> unit)
+    (dataSource: TreeDataSource<'T> option)
+    isSelectionDisabled
+    (isNodeSelectable: TreeItem<'T> -> bool)
+    (onError: exn -> unit)
     =
-    let config = useTreeCtx<'T> ()
+    // Row memoization deliberately ignores callback identity. Keep one current snapshot so
+    // unchanged rows still invoke actions with the latest tree state and consumer callbacks.
+    let actionStateRef =
+        React.useRef<TreeNodeActionState<'T>> {
+            DataSource = dataSource
+            IsSelectionDisabled = isSelectionDisabled
+            IsNodeSelectable = isNodeSelectable
+            Lookup = lookup
+            FocusedId = focusedId
+            SelectionMode = selectionMode
+            ScrollToIndex = scrollToIndex
+            SetSelection = setSelection
+            TreeState = treeState
+            OnError = onError
+        }
 
-    let configRef = React.useRef config
-    let treeStateRef = React.useRef treeState
-    let lookupRef = React.useRef lookup
-    let focusedIdRef = React.useRef focusedId
-    let selectionModeRef = React.useRef selectionMode
-    let scrollToIndexRef = React.useRef<int -> unit> scrollToIndex
-    let setSelectionRef = React.useRef<Set<string> -> unit> setSelection
+    actionStateRef.current <- {
+        DataSource = dataSource
+        IsSelectionDisabled = isSelectionDisabled
+        IsNodeSelectable = isNodeSelectable
+        Lookup = lookup
+        FocusedId = focusedId
+        SelectionMode = selectionMode
+        ScrollToIndex = scrollToIndex
+        SetSelection = setSelection
+        TreeState = treeState
+        OnError = onError
+    }
 
-    configRef.current <- config
-    treeStateRef.current <- treeState
-    lookupRef.current <- lookup
-    focusedIdRef.current <- focusedId
-    selectionModeRef.current <- selectionMode
-    scrollToIndexRef.current <- scrollToIndex
-    setSelectionRef.current <- setSelection
-
-    let currentFocusController () : TreeFocusController<'T> = {
-        Lookup = lookupRef.current
-        SetActiveId = treeStateRef.current.SetActiveId
-        SetFocusedId = treeStateRef.current.SetFocusedId
-        SetSelectionAnchorId = treeStateRef.current.SetSelectionAnchorId
-        ScrollToIndex = scrollToIndexRef.current
+    let currentFocusController (current: TreeNodeActionState<'T>) : TreeFocusController<'T> = {
+        Lookup = current.Lookup
+        SetActiveId = current.TreeState.SetActiveId
+        SetFocusedId = current.TreeState.SetFocusedId
+        SetSelectionAnchorId = current.TreeState.SetSelectionAnchorId
+        ScrollToIndex = current.ScrollToIndex
         FocusDom = focusNodeAfterRender treeRef
     }
 
-    let loadNode (node: TreeItem<'T>) =
-        let currentConfig = configRef.current
-        let currentTreeState = treeStateRef.current
-
+    let loadNode (current: TreeNodeActionState<'T>) (node: TreeItem<'T>) =
         TreeController.loadBranchChildren
-            currentConfig.DataSource
+            current.DataSource
             activeRequestIdsRef
             loadRequestIdRef
-            currentTreeState.LoadedChildren
-            currentTreeState.SetLoadedChildren
-            currentTreeState.SetExpandedIds
-            currentConfig.OnError
+            current.TreeState.LoadedChildren
+            current.TreeState.SetLoadedChildren
+            current.TreeState.SetExpandedIds
+            current.OnError
             node
         |> Promise.start
 
     React.useEffect (
         (fun () ->
+            let current = actionStateRef.current
+
             lookup.VisibleNodes
             |> Array.iter (fun row ->
                 if
-                    treeState.ExpandedIds.Contains(TreeItem.id row.node)
-                    && canExpand row.node
+                    treeState.ExpandedIds.Contains(TreeItem.getId row.node)
+                    && TreeItem.isBranch row.node
                     && (directChildren treeState.LoadedChildren row.node).IsNone
                 then
-                    loadNode row.node
+                    loadNode current row.node
             )
         ),
         [|
-            box config.DataSource
+            box dataSource
             box treeState.ExpandedIds
             box treeState.LoadedChildren
             box lookup.VisibleNodes
+            box onError
         |]
     )
 
     let expandNode (node: TreeItem<'T>) =
-        let currentConfig = configRef.current
-        let currentTreeState = treeStateRef.current
+        let current = actionStateRef.current
 
         TreeController.expandNode
-            currentConfig.DataSource
+            current.DataSource
             activeRequestIdsRef
             loadRequestIdRef
-            currentTreeState.LoadedChildren
-            currentTreeState.ExpandedIds
-            currentTreeState.SetExpandedIds
-            currentTreeState.SetLoadedChildren
-            currentConfig.OnError
+            current.TreeState.LoadedChildren
+            current.TreeState.ExpandedIds
+            current.TreeState.SetExpandedIds
+            current.TreeState.SetLoadedChildren
+            current.OnError
             node
 
     let selectNode (node: TreeItem<'T>) intent =
-        let currentConfig = configRef.current
-        let currentTreeState = treeStateRef.current
+        let current = actionStateRef.current
 
         TreeController.selectNode
-            selectionModeRef.current
-            currentConfig.SelectionDisabled
-            currentConfig.IsNodeSelectable
-            lookupRef.current.VisibleNodes
-            currentTreeState.SelectionAnchorId
-            currentTreeState.SetActiveId
-            currentTreeState.SetSelectionAnchorId
+            current.SelectionMode
+            current.IsSelectionDisabled
+            current.IsNodeSelectable
+            current.Lookup.VisibleNodes
+            current.TreeState.SelectionAnchorId
+            current.TreeState.SetActiveId
+            current.TreeState.SetSelectionAnchorId
             effectiveSelectedIdsRef.current
-            setSelectionRef.current
+            current.SetSelection
             node
             intent
 
     let onNodeKeyDown (node: TreeItem<'T>) (event: KeyboardEvent) =
         if obj.ReferenceEquals(event.target, event.currentTarget) then
-            let currentConfig = configRef.current
-            let currentTreeState = treeStateRef.current
-            let focusController = currentFocusController ()
+            let current = actionStateRef.current
+            let focusController = currentFocusController current
 
             match event.key with
             | kbdEventCode.arrowDown ->
                 event.preventDefault ()
-                TreeController.focusByDelta focusController focusedIdRef.current 1
+                TreeController.focusByDelta focusController current.FocusedId 1
             | kbdEventCode.arrowUp ->
                 event.preventDefault ()
-                TreeController.focusByDelta focusController focusedIdRef.current -1
+                TreeController.focusByDelta focusController current.FocusedId -1
             // "Home" and "End" are KeyboardEvent.key values for jumping to the first or last visible node.
             | kbdEventCode.home ->
                 event.preventDefault ()
-                TreeController.focusFirst focusController
+
+                focusController.Lookup.VisibleNodes
+                |> Array.tryHead
+                |> Option.iter (fun row -> TreeController.tryFocusById focusController (TreeItem.getId row.node))
             | kbdEventCode.End ->
                 event.preventDefault ()
                 TreeController.focusLast focusController
             | kbdEventCode.arrowRight ->
                 event.preventDefault ()
 
-                if canExpand node then
-                    if currentTreeState.ExpandedIds.Contains(TreeItem.id node) then
-                        TreeController.focusFirstChild focusController (TreeItem.id node)
+                if TreeItem.isBranch node then
+                    if current.TreeState.ExpandedIds.Contains(TreeItem.getId node) then
+                        focusController.Lookup.VisibleNodes
+                        |> Array.tryFind (fun row -> row.parentId = Some(TreeItem.getId node))
+                        |> Option.iter (fun row ->
+                            TreeController.tryFocusById focusController (TreeItem.getId row.node)
+                        )
                     else
                         expandNode node
             | kbdEventCode.arrowLeft ->
@@ -262,14 +290,14 @@ let internal useTreeNodeActions
 
                 TreeController.collapseOrFocusParent
                     focusController
-                    currentTreeState.ExpandedIds
-                    currentTreeState.SetExpandedIds
-                    (TreeItem.id node)
+                    current.TreeState.ExpandedIds
+                    current.TreeState.SetExpandedIds
+                    (TreeItem.getId node)
             | kbdEventCode.enter
             | kbdEventCode.space ->
                 event.preventDefault ()
 
-                if event.key = kbdEventCode.enter && canExpand node then
+                if event.key = kbdEventCode.enter && TreeItem.isBranch node then
                     expandNode node
 
                 let intent =
