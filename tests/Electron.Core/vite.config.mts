@@ -3,9 +3,16 @@ import { fileURLToPath } from "node:url";
 
 export default defineConfig({
     resolve: {
-        alias: {
-            electron: fileURLToPath(new URL("./electron.mock.mts", import.meta.url)),
-        },
+        alias: [
+            {
+                find: /^electron$/,
+                replacement: fileURLToPath(new URL("./electron.mock.mts", import.meta.url)),
+            },
+            {
+                find: /^fs\/promises$/,
+                replacement: fileURLToPath(new URL("./electron.mock.mts", import.meta.url)),
+            },
+        ],
     },
     test: {
         environment: "node",

@@ -1,8 +1,21 @@
+import * as fsPromises from "node:fs/promises";
+import { resolve } from "node:path";
+
 const noop = () => {};
 let fromWebContentsMock: ((webContents: unknown) => unknown) | undefined;
 let browserWindowFactoryMock: ((options: unknown) => object) | undefined;
 let showOpenDialogMock: ((...args: unknown[]) => unknown) | undefined;
 let showMessageBoxMock: ((...args: unknown[]) => unknown) | undefined;
+
+type ReaddirGate = {
+    path: string;
+    started: Promise<void>;
+    markStarted: () => void;
+    completion: Promise<void>;
+    release: () => void;
+};
+
+let readdirGate: ReaddirGate | undefined;
 
 // Electron Forge supplies these globals to the main process at build time.
 Object.assign(globalThis, {
@@ -17,6 +30,8 @@ export const __electronMock = {
         browserWindowFactoryMock = undefined;
         showOpenDialogMock = undefined;
         showMessageBoxMock = undefined;
+        readdirGate?.release();
+        readdirGate = undefined;
     },
     setBrowserWindowFactory: (handler: (options: unknown) => object) => {
         browserWindowFactoryMock = handler;
@@ -30,7 +45,42 @@ export const __electronMock = {
     setShowMessageBox: (handler: (...args: unknown[]) => unknown) => {
         showMessageBoxMock = handler;
     },
+    blockNextReaddir: (path: string) => {
+        let released = false;
+        let markStarted = () => {};
+        let release = () => {};
+        const started = new Promise<void>((resolveStarted) => {
+            markStarted = resolveStarted;
+        });
+        const completion = new Promise<void>((resolveCompletion) => {
+            release = resolveCompletion;
+        });
+
+        readdirGate = { path, started, markStarted, completion, release };
+        return {
+            started,
+            release: () => {
+                released = true;
+                release();
+            },
+            isReleased: () => released,
+        };
+    },
 };
+
+export const readdir = async (...args: Parameters<typeof fsPromises.readdir>) => {
+    const gate = readdirGate;
+
+    if (gate && resolve(args[0].toString()) === resolve(gate.path)) {
+        readdirGate = undefined;
+        gate.markStarted();
+        await gate.completion;
+    }
+
+    return fsPromises.readdir(...args);
+};
+
+export * from "node:fs/promises";
 
 export const app = {
     getPath: () => {

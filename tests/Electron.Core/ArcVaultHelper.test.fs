@@ -346,14 +346,14 @@ let private successfulRegistrationTestWindow id onShow =
 
     window, (fun () -> shown), (fun () -> destroyed)
 
-let private closingWhileArcLoadsRegistrationTestWindow id isArcOpening =
+let private closingWhileArcLoadsRegistrationTestWindow id =
     let mutable destroyed = false
     let mutable shown = false
     let mutable lifecycleAttachedWhenShown = false
-    let mutable arcWasOpeningWhenClosed = false
     let mutable preventedCloseCount = 0
     let mutable sendsAfterDestroy = 0
     let mutable titleWritesAfterDestroy = 0
+    let mutable focusCallsAfterDestroy = 0
     let mutable closeHandler: (obj -> unit) option = None
     let mutable closedHandler: (unit -> unit) option = None
     let noop: obj = emitJsExpr () "((..._args) => {})"
@@ -368,6 +368,11 @@ let private closingWhileArcLoadsRegistrationTestWindow id isArcOpening =
 
     let load (_: string) = JS.Constructors.Promise.resolve ()
 
+    let focus () =
+        if destroyed then
+            focusCallsAfterDestroy <- focusCallsAfterDestroy + 1
+            failwith "Object has been destroyed"
+
     let onEvent (eventName: string) (handler: obj) =
         if eventName = "close" then
             closeHandler <- Some(unbox handler)
@@ -381,29 +386,23 @@ let private closingWhileArcLoadsRegistrationTestWindow id isArcOpening =
         shown <- true
         lifecycleAttachedWhenShown <- closeHandler.IsSome && closedHandler.IsSome
 
-        Fable.Core.JS.setTimeout
-            (fun () ->
-                arcWasOpeningWhenClosed <- isArcOpening ()
+    let closeWindow () =
+        closeHandler.Value(
+            createObj [
+                "preventDefault" ==> (fun () -> preventedCloseCount <- preventedCloseCount + 1)
+            ]
+        )
 
-                closeHandler.Value(
-                    createObj [
-                        "preventDefault" ==> (fun () -> preventedCloseCount <- preventedCloseCount + 1)
-                    ]
-                )
-
-                if preventedCloseCount = 0 then
-                    destroyed <- true
-                    closedHandler.Value()
-            )
-            0
-        |> ignore
+        if preventedCloseCount = 0 then
+            destroyed <- true
+            closedHandler.Value()
 
     let windowObject =
         createObj [
             "id" ==> id
             "isDestroyed" ==> (fun () -> destroyed)
             "destroy" ==> (fun () -> destroyed <- true)
-            "focus" ==> ignore
+            "focus" ==> focus
             "show" ==> show
             "loadFile" ==> load
             "loadURL" ==> load
@@ -432,10 +431,11 @@ let private closingWhileArcLoadsRegistrationTestWindow id isArcOpening =
     window,
     (fun () -> shown),
     (fun () -> lifecycleAttachedWhenShown),
-    (fun () -> arcWasOpeningWhenClosed),
+    closeWindow,
     (fun () -> destroyed),
     (fun () -> sendsAfterDestroy),
-    (fun () -> titleWritesAfterDestroy)
+    (fun () -> titleWritesAfterDestroy),
+    (fun () -> focusCallsAfterDestroy)
 
 let private expectRegistrationLoadFailure
     (expectedError: exn)
@@ -635,47 +635,69 @@ Vitest.describe (
                     ignore
                     (fun arcPath -> promise {
                         let windowId = 18
-                        let mutable loadingVault: ArcVault option = None
-                        let mutable vaultsRef: ArcVaults option = None
-
-                        let isArcOpening () =
-                            loadingVault <- vaultsRef.Value.TryGetVault(windowId)
-
-                            loadingVault
-                            |> Option.exists (fun vault -> vault.path.IsSome && vault.arc.IsNone)
 
                         let (window,
                              wasShown,
                              lifecycleWasAttached,
-                             arcWasOpening,
+                             closeWindow,
                              isDestroyed,
                              sendsAfterDestroy,
-                             titleWritesAfterDestroy) =
-                            closingWhileArcLoadsRegistrationTestWindow windowId isArcOpening
+                             titleWritesAfterDestroy,
+                             focusCallsAfterDestroy) =
+                            closingWhileArcLoadsRegistrationTestWindow windowId
 
                         let vaults = ArcVaults()
-                        vaultsRef <- Some vaults
                         setBrowserWindowFactory (fun _ -> window :> obj)
+
+                        let loadGate: obj = electronMock?blockNextReaddir arcPath
+                        let registration = vaults.RegisterVaultWithArc arcPath
+                        do! unbox<JS.Promise<unit>> loadGate?started
+
+                        let loadingVault = vaults.TryGetVault(windowId)
+
+                        Vitest.expect(wasShown ()).toBe (true)
+                        Vitest.expect(lifecycleWasAttached ()).toBe (true)
+                        Vitest.expect(loadingVault.IsSome).toBe (true)
+                        Vitest.expect(loadingVault.Value.path).toEqual (Some(PathHelpers.normalizePath arcPath))
+                        Vitest.expect(loadingVault.Value.arc).toEqual (None)
+                        Vitest.expect(loadingVault.Value.watcher).toEqual (None)
+                        Vitest.expect(loadGate?isReleased ()).toBe (false)
+
+                        closeWindow ()
+
+                        Vitest.expect(isDestroyed ()).toBe (true)
+                        Vitest.expect(vaults.Vaults.ContainsKey(windowId)).toBe (false)
+                        Vitest.expect(loadingVault.Value.watcher).toEqual (None)
+                        Vitest.expect(loadGate?isReleased ()).toBe (false)
+                        Vitest.expect(sendsAfterDestroy ()).toBe (0)
+                        Vitest.expect(titleWritesAfterDestroy ()).toBe (0)
+                        Vitest.expect(focusCallsAfterDestroy ()).toBe (0)
+
+                        loadGate?release () |> ignore
 
                         let mutable registrationError: exn option = None
 
                         try
-                            let! _ = vaults.RegisterVaultWithArc arcPath
+                            let! _ = registration
                             ()
                         with error ->
                             registrationError <- Some error
 
-                        Vitest.expect(wasShown ()).toBe (true)
-                        Vitest.expect(lifecycleWasAttached ()).toBe (true)
-                        Vitest.expect(arcWasOpening ()).toBe (true)
-                        Vitest.expect(isDestroyed ()).toBe (true)
-                        Vitest.expect(vaults.Vaults.ContainsKey(windowId)).toBe (false)
-                        Vitest.expect(loadingVault.IsSome).toBe (true)
+                        Vitest.expect(registrationError.IsSome).toBe (true)
+
+                        Vitest
+                            .expect(registrationError.Value.Message)
+                            .toBe ("The ARC window was closed while the ARC was loading.")
+
+                        Vitest.expect(registrationError.Value.Message).not.toContain ("Object has been destroyed")
+                        Vitest.expect(loadingVault.Value.path).toEqual (None)
+                        Vitest.expect(loadingVault.Value.arc).toEqual (None)
                         Vitest.expect(loadingVault.Value.watcher).toEqual (None)
+                        Vitest.expect(loadingVault.Value.fileTree.Count).toBe (0)
+                        Vitest.expect(vaults.Vaults.ContainsKey(windowId)).toBe (false)
                         Vitest.expect(sendsAfterDestroy ()).toBe (0)
                         Vitest.expect(titleWritesAfterDestroy ()).toBe (0)
-                        Vitest.expect(registrationError.IsSome).toBe (true)
-                        Vitest.expect(registrationError.Value.Message).toContain ("closed while the ARC was loading")
+                        Vitest.expect(focusCallsAfterDestroy ()).toBe (0)
                     })
         )
 
