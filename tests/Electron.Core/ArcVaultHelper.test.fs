@@ -353,6 +353,7 @@ let private closingWhileArcLoadsRegistrationTestWindow id isArcOpening =
     let mutable arcWasOpeningWhenClosed = false
     let mutable preventedCloseCount = 0
     let mutable sendsAfterDestroy = 0
+    let mutable titleWritesAfterDestroy = 0
     let mutable closeHandler: (obj -> unit) option = None
     let mutable closedHandler: (unit -> unit) option = None
     let noop: obj = emitJsExpr () "((..._args) => {})"
@@ -397,10 +398,9 @@ let private closingWhileArcLoadsRegistrationTestWindow id isArcOpening =
             0
         |> ignore
 
-    let window =
+    let windowObject =
         createObj [
             "id" ==> id
-            "title" ==> ""
             "isDestroyed" ==> (fun () -> destroyed)
             "destroy" ==> (fun () -> destroyed <- true)
             "focus" ==> ignore
@@ -416,14 +416,26 @@ let private closingWhileArcLoadsRegistrationTestWindow id isArcOpening =
                 "openDevTools" ==> noop
             ]
         ]
-        |> unbox<BrowserWindow>
+
+    let setTitle (_value: string) =
+        if destroyed then
+            titleWritesAfterDestroy <- titleWritesAfterDestroy + 1
+            failwith "Object has been destroyed"
+
+    emitJsExpr
+        (windowObject, setTitle)
+        "Object.defineProperty($0, 'title', { configurable: true, get: () => '', set: value => $1(value) })"
+    |> ignore
+
+    let window = windowObject |> unbox<BrowserWindow>
 
     window,
     (fun () -> shown),
     (fun () -> lifecycleAttachedWhenShown),
     (fun () -> arcWasOpeningWhenClosed),
     (fun () -> destroyed),
-    (fun () -> sendsAfterDestroy)
+    (fun () -> sendsAfterDestroy),
+    (fun () -> titleWritesAfterDestroy)
 
 let private expectRegistrationLoadFailure
     (expectedError: exn)
@@ -632,7 +644,13 @@ Vitest.describe (
                             loadingVault
                             |> Option.exists (fun vault -> vault.path.IsSome && vault.arc.IsNone)
 
-                        let window, wasShown, lifecycleWasAttached, arcWasOpening, isDestroyed, sendsAfterDestroy =
+                        let (window,
+                             wasShown,
+                             lifecycleWasAttached,
+                             arcWasOpening,
+                             isDestroyed,
+                             sendsAfterDestroy,
+                             titleWritesAfterDestroy) =
                             closingWhileArcLoadsRegistrationTestWindow windowId isArcOpening
 
                         let vaults = ArcVaults()
@@ -655,6 +673,7 @@ Vitest.describe (
                         Vitest.expect(loadingVault.IsSome).toBe (true)
                         Vitest.expect(loadingVault.Value.watcher).toEqual (None)
                         Vitest.expect(sendsAfterDestroy ()).toBe (0)
+                        Vitest.expect(titleWritesAfterDestroy ()).toBe (0)
                         Vitest.expect(registrationError.IsSome).toBe (true)
                         Vitest.expect(registrationError.Value.Message).toContain ("closed while the ARC was loading")
                     })

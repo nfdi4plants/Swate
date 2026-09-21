@@ -87,11 +87,15 @@ type ArcVault(window: BrowserWindow) =
     /// This function mutably sets the active ARC in memory without persisting to disk.
     member this.SetArc(arc: ARC) =
         this.arc <- Some arc
-        this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle (Some arc.Identifier)
+
+        if not (this.window.isDestroyed ()) then
+            this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle (Some arc.Identifier)
 
     member this.ClearArc() =
         this.arc <- None
-        this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle None
+
+        if not (this.window.isDestroyed ()) then
+            this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle None
 
     /// Sets the dirty marker for unsaved in-memory ARC mutations.
     member this.RefreshHasUnsavedArcChangesFlag() =
@@ -381,6 +385,7 @@ module ArcVaultExtensions =
             if this.path.IsSome then
                 match! ARC.LoadAsyncSwateZeroByteRepair this.path.Value with
                 | Error e -> swatefailfn this.window.id "Unable to load ARC: %s" (PathHelpers.formatContractErrors e)
+                | Ok _ when this.window.isDestroyed () -> return raise (exn "The ARC window was closed while the ARC was loading.")
                 | Ok arc ->
                     this.SetArc(arc)
                     this.RefreshHasUnsavedArcChangesFlag()
@@ -873,15 +878,15 @@ type ArcVaults() =
     member this.OpenOrFocusArc(callingWindowId: int, arcPath: string) = promise {
         let normalizedArcPath = PathHelpers.normalizePath arcPath
 
-        match! this.ValidateArcRoot normalizedArcPath with
-        | Error error -> return raise error
-        | Ok() ->
-            match this.TryGetVaultByPath normalizedArcPath with
-            | Some vault ->
-                vault.window.focus ()
-                this.TrackRecentAndBroadcast(normalizedArcPath)
-                return ArcOpenDisposition.FocusedExisting normalizedArcPath
-            | None ->
+        match this.TryGetVaultByPath normalizedArcPath with
+        | Some vault ->
+            vault.window.focus ()
+            this.TrackRecentAndBroadcast(normalizedArcPath)
+            return ArcOpenDisposition.FocusedExisting normalizedArcPath
+        | None ->
+            match! this.ValidateArcRoot normalizedArcPath with
+            | Error error -> return raise error
+            | Ok() ->
                 match this.TryGetVault callingWindowId with
                 | Some vault when vault.path.IsNone ->
                     do! vault.OpenARC(normalizedArcPath)
