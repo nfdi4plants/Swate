@@ -4,7 +4,8 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <DefineConstants>FABLE_COMPILER</DefineConstants>
-    <!-- DefineConstants is required to hotfix an ARCtrl issue, remove if the issue below is resolved and ARCtrl is updated to a version that fixes it -->
+    <!-- DefineConstants is required to hotfix an ARCtrl issue, remove if the issue below is
+    resolved and ARCtrl is updated to a version that fixes it -->
     <!-- https://github.com/nfdi4plants/ARCtrl/issues/603 -->
     <DefineConstants>FABLE_COMPILER_JAVASCRIPT</DefineConstants>
   </PropertyGroup>
@@ -72,8 +73,6 @@
     <Compile Include="Util\DateTimeExtensions.fs" />
     <Compile Include="Util\Extensions.fs" />
     <Compile Include="Util\ReactHooks.fs" />
-    <Compile Include="Hooks\useMutableStore.fs" />
-    <Compile Include="Hooks\useMutableStore.test.fs" />
     <Compile Include="JsBindings\Clipboard.fs" />
     <Compile Include="JsBindings\Virtual.fs" />
     <Compile Include="JsBindings\FloatingUI.fs" />
@@ -92,10 +91,10 @@
     <Compile Include="ARCtrl\Extensions\CompositeHeader.fs" />
     <Compile Include="ARCtrl\Extensions\CompositeCell.fs" />
     <Compile Include="ClipboardContract\Types.fs" />
-      <Compile Include="ClipboardContract\Contract.fs" />
-      <Compile Include="ARCtrl\ClipboardCodec.fs" />
-      <Compile Include="ClipboardContract\Actions.fs" />
-      <Compile Include="ARCtrl\Extensions\ArcTable.fs" />
+    <Compile Include="ClipboardContract\Contract.fs" />
+    <Compile Include="ARCtrl\ClipboardCodec.fs" />
+    <Compile Include="ClipboardContract\Actions.fs" />
+    <Compile Include="ARCtrl\Extensions\ArcTable.fs" />
     <Compile Include="ARCtrl\Extensions\DataFile.fs" />
     <Compile Include="ARCtrl\Extensions\DataMap.fs" />
     <Compile Include="ARCtrl\Extensions\Template.fs" />
@@ -103,7 +102,10 @@
     <Compile Include="Api\SwateApi.fs" />
     <Compile Include="Api\GitLabApi.fs" />
     <Compile Include="Api\TIBApi.fs" />
-   
+
+    <Compile Include="Hooks\useMutableStore\useMutableStore.fs" />
+    <Compile Include="Hooks\useMutableStore\useMutableStore.test.fs" />
+
     <Compile Include="Primitive\Types.fs" />
     <Compile Include="Primitive\Icons.fs" />
     <Compile Include="Primitive\Buttons\Buttons.fs" />
@@ -340,11 +342,13 @@
       <NpmPackage Name="@dnd-kit/sortable" Version="gte 10.0.0 lt 11.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="@dnd-kit/utilities" Version="gte 3.2.0 lt 4.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="@uiw/react-md-editor" Version="gte 4.0.0 lt 5.0.0" ResolutionStrategy="Max" />
-      <NpmPackage Name="@uiw/react-markdown-preview" Version="gte 5.0.0 lt 6.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="@uiw/react-markdown-preview" Version="gte 5.0.0 lt 6.0.0"
+        ResolutionStrategy="Max" />
       <NpmPackage Name="mermaid" Version="gte 11.0.0 lt 12.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="rehype-rewrite" Version="gte 4.0.0 lt 5.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="rehype-sanitize" Version="gte 6.0.0 lt 7.0.0" ResolutionStrategy="Max" />
-      <NpmPackage Name="@tanstack/react-virtual" Version="gte 3.0.0 lt 4.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="@tanstack/react-virtual" Version="gte 3.0.0 lt 4.0.0"
+        ResolutionStrategy="Max" />
       <NpmPackage Name="@uidotdev/usehooks" Version="gte 2.0.0 lt 3.0.0" ResolutionStrategy="Max" />
     </NpmDependencies>
   </PropertyGroup>
