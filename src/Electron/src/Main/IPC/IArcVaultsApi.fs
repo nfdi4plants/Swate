@@ -123,39 +123,32 @@ let private notifyGitRepositoryInitialized (arcPath: string) =
         |> fun rendererApi -> rendererApi.gitRepositoryInitialized arcPath
     )
 
-let private showArcOpenError (window: BaseWindow option) (arcPath: string) (error: exn) =
+let private showArcOpenError (window: BaseWindow option) (arcPath: string option) (error: exn) = promise {
+    let detail =
+        arcPath
+        |> Option.filter (String.IsNullOrWhiteSpace >> not)
+        |> Option.map (fun path -> $"Folder: {path}\n\n{error.Message}")
+        |> Option.defaultValue error.Message
+
     let options =
-        Dialog.ShowMessageBoxSync.Options(
+        Dialog.ShowMessageBox.Options(
             "The ARC could not be opened.",
-            ``type`` = Enums.Dialog.ShowMessageBoxSync.Options.Type.Error,
+            ``type`` = Enums.Dialog.ShowMessageBox.Options.Type.Error,
             title = "Could not open ARC",
-            detail = $"Folder: {arcPath}\n\n{error.Message}"
+            detail = detail
         )
 
-    dialog.showMessageBoxSync (?window = window, options = options) |> ignore
-
-let private validateArcRoot (arcPath: string) = promise {
-    let investigationPath =
-        ARCtrl.ArcPathHelper.combine arcPath ARCtrl.ArcPathHelper.InvestigationFileName
-
-    let! investigationExists = pathExistsAsync investigationPath
-
-    if investigationExists then
-        return Ok()
-    else
-        return
-            Error(
-                exn
-                    $"The folder does not contain the required ARC investigation file '{ARCtrl.ArcPathHelper.InvestigationFileName}'."
-            )
+    let! _ = dialog.showMessageBox (?window = window, options = options)
+    return ()
 }
 
 let private openArcAtPath (event: IpcMainInvokeEvent) (requestedPath: string) = promise {
     let window = dialogParentFromIpcEvent event
 
-    let reportError arcPath error =
-        showArcOpenError window arcPath error
-        Error error
+    let reportError arcPath error = promise {
+        do! showArcOpenError window arcPath error
+        return Error error
+    }
 
     let normalizedPathResult =
         try
@@ -164,22 +157,14 @@ let private openArcAtPath (event: IpcMainInvokeEvent) (requestedPath: string) = 
             Error error
 
     match normalizedPathResult with
-    | Error error -> return reportError requestedPath error
+    | Error error -> return! reportError None error
     | Ok arcPath ->
         try
-            let! arcPathExists = pathExistsAsync arcPath
-
-            if not arcPathExists then
-                return reportError arcPath (exn $"The ARC cannot be found at location: '{arcPath}'.")
-            else
-                match! validateArcRoot arcPath with
-                | Error error -> return reportError arcPath error
-                | Ok() ->
-                    let windowId = windowIdFromIpcEvent event
-                    let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
-                    return Ok disposition
+            let windowId = windowIdFromIpcEvent event
+            let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
+            return Ok disposition
         with error ->
-            return reportError arcPath error
+            return! reportError (Some arcPath) error
 }
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
@@ -201,14 +186,14 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     return Ok None
                 elif r.filePaths.Length <> 1 then
                     let error = exn "Not exactly one path"
-                    showArcOpenError window (String.concat ", " r.filePaths) error
+                    do! showArcOpenError window None error
                     return Error error
                 else
                     match! openArcAtPath event (Array.exactlyOne r.filePaths) with
                     | Ok disposition -> return Ok(Some(ArcOpenDisposition.path disposition))
                     | Error error -> return Error error
             with error ->
-                showArcOpenError window "" error
+                do! showArcOpenError window None error
                 return Error error
         }
     openARCByPath =

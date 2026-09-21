@@ -3,6 +3,7 @@ module ElectronCore.ArcVaultHelperTests
 open ARCtrl
 open Fable.Core
 open Fable.Core.JsInterop
+open Fable.Electron
 open Fable.Electron.Main
 open Main.ARCtrlExtensions
 open Main.ArcVault
@@ -26,6 +27,19 @@ let private resetElectronMock () = electronMock?reset () |> ignore
 
 let private setBrowserWindowFactory (factory: obj -> obj) =
     electronMock?setBrowserWindowFactory (factory) |> ignore
+
+let private setBrowserWindowFromWebContents (handler: obj -> obj) =
+    electronMock?setBrowserWindowFromWebContents (handler) |> ignore
+
+let private setShowOpenDialog (handler: obj -> obj -> obj) =
+    electronMock?setShowOpenDialog (handler) |> ignore
+
+let private setShowMessageBox (handler: obj -> obj -> obj) =
+    electronMock?setShowMessageBox (handler) |> ignore
+
+let private ipcEventWithSenderId senderId : IpcMainInvokeEvent =
+    createObj [ "sender" ==> createObj [ "id" ==> senderId ] ]
+    |> unbox<IpcMainInvokeEvent>
 
 let private runFileImport
     (vault: ArcVault)
@@ -296,6 +310,41 @@ let private registrationTestWindow id (loadError: exn) onLoad =
 
     window, (fun () -> destroyed)
 
+let private successfulRegistrationTestWindow id onShow =
+    let mutable destroyed = false
+    let mutable shown = false
+    let send: obj = emitJsExpr () "((..._args) => {})"
+    let noop: obj = emitJsExpr () "((..._args) => {})"
+
+    let load (_: string) = JS.Constructors.Promise.resolve ()
+
+    let window =
+        createObj [
+            "id" ==> id
+            "title" ==> ""
+            "isDestroyed" ==> (fun () -> destroyed)
+            "destroy" ==> (fun () -> destroyed <- true)
+            "focus" ==> ignore
+            "show"
+            ==> (fun () ->
+                shown <- true
+                onShow ()
+            )
+            "loadFile" ==> load
+            "loadURL" ==> load
+            "on" ==> noop
+            "webContents"
+            ==> createObj [
+                "send" ==> send
+                "setWindowOpenHandler" ==> noop
+                "on" ==> noop
+                "openDevTools" ==> noop
+            ]
+        ]
+        |> unbox<BrowserWindow>
+
+    window, (fun () -> shown), (fun () -> destroyed)
+
 let private expectRegistrationLoadFailure
     (expectedError: exn)
     (vaults: ArcVaults)
@@ -409,8 +458,159 @@ Vitest.describe (
                 setBrowserWindowFactory (fun _ -> window :> obj)
 
                 let vaults = ArcVaults()
+                let mutable windowWasAliveWhenFailureWasReported = false
 
-                do! expectRegistrationLoadFailure loadError vaults windowId isDestroyed vaults.RegisterVault
+                do!
+                    expectRegistrationLoadFailure
+                        loadError
+                        vaults
+                        windowId
+                        isDestroyed
+                        (fun () ->
+                            vaults.RegisterVault(
+                                onFailureBeforeCleanup =
+                                    fun _ -> windowWasAliveWhenFailureWasReported <- not (isDestroyed ())
+                            )
+                        )
+
+                Vitest.expect(windowWasAliveWhenFailureWasReported).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "RegisterVault shows a successfully loaded renderer and keeps its vault registered",
+            fun () -> promise {
+                let windowId = 14
+                let window, wasShown, isDestroyed = successfulRegistrationTestWindow windowId ignore
+                setBrowserWindowFactory (fun _ -> window :> obj)
+
+                let vaults = ArcVaults()
+                let! registeredWindowId = vaults.RegisterVault()
+
+                Vitest.expect(registeredWindowId).toBe (windowId)
+                Vitest.expect(wasShown ()).toBe (true)
+                Vitest.expect(vaults.Vaults.ContainsKey(windowId)).toBe (true)
+                Vitest.expect(isDestroyed ()).toBe (false)
+            }
+        )
+
+        Vitest.test (
+            "RegisterVaultWithArc shows the empty renderer before loading the ARC",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-registration-success-"
+                    "Visible ARC"
+                    ignore
+                    (fun arcPath -> promise {
+                        let windowId = 15
+                        let mutable vaultWasEmptyWhenShown = false
+                        let mutable vaultsRef: ArcVaults option = None
+
+                        let window, wasShown, isDestroyed =
+                            successfulRegistrationTestWindow
+                                windowId
+                                (fun () ->
+                                    vaultWasEmptyWhenShown <-
+                                        vaultsRef.Value.TryGetVault(windowId)
+                                        |> Option.exists (fun vault -> vault.path.IsNone && vault.arc.IsNone)
+                                )
+
+                        let vaults = ArcVaults()
+                        vaultsRef <- Some vaults
+                        setBrowserWindowFactory (fun _ -> window :> obj)
+
+                        let! registeredWindowId = vaults.RegisterVaultWithArc arcPath
+
+                        Vitest.expect(registeredWindowId).toBe (windowId)
+                        Vitest.expect(wasShown ()).toBe (true)
+                        Vitest.expect(vaultWasEmptyWhenShown).toBe (true)
+                        Vitest.expect(vaults.Vaults.ContainsKey(windowId)).toBe (true)
+
+                        Vitest.expect(vaults.Vaults.[windowId].path).toEqual (Some(PathHelpers.normalizePath arcPath))
+
+                        Vitest.expect(isDestroyed ()).toBe (false)
+
+                        do! vaults.Vaults.[windowId].StopFileWatcher()
+                    })
+        )
+
+        Vitest.test (
+            "openARCByPath rejects an invalid ARC and shows one native error with folder context",
+            fun () -> promise {
+                let! folderPath = TestHelpers.createTempDirectoryAsync "swate-ipc-invalid-arc-"
+                let windowId = 16
+                let window = lifecycleTestWindow windowId false ignore
+                let vault = ArcVault(window)
+                let mutable dialogCount = 0
+                let mutable dialogOptions: obj option = None
+
+                ARC_VAULTS.Vaults.Add(windowId, vault)
+                setBrowserWindowFromWebContents (fun _ -> window :> obj)
+
+                setShowMessageBox (fun _ options ->
+                    dialogCount <- dialogCount + 1
+                    dialogOptions <- Some options
+                    createObj [ "response" ==> 0; "checkboxChecked" ==> false ]
+                )
+
+                try
+                    let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId windowId)
+
+                    match! api.openARCByPath folderPath with
+                    | Ok _ -> failwith "Expected a folder without an investigation file to be rejected."
+                    | Error error ->
+                        Vitest.expect(error.Message).toContain (ARCtrl.ArcPathHelper.InvestigationFileName)
+                        Vitest.expect(vault.path).toEqual (None)
+                        Vitest.expect(vault.arc).toEqual (None)
+                        Vitest.expect(dialogCount).toBe (1)
+                        Vitest.expect(dialogOptions.IsSome).toBe (true)
+                        Vitest.expect(dialogOptions.Value?message).toBe ("The ARC could not be opened.")
+
+                        Vitest
+                            .expect(dialogOptions.Value?detail)
+                            .toContain ($"Folder: {PathHelpers.normalizePath folderPath}")
+
+                        Vitest.expect(dialogOptions.Value?detail).toContain (ARCtrl.ArcPathHelper.InvestigationFileName)
+
+                    ARC_VAULTS.Vaults.Remove(windowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync folderPath
+                with error ->
+                    ARC_VAULTS.Vaults.Remove(windowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync folderPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "openARC omits folder context when the dialog returns multiple paths",
+            fun () -> promise {
+                let windowId = 17
+                let window = lifecycleTestWindow windowId false ignore
+                let mutable dialogOptions: obj option = None
+
+                setBrowserWindowFromWebContents (fun _ -> window :> obj)
+
+                setShowOpenDialog (fun _ _ ->
+                    createObj [
+                        "canceled" ==> false
+                        "filePaths" ==> [| "C:/first"; "C:/second" |]
+                    ]
+                )
+
+                setShowMessageBox (fun _ options ->
+                    dialogOptions <- Some options
+                    createObj [ "response" ==> 0; "checkboxChecked" ==> false ]
+                )
+
+                let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId windowId)
+
+                match! api.openARC () with
+                | Ok _ -> failwith "Expected multiple dialog paths to be rejected."
+                | Error error ->
+                    Vitest.expect(error.Message).toContain ("Not exactly one path")
+                    Vitest.expect(dialogOptions.IsSome).toBe (true)
+                    Vitest.expect(dialogOptions.Value?detail).toContain ("Not exactly one path")
+                    Vitest.expect(dialogOptions.Value?detail).not.toContain ("Folder:")
             }
         )
 

@@ -731,7 +731,7 @@ type ArcVaults() =
             window.destroy ()
     }
 
-    member this.RegisterVault() : Fable.Core.JS.Promise<int> = promise {
+    member this.RegisterVault(?onFailureBeforeCleanup: exn -> unit) : Fable.Core.JS.Promise<int> = promise {
         let window = createWindow ()
         let id = window.id
         let vault = ArcVault(window)
@@ -739,6 +739,35 @@ type ArcVaults() =
 
         try
             do! loadWindow window
+
+            this.OnCloseWindow(window, vault, id)
+
+            window.focus ()
+            swatelogfn id "Register window"
+
+            return id
+        with error ->
+            onFailureBeforeCleanup
+            |> Option.iter (fun notifyFailure ->
+                try
+                    notifyFailure error
+                with notificationError ->
+                    swatelogfn id "Failed to report window registration error: %s" notificationError.Message
+            )
+
+            do! this.CleanupFailedRegistration(window, vault, id)
+            return raise error
+    }
+
+    member private this.RegisterVaultWithValidatedArc(path: string) = promise {
+        let window = createWindow ()
+        let id = window.id
+        let vault = ArcVault(window)
+        this.Vaults.Add(id, vault)
+
+        try
+            do! loadWindow window
+            do! vault.OpenARC(path)
 
             this.OnCloseWindow(window, vault, id)
 
@@ -751,25 +780,33 @@ type ArcVaults() =
             return raise error
     }
 
+    member private this.ValidateArcRoot(path: string) = promise {
+        let! arcRootExists = ARCtrl.FileSystemHelper.directoryExistsAsync path
+
+        if not arcRootExists then
+            return Error(exn $"The ARC cannot be found at location: '{path}'.")
+        else
+            let investigationPath =
+                ARCtrl.ArcPathHelper.combine path ARCtrl.ArcPathHelper.InvestigationFileName
+
+            let! investigationExists = ARCtrl.FileSystemHelper.fileExistsAsync investigationPath
+
+            if investigationExists then
+                return Ok()
+            else
+                return
+                    Error(
+                        exn
+                            $"The folder does not contain the required ARC investigation file '{ARCtrl.ArcPathHelper.InvestigationFileName}'."
+                    )
+    }
+
     member this.RegisterVaultWithArc(path: string) = promise {
-        let window = createWindow ()
-        let id = window.id
-        let vault = ArcVault(window)
-        this.Vaults.Add(id, vault)
+        let normalizedArcPath = PathHelpers.normalizePath path
 
-        try
-            do! vault.OpenARC(path)
-            do! loadWindow window
-
-            this.OnCloseWindow(window, vault, id)
-
-            window.focus ()
-            swatelogfn id "Register window"
-
-            return id
-        with error ->
-            do! this.CleanupFailedRegistration(window, vault, id)
-            return raise error
+        match! this.ValidateArcRoot normalizedArcPath with
+        | Error error -> return raise error
+        | Ok() -> return! this.RegisterVaultWithValidatedArc normalizedArcPath
     }
 
     member this.RegisterVaultWithNewArc(path: string, newIdentifier: string) : Fable.Core.JS.Promise<int> = promise {
@@ -794,11 +831,14 @@ type ArcVaults() =
     }
 
     member this.OpenARCInVault(windowId: int, path: string) = promise {
-        match this.Vaults.TryGetValue windowId with
-        | false, _ -> failwith $"Vault with window-id '{windowId}' not found."
-        | true, vault -> do! vault.OpenARC path
+        let normalizedArcPath = PathHelpers.normalizePath path
 
-        return ()
+        match! this.ValidateArcRoot normalizedArcPath with
+        | Error error -> return raise error
+        | Ok() ->
+            match this.Vaults.TryGetValue windowId with
+            | false, _ -> return failwith $"Vault with window-id '{windowId}' not found."
+            | true, vault -> do! vault.OpenARC normalizedArcPath
     }
 
     member this.CreateARCInVault(windowId: int, path: string, identifier: string) = promise {
@@ -827,30 +867,33 @@ type ArcVaults() =
     member this.OpenOrFocusArc(callingWindowId: int, arcPath: string) = promise {
         let normalizedArcPath = PathHelpers.normalizePath arcPath
 
-        match this.TryGetVaultByPath normalizedArcPath with
-        | Some vault ->
-            vault.window.focus ()
-            this.TrackRecentAndBroadcast(normalizedArcPath)
-            return ArcOpenDisposition.FocusedExisting normalizedArcPath
-        | None ->
-            match this.TryGetVault callingWindowId with
-            | Some vault when vault.path.IsNone ->
-                do! vault.OpenARC(normalizedArcPath)
-                let! fileTree = getFileTree normalizedArcPath
-                vault.SetFileTree fileTree
+        match! this.ValidateArcRoot normalizedArcPath with
+        | Error error -> return raise error
+        | Ok() ->
+            match this.TryGetVaultByPath normalizedArcPath with
+            | Some vault ->
+                vault.window.focus ()
                 this.TrackRecentAndBroadcast(normalizedArcPath)
-                return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
-            | _ ->
-                let! newWindowId = this.RegisterVaultWithArc(normalizedArcPath)
-
-                match this.TryGetVault newWindowId with
-                | Some newVault ->
+                return ArcOpenDisposition.FocusedExisting normalizedArcPath
+            | None ->
+                match this.TryGetVault callingWindowId with
+                | Some vault when vault.path.IsNone ->
+                    do! vault.OpenARC(normalizedArcPath)
                     let! fileTree = getFileTree normalizedArcPath
-                    newVault.SetFileTree fileTree
-                | None -> ()
+                    vault.SetFileTree fileTree
+                    this.TrackRecentAndBroadcast(normalizedArcPath)
+                    return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
+                | _ ->
+                    let! newWindowId = this.RegisterVaultWithValidatedArc(normalizedArcPath)
 
-                this.TrackRecentAndBroadcast(normalizedArcPath)
-                return ArcOpenDisposition.OpenedInNewWindow normalizedArcPath
+                    match this.TryGetVault newWindowId with
+                    | Some newVault ->
+                        let! fileTree = getFileTree normalizedArcPath
+                        newVault.SetFileTree fileTree
+                    | None -> ()
+
+                    this.TrackRecentAndBroadcast(normalizedArcPath)
+                    return ArcOpenDisposition.OpenedInNewWindow normalizedArcPath
     }
 
     /// Create a new ARC at the given path with the given identifier.

@@ -1,8 +1,21 @@
 module Main.Main
 
+open Fable.Core
 open Fable.Electron
 open Fable.Electron.Remoting.Main
 open Main
+
+let private registerRequiredWindow (failureContext: string) =
+    ARC_VAULTS.RegisterVault(
+        onFailureBeforeCleanup =
+            fun error ->
+                Browser.Dom.console.error ($"{failureContext}: {error.Message}")
+
+                dialog.showErrorBox ("Swate could not start", $"{failureContext}\n\n{error.Message}")
+    )
+    |> Promise.map ignore
+    |> Promise.catch (fun _ -> app.quit ())
+    |> Promise.start
 
 if SquirrelStartup.started then
     app.quit ()
@@ -13,7 +26,7 @@ app
         // Restore persisted auth before any IPC handlers fire
         Main.Auth.AuthService.tryRestoreFromStorage ()
 
-        ARC_VAULTS.RegisterVault() |> ignore
+        registerRequiredWindow "The application window could not be loaded."
 
         Remoting.createIpc () |> Remoting.fromIpcMainEvent IPC.IGitApi.api
         Remoting.createIpc () |> Remoting.fromValue IPC.IGitLabApi.api
@@ -24,7 +37,7 @@ app
 
         app.onActivate (fun _ ->
             if BrowserWindow.getAllWindows().Length = 0 then
-                ARC_VAULTS.RegisterVault() |> ignore
+                registerRequiredWindow "The application window could not be reopened."
         )
     )
 |> ignore
