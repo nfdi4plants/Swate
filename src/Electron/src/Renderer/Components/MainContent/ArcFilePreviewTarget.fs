@@ -19,18 +19,24 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
     let setArcFilePageState nextRequestedView (nextArcFile: ArcFiles) =
         pageStateCtx.setState (Some(Renderer.Types.PageState.ArcFilePage(nextArcFile, nextRequestedView)))
 
-    let setArcFileInMemoryWithErrorModal (nextArcFile: ArcFiles) =
-        promise {
-            match! ArcFileApiHelper.withArcFileRequest nextArcFile Api.ipcArcVaultApi.setArcFileInMemory with
+    let commitArcFile (nextArcFile: ArcFiles) =
+        publishAndPersistArcFile
+            nextArcFile
+            (setArcFilePageState requestedView)
+            (fun arcFile -> ArcFileApiHelper.withArcFileRequest arcFile Api.ipcArcVaultApi.setArcFileInMemory)
+        |> Promise.map (fun result ->
+            match result with
             | Ok() -> ()
             | Error exn ->
                 errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not update ARC in memory"))
-        }
+        )
         |> Promise.start
 
-    let setArcFile nextArcFile =
-        setArcFilePageState requestedView nextArcFile
-        setArcFileInMemoryWithErrorModal nextArcFile
+    let mutateArcFile (update: ArcFiles -> unit) =
+        update arcFile
+        commitArcFile arcFile
+
+    let replaceArcFile (nextArcFile: ArcFiles) = commitArcFile nextArcFile
 
     let runDataMapMutation (errorTitle: string) (operation: Fable.Core.JS.Promise<Result<unit, exn>>) =
         promise {
@@ -92,7 +98,8 @@ let ArcFilePreviewTarget (arcFile: ArcFiles, requestedView: ActiveView option) =
         prop.children [
             Swate.Components.Page.ArcFileEditor.Main.ArcFileEditor(
                 arcFile,
-                setArcFile,
+                mutateArcFile,
+                replaceArcFile,
                 pickFilePaths,
                 addDataMap,
                 deleteDataMap,

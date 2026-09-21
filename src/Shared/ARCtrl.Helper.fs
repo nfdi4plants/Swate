@@ -207,6 +207,9 @@ module ARCtrlHelper =
 
         member this.CanRenderDataMapView() = this.TryGetDataMap() |> Option.isSome
 
+        /// Deprecated compatibility utility. Prefer the mutable-store contracts exposed by
+        /// `Swate.Components.Hooks.UseMutableStore` (mutate/replace) for reactivity.
+        ///
         /// React only refreshes if the reference changes, but when we update the ArcFile, we usually mutate the existing object. This function creates a new reference with the same content, which can be used to force React to re-render.
         static member refreshRef(arcFile: ArcFiles) : ArcFiles =
             let copy =

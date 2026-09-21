@@ -15,6 +15,7 @@ open Swate.Components.Shared
 open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Composite.AnnotationTable
 open Swate.Components.Composite.Widgets.DataAnnotator.Types
+open Swate.Components.Hooks.UseMutableStore
 
 module private ArcFileEditorTypes =
     type AddRowsFooterViewProps = {
@@ -35,20 +36,22 @@ type private LazyComponents =
 
     [<ReactLazyComponent>]
     static member LazyBuildingBlockWidget
-        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit)
+        (arcFile: ArcFiles, activeTableIndex: int option, mutateArcFile: (ArcFiles -> unit) -> unit)
         =
         Swate.Components.Composite.Widgets.BuildingBlockWidget.BuildingBlockWidget.Main(
             arcFile = arcFile,
             activeTableIndex = activeTableIndex,
-            setArcFile = setArcFile
+            mutateArcFile = mutateArcFile
         )
 
     [<ReactLazyComponent>]
-    static member LazyTemplateWidget(arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit) =
+    static member LazyTemplateWidget
+        (arcFile: ArcFiles, activeTableIndex: int option, mutateArcFile: (ArcFiles -> unit) -> unit)
+        =
         Swate.Components.Composite.Widgets.TemplateWidget.TemplateWidget(
             arcFile = arcFile,
             activeTableIndex = activeTableIndex,
-            setArcFile = setArcFile
+            mutateArcFile = mutateArcFile
         )
 
     [<ReactLazyComponent>]
@@ -56,13 +59,13 @@ type private LazyComponents =
         (
             arcFile: ArcFiles,
             activeTableIndex: int option,
-            setArcFile: ArcFiles -> unit,
+            mutateArcFile: (ArcFiles -> unit) -> unit,
             onPickPaths: unit -> Fable.Core.JS.Promise<string[]>
         ) =
         Swate.Components.Composite.Widgets.FilePickerWidget.Main(
             arcFile = arcFile,
             activeTableIndex = activeTableIndex,
-            setArcFile = setArcFile,
+            mutateArcFile = mutateArcFile,
             onPickPaths = onPickPaths
         )
 
@@ -173,7 +176,7 @@ type Main =
             | Some table ->
                 let setTable (nextTable: ArcTable) =
                     tables.[index] <- nextTable
-                    setArcFileState (ArcFiles.refreshRef arcFileState)
+                    setArcFileState arcFileState
 
                 match table.ColumnCount with
                 | 0 -> EmptyTableView.Main.EmptyTableView(arcFileState, setArcFileState, Some index)
@@ -188,7 +191,7 @@ type Main =
             | ArcFiles.Assay assay when assay.DataMap.IsSome ->
                 let setDatamap (nextDatamap: DataMap) =
                     assay.DataMap <- Some nextDatamap
-                    setArcFileState (ArcFiles.refreshRef arcFileState)
+                    setArcFileState arcFileState
 
                 Main.LazyLoaderWithMessage(
                     LazyComponents.LazyDataMap(assay.DataMap.Value, setDatamap),
@@ -197,7 +200,7 @@ type Main =
             | ArcFiles.Study(study, assays) when study.DataMap.IsSome ->
                 let setDatamap (nextDatamap: DataMap) =
                     study.DataMap <- Some nextDatamap
-                    setArcFileState (ArcFiles.refreshRef (ArcFiles.Study(study, assays)))
+                    setArcFileState arcFileState
 
                 Main.LazyLoaderWithMessage(
                     LazyComponents.LazyDataMap(study.DataMap.Value, setDatamap),
@@ -206,7 +209,7 @@ type Main =
             | ArcFiles.Run run when run.DataMap.IsSome ->
                 let setDatamap (nextDatamap: DataMap) =
                     run.DataMap <- Some nextDatamap
-                    setArcFileState (ArcFiles.refreshRef arcFileState)
+                    setArcFileState arcFileState
 
                 Main.LazyLoaderWithMessage(
                     LazyComponents.LazyDataMap(run.DataMap.Value, setDatamap),
@@ -215,7 +218,7 @@ type Main =
             | ArcFiles.Workflow workflow when workflow.DataMap.IsSome ->
                 let setDatamap (nextDatamap: DataMap) =
                     workflow.DataMap <- Some nextDatamap
-                    setArcFileState (ArcFiles.refreshRef arcFileState)
+                    setArcFileState arcFileState
 
                 Main.LazyLoaderWithMessage(
                     LazyComponents.LazyDataMap(workflow.DataMap.Value, setDatamap),
@@ -254,10 +257,10 @@ type Main =
             match tryGetAddRowsTarget () with
             | Some(AddRowsTarget.Table table) ->
                 table.AddRowsEmptyKeepingUnits rowCount
-                setArcFileState (ArcFiles.refreshRef arcFileState)
+                setArcFileState arcFileState
             | Some(AddRowsTarget.DataMap dataMap) ->
                 dataMap.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
-                setArcFileState (ArcFiles.refreshRef arcFileState)
+                setArcFileState arcFileState
             | None -> ()
 
         let addRows () =
@@ -288,7 +291,8 @@ type Main =
     static member ArcFileEditor
         (
             arcFile: ArcFiles,
-            setArcFile: ArcFiles -> unit,
+            mutateArcFile: (ArcFiles -> unit) -> unit,
+            replaceArcFile: ArcFiles -> unit,
             pickPaths: unit -> Fable.Core.JS.Promise<string[]>,
             ?onAddDataMap: unit -> unit,
             ?onDeleteDataMap: unit -> unit,
@@ -303,6 +307,22 @@ type Main =
 
         let activeView, setActiveView =
             React.useState (startingActiveView |> Option.defaultValue ActiveView.Metadata)
+
+        let arcFileState, mutateStore, setStore, _ = useMutableArcFilesStore arcFile
+
+        let mutate (update: ArcFiles -> unit) =
+            mutateArcFile update
+            mutateStore (fun _ -> ())
+
+        let replace (nextArcFile: ArcFiles) =
+            setStore nextArcFile
+            replaceArcFile nextArcFile
+
+        let setArcFileState (nextArcFile: ArcFiles) =
+            if obj.ReferenceEquals(nextArcFile, arcFileState) then
+                mutate (fun _ -> ())
+            else
+                replace nextArcFile
 
         // The ARC file is caller-owned and can be replaced independently of this component.
         // Keep the internally owned view valid when the available file views change.
@@ -368,17 +388,17 @@ type Main =
         let widgetElements = {|
             buildingBlock =
                 Main.LazyLoaderWithMessage(
-                    LazyComponents.LazyBuildingBlockWidget(arcFile, activeTableIndex, setArcFile),
+                    LazyComponents.LazyBuildingBlockWidget(arcFile, activeTableIndex, mutate),
                     "Loading Building Block Widget..."
                 )
             template =
                 Main.LazyLoaderWithMessage(
-                    LazyComponents.LazyTemplateWidget(arcFile, activeTableIndex, setArcFile),
+                    LazyComponents.LazyTemplateWidget(arcFile, activeTableIndex, mutate),
                     "Loading Template Widget..."
                 )
             filePicker =
                 Main.LazyLoaderWithMessage(
-                    LazyComponents.LazyFilePickerWidget(arcFile, activeTableIndex, setArcFile, pickPaths),
+                    LazyComponents.LazyFilePickerWidget(arcFile, activeTableIndex, mutate, pickPaths),
                     "Loading File Picker Widget..."
                 )
             dataAnnotator =
@@ -387,7 +407,7 @@ type Main =
                     Main.LazyLoaderWithMessage(
                         LazyComponents.LazyDataAnnotator(
                             destination,
-                            Helper.applyDataAnnotatorInputToArcFile (destination, arcFile, setArcFile),
+                            Helper.applyDataAnnotatorInputToArcFile (destination, arcFile, setArcFileState),
                             onError = onError
                         ),
                         "Loading Data Annotator Widget..."
@@ -401,7 +421,7 @@ type Main =
                 Main.LazyLoaderWithMessage(
                     LazyComponents.LazyJsonImportWidget(
                         arcFile,
-                        setArcFile,
+                        setArcFileState,
                         onImportJson,
                         (fun exn -> onError exn.Message)
                     ),
@@ -421,10 +441,12 @@ type Main =
                     navbar
                     Html.div [
                         prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
-                        prop.children [ Main.ArcFileContentView(activeView, arcFile, setArcFile) ]
+                        prop.children [
+                            Main.ArcFileContentView(activeView, arcFileState, setArcFileState)
+                        ]
                     ]
-                    Main.AddRowsFooter(activeView, arcFile, setArcFile)
-                    ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFile, onDeleteDataMap)
+                    Main.AddRowsFooter(activeView, arcFileState, setArcFileState)
+                    ArcFileFooterTabs.Main(arcFileState, activeView, setActiveView, setArcFileState, onDeleteDataMap)
                 ]
             ]
 
@@ -476,7 +498,20 @@ type Main =
                 startAssay
             )
 
-        let (arcFile: ArcFiles), setArcFile = React.useState (ArcFiles.Assay(startAssay))
+        let (arcFile: ArcFiles), setArcFileState =
+            React.useState (ArcFiles.Assay(startAssay))
+
+        let arcFileVersion, setArcFileVersion = React.useState 0
+
+        let publishArcFile (nextArcFile: ArcFiles) =
+            setArcFileState nextArcFile
+            setArcFileVersion (arcFileVersion + 1)
+
+        let mutateArcFile (update: ArcFiles -> unit) =
+            update arcFile
+            publishArcFile arcFile
+
+        let replaceArcFile (nextArcFile: ArcFiles) = publishArcFile nextArcFile
 
         let loadTemplates =
             fun () ->
@@ -549,6 +584,12 @@ type Main =
             loadTemplates,
             React.Fragment [
                 ColumnCountTestDisplay()
-                Main.ArcFileEditor(arcFile, setArcFile, pickPathsMockFn, startingActiveView = ActiveView.Table 0)
+                Main.ArcFileEditor(
+                    arcFile,
+                    mutateArcFile,
+                    replaceArcFile,
+                    pickPathsMockFn,
+                    startingActiveView = ActiveView.Table 0
+                )
             ]
         )

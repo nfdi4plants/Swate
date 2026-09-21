@@ -23,15 +23,16 @@ type Modals =
             setIsOpen: bool -> unit
         ) =
 
-        let setArcFileAndClose nextArcFile =
-            setArcFile nextArcFile
+        let mutateArcFileAndClose (update: ArcFiles -> unit) =
+            update arcFile
+            setArcFile arcFile
             setIsOpen false
 
         BaseModal.Modal(
             isOpen = isOpen,
             setIsOpen = setIsOpen,
             header = Html.text "Select a building block",
-            children = BuildingBlockWidget.Main(arcFile, activeTableIndex, setArcFileAndClose),
+            children = BuildingBlockWidget.Main(arcFile, activeTableIndex, mutateArcFileAndClose),
             className = "swt:max-w-3xl"
         )
 
@@ -45,8 +46,9 @@ type Modals =
             setIsOpen: bool -> unit
         ) =
 
-        let setArcFileAndClose nextArcFile =
-            setArcFile nextArcFile
+        let mutateArcFileAndClose (update: ArcFiles -> unit) =
+            update arcFile
+            setArcFile arcFile
             setIsOpen false
 
         BaseModal.Modal(
@@ -57,7 +59,7 @@ type Modals =
                 Swate.Components.Composite.Widgets.TemplateWidget.TemplateWidget(
                     arcFile,
                     activeTableIndex,
-                    setArcFileAndClose
+                    mutateArcFileAndClose
                 ),
             className = "swt:flex swt:min-w-fit"
         )

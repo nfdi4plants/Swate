@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🔄 Changed
+
+- Improve performance of ARCtrl model edits by optimizing state mutation (by @Freymaurer).
+
 ## 2.3.1 - 2026-09-16
 
 ### 🐛 Fixed

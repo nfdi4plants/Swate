@@ -11,7 +11,7 @@ let editorKey (arcFile: ArcFiles) (requestedView: ActiveView option) =
     |> Option.defaultValue (string arcFile.RelatedArcFilesDiscriminate),
     requestedView |> Option.map _.ViewIndex
 
-let private publishAndPersistArcFile
+let publishAndPersistArcFile
     (nextArcFile: ArcFiles)
     (publishArcFile: ArcFiles -> unit)
     (persistArcFile: ArcFiles -> JS.Promise<Result<unit, exn>>)

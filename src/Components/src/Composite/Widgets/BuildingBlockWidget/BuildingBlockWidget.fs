@@ -241,7 +241,7 @@ type BuildingBlockWidget =
     [<ReactComponent(true)>]
     static member Main
         // 👀 If you rename these variables, ensure that the names are forwarded for lazy loading in `src\Components\src\ARCFileEditor\ArcFileEditor.fs` as well!
-        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit) =
+        (arcFile: ArcFiles, activeTableIndex: int option, mutateArcFile: (ArcFiles -> unit) -> unit) =
 
         let state, setState = React.useState (BuildingBlockWidgetState.Model.init ())
 
@@ -337,8 +337,10 @@ type BuildingBlockWidget =
                     | Some columnIndex -> System.Math.Min(columnIndex + 1, table.ColumnCount)
                     | None -> table.ColumnCount
 
-                table.AddColumn(header, cells, insertionIndex, true)
-                setArcFile (ArcFiles.refreshRef arcFile)
+                mutateArcFile (fun current ->
+                    let currentTable = current.TryGetActiveTable(activeTableIndex).Value |> snd
+                    currentTable.AddColumn(header, cells, insertionIndex, true)
+                )
 
             let header = BuildingBlockWidgetState.createCompositeHeaderFromState state
             let isValid = BuildingBlockWidgetState.isValidColumn header

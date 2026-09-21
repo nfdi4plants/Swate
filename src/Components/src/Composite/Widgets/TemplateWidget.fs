@@ -19,7 +19,7 @@ type TemplateWidget =
     [<ReactComponent(true)>]
     static member TemplateWidget
         // 👀 If you rename these variables, ensure that the names are forwarded for lazy loading in `src\Components\src\ARCFileEditor\ArcFileEditor.fs` as well!
-        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit) =
+        (arcFile: ArcFiles, activeTableIndex: int option, mutateArcFile: (ArcFiles -> unit) -> unit) =
 
         let templateCacheCtx = TemplateCacheContext.useTemplateCacheCtx ()
         let templates = templateCacheCtx.Templates
@@ -78,10 +78,11 @@ type TemplateWidget =
                             (TemplateActions.importTablesConfig payload.SelectedTemplatesForImport)
                             deselectedColumns
 
-                    let nextArcFileState =
-                        Helper.updateTables importTables importConfig (tryGetActiveTableIndex arcFile) (Some arcFile)
+                    mutateArcFile (fun current ->
+                        Helper.updateTables importTables importConfig (tryGetActiveTableIndex current) (Some current)
+                        |> ignore
+                    )
 
-                    setArcFile (ArcFiles.refreshRef nextArcFileState)
                     setSelectedTemplateIds (fun _ -> Set.empty<System.Guid>)
                     true
                 else
@@ -130,9 +131,14 @@ type TemplateWidget =
     /// This will be used for tests in Widgets
     [<ReactComponent>]
     static member Entry
-        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit, services: TemplateWidgetServices) =
+        (
+            arcFile: ArcFiles,
+            activeTableIndex: int option,
+            mutateArcFile: (ArcFiles -> unit) -> unit,
+            services: TemplateWidgetServices
+        ) =
 
         TemplateCacheProvider.TemplateCacheProvider(
             (fun () -> services.loadTemplates () |> Async.StartAsPromise),
-            TemplateWidget.TemplateWidget(arcFile, activeTableIndex, setArcFile)
+            TemplateWidget.TemplateWidget(arcFile, activeTableIndex, mutateArcFile)
         )

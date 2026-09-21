@@ -82,46 +82,49 @@ module private FilePickerWidgetHelper =
                 | _ -> current
             )
 
-    let insertPathsIntoSelectedCells (arcFile: ArcFiles) setArcFile (paths: string[]) (target: InsertTarget option) =
+    let insertPathsIntoSelectedCells
+        (arcFile: ArcFiles)
+        (mutateArcFile: (ArcFiles -> unit) -> unit)
+        (paths: string[])
+        (target: InsertTarget option)
+        =
         let paths = paths |> Array.map (toArcRootRelativeFilePath arcFile)
-        let nextArcFile = ArcFiles.refreshRef arcFile
 
-        match target with
-        | Some(InsertTarget.Table(tableIndex, selection)) ->
-            let nextTable = nextArcFile.TryGetActiveTable(Some tableIndex).Value |> snd
-            let columnIndex = selection.xStart
-            let mutable rowIndex = selection.yStart
+        mutateArcFile (fun current ->
+            match target with
+            | Some(InsertTarget.Table(tableIndex, selection)) ->
+                let nextTable = current.TryGetActiveTable(Some tableIndex).Value |> snd
+                let columnIndex = selection.xStart
+                let mutable rowIndex = selection.yStart
 
-            // GetCellAt also resolves cells that were never stored, for example the Input and
-            // Output cells of a freshly imported template row, which TryGetCellAt reports as missing.
-            let cellsToInsert = [|
-                for path in paths do
-                    if columnIndex < nextTable.ColumnCount && rowIndex < nextTable.RowCount then
-                        let cell = nextTable.GetCellAt(columnIndex, rowIndex)
-                        let nextCell = cell.UpdateMainField path
-                        let coordinate: CellCoordinate = {| x = columnIndex; y = rowIndex |}
-                        coordinate, nextCell
-                        rowIndex <- rowIndex + 1
-            |]
+                // GetCellAt also resolves cells that were never stored, for example the Input and
+                // Output cells of a freshly imported template row, which TryGetCellAt reports as missing.
+                let cellsToInsert = [|
+                    for path in paths do
+                        if columnIndex < nextTable.ColumnCount && rowIndex < nextTable.RowCount then
+                            let cell = nextTable.GetCellAt(columnIndex, rowIndex)
+                            let nextCell = cell.UpdateMainField path
+                            let coordinate: CellCoordinate = {| x = columnIndex; y = rowIndex |}
+                            coordinate, nextCell
+                            rowIndex <- rowIndex + 1
+                |]
 
-            if cellsToInsert.Length = 0 then
-                failwith "No valid cells to insert paths into. Please check the selected range and try again."
-            else
-                nextTable.SetCellsAt cellsToInsert
-                setArcFile nextArcFile
-        | Some(InsertTarget.DataMap selection) ->
-            match nextArcFile.TryGetDataMap() with
-            | Some dataMap ->
-                let anchor: CellCoordinate = {|
-                    x = selection.xStart
-                    y = selection.yStart
-                |}
+                if cellsToInsert.Length = 0 then
+                    failwith "No valid cells to insert paths into. Please check the selected range and try again."
+                else
+                    nextTable.SetCellsAt cellsToInsert
+            | Some(InsertTarget.DataMap selection) ->
+                match current.TryGetDataMap() with
+                | Some dataMap ->
+                    let anchor: CellCoordinate = {|
+                        x = selection.xStart
+                        y = selection.yStart
+                    |}
 
-                dataMap.PasteTabText(anchor, [| anchor |], String.concat System.Environment.NewLine paths)
-
-                setArcFile nextArcFile
+                    dataMap.PasteTabText(anchor, [| anchor |], String.concat System.Environment.NewLine paths)
+                | None -> ()
             | None -> ()
-        | None -> ()
+        )
 
 
 [<Erase; Mangle(false)>]
@@ -405,7 +408,7 @@ type FilePickerWidget =
         (
             arcFile: ArcFiles,
             activeTableIndex: int option,
-            setArcFile: ArcFiles -> unit,
+            mutateArcFile: (ArcFiles -> unit) -> unit,
             onPickPaths: unit -> JS.Promise<string[]>
         ) =
 
@@ -459,7 +462,7 @@ type FilePickerWidget =
                     else
                         paths
 
-                FilePickerWidgetHelper.insertPathsIntoSelectedCells arcFile setArcFile paths insertionTarget
+                FilePickerWidgetHelper.insertPathsIntoSelectedCells arcFile mutateArcFile paths insertionTarget
 
         let selectContextState =
             React.useMemo (

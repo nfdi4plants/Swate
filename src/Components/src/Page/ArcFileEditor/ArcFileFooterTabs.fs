@@ -309,9 +309,8 @@ type ArcFileFooterTabs =
         let tabsRef = React.useElementRef ()
 
         let updateArcFile update =
-            let nextArcFile = ArcFiles.refreshRef arcFile
-            let result = update nextArcFile
-            setArcFile nextArcFile
+            let result = update arcFile
+            setArcFile arcFile
             result
 
         let isEditorModeTableTab, setIsEditorModeTableTab =

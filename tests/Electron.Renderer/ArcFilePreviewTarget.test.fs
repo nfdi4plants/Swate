@@ -72,6 +72,71 @@ Vitest.describe (
 
                 Vitest.expect(ActiveView.Forward(afterDeletion, activeAfterReorder)).toEqual (ActiveView.Table 0)
         )
+
+        Vitest.test (
+            "keeps the editor remount key stable for same-reference in-place mutations",
+            fun () ->
+                let arcFile, _ = createAssayArcFile [| "Table" |]
+                let keyBefore = editorKey arcFile (Some(ActiveView.Table 0))
+
+                arcFile.Tables().[0].AddColumn(CompositeHeader.Comment "Mutated in place")
+
+                Vitest.expect(editorKey arcFile (Some(ActiveView.Table 0))).toEqual (keyBefore)
+        )
+)
+
+Vitest.describe (
+    "ArcFilePreviewTarget same-reference mutation commits",
+    fun () ->
+        Vitest.test (
+            "publishes the mutated reference to page state and persists it in memory",
+            fun () -> promise {
+                let currentArcFile, _ = createAssayArcFile [| "Existing" |]
+                let publishedArcFiles = ResizeArray<ArcFiles>()
+                let persistedArcFiles = ResizeArray<ArcFiles>()
+
+                currentArcFile.Tables().[0].AddColumn(CompositeHeader.Comment "In-place")
+
+                let! result =
+                    publishAndPersistArcFile
+                        currentArcFile
+                        (fun nextArcFile -> publishedArcFiles.Add nextArcFile)
+                        (fun nextArcFile -> promise {
+                            persistedArcFiles.Add nextArcFile
+                            return Ok()
+                        })
+
+                match result with
+                | Error exn -> failwith $"Expected same-reference commit to succeed: {exn.Message}"
+                | Ok() -> ()
+
+                Vitest.expect(publishedArcFiles.Count).toBe (1)
+                Vitest.expect(persistedArcFiles.Count).toBe (1)
+                Vitest.expect(System.Object.ReferenceEquals(publishedArcFiles.[0], currentArcFile)).toBe (true)
+                Vitest.expect(System.Object.ReferenceEquals(persistedArcFiles.[0], currentArcFile)).toBe (true)
+                Vitest.expect(publishedArcFiles.[0].Tables().[0].ColumnCount).toBe (1)
+            }
+        )
+
+        Vitest.test (
+            "persistence errors surface without losing the page state publication",
+            fun () -> promise {
+                let currentArcFile, _ = createAssayArcFile [| "Existing" |]
+                let publishedArcFiles = ResizeArray<ArcFiles>()
+
+                let! result =
+                    publishAndPersistArcFile
+                        currentArcFile
+                        (fun nextArcFile -> publishedArcFiles.Add nextArcFile)
+                        (fun _ -> promise { return Error(exn "IPC unavailable") })
+
+                match result with
+                | Ok() -> failwith "Expected persistence failure to surface."
+                | Error exn -> Vitest.expect(exn.Message).toContain ("IPC unavailable")
+
+                Vitest.expect(publishedArcFiles.Count).toBe (1)
+            }
+        )
 )
 
 Vitest.describe (
