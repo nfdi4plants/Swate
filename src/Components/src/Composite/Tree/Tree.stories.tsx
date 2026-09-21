@@ -165,6 +165,10 @@ export const SelectingAFolderDoesNotToggleExpansion: Story = {
     await expect(studiesNode).toHaveAttribute("aria-selected", "true");
     await expect(studiesNode).toHaveAttribute("aria-expanded", "true");
     await expect(canvas.getByText("Study 01")).toBeVisible();
+
+    await userEvent.click(canvas.getByText("studies"));
+    await expect(studiesNode).toHaveAttribute("aria-expanded", "true");
+    await expect(canvas.getByText("Study 01")).toBeVisible();
   },
 };
 

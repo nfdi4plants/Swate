@@ -130,6 +130,10 @@ type TreeNode =
                     if TreeItem.isBranch node then
                         "swt:pl-4"
                 ]
+                prop.onClick (fun event ->
+                    if not (originatesFromInteractiveDescendant event) then
+                        onSelect event
+                )
                 prop.children [ leadingContent; nodeContent ]
             ]
 
@@ -189,10 +193,6 @@ type TreeNode =
             )
             prop.style [ style.paddingLeft (length.rem (float row.depth * 1.25)) ]
             prop.title (nodeProps.tooltip |> Option.defaultValue nodeProps.label)
-            prop.onClick (fun event ->
-                if not (originatesFromInteractiveDescendant event) then
-                    onSelect event
-            )
             prop.onFocus (fun _ -> onFocus ())
             prop.onKeyDown onKeyDown
             prop.children [
