@@ -21,9 +21,18 @@ module FileImportCoordinator = Main.FileImportCoordinator
 module WatcherHelpers = Main.WatcherHelpers
 module Abort = Main.Bindings.Abort
 
+let private vitestVi: obj = import "vi" "vitest"
+
+[<Emit("vi.mock('fs/promises', () => import('../fs-promises.mock.mts'))")>]
+let private mockFsPromisesForThisTestFile (_vitestVi: obj) : unit = jsNative
+
+do mockFsPromisesForThisTestFile vitestVi
+
 let private electronMock: obj = import "__electronMock" "electron"
+let private fsPromisesMock: obj = import "__fsPromisesMock" "fs/promises"
 
 let private resetElectronMock () = electronMock?reset () |> ignore
+let private resetFsPromisesMock () = fsPromisesMock?reset () |> ignore
 
 let private setBrowserWindowFactory (factory: obj -> obj) =
     electronMock?setBrowserWindowFactory (factory) |> ignore
@@ -491,7 +500,10 @@ let private addDataMapToAllEntityTypes (arc: ARC) =
 Vitest.describe (
     "ArcVaultHelper",
     fun () ->
-        Vitest.afterEach (fun () -> resetElectronMock ())
+        Vitest.afterEach (fun () ->
+            resetElectronMock ()
+            resetFsPromisesMock ()
+        )
 
         Vitest.test (
             "DataMap add synchronization preserves the persisted static-hash baseline",
@@ -649,7 +661,7 @@ Vitest.describe (
                         let vaults = ArcVaults()
                         setBrowserWindowFactory (fun _ -> window :> obj)
 
-                        let loadGate: obj = electronMock?blockNextReaddir arcPath
+                        let loadGate: obj = fsPromisesMock?blockNextReaddir arcPath
                         let registration = vaults.RegisterVaultWithArc arcPath
                         do! unbox<JS.Promise<unit>> loadGate?started
 
