@@ -814,14 +814,6 @@ type ArcVaults() =
                     )
     }
 
-    member this.RegisterVaultWithArc(path: string) = promise {
-        let normalizedArcPath = PathHelpers.normalizePath path
-
-        match! this.ValidateArcRoot normalizedArcPath with
-        | Error error -> return raise error
-        | Ok() -> return! this.RegisterVaultWithValidatedArc normalizedArcPath
-    }
-
     member this.RegisterVaultWithNewArc(path: string, newIdentifier: string) : Fable.Core.JS.Promise<int> = promise {
         let window = createWindow ()
         let id = window.id
