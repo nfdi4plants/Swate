@@ -82,17 +82,24 @@ let queueFileWatcherEvent
             pendingArcMergeEvents.Add watcherEvent
     | None -> ()
 
-/// An admitted event can be older than a write that ran meanwhile. Replaying an unlink for a
-/// file the write recreated would remove a live entity, and an add for a file that is gone
-/// would fail, so the disk decides what each event means at merge time.
+/// An admitted unlink for a recreated file becomes a change. An add or change for a missing file
+/// does not fail. It becomes an unlink. The in-memory ARC drops that entity and its unsaved edits,
+/// which removes stale state. A directory delete for a directory that exists again is dropped.
 let normalizeAgainstDisk (events: ArcVaultFileSystemEvent list) =
     events
-    |> List.map (fun event ->
-        if
+    |> List.choose (fun event ->
+        if isAbsolute event.RelativePath then
+            Some event
+        elif
+            eventNameEquals Chokidar.Events.UnlinkDir event.EventName
+            && existsSync event.AbsolutePath
+        then
+            None
+        elif
             eventNameEquals Chokidar.Events.Unlink event.EventName
             && existsSync event.AbsolutePath
         then
-            {
+            Some {
                 event with
                     EventName = Chokidar.Events.Change.ToString()
             }
@@ -101,12 +108,12 @@ let normalizeAgainstDisk (events: ArcVaultFileSystemEvent list) =
              || eventNameEquals Chokidar.Events.Change event.EventName)
             && not (existsSync event.AbsolutePath)
         then
-            {
+            Some {
                 event with
                     EventName = Chokidar.Events.Unlink.ToString()
             }
         else
-            event
+            Some event
     )
 
 /// Converts raw filesystem events into ARC merge events; unlink-dir events expand to possible canonical files.
