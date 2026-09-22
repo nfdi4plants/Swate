@@ -1023,6 +1023,37 @@ Vitest.describe (
                     })
         )
 
+        Vitest.test (
+            "a tree update queued before a state reset does not publish",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+
+                        let filePath = join [| arcPath; "tree-reset.txt" |]
+                        do! writeWatcherTextFileAsync filePath "reset"
+
+                        let mutable releaseTail = ignore
+
+                        let tailGate =
+                            JS.Constructors.Promise.Create(fun resolve _ -> releaseTail <- fun () -> resolve ())
+
+                        // The update waits behind the tail while the pending state is reset.
+                        vault.FileTreeUpdateTail <- tailGate
+
+                        let update =
+                            vault.ApplyWatcherFileTreeEvents [ watcherEvent arcPath "add" "tree-reset.txt" ]
+
+                        vault.ClearPendingFileWatcherState()
+                        releaseTail ()
+                        do! update
+
+                        Vitest.expect(vault.fileTree.ContainsKey(filePath)).toBe (false)
+                    })
+        )
+
 )
 
 let private lifecycleTestWindow id isDestroyed onSend =
