@@ -2433,10 +2433,13 @@ let private updateCore
         Cmd.none
     | RefreshRequested when
         model.BusyOperation.IsSome
-        && model.BusyOperation <> Some GitBusyOperation.Refreshing
+        && not (
+            model.BusyOperation = Some GitBusyOperation.Refreshing
+            && model.CurrentOperation.IsNone
+        )
         ->
-        // The refresh runs when the write completes. Starting a refresh now would clear the
-        // busy state under the write and let a second write start.
+        // A write may report Refreshing while it still owns CurrentOperation. Queue the
+        // refresh until the write completes so it does not clear the write state.
         { model with RefreshPending = true }, Cmd.none
     | RefreshRequested ->
         let requestId = nextRefreshRequestId model

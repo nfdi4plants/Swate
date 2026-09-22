@@ -6595,6 +6595,52 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "A refresh requested during the save's refresh phase waits for the write",
+            fun () -> promise {
+                let writeKey = {
+                    SessionId = "save-session"
+                    OperationId = "save-op"
+                }
+
+                let savingState = {
+                    runningState with
+                        BusyOperation = Some GitBusyOperation.Refreshing
+                        BusyNotice = Some "Refreshing"
+                        CurrentOperation = Some writeKey
+                }
+
+                let pendingState, pendingCmd =
+                    update defaultDependencies ignore RefreshRequested savingState
+
+                let! pendingMessages = collectMessages pendingCmd
+
+                Vitest.expect(pendingState.RefreshPending).toBe (true)
+                Vitest.expect(pendingMessages).toEqual ([||])
+
+                let deps = {
+                    defaultDependencies with
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let standaloneState = {
+                    runningState with
+                        BusyOperation = Some GitBusyOperation.Refreshing
+                        BusyNotice = Some "Refreshing"
+                        CurrentOperation = None
+                }
+
+                let _, standaloneCmd = update deps ignore RefreshRequested standaloneState
+                let! standaloneMessages = collectMessages standaloneCmd
+
+                match standaloneMessages with
+                | [| RefreshCompleted(_, Ok _) |] -> ()
+                | _ -> failwith "Expected a standalone refresh to produce RefreshCompleted."
+            }
+        )
+
+        Vitest.test (
             "A refresh requested during a write runs when the write completes",
             fun () -> promise {
                 let deps = {
