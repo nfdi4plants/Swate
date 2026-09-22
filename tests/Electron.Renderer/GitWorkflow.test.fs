@@ -442,6 +442,20 @@ let private collectMessages cmd = promise {
     return messages |> Seq.toArray
 }
 
+/// A primary save reports its phases before it completes. Tests that only care about the
+/// completion collect through this helper.
+let private collectWriteMessages cmd = promise {
+    let! messages = collectMessages cmd
+
+    return
+        messages
+        |> Array.filter (fun message ->
+            match message with
+            | WritePhaseChanged _ -> false
+            | _ -> true
+        )
+}
+
 let private runningState = {
     GitState.Empty with
         CurrentArcPath = Some "C:/arc"
@@ -2362,7 +2376,7 @@ Vitest.describe (
                     | [| WriteRequested(PrimarySave _) |] -> update deps ignore requestMessages[0] stateAfterRequest
                     | _ -> failwith "Expected the primary save request to enqueue a write request."
 
-                let! completionMessages = collectMessages finishCmd
+                let! completionMessages = collectWriteMessages finishCmd
 
                 let finalState, finalCmd =
                     match completionMessages with
@@ -2381,6 +2395,108 @@ Vitest.describe (
                 Vitest.expect(finalState.Status.IsClean).toBe (true)
                 Vitest.expect(finalState.ErrorNotice).toEqual (None)
                 Vitest.expect(finalState.WarningNotice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A primary save exposes the cancellable synchronize phase",
+            fun () -> promise {
+                let sync = cleanStatus.Synchronization.Value
+                let mutable releaseSynchronize = None
+                let mutable synchronizeRequest = None
+
+                let deps = {
+                    defaultDependencies with
+                        createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
+                        synchronize =
+                            fun request ->
+                                synchronizeRequest <- Some request
+                                Promise.create (fun resolve _reject -> releaseSynchronize <- Some resolve)
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let state = {
+                    runningState with
+                        ChangedFiles = [| changedFile "README.md" "M" " " false |]
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (PrimarySaveAllRequested "save") state
+
+                let! requestMessages = collectMessages requestCmd
+
+                let stateAfterWrite, writeCmd =
+                    update deps ignore requestMessages[0] stateAfterRequest
+
+                let pendingMessages = ResizeArray<Msg>()
+                writeCmd |> List.iter (fun effect -> effect pendingMessages.Add)
+                do! Promise.sleep 0
+
+                let phaseState, _ = update deps ignore pendingMessages[0] stateAfterWrite
+
+                Vitest
+                    .expect(pendingMessages[0])
+                    .toEqual (
+                        WritePhaseChanged(
+                            stateAfterWrite.ArcSessionId,
+                            stateAfterWrite.WriteRequestId,
+                            GitBusyOperation.PushingToRemote
+                        )
+                    )
+
+                Vitest.expect(phaseState.BusyOperation).toEqual (Some GitBusyOperation.PushingToRemote)
+                Vitest.expect(phaseState.CurrentOperation.IsSome).toBe (true)
+                Vitest.expect(synchronizeRequest.IsSome).toBe (true)
+
+                let synchronizeKey = {
+                    SessionId = "synchronize-session"
+                    OperationId = synchronizeRequest.Value.OperationId
+                }
+
+                let startedState, _ =
+                    update deps ignore (OperationStarted synchronizeKey) phaseState
+
+                Vitest.expect(startedState.CurrentOperation).toEqual (Some synchronizeKey)
+
+                releaseSynchronize.Value(Ok(succeededWithPublication PublicationStateDto.Published sync))
+                do! Promise.sleep 0
+                do! Promise.sleep 0
+
+                let mutable finalState = startedState
+
+                for index in 1 .. pendingMessages.Count - 1 do
+                    let nextState, _ = update deps ignore pendingMessages[index] finalState
+                    finalState <- nextState
+
+                Vitest.expect(finalState.BusyOperation).toEqual (None)
+                Vitest.expect(finalState.ErrorNotice).toEqual (None)
+                Vitest.expect(finalState.WarningNotice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A phase update from an older write is ignored",
+            fun () -> promise {
+                let state = {
+                    runningState with
+                        WriteRequestId = 4
+                        BusyOperation = Some GitBusyOperation.CommittingAllChanges
+                        BusyNotice = Some "Committing all changes"
+                }
+
+                let nextState, cmd =
+                    update
+                        defaultDependencies
+                        ignore
+                        (WritePhaseChanged(state.ArcSessionId, 3, GitBusyOperation.PushingToRemote))
+                        state
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(nextState).toEqual (state)
+                Vitest.expect(messages).toEqual ([||])
             }
         )
 
@@ -2431,7 +2547,7 @@ Vitest.describe (
                     | [| WriteRequested(PrimarySave _) |] -> update deps ignore requestMessages[0] stateAfterRequest
                     | _ -> failwith "Expected the primary save request to enqueue a write request."
 
-                let! completionMessages = collectMessages finishCmd
+                let! completionMessages = collectWriteMessages finishCmd
 
                 let finalState, finalCmd =
                     match completionMessages with
@@ -2513,7 +2629,7 @@ Vitest.describe (
                     | [| WriteRequested(PrimarySave _) |] -> update deps ignore requestMessages[0] stateAfterRequest
                     | _ -> failwith "Expected the primary save request."
 
-                let! completionMessages = collectMessages writeCmd
+                let! completionMessages = collectWriteMessages writeCmd
 
                 let recoveryState, completionCmd =
                     match completionMessages with
@@ -2722,7 +2838,7 @@ Vitest.describe (
                     | [| WriteRequested(PrimarySave _) |] -> update deps ignore requestMessages[0] stateAfterRequest
                     | _ -> failwith "Expected the primary save request."
 
-                let! completionMessages = collectMessages finishCmd
+                let! completionMessages = collectWriteMessages finishCmd
 
                 let nextState, completionCmd =
                     match completionMessages with
@@ -2888,7 +3004,7 @@ Vitest.describe (
                     | [| WriteRequested(PrimarySave _) |] -> update deps ignore requestMessages[0] stateAfterRequest
                     | _ -> failwith "Expected the primary save request."
 
-                let! completionMessages = collectMessages finishCmd
+                let! completionMessages = collectWriteMessages finishCmd
 
                 let nextState, completionCmd =
                     match completionMessages with
@@ -2949,7 +3065,7 @@ Vitest.describe (
                     | [| WriteRequested(PrimarySave _) |] -> update deps ignore requestMessages[0] stateAfterRequest
                     | _ -> failwith "Expected the primary save request."
 
-                let! completionMessages = collectMessages finishCmd
+                let! completionMessages = collectWriteMessages finishCmd
 
                 let nextState, completionCmd =
                     match completionMessages with
@@ -3384,7 +3500,7 @@ Vitest.describe (
                     | [| WriteRequested(PrimarySave _) |] -> update deps ignore requestMessages[0] stateAfterRequest
                     | _ -> failwith "Expected the primary save request."
 
-                let! completionMessages = collectMessages finishCmd
+                let! completionMessages = collectWriteMessages finishCmd
 
                 let finalState, finalCmd =
                     match completionMessages with
@@ -4205,7 +4321,7 @@ Vitest.describe (
                     | [| WriteRequested(PrimarySave _) |] -> update deps ignore requestMessages[0] stateAfterRequest
                     | _ -> failwith "Expected the primary save request."
 
-                let! completionMessages = collectMessages writeCmd
+                let! completionMessages = collectWriteMessages writeCmd
 
                 let finalState, finishCmd =
                     match completionMessages with
@@ -5742,7 +5858,7 @@ Vitest.describe (
                 let model, command = update deps ignore (PrimarySaveAllRequested "save") state
                 let! messages = collectMessages command
                 let requested, writeCmd = update deps ignore messages[0] model
-                let! completion = collectMessages writeCmd
+                let! completion = collectWriteMessages writeCmd
 
                 let finalState, finishCmd =
                     match completion with

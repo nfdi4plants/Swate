@@ -353,6 +353,7 @@ type Msg =
     | RetryMaterializationRequested
     | DismissRecoveryRequested
     | WriteRequested of WriteRequest
+    | WritePhaseChanged of sessionId: int * writeRequestId: int * GitBusyOperation
     | WriteCompleted of sessionId: int * writeRequestId: int * WriteRequest * Result<WriteAttemptOutcome, string>
     | WriteInstallPromptAnswered of sessionId: int * WriteRequest * componentName: string * bool
     | WriteInstallCompleted of sessionId: int * WriteRequest * Result<OperationResultDto<DependencyStatusDto>, string>
@@ -1810,7 +1811,9 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
         let refreshedState = applyRefreshResult success.Refresh state
 
         let runPushAfterLocalCommit (version: string) = promise {
+            deps.reportPhase GitBusyOperation.PushingToRemote
             let! pushResult = runPublishAsync deps refreshedState version GitUpdateAcceptance.RequirePreview
+            deps.reportPhase GitBusyOperation.Refreshing
 
             match pushResult with
             | Ok(outcome, partial) ->
@@ -2321,13 +2324,24 @@ let private writeCmd
     (writeRequestId: int)
     (operationId: string)
     =
-    Cmd.OfPromise.either
-        (fun (deps, model, writeRequest) ->
-            executeWriteAttempt (withFirstOperationId deps operationId) model writeRequest
-        )
-        (deps, model, writeRequest)
-        (fun result -> WriteCompleted(sessionId, writeRequestId, writeRequest, result))
-        (fun err -> WriteCompleted(sessionId, writeRequestId, writeRequest, Error(string err)))
+    Cmd.ofEffect (fun dispatch ->
+        promise {
+            try
+                let writeDeps = withFirstOperationId deps operationId
+
+                let writeDeps = {
+                    writeDeps with
+                        reportPhase = fun phase -> dispatch (WritePhaseChanged(sessionId, writeRequestId, phase))
+                }
+
+                let! result = executeWriteAttempt writeDeps model writeRequest
+
+                dispatch (WriteCompleted(sessionId, writeRequestId, writeRequest, result))
+            with err ->
+                dispatch (WriteCompleted(sessionId, writeRequestId, writeRequest, Error(string err)))
+        }
+        |> Promise.start
+    )
 
 /// Whether the post-merge publish should run now: the primary save asked for it and the
 /// workspace has no open conflict session anymore.
@@ -3015,6 +3029,17 @@ let private updateCore
             }
 
         nextModel, writeCmd deps model writeRequest model.ArcSessionId writeRequestId operationId
+    | WritePhaseChanged(sessionId, writeRequestId, _) when
+        sessionId <> model.ArcSessionId || writeRequestId <> model.WriteRequestId
+        ->
+        model, Cmd.none
+    | WritePhaseChanged(_, _, phase) ->
+        {
+            model with
+                BusyOperation = Some phase
+                BusyNotice = busyNoticeFromOperation phase
+        },
+        Cmd.none
     | WriteCompleted(sessionId, writeRequestId, writeRequest, result) when
         sessionId <> model.ArcSessionId || writeRequestId <> model.WriteRequestId
         ->
