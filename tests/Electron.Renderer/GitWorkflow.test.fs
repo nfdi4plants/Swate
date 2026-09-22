@@ -5722,15 +5722,22 @@ Vitest.describe (
                 let! _ = collectMessages writeCmd
 
                 Vitest.expect(requested.CurrentOperation).toEqual (Some { SessionId = ""; OperationId = "op-1" })
-                Vitest.expect(canceling.WarningNotice).toEqual (Some "Canceling operation...")
+                Vitest.expect(canceling.WarningNotice).toEqual (None)
                 Vitest.expect(cancelKeys |> Seq.toArray).toEqual ([| { SessionId = ""; OperationId = "op-1" } |])
                 Vitest.expect(publishIds |> Seq.toArray).toEqual ([| "op-1" |])
-                Vitest.expect(cancelMessages).toEqual ([| CancelCurrentOperationCompleted(Ok true) |])
+
+                Vitest
+                    .expect(cancelMessages)
+                    .toEqual (
+                        [|
+                            CancelCurrentOperationCompleted(1, { SessionId = ""; OperationId = "op-1" }, Ok true)
+                        |]
+                    )
             }
         )
 
         Vitest.test (
-            "A refused cancel is reported instead of leaving the canceling notice",
+            "A refused cancel leaves the current notices unchanged",
             fun () -> promise {
                 let reportedErrors = ResizeArray<GitErrorNotification>()
 
@@ -5742,17 +5749,59 @@ Vitest.describe (
                 let state = {
                     runningState with
                         BusyOperation = Some GitBusyOperation.PushingToRemote
-                        WarningNotice = Some "Canceling operation..."
+                        CurrentOperation = Some { SessionId = ""; OperationId = "op-1" }
+                        WarningNotice = Some "existing warning"
+                        ErrorNotice = Some "existing error"
                 }
 
                 let nextState, cmd =
-                    update deps ignore (CancelCurrentOperationCompleted(Ok false)) state
+                    update
+                        deps
+                        ignore
+                        (CancelCurrentOperationCompleted(state.ArcSessionId, state.CurrentOperation.Value, Ok false))
+                        state
 
                 let! _ = collectMessages cmd
 
-                Vitest.expect(nextState.WarningNotice).toEqual (None)
-                Vitest.expect(nextState.ErrorNotice).toEqual (Some "Could not cancel the Git operation.")
-                Vitest.expect(reportedErrors.Count).toBe (1)
+                Vitest.expect(nextState.WarningNotice).toEqual (Some "existing warning")
+                Vitest.expect(nextState.ErrorNotice).toEqual (Some "existing error")
+                Vitest.expect(reportedErrors.Count).toBe (0)
+            }
+        )
+
+        Vitest.test (
+            "A late cancel reply from another operation is ignored",
+            fun () -> promise {
+                let currentKey = {
+                    SessionId = "s-1"
+                    OperationId = "op-current"
+                }
+
+                let state = {
+                    runningState with
+                        CurrentOperation = Some currentKey
+                        ErrorNotice = Some "current error"
+                        WarningNotice = Some "current warning"
+                }
+
+                let nextState, cmd =
+                    update
+                        defaultDependencies
+                        ignore
+                        (CancelCurrentOperationCompleted(
+                            state.ArcSessionId,
+                            {
+                                SessionId = "s-1"
+                                OperationId = "op-previous"
+                            },
+                            Error "late failure"
+                        ))
+                        state
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(nextState).toEqual (state)
+                Vitest.expect(messages).toEqual ([||])
             }
         )
 

@@ -327,7 +327,7 @@ type Msg =
     | PullRequested
     | PushRequested
     | CancelCurrentOperationRequested
-    | CancelCurrentOperationCompleted of Result<bool, string>
+    | CancelCurrentOperationCompleted of sessionId: int * operationKey: OperationKeyDto * Result<bool, string>
     | UpdateFromOnlineRequested
     | CloneRequested of CloneWorkspaceRequestDto * Reply<string>
     | PrimarySaveSelectionRequested of GitSidebarCommitSelectionRequest
@@ -2678,36 +2678,27 @@ let private updateCore
         match model.CurrentOperation with
         | None -> model, Cmd.none
         | Some key ->
-            let nextModel = {
-                model with
-                    WarningNotice = Some "Canceling operation..."
-            }
-
             let cmd =
                 Cmd.OfPromise.either
                     deps.cancelOperation
                     key
-                    CancelCurrentOperationCompleted
-                    (fun err -> CancelCurrentOperationCompleted(Error(string err)))
+                    (fun result -> CancelCurrentOperationCompleted(model.ArcSessionId, key, result))
+                    (fun err -> CancelCurrentOperationCompleted(model.ArcSessionId, key, Error(string err)))
 
-            nextModel, cmd
-    | CancelCurrentOperationCompleted(Error message) ->
+            model, cmd
+    | CancelCurrentOperationCompleted(sessionId, key, _) when
+        sessionId <> model.ArcSessionId || model.CurrentOperation <> Some key
+        ->
+        model, Cmd.none
+    | CancelCurrentOperationCompleted(_, _, Error message) ->
         {
             model with
                 ErrorNotice = Some message
                 WarningNotice = None
         },
         reportErrorCmd deps "Could not cancel Git operation" message
-    | CancelCurrentOperationCompleted(Ok true) -> model, Cmd.none
-    | CancelCurrentOperationCompleted(Ok false) ->
-        let message = "Could not cancel the Git operation."
-
-        {
-            model with
-                ErrorNotice = Some message
-                WarningNotice = None
-        },
-        reportErrorCmd deps "Could not cancel Git operation" message
+    | CancelCurrentOperationCompleted(_, _, Ok true) -> model, Cmd.none
+    | CancelCurrentOperationCompleted(_, _, Ok false) -> model, Cmd.none
     | UpdateFromOnlineRequested when model.CurrentArcPath.IsNone || model.BusyOperation.IsSome -> model, Cmd.none
     | UpdateFromOnlineRequested -> model, Cmd.ofMsg (WriteRequested(Pull GitUpdateAcceptance.RequirePreview))
     | CloneRequested(cloneRequest, reply) -> model, Cmd.ofMsg (WriteRequested(Clone(cloneRequest, reply)))
