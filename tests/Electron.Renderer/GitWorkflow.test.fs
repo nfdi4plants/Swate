@@ -453,7 +453,7 @@ let private refreshed status = {
     Session = Ok sessionInfo
     Status = Ok status
     Refs = Ok refs
-    LfsSettings = Some(Ok(lfsSettings 5 true))
+    LfsSettings = Ok(lfsSettings 5 true)
     OriginRemoteRepositoryWebUrl = None
 }
 
@@ -696,7 +696,7 @@ Vitest.describe (
                     Session = Ok sessionInfo
                     Status = Ok(statusForBranch "feature/stale")
                     Refs = Ok [| localBranch "feature/stale" true true |]
-                    LfsSettings = Some(Ok(lfsSettings 9 false))
+                    LfsSettings = Ok(lfsSettings 9 false)
                     OriginRemoteRepositoryWebUrl = Some "https://example.org/feature/stale"
                 }
 
@@ -887,7 +887,7 @@ Vitest.describe (
                     Session = Ok sessionInfo
                     Status = Error missing
                     Refs = Error missing
-                    LfsSettings = None
+                    LfsSettings = Error missing
                     OriginRemoteRepositoryWebUrl = None
                 }
 
@@ -2075,7 +2075,7 @@ Vitest.describe (
                     Session = Ok sessionInfo
                     Status = Ok(statusForBranch "feature/old-arc")
                     Refs = Ok [| localBranch "feature/old-arc" true true |]
-                    LfsSettings = Some(Ok(lfsSettings 13 true))
+                    LfsSettings = Ok(lfsSettings 13 true)
                     OriginRemoteRepositoryWebUrl = None
                 }
 
@@ -2087,7 +2087,18 @@ Vitest.describe (
                             oldSessionState.ArcSessionId,
                             stateAfterRequest.WriteRequestId,
                             Push GitUpdateAcceptance.RequirePreview,
-                            Ok(Completed(UnitSuccess(staleRefresh, GitPageChange.NoChange, None, None, None, None)))
+                            Ok(
+                                Completed(
+                                    UnitSuccess {
+                                        Refresh = staleRefresh
+                                        PageChange = GitPageChange.NoChange
+                                        SelectedChangePath = None
+                                        Warning = None
+                                        Partial = None
+                                        Published = None
+                                    }
+                                )
+                            )
                         ))
                         switchedState
 
@@ -2744,14 +2755,14 @@ Vitest.describe (
                             PrimarySave prepared,
                             Ok(
                                 CompletedWithPendingRemoteConfirmation(
-                                    UnitSuccess(
-                                        refreshed cleanStatus,
-                                        GitPageChange.NoChange,
-                                        None,
-                                        None,
-                                        Some partial,
-                                        None
-                                    ),
+                                    UnitSuccess {
+                                        Refresh = refreshed cleanStatus
+                                        PageChange = GitPageChange.NoChange
+                                        SelectedChangePath = None
+                                        Warning = None
+                                        Partial = Some partial
+                                        Published = None
+                                    },
                                     dialog,
                                     GitPendingRemoteAction.FinalizeMerge
                                 )
@@ -2862,8 +2873,10 @@ Vitest.describe (
                     | [| WriteCompleted(_,
                                         _,
                                         PrimarySave _,
-                                        Ok(CompletedWithPendingRemoteFailure(UnitSuccess(_, _, _, Some warning, None, _),
-                                                                             message))) |] ->
+                                        Ok(CompletedWithPendingRemoteFailure(UnitSuccess success, message))) |] when
+                        success.Warning.IsSome && success.Partial.IsNone
+                        ->
+                        let warning = success.Warning.Value
                         Vitest.expect(warning).toBe ("Changes were saved locally. Online sync is still pending.")
                         Vitest.expect(message).toBe (failureMessage canceled)
                         update deps ignore completionMessages[0] stateAfterWrite
@@ -5458,15 +5471,10 @@ Vitest.describe (
 
                 let finalState, _ =
                     match completion with
-                    | [| WriteCompleted(_,
-                                        _,
-                                        CommitAll _,
-                                        Ok(Completed(UnitSuccess(_,
-                                                                 GitPageChange.Set _,
-                                                                 Some(Some "conflict.txt"),
-                                                                 _,
-                                                                 _,
-                                                                 _)))) |] -> update deps ignore completion[0] requested
+                    | [| WriteCompleted(_, _, CommitAll _, Ok(Completed(UnitSuccess success))) |] ->
+                        match success.SelectedChangePath, success.PageChange with
+                        | Some(Some "conflict.txt"), GitPageChange.Set _ -> update deps ignore completion[0] requested
+                        | _ -> failwith "Expected the conflict page of the first conflicted item."
                     | _ -> failwith "Expected the conflict page of the first conflicted item."
 
                 Vitest.expect(finalState.ActiveConflict.IsSome).toBe (true)
@@ -5548,11 +5556,10 @@ Vitest.describe (
 
                 let finalState, finishCmd =
                     match completion with
-                    | [| WriteCompleted(_,
-                                        _,
-                                        PrimarySave _,
-                                        Ok(Completed(UnitSuccess(_, GitPageChange.Set _, _, _, _, _)))) |] ->
-                        update deps ignore completion[0] requested
+                    | [| WriteCompleted(_, _, PrimarySave _, Ok(Completed(UnitSuccess success))) |] ->
+                        match success.PageChange with
+                        | GitPageChange.Set _ -> update deps ignore completion[0] requested
+                        | _ -> failwith "Expected the conflict page after the update inside the save."
                     | _ -> failwith "Expected the conflict page after the update inside the save."
 
                 let! finishMessages = collectMessages finishCmd

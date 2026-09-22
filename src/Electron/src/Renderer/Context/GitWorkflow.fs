@@ -104,8 +104,6 @@ type GitProvisionedRemote = {
     IsBound: bool
 }
 
-type InitRepositoryOutcome = { WarningMessage: string option }
-
 type GitErrorNotification = { Title: string; Message: string }
 
 type GitState = {
@@ -205,7 +203,7 @@ type GitRefreshResult = {
     Session: Result<WorkspaceSessionInfoDto, OperationFailureDto>
     Status: Result<WorkspaceStatusDto, OperationFailureDto>
     Refs: Result<LogicalRefDto[], OperationFailureDto>
-    LfsSettings: Result<StoragePolicySettingsDto, OperationFailureDto> option
+    LfsSettings: Result<StoragePolicySettingsDto, OperationFailureDto>
     OriginRemoteRepositoryWebUrl: string option
 }
 
@@ -260,17 +258,20 @@ type WriteRequest =
     | RestoreInterruptedPaths of string[]
     | RetryMaterialization
 
-/// A completed write: the refreshed snapshot, the page to show, an optional override
-/// of the selected path, a warning, the structured partial failure when the library
-/// reported one, and whether synchronization published.
+/// SelectedChangePath uses None for no override and Some None to clear the selection.
+/// Published is Some true when the synchronize published, Some false when it did not, and None
+/// when the write was not a synchronize.
+type WriteUnitSuccess = {
+    Refresh: GitRefreshResult
+    PageChange: GitPageChange
+    SelectedChangePath: string option option
+    Warning: string option
+    Partial: OperationFailureDto option
+    Published: bool option
+}
+
 type WriteSuccess =
-    | UnitSuccess of
-        GitRefreshResult *
-        GitPageChange *
-        string option option *
-        string option *
-        OperationFailureDto option *
-        bool option
+    | UnitSuccess of WriteUnitSuccess
     | CloneSuccess of string
 
 type WriteAttemptOutcome =
@@ -309,7 +310,7 @@ type Msg =
     | RefreshRequested
     | RefreshCompleted of requestId: int * result: Result<GitRefreshResult, string>
     | InitRepositoryRequested
-    | InitRepositoryCompleted of sessionId: int * result: Result<InitRepositoryOutcome, string>
+    | InitRepositoryCompleted of sessionId: int * result: Result<unit, string>
     | SelectChangeRequested of GitSidebarChange * Reply<unit>
     | SelectChangeCompleted of
         requestId: int *
@@ -650,14 +651,12 @@ let private publishRenamePrompt message model =
     }
 
 let private refreshFailure (refreshResult: GitRefreshResult) : OperationFailureDto option =
-    match refreshResult.Session, refreshResult.Status, refreshResult.Refs with
-    | Error failure, _, _ -> Some failure
-    | _, Error failure, _ -> Some failure
-    | _, _, Error failure -> Some failure
-    | Ok _, Ok _, Ok _ ->
-        match refreshResult.LfsSettings with
-        | Some(Error failure) -> Some failure
-        | _ -> None
+    match refreshResult.Session, refreshResult.Status, refreshResult.Refs, refreshResult.LfsSettings with
+    | Error failure, _, _, _ -> Some failure
+    | _, Error failure, _, _ -> Some failure
+    | _, _, Error failure, _ -> Some failure
+    | _, _, _, Error failure -> Some failure
+    | Ok _, Ok _, Ok _, Ok _ -> None
 
 let private refreshErrorMessage (refreshResult: GitRefreshResult) =
     refreshFailure refreshResult |> Option.map failureMessage
@@ -711,14 +710,14 @@ let private applyRefreshResult (refreshResult: GitRefreshResult) (model: GitStat
 
     let modelWithSettings =
         match refreshResult.Status, refreshResult.LfsSettings with
-        | Ok _, Some(Ok settings) -> {
+        | Ok _, Ok settings -> {
             modelWithBranches with
                 LfsAutoTrackThresholdMb =
                     settings.AutoPolicyThresholdMb
                     |> Option.defaultValue GitState.Empty.LfsAutoTrackThresholdMb
                 DownloadLargeFiles = settings.MaterializeLargeObjects
           }
-        | Ok _, None -> modelWithBranches
+        | Ok _, Error _ -> modelWithBranches
         | _ -> {
             modelWithBranches with
                 LfsAutoTrackThresholdMb = GitState.Empty.LfsAutoTrackThresholdMb
@@ -738,11 +737,11 @@ let private applyRefreshResult (refreshResult: GitRefreshResult) (model: GitStat
 
 let private applyWriteSuccessModel model success =
     match success with
-    | UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, warningMessage, partial, published) ->
-        let refreshedModel = applyRefreshResult refreshResult model
+    | UnitSuccess success ->
+        let refreshedModel = applyRefreshResult success.Refresh model
 
         let selectionAdjustedModel =
-            match selectedChangePathOverride with
+            match success.SelectedChangePath with
             | Some selectedChangePath -> {
                 refreshedModel with
                     SelectedChangePath = selectedChangePath
@@ -750,11 +749,11 @@ let private applyWriteSuccessModel model success =
             | None -> refreshedModel
 
         selectionAdjustedModel,
-        pageChange,
-        warningMessage,
-        recoveryOfPartial partial,
-        partial |> Option.map failureMessage,
-        published
+        success.PageChange,
+        success.Warning,
+        recoveryOfPartial success.Partial,
+        success.Partial |> Option.map failureMessage,
+        success.Published
     | CloneSuccess _ -> model, GitPageChange.NoChange, None, None, None, None
 
 let nextRefreshRequestId (model: GitState) = model.RefreshRequestId + 1
@@ -884,20 +883,23 @@ let private refreshAllAsync (deps: GitDependencies) = promise {
             Session = Error failure
             Status = Error failure
             Refs = Error failure
-            LfsSettings = None
+            LfsSettings = Error failure
             OriginRemoteRepositoryWebUrl = None
         }
     | Ok(sessionOutcome, _) ->
         let session = sessionOutcome.Value
+        // The session info runs first because it decides whether the repository URL call is
+        // needed. The other four calls are independent and run together. and! awaits them
+        // through Promise.all, so a rejected call never stays unobserved.
         let! statusResult = toResult (deps.getStatus (request deps))
-        let! refsResult = toResult (deps.listRefs (request deps))
+        and! refsResult = toResult (deps.listRefs (request deps))
 
-        let! settingsResult = promise {
+        and! settingsResult = promise {
             let! result = toResult (deps.getStoragePolicySettings (request deps))
-            return Some(result |> Result.map (fun (outcome, _) -> outcome.Value))
+            return result |> Result.map (fun (outcome, _) -> outcome.Value)
         }
 
-        let! webUrl =
+        and! webUrl =
             if session.Services.RepositoryBrowser then
                 promise {
                     let! result = toResult (deps.getRepositoryWebUrl (request deps))
@@ -933,7 +935,7 @@ let private runInitRepositoryAsync (deps: GitDependencies) (arcPath: string) = p
 
     match initResult with
     | Error failure -> return Error(failureMessage failure)
-    | Ok _ -> return Ok { WarningMessage = None }
+    | Ok _ -> return Ok()
 }
 
 /// Builds the diff page from the provider's base content and word diff plus the
@@ -1195,28 +1197,28 @@ let private completeAfterUpdateAsync
                     pageResult
                     |> Result.map (fun page ->
                         Completed(
-                            UnitSuccess(
-                                refreshResult,
-                                GitPageChange.Set page,
-                                Some(Some firstConflictPath),
-                                pendingWarning,
-                                partialToKeep,
-                                None
-                            )
+                            UnitSuccess {
+                                Refresh = refreshResult
+                                PageChange = GitPageChange.Set page
+                                SelectedChangePath = Some(Some firstConflictPath)
+                                Warning = pendingWarning
+                                Partial = partialToKeep
+                                Published = None
+                            }
                         )
                     )
             | Some _ ->
                 return
                     Ok(
                         CompletedWithPendingRemoteConfirmation(
-                            UnitSuccess(
-                                refreshResult,
-                                GitPageChange.NoChange,
-                                None,
-                                pendingWarning,
-                                partialToKeep,
-                                None
-                            ),
+                            UnitSuccess {
+                                Refresh = refreshResult
+                                PageChange = GitPageChange.NoChange
+                                SelectedChangePath = None
+                                Warning = pendingWarning
+                                Partial = partialToKeep
+                                Published = None
+                            },
                             {
                                 Title = "All conflicts resolved"
                                 Message =
@@ -1231,7 +1233,14 @@ let private completeAfterUpdateAsync
                 return
                     Ok(
                         CompletedWithPendingRemoteFailure(
-                            UnitSuccess(refreshResult, GitPageChange.NoChange, None, None, None, None),
+                            UnitSuccess {
+                                Refresh = refreshResult
+                                PageChange = GitPageChange.NoChange
+                                SelectedChangePath = None
+                                Warning = None
+                                Partial = None
+                                Published = None
+                            },
                             partial
                             |> Option.map failureMessage
                             |> Option.defaultValue "The update reported conflicts."
@@ -1241,14 +1250,14 @@ let private completeAfterUpdateAsync
                 return
                     Ok(
                         Completed(
-                            UnitSuccess(
-                                refreshResult,
-                                GitPageChange.NoChange,
-                                None,
-                                partial |> Option.map failureMessage,
-                                partial,
-                                None
-                            )
+                            UnitSuccess {
+                                Refresh = refreshResult
+                                PageChange = GitPageChange.NoChange
+                                SelectedChangePath = None
+                                Warning = partial |> Option.map failureMessage
+                                Partial = partial
+                                Published = None
+                            }
                         )
                     )
     }
@@ -1263,7 +1272,19 @@ let private routedToOutcome (deps: GitDependencies) (routed: RoutedFailure) = pr
 
         match refreshResult.Status with
         | Ok _ ->
-            return Ok(Completed(UnitSuccess(refreshResult, GitPageChange.NoChange, None, Some message, None, None)))
+            return
+                Ok(
+                    Completed(
+                        UnitSuccess {
+                            Refresh = refreshResult
+                            PageChange = GitPageChange.NoChange
+                            SelectedChangePath = None
+                            Warning = Some message
+                            Partial = None
+                            Published = None
+                        }
+                    )
+                )
         | Error refreshFailure -> return Error(failureMessage refreshFailure)
     | RoutedFailure.InspectAfterCancel message ->
         let! refreshResult = refreshAllAsync deps
@@ -1273,7 +1294,14 @@ let private routedToOutcome (deps: GitDependencies) (routed: RoutedFailure) = pr
             return
                 Ok(
                     CompletedWithPendingRemoteFailure(
-                        UnitSuccess(refreshResult, GitPageChange.NoChange, None, None, None, None),
+                        UnitSuccess {
+                            Refresh = refreshResult
+                            PageChange = GitPageChange.NoChange
+                            SelectedChangePath = None
+                            Warning = None
+                            Partial = None
+                            Published = None
+                        },
                         message
                     )
                 )
@@ -1309,14 +1337,14 @@ let private refreshAfterSuccess
             | Ok _, None ->
                 Ok(
                     Completed(
-                        UnitSuccess(
-                            refreshResult,
-                            pageChange,
-                            selectedChangePathOverride,
-                            combinedWarningMessage,
-                            partial,
-                            None
-                        )
+                        UnitSuccess {
+                            Refresh = refreshResult
+                            PageChange = pageChange
+                            SelectedChangePath = selectedChangePathOverride
+                            Warning = combinedWarningMessage
+                            Partial = partial
+                            Published = None
+                        }
                     )
                 )
     }
@@ -1337,26 +1365,26 @@ let private completeAfterSynchronizeAsync
                 result
                 |> Result.map (fun outcome ->
                     match outcome with
-                    | Completed(UnitSuccess(refreshResult, pageChange, selectedChangePath, warning, keptPartial, _)) ->
+                    | Completed(UnitSuccess success) ->
                         let finalWarning =
-                            match recoveryOfPartial keptPartial with
+                            match recoveryOfPartial success.Partial with
                             | None ->
-                                match pendingWarning, warning with
+                                match pendingWarning, success.Warning with
                                 | Some pending, Some partialMessage -> Some $"{pending} {partialMessage}"
                                 | Some pending, None -> Some pending
                                 | None, Some partialMessage -> Some partialMessage
                                 | None, None -> None
-                            | Some _ -> pendingWarning |> Option.orElse warning
+                            | Some _ -> pendingWarning |> Option.orElse success.Warning
 
                         Completed(
-                            UnitSuccess(
-                                refreshResult,
-                                pageChange,
-                                selectedChangePath,
-                                finalWarning,
-                                keptPartial,
-                                published
-                            )
+                            UnitSuccess {
+                                Refresh = success.Refresh
+                                PageChange = success.PageChange
+                                SelectedChangePath = success.SelectedChangePath
+                                Warning = finalWarning
+                                Partial = success.Partial
+                                Published = published
+                            }
                         )
                     | other -> other
                 )
@@ -1378,7 +1406,14 @@ let private acceptanceConfirmation
             return
                 Ok(
                     CompletedWithPendingRemoteConfirmation(
-                        UnitSuccess(refreshResult, GitPageChange.NoChange, None, pendingWarning, None, None),
+                        UnitSuccess {
+                            Refresh = refreshResult
+                            PageChange = GitPageChange.NoChange
+                            SelectedChangePath = None
+                            Warning = pendingWarning
+                            Partial = None
+                            Published = None
+                        },
                         dialog,
                         action
                     )
@@ -1542,7 +1577,14 @@ let private pendingPrimarySaveRemoteFailureAsync (deps: GitDependencies) (messag
         return
             Ok(
                 CompletedWithPendingRemoteFailure(
-                    UnitSuccess(refreshResult, GitPageChange.NoChange, None, Some pendingPrimarySaveWarning, None, None),
+                    UnitSuccess {
+                        Refresh = refreshResult
+                        PageChange = GitPageChange.NoChange
+                        SelectedChangePath = None
+                        Warning = Some pendingPrimarySaveWarning
+                        Partial = None
+                        Published = None
+                    },
                     message
                 )
             )
@@ -1666,15 +1708,20 @@ let private runPublishAsync
                 | routed -> return Error(PublishFailure.Routed routed)
     }
 
-let private publishFailureToOutcome (deps: GitDependencies) (failure: PublishFailure) = promise {
-    match failure with
-    | PublishFailure.Routed routed -> return! routedToOutcome deps routed
-    | PublishFailure.AcceptanceRequired _ ->
-        return Error "The synchronization needs a decision that this write cannot offer."
-    | PublishFailure.ProjectNameRefused message -> return Ok(RequiresRemoteProjectRename message)
-    | PublishFailure.ProvisioningIncomplete(provisioned, message) ->
-        return Ok(ProvisioningIncomplete(provisioned, message))
-}
+let private publishFailureToOutcome
+    (deps: GitDependencies)
+    (onRouted: RoutedFailure -> JS.Promise<Result<WriteAttemptOutcome, string>>)
+    (failure: PublishFailure)
+    =
+    promise {
+        match failure with
+        | PublishFailure.Routed routed -> return! onRouted routed
+        | PublishFailure.AcceptanceRequired _ ->
+            return Error "The synchronization needs a decision that this write cannot offer."
+        | PublishFailure.ProjectNameRefused message -> return Ok(RequiresRemoteProjectRename message)
+        | PublishFailure.ProvisioningIncomplete(provisioned, message) ->
+            return Ok(ProvisioningIncomplete(provisioned, message))
+    }
 
 let private runPushAttemptAsync (deps: GitDependencies) (state: GitState) (acceptance: GitUpdateAcceptance) = promise {
     match requireSynchronization state, requireWorkspaceVersion state with
@@ -1698,7 +1745,7 @@ let private runPushAttemptAsync (deps: GitDependencies) (state: GitState) (accep
                     dialog
                     (GitPendingRemoteAction.PublishAfterUpdate(GitUpdateAcceptance.Accepted(target, workspaceVersion)))
                     None
-        | Error failure -> return! publishFailureToOutcome deps failure
+        | Error failure -> return! publishFailureToOutcome deps (routedToOutcome deps) failure
 }
 
 let private runFetchAttemptAsync (deps: GitDependencies) (state: GitState) = promise {
@@ -1715,42 +1762,46 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
 
     match commitAttempt with
     | Error message -> return Error message
-    | Ok(Completed(UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, _, Some partial, _))) ->
+    | Ok(Completed(UnitSuccess success)) when success.Partial.IsSome ->
         // The revision exists but the library asks for reconciliation first.
+        let partial = success.Partial.Value
+
         return
             Ok(
                 CompletedWithPendingRemoteFailure(
-                    UnitSuccess(
-                        refreshResult,
-                        pageChange,
-                        selectedChangePathOverride,
-                        Some pendingPrimarySaveWarning,
-                        Some partial,
-                        None
-                    ),
+                    UnitSuccess {
+                        Refresh = success.Refresh
+                        PageChange = success.PageChange
+                        SelectedChangePath = success.SelectedChangePath
+                        Warning = Some pendingPrimarySaveWarning
+                        Partial = Some partial
+                        Published = None
+                    },
                     failureMessage partial
                 )
             )
-    | Ok(Completed(UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, _, None, _))) when
-        (requireSynchronization (applyRefreshResult refreshResult state)).IsError
+    | Ok(Completed(UnitSuccess success)) when
+        success.Partial.IsNone
+        && (requireSynchronization (applyRefreshResult success.Refresh state)).IsError
         ->
         // The revision exists. Without an online service the local save is the whole outcome.
         return
             Ok(
                 Completed(
-                    UnitSuccess(
-                        refreshResult,
-                        pageChange,
-                        selectedChangePathOverride,
-                        Some
-                            "Changes were saved locally. This workspace provider does not support online synchronization.",
-                        None,
-                        None
-                    )
+                    UnitSuccess {
+                        Refresh = success.Refresh
+                        PageChange = success.PageChange
+                        SelectedChangePath = success.SelectedChangePath
+                        Warning =
+                            Some
+                                "Changes were saved locally. This workspace provider does not support online synchronization."
+                        Partial = None
+                        Published = None
+                    }
                 )
             )
-    | Ok(Completed(UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, _, None, _))) ->
-        let refreshedState = applyRefreshResult refreshResult state
+    | Ok(Completed(UnitSuccess success)) ->
+        let refreshedState = applyRefreshResult success.Refresh state
 
         let runPushAfterLocalCommit (version: string) = promise {
             let! pushResult = runPublishAsync deps refreshedState version GitUpdateAcceptance.RequirePreview
@@ -1772,51 +1823,54 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
                 let confirmationRefreshSnapshot =
                     match confirmationRefreshResult.Status, refreshErrorMessage confirmationRefreshResult with
                     | Ok _, None -> confirmationRefreshResult
-                    | _ -> refreshResult
+                    | _ -> success.Refresh
 
                 return
                     Ok(
                         CompletedWithPendingRemoteConfirmation(
-                            UnitSuccess(
-                                confirmationRefreshSnapshot,
-                                pageChange,
-                                selectedChangePathOverride,
-                                Some pendingPrimarySaveWarning,
-                                None,
-                                None
-                            ),
+                            UnitSuccess {
+                                Refresh = confirmationRefreshSnapshot
+                                PageChange = success.PageChange
+                                SelectedChangePath = success.SelectedChangePath
+                                Warning = Some pendingPrimarySaveWarning
+                                Partial = None
+                                Published = None
+                            },
                             dialog,
                             GitPendingRemoteAction.PublishAfterUpdate(
                                 GitUpdateAcceptance.Accepted(target, workspaceVersion)
                             )
                         )
                     )
-            | Error(PublishFailure.ProjectNameRefused message) -> return Ok(RequiresRemoteProjectRename message)
-            | Error(PublishFailure.ProvisioningIncomplete(provisioned, message)) ->
-                return Ok(ProvisioningIncomplete(provisioned, message))
-            | Error(PublishFailure.Routed(RoutedFailure.UpdateAcceptanceRequired _)) ->
-                // The wrapper turns every decision into PublishFailure.AcceptanceRequired.
+            | Error failure ->
                 return!
-                    pendingPrimarySaveRemoteFailureAsync
+                    publishFailureToOutcome
                         deps
-                        "The synchronization needs a decision that this write cannot offer."
-            | Error(PublishFailure.Routed(RoutedFailure.Recovery(recovery, message))) ->
-                return Ok(RequiresRecovery(recovery, message))
-            | Error(PublishFailure.Routed(RoutedFailure.Cancelled message))
-            | Error(PublishFailure.Routed(RoutedFailure.DependencyInstall message))
-            | Error(PublishFailure.Routed(RoutedFailure.StaleWorkspace(message, _)))
-            | Error(PublishFailure.Routed(RoutedFailure.Error message)) ->
-                // The local commit already succeeded, so the saved-locally outcome stays.
-                return! pendingPrimarySaveRemoteFailureAsync deps message
-            | Error(PublishFailure.Routed(RoutedFailure.RefreshAfterCancel message)) ->
-                return! pendingPrimarySaveRemoteFailureAsync deps message
-            | Error(PublishFailure.Routed(RoutedFailure.InspectAfterCancel message)) ->
-                return! pendingPrimarySaveRemoteFailureAsync deps message
-            | Error(PublishFailure.Routed(RoutedFailure.ConflictSession failure)) ->
-                return! completeAfterUpdateAsync deps (Some failure) (Some pendingPrimarySaveWarning)
+                        (fun routed -> promise {
+                            match routed with
+                            | RoutedFailure.UpdateAcceptanceRequired _ ->
+                                // The wrapper turns every decision into PublishFailure.AcceptanceRequired.
+                                return!
+                                    pendingPrimarySaveRemoteFailureAsync
+                                        deps
+                                        "The synchronization needs a decision that this write cannot offer."
+                            | RoutedFailure.Recovery(recovery, message) ->
+                                return Ok(RequiresRecovery(recovery, message))
+                            | RoutedFailure.ConflictSession failure ->
+                                return! completeAfterUpdateAsync deps (Some failure) (Some pendingPrimarySaveWarning)
+                            | RoutedFailure.Cancelled message
+                            | RoutedFailure.DependencyInstall message
+                            | RoutedFailure.StaleWorkspace(message, _)
+                            | RoutedFailure.Error message
+                            | RoutedFailure.RefreshAfterCancel message
+                            | RoutedFailure.InspectAfterCancel message ->
+                                // The local commit already succeeded, so the saved-locally outcome stays.
+                                return! pendingPrimarySaveRemoteFailureAsync deps message
+                        })
+                        failure
         }
 
-        match versionOf refreshResult with
+        match versionOf success.Refresh with
         | None ->
             return! pendingPrimarySaveRemoteFailureAsync deps "The workspace state could not be read after saving."
         | Some version -> return! runPushAfterLocalCommit version
@@ -2445,13 +2499,13 @@ let private updateCore
         }
 
         nextModel, reportErrorCmd deps "Could not initialize Git repository" message
-    | InitRepositoryCompleted(_, Ok outcome) ->
+    | InitRepositoryCompleted(_, Ok()) ->
         let nextModel = {
             clearBusy model with
                 RepositoryAvailability = GitRepositoryAvailability.Ready
                 ErrorNotice = None
-                WarningNotice = outcome.WarningMessage
-                PendingRefreshWarningNotice = outcome.WarningMessage
+                WarningNotice = None
+                PendingRefreshWarningNotice = None
         }
 
         nextModel, Cmd.ofMsg RefreshRequested
