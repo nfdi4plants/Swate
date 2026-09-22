@@ -193,13 +193,6 @@ let diffSummary (summary: DiffSummary) : DiffSummaryDto = {
         })
 }
 
-let updatePreview (preview: UpdatePreview) : UpdatePreviewDto = {
-    ChangedPaths = preview.ChangedPaths |> Array.map RepositoryPath.value
-    OverlappingPaths = preview.OverlappingPaths |> Array.map RepositoryPath.value
-    HasDataLossRisk = preview.HasDataLossRisk
-    WouldCreateConflictSession = preview.WouldCreateConflictSession
-}
-
 let objectState (state: ObjectState) : ObjectStateDto = {
     Path = RepositoryPath.value state.Path
     IsMaterialized = state.IsMaterialized

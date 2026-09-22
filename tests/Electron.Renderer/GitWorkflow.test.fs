@@ -360,9 +360,7 @@ let private defaultDependencies: GitDependencies = {
     checkDependencies = fun _ -> unexpectedPromise "checkDependencies"
     installDependency = fun _ -> unexpectedPromise "installDependency"
     refreshSynchronization = fun _ -> unexpectedPromise "refreshSynchronization"
-    previewUpdate = fun _ -> unexpectedPromise "previewUpdate"
-    update = fun _ -> unexpectedPromise "update"
-    publish = fun _ -> unexpectedPromise "publish"
+    synchronize = fun _ -> unexpectedPromise "synchronize"
     cancelOperation = fun _ -> unexpectedPromise "cancelOperation"
     cloneWorkspace = fun _ -> unexpectedPromise "cloneWorkspace"
     createRef = fun _ -> unexpectedPromise "createRef"
@@ -1104,23 +1102,35 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "Publish never provisions when the target is unreachable",
+            "Synchronize never provisions when the target is unreachable",
             fun () -> promise {
                 let mutable projectCalls = 0
 
                 let deps = {
                     defaultDependencies with
-                        publish =
-                            fun _ -> promise {
-                                return Ok(failed Network VersionControlCodes.TargetUnreachable "target unreachable")
-                            }
+                        synchronize =
+                            fun request ->
+                                if request.PublishLocalRevisions then
+                                    promise {
+                                        return
+                                            Ok(
+                                                failed
+                                                    Network
+                                                    VersionControlCodes.TargetUnreachable
+                                                    "target unreachable"
+                                            )
+                                    }
+                                else
+                                    unexpectedPromise "unexpected pull"
                         createRemoteProject =
                             fun _ ->
                                 projectCalls <- projectCalls + 1
                                 unexpectedGitLab "unexpected"
                 }
 
-                let model, command = update deps ignore (WriteRequested Push) runningState
+                let model, command =
+                    update deps ignore (WriteRequested(Push GitUpdateAcceptance.RequirePreview)) runningState
+
                 let! messages = collectMessages command
                 let next, finish = update deps ignore messages[0] model
                 let! _ = collectMessages finish
@@ -1134,15 +1144,19 @@ Vitest.describe (
             fun () -> promise {
                 let deps = {
                     defaultDependencies with
-                        publish =
-                            fun _ -> promise {
-                                return Ok(failed Validation VersionControlCodes.PublishTargetMissing "missing")
-                            }
+                        synchronize =
+                            fun request ->
+                                if request.PublishLocalRevisions then
+                                    promise {
+                                        return Ok(failed Validation VersionControlCodes.PublishTargetMissing "missing")
+                                    }
+                                else
+                                    unexpectedPromise "unexpected pull"
                         createRemoteProject = fun _ -> promise { return Error(GitLabError.HttpError 400) }
                 }
 
                 let model, command =
-                    update deps ignore (WriteRequested Push) {
+                    update deps ignore (WriteRequested(Push GitUpdateAcceptance.RequirePreview)) {
                         runningState with
                             CurrentArcPath = Some "C:/work/Existing ARC"
                     }
@@ -1167,7 +1181,8 @@ Vitest.describe (
                                 promise { return Ok true }
                 }
 
-                let model, _ = update deps ignore (WriteRequested Push) runningState
+                let model, _ =
+                    update deps ignore (WriteRequested(Push GitUpdateAcceptance.RequirePreview)) runningState
 
                 let model, _ =
                     update
@@ -1351,7 +1366,12 @@ Vitest.describe (
                     update
                         deps
                         ignore
-                        (WriteCompleted(state.ArcSessionId, 3, Push, Error "remote rejected the push"))
+                        (WriteCompleted(
+                            state.ArcSessionId,
+                            3,
+                            Push GitUpdateAcceptance.RequirePreview,
+                            Error "remote rejected the push"
+                        ))
                         state
 
                 let! _ = collectMessages cmd
@@ -1371,16 +1391,24 @@ Vitest.describe (
 
                 let deps = {
                     defaultDependencies with
-                        update = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
+                        synchronize =
+                            fun request ->
+                                if request.PublishLocalRevisions then
+                                    unexpectedPromise "unexpected push"
+                                else
+                                    promise { return Ok(OperationResultDto.Failed canceled) }
                 }
 
                 let state = { runningState with WriteRequestId = 0 }
-                let stateAfterRequest, requestCmd = update deps ignore (WriteRequested Pull) state
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested(Pull GitUpdateAcceptance.RequirePreview)) state
+
                 let! completionMessages = collectMessages requestCmd
 
                 let stateAfterWrite, finishCmd =
                     match completionMessages with
-                    | [| WriteCompleted(_, _, Pull, Ok(OperationCancelled _)) |] ->
+                    | [| WriteCompleted(_, _, Pull _, Ok(OperationCancelled _)) |] ->
                         update deps ignore completionMessages[0] stateAfterRequest
                     | _ -> failwith "Expected a canceled pull completion."
 
@@ -1390,42 +1418,6 @@ Vitest.describe (
                 Vitest.expect(stateAfterWrite.WarningNotice).toEqual (Some "Git operation cancelled.")
                 Vitest.expect(stateAfterWrite.ErrorNotice).toEqual (None)
                 Vitest.expect(finishMessages).toEqual ([||])
-            }
-        )
-
-        Vitest.test (
-            "UpdatePreflightCompleted with the shared cancellation message shows a warning notice",
-            fun () -> promise {
-                let canceled =
-                    makeFailure Canceled VersionControlCodes.OperationCanceled "The update was canceled." None [||]
-
-                let reportedErrors = ResizeArray<GitErrorNotification>()
-
-                let deps = {
-                    defaultDependencies with
-                        reportError = reportedErrors.Add
-                }
-
-                let state = {
-                    runningState with
-                        BusyOperation = Some GitBusyOperation.FetchingFromRemote
-                        CurrentOperation = Some { SessionId = ""; OperationId = "op-1" }
-                }
-
-                let nextState, cmd =
-                    update
-                        deps
-                        ignore
-                        (UpdatePreflightCompleted(state.ArcSessionId, Ok(OperationResultDto.Failed canceled)))
-                        state
-
-                let! messages = collectMessages cmd
-
-                Vitest.expect(nextState.BusyOperation).toEqual (None)
-                Vitest.expect(nextState.WarningNotice).toEqual (Some "Git operation cancelled.")
-                Vitest.expect(nextState.ErrorNotice).toEqual (None)
-                Vitest.expect(reportedErrors.Count).toBe (0)
-                Vitest.expect(messages).toEqual ([||])
             }
         )
 
@@ -1452,7 +1444,12 @@ Vitest.describe (
                     update
                         deps
                         ignore
-                        (WriteCompleted(state.ArcSessionId, 1, Pull, Error overwrittenByMergeError))
+                        (WriteCompleted(
+                            state.ArcSessionId,
+                            1,
+                            Pull GitUpdateAcceptance.RequirePreview,
+                            Error overwrittenByMergeError
+                        ))
                         state
 
                 let! _ = collectMessages cmd
@@ -1479,29 +1476,33 @@ Vitest.describe (
 
                 let deps = {
                     defaultDependencies with
-                        update =
-                            fun _ -> promise {
-                                return
-                                    Ok(
-                                        OperationResultDto.PartiallySucceeded(
-                                            operation cleanStatus.Synchronization.Value,
-                                            failure
-                                        )
-                                    )
-                            }
+                        synchronize =
+                            fun request ->
+                                if request.PublishLocalRevisions then
+                                    unexpectedPromise "unexpected push"
+                                else
+                                    promise {
+                                        return
+                                            Ok(
+                                                OperationResultDto.PartiallySucceeded(
+                                                    operation cleanStatus.Synchronization.Value,
+                                                    failure
+                                                )
+                                            )
+                                    }
                         getStatus = fun _ -> promise { return Ok(succeeded (statusForBranch "main")) }
                         listRefs = fun _ -> promise { return Ok(succeeded [| localBranch "main" true true |]) }
                         getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 9 true)) }
                 }
 
                 let stateAfterRequest, requestCmd =
-                    update deps ignore (WriteRequested Pull) runningState
+                    update deps ignore (WriteRequested(Pull GitUpdateAcceptance.RequirePreview)) runningState
 
                 let! completionMessages = collectMessages requestCmd
 
                 let nextState, finishCmd =
                     match completionMessages with
-                    | [| WriteCompleted(_, _, Pull, Ok(Completed _)) |] ->
+                    | [| WriteCompleted(_, _, Pull _, Ok(Completed _)) |] ->
                         update deps ignore completionMessages[0] stateAfterRequest
                     | _ -> failwith "Expected the canceled hydration to complete with refreshed state."
 
@@ -1581,41 +1582,11 @@ Vitest.describe (
                         CurrentProgress = Some(sidebarProgress "Receiving objects" 72.)
                 }
 
-                let nextState, _ = update defaultDependencies ignore (WriteRequested Push) state
+                let nextState, _ =
+                    update defaultDependencies ignore (WriteRequested(Push GitUpdateAcceptance.RequirePreview)) state
 
                 Vitest.expect(nextState.CurrentProgress).toEqual (None)
                 Vitest.expect(currentRunStatus nextState).toEqual (Some(GitSidebarRunStatus.Busy "Pushing to remote"))
-            }
-        )
-
-        Vitest.test (
-            "UpdateFromOnline safe preflight clears fetch progress before scheduling the pull phase",
-            fun () -> promise {
-                let state = {
-                    runningState with
-                        BusyOperation = Some GitBusyOperation.FetchingFromRemote
-                        CurrentProgress = Some(sidebarProgress "Receiving objects" 72.)
-                }
-
-                let preview = {
-                    ChangedPaths = [||]
-                    OverlappingPaths = [||]
-                    HasDataLossRisk = false
-                    WouldCreateConflictSession = false
-                }
-
-                let nextState, cmd =
-                    update
-                        defaultDependencies
-                        ignore
-                        (UpdatePreflightCompleted(state.ArcSessionId, Ok(succeeded preview)))
-                        state
-
-                let! messages = collectMessages cmd
-
-                Vitest.expect(nextState.CurrentProgress).toEqual (None)
-                Vitest.expect(currentRunStatus nextState).toEqual (None)
-                Vitest.expect(messages).toEqual ([| WriteRequested Pull |])
             }
         )
 
@@ -1791,7 +1762,12 @@ Vitest.describe (
             fun () -> promise {
                 let deps = {
                     defaultDependencies with
-                        publish = fun _ -> promise { return Ok(succeeded cleanStatus.Synchronization.Value) }
+                        synchronize =
+                            fun request ->
+                                if request.PublishLocalRevisions then
+                                    promise { return Ok(succeeded cleanStatus.Synchronization.Value) }
+                                else
+                                    unexpectedPromise "unexpected pull"
                         getStatus = fun _ -> promise { return Ok(succeeded (statusForBranch "feature/pushed")) }
                         listRefs =
                             fun _ -> promise { return Ok(succeeded [| localBranch "feature/pushed" true true |]) }
@@ -1799,13 +1775,13 @@ Vitest.describe (
                 }
 
                 let stateAfterRequest, requestCmd =
-                    update deps ignore (WriteRequested Push) runningState
+                    update deps ignore (WriteRequested(Push GitUpdateAcceptance.RequirePreview)) runningState
 
                 let! completionMessages = collectMessages requestCmd
 
                 let nextState, finishCmd =
                     match completionMessages with
-                    | [| WriteCompleted(_, _, Push, Ok(Completed _)) |] ->
+                    | [| WriteCompleted(_, _, Push _, Ok(Completed _)) |] ->
                         update deps ignore completionMessages[0] stateAfterRequest
                     | _ -> failwith "Expected push to complete successfully."
 
@@ -1836,7 +1812,12 @@ Vitest.describe (
                             fun newName ->
                                 renamedNames.Add newName
                                 promise { return Ok "C:/work/Renamed ARC" }
-                        publish = fun _ -> promise { return Ok(succeeded cleanStatus.Synchronization.Value) }
+                        synchronize =
+                            fun request ->
+                                if request.PublishLocalRevisions then
+                                    promise { return Ok(succeeded cleanStatus.Synchronization.Value) }
+                                else
+                                    unexpectedPromise "unexpected pull"
                         getStatus = fun _ -> promise { return Ok(succeeded (statusForBranch "main")) }
                         listRefs = fun _ -> promise { return Ok(succeeded [| localBranch "main" true true |]) }
                         getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
@@ -1892,18 +1873,26 @@ Vitest.describe (
                 Vitest.expect(stateAfterPathChange.PendingPublishAfterRefresh).toBe (true)
                 Vitest.expect(stateAfterPathChange.PendingPublishForPath).toEqual (None)
                 Vitest.expect(refreshedState.PendingPublishAfterRefresh).toBe (false)
-                Vitest.expect(afterRefreshMessages).toEqual ([| WriteRequested Push |])
+
+                Vitest
+                    .expect(afterRefreshMessages)
+                    .toEqual (
+                        [|
+                            WriteRequested(Push GitUpdateAcceptance.RequirePreview)
+                        |]
+                    )
 
                 let stateAfterPush, pushCmd =
                     match afterRefreshMessages with
-                    | [| WriteRequested Push |] -> update deps ignore afterRefreshMessages[0] refreshedState
+                    | [| WriteRequested(Push GitUpdateAcceptance.RequirePreview) |] ->
+                        update deps ignore afterRefreshMessages[0] refreshedState
                     | _ -> failwith "Expected push to start after the refresh."
 
                 let! pushMessages = collectMessages pushCmd
 
                 let finalState, finishCmd =
                     match pushMessages with
-                    | [| WriteCompleted(_, _, Push, Ok(Completed _)) |] ->
+                    | [| WriteCompleted(_, _, Push _, Ok(Completed _)) |] ->
                         update deps ignore pushMessages[0] stateAfterPush
                     | _ -> failwith "Expected retried push to complete successfully."
 
@@ -1966,7 +1955,14 @@ Vitest.describe (
                 let! afterRefreshMessages = collectMessages afterRefreshCmd
 
                 Vitest.expect(refreshedState.PendingPublishAfterRefresh).toBe (false)
-                Vitest.expect(afterRefreshMessages).toEqual ([| WriteRequested Push |])
+
+                Vitest
+                    .expect(afterRefreshMessages)
+                    .toEqual (
+                        [|
+                            WriteRequested(Push GitUpdateAcceptance.RequirePreview)
+                        |]
+                    )
             }
         )
 
@@ -2037,7 +2033,14 @@ Vitest.describe (
 
                 Vitest.expect(stateAfterRenameCompletion.PendingPublishAfterRefresh).toBe (true)
                 Vitest.expect(refreshedState.PendingPublishAfterRefresh).toBe (false)
-                Vitest.expect(afterRefreshMessages).toEqual ([| WriteRequested Push |])
+
+                Vitest
+                    .expect(afterRefreshMessages)
+                    .toEqual (
+                        [|
+                            WriteRequested(Push GitUpdateAcceptance.RequirePreview)
+                        |]
+                    )
             }
         )
 
@@ -2051,7 +2054,11 @@ Vitest.describe (
                 }
 
                 let stateAfterRequest, _ =
-                    update defaultDependencies ignore (WriteRequested Push) oldSessionState
+                    update
+                        defaultDependencies
+                        ignore
+                        (WriteRequested(Push GitUpdateAcceptance.RequirePreview))
+                        oldSessionState
 
                 let switchedState, switchCmd =
                     update defaultDependencies ignore (ArcPathChanged(Some "C:/arc-b")) stateAfterRequest
@@ -2073,7 +2080,7 @@ Vitest.describe (
                         (WriteCompleted(
                             oldSessionState.ArcSessionId,
                             stateAfterRequest.WriteRequestId,
-                            Push,
+                            Push GitUpdateAcceptance.RequirePreview,
                             Ok(Completed(UnitSuccess(staleRefresh, GitPageChange.NoChange, None, None, None)))
                         ))
                         switchedState
@@ -2113,7 +2120,12 @@ Vitest.describe (
                     update
                         defaultDependencies
                         ignore
-                        (WriteInstallPromptAnswered(state.ArcSessionId, Push, "git-lfs-configuration", false))
+                        (WriteInstallPromptAnswered(
+                            state.ArcSessionId,
+                            Push GitUpdateAcceptance.RequirePreview,
+                            "git-lfs-configuration",
+                            false
+                        ))
                         state
 
                 let! _ = collectMessages cmd
@@ -2147,7 +2159,11 @@ Vitest.describe (
                     update
                         defaultDependencies
                         ignore
-                        (WriteInstallCompleted(state.ArcSessionId, Push, Ok(OperationResultDto.Failed failure)))
+                        (WriteInstallCompleted(
+                            state.ArcSessionId,
+                            Push GitUpdateAcceptance.RequirePreview,
+                            Ok(OperationResultDto.Failed failure)
+                        ))
                         state
 
                 let! _ = collectMessages cmd
@@ -2210,20 +2226,11 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "Primary save commits locally, preflights pull, pulls, and pushes when the preflight is safe",
+            "Primary save commits locally and synchronizes once",
             fun () -> promise {
                 let mutable revisionCalls = 0
-                let mutable previewCalls = 0
-                let mutable updateCalls = 0
-                let mutable publishCalls = 0
+                let synchronizeRequests = ResizeArray<SynchronizeRequestDto>()
                 let sync = cleanStatus.Synchronization.Value
-
-                let preview = {
-                    ChangedPaths = [||]
-                    OverlappingPaths = [||]
-                    HasDataLossRisk = false
-                    WouldCreateConflictSession = false
-                }
 
                 let deps = {
                     defaultDependencies with
@@ -2231,17 +2238,9 @@ Vitest.describe (
                             fun _ ->
                                 revisionCalls <- revisionCalls + 1
                                 promise { return Ok(succeeded "revision-1") }
-                        previewUpdate =
-                            fun _ ->
-                                previewCalls <- previewCalls + 1
-                                promise { return Ok(succeeded preview) }
-                        update =
-                            fun _ ->
-                                updateCalls <- updateCalls + 1
-                                promise { return Ok(succeeded sync) }
-                        publish =
-                            fun _ ->
-                                publishCalls <- publishCalls + 1
+                        synchronize =
+                            fun request ->
+                                synchronizeRequests.Add request
                                 promise { return Ok(succeeded sync) }
                         getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
                         listRefs = fun _ -> promise { return Ok(succeeded refs) }
@@ -2274,19 +2273,20 @@ Vitest.describe (
                 let! _ = collectMessages finalCmd
 
                 Vitest.expect(revisionCalls).toBe (1)
-                Vitest.expect(previewCalls).toBe (1)
-                Vitest.expect(updateCalls).toBe (1)
-                Vitest.expect(publishCalls).toBe (1)
+                Vitest.expect(synchronizeRequests.Count).toBe (1)
+                Vitest.expect(synchronizeRequests[0].ExpectedWorkspaceVersion).toBe ("v1")
+                Vitest.expect(synchronizeRequests[0].ExpectedTargetRevision).toEqual (None)
+                Vitest.expect(synchronizeRequests[0].AcceptUpdateRisks).toBe (false)
+                Vitest.expect(synchronizeRequests[0].PublishLocalRevisions).toBe (true)
+                Vitest.expect(finalState.Status.IsClean).toBe (true)
                 Vitest.expect(finalState.ErrorNotice).toEqual (None)
             }
         )
 
         Vitest.test (
-            "Primary save publishes the branch first when no upstream is configured yet",
+            "Primary save synchronizes once when no upstream is configured yet",
             fun () -> promise {
-                let mutable previewCalls = 0
-                let mutable updateCalls = 0
-                let mutable publishCalls = 0
+                let synchronizeRequests = ResizeArray<SynchronizeRequestDto>()
 
                 let noUpstreamStatus = {
                     statusForBranch "feature/new-branch" with
@@ -2304,28 +2304,9 @@ Vitest.describe (
                 let deps = {
                     defaultDependencies with
                         createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
-                        previewUpdate =
-                            fun _ ->
-                                previewCalls <- previewCalls + 1
-
-                                promise {
-                                    return
-                                        Ok(
-                                            succeeded {
-                                                ChangedPaths = [||]
-                                                OverlappingPaths = [||]
-                                                HasDataLossRisk = false
-                                                WouldCreateConflictSession = false
-                                            }
-                                        )
-                                }
-                        update =
-                            fun _ ->
-                                updateCalls <- updateCalls + 1
-                                promise { return Ok(succeeded sync) }
-                        publish =
-                            fun _ ->
-                                publishCalls <- publishCalls + 1
+                        synchronize =
+                            fun request ->
+                                synchronizeRequests.Add request
                                 promise { return Ok(succeeded sync) }
                         getStatus = fun _ -> promise { return Ok(succeeded noUpstreamStatus) }
                         listRefs =
@@ -2358,36 +2339,33 @@ Vitest.describe (
 
                 let! _ = collectMessages finalCmd
 
-                Vitest.expect(publishCalls).toBe (1)
-                Vitest.expect(previewCalls).toBe (0)
-                Vitest.expect(updateCalls).toBe (0)
+                Vitest.expect(synchronizeRequests.Count).toBe (1)
+                Vitest.expect(synchronizeRequests[0].PublishLocalRevisions).toBe (true)
                 Vitest.expect(finalState.ErrorNotice).toEqual (None)
             }
         )
 
         Vitest.test (
-            "Local-only save keeps the old add-and-commit behavior and never requests pull preflight",
+            "Local-only save never requests synchronization",
             fun () -> promise {
-                let mutable previewCalled = false
+                let mutable synchronizeCalled = false
+
+                let localOnly = {
+                    sessionInfo with
+                        Services = {
+                            sessionInfo.Services with
+                                Synchronization = false
+                        }
+                }
 
                 let deps = {
                     defaultDependencies with
                         createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
-                        previewUpdate =
+                        getSessionInfo = fun _ -> promise { return Ok(succeeded localOnly) }
+                        synchronize =
                             fun _ ->
-                                previewCalled <- true
-
-                                promise {
-                                    return
-                                        Ok(
-                                            succeeded {
-                                                ChangedPaths = [||]
-                                                OverlappingPaths = [||]
-                                                HasDataLossRisk = false
-                                                WouldCreateConflictSession = false
-                                            }
-                                        )
-                                }
+                                synchronizeCalled <- true
+                                unexpectedPromise "unexpected synchronize"
                         getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
                         listRefs = fun _ -> promise { return Ok(succeeded refs) }
                         getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
@@ -2418,29 +2396,47 @@ Vitest.describe (
 
                 let! _ = collectMessages finalCmd
 
-                Vitest.expect(previewCalled).toBe (false)
+                Vitest.expect(synchronizeCalled).toBe (false)
                 Vitest.expect(finalState.ErrorNotice).toEqual (None)
             }
         )
 
         Vitest.test (
-            "Primary save keeps a warning and pending confirmation when preflight says online sync still needs merge resolution",
+            "Primary save keeps a warning and pending confirmation when synchronize needs merge resolution",
             fun () -> promise {
+                let sync = cleanStatus.Synchronization.Value
+
+                let failure = {
+                    makeFailure
+                        Conflict
+                        VersionControlCodes.UpdateWouldCreateConflictSession
+                        "Updating from the target needs conflict resolution."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.AcceptUpdateRisks
+                            Instructions = None
+                        })
+                        [| "isa.study.xlsx" |] with
+                        RevisionEvidence = [|
+                            {
+                                Label = "observed_target"
+                                Revision = "target-1"
+                            }
+                        |]
+                }
+
+                let synchronizeRequests = ResizeArray<SynchronizeRequestDto>()
+
                 let deps = {
                     defaultDependencies with
                         createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
-                        previewUpdate =
-                            fun _ -> promise {
-                                return
-                                    Ok(
-                                        succeeded {
-                                            ChangedPaths = [||]
-                                            OverlappingPaths = [| "README.md" |]
-                                            HasDataLossRisk = false
-                                            WouldCreateConflictSession = true
-                                        }
-                                    )
-                            }
+                        synchronize =
+                            fun request ->
+                                synchronizeRequests.Add request
+
+                                if synchronizeRequests.Count = 1 then
+                                    promise { return Ok(OperationResultDto.Failed failure) }
+                                else
+                                    promise { return Ok(succeeded sync) }
                         getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
                         listRefs = fun _ -> promise { return Ok(succeeded refs) }
                         getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
@@ -2468,9 +2464,18 @@ Vitest.describe (
                     | [| WriteCompleted(_,
                                         _,
                                         PrimarySave _,
-                                        Ok(CompletedWithPendingRemoteConfirmation(_,
-                                                                                  _,
-                                                                                  GitPendingRemoteAction.CompletePrimarySavePush))) |] ->
+                                        Ok(CompletedWithPendingRemoteConfirmation(_, _, pendingAction))) |] ->
+                        Vitest
+                            .expect(pendingAction)
+                            .toEqual (
+                                GitPendingRemoteAction.PublishAfterUpdate(
+                                    GitUpdateAcceptance.Accepted(
+                                        "target-1",
+                                        synchronizeRequests[0].ExpectedWorkspaceVersion
+                                    )
+                                )
+                            )
+
                         update deps ignore completionMessages[0] stateAfterWrite
                     | _ -> failwith "Expected the primary save flow to request remote confirmation."
 
@@ -2482,11 +2487,46 @@ Vitest.describe (
                 let! cancelMessages = collectMessages cancelCmd
 
                 Vitest.expect(nextState.PendingConfirmation.IsSome).toBe (true)
-                Vitest.expect(nextState.PendingRemoteAction).toEqual (GitPendingRemoteAction.CompletePrimarySavePush)
+
+                Vitest
+                    .expect(nextState.PendingRemoteAction)
+                    .toEqual (
+                        GitPendingRemoteAction.PublishAfterUpdate(
+                            GitUpdateAcceptance.Accepted("target-1", synchronizeRequests[0].ExpectedWorkspaceVersion)
+                        )
+                    )
+
+                Vitest.expect(nextState.PendingConfirmation.Value.Title).toBe ("Merge resolution required")
+                Vitest.expect(nextState.PendingConfirmation.Value.Message).toContain ("isa.study.xlsx")
                 Vitest.expect(nextState.WarningNotice |> Option.defaultValue "").toContain ("saved locally")
                 Vitest.expect(cancelMessages).toEqual ([||])
                 Vitest.expect(stateAfterCancel.PendingConfirmation).toEqual (None)
                 Vitest.expect(stateAfterCancel.WarningNotice |> Option.defaultValue "").toContain ("saved locally")
+
+                let confirming, confirmCmd =
+                    update deps ignore ConfirmPendingRemoteActionRequested nextState
+
+                let! confirmMessages = collectMessages confirmCmd
+
+                let duringWrite, secondWriteCmd =
+                    match confirmMessages with
+                    | [| WriteRequested(Push(GitUpdateAcceptance.Accepted(target, version))) |] ->
+                        Vitest.expect(target).toBe ("target-1")
+                        Vitest.expect(version).toBe (synchronizeRequests[0].ExpectedWorkspaceVersion)
+                        update deps ignore confirmMessages[0] confirming
+                    | _ -> failwith "Expected the accepted publish request."
+
+                Vitest.expect(duringWrite.PendingPostMergePush).toBe (true)
+                let! _ = collectMessages secondWriteCmd
+                Vitest.expect(synchronizeRequests.Count).toBe (2)
+                Vitest.expect(synchronizeRequests[1].AcceptUpdateRisks).toBe (true)
+                Vitest.expect(synchronizeRequests[1].ExpectedTargetRevision).toEqual (Some "target-1")
+
+                Vitest
+                    .expect(synchronizeRequests[1].ExpectedWorkspaceVersion)
+                    .toBe (synchronizeRequests[0].ExpectedWorkspaceVersion)
+
+                Vitest.expect(synchronizeRequests[1].PublishLocalRevisions).toBe (true)
             }
         )
 
@@ -2550,12 +2590,12 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "Primary save preserves the local commit warning when remote preflight fails after commit",
+            "Primary save preserves the local commit warning when synchronize fails after commit",
             fun () -> promise {
                 let deps = {
                     defaultDependencies with
                         createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
-                        previewUpdate = fun _ -> promise { return Error "Network unavailable during pull preflight." }
+                        synchronize = fun _ -> promise { return Error "Network unavailable during synchronize." }
                         getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
                         listRefs = fun _ -> promise { return Ok(succeeded refs) }
                         getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
@@ -2581,7 +2621,7 @@ Vitest.describe (
                 let nextState, completionCmd =
                     match completionMessages with
                     | [| WriteCompleted(_, _, PrimarySave _, Ok(CompletedWithPendingRemoteFailure(_, message))) |] ->
-                        Vitest.expect(message).toBe ("Network unavailable during pull preflight.")
+                        Vitest.expect(message).toBe ("Network unavailable during synchronize.")
                         update deps ignore completionMessages[0] stateAfterWrite
                     | _ -> failwith "Expected a saved-locally outcome after preflight failed."
 
@@ -2589,13 +2629,13 @@ Vitest.describe (
 
                 Vitest.expect(finishMessages).toEqual ([||])
                 Vitest.expect(nextState.WarningNotice |> Option.defaultValue "").toContain ("saved locally")
-                Vitest.expect(nextState.ErrorNotice).toEqual (Some "Network unavailable during pull preflight.")
+                Vitest.expect(nextState.ErrorNotice).toEqual (Some "Network unavailable during synchronize.")
                 Vitest.expect(nextState.Status.IsClean).toBe (true)
             }
         )
 
         Vitest.test (
-            "A primary save whose publish is canceled with a refresh recovery keeps the saved-locally notice",
+            "A primary save whose synchronize is canceled with a refresh recovery keeps the saved-locally notice",
             fun () -> promise {
                 let canceled =
                     makeFailure
@@ -2608,21 +2648,15 @@ Vitest.describe (
                         })
                         [||]
 
-                let preview = {
-                    ChangedPaths = [||]
-                    OverlappingPaths = [||]
-                    HasDataLossRisk = false
-                    WouldCreateConflictSession = false
-                }
-
-                let sync = cleanStatus.Synchronization.Value
-
                 let deps = {
                     defaultDependencies with
                         createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
-                        previewUpdate = fun _ -> promise { return Ok(succeeded preview) }
-                        update = fun _ -> promise { return Ok(succeeded sync) }
-                        publish = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
+                        synchronize =
+                            fun request ->
+                                if request.PublishLocalRevisions then
+                                    promise { return Ok(OperationResultDto.Failed canceled) }
+                                else
+                                    unexpectedPromise "unexpected pull"
                         getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
                         listRefs = fun _ -> promise { return Ok(succeeded refs) }
                         getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
@@ -2668,22 +2702,41 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "UpdateFromOnlineRequested opens a confirmation dialog instead of pulling when preflight predicts merge resolution",
+            "UpdateFromOnlineRequested opens a confirmation dialog when synchronize predicts merge resolution",
             fun () -> promise {
+                let failure = {
+                    makeFailure
+                        Conflict
+                        VersionControlCodes.UpdateWouldCreateConflictSession
+                        "Updating from the target needs conflict resolution."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.AcceptUpdateRisks
+                            Instructions = None
+                        })
+                        [| "isa.study.xlsx" |] with
+                        RevisionEvidence = [|
+                            {
+                                Label = "observed_target"
+                                Revision = "target-1"
+                            }
+                        |]
+                }
+
+                let synchronizeRequests = ResizeArray<SynchronizeRequestDto>()
+
                 let deps = {
                     defaultDependencies with
-                        previewUpdate =
-                            fun _ -> promise {
-                                return
-                                    Ok(
-                                        succeeded {
-                                            ChangedPaths = [||]
-                                            OverlappingPaths = [||]
-                                            HasDataLossRisk = false
-                                            WouldCreateConflictSession = true
-                                        }
-                                    )
-                            }
+                        synchronize =
+                            fun request ->
+                                synchronizeRequests.Add request
+
+                                if synchronizeRequests.Count = 1 then
+                                    promise { return Ok(OperationResultDto.Failed failure) }
+                                else
+                                    promise { return Ok(succeeded cleanStatus.Synchronization.Value) }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let state = {
@@ -2694,19 +2747,101 @@ Vitest.describe (
                 let stateAfterRequest, requestCmd =
                     update deps ignore UpdateFromOnlineRequested state
 
-                let! preflightMessages = collectMessages requestCmd
+                let! writeMessages = collectMessages requestCmd
+
+                let writeState, writeCmd =
+                    match writeMessages with
+                    | [| WriteRequested(Pull GitUpdateAcceptance.RequirePreview) |] ->
+                        update deps ignore writeMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected the update write request."
+
+                let! completionMessages = collectMessages writeCmd
 
                 let nextState, finishCmd =
-                    match preflightMessages with
-                    | [| UpdatePreflightCompleted(_, Ok _) |] ->
-                        update deps ignore preflightMessages[0] stateAfterRequest
-                    | _ -> failwith "Expected update preflight to complete."
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, Pull _, Ok(CompletedWithPendingRemoteConfirmation(_, dialog, action))) |] ->
+                        Vitest.expect(dialog.Title).toBe ("Merge resolution required")
+
+                        Vitest
+                            .expect(action)
+                            .toEqual (
+                                GitPendingRemoteAction.UpdateFromOnline(GitUpdateAcceptance.Accepted("target-1", "v1"))
+                            )
+
+                        update deps ignore completionMessages[0] writeState
+                    | _ -> failwith "Expected update confirmation to complete."
 
                 let! messages = collectMessages finishCmd
 
                 Vitest.expect(messages).toEqual ([||])
-                Vitest.expect(nextState.PendingConfirmation.IsSome).toBe (true)
-                Vitest.expect(nextState.PendingRemoteAction).toEqual (GitPendingRemoteAction.UpdateFromOnline)
+                Vitest.expect(nextState.PendingConfirmation.Value.Title).toBe ("Merge resolution required")
+                Vitest.expect(nextState.PendingConfirmation.Value.Message).toContain ("isa.study.xlsx")
+
+                Vitest
+                    .expect(nextState.PendingRemoteAction)
+                    .toEqual (GitPendingRemoteAction.UpdateFromOnline(GitUpdateAcceptance.Accepted("target-1", "v1")))
+
+                let confirmed, confirmCmd =
+                    update deps ignore ConfirmPendingRemoteActionRequested nextState
+
+                let! confirmMessages = collectMessages confirmCmd
+
+                let _, secondWriteCmd =
+                    match confirmMessages with
+                    | [| WriteRequested(Pull(GitUpdateAcceptance.Accepted(target, version))) |] ->
+                        Vitest.expect(target).toBe ("target-1")
+                        Vitest.expect(version).toBe ("v1")
+                        update deps ignore confirmMessages[0] confirmed
+                    | _ -> failwith "Expected the accepted pull request."
+
+                let! _ = collectMessages secondWriteCmd
+                Vitest.expect(synchronizeRequests.Count).toBe (2)
+                Vitest.expect(synchronizeRequests[1].AcceptUpdateRisks).toBe (true)
+                Vitest.expect(synchronizeRequests[1].ExpectedTargetRevision).toEqual (Some "target-1")
+                Vitest.expect(synchronizeRequests[1].ExpectedWorkspaceVersion).toBe ("v1")
+                Vitest.expect(synchronizeRequests[1].PublishLocalRevisions).toBe (false)
+            }
+        )
+
+        Vitest.test (
+            "A decision failure without an observed target is reported as an error",
+            fun () -> promise {
+                let failure =
+                    makeFailure
+                        Conflict
+                        VersionControlCodes.UpdateWouldCreateConflictSession
+                        "Updating from the target would overwrite local changes."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.AcceptUpdateRisks
+                            Instructions = None
+                        })
+                        [| "isa.study.xlsx" |]
+
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
+                let deps = {
+                    defaultDependencies with
+                        synchronize = fun _ -> promise { return Ok(OperationResultDto.Failed failure) }
+                        reportError = reportedErrors.Add
+                }
+
+                let requested, requestCmd =
+                    update deps ignore (WriteRequested(Pull GitUpdateAcceptance.RequirePreview)) runningState
+
+                let! completionMessages = collectMessages requestCmd
+
+                let finalState, finishCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, Pull _, Error message) |] ->
+                        Vitest.expect(message).toBe (failureMessage failure)
+                        update deps ignore completionMessages[0] requested
+                    | _ -> failwith "Expected the decision failure to be reported as an error."
+
+                let! _ = collectMessages finishCmd
+                Vitest.expect(finalState.ErrorNotice).toEqual (Some(failureMessage failure))
+                Vitest.expect(finalState.PendingConfirmation).toEqual (None)
+                Vitest.expect(finalState.PendingRemoteAction).toEqual (GitPendingRemoteAction.None)
+                Vitest.expect(reportedErrors.Count).toBe (1)
             }
         )
 
@@ -2724,20 +2859,30 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "UpdateFromOnlineRequested shows the indeterminate confirmation wording when preflight cannot classify safely",
+            "A synchronize that cannot preview the update is reported as an error",
             fun () -> promise {
+                let failure = {
+                    makeFailure
+                        ProviderError
+                        VersionControlCodes.PreviewIndeterminate
+                        "Git pull synchronization could not be classified safely."
+                        None
+                        [||] with
+                        Retryable = true
+                        RevisionEvidence = [|
+                            {
+                                Label = "observed_target"
+                                Revision = "target-1"
+                            }
+                        |]
+                }
+
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
                 let deps = {
                     defaultDependencies with
-                        previewUpdate =
-                            fun _ -> promise {
-                                return
-                                    Ok(
-                                        failed
-                                            Unsupported
-                                            "unsupported_preflight"
-                                            "Git pull preflight could not be classified safely."
-                                    )
-                            }
+                        synchronize = fun _ -> promise { return Ok(OperationResultDto.Failed failure) }
+                        reportError = reportedErrors.Add
                 }
 
                 let state = {
@@ -2748,51 +2893,83 @@ Vitest.describe (
                 let stateAfterRequest, requestCmd =
                     update deps ignore UpdateFromOnlineRequested state
 
-                let! preflightMessages = collectMessages requestCmd
+                let! writeMessages = collectMessages requestCmd
+
+                let writeState, writeCmd =
+                    match writeMessages with
+                    | [| WriteRequested(Pull GitUpdateAcceptance.RequirePreview) |] ->
+                        update deps ignore writeMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected the update write request."
+
+                let! completionMessages = collectMessages writeCmd
 
                 let nextState, finishCmd =
-                    match preflightMessages with
-                    | [| UpdatePreflightCompleted(_, Ok _) |] ->
-                        update deps ignore preflightMessages[0] stateAfterRequest
-                    | _ -> failwith "Expected update preflight to complete."
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, Pull _, Error message) |] ->
+                        Vitest.expect(message).toBe (failureMessage failure)
+                        update deps ignore completionMessages[0] writeState
+                    | _ -> failwith "Expected the indeterminate update to be reported as an error."
 
                 let! messages = collectMessages finishCmd
 
                 Vitest.expect(messages).toEqual ([||])
-
-                Vitest
-                    .expect(nextState.PendingConfirmation |> Option.map _.Title)
-                    .toEqual (Some "Update could not be previewed")
-
-                Vitest
-                    .expect(nextState.PendingConfirmation |> Option.map _.Message |> Option.defaultValue "")
-                    .toContain ("could not determine safely")
+                Vitest.expect(nextState.ErrorNotice).toEqual (Some(failureMessage failure))
+                Vitest.expect(nextState.PendingConfirmation).toEqual (None)
+                Vitest.expect(nextState.PendingRemoteAction).toEqual (GitPendingRemoteAction.None)
+                Vitest.expect(reportedErrors.Count).toBe (1)
             }
         )
 
         Vitest.test (
-            "UpdatePreflightCompleted ignores results from the previous ARC session",
+            "An update over local changes is reported with the paths and without a dialog",
             fun () -> promise {
-                let state = {
-                    GitState.Empty with
-                        CurrentArcPath = Some "C:/arc-b"
-                        ArcSessionId = 4
+                let failure = {
+                    makeFailure
+                        Conflict
+                        VersionControlCodes.UpdateWouldOverwriteLocalChanges
+                        "The library message is replaced by the renderer."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.ResolveLocalChanges
+                            Instructions = None
+                        })
+                        [| "assays/a/isa.assay.xlsx"; "runs/r/out.csv" |] with
+                        RevisionEvidence = [|
+                            {
+                                Label = "observed_target"
+                                Revision = "target-1"
+                            }
+                        |]
                 }
 
-                let preview = {
-                    ChangedPaths = [||]
-                    OverlappingPaths = [||]
-                    HasDataLossRisk = true
-                    WouldCreateConflictSession = true
+                let synchronizeRequests = ResizeArray<SynchronizeRequestDto>()
+
+                let deps = {
+                    defaultDependencies with
+                        synchronize =
+                            fun request ->
+                                synchronizeRequests.Add request
+                                promise { return Ok(OperationResultDto.Failed failure) }
                 }
 
-                let nextState, cmd =
-                    update defaultDependencies ignore (UpdatePreflightCompleted(3, Ok(succeeded preview))) state
+                let requested, requestCmd =
+                    update deps ignore (WriteRequested(Pull GitUpdateAcceptance.RequirePreview)) runningState
 
-                let! messages = collectMessages cmd
+                let! completionMessages = collectMessages requestCmd
 
-                Vitest.expect(messages).toEqual ([||])
-                Vitest.expect(nextState.PendingConfirmation).toEqual (None)
+                let finalState, finishCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, Pull _, Error _) |] -> update deps ignore completionMessages[0] requested
+                    | _ -> failwith "Expected the local-change overwrite to be reported as an error."
+
+                let! _ = collectMessages finishCmd
+                let errorNotice = finalState.ErrorNotice |> Option.defaultValue ""
+
+                Vitest.expect(errorNotice).toContain ("assays/a/isa.assay.xlsx")
+                Vitest.expect(errorNotice).toContain ("runs/r/out.csv")
+                Vitest.expect(errorNotice).toContain ("Save or discard")
+                Vitest.expect(finalState.PendingConfirmation).toEqual (None)
+                Vitest.expect(finalState.PendingRemoteAction).toEqual (GitPendingRemoteAction.None)
+                Vitest.expect(synchronizeRequests.Count).toBe (1)
             }
         )
 
@@ -2828,7 +3005,14 @@ Vitest.describe (
                 let! messages = collectMessages cmd
 
                 Vitest.expect(nextState.PendingPostMergePush).toBe (false)
-                Vitest.expect(messages).toEqual ([| WriteRequested Push |])
+
+                Vitest
+                    .expect(messages)
+                    .toEqual (
+                        [|
+                            WriteRequested(Push GitUpdateAcceptance.RequirePreview)
+                        |]
+                    )
             }
         )
 
@@ -2863,8 +3047,7 @@ Vitest.describe (
                 }
 
                 let sync = cleanStatus.Synchronization.Value
-                let mutable publishCalls = 0
-                let mutable recordStatusCall = false
+                let mutable synchronizeCalls = 0
 
                 let deps = {
                     defaultDependencies with
@@ -2872,12 +3055,12 @@ Vitest.describe (
                             fun _ ->
                                 calls.Add "createRevision"
                                 promise { return Ok(succeeded "revision-1") }
-                        publish =
+                        synchronize =
                             fun _ ->
-                                calls.Add "publish"
-                                publishCalls <- publishCalls + 1
+                                calls.Add "synchronize"
+                                synchronizeCalls <- synchronizeCalls + 1
 
-                                if publishCalls = 1 then
+                                if synchronizeCalls = 1 then
                                     promise {
                                         return
                                             Ok(
@@ -2896,17 +3079,20 @@ Vitest.describe (
                         bindWorkspace =
                             fun request ->
                                 calls.Add "bindWorkspace"
-                                recordStatusCall <- true
                                 boundLocation <- Some request.ProviderLocation
                                 promise { return Ok(succeeded sessionInfo) }
                         getStatus =
                             fun _ ->
-                                if recordStatusCall then
-                                    calls.Add "getStatus"
-
+                                calls.Add "getStatus"
                                 promise { return Ok(succeeded noTargetStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                        listRefs =
+                            fun _ ->
+                                calls.Add "listRefs"
+                                promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings =
+                            fun _ ->
+                                calls.Add "getStoragePolicySettings"
+                                promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let state = {
@@ -2935,19 +3121,97 @@ Vitest.describe (
                 let! _ = collectMessages finalCmd
 
                 Vitest
-                    .expect(calls |> Seq.take 6 |> Seq.toArray)
+                    .expect(calls |> Seq.take 9 |> Seq.toArray)
                     .toEqual (
                         [|
                             "createRevision"
-                            "publish"
+                            "getStatus"
+                            "listRefs"
+                            "getStoragePolicySettings"
+                            "synchronize"
                             "createRemoteProject"
                             "bindWorkspace"
                             "getStatus"
-                            "publish"
+                            "synchronize"
                         |]
                     )
 
                 Vitest.expect(boundLocation).toEqual (Some "https://gitlab.example/carol/my-arc.git")
+                Vitest.expect(finalState.ErrorNotice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A push whose synchronize reports a missing target after an applied update provisions the project",
+            fun () -> promise {
+                let sync = cleanStatus.Synchronization.Value
+                let synchronizeRequests = ResizeArray<SynchronizeRequestDto>()
+                let mutable createProjectCalls = 0
+                let mutable bindCalls = 0
+                let mutable statusCalls = 0
+
+                let partialOutcome = {
+                    operation sync with
+                        Publication = PublicationStateDto.LocalOnly
+                }
+
+                let missingTarget = {
+                    makeFailure
+                        Validation
+                        VersionControlCodes.PublishTargetMissing
+                        "publish target missing after the update"
+                        None
+                        [||] with
+                        StateChanged = true
+                }
+
+                let deps = {
+                    defaultDependencies with
+                        synchronize =
+                            fun request ->
+                                synchronizeRequests.Add request
+
+                                if synchronizeRequests.Count = 1 then
+                                    promise {
+                                        return Ok(OperationResultDto.PartiallySucceeded(partialOutcome, missingTarget))
+                                    }
+                                else
+                                    promise { return Ok(succeeded sync) }
+                        createRemoteProject =
+                            fun _ ->
+                                createProjectCalls <- createProjectCalls + 1
+                                promise { return Ok remoteProject }
+                        bindWorkspace =
+                            fun _ ->
+                                bindCalls <- bindCalls + 1
+                                promise { return Ok(succeeded sessionInfo) }
+                        getStatus =
+                            fun _ ->
+                                statusCalls <- statusCalls + 1
+                                promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let requested, writeCmd =
+                    update deps ignore (WriteRequested(Push GitUpdateAcceptance.RequirePreview)) runningState
+
+                let! completionMessages = collectMessages writeCmd
+
+                let finalState, finishCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, Push _, Ok(Completed _)) |] ->
+                        update deps ignore completionMessages[0] requested
+                    | _ -> failwith "Expected provisioning after the applied update."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(createProjectCalls).toBe (1)
+                Vitest.expect(bindCalls).toBe (1)
+                Vitest.expect(statusCalls).toBeGreaterThan (0)
+                Vitest.expect(synchronizeRequests.Count).toBe (2)
+                Vitest.expect(synchronizeRequests[0].PublishLocalRevisions).toBe (true)
+                Vitest.expect(synchronizeRequests[1].PublishLocalRevisions).toBe (true)
                 Vitest.expect(finalState.ErrorNotice).toEqual (None)
             }
         )
@@ -2974,7 +3238,7 @@ Vitest.describe (
 
                 let deps = {
                     defaultDependencies with
-                        update = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
+                        synchronize = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
                         restorePaths =
                             fun request ->
                                 restoredPaths <- Some request.Paths
@@ -2985,7 +3249,7 @@ Vitest.describe (
                 }
 
                 let stateAfterRequest, requestCmd =
-                    update deps ignore (WriteRequested Pull) runningState
+                    update deps ignore (WriteRequested(Pull GitUpdateAcceptance.RequirePreview)) runningState
 
                 let! completionMessages = collectMessages requestCmd
 
@@ -2993,7 +3257,7 @@ Vitest.describe (
                     match completionMessages with
                     | [| WriteCompleted(_,
                                         _,
-                                        Pull,
+                                        Pull _,
                                         Ok(RequiresRecovery(GitPendingRecovery.RestoreInterruptedPaths _, _))) |] ->
                         update deps ignore completionMessages[0] stateAfterRequest
                     | _ -> failwith "Expected restore recovery after cancellation."
@@ -3044,7 +3308,7 @@ Vitest.describe (
 
                 let deps = {
                     defaultDependencies with
-                        update = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
+                        synchronize = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
                         clearStaleLock = fun _ -> promise { return Ok(succeeded conflicted) }
                         getStatus = fun _ -> promise { return Ok(succeeded conflicted) }
                         listRefs = fun _ -> promise { return Ok(succeeded refs) }
@@ -3052,13 +3316,13 @@ Vitest.describe (
                 }
 
                 let stateAfterRequest, requestCmd =
-                    update deps ignore (WriteRequested Pull) runningState
+                    update deps ignore (WriteRequested(Pull GitUpdateAcceptance.RequirePreview)) runningState
 
                 let! completionMessages = collectMessages requestCmd
 
                 let recoveryState, recoveryCmd =
                     match completionMessages with
-                    | [| WriteCompleted(_, _, Pull, Ok(RequiresRecovery(GitPendingRecovery.ClearStaleLock _, _))) |] ->
+                    | [| WriteCompleted(_, _, Pull _, Ok(RequiresRecovery(GitPendingRecovery.ClearStaleLock _, _))) |] ->
                         update deps ignore completionMessages[0] stateAfterRequest
                     | _ -> failwith "Expected stale-lock recovery after cancellation."
 
@@ -3134,7 +3398,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "A canceled publish with a refresh recovery refreshes and keeps the warning",
+            "A canceled synchronize with a refresh recovery refreshes and keeps the warning",
             fun () -> promise {
                 let canceled =
                     makeFailure
@@ -3149,20 +3413,20 @@ Vitest.describe (
 
                 let deps = {
                     defaultDependencies with
-                        publish = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
+                        synchronize = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
                         getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
                         listRefs = fun _ -> promise { return Ok(succeeded refs) }
                         getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let stateAfterRequest, requestCmd =
-                    update deps ignore (WriteRequested Push) runningState
+                    update deps ignore (WriteRequested(Push GitUpdateAcceptance.RequirePreview)) runningState
 
                 let! completionMessages = collectMessages requestCmd
 
                 let nextState, finishCmd =
                     match completionMessages with
-                    | [| WriteCompleted(_, _, Push, Ok(Completed _)) |] ->
+                    | [| WriteCompleted(_, _, Push _, Ok(Completed _)) |] ->
                         update deps ignore completionMessages[0] stateAfterRequest
                     | _ -> failwith "Expected refresh recovery after the canceled publish."
 
@@ -3170,6 +3434,80 @@ Vitest.describe (
 
                 Vitest.expect(nextState.WarningNotice).toEqual (Some(failureMessage canceled))
                 Vitest.expect(nextState.ErrorNotice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A partial synchronize with retry_publish offers to publish now",
+            fun () -> promise {
+                let sync = cleanStatus.Synchronization.Value
+
+                let retryFailure = {
+                    makeFailure
+                        Canceled
+                        VersionControlCodes.OperationCanceled
+                        "The update was applied. Synchronize again to publish."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RetryPublish
+                            Instructions = Some "Publish the applied update now."
+                        })
+                        [||] with
+                        StateChanged = true
+                }
+
+                let deps = {
+                    defaultDependencies with
+                        synchronize =
+                            fun _ -> promise {
+                                return
+                                    Ok(
+                                        OperationResultDto.PartiallySucceeded(
+                                            {
+                                                operation sync with
+                                                    Publication = PublicationStateDto.LocalOnly
+                                            },
+                                            retryFailure
+                                        )
+                                    )
+                            }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let requested, writeCmd =
+                    update deps ignore (WriteRequested(Push GitUpdateAcceptance.RequirePreview)) runningState
+
+                let! completionMessages = collectMessages writeCmd
+
+                let recoveryState, recoveryCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, Push _, Ok(Completed _)) |] ->
+                        update deps ignore completionMessages[0] requested
+                    | _ -> failwith "Expected the partial synchronize completion."
+
+                let! _ = collectMessages recoveryCmd
+
+                Vitest
+                    .expect(recoveryState.PendingRecovery)
+                    .toEqual (Some(GitPendingRecovery.RetryPublish(failureMessage retryFailure)))
+
+                Vitest
+                    .expect(recoveryState.PendingConfirmation |> Option.map _.Title)
+                    .toEqual (Some "Online sync pending")
+
+                let _, confirmCmd =
+                    update deps ignore ConfirmPendingRemoteActionRequested recoveryState
+
+                let! confirmMessages = collectMessages confirmCmd
+
+                Vitest
+                    .expect(confirmMessages)
+                    .toEqual (
+                        [|
+                            WriteRequested(Push GitUpdateAcceptance.RequirePreview)
+                        |]
+                    )
             }
         )
 
@@ -3230,20 +3568,20 @@ Vitest.describe (
 
                 let deps = {
                     defaultDependencies with
-                        update = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
+                        synchronize = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
                         getStatus = fun _ -> promise { return Ok(succeeded (statusForBranch "main")) }
                         listRefs = fun _ -> promise { return Ok(succeeded [| localBranch "main" true true |]) }
                         getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let stateAfterRequest, requestCmd =
-                    update deps ignore (WriteRequested Pull) runningState
+                    update deps ignore (WriteRequested(Pull GitUpdateAcceptance.RequirePreview)) runningState
 
                 let! completionMessages = collectMessages requestCmd
 
                 let nextState, finishCmd =
                     match completionMessages with
-                    | [| WriteCompleted(_, _, Pull, Ok(Completed _)) |] ->
+                    | [| WriteCompleted(_, _, Pull _, Ok(Completed _)) |] ->
                         update deps ignore completionMessages[0] stateAfterRequest
                     | _ -> failwith "Expected refresh recovery to complete with refreshed state."
 
@@ -3273,7 +3611,7 @@ Vitest.describe (
 
                 let deps = {
                     defaultDependencies with
-                        update =
+                        synchronize =
                             fun _ -> promise {
                                 return
                                     Ok(
@@ -3315,13 +3653,13 @@ Vitest.describe (
                 }
 
                 let stateAfterRequest, requestCmd =
-                    update deps ignore (WriteRequested Pull) runningState
+                    update deps ignore (WriteRequested(Pull GitUpdateAcceptance.RequirePreview)) runningState
 
                 let! completionMessages = collectMessages requestCmd
 
                 let recoveryState, finishCmd =
                     match completionMessages with
-                    | [| WriteCompleted(_, _, Pull, Ok(Completed _)) |] ->
+                    | [| WriteCompleted(_, _, Pull _, Ok(Completed _)) |] ->
                         update deps ignore completionMessages[0] stateAfterRequest
                     | _ -> failwith "Expected partial update completion."
 
@@ -3385,7 +3723,7 @@ Vitest.describe (
 
                 let deps = {
                     defaultDependencies with
-                        update =
+                        synchronize =
                             fun _ -> promise {
                                 return
                                     Ok(
@@ -3405,13 +3743,13 @@ Vitest.describe (
                 }
 
                 let stateAfterRequest, requestCmd =
-                    update deps pageStates.Add (WriteRequested Pull) runningState
+                    update deps pageStates.Add (WriteRequested(Pull GitUpdateAcceptance.RequirePreview)) runningState
 
                 let! completionMessages = collectMessages requestCmd
 
                 let nextState, finishCmd =
                     match completionMessages with
-                    | [| WriteCompleted(_, _, Pull, Ok(Completed _)) |] ->
+                    | [| WriteCompleted(_, _, Pull _, Ok(Completed _)) |] ->
                         update deps pageStates.Add completionMessages[0] stateAfterRequest
                     | _ -> failwith "Expected conflict update completion."
 
@@ -3501,7 +3839,14 @@ Vitest.describe (
                 Vitest.expect(finalizeRequest.Value.Handle).toEqual (refreshedHandle)
                 Vitest.expect(finalizeRequest.Value.ExpectedWorkspaceVersion).toBe (cleanStatus.WorkspaceVersion)
                 Vitest.expect(nextState.PendingPostMergePush).toBe (false)
-                Vitest.expect(messages).toEqual ([| WriteRequested Push |])
+
+                Vitest
+                    .expect(messages)
+                    .toEqual (
+                        [|
+                            WriteRequested(Push GitUpdateAcceptance.RequirePreview)
+                        |]
+                    )
             }
         )
 
@@ -3594,7 +3939,7 @@ Vitest.describe (
 
                 let deps = {
                     defaultDependencies with
-                        publish =
+                        synchronize =
                             fun _ ->
                                 publishCalls <- publishCalls + 1
 
@@ -3626,13 +3971,13 @@ Vitest.describe (
                 }
 
                 let stateAfterRequest, requestCmd =
-                    update deps ignore (WriteRequested Push) runningState
+                    update deps ignore (WriteRequested(Push GitUpdateAcceptance.RequirePreview)) runningState
 
                 let! completionMessages = collectMessages requestCmd
 
                 let stateAfterPrompt, promptCmd =
                     match completionMessages with
-                    | [| WriteCompleted(_, _, Push, Ok(RequiresDependencyInstall("git-lfs-configuration", _))) |] ->
+                    | [| WriteCompleted(_, _, Push _, Ok(RequiresDependencyInstall("git-lfs-configuration", _))) |] ->
                         update deps ignore completionMessages[0] stateAfterRequest
                     | _ -> failwith "Expected the missing dependency prompt."
 
@@ -3640,7 +3985,7 @@ Vitest.describe (
 
                 let stateAfterAnswer, installCmd =
                     match promptMessages with
-                    | [| WriteInstallPromptAnswered(_, Push, "git-lfs-configuration", true) |] ->
+                    | [| WriteInstallPromptAnswered(_, Push _, "git-lfs-configuration", true) |] ->
                         update deps ignore promptMessages[0] stateAfterPrompt
                     | _ -> failwith "Expected an affirmative dependency-install answer."
 
@@ -3648,7 +3993,7 @@ Vitest.describe (
 
                 let stateAfterInstall, retryCmd =
                     match installMessages with
-                    | [| WriteInstallCompleted(_, Push, Ok _) |] ->
+                    | [| WriteInstallCompleted(_, Push _, Ok _) |] ->
                         update deps ignore installMessages[0] stateAfterAnswer
                     | _ -> failwith "Expected dependency installation to complete."
 
@@ -3656,7 +4001,7 @@ Vitest.describe (
 
                 let finalState, finishCmd =
                     match retryMessages with
-                    | [| WriteCompleted(_, _, Push, Ok(Completed _)) |] ->
+                    | [| WriteCompleted(_, _, Push _, Ok(Completed _)) |] ->
                         update deps ignore retryMessages[0] stateAfterInstall
                     | _ -> failwith "Expected the retried publish to complete."
 
@@ -3898,16 +4243,16 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "A stale update is not repeated without a new preview",
+            "A stale update is not repeated without a new synchronize decision",
             fun () -> promise {
-                let updateRequests = ResizeArray<UpdateRequestDto>()
+                let synchronizeRequests = ResizeArray<SynchronizeRequestDto>()
                 let reportedErrors = ResizeArray<GitErrorNotification>()
 
                 let deps = {
                     defaultDependencies with
-                        update =
+                        synchronize =
                             fun request ->
-                                updateRequests.Add request
+                                synchronizeRequests.Add request
 
                                 promise {
                                     return
@@ -3934,20 +4279,20 @@ Vitest.describe (
                 }
 
                 let stateAfterRequest, requestCmd =
-                    update deps ignore (WriteRequested Pull) runningState
+                    update deps ignore (WriteRequested(Pull GitUpdateAcceptance.RequirePreview)) runningState
 
                 let! completionMessages = collectMessages requestCmd
 
                 let finalState, finishCmd, completedMessage =
                     match completionMessages with
-                    | [| WriteCompleted(_, _, Pull, Ok(StaleWorkspaceVersion message)) |] ->
+                    | [| WriteCompleted(_, _, Pull _, Ok(StaleWorkspaceVersion message)) |] ->
                         let nextState, command = update deps ignore completionMessages[0] stateAfterRequest
                         nextState, command, message
                     | _ -> failwith "Expected the stale update completion."
 
                 let! finishMessages = collectMessages finishCmd
 
-                Vitest.expect(updateRequests.Count).toBe (1)
+                Vitest.expect(synchronizeRequests.Count).toBe (1)
 
                 Vitest
                     .expect(completedMessage.StartsWith("The workspace changed since it was last refreshed"))
@@ -3967,6 +4312,88 @@ Vitest.describe (
                         )
                     )
                     .toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "An accepted pull is not replayed when the target moved",
+            fun () -> promise {
+                let synchronizeRequests = ResizeArray<SynchronizeRequestDto>()
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
+                let deps = {
+                    defaultDependencies with
+                        synchronize =
+                            fun request ->
+                                synchronizeRequests.Add request
+
+                                promise {
+                                    return
+                                        Ok(
+                                            failed
+                                                Concurrency
+                                                VersionControlCodes.PreconditionFailed
+                                                "The target moved after the update was accepted."
+                                        )
+                                }
+                        getStatus =
+                            fun _ -> promise {
+                                return
+                                    Ok(
+                                        succeeded {
+                                            cleanStatus with
+                                                WorkspaceVersion = "v2"
+                                        }
+                                    )
+                            }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                        reportError = reportedErrors.Add
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update
+                        deps
+                        ignore
+                        (WriteRequested(Pull(GitUpdateAcceptance.Accepted("target-1", "v1"))))
+                        runningState
+
+                let! completionMessages = collectMessages requestCmd
+
+                let finalState, finishCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, Pull _, Ok(StaleWorkspaceVersion message)) |] ->
+                        let nextState, command = update deps ignore completionMessages[0] stateAfterRequest
+                        nextState, command
+                    | _ -> failwith "Expected the accepted pull to be rejected as stale."
+
+                let! finishMessages = collectMessages finishCmd
+
+                Vitest.expect(synchronizeRequests.Count).toBe (1)
+                Vitest.expect(finalState.ErrorNotice.IsSome).toBe (true)
+                Vitest.expect(reportedErrors.Count).toBe (1)
+
+                let refreshCount =
+                    finishMessages
+                    |> Array.filter (
+                        function
+                        | RefreshRequested -> true
+                        | _ -> false
+                    )
+                    |> Array.length
+
+                Vitest.expect(refreshCount).toBe (1)
+
+                Vitest
+                    .expect(
+                        finishMessages
+                        |> Array.exists (
+                            function
+                            | WriteRequested(Pull _) -> true
+                            | _ -> false
+                        )
+                    )
+                    .toBe (false)
             }
         )
 
@@ -4114,7 +4541,12 @@ Vitest.describe (
                     update
                         deps
                         ignore
-                        (WriteInstallPromptAnswered(runningState.ArcSessionId, Push, "git-lfs-configuration", true))
+                        (WriteInstallPromptAnswered(
+                            runningState.ArcSessionId,
+                            Push GitUpdateAcceptance.RequirePreview,
+                            "git-lfs-configuration",
+                            true
+                        ))
                         runningState
 
                 let! _ = collectMessages cmd
@@ -4191,7 +4623,7 @@ Vitest.describe (
 
                 let deps = {
                     defaultDependencies with
-                        update = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
+                        synchronize = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
                         restorePaths =
                             fun _ ->
                                 restoreCalls <- restoreCalls + 1
@@ -4211,7 +4643,7 @@ Vitest.describe (
                 }
 
                 let stateAfterRequest, requestCmd =
-                    update deps ignore (WriteRequested Pull) runningState
+                    update deps ignore (WriteRequested(Pull GitUpdateAcceptance.RequirePreview)) runningState
 
                 let! completionMessages = collectMessages requestCmd
 
@@ -4219,7 +4651,7 @@ Vitest.describe (
                     match completionMessages with
                     | [| WriteCompleted(_,
                                         _,
-                                        Pull,
+                                        Pull _,
                                         Ok(RequiresRecovery(GitPendingRecovery.RestoreInterruptedPaths _, _))) |] ->
                         update deps ignore completionMessages[0] stateAfterRequest
                     | _ -> failwith "Expected the restore recovery."
@@ -4370,53 +4802,64 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "A primary save whose update opens a conflict session keeps the publish for after the merge",
+            "A primary save whose synchronize opens a conflict session keeps the publish for after the merge",
             fun () -> promise {
                 let conflicted = conflictedStatus [| "conflict.txt" |]
                 let sync = cleanStatus.Synchronization.Value
-                let mutable updated = false
-                let mutable publishCalls = 0
+                let mutable synchronized = false
+                let mutable mergeFinalized = false
+                let conflict = conflicted.ActiveConflictSession.Value
 
-                let preview = {
-                    ChangedPaths = [||]
-                    OverlappingPaths = [||]
-                    HasDataLossRisk = false
-                    WouldCreateConflictSession = false
-                }
+                let failure =
+                    makeFailure
+                        Conflict
+                        VersionControlCodes.ConflictsDetected
+                        "conflicts detected"
+                        (Some {
+                            Code = VersionControlCodes.Recovery.ResolveConflictSession
+                            Instructions = None
+                        })
+                        [| "conflict.txt" |]
 
                 let deps = {
                     defaultDependencies with
                         createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
-                        previewUpdate = fun _ -> promise { return Ok(succeeded preview) }
-                        update =
+                        synchronize =
                             fun _ ->
-                                updated <- true
-
-                                promise {
-                                    return
-                                        Ok(
-                                            OperationResultDto.PartiallySucceeded(
-                                                operation sync,
-                                                makeFailure
-                                                    Conflict
-                                                    VersionControlCodes.ConflictsDetected
-                                                    "conflicts detected"
-                                                    None
-                                                    [| "conflict.txt" |]
-                                            )
-                                        )
-                                }
-                        publish =
-                            fun _ ->
-                                publishCalls <- publishCalls + 1
-                                promise { return Ok(succeeded sync) }
+                                synchronized <- true
+                                promise { return Ok(OperationResultDto.PartiallySucceeded(operation sync, failure)) }
                         getStatus =
                             fun _ -> promise {
-                                return Ok(succeeded (if updated then conflicted else statusForBranch "main"))
+                                return
+                                    Ok(
+                                        succeeded (
+                                            if synchronized && not mergeFinalized then
+                                                conflicted
+                                            else
+                                                statusForBranch "main"
+                                        )
+                                    )
                             }
                         listRefs = fun _ -> promise { return Ok(succeeded [| localBranch "main" true true |]) }
                         getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                         loadConflictPage = fun _ _ path -> promise { return Ok(diffPage path) }
+                        resolveConflict =
+                            fun _ -> promise {
+                                return
+                                    Ok(
+                                        succeeded {
+                                            RefreshedHandle = {
+                                                SessionId = "conflict-2"
+                                                Version = "2"
+                                            }
+                                            RemainingItems = [||]
+                                        }
+                                    )
+                            }
+                        finalizeConflict =
+                            fun _ ->
+                                mergeFinalized <- true
+                                promise { return Ok(succeeded (Some "rev")) }
                 }
 
                 let state = {
@@ -4437,7 +4880,6 @@ Vitest.describe (
 
                 let! finishMessages = collectMessages finishCmd
 
-                Vitest.expect(publishCalls).toBe (0)
                 Vitest.expect(finalState.ActiveConflict.IsSome).toBe (true)
                 Vitest.expect(finalState.PendingPostMergePush).toBe (true)
 
@@ -4446,6 +4888,36 @@ Vitest.describe (
                     .toEqual (Some "Changes were saved locally. Online sync is still pending.")
 
                 Vitest.expect(finishMessages).toEqual ([||])
+
+                let mergeRequest = {
+                    Path = "conflict.txt"
+                    Handle = conflict.Handle
+                    WorkspaceVersion = "v1"
+                    ResolvedContent = "resolved"
+                }
+
+                let mergeState, mergeCmd =
+                    update deps ignore (ConfirmMergeResolutionRequested mergeRequest) finalState
+
+                let! mergeCompletions = collectMessages mergeCmd
+
+                let finalizedState, finalizeCmd =
+                    match mergeCompletions with
+                    | [| ConfirmMergeResolutionCompleted(_, Ok outcome) |] ->
+                        Vitest.expect(outcome.Finalized).toBe (true)
+                        update deps ignore mergeCompletions[0] mergeState
+                    | _ -> failwith "Expected merge resolution to complete."
+
+                let! finalMessages = collectMessages finalizeCmd
+                Vitest.expect(finalizedState.PendingPostMergePush).toBe (false)
+
+                Vitest
+                    .expect(finalMessages)
+                    .toEqual (
+                        [|
+                            WriteRequested(Push GitUpdateAcceptance.RequirePreview)
+                        |]
+                    )
             }
         )
 
@@ -4462,7 +4934,7 @@ Vitest.describe (
                             fun () ->
                                 ids <- ids + 1
                                 $"op-{ids}"
-                        publish =
+                        synchronize =
                             fun request ->
                                 publishIds.Add request.OperationId
                                 promise { return Ok(succeeded cleanStatus.Synchronization.Value) }
@@ -4475,7 +4947,8 @@ Vitest.describe (
                         getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
-                let requested, writeCmd = update deps ignore (WriteRequested Push) runningState
+                let requested, writeCmd =
+                    update deps ignore (WriteRequested(Push GitUpdateAcceptance.RequirePreview)) runningState
 
                 let canceling, cancelCmd =
                     update deps ignore CancelCurrentOperationRequested requested
@@ -4566,7 +5039,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "A publish whose bind fails resumes without creating a second project",
+            "A synchronize whose bind fails resumes without creating a second project",
             fun () -> promise {
                 let sync = cleanStatus.Synchronization.Value
                 let mutable projectCalls = 0
@@ -4575,7 +5048,7 @@ Vitest.describe (
 
                 let deps = {
                     defaultDependencies with
-                        publish =
+                        synchronize =
                             fun _ ->
                                 publishCalls <- publishCalls + 1
 
@@ -4608,12 +5081,14 @@ Vitest.describe (
                         getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
-                let requested, writeCmd = update deps ignore (WriteRequested Push) runningState
+                let requested, writeCmd =
+                    update deps ignore (WriteRequested(Push GitUpdateAcceptance.RequirePreview)) runningState
+
                 let! completion = collectMessages writeCmd
 
                 let incomplete, incompleteCmd =
                     match completion with
-                    | [| WriteCompleted(_, _, Push, Ok(ProvisioningIncomplete _)) |] ->
+                    | [| WriteCompleted(_, _, Push _, Ok(ProvisioningIncomplete _)) |] ->
                         update deps ignore completion[0] requested
                     | _ -> failwith "Expected the failed bind to leave the provisioning incomplete."
 
@@ -4627,12 +5102,15 @@ Vitest.describe (
                 let! refreshMessages = collectMessages refreshCmd
                 let refreshed, _ = update deps ignore refreshMessages[0] refreshing
 
-                let retried, retryCmd = update deps ignore (WriteRequested Push) refreshed
+                let retried, retryCmd =
+                    update deps ignore (WriteRequested(Push GitUpdateAcceptance.RequirePreview)) refreshed
+
                 let! retryCompletion = collectMessages retryCmd
 
                 let finalState, _ =
                     match retryCompletion with
-                    | [| WriteCompleted(_, _, Push, Ok(Completed _)) |] -> update deps ignore retryCompletion[0] retried
+                    | [| WriteCompleted(_, _, Push _, Ok(Completed _)) |] ->
+                        update deps ignore retryCompletion[0] retried
                     | _ -> failwith "Expected the retried publish to complete."
 
                 Vitest
@@ -4671,17 +5149,19 @@ Vitest.describe (
 
                 let deps = {
                     defaultDependencies with
-                        update = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
+                        synchronize = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
                 }
 
-                let requested, writeCmd = update deps ignore (WriteRequested Pull) runningState
+                let requested, writeCmd =
+                    update deps ignore (WriteRequested(Pull GitUpdateAcceptance.RequirePreview)) runningState
+
                 let! completion = collectMessages writeCmd
 
                 let offered, offerCmd =
                     match completion with
                     | [| WriteCompleted(_,
                                         _,
-                                        Pull,
+                                        Pull _,
                                         Ok(RequiresRecovery(GitPendingRecovery.RestoreInterruptedPaths _, _))) |] ->
                         update deps ignore completion[0] requested
                     | _ -> failwith "Expected the restore offer."

@@ -734,14 +734,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 request.OperationId
                 (withService _.Synchronization "synchronization" (fun service context -> service.Refresh context))
                 Mappings.synchronizationState
-    previewUpdate =
-        fun request ->
-            withSession
-                event
-                request.OperationId
-                (withService _.Synchronization "synchronization" (fun service context -> service.PreviewUpdate context))
-                Mappings.updatePreview
-    update =
+    synchronize =
         fun request ->
             withMutatingSession
                 event
@@ -751,30 +744,15 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     _.Synchronization
                     "synchronization"
                     (fun service context ->
-                        service.Update
-                            {
-                                ExpectedWorkspaceVersion = request.ExpectedWorkspaceVersion
-                            }
-                            context
-                    ))
-                Mappings.synchronizationState
-    publish =
-        fun request ->
-            withMutatingSession
-                event
-                request.OperationId
-                false
-                (withService
-                    _.Synchronization
-                    "synchronization"
-                    (fun service context ->
                         withOptionalRevision
                             request.ExpectedTargetRevision
                             (fun expectedTarget ->
-                                service.Publish
+                                service.Synchronize
                                     {
                                         ExpectedWorkspaceVersion = request.ExpectedWorkspaceVersion
                                         ExpectedTargetRevision = expectedTarget
+                                        AcceptUpdateRisks = request.AcceptUpdateRisks
+                                        PublishLocalRevisions = request.PublishLocalRevisions
                                     }
                                     context
                             )

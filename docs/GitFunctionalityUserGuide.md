@@ -30,7 +30,7 @@ installDependency: InstallDependencyRequestDto -> JS.Promise<Result<OperationRes
 getStatus, listRefs, createRef, preflightSwitchRef, switchRef
 createRevision, restorePaths
 getDiffSummary, getTextDiff, getWordDiff, getBaseContent
-refreshSynchronization, previewUpdate, update, publish
+refreshSynchronization, synchronize
 getActiveConflictSession, resolveConflict, finalizeConflict, cancelConflict
 listObjects, materializeObject, dematerializeObject
 getStoragePolicySettings, setStoragePolicySettings, setPathStoragePolicy, pruneStorage, deduplicateStorage
@@ -85,9 +85,9 @@ promise {
 }
 ```
 
-The status carries `WorkspaceVersion`, an opaque optimistic concurrency token. Mutations (`createRevision`, `restorePaths`, `update`, `publish`, `switchRef`) send it back as `ExpectedWorkspaceVersion`. A stale token fails with `precondition_failed` in the `Concurrency` category and `StateChanged = false`. The workflow then refreshes and runs the write once more for commits, saves, publishes, branch creation and switching, settings and merge finalization. It never replays a discard, a restore of interrupted paths, an update or an abandoned merge, because those would act on content the user has not reviewed. They report the stale state and refresh instead.
+The status carries `WorkspaceVersion`, an opaque optimistic concurrency token. Mutations (`createRevision`, `restorePaths`, `synchronize`, `switchRef`) send it back as `ExpectedWorkspaceVersion`. A stale token fails with `precondition_failed` in the `Concurrency` category and `StateChanged = false`. The workflow then refreshes and runs the write once more for commits, saves, a push that carries no acceptance, branch creation and switching, settings and merge finalization. It never replays a discard, a restore of interrupted paths, a pull, an accepted synchronize or an abandoned merge, because those would act on content or a decision the user has not reviewed. They report the stale state and refresh instead.
 
-Primary save in the sidebar: `createRevision` with the exact selected paths, refresh, then either `publish` directly (no target or no tracking ref yet) or `previewUpdate`, a confirmation when the preview predicts a conflict session or data loss, `update`, and `publish`. A `publish` that fails with `publish_target_missing` creates the project on the DataHub through `IGitLabApi.createProject`, binds the workspace with `bindWorkspace` and publishes again. A `target_unreachable` failure is an outage and never triggers provisioning.
+Primary save in the sidebar is `createRevision` with the exact selected paths, a refresh and one `synchronize` with `PublishLocalRevisions = true`. The library refreshes, updates when the online copy is ahead and publishes. A `synchronize` that answers `publish_target_missing`, as a failure or as the partial result after an applied update, creates the project on the DataHub through `IGitLabApi.createProject`, binds the workspace with `bindWorkspace` and synchronizes again. A `target_unreachable` failure never triggers provisioning.
 
 ## 5. Main process structure
 
@@ -137,17 +137,13 @@ The file tree context menu disables blocked toggles, `GitLfsHelper` checks the r
 
 File actions of the explorer: "Download LFS file" calls `materializeObject`, "Free local LFS copy" calls `dematerializeObject`. Both need a clean file. "Clean LFS Cache" (`pruneStorage`) and "Reduce LFS Storage" (`deduplicateStorage`) need a clean working tree. Deduplication can fail on file systems without copy on write support, which is expected and shown to the user.
 
-Clone and update hydrate large objects when `MaterializeAllObjects` (clone) or the materialize setting (update) is on. A cancel during hydration keeps the update and reports a partial result with `retry_materialization`. The sidebar keeps the pulled state and offers the download again.
+Clone and synchronize hydrate large objects when `MaterializeAllObjects` (clone) or the materialize setting (synchronize) is on. A cancel during hydration keeps the update and reports a partial result with `retry_materialization`. The sidebar keeps the pulled state and offers the download again.
 
 ## 9. Refs and the update workflow
 
 `listRefs` returns local and remote refs with their kind. Switching to a remote ref goes through `preflightSwitchRef` and `switchRef` with the opaque provider ref. `createRef` creates and switches to a new local ref.
 
-`previewUpdate` fetches the target and reports `WouldCreateConflictSession` and `HasDataLossRisk`. The sidebar continues directly when both are false and asks first otherwise. A preview that fails with category `Unsupported` opens the indeterminate confirmation.
-
-`update` reconciles with the target. A conflict returns `PartiallySucceeded` with `conflicts_detected` and the recovery `resolve_conflict_session`, and the status carries the `ActiveConflictSession`. A canceled update returns `Failed` with category `Canceled` and one of the recovery codes `remove_index_lock`, `restore_workspace`, `refresh_workspace`, `inspect_workspace` or `abort_merge`, and the sidebar opens the matching dialog.
-
-`publish` pushes the current ref. It returns `NoOp` when the target is up to date.
+`synchronize` takes `ExpectedWorkspaceVersion`, `ExpectedTargetRevision`, `AcceptUpdateRisks` and `PublishLocalRevisions`. The pull button sends `PublishLocalRevisions = false`, the push button and the save send `true`. When the update would open a conflict session, the library stops with `update_would_create_conflict_session` (category `Conflict`, the overlapping paths in `AffectedPaths` when there are any, the target revision the preview used as `observed_target` evidence, recovery `accept_update_risks`) and the sidebar opens the merge resolution confirmation. Confirming repeats the write with `AcceptUpdateRisks = true` and the observed target, and the library refuses with `precondition_failed` when the target moved in between, which the sidebar reports without replaying. When the update would change files with local changes, the library stops with `update_would_overwrite_local_changes` (category `Conflict`, the paths in `AffectedPaths`, recovery `resolve_local_changes`). Acceptance does not apply there. The sidebar names the paths and asks the user to save or discard those changes first. A `preview_indeterminate` failure is a retryable provider failure and a decision code without `observed_target` evidence cannot be acted on, so the sidebar reports both as errors. A conflict returns `PartiallySucceeded` with `conflicts_detected` as before. A publish that fails after an applied update returns `PartiallySucceeded` with `Publication = LocalOnly` and recovery `retry_publish`, and the sidebar offers to publish now. A canceled update returns `Failed` with category `Canceled` and one of the recovery codes `remove_index_lock`, `restore_workspace`, `refresh_workspace`, `inspect_workspace` or `abort_merge`, and the sidebar opens the matching dialog.
 
 ## 10. Diff and conflict resolution
 
@@ -155,7 +151,7 @@ The diff page loads `getBaseContent`, `getWordDiff` and the current file content
 
 ## 11. Busy, progress and cancellation
 
-Mutations run under the vault busy flag so the file watcher does not merge Swate's own writes: `bindWorkspace`, `createRef`, `switchRef`, `createRevision`, `restorePaths`, `update`, `publish`, `resolveConflict`, `finalizeConflict`, `cancelConflict`, `materializeObject`, `dematerializeObject`, `setStoragePolicySettings`, `setPathStoragePolicy`, `pruneStorage`, `deduplicateStorage` and `clearStaleLock`. Nested busy scopes are counted per window, and the flag drops when the outermost scope ends. Read calls, `previewUpdate`, `refreshSynchronization`, the provisioning calls and the dependency calls do not take the flag.
+Mutations run under the vault busy flag so the file watcher does not merge Swate's own writes: `bindWorkspace`, `createRef`, `switchRef`, `createRevision`, `restorePaths`, `synchronize`, `resolveConflict`, `finalizeConflict`, `cancelConflict`, `materializeObject`, `dematerializeObject`, `setStoragePolicySettings`, `setPathStoragePolicy`, `pruneStorage`, `deduplicateStorage` and `clearStaleLock`. Nested busy scopes are counted per window, and the flag drops when the outermost scope ends. Read calls, `refreshSynchronization`, the provisioning calls and the dependency calls do not take the flag.
 
 Progress arrives through `versionControlProgress` with float `Completed` and `Total` counters. Clone reports progress to the window that requested it.
 
@@ -181,7 +177,7 @@ Provider specific behavior belongs in the library or in the composition root. Do
 
 The library requires Git 2.38 or newer and Git LFS 3.7 or newer. `checkDependencies` reports every component with `Installed`, `Compatible` and a remediation text. The sidebar shows the remediation when a component is missing or too old. Only the Git LFS configuration component can be installed through `installDependency`, which the sidebar offers when an operation fails with category `DependencyMissing`.
 
-`Authentication` or `Authorization` failures on update or publish:
+`Authentication` or `Authorization` failures on synchronize:
 
 - Confirm an account is signed in for the target host and its token is valid.
 - Confirm the remote URL is `https://` or full form `ssh://`.

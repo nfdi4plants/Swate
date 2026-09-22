@@ -459,17 +459,17 @@ let private commitAndPublish
 
         let! afterCommit = api.getStatus (request $"{operationPrefix}-status-after")
         let afterCommitStatus = (expectDtoValue "status after revision" afterCommit).Value
-        let! refreshed = api.refreshSynchronization (request $"{operationPrefix}-refresh")
-        let synchronization = (expectDtoValue "refresh synchronization" refreshed).Value
 
         let! published =
-            api.publish {
-                OperationId = $"{operationPrefix}-publish"
+            api.synchronize {
+                OperationId = $"{operationPrefix}-synchronize"
                 ExpectedWorkspaceVersion = afterCommitStatus.WorkspaceVersion
-                ExpectedTargetRevision = synchronization.TargetRevision
+                ExpectedTargetRevision = None
+                AcceptUpdateRisks = false
+                PublishLocalRevisions = true
             }
 
-        return (expectDtoSucceeded "publish local revision" published).Value
+        return (expectDtoSucceeded "synchronize local revision" published).Value
     }
 
 Vitest.describe (
@@ -655,7 +655,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "commits selected paths and publishes them to the repository",
+            "commits selected paths and synchronizes them to the repository",
             TestOptions(timeout = 120000, skip = not (integrationEnabled ())),
             fun () -> promise {
                 return!
@@ -682,20 +682,18 @@ Vitest.describe (
                         let afterCommitValue = (expectDtoValue "status after commit" afterCommit).Value
                         Vitest.expect(afterCommitValue.Changes).toEqual [||]
 
-                        let! refreshed = api.refreshSynchronization (request "lakefs-commit-refresh")
-                        let refreshedValue = (expectDtoValue "refresh before publish" refreshed).Value
-
                         let! published =
-                            api.publish {
-                                OperationId = "lakefs-publish"
+                            api.synchronize {
+                                OperationId = "lakefs-synchronize"
                                 ExpectedWorkspaceVersion = afterCommitValue.WorkspaceVersion
-                                ExpectedTargetRevision = refreshedValue.TargetRevision
+                                ExpectedTargetRevision = None
+                                AcceptUpdateRisks = false
+                                PublishLocalRevisions = true
                             }
 
-                        // This publish check accepts recoverable warnings because the test inspects its returned state.
-                        let publishedValue = (expectDtoValue "publish" published).Value
-                        Vitest.expect(publishedValue.Relationship).toEqual RevisionRelationshipDto.UpToDate
-                        Vitest.expect(publishedValue.LocalRevisionCount).toEqual None
+                        let synchronizedValue = (expectDtoValue "synchronize" published).Value
+                        Vitest.expect(synchronizedValue.Relationship).toEqual RevisionRelationshipDto.UpToDate
+                        Vitest.expect(synchronizedValue.LocalRevisionCount).toEqual None
 
                         let! objects = serverObjects fixture (lakeFsConnection ()) "main" "lakefs-list-main"
                         Vitest.expect(objects |> Array.exists (fun item -> item.Path = "data.txt")).toBe true
@@ -704,7 +702,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "updates the workspace from a revision made on the server",
+            "synchronizes a server revision into the workspace",
             TestOptions(timeout = 120000, skip = not (integrationEnabled ())),
             fun () -> promise {
                 return!
@@ -729,34 +727,20 @@ Vitest.describe (
                                 "Add remote file"
                                 "lakefs-update-remote-commit"
 
-                        let! refreshed = api.refreshSynchronization (request "lakefs-update-refresh")
-                        let refreshedValue = (expectDtoValue "refresh remote revision" refreshed).Value
-                        Vitest.expect(refreshedValue.TargetRevision.IsSome).toBe true
-
-                        Vitest
-                            .expect(
-                                refreshedValue.RemoteChangedPaths
-                                |> Option.defaultValue [||]
-                                |> Array.contains "remote.txt"
-                            )
-                            .toBe
-                            true
-
-                        let! preview = api.previewUpdate (request "lakefs-update-preview")
-                        let previewValue = (expectDtoValue "preview update" preview).Value
-                        Vitest.expect(previewValue.WouldCreateConflictSession).toBe false
-                        Vitest.expect(previewValue.HasDataLossRisk).toBe false
-
                         let! status = api.getStatus (request "lakefs-update-status")
-                        let statusValue = (expectDtoValue "status before update" status).Value
+                        let statusValue = (expectDtoValue "status before synchronize" status).Value
 
-                        let! updated =
-                            api.update {
-                                OperationId = "lakefs-update"
+                        let! synchronized =
+                            api.synchronize {
+                                OperationId = "lakefs-synchronize-update"
                                 ExpectedWorkspaceVersion = statusValue.WorkspaceVersion
+                                ExpectedTargetRevision = None
+                                AcceptUpdateRisks = false
+                                PublishLocalRevisions = false
                             }
 
-                        expectDtoSucceeded "update" updated |> ignore
+                        let outcome = expectDtoSucceeded "synchronize update" synchronized
+                        Vitest.expect(outcome.Effect).toEqual OperationEffectDto.Performed
 
                         Vitest
                             .expect(
@@ -766,6 +750,10 @@ Vitest.describe (
                             )
                             .toBe
                             "remote content\n"
+
+                        let! after = api.getStatus (request "lakefs-after-synchronize")
+                        let afterValue = (expectDtoValue "status after synchronize" after).Value
+                        Vitest.expect(afterValue.ActiveConflictSession).toEqual None
                     })
             }
         )
@@ -816,10 +804,35 @@ Vitest.describe (
                         let beforeUpdateValue =
                             (expectDtoValue "status before conflict update" beforeUpdate).Value
 
-                        let! updateResult =
-                            api.update {
-                                OperationId = "lakefs-conflict-update"
+                        // A diverged file needs the acceptance round trip: the first synchronize
+                        // stops with the decision, the accepted one opens the conflict session.
+                        let! decisionResult =
+                            api.synchronize {
+                                OperationId = "lakefs-conflict-synchronize-decision"
                                 ExpectedWorkspaceVersion = beforeUpdateValue.WorkspaceVersion
+                                ExpectedTargetRevision = None
+                                AcceptUpdateRisks = false
+                                PublishLocalRevisions = false
+                            }
+
+                        let decisionFailure = expectDtoFailureOrPartial "conflict decision" decisionResult
+                        Vitest.expect(decisionFailure.Category).toEqual FailureCategoryDto.Conflict
+                        Vitest.expect(decisionFailure.Code).toBe VersionControlCodes.UpdateWouldCreateConflictSession
+
+                        let observedTarget =
+                            decisionFailure.RevisionEvidence
+                            |> Array.tryFind (fun evidence -> evidence.Label = "observed_target")
+                            |> Option.map _.Revision
+
+                        Vitest.expect(observedTarget.IsSome).toBe true
+
+                        let! updateResult =
+                            api.synchronize {
+                                OperationId = "lakefs-conflict-synchronize"
+                                ExpectedWorkspaceVersion = beforeUpdateValue.WorkspaceVersion
+                                ExpectedTargetRevision = observedTarget
+                                AcceptUpdateRisks = true
+                                PublishLocalRevisions = false
                             }
 
                         let updateFailure = expectDtoFailureOrPartial "conflict update" updateResult
@@ -882,17 +895,16 @@ Vitest.describe (
 
                         Vitest.expect(afterFinalizeValue.ActiveConflictSession).toEqual None
 
-                        let! target = api.refreshSynchronization (request "lakefs-conflict-publish-refresh")
-                        let targetValue = (expectDtoValue "refresh before conflict publish" target).Value
-
                         let! published =
-                            api.publish {
-                                OperationId = "lakefs-publish-conflict"
+                            api.synchronize {
+                                OperationId = "lakefs-synchronize-conflict"
                                 ExpectedWorkspaceVersion = afterFinalizeValue.WorkspaceVersion
-                                ExpectedTargetRevision = targetValue.TargetRevision
+                                ExpectedTargetRevision = None
+                                AcceptUpdateRisks = false
+                                PublishLocalRevisions = true
                             }
 
-                        expectDtoSucceeded "publish resolved conflict" published |> ignore
+                        expectDtoSucceeded "synchronize resolved conflict" published |> ignore
 
                         let! serverContent =
                             downloadServerText
@@ -943,10 +955,33 @@ Vitest.describe (
                         let cancelBeforeUpdateValue =
                             (expectDtoValue "status before canceled conflict update" cancelBeforeUpdate).Value
 
-                        let! cancelUpdate =
-                            api.update {
-                                OperationId = "lakefs-conflict-cancel-update"
+                        let! cancelDecision =
+                            api.synchronize {
+                                OperationId = "lakefs-conflict-cancel-synchronize-decision"
                                 ExpectedWorkspaceVersion = cancelBeforeUpdateValue.WorkspaceVersion
+                                ExpectedTargetRevision = None
+                                AcceptUpdateRisks = false
+                                PublishLocalRevisions = false
+                            }
+
+                        let cancelDecisionFailure =
+                            expectDtoFailureOrPartial "canceled conflict decision" cancelDecision
+
+                        Vitest.expect(cancelDecisionFailure.Code).toBe
+                            VersionControlCodes.UpdateWouldCreateConflictSession
+
+                        let cancelObservedTarget =
+                            cancelDecisionFailure.RevisionEvidence
+                            |> Array.tryFind (fun evidence -> evidence.Label = "observed_target")
+                            |> Option.map _.Revision
+
+                        let! cancelUpdate =
+                            api.synchronize {
+                                OperationId = "lakefs-conflict-cancel-synchronize"
+                                ExpectedWorkspaceVersion = cancelBeforeUpdateValue.WorkspaceVersion
+                                ExpectedTargetRevision = cancelObservedTarget
+                                AcceptUpdateRisks = true
+                                PublishLocalRevisions = false
                             }
 
                         let cancelFailure =
@@ -1078,10 +1113,12 @@ Vitest.describe (
                                 (expectLakeFs "lakeFS head before canceled publish" beforeBranch).CommitId
 
                             let running =
-                                api.publish {
+                                api.synchronize {
                                     OperationId = "lakefs-cancel-publish"
                                     ExpectedWorkspaceVersion = statusValue.WorkspaceVersion
                                     ExpectedTargetRevision = None
+                                    AcceptUpdateRisks = false
+                                    PublishLocalRevisions = true
                                 }
 
                             let enteredRace = promise {
@@ -1137,19 +1174,16 @@ Vitest.describe (
                                     let! retryStatus = api.getStatus (request "lakefs-cancel-retry-status")
                                     let retryStatusValue = (expectDtoValue "cancel retry status" retryStatus).Value
 
-                                    let! retryRefresh =
-                                        api.refreshSynchronization (request "lakefs-cancel-retry-refresh")
-
-                                    let retryRefreshValue = (expectDtoValue "cancel retry refresh" retryRefresh).Value
-
                                     let! republished =
-                                        api.publish {
-                                            OperationId = "lakefs-cancel-retry-publish"
+                                        api.synchronize {
+                                            OperationId = "lakefs-cancel-retry-synchronize"
                                             ExpectedWorkspaceVersion = retryStatusValue.WorkspaceVersion
-                                            ExpectedTargetRevision = retryRefreshValue.TargetRevision
+                                            ExpectedTargetRevision = None
+                                            AcceptUpdateRisks = false
+                                            PublishLocalRevisions = true
                                         }
 
-                                    expectDtoSucceeded "publish after cancellation" republished |> ignore
+                                    expectDtoSucceeded "synchronize after cancellation" republished |> ignore
 
                                     let! objects =
                                         serverObjects fixture (lakeFsConnection ()) "main" "lakefs-cancel-list-main"

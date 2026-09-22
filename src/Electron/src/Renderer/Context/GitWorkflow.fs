@@ -59,12 +59,20 @@ type GitPageChange =
     | Set of PageState
     | Clear
 
+/// Whether the user has accepted the update a synchronize flagged. An acceptance carries the
+/// target revision and the workspace token the preview was computed for, so it never applies
+/// to a state the user did not see.
+[<RequireQualifiedAccess>]
+type GitUpdateAcceptance =
+    | RequirePreview
+    | Accepted of observedTarget: string * workspaceVersion: string
+
 /// What the confirmation dialog continues with when the user confirms.
 [<RequireQualifiedAccess>]
 type GitPendingRemoteAction =
     | None
-    | UpdateFromOnline
-    | CompletePrimarySavePush
+    | UpdateFromOnline of GitUpdateAcceptance
+    | PublishAfterUpdate of GitUpdateAcceptance
     | FinalizeMerge
     /// The dialog offers the recovery stored in PendingRecovery.
     | Recover
@@ -84,6 +92,7 @@ type GitInterruptedUpdate = {
 type GitPendingRecovery =
     | RestoreInterruptedPaths of GitInterruptedUpdate
     | RetryMaterialization of message: string
+    | RetryPublish of message: string
     | ClearStaleLock of instructions: string option
     | ClearCloneTarget of targetPath: string * instructions: string option
 
@@ -235,8 +244,8 @@ type PreparedCommitOperation = {
 
 type WriteRequest =
     | Fetch
-    | Pull
-    | Push
+    | Pull of GitUpdateAcceptance
+    | Push of GitUpdateAcceptance
     | PrimarySave of PreparedCommitOperation
     | Clone of CloneWorkspaceRequestDto * Reply<string>
     | CommitSelection of PreparedCommitOperation
@@ -289,6 +298,7 @@ type private RoutedFailure =
     | StaleWorkspace of string
     /// The workspace has a conflict session the user has to resolve first.
     | ConflictSession of OperationFailureDto
+    | UpdateAcceptanceRequired of dialog: GitSidebarConfirmationDialog * observedTarget: string
     | Error of string
 
 type Msg =
@@ -319,7 +329,6 @@ type Msg =
     | CancelCurrentOperationRequested
     | CancelCurrentOperationCompleted of Result<bool, string>
     | UpdateFromOnlineRequested
-    | UpdatePreflightCompleted of sessionId: int * Result<OperationResultDto<UpdatePreviewDto>, string>
     | CloneRequested of CloneWorkspaceRequestDto * Reply<string>
     | PrimarySaveSelectionRequested of GitSidebarCommitSelectionRequest
     | PrimarySaveAllRequested of string
@@ -367,9 +376,7 @@ type GitDependencies = {
         InstallDependencyRequestDto -> JS.Promise<Result<OperationResultDto<DependencyStatusDto>, string>>
     refreshSynchronization:
         OperationRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, string>>
-    previewUpdate: OperationRequestDto -> JS.Promise<Result<OperationResultDto<UpdatePreviewDto>, string>>
-    update: UpdateRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, string>>
-    publish: PublishRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, string>>
+    synchronize: SynchronizeRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, string>>
     cancelOperation: OperationKeyDto -> JS.Promise<Result<bool, string>>
     cloneWorkspace: CloneWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<string>, string>>
     createRef: CreateRefRequestDto -> JS.Promise<Result<OperationResultDto<LogicalRefDto>, string>>
@@ -546,10 +553,6 @@ let needsDependencyInstall (failure: OperationFailureDto) =
 let needsPublishTarget (failure: OperationFailureDto) =
     failure.Code = VersionControlCodes.PublishTargetMissing
 
-let hasNoTarget (synchronization: SynchronizationStateDto) =
-    synchronization.Relationship = RevisionRelationshipDto.NoTarget
-    || synchronization.TargetRef.IsNone
-
 /// The pending recovery a completed write leaves behind, from the structured partial
 /// failure the library attached to it.
 let recoveryOfPartial (partial: OperationFailureDto option) : GitPendingRecovery option =
@@ -558,6 +561,8 @@ let recoveryOfPartial (partial: OperationFailureDto option) : GitPendingRecovery
         match recoveryCode failure with
         | Some code when code = VersionControlCodes.Recovery.RetryMaterialization ->
             Some(GitPendingRecovery.RetryMaterialization(failureMessage failure))
+        | Some code when code = VersionControlCodes.Recovery.RetryPublish ->
+            Some(GitPendingRecovery.RetryPublish(failureMessage failure))
         | _ -> None
     )
 
@@ -585,6 +590,12 @@ let recoveryDialog (recovery: GitPendingRecovery) : GitSidebarConfirmationDialog
         Title = "Large files not downloaded"
         Message = $"{message} Download the missing large files now?"
         ConfirmLabel = "Download now"
+        CancelLabel = "Later"
+      }
+    | GitPendingRecovery.RetryPublish message -> {
+        Title = "Online sync pending"
+        Message = message
+        ConfirmLabel = "Publish now"
         CancelLabel = "Later"
       }
     | GitPendingRecovery.ClearStaleLock instructions ->
@@ -792,8 +803,8 @@ let private reportErrorCmd (deps: GitDependencies) (title: string) (message: str
 let private titleForWriteRequest =
     function
     | Fetch -> "Could not fetch changes"
-    | Pull -> "Could not pull changes"
-    | Push -> "Could not push changes"
+    | Pull _ -> "Could not pull changes"
+    | Push _ -> "Could not push changes"
     | PrimarySave _ -> "Could not save changes"
     | Clone _ -> "Could not clone repository"
     | CommitSelection _
@@ -902,15 +913,6 @@ let private refreshAllAsync (deps: GitDependencies) = promise {
 
 let private versionOf (refreshResult: GitRefreshResult) =
     refreshResult.Status |> Result.toOption |> Option.map _.WorkspaceVersion
-
-let private targetRevisionOf (refreshResult: GitRefreshResult) =
-    refreshResult.Status
-    |> Result.toOption
-    |> Option.bind _.Synchronization
-    |> Option.bind _.TargetRevision
-
-let private synchronizationOf (refreshResult: GitRefreshResult) =
-    refreshResult.Status |> Result.toOption |> Option.bind _.Synchronization
 
 let private runInitRepositoryAsync (deps: GitDependencies) (arcPath: string) = promise {
     let! initResult =
@@ -1029,6 +1031,39 @@ let private loadPageAsync
         return result |> Result.map GitPageChange.Set
     }
 
+let private conflictSessionConfirmationDialog (overlappingPaths: string[]) : GitSidebarConfirmationDialog =
+    let overlapping =
+        if overlappingPaths.Length > 0 then
+            let separator = ", "
+            let joined = String.Join(separator, overlappingPaths)
+            $" Changed both locally and online: {joined}."
+        else
+            ""
+
+    {
+        Title = "Merge resolution required"
+        Message = $"Updating from online will require merge resolution.{overlapping} Continue?"
+        ConfirmLabel = "Open Merge Resolution"
+        CancelLabel = "Cancel"
+    }
+
+let private localChangesOverwriteMessage (affectedPaths: string[]) =
+    if affectedPaths.Length > 0 then
+        let joined = String.Join(", ", affectedPaths)
+        $"Updating from online would change files you also changed locally: {joined}. Save or discard those changes, then try again."
+    else
+        "Updating from online would change files you also changed locally. Save or discard your local changes, then try again."
+
+let private observedTargetOf (failure: OperationFailureDto) =
+    failure.RevisionEvidence
+    |> Array.tryFind (fun evidence -> evidence.Label = "observed_target")
+    |> Option.map _.Revision
+
+let private isConflictPartial (failure: OperationFailureDto) =
+    failure.Category = FailureCategoryDto.Conflict
+    || failure.Code = VersionControlCodes.ConflictsDetected
+    || failure.Code = VersionControlCodes.ConflictSessionActive
+
 /// Routes a structured failure. Categories and codes decide, never the message.
 let private routeFailure (targetPath: string option) (failure: OperationFailureDto) : RoutedFailure =
     if isCanceled failure then
@@ -1062,6 +1097,16 @@ let private routeFailure (targetPath: string option) (failure: OperationFailureD
             ->
             RoutedFailure.InspectAfterCancel(failureMessage failure)
         | _ -> RoutedFailure.Cancelled(failureMessage failure)
+    elif failure.Code = VersionControlCodes.UpdateWouldOverwriteLocalChanges then
+        RoutedFailure.Error(localChangesOverwriteMessage failure.AffectedPaths)
+    elif
+        failure.Code = VersionControlCodes.UpdateWouldCreateConflictSession
+        && (observedTargetOf failure |> Option.isSome)
+    then
+        match observedTargetOf failure with
+        | Some target ->
+            RoutedFailure.UpdateAcceptanceRequired(conflictSessionConfirmationDialog failure.AffectedPaths, target)
+        | None -> RoutedFailure.Error(failureMessage failure)
     elif needsDependencyInstall failure then
         RoutedFailure.DependencyInstall(failureMessage failure)
     elif
@@ -1119,13 +1164,7 @@ let private completeAfterUpdateAsync
         | Error failure, _ -> return Error(failureMessage failure)
         | Ok _, Some message -> return Error message
         | Ok latestStatus, None ->
-            let isConflictOutcome =
-                partial
-                |> Option.exists (fun failure ->
-                    failure.Category = FailureCategoryDto.Conflict
-                    || failure.Code = VersionControlCodes.ConflictsDetected
-                    || failure.Code = VersionControlCodes.ConflictSessionActive
-                )
+            let isConflictOutcome = partial |> Option.exists isConflictPartial
 
             let partialToKeep = if isConflictOutcome then None else partial
 
@@ -1213,6 +1252,8 @@ let private routedToOutcome (deps: GitDependencies) (routed: RoutedFailure) = pr
         | Error refreshFailure -> return Error(failureMessage refreshFailure)
     | RoutedFailure.StaleWorkspace message -> return Ok(StaleWorkspaceVersion message)
     | RoutedFailure.ConflictSession failure -> return! completeAfterUpdateAsync deps (Some failure) None
+    | RoutedFailure.UpdateAcceptanceRequired(_, _) ->
+        return Error "The synchronization needs a decision that this write cannot offer."
     | RoutedFailure.Error message -> return Error message
 }
 
@@ -1239,6 +1280,58 @@ let private refreshAfterSuccess
                             partial |> Option.map failureMessage,
                             partial
                         )
+                    )
+                )
+    }
+
+let private completeAfterSynchronizeAsync
+    (deps: GitDependencies)
+    (partial: OperationFailureDto option)
+    (pendingWarning: string option)
+    =
+    promise {
+        if partial |> Option.exists isConflictPartial then
+            return! completeAfterUpdateAsync deps partial pendingWarning
+        else
+            let! result = refreshAfterSuccess deps partial GitPageChange.NoChange None
+
+            return
+                result
+                |> Result.map (fun outcome ->
+                    match outcome with
+                    | Completed(UnitSuccess(refreshResult, pageChange, selectedChangePath, warning, keptPartial)) ->
+                        Completed(
+                            UnitSuccess(
+                                refreshResult,
+                                pageChange,
+                                selectedChangePath,
+                                pendingWarning |> Option.orElse warning,
+                                keptPartial
+                            )
+                        )
+                    | other -> other
+                )
+    }
+
+let private acceptanceConfirmation
+    (deps: GitDependencies)
+    (dialog: GitSidebarConfirmationDialog)
+    (action: GitPendingRemoteAction)
+    (pendingWarning: string option)
+    =
+    promise {
+        let! refreshResult = refreshAllAsync deps
+
+        match refreshResult.Status, refreshErrorMessage refreshResult with
+        | Error failure, _ -> return Error(failureMessage failure)
+        | Ok _, Some message -> return Error message
+        | Ok _, None ->
+            return
+                Ok(
+                    CompletedWithPendingRemoteConfirmation(
+                        UnitSuccess(refreshResult, GitPageChange.NoChange, None, pendingWarning, None),
+                        dialog,
+                        action
                     )
                 )
     }
@@ -1275,6 +1368,28 @@ let private requireSynchronization (state: GitState) =
         Error "This workspace provider does not support online synchronization."
     | _ -> Ok()
 
+let private synchronizeRequest
+    (deps: GitDependencies)
+    (version: string)
+    (acceptance: GitUpdateAcceptance)
+    (publish: bool)
+    : SynchronizeRequestDto =
+    match acceptance with
+    | GitUpdateAcceptance.RequirePreview -> {
+        OperationId = deps.newOperationId ()
+        ExpectedWorkspaceVersion = version
+        ExpectedTargetRevision = None
+        AcceptUpdateRisks = false
+        PublishLocalRevisions = publish
+      }
+    | GitUpdateAcceptance.Accepted(target, acceptedVersion) -> {
+        OperationId = deps.newOperationId ()
+        ExpectedWorkspaceVersion = acceptedVersion
+        ExpectedTargetRevision = Some target
+        AcceptUpdateRisks = true
+        PublishLocalRevisions = publish
+      }
+
 let private runCloneAttemptAsync (deps: GitDependencies) (cloneRequest: CloneWorkspaceRequestDto) = promise {
     let! result =
         toResult (
@@ -1292,22 +1407,25 @@ let private runCloneAttemptAsync (deps: GitDependencies) (cloneRequest: CloneWor
 /// After an update: opens the first conflicted item, asks to finalize an emptied
 /// conflict session, or reports the refreshed state. A conflict outcome without a
 /// session stops here with its failure so nothing publishes on top of it.
-let private runPullAttemptAsync (deps: GitDependencies) (state: GitState) = promise {
+let private runPullAttemptAsync (deps: GitDependencies) (state: GitState) (acceptance: GitUpdateAcceptance) = promise {
     match requireSynchronization state, requireWorkspaceVersion state with
     | Error message, _
     | _, Error message -> return Error message
     | Ok(), Ok version ->
-        let! result =
-            toResult (
-                deps.update {
-                    OperationId = deps.newOperationId ()
-                    ExpectedWorkspaceVersion = version
-                }
-            )
+        let! result = toResult (deps.synchronize (synchronizeRequest deps version acceptance false))
 
         match result with
-        | Ok(_, partial) -> return! completeAfterUpdateAsync deps partial None
-        | Error failure -> return! routedToOutcome deps (routeFailure None failure)
+        | Ok(_, partial) -> return! completeAfterSynchronizeAsync deps partial None
+        | Error failure ->
+            match routeFailure None failure with
+            | RoutedFailure.UpdateAcceptanceRequired(dialog, target) ->
+                return!
+                    acceptanceConfirmation
+                        deps
+                        dialog
+                        (GitPendingRemoteAction.UpdateFromOnline(GitUpdateAcceptance.Accepted(target, version)))
+                        None
+            | routed -> return! routedToOutcome deps routed
 }
 
 let private runCommitAttemptAsync (deps: GitDependencies) (state: GitState) (prepared: PreparedCommitOperation) = promise {
@@ -1359,52 +1477,6 @@ let private runDiscardAttemptAsync (deps: GitDependencies) (state: GitState) (pa
 let private pendingPrimarySaveWarning =
     "Changes were saved locally. Online sync is still pending."
 
-let private indeterminateUpdateMessage (message: string option) =
-    let fallback =
-        "Swate could not determine safely whether updating will require merge resolution. Continue anyway?"
-
-    match
-        message
-        |> Option.map _.Trim()
-        |> Option.filter (String.IsNullOrWhiteSpace >> not)
-    with
-    | Some diagnostic -> $"{fallback} {diagnostic}"
-    | None -> fallback
-
-let private mergeConfirmationDialog (preview: UpdatePreviewDto) : GitSidebarConfirmationDialog =
-    let overlapping =
-        if preview.OverlappingPaths.Length > 0 then
-            let separator = ", "
-            let joined = String.Join(separator, preview.OverlappingPaths)
-            $" Changed both locally and online: {joined}."
-        else
-            ""
-
-    if preview.WouldCreateConflictSession then
-        {
-            Title = "Merge resolution required"
-            Message = $"Updating from online will require merge resolution.{overlapping} Continue?"
-            ConfirmLabel = "Open Merge Resolution"
-            CancelLabel = "Cancel"
-        }
-    else
-        {
-            Title = "Local changes would be overwritten"
-            Message = $"Updating from online would overwrite local changes.{overlapping} Continue?"
-            ConfirmLabel = "Update anyway"
-            CancelLabel = "Cancel"
-        }
-
-let private indeterminateConfirmationDialog (message: string option) : GitSidebarConfirmationDialog = {
-    Title = "Update could not be previewed"
-    Message = indeterminateUpdateMessage message
-    ConfirmLabel = "Continue"
-    CancelLabel = "Cancel"
-}
-
-let private previewNeedsConfirmation (preview: UpdatePreviewDto) =
-    preview.WouldCreateConflictSession || preview.HasDataLossRisk
-
 /// The saved-locally outcome after a remote step failed. The snapshot is refreshed
 /// first, because the failed step may have changed the workspace.
 let private pendingPrimarySaveRemoteFailureAsync (deps: GitDependencies) (message: string) = promise {
@@ -1437,25 +1509,19 @@ type private PublishFailure =
     | ProjectNameRefused of string
     | ProvisioningIncomplete of GitProvisionedRemote * string
 
-/// Publishes the current refs. Without a configured target the repository is created
-/// on the DataHub of the signed-in account (or the one created earlier is reused), the
-/// workspace is bound to it and the publish runs once more. An unreachable target is
-/// an outage and never triggers provisioning.
+/// Synchronizes the workspace. Without a publication target the repository is created on the
+/// DataHub of the signed-in account (or the one created earlier is reused), the workspace is
+/// bound to it and the synchronize runs once more. An unreachable target is an outage and
+/// never triggers provisioning.
 let private runPublishAsync
     (deps: GitDependencies)
     (model: GitState)
     (version: string)
-    (targetRevision: string option)
+    (acceptance: GitUpdateAcceptance)
     : JS.Promise<Result<OperationOutcomeDto<SynchronizationStateDto> * OperationFailureDto option, PublishFailure>> =
     promise {
-        let publishOnce (version: string) (targetRevision: string option) =
-            toResult (
-                deps.publish {
-                    OperationId = deps.newOperationId ()
-                    ExpectedWorkspaceVersion = version
-                    ExpectedTargetRevision = targetRevision
-                }
-            )
+        let publishOnce version acceptance =
+            toResult (deps.synchronize (synchronizeRequest deps version acceptance true))
 
         let projectName =
             model.CurrentArcPath |> Option.bind tryGetPathLeaf |> Option.defaultValue "ARC"
@@ -1489,10 +1555,7 @@ let private runPublishAsync
                 | Error failure ->
                     return Error(PublishFailure.ProvisioningIncomplete(boundRemote, failureMessage failure))
                 | Ok(statusOutcome, _) ->
-                    let! published =
-                        publishOnce
-                            statusOutcome.Value.WorkspaceVersion
-                            (statusOutcome.Value.Synchronization |> Option.bind _.TargetRevision)
+                    let! published = publishOnce statusOutcome.Value.WorkspaceVersion GitUpdateAcceptance.RequirePreview
 
                     match published with
                     | Ok(outcome, partial) -> return Ok(outcome, partial)
@@ -1523,9 +1586,10 @@ let private runPublishAsync
         match model.ProvisionedRemote with
         | Some _ -> return! provisionAndPublish ()
         | None ->
-            let! first = publishOnce version targetRevision
+            let! first = publishOnce version acceptance
 
             match first with
+            | Ok(_, Some partial) when needsPublishTarget partial -> return! provisionAndPublish ()
             | Ok(outcome, partial) -> return Ok(outcome, partial)
             | Error failure when needsPublishTarget failure -> return! provisionAndPublish ()
             | Error failure -> return Error(PublishFailure.Routed(routeFailure None failure))
@@ -1539,15 +1603,22 @@ let private publishFailureToOutcome (deps: GitDependencies) (failure: PublishFai
         return Ok(ProvisioningIncomplete(provisioned, message))
 }
 
-let private runPushAttemptAsync (deps: GitDependencies) (state: GitState) = promise {
+let private runPushAttemptAsync (deps: GitDependencies) (state: GitState) (acceptance: GitUpdateAcceptance) = promise {
     match requireSynchronization state, requireWorkspaceVersion state with
     | Error message, _
     | _, Error message -> return Error message
     | Ok(), Ok version ->
-        let! result = runPublishAsync deps state version state.TargetRevision
+        let! result = runPublishAsync deps state version acceptance
 
         match result with
-        | Ok(_, partial) -> return! refreshAfterSuccess deps partial GitPageChange.NoChange None
+        | Ok(_, partial) -> return! completeAfterSynchronizeAsync deps partial None
+        | Error(PublishFailure.Routed(RoutedFailure.UpdateAcceptanceRequired(dialog, target))) ->
+            return!
+                acceptanceConfirmation
+                    deps
+                    dialog
+                    (GitPendingRemoteAction.PublishAfterUpdate(GitUpdateAcceptance.Accepted(target, version)))
+                    None
         | Error failure -> return! publishFailureToOutcome deps failure
 }
 
@@ -1557,9 +1628,9 @@ let private runFetchAttemptAsync (deps: GitDependencies) (state: GitState) = pro
     | Ok() -> return! simpleWriteAsync deps (fun () -> deps.refreshSynchronization (request deps))
 }
 
-/// Primary save: commit the exact selection, then bring the branch online. A partial
+/// Primary save commits the exact selection, then synchronizes the workspace. A partial
 /// commit that needs reconciliation stops here with its recovery. A no-op commit still
-/// continues with the online steps, because the workspace may be ahead of the target.
+/// continues with synchronization because the workspace may be ahead of the target.
 let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState) (prepared: PreparedCommitOperation) = promise {
     let! commitAttempt = runCommitAttemptAsync deps state prepared
 
@@ -1600,11 +1671,26 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
     | Ok(Completed(UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, _, None))) ->
         let refreshedState = applyRefreshResult refreshResult state
 
-        let runPushAfterLocalCommit (version: string) (targetRevision: string option) = promise {
-            let! pushResult = runPublishAsync deps refreshedState version targetRevision
+        let runPushAfterLocalCommit (version: string) = promise {
+            let! pushResult = runPublishAsync deps refreshedState version GitUpdateAcceptance.RequirePreview
 
             match pushResult with
-            | Ok(_, partial) -> return! refreshAfterSuccess deps partial GitPageChange.NoChange None
+            | Ok(_, partial) -> return! completeAfterSynchronizeAsync deps partial (Some pendingPrimarySaveWarning)
+            | Error(PublishFailure.Routed(RoutedFailure.UpdateAcceptanceRequired(dialog, target))) ->
+                return
+                    Ok(
+                        CompletedWithPendingRemoteConfirmation(
+                            UnitSuccess(
+                                refreshResult,
+                                pageChange,
+                                selectedChangePathOverride,
+                                Some pendingPrimarySaveWarning,
+                                None
+                            ),
+                            dialog,
+                            GitPendingRemoteAction.PublishAfterUpdate(GitUpdateAcceptance.Accepted(target, version))
+                        )
+                    )
             | Error(PublishFailure.ProjectNameRefused message) -> return Ok(RequiresRemoteProjectRename message)
             | Error(PublishFailure.ProvisioningIncomplete(provisioned, message)) ->
                 return Ok(ProvisioningIncomplete(provisioned, message))
@@ -1624,98 +1710,10 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
                 return! completeAfterUpdateAsync deps (Some failure) (Some pendingPrimarySaveWarning)
         }
 
-        match versionOf refreshResult, synchronizationOf refreshResult with
-        | None, _ ->
+        match versionOf refreshResult with
+        | None ->
             return! pendingPrimarySaveRemoteFailureAsync deps "The workspace state could not be read after saving."
-        | Some version, synchronization ->
-            let noTarget = synchronization |> Option.map hasNoTarget |> Option.defaultValue true
-
-            if noTarget then
-                return! runPushAfterLocalCommit version (targetRevisionOf refreshResult)
-            else
-                let! previewResult = toResult (deps.previewUpdate (request deps))
-
-                match previewResult with
-                | Error failure when failure.Category = FailureCategoryDto.Unsupported ->
-                    return
-                        Ok(
-                            CompletedWithPendingRemoteConfirmation(
-                                UnitSuccess(
-                                    refreshResult,
-                                    pageChange,
-                                    selectedChangePathOverride,
-                                    Some pendingPrimarySaveWarning,
-                                    None
-                                ),
-                                indeterminateConfirmationDialog (Some failure.Message),
-                                GitPendingRemoteAction.CompletePrimarySavePush
-                            )
-                        )
-                | Error failure -> return! pendingPrimarySaveRemoteFailureAsync deps (failureMessage failure)
-                | Ok(previewOutcome, _) when previewNeedsConfirmation previewOutcome.Value ->
-                    return
-                        Ok(
-                            CompletedWithPendingRemoteConfirmation(
-                                UnitSuccess(
-                                    refreshResult,
-                                    pageChange,
-                                    selectedChangePathOverride,
-                                    Some pendingPrimarySaveWarning,
-                                    None
-                                ),
-                                mergeConfirmationDialog previewOutcome.Value,
-                                GitPendingRemoteAction.CompletePrimarySavePush
-                            )
-                        )
-                | Ok _ ->
-                    let! updateResult =
-                        toResult (
-                            deps.update {
-                                OperationId = deps.newOperationId ()
-                                ExpectedWorkspaceVersion = version
-                            }
-                        )
-
-                    match updateResult with
-                    | Error failure ->
-                        let routed = routeFailure None failure
-
-                        match routed with
-                        | RoutedFailure.Recovery(recovery, message) -> return Ok(RequiresRecovery(recovery, message))
-                        | RoutedFailure.ConflictSession failure ->
-                            return! completeAfterUpdateAsync deps (Some failure) (Some pendingPrimarySaveWarning)
-                        | RoutedFailure.RefreshAfterCancel message
-                        | RoutedFailure.InspectAfterCancel message ->
-                            return! pendingPrimarySaveRemoteFailureAsync deps message
-                        | RoutedFailure.Cancelled message
-                        | RoutedFailure.DependencyInstall message
-                        | RoutedFailure.StaleWorkspace message
-                        | RoutedFailure.Error message -> return! pendingPrimarySaveRemoteFailureAsync deps message
-                    | Ok(_, partial) ->
-                        let! afterUpdate = completeAfterUpdateAsync deps partial (Some pendingPrimarySaveWarning)
-
-                        match afterUpdate with
-                        | Ok(Completed(UnitSuccess(updatedResult, GitPageChange.NoChange, None, _, updatePartial))) when
-                            (updatedResult.Status |> Result.toOption |> Option.bind _.ActiveConflictSession).IsNone
-                            ->
-                            match versionOf updatedResult with
-                            | Some updatedVersion ->
-                                let! pushed = runPushAfterLocalCommit updatedVersion (targetRevisionOf updatedResult)
-
-                                match pushed, updatePartial with
-                                | Ok(Completed(UnitSuccess(finalResult, page, selection, warning, None))), Some kept ->
-                                    // A materialization retry offered by the update survives a later publish.
-                                    return Ok(Completed(UnitSuccess(finalResult, page, selection, warning, Some kept)))
-                                | other, _ -> return other
-                            | None ->
-                                return!
-                                    pendingPrimarySaveRemoteFailureAsync
-                                        deps
-                                        "The workspace state could not be read after updating."
-                        | Ok(CompletedWithPendingRemoteConfirmation(success, dialog, action)) ->
-                            // A conflict session waits for the user. The publish resumes after the merge.
-                            return Ok(CompletedWithPendingRemoteConfirmation(success, dialog, action))
-                        | other -> return other
+        | Some version -> return! runPushAfterLocalCommit version
     | Ok(Completed(CloneSuccess _)) -> return Error "Primary save produced an invalid result."
     | Ok other -> return Ok other
 }
@@ -1881,8 +1879,8 @@ let private runRetryMaterializationAttemptAsync (deps: GitDependencies) = promis
 let private executeWriteAttemptOnce (deps: GitDependencies) (state: GitState) (writeRequest: WriteRequest) = promise {
     match writeRequest with
     | Fetch -> return! runFetchAttemptAsync deps state
-    | Pull -> return! runPullAttemptAsync deps state
-    | Push -> return! runPushAttemptAsync deps state
+    | Pull acceptance -> return! runPullAttemptAsync deps state acceptance
+    | Push acceptance -> return! runPushAttemptAsync deps state acceptance
     | PrimarySave prepared -> return! runPrimarySaveAttemptAsync deps state prepared
     | Clone(cloneRequest, _) -> return! runCloneAttemptAsync deps cloneRequest
     | CommitSelection prepared -> return! runCommitAttemptAsync deps state prepared
@@ -1902,14 +1900,17 @@ let private executeWriteAttemptOnce (deps: GitDependencies) (state: GitState) (w
 
 /// Writes that change the working tree from a state the user reviewed are not replayed
 /// against a workspace that moved in between. A discard or a restore would drop content
-/// the user has not seen. An update would run without its preview. Finalizing or
+/// the user has not seen. An update would run without its preview. An accepted synchronize is
+/// pinned to the target and the token the user saw, so a stale token means the decision no
+/// longer applies and a fresh preview is needed. Finalizing or
 /// abandoning a merge would act on whichever conflict session the refresh found, which
 /// is not the one the user reviewed.
 let private replaysAfterStaleToken =
     function
     | DiscardSelection _
     | RestoreInterruptedPaths _
-    | Pull
+    | Pull _
+    | Push(GitUpdateAcceptance.Accepted _)
     | FinalizeMerge
     | AbandonMerge -> false
     | _ -> true
@@ -2054,8 +2055,8 @@ let private writeErrorModel (message: string) (model: GitState) = {
 let private busyOperationForWriteRequest =
     function
     | Fetch -> GitBusyOperation.FetchingFromRemote
-    | Pull -> GitBusyOperation.PullingFromRemote
-    | Push -> GitBusyOperation.PushingToRemote
+    | Pull _ -> GitBusyOperation.PullingFromRemote
+    | Push _ -> GitBusyOperation.PushingToRemote
     | PrimarySave prepared -> prepared.BusyOperation
     | Clone(cloneRequest, _) -> GitBusyOperation.CloningRepository cloneRequest.TargetPath
     | CommitSelection prepared -> prepared.BusyOperation
@@ -2278,7 +2279,8 @@ let private updateCore
                     applyPageChangeCmd setPageState GitPageChange.Clear
                     reportErrorCmd deps "Could not refresh Git state" message
                 ]
-            | None when nextModel.PendingPublishAfterRefresh -> Cmd.ofMsg (WriteRequested Push)
+            | None when nextModel.PendingPublishAfterRefresh ->
+                Cmd.ofMsg (WriteRequested(Push GitUpdateAcceptance.RequirePreview))
             | None -> Cmd.none
 
         {
@@ -2451,7 +2453,7 @@ let private updateCore
             },
             Cmd.batch [
                 applyPageChangeCmd setPageState outcome.PageChange
-                Cmd.ofMsg (WriteRequested Push)
+                Cmd.ofMsg (WriteRequested(Push GitUpdateAcceptance.RequirePreview))
             ]
         else
             nextModel, applyPageChangeCmd setPageState outcome.PageChange
@@ -2482,8 +2484,8 @@ let private updateCore
             )
         )
     | FetchRequested -> model, Cmd.ofMsg (WriteRequested Fetch)
-    | PullRequested -> model, Cmd.ofMsg (WriteRequested Pull)
-    | PushRequested -> model, Cmd.ofMsg (WriteRequested Push)
+    | PullRequested -> model, Cmd.ofMsg (WriteRequested(Pull GitUpdateAcceptance.RequirePreview))
+    | PushRequested -> model, Cmd.ofMsg (WriteRequested(Push GitUpdateAcceptance.RequirePreview))
     | CancelCurrentOperationRequested ->
         match model.CurrentOperation with
         | None -> model, Cmd.none
@@ -2519,72 +2521,7 @@ let private updateCore
         },
         reportErrorCmd deps "Could not cancel Git operation" message
     | UpdateFromOnlineRequested when model.CurrentArcPath.IsNone || model.BusyOperation.IsSome -> model, Cmd.none
-    | UpdateFromOnlineRequested ->
-        let operationId = deps.newOperationId ()
-
-        let nextModel =
-            model
-            |> withBusyOperation (Some GitBusyOperation.FetchingFromRemote)
-            |> fun state -> {
-                state with
-                    ErrorNotice = None
-                    WarningNotice = None
-                    CurrentOperation =
-                        Some {
-                            SessionId = ""
-                            OperationId = operationId
-                        }
-            }
-
-        let cmd =
-            Cmd.OfPromise.either
-                deps.previewUpdate
-                { OperationId = operationId }
-                (fun result -> UpdatePreflightCompleted(model.ArcSessionId, result))
-                (fun err -> UpdatePreflightCompleted(model.ArcSessionId, Error(string err)))
-
-        nextModel, cmd
-    | UpdatePreflightCompleted(sessionId, _) when sessionId <> model.ArcSessionId -> model, Cmd.none
-    | UpdatePreflightCompleted(_, Ok(OperationResultDto.Succeeded outcome))
-    | UpdatePreflightCompleted(_, Ok(OperationResultDto.PartiallySucceeded(outcome, _))) ->
-        if previewNeedsConfirmation outcome.Value then
-            {
-                clearBusy model with
-                    PendingConfirmation = Some(mergeConfirmationDialog outcome.Value)
-                    PendingRemoteAction = GitPendingRemoteAction.UpdateFromOnline
-            },
-            Cmd.none
-        else
-            clearBusy model, Cmd.ofMsg (WriteRequested Pull)
-    | UpdatePreflightCompleted(_, Ok(OperationResultDto.Failed failure)) when isCanceled failure ->
-        {
-            clearBusy model with
-                WarningNotice = Some "Git operation cancelled."
-        },
-        Cmd.none
-    | UpdatePreflightCompleted(_, Ok(OperationResultDto.Failed failure)) when
-        failure.Category = FailureCategoryDto.Unsupported
-        ->
-        {
-            clearBusy model with
-                PendingConfirmation = Some(indeterminateConfirmationDialog (Some failure.Message))
-                PendingRemoteAction = GitPendingRemoteAction.UpdateFromOnline
-        },
-        Cmd.none
-    | UpdatePreflightCompleted(_, Ok(OperationResultDto.Failed failure)) ->
-        let message = failureMessage failure
-
-        {
-            clearBusy model with
-                ErrorNotice = Some message
-        },
-        reportErrorCmd deps "Could not preview update from online" message
-    | UpdatePreflightCompleted(_, Error message) ->
-        {
-            clearBusy model with
-                ErrorNotice = Some message
-        },
-        reportErrorCmd deps "Could not preview update from online" message
+    | UpdateFromOnlineRequested -> model, Cmd.ofMsg (WriteRequested(Pull GitUpdateAcceptance.RequirePreview))
     | CloneRequested(cloneRequest, reply) -> model, Cmd.ofMsg (WriteRequested(Clone(cloneRequest, reply)))
     | PrimarySaveSelectionRequested selection ->
         model, Cmd.ofMsg (WriteRequested(PrimarySave(prepareCommitSelection selection)))
@@ -2595,21 +2532,21 @@ let private updateCore
     | DiscardSelectionRequested paths -> model, Cmd.ofMsg (WriteRequested(DiscardSelection paths))
     | ConfirmPendingRemoteActionRequested ->
         match model.PendingRemoteAction with
-        | GitPendingRemoteAction.UpdateFromOnline ->
+        | GitPendingRemoteAction.UpdateFromOnline acceptance ->
             {
                 model with
                     PendingConfirmation = None
                     PendingRemoteAction = GitPendingRemoteAction.None
             },
-            Cmd.ofMsg (WriteRequested Pull)
-        | GitPendingRemoteAction.CompletePrimarySavePush ->
+            Cmd.ofMsg (WriteRequested(Pull acceptance))
+        | GitPendingRemoteAction.PublishAfterUpdate acceptance ->
             {
                 model with
                     PendingConfirmation = None
                     PendingRemoteAction = GitPendingRemoteAction.None
                     PendingPostMergePush = true
             },
-            Cmd.ofMsg (WriteRequested Pull)
+            Cmd.ofMsg (WriteRequested(Push acceptance))
         | GitPendingRemoteAction.FinalizeMerge ->
             {
                 model with
@@ -2622,6 +2559,8 @@ let private updateCore
                 match model.PendingRecovery with
                 | Some(GitPendingRecovery.RestoreInterruptedPaths _) -> Cmd.ofMsg RestoreInterruptedPathsRequested
                 | Some(GitPendingRecovery.RetryMaterialization _) -> Cmd.ofMsg RetryMaterializationRequested
+                | Some(GitPendingRecovery.RetryPublish _) ->
+                    Cmd.ofMsg (WriteRequested(Push GitUpdateAcceptance.RequirePreview))
                 | Some(GitPendingRecovery.ClearStaleLock _) -> Cmd.ofMsg ClearStaleLockRequested
                 | Some(GitPendingRecovery.ClearCloneTarget _)
                 | None -> Cmd.ofMsg DismissRecoveryRequested
@@ -2725,7 +2664,7 @@ let private updateCore
                 PendingPublishRename = None
                 ErrorNotice = None
         },
-        Cmd.ofMsg (WriteRequested Push)
+        Cmd.ofMsg (WriteRequested(Push GitUpdateAcceptance.RequirePreview))
     | CreateBranchRequested branchRequest -> model, Cmd.ofMsg (WriteRequested(CreateBranch branchRequest))
     | SwitchBranchRequested branchName ->
         let normalizedBranchName = branchName.Trim()
@@ -3048,7 +2987,7 @@ let private updateCore
                     | None -> GitPendingRemoteAction.None
                 ProvisionedRemote =
                     match writeRequest with
-                    | Push
+                    | Push _
                     | PrimarySave _ -> None
                     | _ -> model.ProvisionedRemote
         }
@@ -3057,14 +2996,12 @@ let private updateCore
             match writeRequest with
             // A cleared lock revealed an open merge: the abandon path runs it.
             | ClearStaleLock when nextModel.ActiveConflict.IsSome -> Cmd.ofMsg (WriteRequested AbandonMerge)
-            // The confirmed update finished without a conflict session: the pending publish runs.
-            | Pull when shouldRunPostMergePush nextModel -> Cmd.ofMsg (WriteRequested Push)
-            | FinalizeMerge when shouldRunPostMergePush nextModel -> Cmd.ofMsg (WriteRequested Push)
+            | FinalizeMerge when shouldRunPostMergePush nextModel ->
+                Cmd.ofMsg (WriteRequested(Push GitUpdateAcceptance.RequirePreview))
             | _ -> Cmd.none
 
         let nextModel =
             match writeRequest with
-            | Pull
             | FinalizeMerge when shouldRunPostMergePush nextModel -> {
                 nextModel with
                     PendingPostMergePush = false
@@ -3078,6 +3015,14 @@ let private updateCore
             | PrimarySave _ when nextModel.ActiveConflict.IsSome -> {
                 nextModel with
                     PendingPostMergePush = true
+              }
+            | Push _ when nextModel.ActiveConflict.IsNone -> {
+                nextModel with
+                    PendingPostMergePush = false
+              }
+            | Push _ -> {
+                nextModel with
+                    PendingPostMergePush = model.PendingPostMergePush
               }
             | _ -> nextModel
 

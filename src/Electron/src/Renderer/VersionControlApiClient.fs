@@ -66,11 +66,7 @@ let getBaseContent (dto: ObjectPathRequestDto) = call (fun () -> api.getBaseCont
 let refreshSynchronization (dto: OperationRequestDto) =
     call (fun () -> api.refreshSynchronization dto)
 
-let previewUpdate (dto: OperationRequestDto) = call (fun () -> api.previewUpdate dto)
-
-let update (dto: UpdateRequestDto) = call (fun () -> api.update dto)
-
-let publish (dto: PublishRequestDto) = call (fun () -> api.publish dto)
+let synchronize (dto: SynchronizeRequestDto) = call (fun () -> api.synchronize dto)
 
 let getActiveConflictSession (dto: OperationRequestDto) =
     call (fun () -> api.getActiveConflictSession dto)

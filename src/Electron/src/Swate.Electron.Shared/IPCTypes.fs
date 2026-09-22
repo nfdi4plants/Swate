@@ -111,9 +111,7 @@ type IVersionControlApi = {
     getWordDiff: ObjectPathRequestDto -> JS.Promise<Result<OperationResultDto<ContentViewDto>, exn>>
     getBaseContent: ObjectPathRequestDto -> JS.Promise<Result<OperationResultDto<ContentViewDto>, exn>>
     refreshSynchronization: OperationRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, exn>>
-    previewUpdate: OperationRequestDto -> JS.Promise<Result<OperationResultDto<UpdatePreviewDto>, exn>>
-    update: UpdateRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, exn>>
-    publish: PublishRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, exn>>
+    synchronize: SynchronizeRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, exn>>
     getActiveConflictSession:
         OperationRequestDto -> JS.Promise<Result<OperationResultDto<ConflictSessionSummaryDto option>, exn>>
     resolveConflict:

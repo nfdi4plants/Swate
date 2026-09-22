@@ -1020,7 +1020,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "session info, status, selected revision, publish and refresh run through the package",
+            "session info, status, selected revision and synchronize run through the package",
             fun () ->
                 withFixture (fun fixture -> promise {
                     registerVault 41 fixture.RepoRoot |> ignore
@@ -1060,20 +1060,18 @@ Vitest.describe (
                     let afterCommitValue = (expectDtoValue "status after commit" afterCommit).Value
                     Vitest.expect(afterCommitValue.Changes |> Array.map _.Path).toEqual [| "other.txt" |]
 
-                    let! refreshed = api.refreshSynchronization (request "refresh")
-                    let refreshedValue = (expectDtoValue "refresh" refreshed).Value
-                    Vitest.expect(refreshedValue.Relationship).toEqual RevisionRelationshipDto.LocalAhead
-
                     let! published =
-                        api.publish {
-                            OperationId = "publish"
+                        api.synchronize {
+                            OperationId = "synchronize"
                             ExpectedWorkspaceVersion = afterCommitValue.WorkspaceVersion
-                            ExpectedTargetRevision = refreshedValue.TargetRevision
+                            ExpectedTargetRevision = None
+                            AcceptUpdateRisks = false
+                            PublishLocalRevisions = true
                         }
 
-                    let publishOutcome = expectDtoValue "publish" published
-                    Vitest.expect(publishOutcome.Publication).toEqual PublicationStateDto.Published
-                    Vitest.expect(publishOutcome.Value.Relationship).toEqual RevisionRelationshipDto.UpToDate
+                    let synchronizeOutcome = expectDtoValue "synchronize" published
+                    Vitest.expect(synchronizeOutcome.Publication).toEqual PublicationStateDto.Published
+                    Vitest.expect(synchronizeOutcome.Value.Relationship).toEqual RevisionRelationshipDto.UpToDate
 
                     Vitest.expect(git fixture.RemoteRoot [ "log"; "-1"; "--format=%s"; "main" ] |> _.Trim()).toBe
                         "Add assay"
@@ -1415,15 +1413,18 @@ Vitest.describe (
                     let api = Main.IPC.IVersionControlApi.api (ipcEvent 43)
 
                     let running =
-                        api.update {
-                            OperationId = "update-cancel"
+                        api.synchronize {
+                            OperationId = "synchronize-cancel"
                             ExpectedWorkspaceVersion = "any"
+                            ExpectedTargetRevision = None
+                            AcceptUpdateRisks = false
+                            PublishLocalRevisions = false
                         }
 
                     let! canceled =
                         api.cancelOperation {
                             SessionId = ""
-                            OperationId = "update-cancel"
+                            OperationId = "synchronize-cancel"
                         }
 
                     Vitest.expect(canceled).toEqual (Ok true)
@@ -1579,15 +1580,19 @@ Vitest.describe (
                     let version = (expectDtoValue "status" status).Value.WorkspaceVersion
 
                     let! published =
-                        api.publish {
-                            OperationId = "publish-bad-revision"
+                        api.synchronize {
+                            OperationId = "synchronize-bad-revision"
                             ExpectedWorkspaceVersion = version
                             ExpectedTargetRevision = Some "   "
+                            AcceptUpdateRisks = false
+                            PublishLocalRevisions = true
                         }
 
-                    let publishFailure = expectDtoFailure "publish with blank revision" published
-                    Vitest.expect(publishFailure.Category).toEqual FailureCategoryDto.Validation
-                    Vitest.expect(publishFailure.Code).toBe VersionControlCodes.InvalidRevision
+                    let synchronizeFailure =
+                        expectDtoFailure "synchronize with blank revision" published
+
+                    Vitest.expect(synchronizeFailure.Category).toEqual FailureCategoryDto.Validation
+                    Vitest.expect(synchronizeFailure.Code).toBe VersionControlCodes.InvalidRevision
 
                     let! created =
                         api.createRef {
@@ -1601,6 +1606,30 @@ Vitest.describe (
                     let refFailure = expectDtoFailure "create ref with blank base" created
                     Vitest.expect(refFailure.Code).toBe VersionControlCodes.InvalidRef
                     Vitest.expect(git fixture.RepoRoot [ "branch"; "--list"; "feature" ] |> _.Trim()).toBe ""
+                })
+        )
+
+        Vitest.test (
+            "synchronize forwards the acceptance fields to the library",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    registerVault 50 fixture.RepoRoot |> ignore
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 50)
+                    let! status = api.getStatus (request "acceptance-status")
+                    let version = (expectDtoValue "acceptance status" status).Value.WorkspaceVersion
+
+                    let! result =
+                        api.synchronize {
+                            OperationId = "accepted-update-without-target"
+                            ExpectedWorkspaceVersion = version
+                            ExpectedTargetRevision = None
+                            AcceptUpdateRisks = true
+                            PublishLocalRevisions = false
+                        }
+
+                    let failure = expectDtoFailure "synchronize acceptance" result
+                    Vitest.expect(failure.Category).toEqual FailureCategoryDto.Validation
+                    Vitest.expect(failure.Code).toBe VersionControlCodes.AcceptanceTargetRequired
                 })
         )
 

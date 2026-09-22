@@ -117,6 +117,21 @@ module VersionControlCodes =
     let ConflictSessionActive = "conflict_session_active"
 
     [<Literal>]
+    let UpdateWouldOverwriteLocalChanges = "update_would_overwrite_local_changes"
+
+    [<Literal>]
+    let UpdateWouldCreateConflictSession = "update_would_create_conflict_session"
+
+    [<Literal>]
+    let AcceptanceTargetRequired = "acceptance_target_required"
+
+    [<Literal>]
+    let PreviewIndeterminate = "preview_indeterminate"
+
+    [<Literal>]
+    let UpdateRejected = "update_rejected"
+
+    [<Literal>]
     let TargetNotEmpty = "target_not_empty"
 
     [<Literal>]
@@ -216,6 +231,15 @@ module VersionControlCodes =
         [<Literal>]
         let RemoveCloneTarget = "remove_clone_target"
 
+        [<Literal>]
+        let AcceptUpdateRisks = "accept_update_risks"
+
+        [<Literal>]
+        let ResolveLocalChanges = "resolve_local_changes"
+
+        [<Literal>]
+        let RetryPublish = "retry_publish"
+
 [<StringEnum(CaseRules.None)>]
 type RefKindDto =
     | Local
@@ -312,13 +336,6 @@ type DiffEntryDto = {
 }
 
 type DiffSummaryDto = { Entries: DiffEntryDto[] }
-
-type UpdatePreviewDto = {
-    ChangedPaths: string[]
-    OverlappingPaths: string[]
-    HasDataLossRisk: bool
-    WouldCreateConflictSession: bool
-}
 
 /// Materialization state of one large object whose content may not be downloaded yet.
 type ObjectStateDto = {
@@ -422,15 +439,15 @@ type RestorePathsRequestDto = {
 
 type ObjectPathRequestDto = { OperationId: string; Path: string }
 
-type UpdateRequestDto = {
-    OperationId: string
-    ExpectedWorkspaceVersion: string
-}
-
-type PublishRequestDto = {
+/// One synchronization: refresh, update when the target is ahead, publish unless
+/// PublishLocalRevisions is false. ExpectedTargetRevision pins an accepted update to the
+/// target revision the user saw.
+type SynchronizeRequestDto = {
     OperationId: string
     ExpectedWorkspaceVersion: string
     ExpectedTargetRevision: string option
+    AcceptUpdateRisks: bool
+    PublishLocalRevisions: bool
 }
 
 [<RequireQualifiedAccess>]
