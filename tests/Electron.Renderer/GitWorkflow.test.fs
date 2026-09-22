@@ -94,6 +94,12 @@ let private operationWithPublication publication value : OperationOutcomeDto<'T>
 let private operation value : OperationOutcomeDto<'T> =
     operationWithPublication PublicationStateDto.NotApplicable value
 
+let private succeededWithWarnings warnings value : OperationResultDto<'T> =
+    OperationResultDto.Succeeded {
+        operation value with
+            Warnings = warnings
+    }
+
 let private succeeded value : OperationResultDto<'T> =
     OperationResultDto.Succeeded(operation value)
 
@@ -3740,6 +3746,109 @@ Vitest.describe (
                 Vitest.expect(recoveryState.PendingRecovery.IsSome).toBe (true)
                 Vitest.expect(recoveryState.PendingConfirmation.IsSome).toBe (true)
                 Vitest.expect(restoredPaths).toEqual (Some affectedPaths)
+            }
+        )
+
+        Vitest.test (
+            "Clearing a stale lock reports the removed lock files",
+            fun () -> promise {
+                let lockA = "C:/arc/.git/index.lock"
+                let lockB = "C:/arc/.git/HEAD.lock"
+                let unrelated = "This warning must stay hidden."
+
+                let warnings = [|
+                    {
+                        Code = VersionControlCodes.LockRemoved
+                        Message = lockA
+                    }
+                    {
+                        Code = VersionControlCodes.LockRemoved
+                        Message = lockB
+                    }
+                    {
+                        Code = "other_warning"
+                        Message = unrelated
+                    }
+                |]
+
+                let refreshDependencies = {
+                    defaultDependencies with
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let runClear result = promise {
+                    let deps = {
+                        refreshDependencies with
+                            clearStaleLock = fun _ -> promise { return result }
+                    }
+
+                    let requested, requestCmd =
+                        update deps ignore (WriteRequested ClearStaleLock) runningState
+
+                    let! completion = collectMessages requestCmd
+
+                    match completion with
+                    | [| WriteCompleted(_, _, ClearStaleLock, Ok(Completed _)) |] ->
+                        let finalState, finishCmd = update deps ignore completion[0] requested
+                        let! _ = collectMessages finishCmd
+                        return finalState
+                    | _ -> return failwith "Expected stale-lock clearing to complete."
+                }
+
+                let! pluralState = runClear (Ok(succeededWithWarnings warnings cleanStatus))
+                let pluralNotice = pluralState.WarningNotice |> Option.defaultValue ""
+
+                Vitest.expect(pluralNotice).toBe ($"Removed stale lock files: {lockA}, {lockB}.")
+                Vitest.expect(pluralNotice).not.toContain (unrelated)
+                Vitest.expect(pluralNotice).toContain (lockA)
+                Vitest.expect(pluralNotice).toContain (lockB)
+
+                let! singularState =
+                    runClear (
+                        Ok(
+                            succeededWithWarnings
+                                [|
+                                    {
+                                        Code = VersionControlCodes.LockRemoved
+                                        Message = lockA
+                                    }
+                                |]
+                                cleanStatus
+                        )
+                    )
+
+                Vitest.expect(singularState.WarningNotice).toEqual (Some $"Removed stale lock file: {lockA}.")
+
+                let! emptyState = runClear (Ok(succeeded cleanStatus))
+                Vitest.expect(emptyState.WarningNotice).toEqual (None)
+
+                let partialFailure =
+                    makeFailure ProviderError "partial_lock_cleanup" "The remaining lock cleanup needs attention." None [||]
+
+                let! partialState =
+                    runClear (
+                        Ok(
+                            OperationResultDto.PartiallySucceeded(
+                                operationWithPublication PublicationStateDto.NotApplicable cleanStatus
+                                |> fun outcome -> {
+                                    outcome with
+                                        Warnings = [|
+                                            {
+                                                Code = VersionControlCodes.LockRemoved
+                                                Message = lockA
+                                            }
+                                        |]
+                                }
+                                , partialFailure
+                            )
+                        )
+                    )
+
+                Vitest
+                    .expect(partialState.WarningNotice)
+                    .toEqual (Some $"Removed stale lock file: {lockA}. {partialFailure.Message}")
             }
         )
 
