@@ -1,4 +1,4 @@
-import { configDefaults, defineConfig } from "vitest/config";
+import { defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
 
 export default defineConfig({
@@ -9,11 +9,7 @@ export default defineConfig({
     },
     test: {
         environment: "node",
-        include: ["output/**/*.test.js", "ArcVaultHelper.wrapper.test.mts"],
-        exclude: [
-            ...configDefaults.exclude,
-            "output/ArcVaultHelper.test.js",
-        ],
+        include: ["output/**/*.test.js"],
         testTimeout: 120000,
         hookTimeout: 120000,
     },
