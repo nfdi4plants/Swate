@@ -1764,11 +1764,18 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
                              None)
                         (Some(outcome.Publication = PublicationStateDto.Published))
             | Error(PublishFailure.AcceptanceRequired(dialog, target, workspaceVersion)) ->
+                let! confirmationRefreshResult = refreshAllAsync deps
+
+                let confirmationRefreshSnapshot =
+                    match confirmationRefreshResult.Status, refreshErrorMessage confirmationRefreshResult with
+                    | Ok _, None -> confirmationRefreshResult
+                    | _ -> refreshResult
+
                 return
                     Ok(
                         CompletedWithPendingRemoteConfirmation(
                             UnitSuccess(
-                                refreshResult,
+                                confirmationRefreshSnapshot,
                                 pageChange,
                                 selectedChangePathOverride,
                                 Some pendingPrimarySaveWarning,
