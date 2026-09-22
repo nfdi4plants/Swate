@@ -2855,7 +2855,7 @@ let private updateCore
         // may have finished before this reply, so a refresh is asked for either way and
         // the publish runs when it has loaded the workspace token.
         {
-            clearBusy model with
+            model with
                 PendingPublishRename = None
                 ErrorNotice = None
                 PendingPublishAfterRefresh = true

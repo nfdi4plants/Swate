@@ -5609,6 +5609,61 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "A rename reply for the current path under another spelling asks for a refresh",
+            fun () -> promise {
+                let model = {
+                    runningState with
+                        CurrentArcPath = Some "C:/arc"
+                        BusyOperation = Some GitBusyOperation.RenamingRepository
+                }
+
+                let nextState, command =
+                    update
+                        defaultDependencies
+                        ignore
+                        (PublishRenameCompleted(model.ArcSessionId - 1, Ok "C:\\arc"))
+                        model
+
+                let! messages = collectMessages command
+
+                Vitest.expect(nextState.PendingPublishAfterRefresh).toBe (true)
+                Vitest.expect(messages).toEqual ([| RefreshRequested |])
+            }
+        )
+
+        Vitest.test (
+            "A stale rename reply does not clear a running write",
+            fun () -> promise {
+                let model = {
+                    runningState with
+                        ArcSessionId = runningState.ArcSessionId + 1
+                        BusyOperation = Some GitBusyOperation.PushingToRemote
+                        BusyNotice = Some "Pushing to remote"
+                        CurrentOperation =
+                            Some {
+                                SessionId = "s-2"
+                                OperationId = "write-op"
+                            }
+                }
+
+                let nextState, command =
+                    update
+                        defaultDependencies
+                        ignore
+                        (PublishRenameCompleted(model.ArcSessionId - 1, Ok "C:\\arc"))
+                        model
+
+                let! messages = collectMessages command
+
+                Vitest.expect(nextState.BusyOperation).toEqual (model.BusyOperation)
+                Vitest.expect(nextState.BusyNotice).toEqual (model.BusyNotice)
+                Vitest.expect(nextState.CurrentOperation).toEqual (model.CurrentOperation)
+                Vitest.expect(nextState.PendingPublishAfterRefresh).toBe (true)
+                Vitest.expect(messages).toEqual ([| RefreshRequested |])
+            }
+        )
+
+        Vitest.test (
             "A dependency install becomes the cancel target while it runs",
             fun () -> promise {
                 let requests = ResizeArray<InstallDependencyRequestDto>()
