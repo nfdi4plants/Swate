@@ -159,12 +159,15 @@ let private openArcAtPath (event: IpcMainInvokeEvent) (requestedPath: string) = 
     match normalizedPathResult with
     | Error error -> return! reportError None error
     | Ok arcPath ->
+        let windowId = windowIdFromIpcEvent event
+
         try
-            let windowId = windowIdFromIpcEvent event
             let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
             return Ok disposition
-        with error ->
-            return! reportError (Some arcPath) error
+        with
+        | ArcLoadCancelledException targetWindowId when targetWindowId <> windowId ->
+            return Error(ArcLoadCancelledException targetWindowId)
+        | error -> return! reportError (Some arcPath) error
 }
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/

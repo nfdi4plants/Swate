@@ -19,6 +19,8 @@ open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
 
+exception ArcLoadCancelledException of targetWindowId: int
+
 let private startFileWatcherOwnWriteArcMergeSuppression suppressionMs currentTimeout onElapsed =
     currentTimeout |> Option.iter Fable.Core.JS.clearTimeout
     Fable.Core.JS.setTimeout onElapsed suppressionMs
@@ -385,8 +387,7 @@ module ArcVaultExtensions =
             if this.path.IsSome then
                 match! ARC.LoadAsyncSwateZeroByteRepair this.path.Value with
                 | Error e -> swatefailfn this.window.id "Unable to load ARC: %s" (PathHelpers.formatContractErrors e)
-                | Ok _ when this.window.isDestroyed () ->
-                    return raise (exn "The ARC window was closed while the ARC was loading.")
+                | Ok _ when this.window.isDestroyed () -> return raise (ArcLoadCancelledException this.window.id)
                 | Ok arc ->
                     this.SetArc(arc)
                     this.RefreshHasUnsavedArcChangesFlag()
@@ -436,7 +437,7 @@ module ArcVaultExtensions =
             do! this.LoadArc()
 
             if this.window.isDestroyed () then
-                return raise (exn "The ARC window was closed while the ARC was loading.")
+                return raise (ArcLoadCancelledException this.window.id)
             else
                 this.StartFileWatcher()
 
