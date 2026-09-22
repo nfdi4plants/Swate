@@ -1711,7 +1711,6 @@ let private runPublishAsync
     }
 
 let private publishFailureToOutcome
-    (deps: GitDependencies)
     (onRouted: RoutedFailure -> JS.Promise<Result<WriteAttemptOutcome, string>>)
     (failure: PublishFailure)
     =
@@ -1747,7 +1746,7 @@ let private runPushAttemptAsync (deps: GitDependencies) (state: GitState) (accep
                     dialog
                     (GitPendingRemoteAction.PublishAfterUpdate(GitUpdateAcceptance.Accepted(target, workspaceVersion)))
                     None
-        | Error failure -> return! publishFailureToOutcome deps (routedToOutcome deps) failure
+        | Error failure -> return! publishFailureToOutcome (routedToOutcome deps) failure
 }
 
 let private runFetchAttemptAsync (deps: GitDependencies) (state: GitState) = promise {
@@ -1860,7 +1859,6 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
             | Error failure ->
                 return!
                     publishFailureToOutcome
-                        deps
                         (fun routed -> promise {
                             match routed with
                             | RoutedFailure.UpdateAcceptanceRequired _ ->
