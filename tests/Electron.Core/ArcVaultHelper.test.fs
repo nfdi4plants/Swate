@@ -21,13 +21,6 @@ module FileImportCoordinator = Main.FileImportCoordinator
 module WatcherHelpers = Main.WatcherHelpers
 module Abort = Main.Bindings.Abort
 
-let private vitestVi: obj = import "vi" "vitest"
-
-[<Emit("vi.mock('fs/promises', () => import('../fs-promises.mock.mts'))")>]
-let private mockFsPromisesForThisTestFile (_vitestVi: obj) : unit = jsNative
-
-do mockFsPromisesForThisTestFile vitestVi
-
 let private electronMock: obj = import "__electronMock" "electron"
 let private fsPromisesMock: obj = import "__fsPromisesMock" "fs/promises"
 

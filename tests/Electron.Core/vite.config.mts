@@ -9,7 +9,8 @@ export default defineConfig({
     },
     test: {
         environment: "node",
-        include: ["output/**/*.test.js"],
+        include: ["output/**/*.test.js", "ArcVaultHelper.wrapper.test.mts"],
+        exclude: ["output/ArcVaultHelper.test.js"],
         testTimeout: 120000,
         hookTimeout: 120000,
     },
