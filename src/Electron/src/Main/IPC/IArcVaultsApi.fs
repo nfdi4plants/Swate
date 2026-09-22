@@ -146,7 +146,11 @@ let private openArcAtPath (event: IpcMainInvokeEvent) (requestedPath: string) = 
     let window = dialogParentFromIpcEvent event
 
     let reportError arcPath error = promise {
-        do! showArcOpenError window arcPath error
+        try
+            do! showArcOpenError window arcPath error
+        with dialogError ->
+            swatelogfn event.sender.id "Failed to show ARC-open error dialog: %s" dialogError.Message
+
         return Error error
     }
 
@@ -201,50 +205,56 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
         }
     openARCByPath =
         fun (arcPath: string) -> promise {
-            match! openArcAtPath event arcPath with
-            | Ok disposition -> return Ok(ArcOpenDisposition.path disposition)
-            | Error error -> return Error error
+            try
+                match! openArcAtPath event arcPath with
+                | Ok disposition -> return Ok(ArcOpenDisposition.path disposition)
+                | Error error -> return Error error
+            with error ->
+                return Error error
         }
     createARC =
         fun (request: CreateArcRequest) -> promise {
-            let window = dialogParentFromIpcEvent event
+            try
+                let window = dialogParentFromIpcEvent event
 
-            let! r =
-                dialog.showOpenDialog (
-                    ?window = window,
-                    properties = [|
-                        Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
-                    |]
-                )
-
-            if r.canceled then
-                return Error(exn "Cancelled")
-            elif r.filePaths.Length <> 1 then
-                return Error(exn "Not exactly one path")
-            else
-                let arcContainerPath = r.filePaths |> Array.exactlyOne
-
-                let arcPath =
-                    ARCtrl.ArcPathHelper.combine arcContainerPath request.identifier
-                    |> PathHelpers.normalizePath
-
-                let windowId = windowIdFromIpcEvent event
-                let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, request.identifier)
-
-                match!
-                    initGitRepositoryForCreatedArcDisposition
-                        Main.Git.GitProvisioningService.initRepository
-                        request.initGit
-                        disposition
-                with
-                | Error failure ->
-                    Swate.Components.console.log (
-                        $"Git init failed for '{ArcOpenDisposition.path disposition}': {failure.Message}"
+                let! r =
+                    dialog.showOpenDialog (
+                        ?window = window,
+                        properties = [|
+                            Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
+                        |]
                     )
-                | Ok(Some initializedArcPath) -> notifyGitRepositoryInitialized initializedArcPath
-                | Ok None -> ()
 
-                return Ok(ArcOpenDisposition.path disposition)
+                if r.canceled then
+                    return Error(exn "Cancelled")
+                elif r.filePaths.Length <> 1 then
+                    return Error(exn "Not exactly one path")
+                else
+                    let arcContainerPath = r.filePaths |> Array.exactlyOne
+
+                    let arcPath =
+                        ARCtrl.ArcPathHelper.combine arcContainerPath request.identifier
+                        |> PathHelpers.normalizePath
+
+                    let windowId = windowIdFromIpcEvent event
+                    let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, request.identifier)
+
+                    match!
+                        initGitRepositoryForCreatedArcDisposition
+                            Main.Git.GitProvisioningService.initRepository
+                            request.initGit
+                            disposition
+                    with
+                    | Error failure ->
+                        Swate.Components.console.log (
+                            $"Git init failed for '{ArcOpenDisposition.path disposition}': {failure.Message}"
+                        )
+                    | Ok(Some initializedArcPath) -> notifyGitRepositoryInitialized initializedArcPath
+                    | Ok None -> ()
+
+                    return Ok(ArcOpenDisposition.path disposition)
+            with error ->
+                return Error error
         }
     ensureNotesFolder =
         fun () -> promise {

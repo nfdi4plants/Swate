@@ -623,6 +623,59 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "openARCByPath preserves the open error when the native error dialog throws",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-ipc-dialog-failure-"
+                    "Dialog Failure ARC"
+                    ignore
+                    (fun arcPath -> promise {
+                        let originatingWindowId = 21
+                        let targetWindowId = 22
+                        let originatingWindow = lifecycleTestWindow originatingWindowId false ignore
+                        let originatingVault = ArcVault(originatingWindow)
+                        originatingVault.path <- Some "C:/already-open-dialog-failure"
+                        originatingVault.SetArc(ARC("Originating ARC"))
+
+                        let openError = exn "Expected renderer load failure"
+                        let dialogError = exn "Expected native dialog failure"
+
+                        let targetWindow, isTargetDestroyed =
+                            registrationTestWindow targetWindowId openError ignore
+
+                        let mutable dialogCount = 0
+
+                        setBrowserWindowFactory (fun _ -> targetWindow :> obj)
+                        setBrowserWindowFromWebContents (fun _ -> originatingWindow :> obj)
+
+                        setShowMessageBox (fun _ _ ->
+                            dialogCount <- dialogCount + 1
+                            raise dialogError
+                        )
+
+                        ARC_VAULTS.Vaults.Add(originatingWindowId, originatingVault)
+
+                        try
+                            let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
+
+                            match! api.openARCByPath arcPath with
+                            | Ok _ -> failwith "Expected ARC opening to fail."
+                            | Error returnedError ->
+                                Vitest.expect(returnedError).toBe (openError)
+                                Vitest.expect(returnedError).not.toBe (dialogError)
+                                Vitest.expect(dialogCount).toBe (1)
+                                Vitest.expect(isTargetDestroyed ()).toBe (true)
+                                Vitest.expect(ARC_VAULTS.Vaults.ContainsKey(targetWindowId)).toBe (false)
+
+                            ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
+                        with error ->
+                            ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
+                            ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
+                            return raise error
+                    })
+        )
+
+        Vitest.test (
             "openARCByPath treats closing a newly opened window during ARC loading as cancellation",
             fun () ->
                 TestHelpers.withTempArcWith
@@ -777,6 +830,74 @@ Vitest.describe (
                     Vitest.expect(dialogOptions.IsSome).toBe (true)
                     Vitest.expect(dialogOptions.Value?detail).toContain ("Not exactly one path")
                     Vitest.expect(dialogOptions.Value?detail).not.toContain ("Folder:")
+            }
+        )
+
+        Vitest.test (
+            "createARC resolves Error when new-window creation fails",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-ipc-create-failure-"
+                let originatingWindowId = 23
+                let targetWindowId = 24
+                let identifier = "Creation Failure ARC"
+                let createError = exn "Expected new ARC renderer load failure"
+                let originatingWindow = lifecycleTestWindow originatingWindowId false ignore
+
+                let targetWindow, isTargetDestroyed =
+                    registrationTestWindow targetWindowId createError ignore
+
+                setBrowserWindowFromWebContents (fun _ -> originatingWindow :> obj)
+                setBrowserWindowFactory (fun _ -> targetWindow :> obj)
+
+                setShowOpenDialog (fun _ _ -> createObj [ "canceled" ==> false; "filePaths" ==> [| rootPath |] ])
+
+                try
+                    let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
+
+                    let request: Swate.Electron.Shared.IPCTypes.CreateArcRequest = {
+                        identifier = identifier
+                        initGit = false
+                    }
+
+                    match! api.createARC request with
+                    | Ok _ -> failwith "Expected new ARC creation to fail."
+                    | Error returnedError ->
+                        Vitest.expect(returnedError).toBe (createError)
+                        Vitest.expect(isTargetDestroyed ()).toBe (true)
+                        Vitest.expect(ARC_VAULTS.Vaults.ContainsKey(targetWindowId)).toBe (false)
+
+                    let requestedArcPath = join [| rootPath; identifier |]
+                    let! requestedArcExists = TestHelpers.pathExistsAsync requestedArcPath
+                    Vitest.expect(requestedArcExists).toBe (false)
+
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "createARC resolves Error when the folder dialog throws",
+            fun () -> promise {
+                let originatingWindowId = 25
+                let originatingWindow = lifecycleTestWindow originatingWindowId false ignore
+                let dialogError = exn "Expected folder dialog failure"
+
+                setBrowserWindowFromWebContents (fun _ -> originatingWindow :> obj)
+                setShowOpenDialog (fun _ _ -> raise dialogError)
+
+                let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
+
+                let request: Swate.Electron.Shared.IPCTypes.CreateArcRequest = {
+                    identifier = "Dialog Failure ARC"
+                    initGit = false
+                }
+
+                match! api.createARC request with
+                | Ok _ -> return failwith "Expected the throwing folder dialog to fail ARC creation."
+                | Error returnedError -> Vitest.expect(returnedError).toBe (dialogError)
             }
         )
 
