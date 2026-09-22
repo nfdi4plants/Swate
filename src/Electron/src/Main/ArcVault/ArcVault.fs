@@ -285,12 +285,17 @@ module ArcVaultExtensions =
         member this.TryApplyWatcherArcMergeIfEligible
             (events: ArcVaultFileSystemEvent list)
             : Fable.Core.JS.Promise<WatcherMergeOutcome> =
+            // The epoch is captured before the queue wait, so a pending-state reset that lands
+            // between the caller's snapshot and the dequeue still invalidates this batch.
+            let capturedWatcherEpoch = this.WatcherEpoch
+
             this.EnqueueArcMerge(fun () -> promise {
                 if not this.IsFileWatcherArcMergeEligible then
                     return WatcherMergeOutcome.Deferred
+                elif capturedWatcherEpoch <> this.WatcherEpoch then
+                    return WatcherMergeOutcome.Deferred
                 else
                     let capturedWriteGeneration = this.WriteGeneration
-                    let capturedWatcherEpoch = this.WatcherEpoch
 
                     match! this.LoadWatcherSnapshot() with
                     | Error loadError ->
@@ -454,10 +459,12 @@ module ArcVaultExtensions =
 
                                             // FileTree updates are renderer-visible and can trigger an immediate openFile call.
                                             // Merge first so that call reads the same ARC state represented by the published tree.
-                                            do!
-                                                this.ApplyWatcherFileTreeEvents(
-                                                    WatcherHelpers.normalizeAgainstDisk pendingEvents
-                                                )
+                                            // A batch snapshotted before a pending-state reset carries paths under the old root.
+                                            if callbackEpoch = this.WatcherEpoch then
+                                                do!
+                                                    this.ApplyWatcherFileTreeEvents(
+                                                        WatcherHelpers.normalizeAgainstDisk pendingEvents
+                                                    )
 
                                             finishReload ()
                                         | WatcherMergeOutcome.Failed mergeError ->
@@ -468,10 +475,11 @@ module ArcVaultExtensions =
 
                                             this.ResetWatcherDeferralCount()
 
-                                            do!
-                                                this.ApplyWatcherFileTreeEvents(
-                                                    WatcherHelpers.normalizeAgainstDisk pendingEvents
-                                                )
+                                            if callbackEpoch = this.WatcherEpoch then
+                                                do!
+                                                    this.ApplyWatcherFileTreeEvents(
+                                                        WatcherHelpers.normalizeAgainstDisk pendingEvents
+                                                    )
 
                                             finishReload ()
                                         | WatcherMergeOutcome.Deferred ->
@@ -484,31 +492,30 @@ module ArcVaultExtensions =
 
                                                 logWatcherDeferral deferralCount
 
-                                                if this.HasReachedWatcherDeferralLimit then
+                                                // Read once: an overlapping callback can reset the counter during the await below.
+                                                let reachedDeferralLimit = this.HasReachedWatcherDeferralLimit
+
+                                                if reachedDeferralLimit then
                                                     // The limit latches during a write, so every later deferral publishes the
                                                     // tree batch too. A file the tree shows before its entity is merged opens
                                                     // through the disk fallback of openFile (raw file text) until the retained
                                                     // ARC batch merges after the write. A tree that hides every external change
                                                     // for the whole duration of a long write would be worse.
+                                                    // The ARC batch is restored first, so a rejected tree update cannot lose it.
+                                                    restorePendingEvents
+                                                        pendingArcMergeEvents
+                                                        this.fileWatcherPendingArcMergeEvents
+                                                        true
+
                                                     do!
                                                         this.ApplyWatcherFileTreeEvents(
                                                             WatcherHelpers.normalizeAgainstDisk pendingEvents
                                                         )
-
-                                                    if callbackEpoch <> this.WatcherEpoch then
-                                                        swatelogfn
-                                                            this.window.id
-                                                            "Watcher merge deferred after watcher state was cleared. Dropping the stale batch."
-                                                    else
-                                                        restorePendingEvents
-                                                            pendingArcMergeEvents
-                                                            this.fileWatcherPendingArcMergeEvents
-                                                            true
                                                 else
                                                     ()
 
                                                 if callbackEpoch = this.WatcherEpoch then
-                                                    if not this.HasReachedWatcherDeferralLimit then
+                                                    if not reachedDeferralLimit then
                                                         restorePendingEvents
                                                             pendingArcMergeEvents
                                                             this.fileWatcherPendingArcMergeEvents
