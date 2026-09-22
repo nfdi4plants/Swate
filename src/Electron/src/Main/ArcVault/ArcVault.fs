@@ -30,7 +30,7 @@ let private startFileWatcherOwnWriteArcMergeSuppression suppressionMs currentTim
 type WatcherMergeOutcome =
     /// The merge updated the in-memory ARC, so the caller can publish its matching tree batch.
     | Applied
-    /// A write changed the merge eligibility, so the caller must retain the batches and retry them.
+    /// The caller retains the ARC batch and retries it. After three consecutive deferrals it publishes the tree batch first.
     | Deferred
     /// Snapshot loading or merging failed, so the caller can publish the tree batch after logging the error.
     | Failed of exn
@@ -46,6 +46,13 @@ type ArcVault(window: BrowserWindow) =
     let mutable busyWritingDepth = 0
     let mutable writeGeneration = 0
     let mutable watcherDeferralCount = 0
+    let mutable watcherEpoch = 0
+
+    let mutable fileTreeUpdateTail: Fable.Core.JS.Promise<unit> =
+        JS.Constructors.Promise.resolve ()
+
+    let mutable restoredPendingEventCount = 0
+    let mutable restoredPendingArcMergeEventCount = 0
 
     member val window: BrowserWindow = window with get
     member val path: string option = None with get, set
@@ -86,6 +93,23 @@ type ArcVault(window: BrowserWindow) =
     member internal this.ResetWatcherDeferralCount() = watcherDeferralCount <- 0
 
     member internal this.HasReachedWatcherDeferralLimit = watcherDeferralCount >= 3
+
+    /// Counts pending-state resets. The watcher controller and ARC merge compare it with a captured value.
+    member internal this.WatcherEpoch = watcherEpoch
+
+    member internal this.IncrementWatcherEpoch() = watcherEpoch <- watcherEpoch + 1
+
+    member internal this.FileTreeUpdateTail
+        with get () = fileTreeUpdateTail
+        and set value = fileTreeUpdateTail <- value
+
+    member internal this.RestoredPendingEventCount
+        with get () = restoredPendingEventCount
+        and set value = restoredPendingEventCount <- value
+
+    member internal this.RestoredPendingArcMergeEventCount
+        with get () = restoredPendingArcMergeEventCount
+        and set value = restoredPendingArcMergeEventCount <- value
 
     /// Indicates whether the vault is currently busy writing changes to disk.
     /// When a write finishes, watcher ARC merges stay suppressed briefly to cover delayed own-write events.
@@ -158,16 +182,19 @@ module ArcVaultExtensions =
     type ArcVault with
 
         member private this.LoadWatcherSnapshot() : Fable.Core.JS.Promise<Result<ARC, exn>> = promise {
-            match this.path, this.arc with
-            | Some arcPath, None ->
-                match! ARC.LoadAsyncSwateZeroByteRepair arcPath with
-                | Error loadError -> return Error(exn (PathHelpers.formatContractErrors loadError))
-                | Ok snapshot -> return Ok snapshot
-            | Some arcPath, Some _ ->
-                match! ARC.LoadAsyncSwate arcPath with
-                | Error loadError -> return Error(exn (PathHelpers.formatContractErrors loadError))
-                | Ok snapshot -> return Ok snapshot
-            | _ -> return Error(arcNotOpenError ())
+            try
+                match this.path, this.arc with
+                | Some arcPath, None ->
+                    match! ARC.LoadAsyncSwateZeroByteRepair arcPath with
+                    | Error loadError -> return Error(exn (PathHelpers.formatContractErrors loadError))
+                    | Ok snapshot -> return Ok snapshot
+                | Some arcPath, Some _ ->
+                    match! ARC.LoadAsyncSwate arcPath with
+                    | Error loadError -> return Error(exn (PathHelpers.formatContractErrors loadError))
+                    | Ok snapshot -> return Ok snapshot
+                | _ -> return Error(arcNotOpenError ())
+            with loadError ->
+                return Error loadError
         }
 
         member private this.PublishWatcherSnapshot(snapshot: ARC, events: FileEvent list) : Result<unit, exn> =
@@ -199,44 +226,51 @@ module ArcVaultExtensions =
                     this.RefreshHasUnsavedArcChangesFlag()
                     Ok()
 
-        member private this.ApplyWatcherFileTreeEvents(events: ArcVaultFileSystemEvent list) = promise {
-            match this.path with
-            | None -> ()
-            | Some arcPath ->
-                let mutable nextFileTree = this.fileTree
-                let mutable hasFileTreeChanges = false
+        member internal this.ApplyWatcherFileTreeEvents(events: ArcVaultFileSystemEvent list) =
+            let queuedUpdate =
+                this.FileTreeUpdateTail
+                |> Promise.bind (fun () -> promise {
+                    match this.path with
+                    | None -> ()
+                    | Some arcPath ->
+                        let mutable nextFileTree = this.fileTree
+                        let mutable hasFileTreeChanges = false
 
-                for event in events do
-                    try
-                        if
-                            WatcherHelpers.eventNameEquals Chokidar.Events.Add event.EventName
-                            || WatcherHelpers.eventNameEquals Chokidar.Events.Change event.EventName
-                        then
-                            let! changedFile = getFileEntryWithLfsMetadata arcPath event.AbsolutePath
-                            nextFileTree <- upsertFileEntry changedFile nextFileTree
-                            hasFileTreeChanges <- true
-                        elif WatcherHelpers.eventNameEquals Chokidar.Events.AddDir event.EventName then
-                            let! addedDirectory = getFileEntry event.AbsolutePath
-                            nextFileTree <- upsertFileEntry addedDirectory nextFileTree
-                            hasFileTreeChanges <- true
-                        elif
-                            WatcherHelpers.eventNameEquals Chokidar.Events.Unlink event.EventName
-                            || WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName
-                        then
-                            nextFileTree <- removePathAndDescendants event.AbsolutePath nextFileTree
-                            hasFileTreeChanges <- true
-                    with fileTreeError ->
-                        swatelogfn
-                            this.window.id
-                            "Unable to update file tree for watcher event '%s' on '%s': %s"
-                            event.EventName
-                            event.RelativePath
-                            fileTreeError.Message
+                        for event in events do
+                            try
+                                if
+                                    WatcherHelpers.eventNameEquals Chokidar.Events.Add event.EventName
+                                    || WatcherHelpers.eventNameEquals Chokidar.Events.Change event.EventName
+                                then
+                                    let! changedFile = getFileEntryWithLfsMetadata arcPath event.AbsolutePath
+                                    nextFileTree <- upsertFileEntry changedFile nextFileTree
+                                    hasFileTreeChanges <- true
+                                elif WatcherHelpers.eventNameEquals Chokidar.Events.AddDir event.EventName then
+                                    let! addedDirectory = getFileEntry event.AbsolutePath
+                                    nextFileTree <- upsertFileEntry addedDirectory nextFileTree
+                                    hasFileTreeChanges <- true
+                                elif
+                                    WatcherHelpers.eventNameEquals Chokidar.Events.Unlink event.EventName
+                                    || WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName
+                                then
+                                    nextFileTree <- removePathAndDescendants event.AbsolutePath nextFileTree
+                                    hasFileTreeChanges <- true
+                            with fileTreeError ->
+                                swatelogfn
+                                    this.window.id
+                                    "Unable to update file tree for watcher event '%s' on '%s': %s"
+                                    event.EventName
+                                    event.RelativePath
+                                    fileTreeError.Message
 
-                if hasFileTreeChanges then
-                    this.SetFileTree(nextFileTree)
-        }
+                        if hasFileTreeChanges then
+                            this.SetFileTree(nextFileTree)
+                })
 
+            this.FileTreeUpdateTail <- queuedUpdate |> Promise.catch (fun _ -> ())
+            queuedUpdate
+
+        /// Returns the load error to the import caller when loading fails. The import can then report that its in-memory merge did not happen.
         member this.TryTriggerArcInMemoryMergeOnFileWatcherEvents(events: ArcVaultFileSystemEvent list) = promise {
             let arcEvents = WatcherHelpers.toArcMergeEvents events
 
@@ -256,9 +290,18 @@ module ArcVaultExtensions =
                     return WatcherMergeOutcome.Deferred
                 else
                     let capturedWriteGeneration = this.WriteGeneration
+                    let capturedWatcherEpoch = this.WatcherEpoch
 
                     match! this.LoadWatcherSnapshot() with
-                    | Error loadError -> return WatcherMergeOutcome.Failed loadError
+                    | Error loadError ->
+                        if
+                            not this.IsFileWatcherArcMergeEligible
+                            || capturedWriteGeneration <> this.WriteGeneration
+                            || capturedWatcherEpoch <> this.WatcherEpoch
+                        then
+                            return WatcherMergeOutcome.Deferred
+                        else
+                            return WatcherMergeOutcome.Failed loadError
                     | Ok snapshot ->
                         match this.WatcherMergeBarrier with
                         | Some barrier -> do! barrier ()
@@ -267,21 +310,36 @@ module ArcVaultExtensions =
                         if
                             not this.IsFileWatcherArcMergeEligible
                             || capturedWriteGeneration <> this.WriteGeneration
+                            || capturedWatcherEpoch <> this.WatcherEpoch
                         then
                             return WatcherMergeOutcome.Deferred
                         else
-                            let normalizedEvents = WatcherHelpers.normalizeAgainstDisk events
+                            match this.path with
+                            | None ->
+                                return
+                                    WatcherMergeOutcome.Failed(
+                                        exn "The ARC path was unavailable while applying a watcher merge."
+                                    )
+                            | Some root ->
+                                let normalizedEvents = WatcherHelpers.normalizeAgainstDisk events
 
-                            let arcEvents =
-                                WatcherHelpers.toArcMergeEvents normalizedEvents
-                                |> List.filter (fun event ->
-                                    event.EventName <> EventName.Unlink
-                                    || not (existsSync (join [| this.path.Value; event.Path |]))
-                                )
+                                let arcEvents =
+                                    WatcherHelpers.toArcMergeEvents normalizedEvents
+                                    |> List.filter (fun event ->
+                                        event.EventName <> EventName.Unlink
+                                        || not (
+                                            existsSync (
+                                                if isAbsolute event.Path then
+                                                    event.Path
+                                                else
+                                                    join [| root; event.Path |]
+                                            )
+                                        )
+                                    )
 
-                            match this.PublishWatcherSnapshot(snapshot, arcEvents) with
-                            | Ok() -> return WatcherMergeOutcome.Applied
-                            | Error mergeError -> return WatcherMergeOutcome.Failed mergeError
+                                match this.PublishWatcherSnapshot(snapshot, arcEvents) with
+                                | Ok() -> return WatcherMergeOutcome.Applied
+                                | Error mergeError -> return WatcherMergeOutcome.Failed mergeError
             })
 
         member this.TriggerArcInMemoryMergeOnFileWatcherEvents(events: ArcVaultFileSystemEvent list) = promise {
@@ -292,53 +350,116 @@ module ArcVaultExtensions =
         }
 
         member internal this._FileEventController(sendMsgApi: IArcFileWatcherApi) =
-            let prependPendingEvents
+            let restorePendingEvents
                 (events: ArcVaultFileSystemEvent list)
                 (pendingEvents: ResizeArray<ArcVaultFileSystemEvent>)
+                isArcMergeEvents
                 =
-                events |> List.rev |> List.iter (fun event -> pendingEvents.Insert(0, event))
+                let restoreIndex =
+                    if isArcMergeEvents then
+                        this.RestoredPendingArcMergeEventCount
+                    else
+                        this.RestoredPendingEventCount
+
+                events
+                |> List.iteri (fun offset event -> pendingEvents.Insert(restoreIndex + offset, event))
+
+                if isArcMergeEvents then
+                    this.RestoredPendingArcMergeEventCount <- restoreIndex + events.Length
+                else
+                    this.RestoredPendingEventCount <- restoreIndex + events.Length
+
+            // A long write retries every 500 ms, so only the first deferral and the limit crossing are logged.
+            let logWatcherDeferral deferralCount =
+                match deferralCount with
+                | 1 ->
+                    swatelogfn
+                        this.window.id
+                        "Watcher merge deferred because a write is running or ran during the snapshot load."
+                | 3 ->
+                    swatelogfn
+                        this.window.id
+                        "Watcher merge deferred three times in a row. The tree batch is published on this and every further deferral until a merge applies."
+                | _ -> ()
 
             let rec scheduleReload () =
                 let mutable ownTimeoutId = None
+
+                let finishReload () =
+                    if
+                        this.fileWatcherPendingEvents.Count > 0
+                        || this.fileWatcherPendingArcMergeEvents.Count > 0
+                    then
+                        if
+                            this.fileWatcherReloadArcTimeout.IsNone
+                            || this.fileWatcherReloadArcTimeout = ownTimeoutId
+                        then
+                            this.fileWatcherReloadArcTimeout <- None
+                            scheduleReload ()
+                        else
+                            ()
+                    else if
+                        this.fileWatcherReloadArcTimeout.IsNone
+                        || this.fileWatcherReloadArcTimeout = ownTimeoutId
+                    then
+                        this.fileWatcherReloadArcTimeout <- None
+                        sendMsgApi.IsLoadingChanges false
+                    else
+                        ()
 
                 let timeoutId =
                     Fable.Core.JS.setTimeout
                         (fun () ->
                             promise {
                                 swatelogfn this.window.id "Scheduled ARC reload triggered by file watcher."
+                                let callbackEpoch = this.WatcherEpoch
 
                                 if this.isBusyWriting then
-                                    // Keep admitted watcher events until the write releases the vault.
+                                    let deferralCount = this.IncrementWatcherDeferralCount()
+                                    logWatcherDeferral deferralCount
+
+                                    if this.HasReachedWatcherDeferralLimit then
+                                        let pendingEvents = this.fileWatcherPendingEvents |> Seq.toList
+                                        this.fileWatcherPendingEvents.Clear()
+                                        this.RestoredPendingEventCount <- 0
+
+                                        do!
+                                            this.ApplyWatcherFileTreeEvents(
+                                                WatcherHelpers.normalizeAgainstDisk pendingEvents
+                                            )
+                                    else
+                                        ()
+
                                     if this.fileWatcherReloadArcTimeout = ownTimeoutId then
                                         this.fileWatcherReloadArcTimeout <- None
                                         scheduleReload ()
+                                    else
+                                        ()
                                 else
                                     let pendingEvents = this.fileWatcherPendingEvents |> Seq.toList
                                     let pendingArcMergeEvents = this.fileWatcherPendingArcMergeEvents |> Seq.toList
                                     this.fileWatcherPendingEvents.Clear()
                                     this.fileWatcherPendingArcMergeEvents.Clear()
+                                    this.RestoredPendingEventCount <- 0
+                                    this.RestoredPendingArcMergeEventCount <- 0
 
                                     if pendingArcMergeEvents.IsEmpty then
+                                        this.ResetWatcherDeferralCount()
                                         do! this.ApplyWatcherFileTreeEvents pendingEvents
-
-                                        if this.fileWatcherReloadArcTimeout = ownTimeoutId then
-                                            this.fileWatcherReloadArcTimeout <- None
-                                            sendMsgApi.IsLoadingChanges false
+                                        finishReload ()
                                     else
                                         match! this.TryApplyWatcherArcMergeIfEligible pendingArcMergeEvents with
                                         | WatcherMergeOutcome.Applied ->
-                                            // FileTree updates are renderer-visible and can trigger an immediate openFile call.
-                                            // Merge first so that call reads the same ARC state represented by the published tree.
                                             this.ResetWatcherDeferralCount()
 
+                                            // FileTree updates are renderer-visible and can trigger an immediate openFile call.
+                                            // Merge first so that call reads the same ARC state represented by the published tree.
                                             do!
                                                 this.ApplyWatcherFileTreeEvents(
                                                     WatcherHelpers.normalizeAgainstDisk pendingEvents
                                                 )
 
-                                            if this.fileWatcherReloadArcTimeout = ownTimeoutId then
-                                                this.fileWatcherReloadArcTimeout <- None
-                                                sendMsgApi.IsLoadingChanges false
+                                            finishReload ()
                                         | WatcherMergeOutcome.Failed mergeError ->
                                             swatelogfn
                                                 this.window.id
@@ -352,44 +473,68 @@ module ArcVaultExtensions =
                                                     WatcherHelpers.normalizeAgainstDisk pendingEvents
                                                 )
 
-                                            if this.fileWatcherReloadArcTimeout = ownTimeoutId then
-                                                this.fileWatcherReloadArcTimeout <- None
-                                                sendMsgApi.IsLoadingChanges false
+                                            finishReload ()
                                         | WatcherMergeOutcome.Deferred ->
-                                            let deferralCount = this.IncrementWatcherDeferralCount()
-
-                                            swatelogfn
-                                                this.window.id
-                                                "Watcher merge deferred because a write is running or ran during the snapshot load (%d consecutive deferrals)."
-                                                deferralCount
-
-                                            if this.HasReachedWatcherDeferralLimit then
-                                                // Three consecutive deferrals give a short write time to finish. After that the tree catches up during a long write.
-                                                do!
-                                                    this.ApplyWatcherFileTreeEvents(
-                                                        WatcherHelpers.normalizeAgainstDisk pendingEvents
-                                                    )
-
-                                                prependPendingEvents
-                                                    pendingArcMergeEvents
-                                                    this.fileWatcherPendingArcMergeEvents
+                                            if callbackEpoch <> this.WatcherEpoch then
+                                                swatelogfn
+                                                    this.window.id
+                                                    "Watcher merge deferred after watcher state was cleared. Dropping the stale batch."
                                             else
-                                                prependPendingEvents
-                                                    pendingArcMergeEvents
-                                                    this.fileWatcherPendingArcMergeEvents
+                                                let deferralCount = this.IncrementWatcherDeferralCount()
 
-                                                prependPendingEvents pendingEvents this.fileWatcherPendingEvents
+                                                logWatcherDeferral deferralCount
 
-                                            if this.fileWatcherReloadArcTimeout = ownTimeoutId then
-                                                this.fileWatcherReloadArcTimeout <- None
-                                                scheduleReload ()
+                                                if this.HasReachedWatcherDeferralLimit then
+                                                    // The limit latches during a write, so every later deferral publishes the
+                                                    // tree batch too. A file the tree shows before its entity is merged opens
+                                                    // through the disk fallback of openFile (raw file text) until the retained
+                                                    // ARC batch merges after the write. A tree that hides every external change
+                                                    // for the whole duration of a long write would be worse.
+                                                    do!
+                                                        this.ApplyWatcherFileTreeEvents(
+                                                            WatcherHelpers.normalizeAgainstDisk pendingEvents
+                                                        )
+
+                                                    if callbackEpoch <> this.WatcherEpoch then
+                                                        swatelogfn
+                                                            this.window.id
+                                                            "Watcher merge deferred after watcher state was cleared. Dropping the stale batch."
+                                                    else
+                                                        restorePendingEvents
+                                                            pendingArcMergeEvents
+                                                            this.fileWatcherPendingArcMergeEvents
+                                                            true
+                                                else
+                                                    ()
+
+                                                if callbackEpoch = this.WatcherEpoch then
+                                                    if not this.HasReachedWatcherDeferralLimit then
+                                                        restorePendingEvents
+                                                            pendingArcMergeEvents
+                                                            this.fileWatcherPendingArcMergeEvents
+                                                            true
+
+                                                        restorePendingEvents
+                                                            pendingEvents
+                                                            this.fileWatcherPendingEvents
+                                                            false
+                                                    else
+                                                        ()
+
+                                                    if
+                                                        this.fileWatcherReloadArcTimeout.IsNone
+                                                        || this.fileWatcherReloadArcTimeout = ownTimeoutId
+                                                    then
+                                                        this.fileWatcherReloadArcTimeout <- None
+                                                        scheduleReload ()
+                                                    else
+                                                        ()
+                                                else
+                                                    ()
                             }
                             |> Promise.catch (fun ex ->
                                 swatelogfn this.window.id "Scheduled ARC reload failed: %s" ex.Message
-
-                                if this.fileWatcherReloadArcTimeout = ownTimeoutId then
-                                    this.fileWatcherReloadArcTimeout <- None
-                                    sendMsgApi.IsLoadingChanges false
+                                finishReload ()
                             )
                             |> Promise.start
                         )
@@ -567,10 +712,14 @@ module ArcVaultExtensions =
                 swatefailfn this.window.id "No path set for StartFileWatcher."
 
         member this.ClearPendingFileWatcherState() =
+            this.IncrementWatcherEpoch()
+            this.ResetWatcherDeferralCount()
             this.fileWatcherReloadArcTimeout |> Option.iter Fable.Core.JS.clearTimeout
             this.fileWatcherReloadArcTimeout <- None
             this.fileWatcherPendingEvents.Clear()
             this.fileWatcherPendingArcMergeEvents.Clear()
+            this.RestoredPendingEventCount <- 0
+            this.RestoredPendingArcMergeEventCount <- 0
             this.importedFileWatcherPaths.Clear()
 
         member this.StopFileWatcher() = promise {
