@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open Fable.Electron
 open Main.Bindings
+open Main.Bindings.Filesystem
 open Main.ArcMerge
 open Main.ArcVaultTypes
 open Main.Bindings.Path
@@ -80,6 +81,33 @@ let queueFileWatcherEvent
         if isArcMergeEligible watcherEvent then
             pendingArcMergeEvents.Add watcherEvent
     | None -> ()
+
+/// An admitted event can be older than a write that ran meanwhile. Replaying an unlink for a
+/// file the write recreated would remove a live entity, and an add for a file that is gone
+/// would fail, so the disk decides what each event means at merge time.
+let normalizeAgainstDisk (events: ArcVaultFileSystemEvent list) =
+    events
+    |> List.map (fun event ->
+        if
+            eventNameEquals Chokidar.Events.Unlink event.EventName
+            && existsSync event.AbsolutePath
+        then
+            {
+                event with
+                    EventName = Chokidar.Events.Change.ToString()
+            }
+        elif
+            (eventNameEquals Chokidar.Events.Add event.EventName
+             || eventNameEquals Chokidar.Events.Change event.EventName)
+            && not (existsSync event.AbsolutePath)
+        then
+            {
+                event with
+                    EventName = Chokidar.Events.Unlink.ToString()
+            }
+        else
+            event
+    )
 
 /// Converts raw filesystem events into ARC merge events; unlink-dir events expand to possible canonical files.
 let toArcMergeEvents (events: ArcVaultFileSystemEvent list) =

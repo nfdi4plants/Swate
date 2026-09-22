@@ -7,6 +7,7 @@ open Fable.Electron.Main
 open Main.ARCtrlExtensions
 open Main.ArcVault
 open Main.ArcVaultHelper
+open Main.ArcVaultTypes
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Main.Notes.NoteConstants
@@ -19,6 +20,15 @@ open Vitest
 module FileImportCoordinator = Main.FileImportCoordinator
 module WatcherHelpers = Main.WatcherHelpers
 module Abort = Main.Bindings.Abort
+
+let private withTempArc =
+    TestHelpers.withTempArcWith "swate-watcher-merge-validation-" "WatcherMergeValidationArc"
+
+let private watcherEvent arcPath eventName relativePath : ArcVaultFileSystemEvent = {
+    EventName = eventName
+    RelativePath = relativePath
+    AbsolutePath = join [| arcPath; relativePath |]
+}
 
 let private runFileImport
     (vault: ArcVault)
@@ -269,6 +279,158 @@ Vitest.describe (
             }
         )
 
+)
+
+Vitest.describe (
+    "watcher merge validation",
+    fun () ->
+        Vitest.test (
+            "a write that starts while the watcher merge waits in the queue defers it",
+            fun () ->
+                withTempArc
+                    (fun arc -> arc.AddAssay(ArcAssay("DiskAssay", title = "Old title")))
+                    (fun arcPath -> promise {
+                        let! loadedArc = TestHelpers.loadArcAsync arcPath
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+                        vault.SetArc loadedArc
+
+                        let! diskArc = TestHelpers.loadArcAsync arcPath
+                        diskArc.GetAssay("DiskAssay").Title <- Some "Changed on disk"
+                        do! diskArc.UpdateAsync arcPath
+
+                        let mutable releaseFirstMerge = ignore
+
+                        let firstMergeGate =
+                            JS.Constructors.Promise.Create(fun resolve _ -> releaseFirstMerge <- fun () -> resolve ())
+
+                        let firstMerge = vault.EnqueueArcMerge(fun () -> firstMergeGate)
+
+                        let watcherEvents = [
+                            watcherEvent arcPath "change" "assays/DiskAssay/isa.assay.xlsx"
+                        ]
+
+                        let watcherMerge = vault.TryApplyWatcherArcMergeIfEligible watcherEvents
+
+                        let mutable releaseWrite = ignore
+
+                        let writeGate =
+                            JS.Constructors.Promise.Create(fun resolve _ -> releaseWrite <- fun () -> resolve ())
+
+                        let writeScope = vault.WithBusyWritingScope(fun () -> writeGate)
+                        releaseFirstMerge ()
+                        do! firstMerge
+
+                        match! watcherMerge with
+                        | Deferred -> ()
+                        | _ -> return failwith "The watcher merge should defer while the write is busy."
+
+                        Vitest.expect(vault.arc.Value.GetAssay("DiskAssay").Title).toEqual (Some "Old title")
+
+                        releaseWrite ()
+                        do! writeScope
+                        do! Promise.sleep 600
+
+                        match! vault.TryApplyWatcherArcMergeIfEligible watcherEvents with
+                        | Applied -> ()
+                        | _ -> return failwith "The watcher merge should apply after the write suppression ends."
+
+                        Vitest.expect(vault.arc.Value.GetAssay("DiskAssay").Title).toEqual (Some "Changed on disk")
+                    })
+        )
+
+        Vitest.test (
+            "a write that starts and ends while the snapshot loads defers it even after suppression",
+            fun () ->
+                withTempArc
+                    (fun arc -> arc.AddAssay(ArcAssay("DiskAssay", title = "Old title")))
+                    (fun arcPath -> promise {
+                        let! loadedArc = TestHelpers.loadArcAsync arcPath
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+                        vault.SetArc loadedArc
+
+                        let! diskArc = TestHelpers.loadArcAsync arcPath
+                        diskArc.GetAssay("DiskAssay").Title <- Some "Changed on disk"
+                        do! diskArc.UpdateAsync arcPath
+
+                        vault.WatcherMergeBarrier <-
+                            Some(fun () -> promise {
+                                do! vault.WithBusyWritingScope(fun () -> promise { return () })
+                                do! Promise.sleep 600
+                            })
+
+                        match!
+                            vault.TryApplyWatcherArcMergeIfEligible [
+                                watcherEvent arcPath "change" "assays/DiskAssay/isa.assay.xlsx"
+                            ]
+                        with
+                        | Deferred -> ()
+                        | _ -> return failwith "The watcher merge should defer after the write generation changes."
+
+                        Vitest.expect(vault.arc.Value.GetAssay("DiskAssay").Title).toEqual (Some "Old title")
+                        Vitest.expect(vault.IsFileWatcherArcMergeEligible).toBe (true)
+                    })
+        )
+
+        Vitest.test (
+            "an unlink admitted before a write that recreated the file merges as a change",
+            fun () ->
+                withTempArc
+                    (fun arc -> arc.AddAssay(ArcAssay("DiskAssay", title = "Old title")))
+                    (fun arcPath -> promise {
+                        let! loadedArc = TestHelpers.loadArcAsync arcPath
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+                        vault.SetArc loadedArc
+
+                        let! diskArc = TestHelpers.loadArcAsync arcPath
+                        diskArc.GetAssay("DiskAssay").Title <- Some "Changed on disk"
+                        do! diskArc.UpdateAsync arcPath
+
+                        match!
+                            vault.TryApplyWatcherArcMergeIfEligible [
+                                watcherEvent arcPath "unlink" "assays/DiskAssay/isa.assay.xlsx"
+                            ]
+                        with
+                        | Applied -> ()
+                        | _ -> return failwith "The recreated assay should apply as a change."
+
+                        Vitest.expect(vault.arc.Value.ContainsAssay("DiskAssay")).toBe (true)
+                        Vitest.expect(vault.arc.Value.GetAssay("DiskAssay").Title).toEqual (Some "Changed on disk")
+                    })
+        )
+
+        Vitest.test (
+            "the import merge inside a busy scope still applies",
+            fun () ->
+                withTempArc
+                    (fun arc -> arc.AddAssay(ArcAssay("DiskAssay", title = "Old title")))
+                    (fun arcPath -> promise {
+                        let! loadedArc = TestHelpers.loadArcAsync arcPath
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+                        vault.SetArc loadedArc
+
+                        let! diskArc = TestHelpers.loadArcAsync arcPath
+                        diskArc.GetAssay("DiskAssay").Title <- Some "Changed on disk"
+                        do! diskArc.UpdateAsync arcPath
+
+                        do!
+                            vault.WithBusyWritingScope(fun () -> promise {
+                                match!
+                                    vault.TryTriggerArcInMemoryMergeOnFileWatcherEvents [
+                                        watcherEvent arcPath "change" "assays/DiskAssay/isa.assay.xlsx"
+                                    ]
+                                with
+                                | Ok() ->
+                                    Vitest
+                                        .expect(vault.arc.Value.GetAssay("DiskAssay").Title)
+                                        .toEqual (Some "Changed on disk")
+                                | Error mergeError -> return raise mergeError
+                            })
+                    })
+        )
 )
 
 let private lifecycleTestWindow id isDestroyed onSend =
