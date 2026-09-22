@@ -1023,24 +1023,39 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
 
                         let! status = hosted.Session.Core.GetStatus context
 
+                        let removedWarnings =
+                            removed
+                            |> Array.map (fun path -> {
+                                Code = VersionControlCodes.LockRemoved
+                                Message = path
+                            })
+
+                        let effect =
+                            if removed.Length > 0 then
+                                Performed
+                            else
+                                NoOp(Some "no stale lock")
+
+                        // A partial status refresh still reports the removed lock files, since these
+                        // warnings are the only evidence of the removal.
                         return
                             match status with
                             | Succeeded outcome ->
                                 Succeeded {
                                     outcome with
-                                        Effect =
-                                            if removed.Length > 0 then
-                                                Performed
-                                            else
-                                                NoOp(Some "no stale lock")
-                                        Warnings =
-                                            removed
-                                            |> Array.map (fun path -> {
-                                                Code = VersionControlCodes.LockRemoved
-                                                Message = path
-                                            })
+                                        Effect = effect
+                                        Warnings = Array.append outcome.Warnings removedWarnings
                                 }
-                            | other -> other
+                            | PartiallySucceeded(outcome, failure) ->
+                                PartiallySucceeded(
+                                    {
+                                        outcome with
+                                            Effect = effect
+                                            Warnings = Array.append outcome.Warnings removedWarnings
+                                    },
+                                    failure
+                                )
+                            | Failed failure -> Failed failure
                 })
                 Mappings.workspaceStatus
 }
