@@ -1810,10 +1810,10 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
 
             let followsRefresh =
                 match pushResult with
-                | Ok _ -> true
+                | Ok _
+                | Error(PublishFailure.AcceptanceRequired _) -> true
                 | Error(PublishFailure.Routed(RoutedFailure.Recovery _)) -> false
                 | Error(PublishFailure.Routed _) -> true
-                | Error(PublishFailure.AcceptanceRequired _)
                 | Error(PublishFailure.ProjectNameRefused _)
                 | Error(PublishFailure.ProvisioningIncomplete _) -> false
 
