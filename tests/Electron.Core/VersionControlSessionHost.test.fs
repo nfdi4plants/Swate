@@ -320,16 +320,19 @@ Vitest.describe (
                         fixture.Host.BeginOperation(
                             "session-a",
                             "op-1",
+                            None,
                             fun progress -> reported <- progress :: reported
                         )
 
                     Vitest.expect(fixture.Host.IsIdle "session-a").toBe false
                     Vitest.expect(fixture.Host.Cancel("session-b", "op-1")).toBe false
 
-                    // An operation whose session is not known yet counts as busy for every
-                    // session and can be canceled with any session id.
-                    let unassigned = fixture.Host.BeginOperation("", "op-unassigned", ignore)
-                    Vitest.expect(fixture.Host.IsIdle "session-b").toBe false
+                    // A sessionless operation without a matching workspace does not make
+                    // an unrelated session busy, and it can still be canceled by id.
+                    let unassigned =
+                        fixture.Host.BeginOperation("", "op-unassigned", Some fixture.RepoRoot, ignore)
+
+                    Vitest.expect(fixture.Host.IsIdle "session-b").toBe true
                     Vitest.expect(fixture.Host.Cancel("session-b", "op-unassigned")).toBe true
                     unassigned.Complete()
                     Vitest.expect(fixture.Host.IsIdle "session-b").toBe true
@@ -365,7 +368,15 @@ Vitest.describe (
                         |> Async.StartAsPromise
 
                     let hosted = expectValue "open" opened
-                    let tracked = fixture.Host.BeginOperation(hosted.SessionId, "op-cancel", ignore)
+
+                    let tracked =
+                        fixture.Host.BeginOperation(
+                            hosted.SessionId,
+                            "op-cancel",
+                            Some hosted.Binding.WorkspaceRoot,
+                            ignore
+                        )
+
                     fixture.Host.Cancel(hosted.SessionId, "op-cancel") |> ignore
 
                     let synchronization =
@@ -442,6 +453,7 @@ let private fakeProviderRuntimeWithStoragePolicy
     (coreOnlyRoot: string)
     (failingRoot: string)
     (storagePolicy: StoragePolicyService option)
+    (objectMaterialization: ObjectMaterializationService option)
     : VersionControlRuntime.VersionControlRuntime =
     let providerId id =
         ProviderId.tryCreate id |> Result.defaultWith failwith
@@ -570,13 +582,11 @@ let private fakeProviderRuntimeWithStoragePolicy
                         }
                         core
 
-                let session =
-                    match storagePolicy with
-                    | Some policy -> {
-                        session with
-                            StoragePolicy = Some policy
-                      }
-                    | None -> session
+                let session = {
+                    session with
+                        ObjectMaterialization = objectMaterialization
+                        StoragePolicy = storagePolicy
+                }
 
                 OperationResult.succeeded session
             )
@@ -604,7 +614,27 @@ let private fakeProviderRuntimeWithStoragePolicy
     }
 
 let private fakeProviderRuntime coreOnlyRoot failingRoot =
-    fakeProviderRuntimeWithStoragePolicy coreOnlyRoot failingRoot None
+    fakeProviderRuntimeWithStoragePolicy coreOnlyRoot failingRoot None None
+
+let private fakeProviderRuntimeThatThrowsOnInitialize coreOnlyRoot failingRoot =
+    let runtime = fakeProviderRuntime coreOnlyRoot failingRoot
+
+    let factories =
+        ProviderResolver.factories runtime.Catalog
+        |> Array.map (fun factory ->
+            if ProviderId.value factory.Id = "git" then
+                {
+                    factory with
+                        Initialize = fun _ _ -> raise (exn "The fake provider initialization threw.")
+                }
+            else
+                factory
+        )
+
+    {
+        runtime with
+            Catalog = ProviderComposition.createCatalog (Array.toList factories)
+    }
 
 Vitest.describe (
     "Version control IPC over a git vault",
@@ -740,6 +770,145 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "an ARC whose repository initialization throws is still created",
+            fun () -> promise {
+                let! root = createTempDirectoryAsync "swate-vc-arc-init-throw-"
+                let container = join [| root; "container" |]
+                let identifier = "throwing-init"
+                Main.Bindings.Filesystem.mkdirSync container (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                let expectedArcPath =
+                    ARCtrl.ArcPathHelper.combine container identifier
+                    |> Swate.Components.Shared.PathHelpers.normalizePath
+
+                let runtime =
+                    fakeProviderRuntimeThatThrowsOnInitialize expectedArcPath (join [| root; "unused" |])
+
+                let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
+                VersionControlRuntime.initialize runtime
+                WorkspaceSessionHost.resetForTests ()
+
+                registerEmptyVault 66 |> ignore
+                let dialogSpy = Vitest.vi.spyOn (electron?dialog, "showOpenDialog")
+                mockResolvedValue dialogSpy (createObj [ "canceled" ==> false; "filePaths" ==> [| container |] ])
+
+                let cleanup () = promise {
+                    Vitest.vi.restoreAllMocks ()
+                    electronMock?reset () |> ignore
+                    ARC_VAULTS.Vaults.Clear()
+                    do! host.CloseAll() |> Async.StartAsPromise
+                    do! removeDirectoryAsync root
+                }
+
+                try
+                    try
+                        let api = Main.IPC.ArcVaultsApi.api (ipcEvent 66)
+
+                        let! created =
+                            api.createARC {
+                                identifier = identifier
+                                initGit = true
+                            }
+
+                        match created with
+                        | Ok createdPath ->
+                            Vitest.expect(createdPath).toBe expectedArcPath
+                            Vitest.expect(Main.Bindings.Filesystem.existsSync createdPath).toBe true
+                        | Error error -> return raise error
+                    with error ->
+                        do! cleanup ()
+                        return raise error
+
+                    do! cleanup ()
+                finally
+                    WorkspaceSessionHost.resetForTests ()
+            }
+        )
+
+        Vitest.test (
+            "materialization defers successful tree refreshes and refreshes after failure",
+            fun () -> promise {
+                let! root = createTempDirectoryAsync "swate-vc-materialize-refresh-"
+                let workspace = join [| root; "workspace" |]
+                Main.Bindings.Filesystem.mkdirSync workspace (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+                writeText (join [| workspace; "object.txt" |]) "object\n"
+
+                let mutable materializationFails = false
+
+                let objectMaterialization: ObjectMaterializationService = {
+                    ListObjects = fun _ -> async { return OperationResult.succeeded [||] }
+                    Materialize =
+                        fun _ _ -> async {
+                            if materializationFails then
+                                return
+                                    Failed(
+                                        OperationFailure.create
+                                            ProviderError
+                                            "fake_materialization_failed"
+                                            "The fake materialization failed."
+                                    )
+                            else
+                                return OperationResult.succeeded ()
+                        }
+                    Dematerialize = fun _ _ -> async { return OperationResult.succeeded () }
+                }
+
+                let runtime =
+                    fakeProviderRuntimeWithStoragePolicy
+                        workspace
+                        (join [| root; "unused" |])
+                        None
+                        (Some objectMaterialization)
+
+                let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
+                VersionControlRuntime.initialize runtime
+                WorkspaceSessionHost.initialize host
+                let vault = registerVault 65 workspace
+
+                let cleanup () = promise {
+                    electronMock?reset () |> ignore
+                    ARC_VAULTS.Vaults.Clear()
+                    do! host.CloseAll() |> Async.StartAsPromise
+                    do! removeDirectoryAsync root
+                }
+
+                try
+                    try
+                        let api = Main.IPC.IVersionControlApi.api (ipcEvent 65)
+                        vault.fileTree.Clear()
+
+                        let! succeeded =
+                            api.materializeObject {
+                                OperationId = "materialize-success-no-refresh"
+                                Path = "object.txt"
+                                RefreshTree = Some false
+                            }
+
+                        expectDtoValue "successful materialization" succeeded |> ignore
+                        Vitest.expect(vault.fileTree.Count).toBe 0
+
+                        materializationFails <- true
+
+                        let! failed =
+                            api.materializeObject {
+                                OperationId = "materialize-failure-refresh"
+                                Path = "object.txt"
+                                RefreshTree = Some false
+                            }
+
+                        expectDtoFailure "failed materialization" failed |> ignore
+                        Vitest.expect(vault.fileTree.Count).toBeGreaterThan 0
+                    with error ->
+                        do! cleanup ()
+                        return raise error
+
+                    do! cleanup ()
+                finally
+                    WorkspaceSessionHost.resetForTests ()
+            }
+        )
+
+        Vitest.test (
             "an open whose default settings push fails is reported as partial",
             fun () ->
                 withFixture (fun fixture -> promise {
@@ -780,7 +949,7 @@ Vitest.describe (
                     }
 
                     let fakeRuntime =
-                        fakeProviderRuntimeWithStoragePolicy coreOnlyRoot failingRoot (Some storagePolicy)
+                        fakeProviderRuntimeWithStoragePolicy coreOnlyRoot failingRoot (Some storagePolicy) None
 
                     let fakeHost = WorkspaceSessionHost.WorkspaceSessionHost(fakeRuntime)
                     WorkspaceSessionHost.initialize fakeHost
@@ -919,7 +1088,7 @@ Vitest.describe (
                     }
 
                     let fakeRuntime =
-                        fakeProviderRuntimeWithStoragePolicy coreOnlyRoot failingRoot (Some storagePolicy)
+                        fakeProviderRuntimeWithStoragePolicy coreOnlyRoot failingRoot (Some storagePolicy) None
 
                     let fakeHost = WorkspaceSessionHost.WorkspaceSessionHost(fakeRuntime)
                     WorkspaceSessionHost.initialize fakeHost
@@ -994,7 +1163,7 @@ Vitest.describe (
                     }
 
                     let fakeRuntime =
-                        fakeProviderRuntimeWithStoragePolicy coreOnlyRoot failingRoot (Some storagePolicy)
+                        fakeProviderRuntimeWithStoragePolicy coreOnlyRoot failingRoot (Some storagePolicy) None
 
                     let fakeHost = WorkspaceSessionHost.WorkspaceSessionHost(fakeRuntime)
                     WorkspaceSessionHost.initialize fakeHost
@@ -1444,7 +1613,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "a stale index lock is removed only while the session is idle, then the status is refreshed",
+            "clearStaleLock scopes sessionless operations by workspace root",
             fun () ->
                 withFixture (fun fixture -> promise {
                     registerVault 44 fixture.RepoRoot |> ignore
@@ -1466,11 +1635,35 @@ Vitest.describe (
                     Vitest.expect(noOp.Warnings).toEqual [||]
                     Vitest.expect(noOp.Effect).toEqual (OperationEffectDto.NoOp(Some "no stale lock"))
 
+                    let otherWorkspace = join [| fixture.Root; "other-workspace" |]
+
+                    let unrelatedClone =
+                        fixture.Host.BeginOperation("", "clone-other-workspace", Some otherWorkspace, ignore)
+
+                    let! unrelatedClear = api.clearStaleLock (request "clear-lock-other-workspace")
+
+                    let unrelatedOutcome =
+                        expectDtoValue "clear lock with unrelated clone" unrelatedClear
+
+                    Vitest.expect(unrelatedOutcome.Effect).toEqual (OperationEffectDto.NoOp(Some "no stale lock"))
+                    unrelatedClone.Complete()
+
+                    let sameWorkspaceOperation =
+                        fixture.Host.BeginOperation("", "clone-same-workspace", Some fixture.RepoRoot, ignore)
+
+                    let! sameWorkspaceClear = api.clearStaleLock (request "clear-lock-same-workspace")
+                    sameWorkspaceOperation.Complete()
+
+                    let sameWorkspaceFailure =
+                        expectDtoFailure "clear lock with same-workspace clone" sameWorkspaceClear
+
+                    Vitest.expect(sameWorkspaceFailure.Code).toBe VersionControlCodes.LockRemovalRefused
+
                     let session =
                         fixture.Host.TryGetSession fixture.RepoRoot
                         |> Option.defaultWith (fun () -> failwith "session missing")
 
-                    let other = fixture.Host.BeginOperation(session.SessionId, "busy", ignore)
+                    let other = fixture.Host.BeginOperation(session.SessionId, "busy", None, ignore)
                     let! refused = api.clearStaleLock (request "clear-lock-3")
                     other.Complete()
                     let failure = expectDtoFailure "refused lock removal" refused
@@ -2045,5 +2238,41 @@ Vitest.describe (
                     let cloneFailure = expectDtoFailure "clone into non-empty" cloned
                     Vitest.expect(cloneFailure.Code).toBe VersionControlCodes.TargetNotEmpty
                 })
+        )
+
+        // The library only documents these literals and exposes no constants for them:
+        // IdentityMissing, PublishTargetMissing, TargetUnreachable, NetworkFailure,
+        // ConfiguredTargetInvalid, ConflictsDetected, PreviewIndeterminate, UpdateRejected,
+        // TargetNotEmpty, OperationCanceled, BaseContentNotFound, InvalidLfsThreshold,
+        // ServiceUnavailable, SessionUnavailable, WorkspaceUnmanaged, WorkspaceAmbiguous,
+        // LocationUnsupported, UnexpectedException, LockRemovalRefused, LockRemoved,
+        // InvalidPath, InvalidRef, InvalidRevision, BindingNotPersisted, TransportError,
+        // StoragePolicyBlocked, Recovery.RefreshConflictSession, Recovery.ResolveConflictSession,
+        // Recovery.RetryMaterialization, Recovery.ReconcileMaterialization, Recovery.ReconcileIndex,
+        // Recovery.RemoveIndexLock, Recovery.RestoreWorkspace, Recovery.RefreshWorkspace,
+        // Recovery.InspectWorkspace, Recovery.ReopenWorkspace, Recovery.CheckDependencies,
+        // Recovery.AbortMerge, Recovery.RemoveCloneTarget.
+        Vitest.test (
+            "Swate's code literals match the library's",
+            fun () ->
+                Vitest.expect(VersionControlCodes.UpdateWouldOverwriteLocalChanges).toBe
+                    SynchronizationCodes.UpdateWouldOverwriteLocalChanges
+
+                Vitest.expect(VersionControlCodes.UpdateWouldCreateConflictSession).toBe
+                    SynchronizationCodes.UpdateWouldCreateConflictSession
+
+                Vitest.expect(VersionControlCodes.AcceptanceTargetRequired).toBe
+                    SynchronizationCodes.AcceptanceTargetRequired
+
+                Vitest.expect(VersionControlCodes.ConflictSessionActive).toBe SynchronizationCodes.ConflictSessionActive
+                Vitest.expect(VersionControlCodes.PreconditionFailed).toBe SynchronizationCodes.PreconditionFailed
+
+                Vitest.expect(VersionControlCodes.Recovery.AcceptUpdateRisks).toBe
+                    SynchronizationCodes.AcceptUpdateRisksRecovery
+
+                Vitest.expect(VersionControlCodes.Recovery.ResolveLocalChanges).toBe
+                    SynchronizationCodes.ResolveLocalChangesRecovery
+
+                Vitest.expect(VersionControlCodes.Recovery.RetryPublish).toBe SynchronizationCodes.RetryPublishRecovery
         )
 )

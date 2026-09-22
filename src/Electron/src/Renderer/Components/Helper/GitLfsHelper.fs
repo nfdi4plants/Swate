@@ -15,7 +15,7 @@ let private toUnitResult (result: Result<OperationResultDto<unit>, string>) : Re
     match result with
     | Error message -> Error message
     | Ok(OperationResultDto.Succeeded _) -> Ok()
-    | Ok(OperationResultDto.PartiallySucceeded(_, failure))
+    | Ok(OperationResultDto.PartiallySucceeded _) -> Ok()
     | Ok(OperationResultDto.Failed failure) -> Error(Renderer.Context.GitWorkflow.failureMessage failure)
 
 /// The size is not known here, so the size rule is left to the context menu, which
@@ -42,6 +42,7 @@ let runFreeLocalLfsCopy (relativePath: string) : JS.Promise<Result<unit, string>
         Renderer.VersionControlApiClient.dematerializeObject {
             OperationId = operationId ()
             Path = PathHelpers.normalizeSeparators relativePath
+            RefreshTree = None
         }
 
     return toUnitResult result
@@ -52,6 +53,7 @@ let runDownloadLfsFile (relativePath: string) : JS.Promise<Result<unit, string>>
         Renderer.VersionControlApiClient.materializeObject {
             OperationId = operationId ()
             Path = PathHelpers.normalizeSeparators relativePath
+            RefreshTree = None
         }
 
     return toUnitResult result

@@ -28,6 +28,7 @@ type TrackedOperation = {
 
 type private RunningOperation = {
     SessionId: string
+    WorkspaceRoot: string option
     Source: OperationCancellation.Source
 }
 
@@ -365,15 +366,20 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
     }
 
     /// Registers an operation before any library call so a cancel that arrives before
-    /// the first progress event still lands. Operations without a session (clone,
-    /// initialize, or a session still opening) register with an empty session id.
+    /// the first progress event still lands. Sessionless operations retain the
+    /// workspace they target so lock cleanup can scope them correctly.
     member _.BeginOperation
-        (sessionId: string, operationId: string, reportProgress: VersionControlProgressDto -> unit)
-        : TrackedOperation =
+        (
+            sessionId: string,
+            operationId: string,
+            workspaceRoot: string option,
+            reportProgress: VersionControlProgressDto -> unit
+        ) : TrackedOperation =
         let source = OperationCancellation.Source()
 
         operations[operationId] <- {
             SessionId = sessionId
+            WorkspaceRoot = workspaceRoot
             Source = source
         }
 
@@ -415,11 +421,26 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
             true
         | _ -> false
 
-    /// Operation ids that may be running under one session. An operation whose session
-    /// is not assigned yet counts too, because it may end up in this session.
-    member _.RunningOperationIds(sessionId: string) : string[] =
+    /// Operation ids that may be running under one session. A sessionless operation
+    /// counts when its target root matches the queried session's root.
+    member this.RunningOperationIds(sessionId: string) : string[] =
+        let sessionRoot =
+            this.TryGetSessionById sessionId
+            |> Option.map (fun hosted -> hosted.Binding.WorkspaceRoot)
+
         operations
-        |> Seq.filter (fun entry -> String.IsNullOrEmpty entry.Value.SessionId || entry.Value.SessionId = sessionId)
+        |> Seq.filter (fun entry ->
+            let running = entry.Value
+
+            if running.SessionId = sessionId then
+                true
+            elif String.IsNullOrEmpty running.SessionId then
+                match sessionRoot, running.WorkspaceRoot with
+                | Some queriedRoot, Some operationRoot -> sameRoot queriedRoot operationRoot
+                | _ -> false
+            else
+                false
+        )
         |> Seq.map (fun entry -> entry.Key)
         |> Seq.toArray
 

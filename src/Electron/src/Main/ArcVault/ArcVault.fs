@@ -31,6 +31,7 @@ type ArcVault(window: BrowserWindow) =
 
     let fileWatcherOwnWriteArcMergeSuppressionMs = 500
     let arcMergeQueue = ArcMergeQueue(window.id)
+    let mutable busyWritingDepth = 0
 
     member val window: BrowserWindow = window with get
     member val path: string option = None with get, set
@@ -62,7 +63,7 @@ type ArcVault(window: BrowserWindow) =
     /// When a write finishes, watcher ARC merges stay suppressed briefly to cover delayed own-write events.
     member this.isBusyWriting
         with get () = this.isBusyWritingValue
-        and set value =
+        and private set value =
             let wasBusyWriting = this.isBusyWritingValue
             this.isBusyWritingValue <- value
 
@@ -73,6 +74,23 @@ type ArcVault(window: BrowserWindow) =
                         this.fileWatcherOwnWriteArcMergeSuppressionTimeout
                         (fun () -> this.fileWatcherOwnWriteArcMergeSuppressionTimeout <- None)
                     |> Some
+
+    /// Marks this vault busy until the supplied promise settles, including nested writes.
+    member this.WithBusyWritingScope<'T>(operation: unit -> Fable.Core.JS.Promise<'T>) : Fable.Core.JS.Promise<'T> =
+        busyWritingDepth <- busyWritingDepth + 1
+
+        if busyWritingDepth = 1 then
+            this.isBusyWriting <- true
+
+        promise {
+            try
+                return! operation ()
+            finally
+                busyWritingDepth <- busyWritingDepth - 1
+
+                if busyWritingDepth = 0 then
+                    this.isBusyWriting <- false
+        }
 
     /// Indicates whether a captured watcher event is eligible to update the in-memory ARC.
     member this.IsFileWatcherArcMergeEligible =
@@ -280,19 +298,17 @@ module ArcVaultExtensions =
             | true, _, _ ->
                 return Error(exn "Swate is still saving another change. Please wait a moment and try again.")
             | false, Some arcPath, Some arc ->
-                this.isBusyWriting <- true
-
-                try
-                    try
-                        match! arc.TryUpdateAsyncSwate(arcPath) with
-                        | Error errors -> return Error(exn (PathHelpers.formatContractErrors errors))
-                        | Ok _ ->
-                            this.RefreshHasUnsavedArcChangesFlag()
-                            return Ok()
-                    with e ->
-                        return Error(exn $"Failed to persist ARC to disk: {e.Message}")
-                finally
-                    this.isBusyWriting <- false
+                return!
+                    this.WithBusyWritingScope(fun () -> promise {
+                        try
+                            match! arc.TryUpdateAsyncSwate(arcPath) with
+                            | Error errors -> return Error(exn (PathHelpers.formatContractErrors errors))
+                            | Ok _ ->
+                                this.RefreshHasUnsavedArcChangesFlag()
+                                return Ok()
+                        with e ->
+                            return Error(exn $"Failed to persist ARC to disk: {e.Message}")
+                    })
             | _ -> return Error(arcNotOpenError ())
         }
 
@@ -309,41 +325,41 @@ module ArcVaultExtensions =
                 match Swate.Electron.Shared.FileIOHelper.FileContentDTO.toArcFile normalizedRequest with
                 | None -> return Error(exn $"Unsupported file type for adding: {normalizedRequest.fileType}")
                 | Some arcFile ->
-                    let wasBusyWriting = this.isBusyWriting
-                    this.isBusyWriting <- true
+                    return!
+                        this.WithBusyWritingScope(fun () -> promise {
+                            match! arcLocal.TryAddArcFileAsync(arcPath, arcFile, false) with
+                            | Error errors -> return Error(exn (PathHelpers.formatContractErrors errors))
+                            | Ok _ ->
+                                match! ARC.LoadAsyncSwate arcPath with
+                                | Ok persistedArc ->
+                                    baselineArcStaticHashes persistedArc
+                                    syncAddedArcFileFromPersisted persistedArc arcLocal arcFile
+                                    syncArcStaticHashes persistedArc arcLocal
+                                    this.RefreshHasUnsavedArcChangesFlag()
 
-                    try
-                        match! arcLocal.TryAddArcFileAsync(arcPath, arcFile, false) with
-                        | Error errors -> return Error(exn (PathHelpers.formatContractErrors errors))
-                        | Ok _ ->
-                            match! ARC.LoadAsyncSwate arcPath with
-                            | Ok persistedArc ->
-                                baselineArcStaticHashes persistedArc
-                                syncAddedArcFileFromPersisted persistedArc arcLocal arcFile
-                                syncArcStaticHashes persistedArc arcLocal
-                                this.RefreshHasUnsavedArcChangesFlag()
+                                    match arcFile with
+                                    | ArcFiles.DataMap(Some parentInfo, _) ->
+                                        let! refreshedFileTree =
+                                            refreshFileTreeEntry
+                                                arcPath
+                                                (DatamapParentInfo.toPath parentInfo)
+                                                this.fileTree
 
-                                match arcFile with
-                                | ArcFiles.DataMap(Some parentInfo, _) ->
-                                    let! refreshedFileTree =
-                                        refreshFileTreeEntry arcPath (DatamapParentInfo.toPath parentInfo) this.fileTree
+                                        this.SetFileTree refreshedFileTree
+                                    | _ -> ()
 
-                                    this.SetFileTree refreshedFileTree
-                                | _ -> ()
+                                    return Ok()
+                                | Error loadErrors ->
+                                    this.RefreshHasUnsavedArcChangesFlag()
 
-                                return Ok()
-                            | Error loadErrors ->
-                                this.RefreshHasUnsavedArcChangesFlag()
-
-                                return
-                                    Error(
-                                        exn (
-                                            "Added ARC file, but could not reload the persisted hash baseline: "
-                                            + (PathHelpers.formatContractErrors loadErrors)
+                                    return
+                                        Error(
+                                            exn (
+                                                "Added ARC file, but could not reload the persisted hash baseline: "
+                                                + (PathHelpers.formatContractErrors loadErrors)
+                                            )
                                         )
-                                    )
-                    finally
-                        this.isBusyWriting <- wasBusyWriting
+                        })
             | _ -> return Error(arcNotOpenError ())
         }
 
@@ -461,17 +477,16 @@ module ArcVaultExtensions =
                 this.path <- Some normalizedPath
                 this.SetArc(arc)
                 this.RefreshHasUnsavedArcChangesFlag()
-                this.isBusyWriting <- true
 
-                try
-                    match! arc.TryWriteAsyncSwate(normalizedPath) with
-                    | Ok _ -> ()
-                    | Error errors ->
-                        failwithf
-                            "Could not write ARC, failed with the following errors %s"
-                            (PathHelpers.formatContractErrors errors)
-                finally
-                    this.isBusyWriting <- false
+                do!
+                    this.WithBusyWritingScope(fun () -> promise {
+                        match! arc.TryWriteAsyncSwate(normalizedPath) with
+                        | Ok _ -> ()
+                        | Error errors ->
+                            failwithf
+                                "Could not write ARC, failed with the following errors %s"
+                                (PathHelpers.formatContractErrors errors)
+                    })
 
                 do! this.Startup()
                 sendMsg.pathChange (Some normalizedPath)

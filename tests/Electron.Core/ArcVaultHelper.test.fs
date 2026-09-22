@@ -40,6 +40,50 @@ Vitest.describe (
     "ArcVault merge queue",
     fun () ->
         Vitest.test (
+            "keeps the busy flag set while a raw writer runs inside a version control scope",
+            fun () -> promise {
+                let vault = ArcVault(TestHelpers.testWindow ())
+
+                do!
+                    Main.IPC.IPCHelper.withBusyWritingScope
+                        vault
+                        (fun () -> promise {
+                            Vitest.expect(vault.isBusyWriting).toBe true
+
+                            do!
+                                vault.WithBusyWritingScope(fun () -> promise {
+                                    Vitest.expect(vault.isBusyWriting).toBe true
+                                })
+
+                            Vitest.expect(vault.isBusyWriting).toBe true
+                        })
+
+                Vitest.expect(vault.isBusyWriting).toBe false
+            }
+        )
+
+        Vitest.test (
+            "keeps the busy flag set while a version control scope runs inside a raw writer",
+            fun () -> promise {
+                let vault = ArcVault(TestHelpers.testWindow ())
+
+                do!
+                    vault.WithBusyWritingScope(fun () -> promise {
+                        Vitest.expect(vault.isBusyWriting).toBe true
+
+                        do!
+                            Main.IPC.IPCHelper.withBusyWritingScope
+                                vault
+                                (fun () -> promise { Vitest.expect(vault.isBusyWriting).toBe true })
+
+                        Vitest.expect(vault.isBusyWriting).toBe true
+                    })
+
+                Vitest.expect(vault.isBusyWriting).toBe false
+            }
+        )
+
+        Vitest.test (
             "active import cancellation waits for import cleanup to finish",
             fun () -> promise {
                 let vault = ArcVault(TestHelpers.testWindow ())
@@ -156,23 +200,26 @@ Vitest.describe (
             "file import does not start while another ARC write owns the vault",
             fun () -> promise {
                 let vault = ArcVault(TestHelpers.testWindow ())
-                vault.isBusyWriting <- true
-
                 let mutable operationStarted = false
 
-                match!
-                    runFileImport
-                        vault
-                        ("blocked-import",
-                         fun _ ->
-                             operationStarted <- true
-                             JS.Constructors.Promise.resolve (Ok ImportExternalFilesResult.Completed))
-                with
-                | Ok _ -> return failwith "Expected the import to be rejected while the vault is busy."
-                | Error error ->
-                    Vitest.expect(error.Message).toContain ("still saving")
-                    Vitest.expect(operationStarted).toBe (false)
-                    Vitest.expect(vault.isBusyWriting).toBe (true)
+                do!
+                    vault.WithBusyWritingScope(fun () -> promise {
+                        match!
+                            runFileImport
+                                vault
+                                ("blocked-import",
+                                 fun _ ->
+                                     operationStarted <- true
+                                     JS.Constructors.Promise.resolve (Ok ImportExternalFilesResult.Completed))
+                        with
+                        | Ok _ -> return failwith "Expected the import to be rejected while the vault is busy."
+                        | Error error ->
+                            Vitest.expect(error.Message).toContain ("still saving")
+                            Vitest.expect(operationStarted).toBe (false)
+                            Vitest.expect(vault.isBusyWriting).toBe (true)
+                    })
+
+                Vitest.expect(vault.isBusyWriting).toBe (false)
             }
         )
 

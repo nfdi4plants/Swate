@@ -78,10 +78,12 @@ let private runTracked
     (bridge: RendererBridge)
     (sessionId: string)
     (operationId: string)
+    (workspaceRoot: string option)
     (operation: OperationContext -> Async<OperationResult<'T>>)
     : JS.Promise<OperationResult<'T>> =
     promise {
-        let tracked = host.BeginOperation(sessionId, operationId, bridge.Progress)
+        let tracked =
+            host.BeginOperation(sessionId, operationId, workspaceRoot, bridge.Progress)
 
         try
             try
@@ -114,7 +116,8 @@ let private withSession
                 |> Option.map (fun hosted -> hosted.SessionId)
                 |> Option.defaultValue ""
 
-            let tracked = host.BeginOperation(knownSessionId, operationId, bridge.Progress)
+            let tracked =
+                host.BeginOperation(knownSessionId, operationId, Some arcPath, bridge.Progress)
 
             try
                 try
@@ -148,9 +151,6 @@ let private withSession
                 tracked.Complete()
     }
 
-let private withBusyWritingNested (vault: ArcVault) (operation: unit -> JS.Promise<'T>) : JS.Promise<'T> =
-    withBusyWritingScope vault operation
-
 /// Whether a result reports a change of the workspace, which is when the file tree
 /// is refreshed after a mutation.
 let resultChangedState (result: Result<OperationResultDto<'U>, exn>) =
@@ -161,11 +161,11 @@ let resultChangedState (result: Result<OperationResultDto<'U>, exn>) =
     | Error _ -> false
 
 /// Same as withSession, with the vault marked busy for the duration and the file tree
-/// refreshed afterwards when the operation changed the workspace.
-let private withMutatingSession
+/// refreshed afterwards when the result predicate allows it.
+let private withMutatingSessionUsingRefreshPredicate
     (event: IpcMainInvokeEvent)
     (operationId: string)
-    (refreshTree: bool)
+    (shouldRefresh: Result<OperationResultDto<'U>, exn> -> bool)
     (operation: WorkspaceSessionHost.HostedSession -> OperationContext -> Async<OperationResult<'T>>)
     (mapValue: 'T -> 'U)
     : JS.Promise<Result<OperationResultDto<'U>, exn>> =
@@ -174,18 +174,34 @@ let private withMutatingSession
         | Error error -> return Error error
         | Ok(vault, arcPath) ->
             return!
-                withBusyWritingNested
+                withBusyWritingScope
                     vault
                     (fun () -> promise {
                         let! result = withSession event operationId operation mapValue
 
-                        if refreshTree && resultChangedState result then
+                        if shouldRefresh result then
                             let! fileTree = getFileTree arcPath
                             vault.SetFileTree fileTree
 
                         return result
                     })
     }
+
+/// Same as withSession, with the vault marked busy for the duration and the file tree
+/// refreshed afterwards when the operation changed the workspace.
+let private withMutatingSession
+    (event: IpcMainInvokeEvent)
+    (operationId: string)
+    (refreshTree: bool)
+    (operation: WorkspaceSessionHost.HostedSession -> OperationContext -> Async<OperationResult<'T>>)
+    (mapValue: 'T -> 'U)
+    : JS.Promise<Result<OperationResultDto<'U>, exn>> =
+    withMutatingSessionUsingRefreshPredicate
+        event
+        operationId
+        (fun result -> refreshTree && resultChangedState result)
+        operation
+        mapValue
 
 let private withService
     (select: WorkspaceSession -> 'S option)
@@ -305,10 +321,11 @@ let private provision
     (host: WorkspaceSessionHost.WorkspaceSessionHost)
     (bridge: RendererBridge)
     (operationId: string)
+    (workspaceRoot: string)
     (run: OperationContext -> Async<OperationResult<WorkspaceBinding>>)
     : JS.Promise<Result<OperationResultDto<string>, exn>> =
     promise {
-        let! result = runTracked host bridge "" operationId run
+        let! result = runTracked host bridge "" operationId (Some workspaceRoot) run
 
         return Ok(Mappings.result (fun (binding: WorkspaceBinding) -> binding.WorkspaceRoot) result)
     }
@@ -357,6 +374,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 host
                 bridge
                 request.OperationId
+                request.TargetPath
                 (fun context -> async {
                     let! cloned =
                         match locationFor host request.ProviderLocation request.DisplayName with
@@ -386,6 +404,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 host
                 bridge
                 request.OperationId
+                request.TargetPath
                 (fun context -> initializeLocalWorkspace host request.TargetPath context)
     // Bind changes the vault's repository configuration, so it runs as a mutation of
     // the open vault and refreshes the tree afterwards.
@@ -431,7 +450,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 }
 
                 return!
-                    withBusyWritingNested
+                    withBusyWritingScope
                         vault
                         (fun () -> promise {
                             let! bound =
@@ -440,6 +459,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                     bridge
                                     ""
                                     request.OperationId
+                                    (Some arcPath)
                                     (fun context -> async {
                                         match locationFor host request.ProviderLocation request.DisplayName with
                                         | Error failure -> return Failed failure
@@ -506,6 +526,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     bridge
                     ""
                     request.OperationId
+                    None
                     (fun context -> async {
                         let factories = ProviderResolver.factories host.Runtime.Catalog
                         let mutable statuses: DependencyStatus[] = [||]
@@ -560,6 +581,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     bridge
                     ""
                     request.OperationId
+                    None
                     (fun context -> async {
                         let factories = ProviderResolver.factories host.Runtime.Catalog
                         let mutable outcome: OperationResult<DependencyStatus> option = None
@@ -841,10 +863,18 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 (Array.map Mappings.objectState)
     materializeObject =
         fun request ->
-            withMutatingSession
+            withMutatingSessionUsingRefreshPredicate
                 event
                 request.OperationId
-                true
+                (fun result ->
+                    match request.RefreshTree with
+                    | Some true -> true
+                    | Some false ->
+                        match result with
+                        | Ok(OperationResultDto.Succeeded _) -> false
+                        | _ -> true
+                    | None -> resultChangedState result
+                )
                 (withService
                     _.ObjectMaterialization
                     "large object materialization"

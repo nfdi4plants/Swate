@@ -551,18 +551,21 @@ Vitest.describe (
                             api.getTextDiff {
                                 OperationId = "lakefs-text-diff"
                                 Path = "data.txt"
+                                RefreshTree = None
                             }
 
                         let! wordDiff =
                             api.getWordDiff {
                                 OperationId = "lakefs-word-diff"
                                 Path = "data.txt"
+                                RefreshTree = None
                             }
 
                         let! baseContent =
                             api.getBaseContent {
                                 OperationId = "lakefs-base-content"
                                 Path = "data.txt"
+                                RefreshTree = None
                             }
 
                         let! objects = api.listObjects (request "lakefs-list-objects")
@@ -571,12 +574,14 @@ Vitest.describe (
                             api.materializeObject {
                                 OperationId = "lakefs-materialize"
                                 Path = "data.txt"
+                                RefreshTree = None
                             }
 
                         let! dematerialize =
                             api.dematerializeObject {
                                 OperationId = "lakefs-dematerialize"
                                 Path = "data.txt"
+                                RefreshTree = None
                             }
 
                         let! getPolicy = api.getStoragePolicySettings (request "lakefs-get-policy")

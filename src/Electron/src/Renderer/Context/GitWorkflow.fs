@@ -1262,6 +1262,7 @@ let private refreshAfterSuccess
     (partial: OperationFailureDto option)
     (pageChange: GitPageChange)
     (selectedChangePathOverride: string option option)
+    (warningMessage: string option)
     =
     promise {
         let! refreshResult = refreshAllAsync deps
@@ -1277,7 +1278,7 @@ let private refreshAfterSuccess
                             refreshResult,
                             pageChange,
                             selectedChangePathOverride,
-                            partial |> Option.map failureMessage,
+                            warningMessage |> Option.orElse (partial |> Option.map failureMessage),
                             partial
                         )
                     )
@@ -1293,7 +1294,7 @@ let private completeAfterSynchronizeAsync
         if partial |> Option.exists isConflictPartial then
             return! completeAfterUpdateAsync deps partial pendingWarning
         else
-            let! result = refreshAfterSuccess deps partial GitPageChange.NoChange None
+            let! result = refreshAfterSuccess deps partial GitPageChange.NoChange None None
 
             return
                 result
@@ -1355,7 +1356,7 @@ let private simpleWriteAsync
     (deps: GitDependencies)
     (call: unit -> JS.Promise<Result<OperationResultDto<'T>, string>>)
     =
-    runTrackedWriteAsync deps call (fun _ partial -> refreshAfterSuccess deps partial GitPageChange.NoChange None)
+    runTrackedWriteAsync deps call (fun _ partial -> refreshAfterSuccess deps partial GitPageChange.NoChange None None)
 
 let private requireWorkspaceVersion (state: GitState) =
     match state.WorkspaceVersion with
@@ -1471,7 +1472,7 @@ let private runDiscardAttemptAsync (deps: GitDependencies) (state: GitState) (pa
                             ExpectedWorkspaceVersion = version
                         }
                     )
-                    (fun _ partial -> refreshAfterSuccess deps partial GitPageChange.Clear (Some None))
+                    (fun _ partial -> refreshAfterSuccess deps partial GitPageChange.Clear (Some None) None)
 }
 
 let private pendingPrimarySaveWarning =
@@ -1760,7 +1761,7 @@ let private runCreateBranchAttemptAsync
                                 ExpectedWorkspaceVersion = version
                             }
                         )
-                        (fun _ partial -> refreshAfterSuccess deps partial GitPageChange.Clear (Some None))
+                        (fun _ partial -> refreshAfterSuccess deps partial GitPageChange.Clear (Some None) None)
     }
 
 let private runSwitchBranchAttemptAsync (deps: GitDependencies) (state: GitState) (refName: string) = promise {
@@ -1778,7 +1779,7 @@ let private runSwitchBranchAttemptAsync (deps: GitDependencies) (state: GitState
                         ExpectedWorkspaceVersion = version
                     }
                 )
-                (fun _ partial -> refreshAfterSuccess deps partial GitPageChange.Clear (Some None))
+                (fun _ partial -> refreshAfterSuccess deps partial GitPageChange.Clear (Some None) None)
 }
 
 let private runFinalizeMergeAttemptAsync (deps: GitDependencies) (state: GitState) = promise {
@@ -1797,7 +1798,7 @@ let private runFinalizeMergeAttemptAsync (deps: GitDependencies) (state: GitStat
                         Message = None
                     }
                 )
-                (fun _ partial -> refreshAfterSuccess deps partial GitPageChange.Clear (Some None))
+                (fun _ partial -> refreshAfterSuccess deps partial GitPageChange.Clear (Some None) None)
 }
 
 let private runAbandonMergeAttemptAsync (deps: GitDependencies) (state: GitState) = promise {
@@ -1815,7 +1816,7 @@ let private runAbandonMergeAttemptAsync (deps: GitDependencies) (state: GitState
                         ExpectedWorkspaceVersion = version
                     }
                 )
-                (fun _ partial -> refreshAfterSuccess deps partial GitPageChange.Clear (Some None))
+                (fun _ partial -> refreshAfterSuccess deps partial GitPageChange.Clear (Some None) None)
 }
 
 /// Removes a stale lock and refreshes. The refreshed status decides what follows: an
@@ -1824,7 +1825,26 @@ let private runClearStaleLockAttemptAsync (deps: GitDependencies) =
     runTrackedWriteAsync
         deps
         (fun () -> deps.clearStaleLock (request deps))
-        (fun _ partial -> refreshAfterSuccess deps partial GitPageChange.NoChange None)
+        (fun outcome partial ->
+            let removedLockPaths =
+                outcome.Warnings
+                |> Array.choose (fun warning ->
+                    if warning.Code = VersionControlCodes.LockRemoved then
+                        Some warning.Message
+                    else
+                        None
+                )
+
+            let warningMessage =
+                match removedLockPaths with
+                | [||] -> None
+                | [| path |] -> Some $"Removed stale lock file: {path}."
+                | paths ->
+                    let joined = String.concat ", " paths
+                    Some $"Removed stale lock files: {joined}."
+
+            refreshAfterSuccess deps partial GitPageChange.NoChange None warningMessage
+        )
 
 let private runRestoreInterruptedPathsAttemptAsync (deps: GitDependencies) (state: GitState) (paths: string[]) = promise {
     match requireWorkspaceVersion state with
@@ -1840,7 +1860,7 @@ let private runRestoreInterruptedPathsAttemptAsync (deps: GitDependencies) (stat
                         ExpectedWorkspaceVersion = version
                     }
                 )
-                (fun _ partial -> refreshAfterSuccess deps partial GitPageChange.Clear (Some None))
+                (fun _ partial -> refreshAfterSuccess deps partial GitPageChange.Clear (Some None) None)
 }
 
 /// Downloads the large objects an interrupted update left behind, one per object,
@@ -1857,13 +1877,14 @@ let private runRetryMaterializationAttemptAsync (deps: GitDependencies) = promis
 
         let mutable failure: OperationFailureDto option = None
 
-        for objectState in pending do
+        for index, objectState in pending |> Array.indexed do
             if failure.IsNone then
                 let! materialized =
                     toResult (
                         deps.materializeObject {
                             OperationId = deps.newOperationId ()
                             Path = objectState.Path
+                            RefreshTree = Some(index = pending.Length - 1)
                         }
                     )
 
@@ -1873,7 +1894,7 @@ let private runRetryMaterializationAttemptAsync (deps: GitDependencies) = promis
 
         match failure with
         | Some error -> return! routedToOutcome deps (routeFailure None error)
-        | None -> return! refreshAfterSuccess deps None GitPageChange.NoChange None
+        | None -> return! refreshAfterSuccess deps None GitPageChange.NoChange None None
 }
 
 let private executeWriteAttemptOnce (deps: GitDependencies) (state: GitState) (writeRequest: WriteRequest) = promise {

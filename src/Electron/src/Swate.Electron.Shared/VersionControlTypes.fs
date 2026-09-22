@@ -437,7 +437,15 @@ type RestorePathsRequestDto = {
     ExpectedWorkspaceVersion: string
 }
 
-type ObjectPathRequestDto = { OperationId: string; Path: string }
+type ObjectPathRequestDto = {
+    OperationId: string
+    Path: string
+    /// How the file tree is refreshed after a materialization. None refreshes when the
+    /// result changed state, Some true always refreshes, Some false skips the refresh on
+    /// success and keeps it on failure, because earlier objects of a loop may have changed
+    /// files on disk.
+    RefreshTree: bool option
+}
 
 /// One synchronization: refresh, update when the target is ahead, publish unless
 /// PublishLocalRevisions is false. ExpectedTargetRevision pins an accepted update to the

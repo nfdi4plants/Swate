@@ -48,6 +48,7 @@ module private Helper =
     let private pathRequest (path: string) : ObjectPathRequestDto = {
         OperationId = Renderer.VersionControlApiClient.newOperationId ()
         Path = path
+        RefreshTree = None
     }
 
     let private unsupportedPage (path: string) (reason: string option) =
