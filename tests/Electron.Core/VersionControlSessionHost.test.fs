@@ -2242,7 +2242,7 @@ Vitest.describe (
 
         // The library only documents these literals and exposes no constants for them:
         // IdentityMissing, PublishTargetMissing, TargetUnreachable, NetworkFailure,
-        // ConfiguredTargetInvalid, ConflictsDetected, PreviewIndeterminate, UpdateRejected,
+        // ConfiguredTargetInvalid, ConflictsDetected, PreviewIndeterminate,
         // TargetNotEmpty, OperationCanceled, BaseContentNotFound, InvalidLfsThreshold,
         // ServiceUnavailable, SessionUnavailable, WorkspaceUnmanaged, WorkspaceAmbiguous,
         // LocationUnsupported, UnexpectedException, LockRemovalRefused, LockRemoved,

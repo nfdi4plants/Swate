@@ -129,9 +129,6 @@ module VersionControlCodes =
     let PreviewIndeterminate = "preview_indeterminate"
 
     [<Literal>]
-    let UpdateRejected = "update_rejected"
-
-    [<Literal>]
     let TargetNotEmpty = "target_not_empty"
 
     [<Literal>]
