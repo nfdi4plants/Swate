@@ -716,20 +716,15 @@ let private applyRefreshResult (refreshResult: GitRefreshResult) (model: GitStat
           }
 
     let modelWithSettings =
-        match refreshResult.Status, refreshResult.LfsSettings with
-        | Ok _, Ok settings -> {
+        match refreshResult.LfsSettings with
+        | Ok settings -> {
             modelWithBranches with
                 LfsAutoTrackThresholdMb =
                     settings.AutoPolicyThresholdMb
                     |> Option.defaultValue GitState.Empty.LfsAutoTrackThresholdMb
                 DownloadLargeFiles = settings.MaterializeLargeObjects
           }
-        | Ok _, Error _ -> modelWithBranches
-        | _ -> {
-            modelWithBranches with
-                LfsAutoTrackThresholdMb = GitState.Empty.LfsAutoTrackThresholdMb
-                DownloadLargeFiles = GitState.Empty.DownloadLargeFiles
-          }
+        | Error _ -> modelWithBranches
 
     {
         modelWithSettings with

@@ -702,6 +702,57 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "A failed settings read keeps the current threshold and download preference",
+            fun () -> promise {
+                let settingsFailure =
+                    makeFailure ProviderError "settings_read_failed" "The settings read failed." None [||]
+
+                let statusFailure =
+                    makeFailure ProviderError "status_read_failed" "The status read failed." None [||]
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        RefreshRequestId = 1
+                        RefreshState = GitRefreshState.Loading
+                        LfsAutoTrackThresholdMb = 42
+                        DownloadLargeFiles = true
+                }
+
+                let settingsFailedRefresh = {
+                    Session = Ok sessionInfo
+                    Status = Ok cleanStatus
+                    Refs = Ok refs
+                    LfsSettings = Error settingsFailure
+                    OriginRemoteRepositoryWebUrl = None
+                }
+
+                let firstState, firstCmd =
+                    update defaultDependencies ignore (RefreshCompleted(1, Ok settingsFailedRefresh)) state
+
+                let! _ = collectMessages firstCmd
+
+                Vitest.expect(firstState.LfsAutoTrackThresholdMb).toBe (42)
+                Vitest.expect(firstState.DownloadLargeFiles).toBe (true)
+                Vitest.expect(firstState.ErrorNotice).toEqual (Some "The settings read failed.")
+
+                let statusFailedRefresh = {
+                    settingsFailedRefresh with
+                        Status = Error statusFailure
+                        LfsSettings = Ok(lfsSettings 9 false)
+                }
+
+                let secondState, secondCmd =
+                    update defaultDependencies ignore (RefreshCompleted(1, Ok statusFailedRefresh)) state
+
+                let! _ = collectMessages secondCmd
+
+                Vitest.expect(secondState.LfsAutoTrackThresholdMb).toBe (9)
+                Vitest.expect(secondState.DownloadLargeFiles).toBe (false)
+            }
+        )
+
+        Vitest.test (
             "RefreshCompleted ignores stale responses without emitting follow-up callback work",
             fun () -> promise {
                 let state = {
