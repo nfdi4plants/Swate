@@ -142,17 +142,23 @@ let private showArcOpenError (window: BaseWindow option) (arcPath: string option
     return ()
 }
 
-let private openArcAtPath (event: IpcMainInvokeEvent) (requestedPath: string) = promise {
-    let window = dialogParentFromIpcEvent event
-
-    let reportError arcPath error = promise {
+let private reportArcOpenError
+    (event: IpcMainInvokeEvent)
+    (window: BaseWindow option)
+    (arcPath: string option)
+    (originalError: exn)
+    =
+    promise {
         try
-            do! showArcOpenError window arcPath error
+            do! showArcOpenError window arcPath originalError
         with dialogError ->
             swatelogfn event.sender.id "Failed to show ARC-open error dialog: %s" dialogError.Message
 
-        return Error error
+        return Error originalError
     }
+
+let private openArcAtPath (event: IpcMainInvokeEvent) (requestedPath: string) = promise {
+    let window = dialogParentFromIpcEvent event
 
     let normalizedPathResult =
         try
@@ -161,7 +167,7 @@ let private openArcAtPath (event: IpcMainInvokeEvent) (requestedPath: string) = 
             Error error
 
     match normalizedPathResult with
-    | Error error -> return! reportError None error
+    | Error error -> return! reportArcOpenError event window None error
     | Ok arcPath ->
         let windowId = windowIdFromIpcEvent event
 
@@ -169,38 +175,45 @@ let private openArcAtPath (event: IpcMainInvokeEvent) (requestedPath: string) = 
             let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
             return Ok disposition
         with
-        | ArcLoadCancelledException targetWindowId when targetWindowId <> windowId ->
-            return Error(ArcLoadCancelledException targetWindowId)
-        | error -> return! reportError (Some arcPath) error
+        | ArcLoadCancelledException targetWindowId -> return Error(ArcLoadCancelledException targetWindowId)
+        | error -> return! reportArcOpenError event window (Some arcPath) error
 }
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
 let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
     openARC =
         fun () -> promise {
-            let window = dialogParentFromIpcEvent event
-
             try
-                let! r =
-                    dialog.showOpenDialog (
-                        ?window = window,
-                        properties = [|
-                            Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
-                        |]
-                    )
+                let window = dialogParentFromIpcEvent event
 
-                if r.canceled then
-                    return Ok None
-                elif r.filePaths.Length <> 1 then
-                    let error = exn "Not exactly one path"
-                    do! showArcOpenError window None error
-                    return Error error
-                else
-                    match! openArcAtPath event (Array.exactlyOne r.filePaths) with
-                    | Ok disposition -> return Ok(Some(ArcOpenDisposition.path disposition))
-                    | Error error -> return Error error
+                let! selectionResult = promise {
+                    try
+                        let! selection =
+                            dialog.showOpenDialog (
+                                ?window = window,
+                                properties = [|
+                                    Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
+                                |]
+                            )
+
+                        return Ok selection
+                    with error ->
+                        return Error error
+                }
+
+                match selectionResult with
+                | Error error -> return! reportArcOpenError event window None error
+                | Ok r ->
+                    if r.canceled then
+                        return Ok None
+                    elif r.filePaths.Length <> 1 then
+                        let error = exn "Not exactly one path"
+                        return! reportArcOpenError event window None error
+                    else
+                        match! openArcAtPath event (Array.exactlyOne r.filePaths) with
+                        | Ok disposition -> return Ok(Some(ArcOpenDisposition.path disposition))
+                        | Error error -> return Error error
             with error ->
-                do! showArcOpenError window None error
                 return Error error
         }
     openARCByPath =

@@ -465,6 +465,77 @@ let private closingWhileArcLoadsRegistrationTestWindow id isArcOpening =
     (fun () -> sendsAfterDestroy),
     (fun () -> titleWritesAfterDestroy)
 
+let private closingCurrentArcLoadTestWindow id isArcOpening =
+    let mutable destroyed = false
+    let mutable arcWasOpeningWhenClosed = false
+    let mutable preventedCloseCount = 0
+    let mutable sendsAfterDestroy = 0
+    let mutable titleWritesAfterDestroy = 0
+    let mutable closeHandler: (obj -> unit) option = None
+    let mutable closedHandler: (unit -> unit) option = None
+    let noop: obj = emitJsExpr () "((..._args) => {})"
+
+    let send: obj =
+        emitJsExpr
+            (fun () ->
+                if destroyed then
+                    sendsAfterDestroy <- sendsAfterDestroy + 1
+            )
+            "((..._args) => $0())"
+
+    let onEvent (eventName: string) (handler: obj) =
+        if eventName = "close" then
+            closeHandler <- Some(unbox handler)
+        elif eventName = "closed" then
+            closedHandler <- Some(unbox handler)
+
+    let onEventJs: obj =
+        emitJsExpr onEvent "((eventName, handler) => $0(eventName, handler))"
+
+    let isDestroyed () =
+        if not destroyed then
+            arcWasOpeningWhenClosed <- isArcOpening ()
+
+            closeHandler.Value(
+                createObj [
+                    "preventDefault" ==> (fun () -> preventedCloseCount <- preventedCloseCount + 1)
+                ]
+            )
+
+            if preventedCloseCount = 0 then
+                destroyed <- true
+                closedHandler.Value()
+
+        destroyed
+
+    let windowObject =
+        createObj [
+            "id" ==> id
+            "isDestroyed" ==> isDestroyed
+            "destroy" ==> (fun () -> destroyed <- true)
+            "focus" ==> ignore
+            "on" ==> onEventJs
+            "webContents" ==> createObj [ "send" ==> send; "on" ==> noop ]
+        ]
+
+    let setTitle (_value: string) =
+        if destroyed then
+            titleWritesAfterDestroy <- titleWritesAfterDestroy + 1
+            failwith "Object has been destroyed"
+
+    emitJsExpr
+        (windowObject, setTitle)
+        "Object.defineProperty($0, 'title', { configurable: true, get: () => '', set: value => $1(value) })"
+    |> ignore
+
+    let window = windowObject |> unbox<BrowserWindow>
+
+    window,
+    (fun () -> arcWasOpeningWhenClosed),
+    (fun () -> destroyed),
+    (fun () -> sendsAfterDestroy),
+    (fun () -> titleWritesAfterDestroy)
+
 let private expectRegistrationLoadFailure
     (expectedError: exn)
     (vaults: ArcVaults)
@@ -959,6 +1030,89 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "openARCByPath treats closing the current window during ARC loading as cancellation",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-ipc-current-close-during-load-"
+                    "Closing Current ARC"
+                    ignore
+                    (fun arcPath -> promise {
+                        let windowId = 32
+                        let mutable loadingVault: ArcVault option = None
+                        let mutable vaultExistedWhenClosed = false
+                        let mutable pathWasAssignedWhenClosed = false
+                        let mutable arcWasNoneWhenClosed = false
+                        let mutable watcherWasAbsentWhenClosed = false
+
+                        let isArcOpening () =
+                            loadingVault <- ARC_VAULTS.TryGetVault(windowId)
+
+                            match loadingVault with
+                            | Some vault ->
+                                vaultExistedWhenClosed <- true
+                                pathWasAssignedWhenClosed <- vault.path = Some(PathHelpers.normalizePath arcPath)
+
+                                arcWasNoneWhenClosed <- vault.arc.IsNone
+                                watcherWasAbsentWhenClosed <- vault.watcher.IsNone
+                            | None -> ()
+
+                            vaultExistedWhenClosed
+                            && pathWasAssignedWhenClosed
+                            && arcWasNoneWhenClosed
+                            && watcherWasAbsentWhenClosed
+
+                        let (window, arcWasOpening, isDestroyed, sendsAfterDestroy, titleWritesAfterDestroy) =
+                            closingCurrentArcLoadTestWindow windowId isArcOpening
+
+                        let vault = ArcVault(window)
+                        let mutable dialogCount = 0
+                        let mutable createdWindowCount = 0
+
+                        ARC_VAULTS.Vaults.Add(windowId, vault)
+                        ARC_VAULTS.OnCloseWindow(window, vault, windowId)
+                        setBrowserWindowFromWebContents (fun _ -> window :> obj)
+
+                        setBrowserWindowFactory (fun _ ->
+                            createdWindowCount <- createdWindowCount + 1
+                            failwith "Same-window ARC opening must not create a BrowserWindow."
+                        )
+
+                        setShowMessageBox (fun _ _ ->
+                            dialogCount <- dialogCount + 1
+                            createObj [ "response" ==> 0; "checkboxChecked" ==> false ]
+                        )
+
+                        try
+                            let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId windowId)
+
+                            match! api.openARCByPath arcPath with
+                            | Ok _ -> failwith "Expected closing the current ARC window to cancel the operation."
+                            | Error cancellation ->
+                                match cancellation with
+                                | ArcLoadCancelledException cancelledWindowId ->
+                                    Vitest.expect(cancelledWindowId).toBe (windowId)
+                                | _ -> failwith "Expected an explicit ARC-load cancellation marker."
+
+                                Vitest.expect(createdWindowCount).toBe (0)
+                                Vitest.expect(arcWasOpening ()).toBe (true)
+                                Vitest.expect(vaultExistedWhenClosed).toBe (true)
+                                Vitest.expect(pathWasAssignedWhenClosed).toBe (true)
+                                Vitest.expect(arcWasNoneWhenClosed).toBe (true)
+                                Vitest.expect(watcherWasAbsentWhenClosed).toBe (true)
+                                Vitest.expect(isDestroyed ()).toBe (true)
+                                Vitest.expect(vault.watcher.IsNone).toBe (true)
+                                Vitest.expect(ARC_VAULTS.Vaults.ContainsKey(windowId)).toBe (false)
+                                Vitest.expect(sendsAfterDestroy ()).toBe (0)
+                                Vitest.expect(titleWritesAfterDestroy ()).toBe (0)
+                                Vitest.expect(dialogCount).toBe (0)
+                        with error ->
+                            ARC_VAULTS.Vaults.Remove(windowId) |> ignore
+                            do! vault.StopFileWatcher()
+                            return raise error
+                    })
+        )
+
+        Vitest.test (
             "openARCByPath rejects an invalid ARC and shows one native error with folder context",
             fun () -> promise {
                 let! folderPath = TestHelpers.createTempDirectoryAsync "swate-ipc-invalid-arc-"
@@ -1036,6 +1190,67 @@ Vitest.describe (
                     Vitest.expect(dialogOptions.IsSome).toBe (true)
                     Vitest.expect(dialogOptions.Value?detail).toContain ("Not exactly one path")
                     Vitest.expect(dialogOptions.Value?detail).not.toContain ("Folder:")
+            }
+        )
+
+        Vitest.test (
+            "openARC preserves the multi-selection error when the native error dialog throws",
+            fun () -> promise {
+                let windowId = 33
+                let window = lifecycleTestWindow windowId false ignore
+                let dialogError = exn "Expected native dialog failure"
+                let mutable dialogCount = 0
+
+                setBrowserWindowFromWebContents (fun _ -> window :> obj)
+
+                setShowOpenDialog (fun _ _ ->
+                    createObj [
+                        "canceled" ==> false
+                        "filePaths" ==> [| "C:/first"; "C:/second" |]
+                    ]
+                )
+
+                setShowMessageBox (fun _ _ ->
+                    dialogCount <- dialogCount + 1
+                    raise dialogError
+                )
+
+                let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId windowId)
+
+                match! api.openARC () with
+                | Ok _ -> return failwith "Expected multiple dialog paths to be rejected."
+                | Error returnedError ->
+                    Vitest.expect(returnedError.Message).toBe ("Not exactly one path")
+                    Vitest.expect(returnedError).not.toBe (dialogError)
+                    Vitest.expect(dialogCount).toBe (1)
+            }
+        )
+
+        Vitest.test (
+            "openARC preserves the folder-picker error when the native error dialog throws",
+            fun () -> promise {
+                let windowId = 34
+                let window = lifecycleTestWindow windowId false ignore
+                let openDialogError = exn "Expected folder-picker failure"
+                let messageDialogError = exn "Expected native dialog failure"
+                let mutable dialogCount = 0
+
+                setBrowserWindowFromWebContents (fun _ -> window :> obj)
+                setShowOpenDialog (fun _ _ -> raise openDialogError)
+
+                setShowMessageBox (fun _ _ ->
+                    dialogCount <- dialogCount + 1
+                    raise messageDialogError
+                )
+
+                let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId windowId)
+
+                match! api.openARC () with
+                | Ok _ -> return failwith "Expected the throwing folder picker to fail ARC opening."
+                | Error returnedError ->
+                    Vitest.expect(returnedError).toBe (openDialogError)
+                    Vitest.expect(returnedError).not.toBe (messageDialogError)
+                    Vitest.expect(dialogCount).toBe (1)
             }
         )
 
