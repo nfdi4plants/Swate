@@ -3023,6 +3023,90 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "The save's acceptance dialog is built over the refreshed snapshot",
+            fun () -> promise {
+                let failure = {
+                    makeFailure
+                        Conflict
+                        VersionControlCodes.UpdateWouldCreateConflictSession
+                        "Updating from the target needs conflict resolution."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.AcceptUpdateRisks
+                            Instructions = None
+                        })
+                        [| "isa.study.xlsx" |] with
+                        RevisionEvidence = [|
+                            {
+                                Label = "observed_target"
+                                Revision = "target-1"
+                            }
+                        |]
+                }
+
+                let runCase (confirmationStatus: Result<OperationResultDto<WorkspaceStatusDto>, string>) = promise {
+                    let mutable getStatusCalls = 0
+                    let postCommitStatus = statusForBranch "post-commit"
+
+                    let deps = {
+                        defaultDependencies with
+                            createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
+                            synchronize = fun _ -> promise { return Ok(OperationResultDto.Failed failure) }
+                            getStatus =
+                                fun _ ->
+                                    getStatusCalls <- getStatusCalls + 1
+
+                                    promise {
+                                        if getStatusCalls = 1 then
+                                            return Ok(succeeded postCommitStatus)
+                                        else
+                                            return confirmationStatus
+                                    }
+                            listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                            getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                    }
+
+                    let state = {
+                        runningState with
+                            ChangedFiles = [| changedFile "README.md" "M" " " false |]
+                    }
+
+                    let stateAfterRequest, requestCmd =
+                        update deps ignore (PrimarySaveAllRequested "Add polish") state
+
+                    let! requestMessages = collectMessages requestCmd
+
+                    let stateAfterWrite, finishCmd =
+                        match requestMessages with
+                        | [| WriteRequested(PrimarySave _) |] -> update deps ignore requestMessages[0] stateAfterRequest
+                        | _ -> failwith "Expected the primary save request."
+
+                    let! completionMessages = collectWriteMessages finishCmd
+
+                    let finalState, completionCmd =
+                        match completionMessages with
+                        | [| WriteCompleted(_, _, PrimarySave _, Ok(CompletedWithPendingRemoteConfirmation(_, _, _))) |] ->
+                            update deps ignore completionMessages[0] stateAfterWrite
+                        | _ -> failwith "Expected the primary save flow to request remote confirmation."
+
+                    let! _ = collectMessages completionCmd
+
+                    Vitest.expect(getStatusCalls).toBe (2)
+                    return finalState
+                }
+
+                let! refreshedState = runCase (Ok(succeeded (statusForBranch "refreshed")))
+
+                Vitest.expect(refreshedState.Status.CurrentBranch).toEqual (Some "refreshed")
+
+                let! failedRefreshState = runCase (Error "confirmation refresh failed")
+
+                Vitest.expect(failedRefreshState.Status.CurrentBranch).toEqual (Some "post-commit")
+                Vitest.expect(failedRefreshState.PendingConfirmation.IsSome).toBe (true)
+                Vitest.expect(failedRefreshState.ErrorNotice).toEqual (None)
+            }
+        )
+
+        Vitest.test (
             "A recovery attached to a pending confirmation becomes a warning and is not parked",
             fun () -> promise {
                 let partial =
