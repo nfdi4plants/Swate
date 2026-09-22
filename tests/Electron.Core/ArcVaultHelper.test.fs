@@ -494,6 +494,25 @@ Vitest.describe (
         Vitest.afterEach (fun () -> resetElectronMock ())
 
         Vitest.test (
+            "BrowserWindow factory preserves title property descriptors",
+            fun () ->
+                let mutable writtenTitle = ""
+                let factoryWindow = createObj []
+
+                emitJsExpr
+                    (factoryWindow, fun (value: string) -> writtenTitle <- value)
+                    "Object.defineProperty($0, 'title', { configurable: true, get: () => '', set: value => $1(value) })"
+                |> ignore
+
+                setBrowserWindowFactory (fun _ -> factoryWindow)
+
+                let window = BrowserWindow()
+                window.title <- "Descriptor-preserving title"
+
+                Vitest.expect(writtenTitle).toBe ("Descriptor-preserving title")
+        )
+
+        Vitest.test (
             "DataMap add synchronization preserves the persisted static-hash baseline",
             fun () ->
                 let parentInfo = DatamapParentInfo.create "DataMapAssay" DataMapParent.Assay
@@ -637,12 +656,23 @@ Vitest.describe (
                         let windowId = 18
                         let mutable loadingVault: ArcVault option = None
                         let mutable vaultsRef: ArcVaults option = None
+                        let mutable vaultExistedWhenClosed = false
+                        let mutable pathWasAssignedWhenClosed = false
+                        let mutable arcWasNoneWhenClosed = false
+                        let mutable watcherWasAbsentWhenClosed = false
 
                         let isArcOpening () =
                             loadingVault <- vaultsRef.Value.TryGetVault(windowId)
 
-                            loadingVault
-                            |> Option.exists (fun vault -> vault.path.IsSome && vault.arc.IsNone)
+                            match loadingVault with
+                            | Some vault ->
+                                vaultExistedWhenClosed <- true
+                                pathWasAssignedWhenClosed <- vault.path = Some(PathHelpers.normalizePath arcPath)
+                                arcWasNoneWhenClosed <- vault.arc.IsNone
+                                watcherWasAbsentWhenClosed <- vault.watcher.IsNone
+                            | None -> ()
+
+                            vaultExistedWhenClosed && pathWasAssignedWhenClosed && arcWasNoneWhenClosed
 
                         let (window,
                              wasShown,
@@ -657,23 +687,31 @@ Vitest.describe (
                         vaultsRef <- Some vaults
                         setBrowserWindowFactory (fun _ -> window :> obj)
 
+                        // Temporary scheduler-based regression coverage: show() queues the close for the next
+                        // event-loop turn. A deterministic async loading seam still needs to replace this timing.
                         let mutable registrationError: exn option = None
+                        let mutable registrationSucceeded = false
 
                         try
                             let! _ = vaults.RegisterVaultWithArc arcPath
-                            ()
+                            registrationSucceeded <- true
                         with error ->
                             registrationError <- Some error
 
                         Vitest.expect(wasShown ()).toBe (true)
                         Vitest.expect(lifecycleWasAttached ()).toBe (true)
                         Vitest.expect(arcWasOpening ()).toBe (true)
+                        Vitest.expect(vaultExistedWhenClosed).toBe (true)
+                        Vitest.expect(pathWasAssignedWhenClosed).toBe (true)
+                        Vitest.expect(arcWasNoneWhenClosed).toBe (true)
+                        Vitest.expect(watcherWasAbsentWhenClosed).toBe (true)
                         Vitest.expect(isDestroyed ()).toBe (true)
                         Vitest.expect(vaults.Vaults.ContainsKey(windowId)).toBe (false)
                         Vitest.expect(loadingVault.IsSome).toBe (true)
                         Vitest.expect(loadingVault.Value.watcher).toEqual (None)
                         Vitest.expect(sendsAfterDestroy ()).toBe (0)
                         Vitest.expect(titleWritesAfterDestroy ()).toBe (0)
+                        Vitest.expect(registrationSucceeded).toBe (false)
                         Vitest.expect(registrationError.IsSome).toBe (true)
                         Vitest.expect(registrationError.Value.Message).toContain ("closed while the ARC was loading")
                     })

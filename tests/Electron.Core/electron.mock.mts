@@ -56,7 +56,8 @@ export const safeStorage = {
 export class BrowserWindow {
     constructor(options: unknown) {
         if (browserWindowFactoryMock) {
-            Object.assign(this, browserWindowFactoryMock(options));
+            const mockWindow = browserWindowFactoryMock(options);
+            Object.defineProperties(this, Object.getOwnPropertyDescriptors(mockWindow));
         }
     }
 
