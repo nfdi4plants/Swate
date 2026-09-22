@@ -282,7 +282,7 @@ type WriteAttemptOutcome =
     | RequiresRecovery of GitPendingRecovery * message: string
     /// The workspace token was stale while the workspace itself did not change. The
     /// write is retried once against a refreshed token before this reaches the user.
-    | StaleWorkspaceVersion of string
+    | StaleWorkspaceVersion of message: string * targetMoved: bool
     | OperationCancelled of string
     /// The remote project exists now. Binding or publishing still has to be retried.
     | ProvisioningIncomplete of GitProvisionedRemote * message: string
@@ -294,7 +294,7 @@ type private RoutedFailure =
     | Recovery of GitPendingRecovery * message: string
     | RefreshAfterCancel of message: string
     | InspectAfterCancel of message: string
-    | StaleWorkspace of string
+    | StaleWorkspace of message: string * targetMoved: bool
     /// The workspace has a conflict session the user has to resolve first.
     | ConflictSession of OperationFailureDto
     | UpdateAcceptanceRequired of dialog: GitSidebarConfirmationDialog * observedTarget: string
@@ -1124,13 +1124,15 @@ let private routeFailure (targetPath: string option) (failure: OperationFailureD
             && failure.Category = FailureCategoryDto.Concurrency
             && not failure.StateChanged
             ->
+            let targetMoved = hasRevisionEvidence "expected_target" failure
+
             let message =
-                if hasRevisionEvidence "expected_target" failure then
+                if targetMoved then
                     movedTargetMessage
                 else
                     failureMessage failure
 
-            RoutedFailure.StaleWorkspace message
+            RoutedFailure.StaleWorkspace(message, targetMoved)
         | _ when
             failure.Code = VersionControlCodes.ConflictsDetected
             || failure.Code = VersionControlCodes.ConflictSessionActive
@@ -1275,7 +1277,7 @@ let private routedToOutcome (deps: GitDependencies) (routed: RoutedFailure) = pr
                     )
                 )
         | Error refreshFailure -> return Error(failureMessage refreshFailure)
-    | RoutedFailure.StaleWorkspace message -> return Ok(StaleWorkspaceVersion message)
+    | RoutedFailure.StaleWorkspace(message, targetMoved) -> return Ok(StaleWorkspaceVersion(message, targetMoved))
     | RoutedFailure.ConflictSession failure -> return! completeAfterUpdateAsync deps (Some failure) None
     | RoutedFailure.UpdateAcceptanceRequired(_, _) ->
         return Error "The synchronization needs a decision that this write cannot offer."
@@ -1801,7 +1803,7 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
                 return Ok(RequiresRecovery(recovery, message))
             | Error(PublishFailure.Routed(RoutedFailure.Cancelled message))
             | Error(PublishFailure.Routed(RoutedFailure.DependencyInstall message))
-            | Error(PublishFailure.Routed(RoutedFailure.StaleWorkspace message))
+            | Error(PublishFailure.Routed(RoutedFailure.StaleWorkspace(message, _)))
             | Error(PublishFailure.Routed(RoutedFailure.Error message)) ->
                 // The local commit already succeeded, so the saved-locally outcome stays.
                 return! pendingPrimarySaveRemoteFailureAsync deps message
@@ -2049,16 +2051,11 @@ let private executeWriteAttempt (deps: GitDependencies) (state: GitState) (write
     let! first = executeWriteAttemptOnce deps state writeRequest
 
     match first with
-    | Ok(StaleWorkspaceVersion message) when not (replaysAfterStaleToken writeRequest) ->
-        // A moved target keeps its own message. Every other stale token gets the generic one.
-        let reported =
-            if message = movedTargetMessage then
-                message
-            else
-                staleWithoutReplayMessage
+    | Ok(StaleWorkspaceVersion(message, targetMoved)) when not (replaysAfterStaleToken writeRequest) ->
+        let reported = if targetMoved then message else staleWithoutReplayMessage
 
-        return Ok(StaleWorkspaceVersion reported)
-    | Ok(StaleWorkspaceVersion _) ->
+        return Ok(StaleWorkspaceVersion(reported, targetMoved))
+    | Ok(StaleWorkspaceVersion(_, _)) ->
         let! refreshResult = refreshAllAsync deps
 
         match refreshResult.Status, refreshErrorMessage refreshResult with
@@ -2068,7 +2065,7 @@ let private executeWriteAttempt (deps: GitDependencies) (state: GitState) (write
             let! second = executeWriteAttemptOnce deps (applyRefreshResult refreshResult state) writeRequest
 
             match second with
-            | Ok(StaleWorkspaceVersion message) -> return Error message
+            | Ok(StaleWorkspaceVersion(message, _)) -> return Error message
             | other -> return other
     | other -> return other
 }
@@ -2225,7 +2222,7 @@ let private resolveStaleWriteCompletedCmd writeRequest result =
     | Ok(RequiresRecovery(_, message)) -> resolveCloneReplyCmd writeRequest (Error message)
     | Ok(ProvisioningIncomplete(_, message)) -> resolveCloneReplyCmd writeRequest (Error message)
     | Ok(OperationCancelled message) -> resolveCloneReplyCmd writeRequest (Error message)
-    | Ok(StaleWorkspaceVersion message) -> resolveCloneReplyCmd writeRequest (Error message)
+    | Ok(StaleWorkspaceVersion(message, _)) -> resolveCloneReplyCmd writeRequest (Error message)
     | Error message -> resolveCloneReplyCmd writeRequest (Error message)
 
 /// The first library call of a write uses the id allocated when the write was
@@ -2876,7 +2873,7 @@ let private updateCore
         sessionId <> model.ArcSessionId || writeRequestId <> model.WriteRequestId
         ->
         model, resolveStaleWriteCompletedCmd writeRequest result
-    | WriteCompleted(_, _, writeRequest, Ok(StaleWorkspaceVersion message)) ->
+    | WriteCompleted(_, _, writeRequest, Ok(StaleWorkspaceVersion(message, _))) ->
         // Reached when the retry after a refresh was stale again, or when the write is
         // one that is never replayed. The refresh shows the state the user has to review.
         let nextModel = {

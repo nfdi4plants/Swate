@@ -2199,7 +2199,7 @@ Vitest.describe (
                             model.ArcSessionId,
                             model.WriteRequestId - 1,
                             DiscardSelection [| "a.txt" |],
-                            Ok(StaleWorkspaceVersion "old")
+                            Ok(StaleWorkspaceVersion("old", false))
                         ))
                         model
 
@@ -4797,7 +4797,7 @@ Vitest.describe (
 
                 let finalState, finishCmd, completedMessage =
                     match completion with
-                    | [| WriteCompleted(_, _, DiscardSelection _, Ok(StaleWorkspaceVersion message)) |] ->
+                    | [| WriteCompleted(_, _, DiscardSelection _, Ok(StaleWorkspaceVersion(message, _))) |] ->
                         let nextState, command = update deps ignore completion[0] requestedWithPending
                         nextState, command, message
                     | _ -> failwith "Expected the stale discard completion."
@@ -4870,7 +4870,7 @@ Vitest.describe (
 
                 let finalState, finishCmd, completedMessage =
                     match completionMessages with
-                    | [| WriteCompleted(_, _, Pull _, Ok(StaleWorkspaceVersion message)) |] ->
+                    | [| WriteCompleted(_, _, Pull _, Ok(StaleWorkspaceVersion(message, _))) |] ->
                         let nextState, command = update deps ignore completionMessages[0] stateAfterRequest
                         nextState, command, message
                     | _ -> failwith "Expected the stale update completion."
@@ -4947,7 +4947,7 @@ Vitest.describe (
 
                 let finalState, finishCmd =
                     match completionMessages with
-                    | [| WriteCompleted(_, _, Pull _, Ok(StaleWorkspaceVersion message)) |] ->
+                    | [| WriteCompleted(_, _, Pull _, Ok(StaleWorkspaceVersion(message, _))) |] ->
                         let nextState, command = update deps ignore completionMessages[0] stateAfterRequest
                         nextState, command
                     | _ -> failwith "Expected the accepted pull to be rejected as stale."
@@ -5039,7 +5039,7 @@ Vitest.describe (
 
                 let finalState, finishCmd, message =
                     match completionMessages with
-                    | [| WriteCompleted(_, _, Push _, Ok(StaleWorkspaceVersion message)) |] ->
+                    | [| WriteCompleted(_, _, Push _, Ok(StaleWorkspaceVersion(message, _))) |] ->
                         let state, command = update deps ignore completionMessages[0] stateAfterRequest
                         state, command, message
                     | _ -> failwith "Expected the accepted push to be rejected as stale."
@@ -5101,7 +5101,7 @@ Vitest.describe (
 
                 let finalState, finishCmd =
                     match completion with
-                    | [| WriteCompleted(_, _, FinalizeMerge, Ok(StaleWorkspaceVersion _)) |] ->
+                    | [| WriteCompleted(_, _, FinalizeMerge, Ok(StaleWorkspaceVersion(_, _))) |] ->
                         update deps ignore completion[0] requested
                     | _ -> failwith "Expected the stale finalize completion."
 
@@ -5263,7 +5263,7 @@ Vitest.describe (
 
                 let finalState, finishCmd =
                     match completion with
-                    | [| WriteCompleted(_, _, AbandonMerge, Ok(StaleWorkspaceVersion _)) |] ->
+                    | [| WriteCompleted(_, _, AbandonMerge, Ok(StaleWorkspaceVersion(_, _))) |] ->
                         update deps ignore completion[0] requested
                     | _ -> failwith "Expected the stale abandon completion."
 
@@ -5350,7 +5350,7 @@ Vitest.describe (
 
                 let finalState, finishCmd =
                     match completion with
-                    | [| WriteCompleted(_, _, RestoreInterruptedPaths _, Ok(StaleWorkspaceVersion _)) |] ->
+                    | [| WriteCompleted(_, _, RestoreInterruptedPaths _, Ok(StaleWorkspaceVersion(_, _))) |] ->
                         update deps ignore completion[0] requestedState
                     | _ -> failwith "Expected the stale restore completion."
 
