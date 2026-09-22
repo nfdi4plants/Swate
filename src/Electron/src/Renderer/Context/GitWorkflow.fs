@@ -342,6 +342,10 @@ type Msg =
     | PublishRenameCompleted of sessionId: int * result: Result<string, string>
     | CreateBranchRequested of GitSidebarCreateBranchRequest
     | SwitchBranchRequested of string
+    | SwitchBranchPreflightCompleted of
+        sessionId: int *
+        refName: string *
+        Result<OperationResultDto<SwitchPreflightDto>, string>
     | PruneLfsCacheRequested
     | DedupLfsStorageRequested
     | ClearStaleLockRequested
@@ -377,10 +381,12 @@ type GitDependencies = {
     refreshSynchronization:
         OperationRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, string>>
     synchronize: SynchronizeRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, string>>
+    reportPhase: GitBusyOperation -> unit
     cancelOperation: OperationKeyDto -> JS.Promise<Result<bool, string>>
     cloneWorkspace: CloneWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<string>, string>>
     createRef: CreateRefRequestDto -> JS.Promise<Result<OperationResultDto<LogicalRefDto>, string>>
     switchRef: SwitchRefRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceStatusDto>, string>>
+    preflightSwitchRef: SwitchRefRequestDto -> JS.Promise<Result<OperationResultDto<SwitchPreflightDto>, string>>
     createRevision: CreateRevisionRequestDto -> JS.Promise<Result<OperationResultDto<string>, string>>
     restorePaths: RestorePathsRequestDto -> JS.Promise<Result<OperationResultDto<unit>, string>>
     resolveConflict:
@@ -2852,13 +2858,105 @@ let private updateCore
         },
         Cmd.ofMsg (WriteRequested(Push GitUpdateAcceptance.RequirePreview))
     | CreateBranchRequested branchRequest -> model, Cmd.ofMsg (WriteRequested(CreateBranch branchRequest))
+    | SwitchBranchRequested _ when model.CurrentArcPath.IsNone || model.BusyOperation.IsSome -> model, Cmd.none
     | SwitchBranchRequested branchName ->
         let normalizedBranchName = branchName.Trim()
 
         if String.IsNullOrWhiteSpace normalizedBranchName then
             model, Cmd.none
         else
-            model, Cmd.ofMsg (WriteRequested(SwitchBranch normalizedBranchName))
+            match requireWorkspaceVersion model, providerRefOf model normalizedBranchName with
+            | Error message, _ ->
+                {
+                    model with
+                        ErrorNotice = Some message
+                },
+                reportErrorCmd deps "Could not switch branch" message
+            | Ok _, None ->
+                let message =
+                    $"Branch '{normalizedBranchName}' is not known. Refresh and try again."
+
+                {
+                    model with
+                        ErrorNotice = Some message
+                },
+                reportErrorCmd deps "Could not switch branch" message
+            | Ok version, Some providerRef ->
+                let operationId = deps.newOperationId ()
+
+                let nextModel =
+                    model
+                    |> withBusyOperation (Some GitBusyOperation.SwitchingBranch)
+                    |> fun state -> {
+                        state with
+                            ErrorNotice = None
+                            WarningNotice = None
+                            CurrentOperation =
+                                Some {
+                                    SessionId = ""
+                                    OperationId = operationId
+                                }
+                    }
+
+                let cmd =
+                    Cmd.OfPromise.either
+                        deps.preflightSwitchRef
+                        {
+                            OperationId = operationId
+                            TargetRef = providerRef
+                            ExpectedWorkspaceVersion = version
+                        }
+                        (fun result -> SwitchBranchPreflightCompleted(model.ArcSessionId, normalizedBranchName, result))
+                        (fun err ->
+                            SwitchBranchPreflightCompleted(model.ArcSessionId, normalizedBranchName, Error(string err))
+                        )
+
+                nextModel, cmd
+    | SwitchBranchPreflightCompleted(sessionId, _, _) when sessionId <> model.ArcSessionId -> model, Cmd.none
+    | SwitchBranchPreflightCompleted(_, refName, Ok(OperationResultDto.Succeeded outcome))
+    | SwitchBranchPreflightCompleted(_, refName, Ok(OperationResultDto.PartiallySucceeded(outcome, _))) when
+        outcome.Value.IsSafe
+        ->
+        clearBusy model, Cmd.ofMsg (WriteRequested(SwitchBranch refName))
+    | SwitchBranchPreflightCompleted(_, _, Ok(OperationResultDto.Succeeded outcome))
+    | SwitchBranchPreflightCompleted(_, _, Ok(OperationResultDto.PartiallySucceeded(outcome, _))) ->
+        let paths = String.Join(", ", outcome.Value.PathsAtRisk)
+
+        let message =
+            if outcome.Value.PathsAtRisk.Length > 0 then
+                $"Switching branches would overwrite local changes in: {paths}. Save or discard those files, then switch."
+            else
+                "Switching branches would overwrite local changes. Save or discard those files, then switch."
+
+        {
+            clearBusy model with
+                ErrorNotice = Some message
+                WarningNotice = None
+        },
+        reportErrorCmd deps "Could not switch branch" message
+    | SwitchBranchPreflightCompleted(_, _, Ok(OperationResultDto.Failed failure)) when isCanceled failure ->
+        {
+            clearBusy model with
+                ErrorNotice = None
+                WarningNotice = Some "Git operation cancelled."
+        },
+        Cmd.none
+    | SwitchBranchPreflightCompleted(_, _, Ok(OperationResultDto.Failed failure)) ->
+        let message = failureMessage failure
+
+        {
+            clearBusy model with
+                ErrorNotice = Some message
+                WarningNotice = None
+        },
+        reportErrorCmd deps "Could not switch branch" message
+    | SwitchBranchPreflightCompleted(_, _, Error message) ->
+        {
+            clearBusy model with
+                ErrorNotice = Some message
+                WarningNotice = None
+        },
+        reportErrorCmd deps "Could not switch branch" message
     | PruneLfsCacheRequested ->
         let message =
             "This cleans hidden Git LFS cache files for the current ARC. Files that are still needed can be downloaded again from the remote. Continue?"

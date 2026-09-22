@@ -367,9 +367,11 @@ let private defaultDependencies: GitDependencies = {
     installDependency = fun _ -> unexpectedPromise "installDependency"
     refreshSynchronization = fun _ -> unexpectedPromise "refreshSynchronization"
     synchronize = fun _ -> unexpectedPromise "synchronize"
+    reportPhase = ignore
     cancelOperation = fun _ -> unexpectedPromise "cancelOperation"
     cloneWorkspace = fun _ -> unexpectedPromise "cloneWorkspace"
     createRef = fun _ -> unexpectedPromise "createRef"
+    preflightSwitchRef = fun _ -> unexpectedPromise "preflightSwitchRef"
     switchRef = fun _ -> unexpectedPromise "switchRef"
     createRevision = fun _ -> unexpectedPromise "createRevision"
     restorePaths = fun _ -> unexpectedPromise "restorePaths"
@@ -1332,6 +1334,8 @@ Vitest.describe (
 
                 let deps = {
                     defaultDependencies with
+                        preflightSwitchRef =
+                            fun _ -> promise { return Ok(succeeded { PathsAtRisk = [||]; IsSafe = true }) }
                         switchRef =
                             fun request ->
                                 captured <- Some request
@@ -1345,9 +1349,82 @@ Vitest.describe (
                     }
 
                 let! messages = collectMessages command
-                let model, write = update deps ignore messages[0] model
+                let preflightState, writeRequest = update deps ignore messages[0] model
+                let! writeMessages = collectMessages writeRequest
+                let model, write = update deps ignore writeMessages[0] preflightState
                 let! _ = collectMessages write
                 Vitest.expect(captured.Value.TargetRef).toBe ("git-local:feature")
+            }
+        )
+
+        Vitest.test (
+            "An unsafe branch switch names the paths at risk and does not write",
+            fun () -> promise {
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
+                let deps = {
+                    defaultDependencies with
+                        preflightSwitchRef =
+                            fun _ -> promise {
+                                return
+                                    Ok(
+                                        succeeded {
+                                            PathsAtRisk = [| "data.txt"; "metadata.tsv" |]
+                                            IsSafe = false
+                                        }
+                                    )
+                            }
+                        reportError = reportedErrors.Add
+                }
+
+                let model, command =
+                    update deps ignore (SwitchBranchRequested "feature") {
+                        runningState with
+                            Refs = [| localBranch "feature" false false |]
+                    }
+
+                let! messages = collectMessages command
+                let nextState, finishCmd = update deps ignore messages[0] model
+                let! finishMessages = collectMessages finishCmd
+
+                Vitest.expect(nextState.BusyOperation).toEqual (None)
+                Vitest.expect(nextState.ErrorNotice.Value).toContain ("data.txt")
+                Vitest.expect(nextState.ErrorNotice.Value).toContain ("metadata.tsv")
+                Vitest.expect(nextState.ErrorNotice.Value).toContain ("Save or discard")
+                Vitest.expect(finishMessages).toEqual ([||])
+                Vitest.expect(reportedErrors.Count).toBe (1)
+            }
+        )
+
+        Vitest.test (
+            "A stale branch preflight reply is ignored",
+            fun () -> promise {
+                let state = {
+                    runningState with
+                        BusyOperation = Some GitBusyOperation.SwitchingBranch
+                        CurrentOperation =
+                            Some {
+                                SessionId = ""
+                                OperationId = "switch-op"
+                            }
+                        Refs = [| localBranch "feature" false false |]
+                }
+
+                let nextState, cmd =
+                    update
+                        defaultDependencies
+                        ignore
+                        (SwitchBranchPreflightCompleted(
+                            state.ArcSessionId - 1,
+                            "feature",
+                            Ok(succeeded { PathsAtRisk = [||]; IsSafe = true })
+                        ))
+                        state
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(nextState).toEqual (state)
+                Vitest.expect(messages).toEqual ([||])
             }
         )
 
@@ -5381,6 +5458,8 @@ Vitest.describe (
 
                 let deps = {
                     defaultDependencies with
+                        preflightSwitchRef =
+                            fun _ -> promise { return Ok(succeeded { PathsAtRisk = [||]; IsSafe = true }) }
                         switchRef =
                             fun request ->
                                 requests.Add request
@@ -5418,7 +5497,9 @@ Vitest.describe (
 
                 let model, command = update deps ignore (SwitchBranchRequested "feature") state
                 let! messages = collectMessages command
-                let requested, writeCmd = update deps ignore messages[0] model
+                let preflightState, writeRequest = update deps ignore messages[0] model
+                let! writeMessages = collectMessages writeRequest
+                let requested, writeCmd = update deps ignore writeMessages[0] preflightState
                 let! completion = collectMessages writeCmd
 
                 let finalState, finishCmd =
