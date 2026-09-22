@@ -104,9 +104,9 @@ type ArcVault(window: BrowserWindow) =
         and set value = fileTreeUpdateTail <- value
 
     /// The restore counters place a restored batch after the batches restored since the last
-    /// drain and ahead of events admitted since. Across overlapping reloads that is deferral
-    /// order, not admission order; both consumers normalize every event against the disk at
-    /// apply time, so the outcome does not depend on it.
+    /// drain and ahead of events admitted since. Across overlapping reloads the counters give
+    /// deferral order. Both consumers normalize every event against the disk at apply time, so
+    /// the outcome does not depend on the order.
     member internal this.RestoredPendingEventCount
         with get () = restoredPendingEventCount
         and set value = restoredPendingEventCount <- value
@@ -263,8 +263,10 @@ module ArcVaultExtensions =
                                      || WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName)
                                     && not (existsSync event.AbsolutePath)
                                 then
-                                    // A delete for a path that exists again is stale; the events that
-                                    // recreated it keep the entry current.
+                                    // A delete for a path that exists again is stale. The events that
+                                    // recreated it keep the entry current. This is one more stat per delete
+                                    // event, so the cost grows with the batch (a branch switch can carry
+                                    // thousands).
                                     nextFileTree <- removePathAndDescendants event.AbsolutePath nextFileTree
                                     hasFileTreeChanges <- true
                             with fileTreeError ->
@@ -307,7 +309,7 @@ module ArcVaultExtensions =
                 elif capturedWatcherEpoch <> this.WatcherEpoch then
                     return WatcherMergeOutcome.Deferred
                 elif this.RestoredPendingArcMergeEventCount > 0 then
-                    // An older batch was restored while this one waited; the next reload takes both in order.
+                    // An older batch was restored while this one waited. The next reload takes both in order.
                     return WatcherMergeOutcome.Deferred
                 else
                     let capturedWriteGeneration = this.WriteGeneration
@@ -435,26 +437,34 @@ module ArcVaultExtensions =
                                 let callbackEpoch = this.WatcherEpoch
 
                                 if this.isBusyWriting then
-                                    let deferralCount = this.IncrementWatcherDeferralCount()
-                                    logWatcherDeferral deferralCount
+                                    let hasPendingEvents =
+                                        this.fileWatcherPendingEvents.Count > 0
+                                        || this.fileWatcherPendingArcMergeEvents.Count > 0
 
-                                    if this.HasReachedWatcherDeferralLimit then
-                                        let pendingEvents = this.fileWatcherPendingEvents |> Seq.toList
-                                        this.fileWatcherPendingEvents.Clear()
-                                        this.RestoredPendingEventCount <- 0
+                                    // A fire with nothing pending defers nothing, so it neither counts nor logs.
+                                    if hasPendingEvents then
+                                        let deferralCount = this.IncrementWatcherDeferralCount()
+                                        logWatcherDeferral deferralCount
 
-                                        do!
-                                            this.ApplyWatcherFileTreeEvents(
-                                                WatcherHelpers.normalizeAgainstDisk pendingEvents
-                                            )
-                                    else
-                                        ()
+                                        if this.HasReachedWatcherDeferralLimit then
+                                            let pendingEvents = this.fileWatcherPendingEvents |> Seq.toList
+                                            this.fileWatcherPendingEvents.Clear()
+                                            this.RestoredPendingEventCount <- 0
+
+                                            do!
+                                                this.ApplyWatcherFileTreeEvents(
+                                                    WatcherHelpers.normalizeAgainstDisk pendingEvents
+                                                )
 
                                     if
                                         this.fileWatcherPendingEvents.Count = 0
                                         && this.fileWatcherPendingArcMergeEvents.Count = 0
                                     then
-                                        // Nothing is left to retry, so the loading flag must not wait for the write.
+                                        // Nothing is left to retry, so the retry chain ends here and the loading
+                                        // flag goes off. The flag means that watcher changes are loading, so a
+                                        // false during a write is truthful, and the next admitted event turns it
+                                        // on again. The counter resets so the next batch starts its own count.
+                                        this.ResetWatcherDeferralCount()
                                         finishReload ()
                                     elif this.fileWatcherReloadArcTimeout = ownTimeoutId then
                                         this.fileWatcherReloadArcTimeout <- None
