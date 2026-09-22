@@ -2712,7 +2712,10 @@ let private updateCore
 
             model, cmd
     | CancelCurrentOperationCompleted(sessionId, key, _) when
-        sessionId <> model.ArcSessionId || model.CurrentOperation <> Some key
+        sessionId <> model.ArcSessionId
+        || (model.CurrentOperation
+            |> Option.map (fun current -> operationRootId current.OperationId))
+           <> Some(operationRootId key.OperationId)
         ->
         model, Cmd.none
     | CancelCurrentOperationCompleted(_, _, Error message) ->

@@ -6009,7 +6009,7 @@ Vitest.describe (
             fun () -> promise {
                 let currentKey = {
                     SessionId = "s-1"
-                    OperationId = "op-current"
+                    OperationId = "op-1/1"
                 }
 
                 let state = {
@@ -6027,7 +6027,7 @@ Vitest.describe (
                             state.ArcSessionId,
                             {
                                 SessionId = "s-1"
-                                OperationId = "op-previous"
+                                OperationId = "op-2/1"
                             },
                             Error "late failure"
                         ))
@@ -6037,6 +6037,43 @@ Vitest.describe (
 
                 Vitest.expect(nextState).toEqual (state)
                 Vitest.expect(messages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
+            "A cancel error reply survives the started event",
+            fun () -> promise {
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
+                let deps = {
+                    defaultDependencies with
+                        reportError = reportedErrors.Add
+                }
+
+                let model = {
+                    runningState with
+                        CurrentOperation =
+                            Some {
+                                SessionId = "s-1"
+                                OperationId = "op-1/1"
+                            }
+                }
+
+                let nextState, command =
+                    update
+                        deps
+                        ignore
+                        (CancelCurrentOperationCompleted(
+                            model.ArcSessionId,
+                            { SessionId = ""; OperationId = "op-1" },
+                            Error "boom"
+                        ))
+                        model
+
+                let! _ = collectMessages command
+
+                Vitest.expect(nextState.ErrorNotice).toEqual (Some "boom")
+                Vitest.expect(reportedErrors.Count).toBe (1)
             }
         )
 
