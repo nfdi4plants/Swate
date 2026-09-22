@@ -86,9 +86,11 @@ type ArcVault(window: BrowserWindow) =
                     |> Some
 
     /// Marks this vault busy until the supplied promise settles, including nested writes.
-    /// The increment and flag update run before the promise builder because callers such as
-    /// withExclusiveBusyWriting read the flag before they await. A builder would defer that
-    /// work by a microtask.
+    /// The increment and the flag update sit before the promise builder, paired with the finally
+    /// that undoes them. Fable.Promise runs the body in the calling tick, so the placement is for
+    /// readability. What matters is that the flag is set before the caller yields, because the
+    /// entry guards (WriteArc and its siblings, withExclusiveBusyWriting) read it right after a
+    /// scope opens.
     member this.WithBusyWritingScope<'T>(operation: unit -> Fable.Core.JS.Promise<'T>) : Fable.Core.JS.Promise<'T> =
         busyWritingDepth <- busyWritingDepth + 1
         writeGeneration <- writeGeneration + 1

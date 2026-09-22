@@ -422,8 +422,9 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
         | _ -> false
 
     /// An operation assigned to the queried session always counts. A sessionless operation
-    /// counts when its root equals the queried session's root, and an unknown session id
-    /// matches no sessionless operation.
+    /// counts when its root equals the root of the queried session. An unknown session id
+    /// matches no sessionless operation, and the empty id matches every sessionless one,
+    /// as it does in Cancel.
     member this.RunningOperationIds(sessionId: string) : string[] =
         let sessionRoot =
             this.TryGetSessionById sessionId

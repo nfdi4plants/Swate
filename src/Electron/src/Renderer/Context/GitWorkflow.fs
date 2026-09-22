@@ -538,8 +538,9 @@ let failureMessage (failure: OperationFailureDto) =
     | Some instructions when not (String.IsNullOrWhiteSpace instructions) -> $"{failure.Message} {instructions}"
     | _ -> failure.Message
 
-/// A partial success counts as a success for the explorer actions: the operation did
-/// its work and the sidebar shows the recovery it left behind.
+/// A partial success counts as a success here. The explorer actions have no warning
+/// channel, so a partial that lands on one of these calls (a session-open failure the
+/// host reports once) is dropped on this path.
 let toUnitResult (result: Result<OperationResultDto<unit>, string>) : Result<unit, string> =
     match result with
     | Error message -> Error message

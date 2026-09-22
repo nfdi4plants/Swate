@@ -327,8 +327,8 @@ Vitest.describe (
                     Vitest.expect(fixture.Host.IsIdle "session-a").toBe false
                     Vitest.expect(fixture.Host.Cancel("session-b", "op-1")).toBe false
 
-                    // A sessionless operation registered for another root does not count
-                    // for an unknown session id, and it can still be canceled by id.
+                    // A sessionless operation does not count for a session id the host cannot
+                    // resolve, whatever its root, and it can still be canceled by id.
                     let unassigned =
                         fixture.Host.BeginOperation(
                             "",

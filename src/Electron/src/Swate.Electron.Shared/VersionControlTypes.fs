@@ -437,10 +437,11 @@ type RestorePathsRequestDto = {
 type ObjectPathRequestDto = {
     OperationId: string
     Path: string
-    /// How the file tree is refreshed after materialization or dematerialization. None
-    /// refreshes when the result changed state, Some true always refreshes, and Some false
-    /// skips the refresh on success and keeps it on failure. Diff and content reads ignore
-    /// this field.
+    /// How the file tree is refreshed after a materialization or a dematerialization. None
+    /// refreshes when the result changed state. Some true always refreshes. Some false skips
+    /// the refresh when the result is Succeeded and keeps it for a partial or failed result,
+    /// because earlier objects of a loop may have changed files on disk. Diff and content
+    /// reads ignore the field.
     RefreshTree: bool option
 }
 
