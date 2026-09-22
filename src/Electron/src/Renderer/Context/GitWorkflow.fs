@@ -1335,12 +1335,22 @@ let private completeAfterSynchronizeAsync
                 |> Result.map (fun outcome ->
                     match outcome with
                     | Completed(UnitSuccess(refreshResult, pageChange, selectedChangePath, warning, keptPartial, _)) ->
+                        let finalWarning =
+                            match recoveryOfPartial keptPartial with
+                            | None ->
+                                match pendingWarning, warning with
+                                | Some pending, Some partialMessage -> Some $"{pending} {partialMessage}"
+                                | Some pending, None -> Some pending
+                                | None, Some partialMessage -> Some partialMessage
+                                | None, None -> None
+                            | Some _ -> pendingWarning |> Option.orElse warning
+
                         Completed(
                             UnitSuccess(
                                 refreshResult,
                                 pageChange,
                                 selectedChangePath,
-                                pendingWarning |> Option.orElse warning,
+                                finalWarning,
                                 keptPartial,
                                 published
                             )
@@ -2682,6 +2692,10 @@ let private updateCore
                 model with
                     PendingConfirmation = None
                     PendingRemoteAction = GitPendingRemoteAction.None
+                    PendingRecovery =
+                        match model.PendingRecovery with
+                        | Some(GitPendingRecovery.RetryPublish _) -> None
+                        | _ -> model.PendingRecovery
             },
             followUp
         | GitPendingRemoteAction.None -> model, Cmd.none
@@ -3058,8 +3072,10 @@ let private updateCore
                 PendingConfirmation = Some dialog
                 PendingRemoteAction = pendingRemoteAction
                 PendingRecovery = None
-                // The acceptance confirmation after a primary save starts the pending publish.
-                // Other finalize questions keep it. A merge preview falls through to `_ -> false`.
+                // PrimarySave with FinalizeMerge is the "All conflicts resolved" question after
+                // a save whose update opened a conflict session. The publish resumes after finalization.
+                // A save acceptance arrives as PublishAfterUpdate, so it falls through to `_ -> false`
+                // because its confirm branch sets the flag. Merge previews no longer exist.
                 PendingPostMergePush =
                     match writeRequest, pendingRemoteAction with
                     | PrimarySave _, GitPendingRemoteAction.FinalizeMerge -> true
@@ -3139,12 +3155,19 @@ let private updateCore
                 nextModel with
                     PendingPostMergePush = false
               }
-            // A partial that is not a conflict session (the conflict path clears it) left the
-            // update applied and the publish undone. The publish resumes after the recovery.
-            | (PrimarySave _ | Push _) when published = Some false && partial.IsSome -> {
-                nextModel with
-                    PendingPostMergePush = true
-              }
+            // Only a materialization recovery leaves the publish undone with nothing else
+            // offering it. The publish resumes after that recovery. The retry_publish partial
+            // is its own offer, and an unmapped partial has no path that could resume.
+            | (PrimarySave _ | Push _) when published = Some false && partial.IsSome ->
+                let resumesAfterMaterialization =
+                    match recovery with
+                    | Some(GitPendingRecovery.RetryMaterialization _) -> true
+                    | _ -> false
+
+                {
+                    nextModel with
+                        PendingPostMergePush = resumesAfterMaterialization
+                }
             // The update inside the save opened a conflict session. The publish resumes
             // once the merge is finalized.
             | PrimarySave _ when nextModel.ActiveConflict.IsSome -> {

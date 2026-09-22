@@ -3875,6 +3875,225 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "Later on the publish offer does not publish",
+            fun () -> promise {
+                let sync = cleanStatus.Synchronization.Value
+
+                let retryFailure = {
+                    makeFailure
+                        Canceled
+                        VersionControlCodes.OperationCanceled
+                        "The update was applied. Synchronize again to publish."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RetryPublish
+                            Instructions = Some "Publish the applied update now."
+                        })
+                        [||] with
+                        StateChanged = true
+                }
+
+                let deps = {
+                    defaultDependencies with
+                        synchronize =
+                            fun _ -> promise {
+                                return
+                                    Ok(
+                                        OperationResultDto.PartiallySucceeded(
+                                            {
+                                                operation sync with
+                                                    Publication = PublicationStateDto.LocalOnly
+                                            },
+                                            retryFailure
+                                        )
+                                    )
+                            }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let requested, writeCmd =
+                    update deps ignore (WriteRequested(Push GitUpdateAcceptance.RequirePreview)) runningState
+
+                let! completionMessages = collectMessages writeCmd
+
+                let recoveryState, recoveryCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, Push _, Ok(Completed _)) |] ->
+                        update deps ignore completionMessages[0] requested
+                    | _ -> failwith "Expected the partial synchronize completion."
+
+                let! _ = collectMessages recoveryCmd
+
+                let cancelingState, cancelCmd =
+                    update deps ignore CancelPendingRemoteActionRequested recoveryState
+
+                let! cancelMessages = collectMessages cancelCmd
+
+                let dismissedState, dismissCmd =
+                    match cancelMessages with
+                    | [| DismissRecoveryRequested |] -> update deps ignore cancelMessages[0] cancelingState
+                    | _ -> failwith "Expected the recovery dismissal."
+
+                let! dismissMessages = collectMessages dismissCmd
+
+                let dispatchedMessages = Array.append cancelMessages dismissMessages
+
+                Vitest
+                    .expect(
+                        dispatchedMessages
+                        |> Array.exists (
+                            function
+                            | WriteRequested(Push _) -> true
+                            | _ -> false
+                        )
+                    )
+                    .toBe (false)
+
+                Vitest.expect(dismissedState.PendingPostMergePush).toBe (false)
+                Vitest.expect(dismissedState.PendingRecovery).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A partial without a mapped recovery leaves no pending publish",
+            fun () -> promise {
+                let sync = cleanStatus.Synchronization.Value
+
+                let partialFailure = {
+                    makeFailure
+                        Concurrency
+                        VersionControlCodes.PreconditionFailed
+                        "The workspace changed while synchronizing."
+                        None
+                        [||] with
+                        StateChanged = true
+                }
+
+                let deps = {
+                    defaultDependencies with
+                        createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
+                        synchronize =
+                            fun _ -> promise {
+                                return
+                                    Ok(
+                                        OperationResultDto.PartiallySucceeded(
+                                            {
+                                                operation sync with
+                                                    Publication = PublicationStateDto.LocalOnly
+                                            },
+                                            partialFailure
+                                        )
+                                    )
+                            }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let saveState = {
+                    runningState with
+                        ChangedFiles = [| changedFile "README.md" "M" " " false |]
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (PrimarySaveAllRequested "Save") saveState
+
+                let! requestMessages = collectMessages requestCmd
+
+                let stateAfterWrite, writeCmd =
+                    match requestMessages with
+                    | [| WriteRequested(PrimarySave _) |] -> update deps ignore requestMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected the primary save request."
+
+                let! completionMessages = collectMessages writeCmd
+
+                let finalState, finishCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, PrimarySave _, Ok(Completed _)) |] ->
+                        update deps ignore completionMessages[0] stateAfterWrite
+                    | _ -> failwith "Expected the partial save completion."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(finalState.PendingPostMergePush).toBe (false)
+                Vitest.expect(finalState.PendingRecovery).toEqual (None)
+
+                Vitest
+                    .expect(finalState.WarningNotice |> Option.defaultValue "")
+                    .toContain (failureMessage partialFailure)
+            }
+        )
+
+        Vitest.test (
+            "Publish now clears the parked recovery",
+            fun () -> promise {
+                let sync = cleanStatus.Synchronization.Value
+
+                let retryFailure = {
+                    makeFailure
+                        Canceled
+                        VersionControlCodes.OperationCanceled
+                        "The update was applied. Synchronize again to publish."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RetryPublish
+                            Instructions = Some "Publish the applied update now."
+                        })
+                        [||] with
+                        StateChanged = true
+                }
+
+                let deps = {
+                    defaultDependencies with
+                        synchronize =
+                            fun _ -> promise {
+                                return
+                                    Ok(
+                                        OperationResultDto.PartiallySucceeded(
+                                            {
+                                                operation sync with
+                                                    Publication = PublicationStateDto.LocalOnly
+                                            },
+                                            retryFailure
+                                        )
+                                    )
+                            }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                }
+
+                let requested, writeCmd =
+                    update deps ignore (WriteRequested(Push GitUpdateAcceptance.RequirePreview)) runningState
+
+                let! completionMessages = collectMessages writeCmd
+
+                let recoveryState, recoveryCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, Push _, Ok(Completed _)) |] ->
+                        update deps ignore completionMessages[0] requested
+                    | _ -> failwith "Expected the partial synchronize completion."
+
+                let! _ = collectMessages recoveryCmd
+
+                let confirmedState, confirmCmd =
+                    update deps ignore ConfirmPendingRemoteActionRequested recoveryState
+
+                Vitest.expect(confirmedState.PendingRecovery).toEqual (None)
+
+                let! confirmMessages = collectMessages confirmCmd
+
+                Vitest
+                    .expect(confirmMessages)
+                    .toEqual (
+                        [|
+                            WriteRequested(Push GitUpdateAcceptance.RequirePreview)
+                        |]
+                    )
+            }
+        )
+
+        Vitest.test (
             "A canceled fetch that needs inspection reports it after a refresh",
             fun () -> promise {
                 let canceled =
