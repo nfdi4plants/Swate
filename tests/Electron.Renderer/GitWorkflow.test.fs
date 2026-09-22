@@ -3971,6 +3971,7 @@ Vitest.describe (
                         [||]
 
                 let mutable materializedPaths = ResizeArray<string>()
+                let mutable refreshTreeValues = ResizeArray<bool option>()
 
                 let deps = {
                     defaultDependencies with
@@ -3998,8 +3999,8 @@ Vitest.describe (
                                             }
                                             {
                                                 Path = "small.txt"
-                                                IsMaterialized = true
-                                                IsLocallyAvailable = true
+                                                IsMaterialized = false
+                                                IsLocallyAvailable = false
                                                 SizeBytes = None
                                                 ObjectId = None
                                             }
@@ -4009,6 +4010,7 @@ Vitest.describe (
                         materializeObject =
                             fun request ->
                                 materializedPaths.Add request.Path
+                                refreshTreeValues.Add request.RefreshTree
                                 promise { return Ok(succeeded ()) }
                         getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
                         listRefs = fun _ -> promise { return Ok(succeeded refs) }
@@ -4060,7 +4062,8 @@ Vitest.describe (
                     .toEqual (Some true)
 
                 Vitest.expect(recoveryState.Status.CurrentBranch).toEqual (Some "main")
-                Vitest.expect(materializedPaths |> Seq.toArray).toEqual ([| "large.bin" |])
+                Vitest.expect(materializedPaths |> Seq.toArray).toEqual ([| "large.bin"; "small.txt" |])
+                Vitest.expect(refreshTreeValues |> Seq.toArray).toEqual ([| Some false; Some true |])
             }
         )
 

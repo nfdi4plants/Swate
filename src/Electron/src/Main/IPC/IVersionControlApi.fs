@@ -160,6 +160,15 @@ let resultChangedState (result: Result<OperationResultDto<'U>, exn>) =
     | Ok(OperationResultDto.Failed failure) -> failure.StateChanged
     | Error _ -> false
 
+let private shouldRefreshObjectTree (request: ObjectPathRequestDto) (result: Result<OperationResultDto<unit>, exn>) =
+    match request.RefreshTree with
+    | Some true -> true
+    | Some false ->
+        match result with
+        | Ok(OperationResultDto.Succeeded _) -> false
+        | _ -> true
+    | None -> resultChangedState result
+
 /// Same as withSession, with the vault marked busy for the duration and the file tree
 /// refreshed afterwards when the result predicate allows it.
 let private withMutatingSessionUsingRefreshPredicate
@@ -866,15 +875,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             withMutatingSessionUsingRefreshPredicate
                 event
                 request.OperationId
-                (fun result ->
-                    match request.RefreshTree with
-                    | Some true -> true
-                    | Some false ->
-                        match result with
-                        | Ok(OperationResultDto.Succeeded _) -> false
-                        | _ -> true
-                    | None -> resultChangedState result
-                )
+                (shouldRefreshObjectTree request)
                 (withService
                     _.ObjectMaterialization
                     "large object materialization"
@@ -882,10 +883,10 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 id
     dematerializeObject =
         fun request ->
-            withMutatingSession
+            withMutatingSessionUsingRefreshPredicate
                 event
                 request.OperationId
-                true
+                (shouldRefreshObjectTree request)
                 (withService
                     _.ObjectMaterialization
                     "large object materialization"
