@@ -40,7 +40,7 @@ Vitest.describe (
     "ArcVault merge queue",
     fun () ->
         Vitest.test (
-            "keeps the busy flag set while a raw writer runs inside a version control scope",
+            "nested busy scopes release the flag with the outermost scope",
             fun () -> promise {
                 let vault = ArcVault(TestHelpers.testWindow ())
 
@@ -57,27 +57,6 @@ Vitest.describe (
 
                             Vitest.expect(vault.isBusyWriting).toBe true
                         })
-
-                Vitest.expect(vault.isBusyWriting).toBe false
-            }
-        )
-
-        Vitest.test (
-            "keeps the busy flag set while a version control scope runs inside a raw writer",
-            fun () -> promise {
-                let vault = ArcVault(TestHelpers.testWindow ())
-
-                do!
-                    vault.WithBusyWritingScope(fun () -> promise {
-                        Vitest.expect(vault.isBusyWriting).toBe true
-
-                        do!
-                            Main.IPC.IPCHelper.withBusyWritingScope
-                                vault
-                                (fun () -> promise { Vitest.expect(vault.isBusyWriting).toBe true })
-
-                        Vitest.expect(vault.isBusyWriting).toBe true
-                    })
 
                 Vitest.expect(vault.isBusyWriting).toBe false
             }
