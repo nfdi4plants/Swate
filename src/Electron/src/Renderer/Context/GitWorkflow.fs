@@ -538,6 +538,15 @@ let failureMessage (failure: OperationFailureDto) =
     | Some instructions when not (String.IsNullOrWhiteSpace instructions) -> $"{failure.Message} {instructions}"
     | _ -> failure.Message
 
+/// A partial success counts as a success for the explorer actions: the operation did
+/// its work and the sidebar shows the recovery it left behind.
+let toUnitResult (result: Result<OperationResultDto<unit>, string>) : Result<unit, string> =
+    match result with
+    | Error message -> Error message
+    | Ok(OperationResultDto.Succeeded _) -> Ok()
+    | Ok(OperationResultDto.PartiallySucceeded _) -> Ok()
+    | Ok(OperationResultDto.Failed failure) -> Error(failureMessage failure)
+
 let recoveryCode (failure: OperationFailureDto) =
     failure.RecoveryAction |> Option.map _.Code
 

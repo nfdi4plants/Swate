@@ -11,12 +11,7 @@ open Swate.Electron.Shared.VersionControlTypes
 let private operationId () =
     Renderer.VersionControlApiClient.newOperationId ()
 
-let private toUnitResult (result: Result<OperationResultDto<unit>, string>) : Result<unit, string> =
-    match result with
-    | Error message -> Error message
-    | Ok(OperationResultDto.Succeeded _) -> Ok()
-    | Ok(OperationResultDto.PartiallySucceeded _) -> Ok()
-    | Ok(OperationResultDto.Failed failure) -> Error(Renderer.Context.GitWorkflow.failureMessage failure)
+let private toUnitResult = Renderer.Context.GitWorkflow.toUnitResult
 
 /// The size is not known here, so the size rule is left to the context menu, which
 /// has it. The path rules are checked for both directions.
