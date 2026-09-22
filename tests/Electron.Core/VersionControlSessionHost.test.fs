@@ -327,10 +327,15 @@ Vitest.describe (
                     Vitest.expect(fixture.Host.IsIdle "session-a").toBe false
                     Vitest.expect(fixture.Host.Cancel("session-b", "op-1")).toBe false
 
-                    // A sessionless operation without a matching workspace does not make
-                    // an unrelated session busy, and it can still be canceled by id.
+                    // A sessionless operation registered for another root does not count
+                    // for an unknown session id, and it can still be canceled by id.
                     let unassigned =
-                        fixture.Host.BeginOperation("", "op-unassigned", Some fixture.RepoRoot, ignore)
+                        fixture.Host.BeginOperation(
+                            "",
+                            "op-unassigned",
+                            Some(join [| fixture.Root; "elsewhere" |]),
+                            ignore
+                        )
 
                     Vitest.expect(fixture.Host.IsIdle "session-b").toBe true
                     Vitest.expect(fixture.Host.Cancel("session-b", "op-unassigned")).toBe true
@@ -784,8 +789,8 @@ Vitest.describe (
                 let runtime =
                     fakeProviderRuntimeThatThrowsOnInitialize expectedArcPath (join [| root; "unused" |])
 
-                let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
                 VersionControlRuntime.initialize runtime
+                // The handler uses the host that WorkspaceSessionHost.get () builds lazily.
                 WorkspaceSessionHost.resetForTests ()
 
                 registerEmptyVault 66 |> ignore
@@ -796,7 +801,6 @@ Vitest.describe (
                     Vitest.vi.restoreAllMocks ()
                     electronMock?reset () |> ignore
                     ARC_VAULTS.Vaults.Clear()
-                    do! host.CloseAll() |> Async.StartAsPromise
                     do! removeDirectoryAsync root
                 }
 
@@ -2247,7 +2251,7 @@ Vitest.describe (
         // ServiceUnavailable, SessionUnavailable, WorkspaceUnmanaged, WorkspaceAmbiguous,
         // LocationUnsupported, UnexpectedException, LockRemovalRefused, LockRemoved,
         // InvalidPath, InvalidRef, InvalidRevision, BindingNotPersisted, TransportError,
-        // StoragePolicyBlocked, Recovery.RefreshConflictSession, Recovery.ResolveConflictSession,
+        // StoragePolicyBlocked, Recovery.ResolveConflictSession,
         // Recovery.RetryMaterialization, Recovery.ReconcileMaterialization, Recovery.ReconcileIndex,
         // Recovery.RemoveIndexLock, Recovery.RestoreWorkspace, Recovery.RefreshWorkspace,
         // Recovery.InspectWorkspace, Recovery.ReopenWorkspace, Recovery.CheckDependencies,
@@ -2274,5 +2278,8 @@ Vitest.describe (
                     SynchronizationCodes.ResolveLocalChangesRecovery
 
                 Vitest.expect(VersionControlCodes.Recovery.RetryPublish).toBe SynchronizationCodes.RetryPublishRecovery
+
+                Vitest.expect(VersionControlCodes.Recovery.RefreshConflictSession).toBe
+                    ConflictRecovery.RefreshConflictSession
         )
 )
