@@ -2105,12 +2105,14 @@ let private executeWriteAttemptOnce (deps: GitDependencies) (state: GitState) (w
 /// longer applies and a fresh preview is needed. Finalizing or
 /// abandoning a merge would act on whichever conflict session the refresh found, which
 /// is not the one the user reviewed.
+/// A stale branch switch must run its preflight again before retrying the switch.
 let private replaysAfterStaleToken =
     function
     | DiscardSelection _
     | RestoreInterruptedPaths _
     | Pull _
     | Push(GitUpdateAcceptance.Accepted _)
+    | SwitchBranch _
     | FinalizeMerge
     | AbandonMerge -> false
     | _ -> true
@@ -2934,13 +2936,18 @@ let private updateCore
 
                 nextModel, cmd
     | SwitchBranchPreflightCompleted(sessionId, _, _) when sessionId <> model.ArcSessionId -> model, Cmd.none
-    | SwitchBranchPreflightCompleted(_, refName, Ok(OperationResultDto.Succeeded outcome))
-    | SwitchBranchPreflightCompleted(_, refName, Ok(OperationResultDto.PartiallySucceeded(outcome, _))) when
-        outcome.Value.IsSafe
-        ->
+    | SwitchBranchPreflightCompleted(_, _, Ok(OperationResultDto.PartiallySucceeded(_, failure))) ->
+        let message = failureMessage failure
+
+        {
+            clearBusy model with
+                ErrorNotice = Some message
+                WarningNotice = None
+        },
+        reportErrorCmd deps "Could not switch branch" message
+    | SwitchBranchPreflightCompleted(_, refName, Ok(OperationResultDto.Succeeded outcome)) when outcome.Value.IsSafe ->
         clearBusy model, Cmd.ofMsg (WriteRequested(SwitchBranch refName))
-    | SwitchBranchPreflightCompleted(_, _, Ok(OperationResultDto.Succeeded outcome))
-    | SwitchBranchPreflightCompleted(_, _, Ok(OperationResultDto.PartiallySucceeded(outcome, _))) ->
+    | SwitchBranchPreflightCompleted(_, _, Ok(OperationResultDto.Succeeded outcome)) ->
         let paths = String.Join(", ", outcome.Value.PathsAtRisk)
 
         let message =

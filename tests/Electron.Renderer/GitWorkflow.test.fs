@@ -1417,6 +1417,56 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "A partial branch preflight does not switch",
+            fun () -> promise {
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
+                let deps = {
+                    defaultDependencies with
+                        reportError = reportedErrors.Add
+                }
+
+                let failure =
+                    makeFailure ProviderError "preflight_incomplete" "The branch preflight did not finish." None [||]
+
+                let model = {
+                    runningState with
+                        BusyOperation = Some GitBusyOperation.SwitchingBranch
+                        BusyNotice = Some "Switching branch"
+                        CurrentOperation =
+                            Some {
+                                SessionId = ""
+                                OperationId = "switch-op"
+                            }
+                }
+
+                let nextState, command =
+                    update
+                        deps
+                        ignore
+                        (SwitchBranchPreflightCompleted(
+                            model.ArcSessionId,
+                            "feature",
+                            Ok(
+                                OperationResultDto.PartiallySucceeded(
+                                    operation { PathsAtRisk = [||]; IsSafe = true },
+                                    failure
+                                )
+                            )
+                        ))
+                        model
+
+                let! messages = collectMessages command
+
+                Vitest.expect(nextState.BusyOperation).toEqual (None)
+                Vitest.expect(nextState.ErrorNotice).toEqual (Some failure.Message)
+                Vitest.expect(messages).toEqual ([||])
+                Vitest.expect(reportedErrors.Count).toBe (1)
+                Vitest.expect(reportedErrors[0].Title).toBe ("Could not switch branch")
+            }
+        )
+
+        Vitest.test (
             "A stale branch preflight reply is ignored",
             fun () -> promise {
                 let state = {
@@ -5687,14 +5737,17 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "A stale branch switch is retried once against the refreshed token",
+            "A stale token does not replay a branch switch",
             fun () -> promise {
                 let requests = ResizeArray<SwitchRefRequestDto>()
+                let mutable preflightCalls = 0
 
                 let deps = {
                     defaultDependencies with
                         preflightSwitchRef =
-                            fun _ -> promise { return Ok(succeeded { PathsAtRisk = [||]; IsSafe = true }) }
+                            fun _ ->
+                                preflightCalls <- preflightCalls + 1
+                                promise { return Ok(succeeded { PathsAtRisk = [||]; IsSafe = true }) }
                         switchRef =
                             fun request ->
                                 requests.Add request
@@ -5739,16 +5792,27 @@ Vitest.describe (
 
                 let finalState, finishCmd =
                     match completion with
-                    | [| WriteCompleted(_, _, SwitchBranch "feature", Ok(Completed _)) |] ->
+                    | [| WriteCompleted(_, _, SwitchBranch "feature", Ok(StaleWorkspaceVersion(message, false))) |] ->
+                        Vitest
+                            .expect(message)
+                            .toBe (
+                                "The workspace changed since it was last refreshed, so the action was not repeated. Review the current changes and try again."
+                            )
+
                         update deps ignore completion[0] requested
-                    | _ -> failwith "Expected the retried branch switch to complete."
+                    | _ -> failwith "Expected the stale branch switch completion."
 
                 let! _ = collectMessages finishCmd
 
-                Vitest.expect(requests.Count).toBe (2)
-                Vitest.expect(requests[0].ExpectedWorkspaceVersion).toBe ("v1")
-                Vitest.expect(requests[1].ExpectedWorkspaceVersion).toBe ("v2")
-                Vitest.expect(finalState.ErrorNotice).toEqual (None)
+                Vitest.expect(requests.Count).toBe (1)
+                Vitest.expect(preflightCalls).toBe (1)
+
+                Vitest
+                    .expect(finalState.ErrorNotice)
+                    .toEqual (
+                        Some
+                            "The workspace changed since it was last refreshed, so the action was not repeated. Review the current changes and try again."
+                    )
             }
         )
 
