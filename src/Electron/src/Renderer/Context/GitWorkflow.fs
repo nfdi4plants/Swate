@@ -1283,6 +1283,13 @@ let private refreshAfterSuccess
     promise {
         let! refreshResult = refreshAllAsync deps
 
+        let combinedWarningMessage =
+            match warningMessage, partial |> Option.map failureMessage with
+            | Some warning, Some partialMessage -> Some $"{warning} {partialMessage}"
+            | Some warning, None -> Some warning
+            | None, Some partialMessage -> Some partialMessage
+            | None, None -> None
+
         return
             match refreshResult.Status, refreshErrorMessage refreshResult with
             | Error failure, _ -> Error(failureMessage failure)
@@ -1294,7 +1301,7 @@ let private refreshAfterSuccess
                             refreshResult,
                             pageChange,
                             selectedChangePathOverride,
-                            warningMessage |> Option.orElse (partial |> Option.map failureMessage),
+                            combinedWarningMessage,
                             partial,
                             None
                         )
