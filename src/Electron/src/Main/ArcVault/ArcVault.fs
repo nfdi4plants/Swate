@@ -103,6 +103,10 @@ type ArcVault(window: BrowserWindow) =
         with get () = fileTreeUpdateTail
         and set value = fileTreeUpdateTail <- value
 
+    /// The restore counters place a restored batch after the batches restored since the last
+    /// drain and ahead of events admitted since. Across overlapping reloads that is deferral
+    /// order, not admission order; both consumers normalize every event against the disk at
+    /// apply time, so the outcome does not depend on it.
     member internal this.RestoredPendingEventCount
         with get () = restoredPendingEventCount
         and set value = restoredPendingEventCount <- value
@@ -227,11 +231,16 @@ module ArcVaultExtensions =
                     Ok()
 
         member internal this.ApplyWatcherFileTreeEvents(events: ArcVaultFileSystemEvent list) =
+            // Captured at the call: an update queued before a pending-state reset must not
+            // publish a tree built under the old root after it.
+            let capturedWatcherEpoch = this.WatcherEpoch
+
             let queuedUpdate =
                 this.FileTreeUpdateTail
                 |> Promise.bind (fun () -> promise {
                     match this.path with
                     | None -> ()
+                    | Some _ when capturedWatcherEpoch <> this.WatcherEpoch -> ()
                     | Some arcPath ->
                         let mutable nextFileTree = this.fileTree
                         let mutable hasFileTreeChanges = false
@@ -250,9 +259,12 @@ module ArcVaultExtensions =
                                     nextFileTree <- upsertFileEntry addedDirectory nextFileTree
                                     hasFileTreeChanges <- true
                                 elif
-                                    WatcherHelpers.eventNameEquals Chokidar.Events.Unlink event.EventName
-                                    || WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName
+                                    (WatcherHelpers.eventNameEquals Chokidar.Events.Unlink event.EventName
+                                     || WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName)
+                                    && not (existsSync event.AbsolutePath)
                                 then
+                                    // A delete for a path that exists again is stale; the events that
+                                    // recreated it keep the entry current.
                                     nextFileTree <- removePathAndDescendants event.AbsolutePath nextFileTree
                                     hasFileTreeChanges <- true
                             with fileTreeError ->
@@ -263,7 +275,7 @@ module ArcVaultExtensions =
                                     event.RelativePath
                                     fileTreeError.Message
 
-                        if hasFileTreeChanges then
+                        if hasFileTreeChanges && capturedWatcherEpoch = this.WatcherEpoch then
                             this.SetFileTree(nextFileTree)
                 })
 
@@ -293,6 +305,9 @@ module ArcVaultExtensions =
                 if not this.IsFileWatcherArcMergeEligible then
                     return WatcherMergeOutcome.Deferred
                 elif capturedWatcherEpoch <> this.WatcherEpoch then
+                    return WatcherMergeOutcome.Deferred
+                elif this.RestoredPendingArcMergeEventCount > 0 then
+                    // An older batch was restored while this one waited; the next reload takes both in order.
                     return WatcherMergeOutcome.Deferred
                 else
                     let capturedWriteGeneration = this.WriteGeneration
@@ -435,7 +450,13 @@ module ArcVaultExtensions =
                                     else
                                         ()
 
-                                    if this.fileWatcherReloadArcTimeout = ownTimeoutId then
+                                    if
+                                        this.fileWatcherPendingEvents.Count = 0
+                                        && this.fileWatcherPendingArcMergeEvents.Count = 0
+                                    then
+                                        // Nothing is left to retry, so the loading flag must not wait for the write.
+                                        finishReload ()
+                                    elif this.fileWatcherReloadArcTimeout = ownTimeoutId then
                                         this.fileWatcherReloadArcTimeout <- None
                                         scheduleReload ()
                                     else
@@ -487,6 +508,8 @@ module ArcVaultExtensions =
                                                 swatelogfn
                                                     this.window.id
                                                     "Watcher merge deferred after watcher state was cleared. Dropping the stale batch."
+
+                                                finishReload ()
                                             else
                                                 let deferralCount = this.IncrementWatcherDeferralCount()
 
