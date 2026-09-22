@@ -84,6 +84,13 @@ let Main () =
                             title = "Could not verify Git installation"
                         )
                     )
+                | Ok(OperationResultDto.PartiallySucceeded(_, failure)), None ->
+                    errorCtx.enqueue (
+                        ErrorModalRequest.create (
+                            Renderer.Context.GitWorkflow.failureMessage failure,
+                            title = "Could not verify Git installation"
+                        )
+                    )
                 | Error message, None ->
                     errorCtx.enqueue (ErrorModalRequest.create (message, title = "Could not verify Git installation"))
                 | _ -> ()

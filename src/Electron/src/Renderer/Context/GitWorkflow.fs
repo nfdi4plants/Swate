@@ -2822,7 +2822,9 @@ let private updateCore
         },
         Cmd.none
     | PublishRenameCompleted(sessionId, Ok renamedPath) when
-        sessionId <> model.ArcSessionId && model.CurrentArcPath = Some renamedPath
+        sessionId <> model.ArcSessionId
+        && (model.CurrentArcPath
+            |> Option.exists (fun currentPath -> Swate.Components.Shared.PathHelpers.pathsEqual currentPath renamedPath))
         ->
         // The path change already reset the model. Its refresh may still be running or
         // may have finished before this reply, so a refresh is asked for either way and
