@@ -822,8 +822,8 @@ type ArcVaults() =
         this.OnCloseWindow(window, vault, id)
 
         try
-            do! vault.CreateARC(path, newIdentifier)
             do! loadWindow window
+            do! vault.CreateARC(path, newIdentifier)
 
             window.focus ()
             swatelogfn id "Register window"

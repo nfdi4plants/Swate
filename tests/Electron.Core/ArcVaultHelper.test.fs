@@ -314,10 +314,24 @@ let private registrationTestWindow id (loadError: exn) onLoad =
 let private successfulRegistrationTestWindow id onShow =
     let mutable destroyed = false
     let mutable shown = false
+    let mutable closeHandlerAttached = false
+    let mutable closedHandlerAttached = false
+    let mutable lifecycleWasAttachedWhenLoadStarted = false
     let send: obj = emitJsExpr () "((..._args) => {})"
     let noop: obj = emitJsExpr () "((..._args) => {})"
 
-    let load (_: string) = JS.Constructors.Promise.resolve ()
+    let load (_: string) =
+        lifecycleWasAttachedWhenLoadStarted <- closeHandlerAttached && closedHandlerAttached
+        JS.Constructors.Promise.resolve ()
+
+    let onEvent (eventName: string) (_handler: obj) =
+        if eventName = "close" then
+            closeHandlerAttached <- true
+        elif eventName = "closed" then
+            closedHandlerAttached <- true
+
+    let onEventJs: obj =
+        emitJsExpr onEvent "((eventName, handler) => $0(eventName, handler))"
 
     let window =
         createObj [
@@ -333,7 +347,7 @@ let private successfulRegistrationTestWindow id onShow =
             )
             "loadFile" ==> load
             "loadURL" ==> load
-            "on" ==> noop
+            "on" ==> onEventJs
             "webContents"
             ==> createObj [
                 "send" ==> send
@@ -344,7 +358,7 @@ let private successfulRegistrationTestWindow id onShow =
         ]
         |> unbox<BrowserWindow>
 
-    window, (fun () -> shown), (fun () -> destroyed)
+    window, (fun () -> shown), (fun () -> destroyed), (fun () -> lifecycleWasAttachedWhenLoadStarted)
 
 let private expectRegistrationLoadFailure
     (expectedError: exn)
@@ -501,7 +515,10 @@ Vitest.describe (
             "RegisterVault shows a successfully loaded renderer and keeps its vault registered",
             fun () -> promise {
                 let windowId = 14
-                let window, wasShown, isDestroyed = successfulRegistrationTestWindow windowId ignore
+
+                let window, wasShown, isDestroyed, _ =
+                    successfulRegistrationTestWindow windowId ignore
+
                 setBrowserWindowFactory (fun _ -> window :> obj)
 
                 let vaults = ArcVaults()
@@ -595,19 +612,81 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "RegisterVaultWithNewArc cleans up when renderer loading fails",
+            "RegisterVaultWithNewArc loads and shows the renderer before creating the ARC",
             fun () -> promise {
-                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-registration-create-"
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-registration-create-order-"
+                let arcPath = join [| rootPath; "new-arc" |]
+                let mutable vaultsRef: ArcVaults option = None
+                let mutable vaultWasEmptyWhenShown = false
+                let mutable arcDirectoryWasAbsentWhenShown = false
+                let mutable registeredVault: ArcVault option = None
 
                 try
                     let windowId = 13
+
+                    let window, wasShown, isDestroyed, lifecycleWasAttachedWhenLoadStarted =
+                        successfulRegistrationTestWindow
+                            windowId
+                            (fun () ->
+                                registeredVault <- vaultsRef.Value.TryGetVault(windowId)
+
+                                vaultWasEmptyWhenShown <-
+                                    registeredVault
+                                    |> Option.exists (fun vault -> vault.path.IsNone && vault.arc.IsNone)
+
+                                arcDirectoryWasAbsentWhenShown <- not (existsSync arcPath)
+                            )
+
+                    let vaults = ArcVaults()
+                    vaultsRef <- Some vaults
+                    setBrowserWindowFactory (fun _ -> window :> obj)
+
+                    let! registeredWindowId = vaults.RegisterVaultWithNewArc(arcPath, "New ARC")
+
+                    Vitest.expect(registeredWindowId).toBe (windowId)
+                    Vitest.expect(lifecycleWasAttachedWhenLoadStarted ()).toBe (true)
+                    Vitest.expect(wasShown ()).toBe (true)
+                    Vitest.expect(vaultWasEmptyWhenShown).toBe (true)
+                    Vitest.expect(arcDirectoryWasAbsentWhenShown).toBe (true)
+                    Vitest.expect(existsSync arcPath).toBe (true)
+                    Vitest.expect(isDestroyed ()).toBe (false)
+                    Vitest.expect(registeredVault.IsSome).toBe (true)
+                    Vitest.expect(vaults.Vaults.ContainsKey(windowId)).toBe (true)
+
+                    do! registeredVault.Value.StopFileWatcher()
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    match registeredVault with
+                    | Some vault -> do! vault.StopFileWatcher()
+                    | None -> ()
+
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "RegisterVaultWithNewArc renderer-load failure does not create an ARC",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-registration-create-"
+                let arcPath = join [| rootPath; "new-arc" |]
+                let mutable initializedVault: ArcVault option = None
+                let mutable vaultsRef: ArcVaults option = None
+
+                try
+                    let windowId = 19
                     let loadError = exn "Expected renderer load failure"
-                    let window, isDestroyed = registrationTestWindow windowId loadError ignore
+
+                    let window, isDestroyed =
+                        registrationTestWindow
+                            windowId
+                            loadError
+                            (fun () -> initializedVault <- vaultsRef.Value.TryGetVault(windowId))
+
                     setBrowserWindowFactory (fun _ -> window :> obj)
 
                     let vaults = ArcVaults()
-
-                    let arcPath = join [| rootPath; "new-arc" |]
+                    vaultsRef <- Some vaults
 
                     do!
                         expectRegistrationLoadFailure
@@ -616,6 +695,12 @@ Vitest.describe (
                             windowId
                             isDestroyed
                             (fun () -> vaults.RegisterVaultWithNewArc(arcPath, "New ARC"))
+
+                    Vitest.expect(initializedVault.IsSome).toBe (true)
+                    Vitest.expect(initializedVault.Value.watcher.IsNone).toBe (true)
+
+                    let! arcDirectoryExists = TestHelpers.pathExistsAsync arcPath
+                    Vitest.expect(arcDirectoryExists).toBe (false)
 
                     do! TestHelpers.removeDirectoryAsync rootPath
                 with error ->
