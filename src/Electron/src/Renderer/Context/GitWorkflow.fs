@@ -259,8 +259,7 @@ type WriteRequest =
     | RetryMaterialization
 
 /// SelectedChangePath uses None for no override and Some None to clear the selection.
-/// Published is Some true when the synchronize published, Some false when it did not, and None
-/// when the write was not a synchronize.
+/// Published says whether the synchronize published. It is None when the write was not a synchronize.
 type WriteUnitSuccess = {
     Refresh: GitRefreshResult
     PageChange: GitPageChange
@@ -382,6 +381,7 @@ type GitDependencies = {
     refreshSynchronization:
         OperationRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, string>>
     synchronize: SynchronizeRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, string>>
+    /// The write command replaces this with a dispatch of WritePhaseChanged, and nothing outside writeCmd reports phases.
     reportPhase: GitBusyOperation -> unit
     cancelOperation: OperationKeyDto -> JS.Promise<Result<bool, string>>
     cloneWorkspace: CloneWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<string>, string>>
@@ -1813,7 +1813,18 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
         let runPushAfterLocalCommit (version: string) = promise {
             deps.reportPhase GitBusyOperation.PushingToRemote
             let! pushResult = runPublishAsync deps refreshedState version GitUpdateAcceptance.RequirePreview
-            deps.reportPhase GitBusyOperation.Refreshing
+
+            let followsRefresh =
+                match pushResult with
+                | Ok _ -> true
+                | Error(PublishFailure.Routed(RoutedFailure.Recovery _)) -> false
+                | Error(PublishFailure.Routed _) -> true
+                | Error(PublishFailure.AcceptanceRequired _)
+                | Error(PublishFailure.ProjectNameRefused _)
+                | Error(PublishFailure.ProvisioningIncomplete _) -> false
+
+            if followsRefresh then
+                deps.reportPhase GitBusyOperation.Refreshing
 
             match pushResult with
             | Ok(outcome, partial) ->
@@ -3038,6 +3049,7 @@ let private updateCore
             model with
                 BusyOperation = Some phase
                 BusyNotice = busyNoticeFromOperation phase
+                CurrentProgress = None
         },
         Cmd.none
     | WriteCompleted(sessionId, writeRequestId, writeRequest, result) when

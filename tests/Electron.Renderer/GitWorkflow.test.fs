@@ -2447,7 +2447,7 @@ Vitest.describe (
                     )
 
                 Vitest.expect(phaseState.BusyOperation).toEqual (Some GitBusyOperation.PushingToRemote)
-                Vitest.expect(phaseState.CurrentOperation.IsSome).toBe (true)
+                Vitest.expect(phaseState.CurrentOperation).toEqual (stateAfterWrite.CurrentOperation)
                 Vitest.expect(synchronizeRequest.IsSome).toBe (true)
 
                 let synchronizeKey = {
@@ -2463,6 +2463,16 @@ Vitest.describe (
                 releaseSynchronize.Value(Ok(succeededWithPublication PublicationStateDto.Published sync))
                 do! Promise.sleep 0
                 do! Promise.sleep 0
+
+                Vitest
+                    .expect(pendingMessages[1])
+                    .toEqual (
+                        WritePhaseChanged(
+                            stateAfterWrite.ArcSessionId,
+                            stateAfterWrite.WriteRequestId,
+                            GitBusyOperation.Refreshing
+                        )
+                    )
 
                 let mutable finalState = startedState
 

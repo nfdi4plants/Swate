@@ -113,6 +113,7 @@ module private Helper =
         installDependency = Renderer.VersionControlApiClient.installDependency
         refreshSynchronization = Renderer.VersionControlApiClient.refreshSynchronization
         synchronize = Renderer.VersionControlApiClient.synchronize
+        // The write command replaces this with a dispatch of WritePhaseChanged, and nothing outside writeCmd reports phases.
         reportPhase = ignore
         cancelOperation = Renderer.VersionControlApiClient.cancelOperation
         cloneWorkspace = Renderer.VersionControlApiClient.cloneWorkspace
