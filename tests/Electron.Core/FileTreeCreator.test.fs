@@ -120,7 +120,6 @@ let private withTempRepository
 
             let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
             WorkspaceSessionHost.initialize host
-            VersionControlRuntime.initialize runtime
 
             try
                 do!

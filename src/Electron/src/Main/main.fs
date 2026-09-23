@@ -17,10 +17,11 @@ app
         // The provider catalog needs the settings root, which exists only once the app is
         // ready. A failure here must not take the IPC registrations below with it.
         try
-            Main.VersionControl.VersionControlRuntime.createProduction ()
-            |> Main.VersionControl.VersionControlRuntime.initialize
+            let runtime = Main.VersionControl.VersionControlRuntime.createProduction ()
+            let host = Main.VersionControl.WorkspaceSessionHost.WorkspaceSessionHost(runtime)
+            Main.VersionControl.WorkspaceSessionHost.initialize host
         with error ->
-            Browser.Dom.console.error ("Version control runtime initialization failed", error.Message)
+            Browser.Dom.console.error ("Version control host initialization failed", error.Message)
 
         ARC_VAULTS.RegisterVault() |> ignore
 

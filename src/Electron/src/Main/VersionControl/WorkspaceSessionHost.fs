@@ -396,21 +396,17 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
 
 let mutable private current: WorkspaceSessionHost option = None
 
-/// The process-wide host over the current runtime. Tests replace it with a host over
-/// their own runtime.
+/// Installs the process-wide host. Tests replace it with a host over their own runtime.
 let initialize (host: WorkspaceSessionHost) = current <- Some host
 
-/// Only tests call this to exercise lazy host construction.
+/// Clears the process-wide host between tests.
 let resetForTests () = current <- None
 
 let get () : WorkspaceSessionHost =
     match current with
     | Some host -> host
-    | None ->
-        let host = WorkspaceSessionHost(VersionControlRuntime.get ())
-        current <- Some host
-        host
+    | None -> failwith "The workspace session host has not been initialized."
 
-/// The host only when one was created. Vault lifecycle hooks use it so that closing a
-/// vault never builds the production runtime as a side effect.
+/// Returns the host only when one was installed. Vault lifecycle hooks use it so they
+/// can tolerate failed initialization without building a host.
 let tryCurrent () = current

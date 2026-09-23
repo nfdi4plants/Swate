@@ -70,7 +70,6 @@ let private createFixture () = promise {
 
     let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
     WorkspaceSessionHost.initialize host
-    VersionControlRuntime.initialize runtime
 
     return {
         Root = root
@@ -553,7 +552,7 @@ let private withCreateArcSetup
     (windowId: int)
     (identifier: string)
     (createArcRuntime: string -> string -> string -> string -> VersionControlRuntime.VersionControlRuntime)
-    (createExplicitHost: bool)
+    (createSettingsRoot: bool)
     testBody
     =
     promise {
@@ -566,7 +565,7 @@ let private withCreateArcSetup
             |> Swate.Components.Shared.PathHelpers.normalizePath
 
         let folders =
-            if createExplicitHost then
+            if createSettingsRoot then
                 [ settingsRoot; container ]
             else
                 [ container ]
@@ -575,15 +574,9 @@ let private withCreateArcSetup
             Main.Bindings.Filesystem.mkdirSync folder (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
 
         let runtime = createArcRuntime root settingsRoot container expectedArcPath
-
-        let host =
-            if createExplicitHost then
-                Some(WorkspaceSessionHost.WorkspaceSessionHost(runtime))
-            else
-                None
-
-        VersionControlRuntime.initialize runtime
+        let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
         WorkspaceSessionHost.resetForTests ()
+        WorkspaceSessionHost.initialize host
         registerEmptyVault windowId |> ignore
         let dialogSpy = Vitest.vi.spyOn (electron?dialog, "showOpenDialog")
 
@@ -594,14 +587,7 @@ let private withCreateArcSetup
             electronMock?reset () |> ignore
             ARC_VAULTS.Vaults.Clear()
 
-            if createExplicitHost then
-                match WorkspaceSessionHost.tryCurrent () with
-                | Some currentHost -> do! currentHost.CloseAll() |> Async.StartAsPromise
-                | None -> ()
-
-                match host with
-                | Some explicitHost -> do! explicitHost.CloseAll() |> Async.StartAsPromise
-                | None -> ()
+            do! host.CloseAll() |> Async.StartAsPromise
 
             do! removeDirectoryAsync root
         }
@@ -616,9 +602,7 @@ let private withCreateArcSetup
 
             do! cleanup ()
         finally
-            match host with
-            | Some explicitHost -> WorkspaceSessionHost.initialize explicitHost
-            | None -> WorkspaceSessionHost.resetForTests ()
+            WorkspaceSessionHost.resetForTests ()
     }
 
 Vitest.describe (
@@ -627,37 +611,6 @@ Vitest.describe (
         Vitest.afterEach (fun () ->
             electronMock?reset () |> ignore
             ARC_VAULTS.Vaults.Clear()
-        )
-
-        Vitest.test (
-            "creating an ARC on a fresh process initializes its repository through a lazily built host",
-            fun () ->
-                withCreateArcSetup
-                    "swate-vc-arc-create-"
-                    60
-                    "fresh"
-                    (fun _ settingsRoot _ _ ->
-                        createRuntime
-                            settingsRoot
-                            VersionControlService.LakeFs.LakeFsCredentials.unconfigured
-                            (memoryBindings ())
-                    )
-                    true
-                    (fun _ api -> promise {
-                        Vitest.expect(WorkspaceSessionHost.tryCurrent ()).toEqual None
-
-                        let! created = api.createARC { identifier = "fresh"; initGit = true }
-
-                        match created with
-                        | Ok createdPath ->
-                            Vitest.expect(Main.Bindings.Filesystem.existsSync (join [| createdPath; ".git" |])).toBe
-                                true
-
-                            match WorkspaceSessionHost.tryCurrent () with
-                            | Some _ -> ()
-                            | None -> failwith "The workspace session host was not built lazily."
-                        | Error error -> return raise error
-                    })
         )
 
         Vitest.test (
@@ -690,7 +643,6 @@ Vitest.describe (
         Vitest.test (
             "an ARC whose repository initialization throws is still created",
             fun () ->
-                // The handler uses the host that WorkspaceSessionHost.get () builds lazily.
                 withCreateArcSetup
                     "swate-vc-arc-init-throw-"
                     66
@@ -750,7 +702,6 @@ Vitest.describe (
                         (Some objectMaterialization)
 
                 let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
-                VersionControlRuntime.initialize runtime
                 WorkspaceSessionHost.initialize host
                 let vault = registerVault 65 workspace
 

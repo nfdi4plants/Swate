@@ -539,7 +539,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "the runtime serves what was installed",
+            "the runtime catalog serves its registered providers",
             fun () ->
                 let runtime: VersionControlRuntime.VersionControlRuntime = {
                     Catalog = catalog ()
@@ -547,15 +547,7 @@ Vitest.describe (
                     PathCaseSensitivity = CaseInsensitive
                 }
 
-                VersionControlRuntime.initialize runtime
-
-                Vitest
-                    .expect(
-                        ProviderResolver.factories (VersionControlRuntime.get ()).Catalog
-                        |> Array.length
-                    )
-                    .toBe
-                    2
+                Vitest.expect(ProviderResolver.factories runtime.Catalog |> Array.length).toBe 2
         )
 
         Vitest.test (

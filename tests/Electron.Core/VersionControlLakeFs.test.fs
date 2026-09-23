@@ -166,7 +166,6 @@ let private createFixtureWithRuntime
             do! createRepository connection repository
 
             WorkspaceSessionHost.initialize host
-            VersionControlRuntime.initialize runtime
 
             return {
                 Root = root
@@ -945,9 +944,8 @@ Vitest.describe (
 
                         let badHost = WorkspaceSessionHost.WorkspaceSessionHost(badRuntime)
                         WorkspaceSessionHost.initialize badHost
-                        VersionControlRuntime.initialize badRuntime
 
-                        // Restore the process-global host and runtime so later fixture cleanup uses the live server connection.
+                        // Restore the process-global host so later fixture cleanup uses the live server connection.
                         try
                             registerVault 66 fixture.Workspace |> ignore
                             let api = Main.IPC.IVersionControlApi.api (ipcEvent 66)
@@ -959,11 +957,9 @@ Vitest.describe (
                             Vitest.expect(failure.Retryable).toBe true
                             do! badHost.CloseAll() |> Async.StartAsPromise
                             WorkspaceSessionHost.initialize fixture.Host
-                            VersionControlRuntime.initialize fixture.Runtime
                         with error ->
                             do! badHost.CloseAll() |> Async.StartAsPromise
                             WorkspaceSessionHost.initialize fixture.Host
-                            VersionControlRuntime.initialize fixture.Runtime
                             return raise error
                     })
             }
