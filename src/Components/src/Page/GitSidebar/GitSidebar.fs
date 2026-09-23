@@ -1220,8 +1220,8 @@ type GitSidebar =
                                     else
                                         $"Discard {props.DiscardPaths.Length} selected changes"
 
-                                // A conflicted file is resolved on its conflict page, so its row offers no discard.
-                                if not change.IsConflicted then
+                                // The row offers no discard for a conflicted file, since discarding it would drop one side of the merge.
+                                if not change.IsConflicted && props.DiscardPaths.Length > 0 then
                                     Html.button [
                                         prop.testId $"GitSidebarDiscardChangeButton-{props.Index}"
                                         prop.type'.button
@@ -1259,13 +1259,22 @@ type GitSidebar =
         let overscan = 8
 
         let discardPathsForChange (change: GitSidebarChange) =
-            if
-                Set.contains change.Path props.MarkedPaths
-                && not (Set.isEmpty props.MarkedPaths)
-            then
-                props.MarkedPaths |> Set.toArray |> Array.sort
-            else
-                [| change.Path |]
+            let conflictedPaths =
+                props.ChangedFiles
+                |> Array.filter _.IsConflicted
+                |> Array.map _.Path
+                |> Set.ofArray
+
+            let paths =
+                if
+                    Set.contains change.Path props.MarkedPaths
+                    && not (Set.isEmpty props.MarkedPaths)
+                then
+                    props.MarkedPaths |> Set.toArray |> Array.sort
+                else
+                    [| change.Path |]
+
+            paths |> Array.filter (fun path -> not (Set.contains path conflictedPaths))
 
         let changedFileListVirtualizer =
             Virtual.useVirtualizer (

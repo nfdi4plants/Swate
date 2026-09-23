@@ -376,6 +376,13 @@ export const ConflictsPresent: Story = {
       conflictedFiles[0],
       conflictedFiles[1],
       conflictedFiles[2],
+      {
+        Path: "README.md",
+        OriginalPath: undefined,
+        IndexStatus: "M",
+        WorkingTreeStatus: " ",
+        IsConflicted: false,
+      },
     ],
     branchOptions: branchOptions.slice(),
     callbacks: buildCallbacks(),
@@ -387,10 +394,15 @@ export const ConflictsPresent: Story = {
     await expect(canvas.getByTestId("GitSidebarMergeBanner")).toHaveTextContent(
       "Resolve all conflicted files before pushing.",
     );
-    await expect(canvasElement.querySelectorAll("[data-testid^='GitSidebarChangeRow-']")).toHaveLength(4);
+    await expect(canvasElement.querySelectorAll("[data-testid^='GitSidebarChangeRow-']")).toHaveLength(5);
     await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-0")).toBeInTheDocument();
     await expect(canvas.queryByTestId("GitSidebarDiscardChangeButton-0")).toBeNull();
-    await expect(canvas.getByTestId("GitSidebarDiscardChangeButton-1")).toBeInTheDocument();
+    await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
+    fireEvent.click(canvas.getByTestId("GitSidebarChangeRow-4"), { ctrlKey: true });
+    await expect(canvas.getByTestId("GitSidebarDiscardChangeButton-4")).toHaveAttribute(
+      "aria-label",
+      "Discard change",
+    );
   },
 };
 
