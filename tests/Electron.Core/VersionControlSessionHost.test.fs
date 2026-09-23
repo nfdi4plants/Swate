@@ -551,31 +551,21 @@ let private withCreateArcSetup
     (tempPrefix: string)
     (windowId: int)
     (identifier: string)
-    (createArcRuntime: string -> string -> string -> string -> VersionControlRuntime.VersionControlRuntime)
-    (createSettingsRoot: bool)
+    (createArcRuntime: string -> string -> VersionControlRuntime.VersionControlRuntime)
     testBody
     =
     promise {
         let! root = createTempDirectoryAsync tempPrefix
-        let settingsRoot = join [| root; "settings" |]
         let container = join [| root; "container" |]
 
         let expectedArcPath =
             ARCtrl.ArcPathHelper.combine container identifier
             |> Swate.Components.Shared.PathHelpers.normalizePath
 
-        let folders =
-            if createSettingsRoot then
-                [ settingsRoot; container ]
-            else
-                [ container ]
+        Main.Bindings.Filesystem.mkdirSync container (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
 
-        for folder in folders do
-            Main.Bindings.Filesystem.mkdirSync folder (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
-
-        let runtime = createArcRuntime root settingsRoot container expectedArcPath
+        let runtime = createArcRuntime root expectedArcPath
         let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
-        WorkspaceSessionHost.resetForTests ()
         WorkspaceSessionHost.initialize host
         registerEmptyVault windowId |> ignore
         let dialogSpy = Vitest.vi.spyOn (electron?dialog, "showOpenDialog")
@@ -620,8 +610,7 @@ Vitest.describe (
                     "swate-vc-arc-init-failure-"
                     64
                     "failed-init"
-                    (fun root _ _ expectedArcPath -> fakeProviderRuntime expectedArcPath (join [| root; "unused" |]))
-                    true
+                    (fun root expectedArcPath -> fakeProviderRuntime expectedArcPath (join [| root; "unused" |]))
                     (fun expectedArcPath api -> promise {
                         let! created =
                             api.createARC {
@@ -647,10 +636,9 @@ Vitest.describe (
                     "swate-vc-arc-init-throw-"
                     66
                     "throwing-init"
-                    (fun root _ _ expectedArcPath ->
+                    (fun root expectedArcPath ->
                         fakeProviderRuntimeThatThrowsOnInitialize expectedArcPath (join [| root; "unused" |])
                     )
-                    false
                     (fun expectedArcPath api -> promise {
                         let! created =
                             api.createARC {
