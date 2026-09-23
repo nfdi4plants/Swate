@@ -1764,12 +1764,8 @@ let private runPrimarySaveAttemptAsync
                 Ok(
                     CompletedWithPendingRemoteFailure(
                         UnitSuccess {
-                            Refresh = success.Refresh
-                            PageChange = success.PageChange
-                            SelectedChangePath = success.SelectedChangePath
-                            Warning = Some pendingPrimarySaveWarning
-                            Partial = Some partial
-                            Published = None
+                            success with
+                                Warning = Some pendingPrimarySaveWarning
                         },
                         failureMessage partial
                     )
@@ -1783,14 +1779,10 @@ let private runPrimarySaveAttemptAsync
                 Ok(
                     Completed(
                         UnitSuccess {
-                            Refresh = success.Refresh
-                            PageChange = success.PageChange
-                            SelectedChangePath = success.SelectedChangePath
-                            Warning =
-                                Some
-                                    "Changes were saved locally. This workspace provider does not support online synchronization."
-                            Partial = None
-                            Published = None
+                            success with
+                                Warning =
+                                    Some
+                                        "Changes were saved locally. This workspace provider does not support online synchronization."
                         }
                     )
                 )
@@ -1836,12 +1828,9 @@ let private runPrimarySaveAttemptAsync
                         Ok(
                             CompletedWithPendingRemoteConfirmation(
                                 UnitSuccess {
-                                    Refresh = confirmationRefreshSnapshot
-                                    PageChange = success.PageChange
-                                    SelectedChangePath = success.SelectedChangePath
-                                    Warning = Some pendingPrimarySaveWarning
-                                    Partial = None
-                                    Published = None
+                                    success with
+                                        Refresh = confirmationRefreshSnapshot
+                                        Warning = Some pendingPrimarySaveWarning
                                 },
                                 dialog,
                                 GitPendingRemoteAction.PublishAfterUpdate(
