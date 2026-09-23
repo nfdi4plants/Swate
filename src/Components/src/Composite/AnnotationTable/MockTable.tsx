@@ -1,4 +1,36 @@
-import {ArcTable, OntologyAnnotation, CompositeHeader, CompositeCell, IOType} from "@nfdi4plants/arctrl";
+//import {ArcTable, OntologyAnnotation, CompositeHeader, CompositeCell, IOType} from "@nfdi4plants/arctrl";
+
+// ARCtrl from the Components Fable are used for the build because the published npm package references
+// generated fable_modules that are not included in the package and cannot be resolved by Vite.
+import { ArcTable } from "../../fable_modules/ARCtrl.Core.3.0.0-beta.12/Table/ArcTable.fs.js";
+import { OntologyAnnotation } from "../../fable_modules/ARCtrl.Core.3.0.0-beta.12/OntologyAnnotation.fs.js";
+import {
+  CompositeHeader_Characteristic,
+  CompositeHeader_Component,
+  CompositeHeader_Factor,
+  CompositeHeader_FreeText,
+  CompositeHeader_Input,
+  CompositeHeader_Output,
+  IOType_Sample,
+  IOType_Source,
+} from "../../fable_modules/ARCtrl.Core.3.0.0-beta.12/Table/CompositeHeader.fs.js";
+import { CompositeCell } from "../../fable_modules/ARCtrl.Core.3.0.0-beta.12/Table/CompositeCell.fs.js";
+
+const CompositeHeader = {
+  input: CompositeHeader_Input,
+  output: CompositeHeader_Output,
+  component: CompositeHeader_Component,
+  freeText: CompositeHeader_FreeText,
+  factor: CompositeHeader_Factor,
+  characteristic: CompositeHeader_Characteristic,
+};
+
+const IOType = {
+  source: IOType_Source,
+  sample: IOType_Sample,
+};
+
+///Workaround ends here
 
 let oa_species = new OntologyAnnotation("species", "NCIT", "NCIT:C45293")
 let oa_chlamy = new OntologyAnnotation("Chlamydomonas reinhardtii", "NCBITaxon", "NCBITaxon_3055")
@@ -16,14 +48,13 @@ const freeTextCells: any[] = [];
 const temperatureCells: any[] = [];
 const organismCells: any[] = [];
 
-
 for (let i = 0; i <= 100; i++) {
-    sourceCells.push(CompositeCell.createFreeText(`Source ${i}`));
-    sampleCells.push(CompositeCell.createFreeText(`Sample ${i}`));
-    instrumentCells.push(CompositeCell.createTerm(oa_sciex));
-    freeTextCells.push(CompositeCell.createFreeText(`Free text ${i}`));
-    temperatureCells.push(CompositeCell.createUnitized(`${Math.floor(i / 10)}`, oa_celcius));
-    organismCells.push(CompositeCell.createTerm(oa_chlamy));
+  sourceCells.push(CompositeCell.createFreeText(`Source ${i}`));
+  sampleCells.push(CompositeCell.createFreeText(`Sample ${i}`));
+  instrumentCells.push(CompositeCell.createTerm(oa_sciex));
+  freeTextCells.push(CompositeCell.createFreeText(`Free text ${i}`));
+  temperatureCells.push(CompositeCell.createUnitized(`${Math.floor(i / 10)}`, oa_celcius));
+  organismCells.push(CompositeCell.createTerm(oa_chlamy));
 }
 
 const LargeTable = ArcTable.init("Example Table")
