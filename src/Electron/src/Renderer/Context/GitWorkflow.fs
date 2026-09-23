@@ -1886,14 +1886,32 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
                                 return Ok(RequiresRecovery(recovery, message))
                             | RoutedFailure.ConflictSession failure ->
                                 return! completeAfterUpdateAsync deps (Some failure) (Some pendingPrimarySaveWarning)
-                            | RoutedFailure.Cancelled message
                             | RoutedFailure.DependencyInstall message
                             | RoutedFailure.StaleWorkspace(message, _)
                             | RoutedFailure.Error message
-                            | RoutedFailure.RefreshAfterCancel message
                             | RoutedFailure.RefreshThenReport message ->
                                 // The local commit already succeeded, so the saved-locally outcome stays.
                                 return! pendingPrimarySaveRemoteFailureAsync deps message
+                            | RoutedFailure.Cancelled _
+                            | RoutedFailure.RefreshAfterCancel _ ->
+                                let! refreshResult = refreshAllAsync deps
+
+                                match refreshResult.Status with
+                                | Ok _ ->
+                                    return
+                                        Ok(
+                                            Completed(
+                                                UnitSuccess {
+                                                    Refresh = refreshResult
+                                                    PageChange = GitPageChange.NoChange
+                                                    SelectedChangePath = None
+                                                    Warning = Some pendingPrimarySaveWarning
+                                                    Partial = None
+                                                    Published = None
+                                                }
+                                            )
+                                        )
+                                | Error refreshFailure -> return Error(failureMessage refreshFailure)
                         })
                         failure
         }

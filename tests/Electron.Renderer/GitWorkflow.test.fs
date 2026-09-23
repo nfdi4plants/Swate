@@ -3284,6 +3284,8 @@ Vitest.describe (
         Vitest.test (
             "A primary save whose synchronize is canceled with a refresh recovery keeps the saved-locally notice",
             fun () -> promise {
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
                 let canceled =
                     makeFailure
                         Canceled
@@ -3307,6 +3309,7 @@ Vitest.describe (
                         getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
                         listRefs = fun _ -> promise { return Ok(succeeded refs) }
                         getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                        reportError = reportedErrors.Add
                 }
 
                 let state = {
@@ -3328,17 +3331,13 @@ Vitest.describe (
 
                 let nextState, completionCmd =
                     match completionMessages with
-                    | [| WriteCompleted(_,
-                                        _,
-                                        PrimarySave _,
-                                        Ok(CompletedWithPendingRemoteFailure(UnitSuccess success, message))) |] when
+                    | [| WriteCompleted(_, _, PrimarySave _, Ok(Completed(UnitSuccess success))) |] when
                         success.Warning.IsSome && success.Partial.IsNone
                         ->
                         let warning = success.Warning.Value
                         Vitest.expect(warning).toBe ("Changes were saved locally. Online sync is still pending.")
-                        Vitest.expect(message).toBe (failureMessage canceled)
                         update deps ignore completionMessages[0] stateAfterWrite
-                    | _ -> failwith "Expected a saved-locally outcome after publish was canceled."
+                    | _ -> failwith "Expected a completed saved-locally outcome after publish was canceled."
 
                 let! finishMessages = collectMessages completionCmd
 
@@ -3347,6 +3346,74 @@ Vitest.describe (
                 Vitest
                     .expect(nextState.WarningNotice)
                     .toEqual (Some "Changes were saved locally. Online sync is still pending.")
+
+                Vitest.expect(nextState.ErrorNotice).toEqual (None)
+                Vitest.expect(reportedErrors.Count).toBe (0)
+            }
+        )
+
+        Vitest.test (
+            "A canceled primary save push shows the saved-locally warning without an error",
+            fun () -> promise {
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
+                let canceled =
+                    makeFailure Canceled VersionControlCodes.OperationCanceled "Publish was canceled." None [||]
+
+                let deps = {
+                    defaultDependencies with
+                        createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
+                        synchronize =
+                            fun request ->
+                                if request.PublishLocalRevisions then
+                                    promise { return Ok(OperationResultDto.Failed canceled) }
+                                else
+                                    unexpectedPromise "unexpected pull"
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                        reportError = reportedErrors.Add
+                }
+
+                let state = {
+                    runningState with
+                        ChangedFiles = [| changedFile "README.md" "M" " " false |]
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (PrimarySaveAllRequested "Save locally first") state
+
+                let! requestMessages = collectMessages requestCmd
+
+                let stateAfterWrite, finishCmd =
+                    match requestMessages with
+                    | [| WriteRequested(PrimarySave _) |] -> update deps ignore requestMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected the primary save request."
+
+                let! completionMessages = collectWriteMessages finishCmd
+
+                let nextState, completionCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, PrimarySave _, Ok(Completed(UnitSuccess success))) |] when
+                        success.Warning.IsSome && success.Partial.IsNone
+                        ->
+                        Vitest
+                            .expect(success.Warning.Value)
+                            .toBe ("Changes were saved locally. Online sync is still pending.")
+
+                        update deps ignore completionMessages[0] stateAfterWrite
+                    | _ -> failwith "Expected a completed saved-locally outcome after publish was canceled."
+
+                let! finishMessages = collectMessages completionCmd
+
+                Vitest.expect(finishMessages).toEqual ([||])
+
+                Vitest
+                    .expect(nextState.WarningNotice)
+                    .toEqual (Some "Changes were saved locally. Online sync is still pending.")
+
+                Vitest.expect(nextState.ErrorNotice).toEqual (None)
+                Vitest.expect(reportedErrors.Count).toBe (0)
             }
         )
 
