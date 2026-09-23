@@ -14,6 +14,7 @@ open Main.Notes.NoteConstants
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Vitest
 
@@ -374,7 +375,7 @@ let private successfulRegistrationTestWindow id onLoad onShow =
 
     window, (fun () -> shown), (fun () -> destroyed), (fun () -> lifecycleWasAttachedWhenLoadStarted)
 
-let private closingWhileArcLoadsRegistrationTestWindow id isArcOpening =
+let private closingWhileArcLoadsRegistrationTestWindow id isArcOpening destroyedCheckCountBeforeClose onShow =
     let mutable destroyed = false
     let mutable shown = false
     let mutable lifecycleAttachedWhenShown = false
@@ -382,6 +383,7 @@ let private closingWhileArcLoadsRegistrationTestWindow id isArcOpening =
     let mutable preventedCloseCount = 0
     let mutable sendsAfterDestroy = 0
     let mutable titleWritesAfterDestroy = 0
+    let mutable destroyedCheckCount = 0
     let mutable closeHandler: (obj -> unit) option = None
     let mutable closedHandler: (unit -> unit) option = None
     let noop: obj = emitJsExpr () "((..._args) => {})"
@@ -405,31 +407,41 @@ let private closingWhileArcLoadsRegistrationTestWindow id isArcOpening =
     let onEventJs: obj =
         emitJsExpr onEvent "((eventName, handler) => $0(eventName, handler))"
 
+    let closeWhenArcIsOpening () =
+        arcWasOpeningWhenClosed <- isArcOpening ()
+
+        if arcWasOpeningWhenClosed then
+            let preventedCloseCountBeforeAttempt = preventedCloseCount
+
+            closeHandler.Value(
+                createObj [
+                    "preventDefault" ==> (fun () -> preventedCloseCount <- preventedCloseCount + 1)
+                ]
+            )
+
+            if preventedCloseCount = preventedCloseCountBeforeAttempt then
+                destroyed <- true
+                closedHandler.Value()
+
     let show () =
         shown <- true
         lifecycleAttachedWhenShown <- closeHandler.IsSome && closedHandler.IsSome
+        onShow ()
 
-        Fable.Core.JS.setTimeout
-            (fun () ->
-                arcWasOpeningWhenClosed <- isArcOpening ()
+    let isDestroyed () =
+        if shown && not destroyed then
+            destroyedCheckCount <- destroyedCheckCount + 1
+            let shouldClose = isArcOpening ()
 
-                closeHandler.Value(
-                    createObj [
-                        "preventDefault" ==> (fun () -> preventedCloseCount <- preventedCloseCount + 1)
-                    ]
-                )
+            if shouldClose && destroyedCheckCount >= destroyedCheckCountBeforeClose then
+                closeWhenArcIsOpening ()
 
-                if preventedCloseCount = 0 then
-                    destroyed <- true
-                    closedHandler.Value()
-            )
-            0
-        |> ignore
+        destroyed
 
     let windowObject =
         createObj [
             "id" ==> id
-            "isDestroyed" ==> (fun () -> destroyed)
+            "isDestroyed" ==> isDestroyed
             "destroy" ==> (fun () -> destroyed <- true)
             "focus" ==> ignore
             "show" ==> show
@@ -802,7 +814,7 @@ Vitest.describe (
                              isDestroyed,
                              sendsAfterDestroy,
                              titleWritesAfterDestroy) =
-                            closingWhileArcLoadsRegistrationTestWindow targetWindowId isArcOpening
+                            closingWhileArcLoadsRegistrationTestWindow targetWindowId isArcOpening 1 ignore
 
                         setBrowserWindowFactory (fun _ ->
                             createdWindowCount <- createdWindowCount + 1
@@ -984,7 +996,7 @@ Vitest.describe (
                              isDestroyed,
                              sendsAfterDestroy,
                              titleWritesAfterDestroy) =
-                            closingWhileArcLoadsRegistrationTestWindow targetWindowId isArcOpening
+                            closingWhileArcLoadsRegistrationTestWindow targetWindowId isArcOpening 1 ignore
 
                         let mutable dialogCount = 0
 
@@ -1251,6 +1263,230 @@ Vitest.describe (
                     Vitest.expect(returnedError).toBe (openDialogError)
                     Vitest.expect(returnedError).not.toBe (messageDialogError)
                     Vitest.expect(dialogCount).toBe (1)
+            }
+        )
+
+        Vitest.test (
+            "createARC resolves Cancelled when the folder picker is cancelled",
+            fun () -> promise {
+                let originatingWindowId = 35
+                let originatingWindow = lifecycleTestWindow originatingWindowId false ignore
+                let mutable createdWindowCount = 0
+
+                setBrowserWindowFromWebContents (fun _ -> originatingWindow :> obj)
+
+                setBrowserWindowFactory (fun _ ->
+                    createdWindowCount <- createdWindowCount + 1
+                    failwith "Folder-picker cancellation must not create a BrowserWindow."
+                )
+
+                setShowOpenDialog (fun _ _ -> createObj [ "canceled" ==> true; "filePaths" ==> [||] ])
+
+                let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
+
+                let request: CreateArcRequest = {
+                    identifier = "Cancelled ARC"
+                    initGit = false
+                }
+
+                match! api.createARC request with
+                | Ok CreateArcOutcome.Cancelled -> Vitest.expect(createdWindowCount).toBe (0)
+                | Ok outcome -> return failwithf "Expected Cancelled, received %A." outcome
+                | Error error -> return failwithf "Expected cancellation to be non-error, received %s." error.Message
+            }
+        )
+
+        Vitest.test (
+            "createARC resolves Created with the normalized path after successful creation",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-ipc-create-success-"
+                let originatingWindowId = 36
+                let targetWindowId = 37
+                let identifier = "Successful ARC"
+                let originatingWindow = lifecycleTestWindow originatingWindowId false ignore
+                let originatingVault = ArcVault(originatingWindow)
+                originatingVault.path <- Some "C:/already-open-create-success"
+                originatingVault.SetArc(ARC("Originating ARC"))
+                let mutable createdWindowCount = 0
+                let mutable targetVault: ArcVault option = None
+
+                let targetWindow, wasShown, isTargetDestroyed, lifecycleWasAttachedWhenLoadStarted =
+                    successfulRegistrationTestWindow
+                        targetWindowId
+                        (fun () -> targetVault <- ARC_VAULTS.TryGetVault(targetWindowId))
+                        ignore
+
+                setBrowserWindowFromWebContents (fun _ -> originatingWindow :> obj)
+
+                setBrowserWindowFactory (fun _ ->
+                    createdWindowCount <- createdWindowCount + 1
+                    targetWindow :> obj
+                )
+
+                setShowOpenDialog (fun _ _ -> createObj [ "canceled" ==> false; "filePaths" ==> [| rootPath |] ])
+                ARC_VAULTS.Vaults.Add(originatingWindowId, originatingVault)
+
+                try
+                    let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
+
+                    let request: CreateArcRequest = {
+                        identifier = identifier
+                        initGit = false
+                    }
+
+                    let expectedPath =
+                        ARCtrl.ArcPathHelper.combine rootPath identifier |> PathHelpers.normalizePath
+
+                    match! api.createARC request with
+                    | Ok(CreateArcOutcome.Created createdPath) -> Vitest.expect(createdPath).toBe (expectedPath)
+                    | Ok outcome -> failwithf "Expected Created, received %A." outcome
+                    | Error error -> failwithf "Expected successful creation, received %s." error.Message
+
+                    Vitest.expect(createdWindowCount).toBe (1)
+                    Vitest.expect(wasShown ()).toBe (true)
+                    Vitest.expect(lifecycleWasAttachedWhenLoadStarted ()).toBe (true)
+                    Vitest.expect(isTargetDestroyed ()).toBe (false)
+                    Vitest.expect(targetVault.IsSome).toBe (true)
+                    Vitest.expect(targetVault.Value.path).toEqual (Some expectedPath)
+                    Vitest.expect(targetVault.Value.watcher.IsSome).toBe (true)
+
+                    let! arcExists = TestHelpers.pathExistsAsync expectedPath
+                    Vitest.expect(arcExists).toBe (true)
+
+                    do! targetVault.Value.StopFileWatcher()
+                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
+                    ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    match targetVault with
+                    | Some vault -> do! vault.StopFileWatcher()
+                    | None -> ()
+
+                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
+                    ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "createARC resolves CreatedButClosed when the new window closes during post-write loading",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-ipc-create-close-during-load-"
+                let originatingWindowId = 38
+                let targetWindowId = 39
+                let identifier = "Created Then Closed ARC"
+                let originatingWindow = lifecycleTestWindow originatingWindowId false ignore
+                let originatingVault = ArcVault(originatingWindow)
+                originatingVault.path <- Some "C:/already-open-create-close"
+                originatingVault.SetArc(ARC("Originating ARC"))
+
+                let expectedPath =
+                    ARCtrl.ArcPathHelper.combine rootPath identifier |> PathHelpers.normalizePath
+
+                let mutable createdWindowCount = 0
+                let mutable loadingVault: ArcVault option = None
+                let mutable targetWasRegistered = false
+                let mutable targetPathWasAssigned = false
+                let mutable creationReachedPostWriteLoad = false
+                let mutable watcherWasAbsent = false
+                let mutable vaultWasEmptyWhenShown = false
+
+                let isArcLoadingAfterWrite () =
+                    loadingVault <- ARC_VAULTS.TryGetVault(targetWindowId)
+
+                    match loadingVault with
+                    | Some vault ->
+                        targetWasRegistered <- true
+                        targetPathWasAssigned <- vault.path = Some expectedPath
+                        creationReachedPostWriteLoad <- vault.arc.IsSome
+                        watcherWasAbsent <- vault.watcher.IsNone
+
+                        targetWasRegistered
+                        && targetPathWasAssigned
+                        && creationReachedPostWriteLoad
+                        && watcherWasAbsent
+                        && not vault.hasUnsavedArcChanges
+                    | None -> false
+
+                let (targetWindow,
+                     wasShown,
+                     lifecycleWasAttached,
+                     arcWasLoadingAfterWrite,
+                     isTargetDestroyed,
+                     sendsAfterDestroy,
+                     titleWritesAfterDestroy) =
+                    closingWhileArcLoadsRegistrationTestWindow
+                        targetWindowId
+                        isArcLoadingAfterWrite
+                        // The first destroyed check comes from the initial in-memory SetArc before the disk write.
+                        // Close on a later check, once reload has cleared the unsaved flag but before the watcher starts.
+                        2
+                        (fun () ->
+                            vaultWasEmptyWhenShown <-
+                                ARC_VAULTS.TryGetVault(targetWindowId)
+                                |> Option.exists (fun vault -> vault.path.IsNone && vault.arc.IsNone)
+                        )
+
+                setBrowserWindowFromWebContents (fun _ -> originatingWindow :> obj)
+
+                setBrowserWindowFactory (fun _ ->
+                    createdWindowCount <- createdWindowCount + 1
+                    targetWindow :> obj
+                )
+
+                setShowOpenDialog (fun _ _ -> createObj [ "canceled" ==> false; "filePaths" ==> [| rootPath |] ])
+                ARC_VAULTS.Vaults.Add(originatingWindowId, originatingVault)
+
+                try
+                    let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
+
+                    let request: CreateArcRequest = {
+                        identifier = identifier
+                        initGit = false
+                    }
+
+                    match! api.createARC request with
+                    | Ok(CreateArcOutcome.CreatedButClosed createdPath) ->
+                        Vitest.expect(createdPath).toBe (expectedPath)
+                    | Ok outcome -> failwithf "Expected CreatedButClosed, received %A." outcome
+                    | Error error -> failwithf "Expected close-after-create to be non-error, received %s." error.Message
+
+                    Vitest.expect(createdWindowCount).toBe (1)
+                    Vitest.expect(targetWasRegistered).toBe (true)
+                    Vitest.expect(lifecycleWasAttached ()).toBe (true)
+                    Vitest.expect(wasShown ()).toBe (true)
+                    Vitest.expect(vaultWasEmptyWhenShown).toBe (true)
+                    Vitest.expect(targetPathWasAssigned).toBe (true)
+                    Vitest.expect(creationReachedPostWriteLoad).toBe (true)
+                    Vitest.expect(arcWasLoadingAfterWrite ()).toBe (true)
+                    Vitest.expect(isTargetDestroyed ()).toBe (true)
+                    Vitest.expect(loadingVault.IsSome).toBe (true)
+                    Vitest.expect(loadingVault.Value.watcher.IsNone).toBe (true)
+                    Vitest.expect(ARC_VAULTS.Vaults.ContainsKey(targetWindowId)).toBe (false)
+                    Vitest.expect(sendsAfterDestroy ()).toBe (0)
+                    Vitest.expect(titleWritesAfterDestroy ()).toBe (0)
+
+                    let! arcDirectoryExists = TestHelpers.pathExistsAsync expectedPath
+
+                    let investigationPath =
+                        ARCtrl.ArcPathHelper.combine expectedPath ARCtrl.ArcPathHelper.InvestigationFileName
+
+                    let! investigationFileExists = TestHelpers.pathExistsAsync investigationPath
+                    Vitest.expect(arcDirectoryExists).toBe (true)
+                    Vitest.expect(investigationFileExists).toBe (true)
+
+                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    match loadingVault with
+                    | Some vault -> do! vault.StopFileWatcher()
+                    | None -> ()
+
+                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
+                    ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
             }
         )
 

@@ -239,7 +239,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     )
 
                 if r.canceled then
-                    return Error(exn "Cancelled")
+                    return Ok CreateArcOutcome.Cancelled
                 elif r.filePaths.Length <> 1 then
                     return Error(exn "Not exactly one path")
                 else
@@ -250,22 +250,32 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         |> PathHelpers.normalizePath
 
                     let windowId = windowIdFromIpcEvent event
-                    let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, request.identifier)
 
-                    match!
-                        initGitRepositoryForCreatedArcDisposition
-                            Main.Git.GitProvisioningService.initRepository
-                            request.initGit
-                            disposition
-                    with
-                    | Error failure ->
-                        Swate.Components.console.log (
-                            $"Git init failed for '{ArcOpenDisposition.path disposition}': {failure.Message}"
-                        )
-                    | Ok(Some initializedArcPath) -> notifyGitRepositoryInitialized initializedArcPath
-                    | Ok None -> ()
+                    let! disposition = promise {
+                        try
+                            let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, request.identifier)
+                            return Some disposition
+                        with ArcLoadCancelledException _ ->
+                            return None
+                    }
 
-                    return Ok(ArcOpenDisposition.path disposition)
+                    match disposition with
+                    | None -> return Ok(CreateArcOutcome.CreatedButClosed arcPath)
+                    | Some disposition ->
+                        match!
+                            initGitRepositoryForCreatedArcDisposition
+                                Main.Git.GitProvisioningService.initRepository
+                                request.initGit
+                                disposition
+                        with
+                        | Error failure ->
+                            Swate.Components.console.log (
+                                $"Git init failed for '{ArcOpenDisposition.path disposition}': {failure.Message}"
+                            )
+                        | Ok(Some initializedArcPath) -> notifyGitRepositoryInitialized initializedArcPath
+                        | Ok None -> ()
+
+                        return Ok(CreateArcOutcome.Created(ArcOpenDisposition.path disposition))
             with error ->
                 return Error error
         }

@@ -5,6 +5,7 @@ open Browser.Dom
 open Fable.Core
 open Swate.Components.PageComponents.SettingsPage
 open Swate.Components.Primitive.ErrorModal.Types
+open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.IPCTypes
 
 let private tryParseLocalStorageBool (raw: string option) : bool option =
@@ -71,7 +72,9 @@ let createArc (onError: string -> unit) (identifier: string) (initGit: bool) : J
     | Error exn ->
         onError exn.Message
         return None
-    | Ok path ->
+    | Ok CreateArcOutcome.Cancelled
+    | Ok(CreateArcOutcome.CreatedButClosed _) -> return None
+    | Ok(CreateArcOutcome.Created path) ->
         do! ensureNotesFolderIfEnabled onError
         return Some path
 }

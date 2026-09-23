@@ -45,7 +45,7 @@ type IArcVaultsApi = {
     /// Open ARC at a known path (e.g. recent-ARC click). Main decides disposition.
     openARCByPath: string -> JS.Promise<Result<string, exn>>
     /// Create ARC via folder dialog. Main decides disposition.
-    createARC: CreateArcRequest -> JS.Promise<Result<string, exn>>
+    createARC: CreateArcRequest -> JS.Promise<Result<CreateArcOutcome, exn>>
     /// Ensure ARC notes scaffolding exists for the ARCVault root path.
     ensureNotesFolder: unit -> JS.Promise<Result<unit, exn>>
     closeARC: unit -> JS.Promise<Result<unit, exn>>
