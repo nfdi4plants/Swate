@@ -293,7 +293,7 @@ type private RoutedFailure =
     | DependencyInstall of message: string
     | Recovery of GitPendingRecovery * message: string
     | RefreshAfterCancel of message: string
-    | InspectAfterCancel of message: string
+    | RefreshThenReport of message: string
     | StaleWorkspace of message: string * targetMoved: bool
     /// The workspace has a conflict session the user has to resolve first.
     | ConflictSession of OperationFailureDto
@@ -1115,7 +1115,7 @@ let private routeFailure (targetPath: string option) (failure: OperationFailureD
             code = VersionControlCodes.Recovery.InspectWorkspace
             || code = VersionControlCodes.Recovery.AbortMerge
             ->
-            RoutedFailure.InspectAfterCancel(failureMessage failure)
+            RoutedFailure.RefreshThenReport(failureMessage failure)
         | _ -> RoutedFailure.Cancelled(failureMessage failure)
     elif failure.Code = VersionControlCodes.UpdateWouldOverwriteLocalChanges then
         RoutedFailure.Error(localChangesOverwriteMessage failure.AffectedPaths)
@@ -1143,6 +1143,7 @@ let private routeFailure (targetPath: string option) (failure: OperationFailureD
             || failure.Code = VersionControlCodes.ConflictSessionActive
             ->
             RoutedFailure.ConflictSession failure
+        | _ when failure.StateChanged -> RoutedFailure.RefreshThenReport(failureMessage failure)
         | _ -> RoutedFailure.Error(failureMessage failure)
 
 /// A dependency failure names no component. The dependency report does: the first
@@ -1288,7 +1289,7 @@ let private routedToOutcome (deps: GitDependencies) (routed: RoutedFailure) = pr
                     )
                 )
         | Error refreshFailure -> return Error(failureMessage refreshFailure)
-    | RoutedFailure.InspectAfterCancel message ->
+    | RoutedFailure.RefreshThenReport message ->
         let! refreshResult = refreshAllAsync deps
 
         match refreshResult.Status with
@@ -1307,7 +1308,13 @@ let private routedToOutcome (deps: GitDependencies) (routed: RoutedFailure) = pr
                         message
                     )
                 )
-        | Error refreshFailure -> return Error(failureMessage refreshFailure)
+        | Error refreshFailure ->
+            let refreshMessage = failureMessage refreshFailure
+
+            let combined =
+                $"{message} Refreshing the workspace afterwards failed: {refreshMessage}"
+
+            return Error combined
     | RoutedFailure.StaleWorkspace(message, targetMoved) -> return Ok(StaleWorkspaceVersion(message, targetMoved))
     | RoutedFailure.ConflictSession failure -> return! completeAfterUpdateAsync deps (Some failure) None
     | RoutedFailure.UpdateAcceptanceRequired(_, _) ->
@@ -1487,7 +1494,15 @@ let private runCloneAttemptAsync (deps: GitDependencies) (cloneRequest: CloneWor
 
     match result with
     | Ok(outcome, _) -> return Ok(Completed(CloneSuccess outcome.Value))
-    | Error failure -> return! routedToOutcome deps (routeFailure (Some cloneRequest.TargetPath) failure)
+    | Error failure ->
+        let routed = routeFailure (Some cloneRequest.TargetPath) failure
+
+        let routed =
+            match routed with
+            | RoutedFailure.RefreshThenReport message when not (isCanceled failure) -> RoutedFailure.Error message
+            | _ -> routed
+
+        return! routedToOutcome deps routed
 }
 
 /// After an update: opens the first conflicted item, asks to finalize an emptied
@@ -1876,7 +1891,7 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
                             | RoutedFailure.StaleWorkspace(message, _)
                             | RoutedFailure.Error message
                             | RoutedFailure.RefreshAfterCancel message
-                            | RoutedFailure.InspectAfterCancel message ->
+                            | RoutedFailure.RefreshThenReport message ->
                                 // The local commit already succeeded, so the saved-locally outcome stays.
                                 return! pendingPrimarySaveRemoteFailureAsync deps message
                         })

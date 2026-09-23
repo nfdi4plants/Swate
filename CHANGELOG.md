@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 -   Clearing a stale Git lock names the removed lock files in the notice.
 -   A push the online copy refuses (a protected branch, a declined hook) is reported with the remote's reason instead of as a moved target that is retried.
+-   A Git operation that fails after it already changed the workspace refreshes the sidebar before it shows the error.
 
 ## 2.3.1 - 2026-09-16
 

@@ -1882,6 +1882,70 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "A failed clone that changed the target reports its own message without a refresh",
+            fun () -> promise {
+                let failure = {
+                    makeFailure
+                        ProviderError
+                        "git_failure"
+                        "The clone failed after changing the target."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RemoveCloneTarget
+                            Instructions = Some "Remove the target before retrying the clone."
+                        })
+                        [||] with
+                        StateChanged = true
+                }
+
+                let mutable replyResult = None
+                let reply result = replyResult <- Some result
+                let refreshCalls = ResizeArray<string>()
+
+                let cloneRequest = {
+                    OperationId = "clone-op"
+                    ProviderLocation = "https://gitlab.example/carol/my-arc.git"
+                    DisplayName = Some "my-arc"
+                    TargetPath = "C:/clone-target"
+                    TargetRef = None
+                    MaterializeAllObjects = true
+                }
+
+                let deps = {
+                    defaultDependencies with
+                        getSessionInfo =
+                            fun _ ->
+                                refreshCalls.Add("getSessionInfo")
+                                promise { return Ok(succeeded sessionInfo) }
+                        getStatus =
+                            fun _ ->
+                                refreshCalls.Add("getStatus")
+                                promise { return Ok(succeeded cleanStatus) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                        cloneWorkspace = fun _ -> promise { return Ok(OperationResultDto.Failed failure) }
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested(Clone(cloneRequest, reply))) GitState.Empty
+
+                let! completionMessages = collectMessages requestCmd
+
+                let _, finishCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, Clone _, Error message) |] ->
+                        Vitest.expect(message).toBe (failureMessage failure)
+                        update deps ignore completionMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected the failed clone to report its operation message."
+
+                let! finishMessages = collectMessages finishCmd
+
+                Vitest.expect(finishMessages).toEqual ([||])
+                Vitest.expect(refreshCalls |> Seq.toArray).toEqual ([||])
+                Vitest.expect(replyResult).toEqual (Some(Error(failureMessage failure)))
+            }
+        )
+
+        Vitest.test (
             "A clone runs under the operation id allocated for cancellation",
             fun () -> promise {
                 let mutable capturedRequest = None
@@ -4682,6 +4746,142 @@ Vitest.describe (
                 Vitest.expect(nextState.ErrorNotice).toEqual (None)
                 Vitest.expect(nextState.WarningNotice).toEqual (Some(failureMessage canceled))
                 Vitest.expect(nextState.Status.CurrentBranch).toEqual (Some "main")
+            }
+        )
+
+        Vitest.test (
+            "A failed update that changed the workspace refreshes before it reports the error",
+            fun () -> promise {
+                let failure = {
+                    makeFailure
+                        Timeout
+                        "inspection_timeout"
+                        "The update changed the workspace, but inspection timed out."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RefreshWorkspace
+                            Instructions = None
+                        })
+                        [||] with
+                        StateChanged = true
+                }
+
+                let callOrder = ResizeArray<string>()
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
+                let refreshedStatus = {
+                    statusForBranch "feature/refreshed" with
+                        WorkspaceVersion = "v2"
+                }
+
+                let deps = {
+                    defaultDependencies with
+                        getSessionInfo =
+                            fun _ ->
+                                callOrder.Add("getSessionInfo")
+                                promise { return Ok(succeeded sessionInfo) }
+                        synchronize =
+                            fun _ ->
+                                callOrder.Add("synchronize")
+                                promise { return Ok(OperationResultDto.Failed failure) }
+                        getStatus =
+                            fun _ ->
+                                callOrder.Add("getStatus")
+                                promise { return Ok(succeeded refreshedStatus) }
+                        listRefs =
+                            fun _ -> promise { return Ok(succeeded [| localBranch "feature/refreshed" true true |]) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                        reportError = reportedErrors.Add
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested(Pull GitUpdateAcceptance.RequirePreview)) runningState
+
+                let! completionMessages = collectMessages requestCmd
+
+                let nextState, finishCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, Pull _, Ok(CompletedWithPendingRemoteFailure(_, message))) |] ->
+                        Vitest.expect(message).toBe (failureMessage failure)
+                        update deps ignore completionMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected the failed update to refresh before reporting."
+
+                let! finishMessages = collectMessages finishCmd
+
+                Vitest.expect(finishMessages).toEqual ([||])
+                Vitest.expect(callOrder.IndexOf("getStatus") > callOrder.IndexOf("synchronize")).toBe (true)
+                Vitest.expect(nextState.Status.CurrentBranch).toEqual (Some "feature/refreshed")
+                Vitest.expect(nextState.WorkspaceVersion).toEqual (Some "v2")
+                Vitest.expect(nextState.ErrorNotice).toEqual (Some(failureMessage failure))
+                Vitest.expect(reportedErrors.Count).toBe (1)
+            }
+        )
+
+        Vitest.test (
+            "A failed update whose refresh fails keeps the operation's message",
+            fun () -> promise {
+                let failure = {
+                    makeFailure
+                        Timeout
+                        "inspection_timeout"
+                        "The update changed the workspace, but inspection timed out."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RefreshWorkspace
+                            Instructions = None
+                        })
+                        [||] with
+                        StateChanged = true
+                }
+
+                let refreshFailure =
+                    makeFailure ProviderError "status_read_failed" "Reading refreshed workspace status failed." None [||]
+
+                let callOrder = ResizeArray<string>()
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
+                let deps = {
+                    defaultDependencies with
+                        getSessionInfo =
+                            fun _ ->
+                                callOrder.Add("getSessionInfo")
+                                promise { return Ok(succeeded sessionInfo) }
+                        synchronize =
+                            fun _ ->
+                                callOrder.Add("synchronize")
+                                promise { return Ok(OperationResultDto.Failed failure) }
+                        getStatus =
+                            fun _ ->
+                                callOrder.Add("getStatus")
+                                promise { return Ok(OperationResultDto.Failed refreshFailure) }
+                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                        reportError = reportedErrors.Add
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested(Pull GitUpdateAcceptance.RequirePreview)) runningState
+
+                let! completionMessages = collectMessages requestCmd
+
+                let nextState, finishCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, Pull _, Error _) |] ->
+                        update deps ignore completionMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected the failed update to keep its error after refresh failed."
+
+                let! finishMessages = collectMessages finishCmd
+
+                Vitest.expect(finishMessages).toEqual ([||])
+                Vitest.expect(callOrder.IndexOf("getStatus") > callOrder.IndexOf("synchronize")).toBe (true)
+                Vitest.expect(nextState.ErrorNotice.IsSome).toBe (true)
+                Vitest.expect(reportedErrors.Count).toBe (1)
+
+                Vitest
+                    .expect(reportedErrors[0].Message.StartsWith(failureMessage failure, StringComparison.Ordinal))
+                    .toBe (true)
+
+                Vitest
+                    .expect(reportedErrors[0].Message.Contains("Refreshing the workspace afterwards failed"))
+                    .toBe (true)
             }
         )
 
