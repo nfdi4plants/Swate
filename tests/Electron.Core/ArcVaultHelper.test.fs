@@ -489,6 +489,130 @@ let private closingWhileArcLoadsRegistrationTestWindow id isArcOpening destroyed
     (fun () -> sendsAfterDestroy),
     (fun () -> titleWritesAfterDestroy)
 
+let rec private scheduleAfterMicrotaskTurns remaining action =
+    if remaining <= 0 then
+        action ()
+    else
+        promise {
+            do! JS.Constructors.Promise.resolve ()
+            scheduleAfterMicrotaskTurns (remaining - 1) action
+        }
+        |> Promise.start
+
+let rec private waitUntilWithEventLoopTurns predicate remaining = promise {
+    if predicate () then
+        return true
+    elif remaining <= 0 then
+        return false
+    else
+        do! Promise.sleep 0
+        return! waitUntilWithEventLoopTurns predicate (remaining - 1)
+}
+
+let private closingAfterStartupTestWindow id isStartupComplete scheduleFromFocus microtaskTurns onShow =
+    let mutable destroyed = false
+    let mutable shown = false
+    let mutable lifecycleAttachedWhenShown = false
+    let mutable closeScheduledAfterStartup = false
+    let mutable startupWasCompleteWhenClosed = false
+    let mutable preventedCloseCount = 0
+    let mutable sendsAfterDestroy = 0
+    let mutable titleWritesAfterDestroy = 0
+    let mutable closeHandler: (obj -> unit) option = None
+    let mutable closedHandler: (unit -> unit) option = None
+    let noop: obj = emitJsExpr () "((..._args) => {})"
+
+    let send: obj =
+        emitJsExpr
+            (fun () ->
+                if destroyed then
+                    sendsAfterDestroy <- sendsAfterDestroy + 1
+            )
+            "((..._args) => $0())"
+
+    let load (_: string) = JS.Constructors.Promise.resolve ()
+
+    let onEvent (eventName: string) (handler: obj) =
+        if eventName = "close" then
+            closeHandler <- Some(unbox handler)
+        elif eventName = "closed" then
+            closedHandler <- Some(unbox handler)
+
+    let onEventJs: obj =
+        emitJsExpr onEvent "((eventName, handler) => $0(eventName, handler))"
+
+    let closeAfterStartup () =
+        startupWasCompleteWhenClosed <- isStartupComplete ()
+
+        if startupWasCompleteWhenClosed && not destroyed then
+            let preventedCloseCountBeforeAttempt = preventedCloseCount
+
+            closeHandler.Value(
+                createObj [
+                    "preventDefault" ==> (fun () -> preventedCloseCount <- preventedCloseCount + 1)
+                ]
+            )
+
+            if preventedCloseCount = preventedCloseCountBeforeAttempt then
+                destroyed <- true
+                closedHandler.Value()
+
+    let scheduleCloseIfStartupComplete () =
+        if not closeScheduledAfterStartup && isStartupComplete () then
+            closeScheduledAfterStartup <- true
+            scheduleAfterMicrotaskTurns microtaskTurns closeAfterStartup
+
+    let show () =
+        shown <- true
+        lifecycleAttachedWhenShown <- closeHandler.IsSome && closedHandler.IsSome
+        onShow ()
+
+    let focus () =
+        if scheduleFromFocus then
+            scheduleCloseIfStartupComplete ()
+
+    let windowObject =
+        createObj [
+            "id" ==> id
+            "isDestroyed" ==> (fun () -> destroyed)
+            "destroy" ==> (fun () -> destroyed <- true)
+            "focus" ==> focus
+            "show" ==> show
+            "loadFile" ==> load
+            "loadURL" ==> load
+            "on" ==> onEventJs
+            "webContents"
+            ==> createObj [
+                "send" ==> send
+                "setWindowOpenHandler" ==> noop
+                "on" ==> noop
+                "openDevTools" ==> noop
+            ]
+        ]
+
+    let setTitle (_value: string) =
+        if destroyed then
+            titleWritesAfterDestroy <- titleWritesAfterDestroy + 1
+            failwith "Object has been destroyed"
+        elif not scheduleFromFocus then
+            scheduleCloseIfStartupComplete ()
+
+    emitJsExpr
+        (windowObject, setTitle)
+        "Object.defineProperty($0, 'title', { configurable: true, get: () => '', set: value => $1(value) })"
+    |> ignore
+
+    let window = windowObject |> unbox<BrowserWindow>
+
+    window,
+    (fun () -> shown),
+    (fun () -> lifecycleAttachedWhenShown),
+    (fun () -> closeScheduledAfterStartup),
+    (fun () -> startupWasCompleteWhenClosed),
+    (fun () -> destroyed),
+    (fun () -> sendsAfterDestroy),
+    (fun () -> titleWritesAfterDestroy)
+
 let private closingCurrentArcLoadTestWindow id isArcOpening =
     let mutable destroyed = false
     let mutable arcWasOpeningWhenClosed = false
@@ -1156,14 +1280,16 @@ Vitest.describe (
                         let (targetWindow,
                              wasShown,
                              lifecycleWasAttached,
-                             arcWasStarted,
+                             closeScheduledAfterStartup,
+                             startupWasCompleteWhenClosed,
                              isTargetDestroyed,
                              sendsAfterDestroy,
                              titleWritesAfterDestroy) =
-                            closingWhileArcLoadsRegistrationTestWindow
+                            closingAfterStartupTestWindow
                                 targetWindowId
                                 isArcStartedBeforeFileTreePublication
-                                1
+                                true
+                                8
                                 ignore
 
                         let mutable dialogCount = 0
@@ -1184,14 +1310,7 @@ Vitest.describe (
 
                         try
                             let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
-
-                            match! api.openARCByPath arcPath with
-                            | Ok _ -> failwith "Expected closing during the file-tree scan to cancel ARC opening."
-                            | Error cancellation ->
-                                match cancellation with
-                                | ArcLoadCancelledException cancelledWindowId ->
-                                    Vitest.expect(cancelledWindowId).toBe (targetWindowId)
-                                | _ -> failwith "Expected an explicit ARC-load cancellation marker."
+                            let! openResult = api.openARCByPath arcPath
 
                             Vitest.expect(createdWindowCount).toBe (1)
                             Vitest.expect(targetWasRegistered).toBe (true)
@@ -1201,7 +1320,8 @@ Vitest.describe (
                             Vitest.expect(arcWasLoaded).toBe (true)
                             Vitest.expect(watcherWasRunning).toBe (true)
                             Vitest.expect(fileTreeWasEmpty).toBe (true)
-                            Vitest.expect(arcWasStarted ()).toBe (true)
+                            Vitest.expect(closeScheduledAfterStartup ()).toBe (true)
+                            Vitest.expect(startupWasCompleteWhenClosed ()).toBe (true)
                             Vitest.expect(isTargetDestroyed ()).toBe (true)
                             Vitest.expect(targetVault.IsSome).toBe (true)
                             Vitest.expect(targetVault.Value.fileTree.Count).toBe (0)
@@ -1209,6 +1329,20 @@ Vitest.describe (
                             Vitest.expect(sendsAfterDestroy ()).toBe (0)
                             Vitest.expect(titleWritesAfterDestroy ()).toBe (0)
                             Vitest.expect(dialogCount).toBe (0)
+
+                            let! watcherStopped =
+                                waitUntilWithEventLoopTurns (fun () -> targetVault.Value.watcher.IsNone) 20
+
+                            Vitest.expect(watcherStopped).toBe (true)
+                            Vitest.expect(targetVault.Value.watcher.IsNone).toBe (true)
+
+                            match openResult with
+                            | Ok _ -> failwith "Expected closing during the file-tree scan to cancel ARC opening."
+                            | Error cancellation ->
+                                match cancellation with
+                                | ArcLoadCancelledException cancelledWindowId ->
+                                    Vitest.expect(cancelledWindowId).toBe (targetWindowId)
+                                | _ -> failwith "Expected an explicit ARC-load cancellation marker."
 
                             ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
                         with error ->
@@ -1298,6 +1432,95 @@ Vitest.describe (
                                 Vitest.expect(sendsAfterDestroy ()).toBe (0)
                                 Vitest.expect(titleWritesAfterDestroy ()).toBe (0)
                                 Vitest.expect(dialogCount).toBe (0)
+                        with error ->
+                            ARC_VAULTS.Vaults.Remove(windowId) |> ignore
+                            do! vault.StopFileWatcher()
+                            return raise error
+                    })
+        )
+
+        Vitest.test (
+            "openARCByPath treats closing the current window after startup but before file-tree publication as cancellation",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-ipc-current-close-during-tree-"
+                    "Closing Current ARC During Tree Scan"
+                    ignore
+                    (fun arcPath -> promise {
+                        let windowId = 48
+                        let expectedPath = PathHelpers.normalizePath arcPath
+                        let mutable currentVault: ArcVault option = None
+                        let mutable pathWasAssigned = false
+                        let mutable arcWasLoaded = false
+                        let mutable watcherWasRunning = false
+                        let mutable fileTreeWasEmpty = false
+
+                        let isArcStartedBeforeFileTreePublication () =
+                            currentVault <- ARC_VAULTS.TryGetVault(windowId)
+
+                            match currentVault with
+                            | Some vault ->
+                                pathWasAssigned <- vault.path = Some expectedPath
+                                arcWasLoaded <- vault.arc.IsSome
+                                watcherWasRunning <- vault.watcher.IsSome
+                                fileTreeWasEmpty <- vault.fileTree.Count = 0
+
+                                pathWasAssigned && arcWasLoaded && watcherWasRunning && fileTreeWasEmpty
+                            | None -> false
+
+                        let (window,
+                             _,
+                             _,
+                             closeScheduledAfterStartup,
+                             startupWasCompleteWhenClosed,
+                             isDestroyed,
+                             sendsAfterDestroy,
+                             titleWritesAfterDestroy) =
+                            closingAfterStartupTestWindow windowId isArcStartedBeforeFileTreePublication false 6 ignore
+
+                        let vault = ArcVault(window)
+                        let mutable dialogCount = 0
+                        let mutable createdWindowCount = 0
+
+                        ARC_VAULTS.Vaults.Add(windowId, vault)
+                        ARC_VAULTS.OnCloseWindow(window, vault, windowId)
+                        setBrowserWindowFromWebContents (fun _ -> window :> obj)
+
+                        setBrowserWindowFactory (fun _ ->
+                            createdWindowCount <- createdWindowCount + 1
+                            failwith "Same-window ARC opening must not create a BrowserWindow."
+                        )
+
+                        setShowMessageBox (fun _ _ ->
+                            dialogCount <- dialogCount + 1
+                            createObj [ "response" ==> 0; "checkboxChecked" ==> false ]
+                        )
+
+                        try
+                            let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId windowId)
+
+                            match! api.openARCByPath arcPath with
+                            | Ok _ -> failwith "Expected closing during the file-tree scan to cancel ARC opening."
+                            | Error cancellation ->
+                                match cancellation with
+                                | ArcLoadCancelledException cancelledWindowId ->
+                                    Vitest.expect(cancelledWindowId).toBe (windowId)
+                                | _ -> failwith "Expected an explicit ARC-load cancellation marker."
+
+                            Vitest.expect(createdWindowCount).toBe (0)
+                            Vitest.expect(pathWasAssigned).toBe (true)
+                            Vitest.expect(arcWasLoaded).toBe (true)
+                            Vitest.expect(watcherWasRunning).toBe (true)
+                            Vitest.expect(fileTreeWasEmpty).toBe (true)
+                            Vitest.expect(closeScheduledAfterStartup ()).toBe (true)
+                            Vitest.expect(startupWasCompleteWhenClosed ()).toBe (true)
+                            Vitest.expect(isDestroyed ()).toBe (true)
+                            Vitest.expect(currentVault.IsSome).toBe (true)
+                            Vitest.expect(currentVault.Value.fileTree.Count).toBe (0)
+                            Vitest.expect(ARC_VAULTS.Vaults.ContainsKey(windowId)).toBe (false)
+                            Vitest.expect(sendsAfterDestroy ()).toBe (0)
+                            Vitest.expect(titleWritesAfterDestroy ()).toBe (0)
+                            Vitest.expect(dialogCount).toBe (0)
                         with error ->
                             ARC_VAULTS.Vaults.Remove(windowId) |> ignore
                             do! vault.StopFileWatcher()
@@ -1779,14 +2002,16 @@ Vitest.describe (
                 let (targetWindow,
                      wasShown,
                      lifecycleWasAttached,
-                     arcWasStarted,
+                     closeScheduledAfterStartup,
+                     startupWasCompleteWhenClosed,
                      isTargetDestroyed,
                      sendsAfterDestroy,
                      titleWritesAfterDestroy) =
-                    closingWhileArcLoadsRegistrationTestWindow
+                    closingAfterStartupTestWindow
                         targetWindowId
                         isArcStartedBeforeFileTreePublication
-                        1
+                        true
+                        8
                         (fun () ->
                             vaultWasEmptyWhenShown <-
                                 ARC_VAULTS.TryGetVault(targetWindowId)
@@ -1826,7 +2051,8 @@ Vitest.describe (
                     Vitest.expect(arcWasLoaded).toBe (true)
                     Vitest.expect(watcherWasRunning).toBe (true)
                     Vitest.expect(fileTreeWasEmpty).toBe (true)
-                    Vitest.expect(arcWasStarted ()).toBe (true)
+                    Vitest.expect(closeScheduledAfterStartup ()).toBe (true)
+                    Vitest.expect(startupWasCompleteWhenClosed ()).toBe (true)
                     Vitest.expect(isTargetDestroyed ()).toBe (true)
                     Vitest.expect(targetVault.IsSome).toBe (true)
                     Vitest.expect(targetVault.Value.fileTree.Count).toBe (0)
