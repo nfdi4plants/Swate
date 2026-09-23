@@ -269,20 +269,7 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
                             let shouldClose = closeRequested.Remove key
 
                             match opened with
-                            | Succeeded outcome ->
-                                if shouldClose then
-                                    do! closeHostedSession outcome.Value |> Async.StartAsPromise
-
-                                    return
-                                        Failed(
-                                            OperationFailure.create
-                                                NotFound
-                                                VersionControlCodes.SessionUnavailable
-                                                "The workspace session is not open."
-                                        )
-                                else
-                                    sessions[outcome.Value.SessionId] <- outcome.Value
-                                    return opened
+                            | Succeeded outcome
                             | PartiallySucceeded(outcome, _) ->
                                 if shouldClose then
                                     do! closeHostedSession outcome.Value |> Async.StartAsPromise

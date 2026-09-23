@@ -77,13 +77,7 @@ let Main () =
                 match result, dependencyProblemMessage statuses with
                 | _, Some message ->
                     errorCtx.enqueue (ErrorModalRequest.create (message, title = "Version control dependencies"))
-                | Ok(OperationResultDto.Failed failure), None ->
-                    errorCtx.enqueue (
-                        ErrorModalRequest.create (
-                            Renderer.Context.GitWorkflow.failureMessage failure,
-                            title = "Could not verify Git installation"
-                        )
-                    )
+                | Ok(OperationResultDto.Failed failure), None
                 | Ok(OperationResultDto.PartiallySucceeded(_, failure)), None ->
                     errorCtx.enqueue (
                         ErrorModalRequest.create (

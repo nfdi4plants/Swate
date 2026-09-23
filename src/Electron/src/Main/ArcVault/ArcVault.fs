@@ -448,24 +448,20 @@ module ArcVaultExtensions =
                                         finishReload ()
                                     else
                                         match! this.TryApplyWatcherArcMergeIfEligible pendingArcMergeEvents with
-                                        | WatcherMergeOutcome.Applied ->
+                                        | (WatcherMergeOutcome.Applied | WatcherMergeOutcome.Failed _) as outcome ->
+                                            match outcome with
+                                            | WatcherMergeOutcome.Failed mergeError ->
+                                                swatelogfn
+                                                    this.window.id
+                                                    "Unable to merge ARC after file watcher event: %s"
+                                                    mergeError.Message
+                                            | _ -> ()
+
                                             this.ResetWatcherDeferralCount()
 
                                             // FileTree updates are renderer-visible and can trigger an immediate openFile call.
-                                            // Merge first so that call reads the same ARC state represented by the published tree.
+                                            // A successful merge means that call reads the same ARC state represented by the published tree.
                                             // A batch snapshotted before a pending-state reset carries paths under the old root.
-                                            if callbackEpoch = this.WatcherEpoch then
-                                                do! this.ApplyWatcherFileTreeEvents pendingEvents
-
-                                            finishReload ()
-                                        | WatcherMergeOutcome.Failed mergeError ->
-                                            swatelogfn
-                                                this.window.id
-                                                "Unable to merge ARC after file watcher event: %s"
-                                                mergeError.Message
-
-                                            this.ResetWatcherDeferralCount()
-
                                             if callbackEpoch = this.WatcherEpoch then
                                                 do! this.ApplyWatcherFileTreeEvents pendingEvents
 

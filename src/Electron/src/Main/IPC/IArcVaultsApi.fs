@@ -181,7 +181,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     let windowId = windowIdFromIpcEvent event
                     let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, request.identifier)
 
-                    let! initializationResult =
+                    do!
                         if request.initGit then
                             match disposition.CreatedArcPath with
                             | Some createdArcPath -> promise {
@@ -199,25 +199,23 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             $"The ARC was created, but its Git repository could not be initialized: {failure.Code}: {failure.Message}"
                                         )
 
-                                        return Ok()
+                                        return ()
                                     | Succeeded _
                                     | PartiallySucceeded _ ->
                                         notifyGitRepositoryInitialized createdArcPath
-                                        return Ok()
+                                        return ()
                                 with error ->
                                     Browser.Dom.console.error (
                                         $"The ARC was created, but Git initialization failed: {error.Message}"
                                     )
 
-                                    return Ok()
+                                    return ()
                               }
-                            | None -> promise { return Ok() }
+                            | None -> promise { return () }
                         else
-                            promise { return Ok() }
+                            promise { return () }
 
-                    match initializationResult with
-                    | Error error -> return Error error
-                    | Ok() -> return Ok(ArcOpenDisposition.path disposition)
+                    return Ok(ArcOpenDisposition.path disposition)
             with e ->
                 return Error e
         }
