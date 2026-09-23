@@ -4,7 +4,6 @@ open Fable.Core
 open Feliz
 open Renderer.Context.GitWorkflow
 open Renderer.Types
-open Swate.Electron.Shared.VersionControlTypes
 
 [<ReactComponent>]
 let Main (choiceData: VersionControlFileChoicePage) =
@@ -15,14 +14,9 @@ let Main (choiceData: VersionControlFileChoicePage) =
 
     let isBusy = gitStateCtx.state.BusyOperation.IsSome
 
-    let pickCandidate candidateId =
+    let pickChoice choice =
         if not isBusy then
-            gitStateCtx.confirmMergeResolution {
-                Path = choiceData.Path
-                Handle = choiceData.Handle
-                WorkspaceVersion = choiceData.WorkspaceVersion
-                Resolution = ConflictResolutionDto.PickCandidate candidateId
-            }
+            gitStateCtx.confirmMergeResolution (pickRequestFor choiceData choice)
 
     Html.div [
         prop.testId "renderer-git-file-choice-page"
@@ -85,7 +79,7 @@ let Main (choiceData: VersionControlFileChoicePage) =
                                         prop.className "swt:btn swt:btn-primary"
                                         prop.disabled isBusy
                                         prop.text "Keep my version"
-                                        prop.onClick (fun _ -> pickCandidate keepMineCandidateId)
+                                        prop.onClick (fun _ -> pickChoice KeepMine)
                                     ]
                                     Html.p [
                                         prop.testId "renderer-git-file-choice-keep-mine-hint"
@@ -108,7 +102,7 @@ let Main (choiceData: VersionControlFileChoicePage) =
                                         prop.className "swt:btn swt:btn-primary"
                                         prop.disabled isBusy
                                         prop.text "Use online version"
-                                        prop.onClick (fun _ -> pickCandidate useOnlineCandidateId)
+                                        prop.onClick (fun _ -> pickChoice UseOnline)
                                     ]
                                     Html.p [
                                         prop.testId "renderer-git-file-choice-use-online-hint"

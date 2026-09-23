@@ -572,13 +572,41 @@ Vitest.describe (
                     Vitest.expect(page.Online.IsDeleted).toBe (true)
                 | _ -> failwith "Expected the file-choice conflict page."
 
-                let textConflict = {
+                let modifiedWorkspaceCandidate = {
+                    workspaceCandidate with
+                        Preview = Some(ContentViewDto.Text "workspace")
+                }
+
+                let textModifyDeleteConflict = {
                     fileChoiceConflict with
                         Items = [|
                             {
                                 fileChoiceConflict.Items[0] with
+                                    Candidates = [| modifiedWorkspaceCandidate; targetCandidate |]
                                     CombinedPreview = Some(ContentViewDto.Text "combined")
                                     SupportsResolvedContent = true
+                            }
+                        |]
+                }
+
+                match conflictPageFor textModifyDeleteConflict "v1" "data/file.bin" with
+                | Ok(PageState.GitFileChoiceConflictPage page) ->
+                    Vitest.expect(page.Mine.IsDeleted).toBe (false)
+                    Vitest.expect(page.Online.IsDeleted).toBe (true)
+                | _ -> failwith "Expected the text modify/delete file-choice page."
+
+                let textConflict = {
+                    textModifyDeleteConflict with
+                        Items = [|
+                            {
+                                textModifyDeleteConflict.Items[0] with
+                                    Candidates = [|
+                                        modifiedWorkspaceCandidate
+                                        {
+                                            targetCandidate with
+                                                Preview = Some(ContentViewDto.Text "online")
+                                        }
+                                    |]
                             }
                         |]
                 }
@@ -589,10 +617,44 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "file choice candidate ids match the button mappings",
+            "pickRequestFor maps choices and carries the reviewed page context",
             fun () ->
-                Vitest.expect(keepMineCandidateId).toBe "workspace"
-                Vitest.expect(useOnlineCandidateId).toBe "target"
+                let page: VersionControlFileChoicePage = {
+                    Path = "data/file.bin"
+                    Handle = {
+                        SessionId = "conflict-page"
+                        Version = "5"
+                    }
+                    WorkspaceVersion = "workspace-v7"
+                    Mine = {
+                        CandidateId = "workspace"
+                        SizeBytes = None
+                        IsDownloaded = None
+                        Revision = None
+                        IsDeleted = false
+                    }
+                    Online = {
+                        CandidateId = "target"
+                        SizeBytes = None
+                        IsDownloaded = None
+                        Revision = None
+                        IsDeleted = false
+                    }
+                }
+
+                Vitest.expect(pickRequestFor page KeepMine).toEqual {
+                    Path = "data/file.bin"
+                    Handle = page.Handle
+                    WorkspaceVersion = "workspace-v7"
+                    Resolution = ConflictResolutionDto.PickCandidate "workspace"
+                }
+
+                Vitest.expect(pickRequestFor page UseOnline).toEqual {
+                    Path = "data/file.bin"
+                    Handle = page.Handle
+                    WorkspaceVersion = "workspace-v7"
+                    Resolution = ConflictResolutionDto.PickCandidate "target"
+                }
         )
 )
 
@@ -1232,7 +1294,7 @@ Vitest.describe (
                         clearedPages.Add
                         (ConfirmMergeResolutionCompleted(
                             state.ArcSessionId,
-                            Error(ConfirmMergeResolutionError.Stale "stale conflict handle")
+                            Error(ConfirmMergeResolutionError.Stale("stale conflict handle", None, false))
                         ))
                         state
 
@@ -5412,6 +5474,118 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "Dialog finalization materializes a picked path after in-flow finalization fails",
+            fun () -> promise {
+                let conflictStatus = conflictedStatus [| "data/big.bin" |]
+                let conflict = conflictStatus.ActiveConflictSession.Value
+
+                let warning = {
+                    Code = VersionControlCodes.ObjectNotMaterialized
+                    Message = "The selected file holds a pointer."
+                }
+
+                let finalizeFailure =
+                    makeFailure ProviderError "finalize_failed" "Could not finalize the conflict." None [||]
+
+                let mutable finalizeCalls = 0
+                let mutable finalized = false
+                let materializedPaths = ResizeArray<string>()
+
+                let deps = {
+                    (withRefresh conflictStatus defaultDependencies) with
+                        resolveConflict =
+                            fun _ -> promise {
+                                return
+                                    Ok(
+                                        succeededWithWarnings [| warning |] {
+                                            RefreshedHandle = conflict.Handle
+                                            RemainingItems = [||]
+                                        }
+                                    )
+                            }
+                        getStatus =
+                            fun _ -> promise {
+                                return Ok(succeeded (if finalized then cleanStatus else conflictStatus))
+                            }
+                        finalizeConflict =
+                            fun _ ->
+                                finalizeCalls <- finalizeCalls + 1
+
+                                if finalizeCalls = 1 then
+                                    promise { return Ok(OperationResultDto.Failed finalizeFailure) }
+                                else
+                                    finalized <- true
+                                    promise { return Ok(succeeded (Some "rev")) }
+                        materializeObject =
+                            fun request ->
+                                if not finalized then
+                                    failwith "Materialization ran before conflict finalization."
+
+                                materializedPaths.Add request.Path
+                                promise { return Ok(succeeded ()) }
+                }
+
+                let pickRequest = {
+                    Path = "data/big.bin"
+                    Handle = conflict.Handle
+                    WorkspaceVersion = "v1"
+                    Resolution = ConflictResolutionDto.PickCandidate useOnlineCandidateId
+                }
+
+                let state = {
+                    runningState with
+                        ActiveConflict = Some conflict
+                        DownloadLargeFiles = true
+                }
+
+                let stateAfterPickRequest, pickCmd =
+                    update deps ignore (ConfirmMergeResolutionRequested pickRequest) state
+
+                let! pickMessages = collectMessages pickCmd
+
+                let stateAfterPickError, errorCmd =
+                    match pickMessages with
+                    | [| ConfirmMergeResolutionCompleted(_, Error(ConfirmMergeResolutionError.Failed _)) |] ->
+                        update deps ignore pickMessages[0] stateAfterPickRequest
+                    | _ -> failwith "Expected the in-flow finalization to fail."
+
+                let! errorMessages = collectMessages errorCmd
+
+                let stateBeforeRefresh, refreshCmd =
+                    match errorMessages with
+                    | [| RefreshRequested |] -> update deps ignore RefreshRequested stateAfterPickError
+                    | _ -> failwith "Expected the failed pick to request a refresh."
+
+                let! refreshMessages = collectMessages refreshCmd
+
+                let stateAfterRefresh, refreshFinishCmd =
+                    match refreshMessages with
+                    | [| (RefreshCompleted _ as message) |] -> update deps ignore message stateBeforeRefresh
+                    | _ -> failwith "Expected the conflict refresh to complete."
+
+                let! _ = collectMessages refreshFinishCmd
+                Vitest.expect(stateAfterRefresh.PendingMaterializations).toEqual [ ("data/big.bin", false) ]
+
+                let dialogFinalizeState, dialogFinalizeCmd =
+                    update deps ignore (WriteRequested FinalizeMerge) stateAfterRefresh
+
+                let! finalizeMessages = collectMessages dialogFinalizeCmd
+
+                let finalState, finishCmd =
+                    match finalizeMessages with
+                    | [| WriteCompleted(_, _, FinalizeMerge, Ok(Completed _)) |] ->
+                        update deps ignore finalizeMessages[0] dialogFinalizeState
+                    | _ -> failwith "Expected dialog finalization to complete."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(finalizeCalls).toBe 2
+                Vitest.expect(materializedPaths.ToArray()).toEqual [| "data/big.bin" |]
+                Vitest.expect(finalState.PendingMaterializations).toEqual []
+            }
+        )
+
+        Vitest.test (
             "Two conflict picks materialize only the warned path after finalization",
             fun () -> promise {
                 let conflict =
@@ -5504,7 +5678,7 @@ Vitest.describe (
                     | _ -> failwith "Expected the first conflict resolution to complete."
 
                 let! _ = collectMessages firstFinishCmd
-                Vitest.expect(stateAfterFirst.PendingMaterializations).toEqual [ "first.bin" ]
+                Vitest.expect(stateAfterFirst.PendingMaterializations).toEqual [ ("first.bin", false) ]
 
                 let secondRequest = {
                     Path = "second.txt"
@@ -5607,23 +5781,168 @@ Vitest.describe (
                             .expect(outcome.Notice)
                             .toEqual (
                                 Some
-                                    "The file was resolved, but its content could not be restored from the local cache. Swate downloads it after the merge when Download Large Files is on."
+                                    "The file was resolved, but its content could not be restored from the local cache yet. Swate restores it after the merge."
                             )
 
                         nextState, finishCmd
                     | _ -> failwith "Expected the partial conflict resolution to continue."
 
                 let! _ = collectMessages finishCmd
-                Vitest.expect(nextState.PendingMaterializations).toEqual [ "partial.bin" ]
+                Vitest.expect(nextState.PendingMaterializations).toEqual [ ("partial.bin", true) ]
 
                 Vitest
                     .expect(nextState.WarningNotice)
                     .toEqual (
                         Some
-                            "The file was resolved, but its content could not be restored from the local cache. Swate downloads it after the merge when Download Large Files is on."
+                            "The file was resolved, but its content could not be restored from the local cache yet. Swate restores it after the merge."
                     )
 
                 Vitest.expect(nextState.ActiveConflict |> Option.map _.Handle).toEqual (Some refreshedHandle)
+            }
+        )
+
+        Vitest.test (
+            "Finalization restores local partial picks when automatic downloads are off",
+            fun () -> promise {
+                let conflict =
+                    (conflictedStatus [| "partial.bin"; "warning.bin" |]).ActiveConflictSession.Value
+
+                let partialHandle = {
+                    SessionId = "conflict-partial"
+                    Version = "2"
+                }
+
+                let warningHandle = {
+                    SessionId = "conflict-warning"
+                    Version = "3"
+                }
+
+                let partialFailure =
+                    makeFailure
+                        Conflict
+                        "object_materialization_failed"
+                        "The selected object could not be restored."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RetryMaterialization
+                            Instructions = None
+                        })
+                        [| "partial.bin" |]
+
+                let warning = {
+                    Code = VersionControlCodes.ObjectNotMaterialized
+                    Message = "The selected file holds a pointer."
+                }
+
+                let mutable finalized = false
+                let materializedPaths = ResizeArray<string>()
+
+                let deps = {
+                    defaultDependencies with
+                        resolveConflict =
+                            fun request ->
+                                if request.Path = "partial.bin" then
+                                    promise {
+                                        return
+                                            Ok(
+                                                OperationResultDto.PartiallySucceeded(
+                                                    operation {
+                                                        RefreshedHandle = partialHandle
+                                                        RemainingItems = [| conflict.Items[1] |]
+                                                    },
+                                                    partialFailure
+                                                )
+                                            )
+                                    }
+                                else
+                                    promise {
+                                        return
+                                            Ok(
+                                                succeededWithWarnings [| warning |] {
+                                                    RefreshedHandle = warningHandle
+                                                    RemainingItems = [||]
+                                                }
+                                            )
+                                    }
+                        getStatus =
+                            fun _ -> promise {
+                                return
+                                    Ok(
+                                        succeeded (
+                                            if finalized then
+                                                cleanStatus
+                                            else
+                                                conflictedStatus [| "partial.bin"; "warning.bin" |]
+                                        )
+                                    )
+                            }
+                        loadConflictPage = fun _ _ path -> promise { return Ok(diffPage path) }
+                        finalizeConflict =
+                            fun _ ->
+                                finalized <- true
+                                promise { return Ok(succeeded (Some "rev")) }
+                        materializeObject =
+                            fun request ->
+                                materializedPaths.Add request.Path
+                                promise { return Ok(succeeded ()) }
+                }
+
+                let state = {
+                    runningState with
+                        ActiveConflict = Some conflict
+                        DownloadLargeFiles = false
+                }
+
+                let partialRequest = {
+                    Path = "partial.bin"
+                    Handle = conflict.Handle
+                    WorkspaceVersion = "v1"
+                    Resolution = ConflictResolutionDto.PickCandidate useOnlineCandidateId
+                }
+
+                let stateAfterPartialRequest, partialCmd =
+                    update deps ignore (ConfirmMergeResolutionRequested partialRequest) state
+
+                let! partialMessages = collectMessages partialCmd
+
+                let stateAfterPartial, partialFinishCmd =
+                    match partialMessages with
+                    | [| ConfirmMergeResolutionCompleted(_, Ok outcome) |] ->
+                        Vitest
+                            .expect(outcome.Notice)
+                            .toEqual (
+                                Some
+                                    "The file was resolved, but its content could not be restored from the local cache yet. Swate restores it after the merge."
+                            )
+
+                        update deps ignore partialMessages[0] stateAfterPartialRequest
+                    | _ -> failwith "Expected the partial pick to complete."
+
+                let! _ = collectMessages partialFinishCmd
+                Vitest.expect(stateAfterPartial.PendingMaterializations).toEqual [ ("partial.bin", true) ]
+
+                let warningRequest = {
+                    Path = "warning.bin"
+                    Handle = partialHandle
+                    WorkspaceVersion = "v1"
+                    Resolution = ConflictResolutionDto.PickCandidate useOnlineCandidateId
+                }
+
+                let stateAfterWarningRequest, warningCmd =
+                    update deps ignore (ConfirmMergeResolutionRequested warningRequest) stateAfterPartial
+
+                let! warningMessages = collectMessages warningCmd
+
+                let finalState, warningFinishCmd =
+                    match warningMessages with
+                    | [| ConfirmMergeResolutionCompleted(_, Ok outcome) |] ->
+                        Vitest.expect(outcome.Finalized).toBe (true)
+                        update deps ignore warningMessages[0] stateAfterWarningRequest
+                    | _ -> failwith "Expected the warning pick to complete."
+
+                let! _ = collectMessages warningFinishCmd
+
+                Vitest.expect(materializedPaths.ToArray()).toEqual [| "partial.bin" |]
+                Vitest.expect(finalState.PendingMaterializations).toEqual []
             }
         )
 
@@ -5785,7 +6104,7 @@ Vitest.describe (
                 let state = {
                     runningState with
                         ActiveConflict = Some conflict
-                        PendingMaterializations = [ "pending.bin" ]
+                        PendingMaterializations = [ ("pending.bin", false) ]
                 }
 
                 let stateAfterRequest, requestCmd =
