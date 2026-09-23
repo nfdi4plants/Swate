@@ -124,6 +124,11 @@ module VersionControlCodes =
     [<Literal>]
     let BaseContentNotFound = "base_content_not_found"
 
+    // Produced by the library as an operation warning.
+    /// The library reports this warning when a picked file holds a pointer whose content is not in the local cache.
+    [<Literal>]
+    let ObjectNotMaterialized = "object_not_materialized"
+
     [<Literal>]
     let InvalidLfsThreshold = "invalid_lfs_threshold"
 
@@ -271,11 +276,18 @@ type ContentViewDto =
     | Text of content: string
     | Unsupported of reason: string option
 
+type ConflictCandidateObjectDto = {
+    SizeBytes: float option
+    ObjectId: string option
+    IsLocallyAvailable: bool
+}
+
 type ConflictCandidateDto = {
     CandidateId: string
     Label: string
     Revision: string option
     Preview: ContentViewDto option
+    Object: ConflictCandidateObjectDto option
 }
 
 type ConflictItemDto = {

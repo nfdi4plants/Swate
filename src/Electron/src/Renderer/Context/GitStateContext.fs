@@ -39,6 +39,7 @@ type GitStateController = {
     switchBranch: string -> unit
     selectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>
     confirmMergeResolution: GitMergeResolutionRequest -> unit
+    abandonMerge: unit -> unit
     pruneLfsCache: unit -> unit
     dedupLfsStorage: unit -> unit
 }
@@ -65,8 +66,7 @@ module private Helper =
             })
             change
 
-    /// The conflict page carries the handle and the workspace token the preview was
-    /// taken with, so the confirmation is checked against exactly that state.
+    /// The conflict page captures the handle and workspace token used to validate its resolution request.
     let loadConflictPage
         (conflict: ConflictSessionSummaryDto)
         (workspaceVersion: string)
@@ -76,8 +76,13 @@ module private Helper =
             match conflict.Items |> Array.tryFind (fun item -> item.Path = requestedPath) with
             | None -> return Error $"'{requestedPath}' is not part of the open conflict session anymore."
             | Some item ->
-                match item.CombinedPreview with
-                | Some(ContentViewDto.Text content) when item.SupportsResolvedContent ->
+                let unsupportedReason =
+                    match item.CombinedPreview with
+                    | Some(ContentViewDto.Unsupported reason) -> reason
+                    | _ -> Some "The provider offers no text preview for this conflict."
+
+                match item.SupportsResolvedContent, item.CombinedPreview with
+                | true, Some(ContentViewDto.Text content) ->
                     return
                         Ok(
                             PageState.GitMergeConflictPage {
@@ -87,9 +92,30 @@ module private Helper =
                                 WorkspaceVersion = workspaceVersion
                             }
                         )
-                | Some(ContentViewDto.Unsupported reason) -> return unsupportedPage requestedPath reason
-                | _ ->
-                    return unsupportedPage requestedPath (Some "The provider offers no text preview for this conflict.")
+                | false, _ ->
+                    let workspaceCandidate =
+                        item.Candidates
+                        |> Array.tryFind (fun candidate -> candidate.CandidateId = "workspace")
+
+                    let targetCandidate =
+                        item.Candidates
+                        |> Array.tryFind (fun candidate -> candidate.CandidateId = "target")
+
+                    match workspaceCandidate, targetCandidate with
+                    | Some workspace, Some target ->
+                        return
+                            Ok(
+                                PageState.GitFileChoiceConflictPage {
+                                    Path = requestedPath
+                                    Handle = conflict.Handle
+                                    WorkspaceVersion = workspaceVersion
+                                    Mine = candidateToFileChoiceVersion workspace
+                                    Online = candidateToFileChoiceVersion target
+                                }
+                            )
+                    | _ -> return unsupportedPage requestedPath unsupportedReason
+                | _, Some(ContentViewDto.Unsupported reason) -> return unsupportedPage requestedPath reason
+                | _ -> return unsupportedPage requestedPath unsupportedReason
         }
 
     let dependencies (reportError: GitErrorNotification -> unit) : GitDependencies = {
@@ -161,6 +187,7 @@ let GitStateCtx =
             switchBranch = fun _ -> ()
             selectChange = fun _ -> promise { return Ok() }
             confirmMergeResolution = fun _ -> ()
+            abandonMerge = fun () -> ()
             pruneLfsCache = fun () -> ()
             dedupLfsStorage = fun () -> ()
         }
@@ -255,6 +282,8 @@ let GitStateCtxProvider (children: ReactElement) =
     let confirmMergeResolutionAction (request: GitMergeResolutionRequest) =
         dispatch (ConfirmMergeResolutionRequested request)
 
+    let abandonMerge () = dispatch (WriteRequested AbandonMerge)
+
     let pruneLfsCache () = dispatch PruneLfsCacheRequested
 
     let dedupLfsStorage () = dispatch DedupLfsStorageRequested
@@ -288,6 +317,7 @@ let GitStateCtxProvider (children: ReactElement) =
                 switchBranch = switchBranchTo
                 selectChange = selectChange
                 confirmMergeResolution = confirmMergeResolutionAction
+                abandonMerge = abandonMerge
                 pruneLfsCache = pruneLfsCache
                 dedupLfsStorage = dedupLfsStorage
             }),

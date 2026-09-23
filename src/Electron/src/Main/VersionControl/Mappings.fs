@@ -152,6 +152,13 @@ let conflictItem (item: ConflictItem) : ConflictItemDto = {
             Label = candidate.Label
             Revision = candidate.Revision |> Option.map RevisionId.value
             Preview = candidate.Preview |> Option.map conflictPreview
+            Object =
+                candidate.Object
+                |> Option.map (fun candidateObject -> {
+                    SizeBytes = candidateObject.SizeBytes
+                    ObjectId = candidateObject.ObjectId
+                    IsLocallyAvailable = candidateObject.IsLocallyAvailable
+                })
         })
     CombinedPreview = item.CombinedPreview |> Option.map conflictPreview
     SupportsResolvedContent = item.SupportsResolvedContent

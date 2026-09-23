@@ -208,22 +208,72 @@ type GitRefreshResult = {
 
 type Reply<'T> = Result<'T, string> -> unit
 
-/// The conflict page the user reviewed: handle and workspace token captured with the
-/// preview, so a confirmation is checked against exactly that state.
+/// The handle and workspace token bind a user's choice to the conflict state that was shown.
 type GitMergeResolutionRequest = {
     Path: string
     Handle: ConflictSessionHandleDto
     WorkspaceVersion: string
-    ResolvedContent: string
+    Resolution: ConflictResolutionDto
 }
 
 type ConfirmMergeResolutionOutcome = {
     UpdatedStatus: WorkspaceStatusDto
     NextConflictedPath: string option
     PageChange: GitPageChange
+    Notice: string option
     /// True when the last item was resolved and the merge was finalized.
     Finalized: bool
 }
+
+let candidateToFileChoiceVersion (candidate: ConflictCandidateDto) : FileChoiceVersion = {
+    CandidateId = candidate.CandidateId
+    SizeBytes = candidate.Object |> Option.bind _.SizeBytes
+    IsDownloaded = candidate.Object |> Option.map _.IsLocallyAvailable
+    Revision =
+        candidate.Revision
+        |> Option.map (fun revision ->
+            if revision.Length > 7 then
+                revision.Substring(0, 7)
+            else
+                revision
+        )
+}
+
+let private formatSizeBytes (sizeBytes: float) =
+    if sizeBytes < 1024.0 then
+        Math.Round(sizeBytes).ToString("0", Globalization.CultureInfo.InvariantCulture)
+        + " bytes"
+    else
+        let mutable scaledSize = sizeBytes
+        let mutable unit = "KB"
+
+        for nextUnit in [| "KB"; "MB"; "GB" |] do
+            if scaledSize >= 1024.0 then
+                scaledSize <- scaledSize / 1024.0
+                unit <- nextUnit
+
+        scaledSize.ToString("0.0", Globalization.CultureInfo.InvariantCulture)
+        + " "
+        + unit
+
+let versionLine (label: string) (version: FileChoiceVersion) =
+    let parts =
+        [
+            version.SizeBytes |> Option.map formatSizeBytes
+            version.IsDownloaded
+            |> Option.map (fun isDownloaded -> if isDownloaded then "downloaded" else "not downloaded")
+            if label = "Online version" then
+                version.Revision |> Option.map (fun revision -> $"from {revision}")
+            else
+                None
+        ]
+        |> List.choose id
+
+    if List.isEmpty parts then
+        label
+    else
+        let joinedParts = String.concat ", " parts
+        $"{label}: {joinedParts}"
 
 [<RequireQualifiedAccess>]
 type ConfirmMergeResolutionError =
@@ -2149,88 +2199,129 @@ let private executeWriteAttempt
         | other -> return other
     }
 
-/// Resolves one conflicted file with the content the user reviewed, against the handle
+/// Resolves one conflicted file with the choice the user reviewed, against the handle
 /// and token captured with the page. When nothing remains, the merge is finalized.
-let private confirmMergeResolutionAsync (deps: GitDependencies) (resolution: GitMergeResolutionRequest) = promise {
-    let! resolved =
-        toResult (
-            deps.resolveConflict {
-                OperationId = deps.newOperationId ()
-                Handle = resolution.Handle
-                ExpectedWorkspaceVersion = resolution.WorkspaceVersion
-                Path = resolution.Path
-                Resolution = ConflictResolutionDto.SupplyResolvedContent resolution.ResolvedContent
-            }
-        )
-
-    let staleOrFailed (failure: OperationFailureDto) =
-        if
-            failure.Category = FailureCategoryDto.Concurrency
-            || recoveryCode failure = Some VersionControlCodes.Recovery.RefreshConflictSession
-        then
-            ConfirmMergeResolutionError.Stale(failureMessage failure)
-        else
-            ConfirmMergeResolutionError.Failed(failureMessage failure)
-
-    match resolved with
-    | Error failure -> return Error(staleOrFailed failure)
-    | Ok(outcome, _) ->
-        let! statusResult = toResult (deps.getStatus (request deps))
-
-        match statusResult with
-        | Error failure -> return Error(ConfirmMergeResolutionError.Failed(failureMessage failure))
-        | Ok(statusOutcome, _) ->
-            let status = statusOutcome.Value
-
-            if outcome.Value.RemainingItems.Length = 0 then
-                let! finalized =
-                    toResult (
-                        deps.finalizeConflict {
-                            OperationId = deps.newOperationId ()
-                            Handle = outcome.Value.RefreshedHandle
-                            ExpectedWorkspaceVersion = status.WorkspaceVersion
-                            Message = None
-                        }
-                    )
-
-                match finalized with
-                | Error failure -> return Error(staleOrFailed failure)
-                | Ok _ ->
-                    let! afterFinalize = toResult (deps.getStatus (request deps))
-
-                    match afterFinalize with
-                    | Error failure -> return Error(ConfirmMergeResolutionError.Failed(failureMessage failure))
-                    | Ok(finalStatus, _) ->
-                        return
-                            Ok {
-                                UpdatedStatus = finalStatus.Value
-                                NextConflictedPath = None
-                                PageChange = GitPageChange.Clear
-                                Finalized = true
-                            }
-            else
-                let nextPath = outcome.Value.RemainingItems.[0].Path
-
-                let refreshedSession: ConflictSessionSummaryDto = {
-                    Handle = outcome.Value.RefreshedHandle
-                    Items = outcome.Value.RemainingItems
+let private confirmMergeResolutionAsync
+    (deps: GitDependencies)
+    (downloadLargeFiles: bool)
+    (resolution: GitMergeResolutionRequest)
+    =
+    promise {
+        let! resolved =
+            toResult (
+                deps.resolveConflict {
+                    OperationId = deps.newOperationId ()
+                    Handle = resolution.Handle
+                    ExpectedWorkspaceVersion = resolution.WorkspaceVersion
+                    Path = resolution.Path
+                    Resolution = resolution.Resolution
                 }
+            )
 
-                let! pageResult = deps.loadConflictPage refreshedSession status.WorkspaceVersion nextPath
+        let staleOrFailed (failure: OperationFailureDto) =
+            if
+                failure.Category = FailureCategoryDto.Concurrency
+                || recoveryCode failure = Some VersionControlCodes.Recovery.RefreshConflictSession
+            then
+                ConfirmMergeResolutionError.Stale(failureMessage failure)
+            else
+                ConfirmMergeResolutionError.Failed(failureMessage failure)
 
-                return
-                    pageResult
-                    |> Result.map (fun page -> {
-                        UpdatedStatus = {
-                            status with
-                                ActiveConflictSession = Some refreshedSession
-                        }
-                        NextConflictedPath = Some nextPath
-                        PageChange = GitPageChange.Set page
-                        Finalized = false
-                    })
-                    |> Result.mapError ConfirmMergeResolutionError.Failed
-}
+        match resolved with
+        | Error failure -> return Error(staleOrFailed failure)
+        | Ok(outcome, _) ->
+            let isCandidatePick =
+                match resolution.Resolution with
+                | ConflictResolutionDto.PickCandidate _ -> true
+                | ConflictResolutionDto.SupplyResolvedContent _ -> false
+
+            let objectWasNotMaterialized =
+                isCandidatePick
+                && (outcome.Warnings
+                    |> Array.exists (fun warning -> warning.Code = VersionControlCodes.ObjectNotMaterialized))
+
+            let! notice =
+                if not objectWasNotMaterialized then
+                    promise { return None }
+                elif not downloadLargeFiles then
+                    promise { return Some "The online version isn't downloaded yet. Use Download LFS file to get it." }
+                else
+                    promise {
+                        let! materialized =
+                            toResult (
+                                deps.materializeObject {
+                                    OperationId = deps.newOperationId ()
+                                    Path = resolution.Path
+                                    RefreshTree = Some true
+                                }
+                            )
+
+                        return
+                            match materialized with
+                            | Ok(_, None) -> None
+                            | Ok(_, Some _)
+                            | Error _ ->
+                                Some $"Could not download '{resolution.Path}'. Use Download LFS file to try again."
+                    }
+
+            let! statusResult = toResult (deps.getStatus (request deps))
+
+            match statusResult with
+            | Error failure -> return Error(ConfirmMergeResolutionError.Failed(failureMessage failure))
+            | Ok(statusOutcome, _) ->
+                let status = statusOutcome.Value
+
+                if outcome.Value.RemainingItems.Length = 0 then
+                    let! finalized =
+                        toResult (
+                            deps.finalizeConflict {
+                                OperationId = deps.newOperationId ()
+                                Handle = outcome.Value.RefreshedHandle
+                                ExpectedWorkspaceVersion = status.WorkspaceVersion
+                                Message = None
+                            }
+                        )
+
+                    match finalized with
+                    | Error failure -> return Error(staleOrFailed failure)
+                    | Ok _ ->
+                        let! afterFinalize = toResult (deps.getStatus (request deps))
+
+                        match afterFinalize with
+                        | Error failure -> return Error(ConfirmMergeResolutionError.Failed(failureMessage failure))
+                        | Ok(finalStatus, _) ->
+                            return
+                                Ok {
+                                    UpdatedStatus = finalStatus.Value
+                                    NextConflictedPath = None
+                                    PageChange = GitPageChange.Clear
+                                    Notice = notice
+                                    Finalized = true
+                                }
+                else
+                    let nextPath = outcome.Value.RemainingItems.[0].Path
+
+                    let refreshedSession: ConflictSessionSummaryDto = {
+                        Handle = outcome.Value.RefreshedHandle
+                        Items = outcome.Value.RemainingItems
+                    }
+
+                    let! pageResult = deps.loadConflictPage refreshedSession status.WorkspaceVersion nextPath
+
+                    return
+                        pageResult
+                        |> Result.map (fun page -> {
+                            UpdatedStatus = {
+                                status with
+                                    ActiveConflictSession = Some refreshedSession
+                            }
+                            NextConflictedPath = Some nextPath
+                            PageChange = GitPageChange.Set page
+                            Notice = notice
+                            Finalized = false
+                        })
+                        |> Result.mapError ConfirmMergeResolutionError.Failed
+    }
 
 let init () : GitState * Cmd<Msg> = GitState.Empty, Cmd.none
 
@@ -2609,8 +2700,10 @@ let private updateCore
 
             let cmd =
                 Cmd.OfPromise.either
-                    (fun (deps, resolution) -> confirmMergeResolutionAsync deps resolution)
-                    (deps, resolution)
+                    (fun (deps, downloadLargeFiles, resolution) ->
+                        confirmMergeResolutionAsync deps downloadLargeFiles resolution
+                    )
+                    (deps, model.DownloadLargeFiles, resolution)
                     (fun result -> ConfirmMergeResolutionCompleted(model.ArcSessionId, result))
                     (fun err ->
                         ConfirmMergeResolutionCompleted(
@@ -2662,6 +2755,7 @@ let private updateCore
                     MergeResolutionPendingPath = None
                     SelectedChangePath = outcome.NextConflictedPath
                     ErrorNotice = None
+                    WarningNotice = outcome.Notice
             }
 
         if outcome.Finalized && shouldRunPostMergePush nextModel then

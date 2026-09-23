@@ -174,7 +174,19 @@ let Main () =
                 OnPrimarySaveAll = gitStateCtx.primarySaveAll
                 OnCommitSelection = gitStateCtx.commitSelection
                 OnCommitAll = gitStateCtx.commitAll
-                OnDiscardSelection = gitStateCtx.discardSelection
+                OnDiscardSelection =
+                    fun paths ->
+                        let conflictedPaths =
+                            gitStateCtx.state.ChangedFiles
+                            |> Array.filter _.IsConflicted
+                            |> Array.map _.Path
+                            |> Set.ofArray
+
+                        let discardablePaths =
+                            paths |> Array.filter (fun path -> not (Set.contains path conflictedPaths))
+
+                        if discardablePaths.Length > 0 then
+                            gitStateCtx.discardSelection discardablePaths
                 OnConfirmPendingRemoteAction = gitStateCtx.confirmPendingRemoteAction
                 OnCancelPendingRemoteAction = gitStateCtx.cancelPendingRemoteAction
                 OnSaveDownloadLargeFiles = gitStateCtx.saveDownloadLargeFiles

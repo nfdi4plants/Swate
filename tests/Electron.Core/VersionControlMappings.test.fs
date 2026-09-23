@@ -271,10 +271,24 @@ Vitest.describe (
                                             Label = "Local"
                                             Revision = Some(revision "abc")
                                             Preview = Some(TextPreview "local")
+                                            Object =
+                                                Some {
+                                                    SizeBytes = Some 3158016.0
+                                                    ObjectId = Some "sha256:abc"
+                                                    IsLocallyAvailable = true
+                                                }
+                                        }
+                                        {
+                                            CandidateId = "theirs"
+                                            Label = "Online"
+                                            Revision = Some(revision "def")
+                                            Preview = None
+                                            Object = None
                                         }
                                     |]
-                                    CombinedPreview = Some(TextPreview "<<<<<<<\n=======\n>>>>>>>")
-                                    SupportsResolvedContent = true
+                                    CombinedPreview =
+                                        Some(UnsupportedPreview(Some "Stored object preview unavailable."))
+                                    SupportsResolvedContent = false
                                 }
                             |]
                         }
@@ -319,8 +333,20 @@ Vitest.describe (
                 Vitest.expect(conflict.Items.[0].Candidates.[0].Preview).toEqual (Some(ContentViewDto.Text "local"))
 
                 Vitest
+                    .expect(conflict.Items.[0].Candidates.[0].Object)
+                    .toEqual (
+                        Some {
+                            SizeBytes = Some 3158016.0
+                            ObjectId = Some "sha256:abc"
+                            IsLocallyAvailable = true
+                        }
+                    )
+
+                Vitest.expect(conflict.Items.[0].Candidates.[1].Object).toEqual None
+
+                Vitest
                     .expect(conflict.Items.[0].CombinedPreview)
-                    .toEqual (Some(ContentViewDto.Text "<<<<<<<\n=======\n>>>>>>>"))
+                    .toEqual (Some(ContentViewDto.Unsupported(Some "Stored object preview unavailable.")))
 
                 let synchronization =
                     mapped.Synchronization |> Option.defaultWith (fun () -> failwith "sync missing")

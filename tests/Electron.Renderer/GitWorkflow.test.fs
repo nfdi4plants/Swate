@@ -448,6 +448,81 @@ let private refreshed status = {
 }
 
 Vitest.describe (
+    "File-choice conflict helpers",
+    fun () ->
+        Vitest.test (
+            "candidate conversion carries stored-object state and shortens revisions",
+            fun () ->
+                let withObject = {
+                    CandidateId = "target"
+                    Label = "Online"
+                    Revision = Some "e8955bc3f9"
+                    Preview = None
+                    Object =
+                        Some {
+                            SizeBytes = Some 3250585.6
+                            ObjectId = Some "sha256:abc"
+                            IsLocallyAvailable = false
+                        }
+                }
+
+                let withoutObject = {
+                    CandidateId = "workspace"
+                    Label = "Workspace"
+                    Revision = None
+                    Preview = None
+                    Object = None
+                }
+
+                Vitest.expect(candidateToFileChoiceVersion withObject).toEqual {
+                    CandidateId = "target"
+                    SizeBytes = Some 3250585.6
+                    IsDownloaded = Some false
+                    Revision = Some "e8955bc"
+                }
+
+                Vitest.expect(candidateToFileChoiceVersion withoutObject).toEqual {
+                    CandidateId = "workspace"
+                    SizeBytes = None
+                    IsDownloaded = None
+                    Revision = None
+                }
+        )
+
+        Vitest.test (
+            "version lines format known details and keep a bare label when details are absent",
+            fun () ->
+                let yourVersion: FileChoiceVersion = {
+                    CandidateId = "workspace"
+                    SizeBytes = Some(3.1 * 1024.0 * 1024.0)
+                    IsDownloaded = Some true
+                    Revision = None
+                }
+
+                let onlineVersion = {
+                    yourVersion with
+                        CandidateId = "target"
+                        IsDownloaded = Some false
+                        Revision = Some "e8955bc"
+                }
+
+                let unknownVersion: FileChoiceVersion = {
+                    CandidateId = "workspace"
+                    SizeBytes = None
+                    IsDownloaded = None
+                    Revision = None
+                }
+
+                Vitest.expect(versionLine "Your version" yourVersion).toBe "Your version: 3.1 MB, downloaded"
+
+                Vitest.expect(versionLine "Online version" onlineVersion).toBe
+                    "Online version: 3.1 MB, not downloaded, from e8955bc"
+
+                Vitest.expect(versionLine "Your version" unknownVersion).toBe "Your version"
+        )
+)
+
+Vitest.describe (
     "GitWorkflow request preparation",
     fun () ->
         Vitest.test (
@@ -1125,7 +1200,7 @@ Vitest.describe (
                     Path = "conflict-a.txt"
                     Handle = conflict.Handle
                     WorkspaceVersion = "v1"
-                    ResolvedContent = "resolved"
+                    Resolution = ConflictResolutionDto.SupplyResolvedContent "resolved"
                 }
 
                 let initialState = {
@@ -3716,6 +3791,7 @@ Vitest.describe (
                                 UpdatedStatus = cleanStatus
                                 NextConflictedPath = None
                                 PageChange = GitPageChange.Clear
+                                Notice = None
                                 Finalized = true
                             }
                         ))
@@ -5133,7 +5209,7 @@ Vitest.describe (
                     Path = "conflict.txt"
                     Handle = conflict.Handle
                     WorkspaceVersion = "v1"
-                    ResolvedContent = "resolved"
+                    Resolution = ConflictResolutionDto.SupplyResolvedContent "resolved"
                 }
 
                 let state = {
@@ -5160,6 +5236,11 @@ Vitest.describe (
                 Vitest.expect(statusCalls).toBe (2)
                 Vitest.expect(resolveRequest.Value.Handle).toEqual (request.Handle)
                 Vitest.expect(resolveRequest.Value.ExpectedWorkspaceVersion).toBe ("v1")
+
+                Vitest
+                    .expect(resolveRequest.Value.Resolution)
+                    .toEqual (ConflictResolutionDto.SupplyResolvedContent "resolved")
+
                 Vitest.expect(finalizeRequest.Value.Handle).toEqual (refreshedHandle)
                 Vitest.expect(finalizeRequest.Value.ExpectedWorkspaceVersion).toBe (cleanStatus.WorkspaceVersion)
                 Vitest.expect(nextState.PendingPostMergePush).toBe (false)
@@ -5171,6 +5252,153 @@ Vitest.describe (
                             WriteRequested(Push GitUpdateAcceptance.RequirePreview)
                         |]
                     )
+            }
+        )
+
+        Vitest.test (
+            "Picking a candidate downloads an unmaterialized object when the preference is on",
+            fun () -> promise {
+                let conflict = (conflictedStatus [| "data/big.bin" |]).ActiveConflictSession.Value
+                let mutable resolveRequest = None
+                let mutable materializeRequest = None
+                let mutable callOrder = []
+
+                let warning = {
+                    Code = VersionControlCodes.ObjectNotMaterialized
+                    Message = "The selected file holds a pointer."
+                }
+
+                let deps = {
+                    defaultDependencies with
+                        resolveConflict =
+                            fun request ->
+                                resolveRequest <- Some request
+                                callOrder <- callOrder @ [ "resolve" ]
+
+                                promise {
+                                    return
+                                        Ok(
+                                            succeededWithWarnings [| warning |] {
+                                                RefreshedHandle = conflict.Handle
+                                                RemainingItems = [||]
+                                            }
+                                        )
+                                }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        finalizeConflict =
+                            fun _ ->
+                                callOrder <- callOrder @ [ "finalize" ]
+                                promise { return Ok(succeeded (Some "rev")) }
+                        materializeObject =
+                            fun request ->
+                                materializeRequest <- Some request
+                                callOrder <- callOrder @ [ "materialize" ]
+                                promise { return Ok(succeeded ()) }
+                }
+
+                let request = {
+                    Path = "data/big.bin"
+                    Handle = conflict.Handle
+                    WorkspaceVersion = "v1"
+                    Resolution = ConflictResolutionDto.PickCandidate "target"
+                }
+
+                let state = {
+                    runningState with
+                        ActiveConflict = Some conflict
+                        DownloadLargeFiles = true
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (ConfirmMergeResolutionRequested request) state
+
+                let! completionMessages = collectMessages requestCmd
+
+                let nextState, finishCmd =
+                    match completionMessages with
+                    | [| ConfirmMergeResolutionCompleted(_, Ok outcome) |] ->
+                        Vitest.expect(outcome.Notice).toEqual None
+                        update deps ignore completionMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected merge resolution completion."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(resolveRequest.Value.Resolution).toEqual (ConflictResolutionDto.PickCandidate "target")
+                Vitest.expect(materializeRequest.Value.Path).toBe "data/big.bin"
+                Vitest.expect(materializeRequest.Value.RefreshTree).toEqual (Some true)
+                Vitest.expect(callOrder).toEqual [ "resolve"; "materialize"; "finalize" ]
+                Vitest.expect(nextState.WarningNotice).toEqual None
+            }
+        )
+
+        Vitest.test (
+            "Picking an unmaterialized object without automatic downloads shows a notice",
+            fun () -> promise {
+                let conflict = (conflictedStatus [| "data/big.bin" |]).ActiveConflictSession.Value
+                let mutable materializeCalls = 0
+
+                let deps = {
+                    defaultDependencies with
+                        resolveConflict =
+                            fun _ -> promise {
+                                return
+                                    Ok(
+                                        succeededWithWarnings
+                                            [|
+                                                {
+                                                    Code = VersionControlCodes.ObjectNotMaterialized
+                                                    Message = "The selected file holds a pointer."
+                                                }
+                                            |]
+                                            {
+                                                RefreshedHandle = conflict.Handle
+                                                RemainingItems = [||]
+                                            }
+                                    )
+                            }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        finalizeConflict = fun _ -> promise { return Ok(succeeded (Some "rev")) }
+                        materializeObject =
+                            fun _ ->
+                                materializeCalls <- materializeCalls + 1
+                                promise { return Ok(succeeded ()) }
+                }
+
+                let request = {
+                    Path = "data/big.bin"
+                    Handle = conflict.Handle
+                    WorkspaceVersion = "v1"
+                    Resolution = ConflictResolutionDto.PickCandidate "target"
+                }
+
+                let state = {
+                    runningState with
+                        ActiveConflict = Some conflict
+                        DownloadLargeFiles = false
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (ConfirmMergeResolutionRequested request) state
+
+                let! completionMessages = collectMessages requestCmd
+
+                let nextState, finishCmd =
+                    match completionMessages with
+                    | [| ConfirmMergeResolutionCompleted(_, Ok outcome) |] ->
+                        Vitest
+                            .expect(outcome.Notice)
+                            .toEqual (Some "The online version isn't downloaded yet. Use Download LFS file to get it.")
+
+                        update deps ignore completionMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected merge resolution completion."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(materializeCalls).toBe 0
+
+                Vitest
+                    .expect(nextState.WarningNotice)
+                    .toEqual (Some "The online version isn't downloaded yet. Use Download LFS file to get it.")
             }
         )
 
@@ -5201,7 +5429,7 @@ Vitest.describe (
                     Path = "conflict.txt"
                     Handle = conflict.Handle
                     WorkspaceVersion = "v1"
-                    ResolvedContent = "resolved"
+                    Resolution = ConflictResolutionDto.SupplyResolvedContent "resolved"
                 }
 
                 let state = {
@@ -6262,7 +6490,7 @@ Vitest.describe (
                     Path = "conflict.txt"
                     Handle = conflict.Handle
                     WorkspaceVersion = "v1"
-                    ResolvedContent = "resolved"
+                    Resolution = ConflictResolutionDto.SupplyResolvedContent "resolved"
                 }
 
                 let mergeState, mergeCmd =
@@ -6953,7 +7181,7 @@ Vitest.describe (
                         Version = "1"
                     }
                     WorkspaceVersion = "v1"
-                    ResolvedContent = "resolved"
+                    Resolution = ConflictResolutionDto.SupplyResolvedContent "resolved"
                 }
 
                 let state = {

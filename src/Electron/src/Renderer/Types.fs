@@ -31,6 +31,23 @@ type VersionControlConflictPage = {
     WorkspaceVersion: string
 }
 
+type FileChoiceVersion = {
+    CandidateId: string
+    SizeBytes: float option
+    /// None when the version is not a separately stored object, so download state does not apply.
+    IsDownloaded: bool option
+    /// Short source revision of the version (first 7 characters), when the provider names one.
+    Revision: string option
+}
+
+type VersionControlFileChoicePage = {
+    Path: string
+    Handle: ConflictSessionHandleDto
+    WorkspaceVersion: string
+    Mine: FileChoiceVersion
+    Online: FileChoiceVersion
+}
+
 type GitUnsupportedPageData = { Path: string; Reason: string option }
 
 [<RequireQualifiedAccess>]
@@ -45,6 +62,7 @@ type PageState =
     | ProvenanceGroupingPage
     | GitDiffPage of VersionControlDiffPage
     | GitMergeConflictPage of VersionControlConflictPage
+    | GitFileChoiceConflictPage of VersionControlFileChoicePage
     | GitUnsupportedPage of GitUnsupportedPageData
     | ErrorPage of string
     | DataHubBrowser

@@ -3,6 +3,7 @@ module Renderer.Components.MainContent.GitMergeConflictTarget
 open Fable.Core
 open Feliz
 open Renderer.Types
+open Swate.Electron.Shared.VersionControlTypes
 
 [<ReactComponent>]
 let Main (mergeData: VersionControlConflictPage) =
@@ -24,11 +25,11 @@ let Main (mergeData: VersionControlConflictPage) =
                 Path = mergeData.Path
                 Handle = mergeData.Handle
                 WorkspaceVersion = mergeData.WorkspaceVersion
-                ResolvedContent = resolvedContent
+                Resolution = ConflictResolutionDto.SupplyResolvedContent resolvedContent
             }
 
     Html.div [
-        prop.className "swt:h-full swt:w-full swt:min-h-0"
+        prop.className "swt:relative swt:h-full swt:w-full swt:min-h-0"
         prop.children [
             if isConfirmingCurrentPath then
                 Html.div [
@@ -45,5 +46,15 @@ let Main (mergeData: VersionControlConflictPage) =
                 confirmDisabled = isBusy,
                 testIdPrefix = "renderer-git-merge"
             )
+            Html.div [
+                prop.className "swt:absolute swt:right-4 swt:top-2 swt:z-10"
+                prop.children [
+                    Renderer.Components.Helper.GitMergeAbandonConfirmation.Main(
+                        isBusy,
+                        gitStateCtx.abandonMerge,
+                        "renderer-git-merge"
+                    )
+                ]
+            ]
         ]
     ]
