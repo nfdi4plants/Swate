@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Pulling, pushing and saving run one `synchronize` operation of the library, which refreshes, updates when the online copy is ahead and publishes. It asks first only when the update needs merge resolution, and it refuses an update that would change files with local changes until they are saved or discarded.
 -   Switching branches runs a preflight first. A switch that would overwrite local changes is refused with the files at risk named, and a switch is never repeated after the workspace changed underneath it.
 -   The cancel button covers the remote phase of a save: while the save synchronizes with the online copy, the sidebar names that phase and the operation can be canceled.
--   External edits that arrive while Swate writes to disk are kept and applied after the write. During a long write the file tree catches up first and the in-memory ARC follows once the write is done.
+-   External edits that the file watcher picked up before Swate started writing to disk are kept and merged after the write. During a long write the file tree catches up first and the in-memory ARC follows once the write is done. Edits that arrive while Swate writes, or in the half second after, reach the file tree, and the in-memory ARC may miss them.
 
 ### 🐛 Fixed
 
