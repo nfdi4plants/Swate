@@ -389,6 +389,8 @@ export const ConflictsPresent: Story = {
     );
     await expect(canvasElement.querySelectorAll("[data-testid^='GitSidebarChangeRow-']")).toHaveLength(4);
     await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-0")).toBeInTheDocument();
+    await expect(canvas.queryByTestId("GitSidebarDiscardChangeButton-0")).toBeNull();
+    await expect(canvas.getByTestId("GitSidebarDiscardChangeButton-1")).toBeInTheDocument();
   },
 };
 

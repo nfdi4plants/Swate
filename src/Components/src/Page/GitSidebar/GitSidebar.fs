@@ -1220,26 +1220,28 @@ type GitSidebar =
                                     else
                                         $"Discard {props.DiscardPaths.Length} selected changes"
 
-                                Html.button [
-                                    prop.testId $"GitSidebarDiscardChangeButton-{props.Index}"
-                                    prop.type'.button
-                                    prop.className
-                                        "swt:btn swt:btn-ghost swt:btn-square swt:btn-xs swt:opacity-0 swt:transition-opacity swt:group-hover:opacity-100 swt:focus:opacity-100"
-                                    prop.ariaLabel discardLabel
-                                    prop.title discardLabel
-                                    prop.disabled props.IsBusy
-                                    prop.onClick (fun (event: MouseEvent) ->
-                                        event.preventDefault ()
-                                        event.stopPropagation ()
-                                        props.DiscardChanges props.DiscardPaths
-                                    )
-                                    prop.children [
-                                        Html.span [
-                                            prop.className
-                                                "swt:iconify swt:fluent--arrow-undo-24-regular swt:size-4 swt:text-error"
+                                // A conflicted file is resolved on its conflict page, so its row offers no discard.
+                                if not change.IsConflicted then
+                                    Html.button [
+                                        prop.testId $"GitSidebarDiscardChangeButton-{props.Index}"
+                                        prop.type'.button
+                                        prop.className
+                                            "swt:btn swt:btn-ghost swt:btn-square swt:btn-xs swt:opacity-0 swt:transition-opacity swt:group-hover:opacity-100 swt:focus:opacity-100"
+                                        prop.ariaLabel discardLabel
+                                        prop.title discardLabel
+                                        prop.disabled props.IsBusy
+                                        prop.onClick (fun (event: MouseEvent) ->
+                                            event.preventDefault ()
+                                            event.stopPropagation ()
+                                            props.DiscardChanges props.DiscardPaths
+                                        )
+                                        prop.children [
+                                            Html.span [
+                                                prop.className
+                                                    "swt:iconify swt:fluent--arrow-undo-24-regular swt:size-4 swt:text-error"
+                                            ]
                                         ]
                                     ]
-                                ]
 
                                 GitSidebar.ChangeStatusTooltip(props.Index, change)
                             ]
