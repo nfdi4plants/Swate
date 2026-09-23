@@ -958,6 +958,76 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "a reload deferred three times during a write publishes the tree and merges the ARC after it",
+            fun () ->
+                withTempArc
+                    (fun arc -> arc.AddAssay(ArcAssay("DiskAssay", title = "Old title")))
+                    (fun arcPath -> promise {
+                        let! loadedArc = TestHelpers.loadArcAsync arcPath
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+                        vault.SetArc loadedArc
+
+                        let! diskArc = TestHelpers.loadArcAsync arcPath
+                        diskArc.GetAssay("DiskAssay").Title <- Some "Changed on disk"
+                        do! diskArc.UpdateAsync arcPath
+
+                        let treeEntryPath = join [| arcPath; "watcher-deferred-tree.txt" |]
+                        do! writeWatcherTextFileAsync treeEntryPath "tree entry"
+
+                        let loadingChanges = ResizeArray<bool>()
+
+                        let handleFileEvent =
+                            vault._FileEventController (recordingWatcherApi loadingChanges)
+
+                        let assayPath = join [| arcPath; "assays/DiskAssay/isa.assay.xlsx" |]
+                        handleFileEvent "change" assayPath
+                        handleFileEvent "add" treeEntryPath
+
+                        let mutable releaseWrite = ignore
+
+                        let writeGate =
+                            JS.Constructors.Promise.Create(fun resolve _ -> releaseWrite <- fun () -> resolve ())
+
+                        let writeScope = vault.WithBusyWritingScope(fun () -> writeGate)
+
+                        try
+                            let waitStartedAt = nowMs ()
+                            let mutable attempts = 0
+
+                            // Watcher events carry normalized paths, so the tree key uses forward slashes.
+                            let treeHasEntry () =
+                                let expectedKey = PathHelpers.normalizePath treeEntryPath
+
+                                vault.fileTree.Keys
+                                |> Seq.exists (fun key -> PathHelpers.normalizePath key = expectedKey)
+
+                            let fallbackPublished () =
+                                vault.HasReachedWatcherDeferralLimit
+                                && treeHasEntry ()
+                                && vault.fileWatcherPendingArcMergeEvents.Count > 0
+
+                            while attempts < 80
+                                  && (nowMs () - waitStartedAt < 2300.0 || not (fallbackPublished ())) do
+                                do! Promise.sleep 50
+                                attempts <- attempts + 1
+
+                            Vitest.expect(vault.HasReachedWatcherDeferralLimit).toBe (true)
+                            Vitest.expect(treeHasEntry ()).toBe (true)
+                            Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count > 0).toBe (true)
+                            Vitest.expect(vault.arc.Value.GetAssay("DiskAssay").Title).toEqual (Some "Old title")
+                        finally
+                            releaseWrite ()
+
+                        do! writeScope
+                        do! expectWatcherAssayTitle vault "Changed on disk"
+
+                        Vitest.expect(vault.HasReachedWatcherDeferralLimit).toBe (false)
+                        Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (0)
+                    })
+        )
+
+        Vitest.test (
             "a reload whose batch went stale finishes",
             fun () ->
                 withTempArc
