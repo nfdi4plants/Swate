@@ -1074,7 +1074,6 @@ type ArcVaults() =
                                         vault.isWaitingForOperationsOnClose <- false
 
                                         if not (window.isDestroyed ()) then
-                                            cancelWindowReads ()
                                             window.close ()
                                     else
                                         vault.isWaitingForOperationsOnClose <- false

@@ -514,7 +514,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                 )
 
                             if resultChangedState result then
-                                let! fileTree = getFileTree arcPath
+                                let! fileTree = getFileTreeFromOpenSession arcPath
                                 vault.SetFileTree fileTree
 
                             return result
