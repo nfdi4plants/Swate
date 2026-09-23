@@ -25,6 +25,13 @@ open IPCTypesHelper
 
 type CreateArcRequest = { identifier: string; initGit: bool }
 
+[<RequireQualifiedAccess>]
+type CreateArcOutcome =
+    | Created of path: string
+    | FocusedExisting of path: string
+    | Cancelled
+    | CreatedButClosed of path: string
+
 /// TEMPORARY DUCT-TAPE WORKAROUND: This IPC API only exists because template loading currently cannot run
 /// through ARCtrl on the Swate .NET server or directly in the renderer due to GitHub CORS.
 /// Remove it when ARCtrl provides a working .NET implementation or a CORS-enabled template source.

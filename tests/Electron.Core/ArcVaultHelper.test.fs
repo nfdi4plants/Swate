@@ -281,6 +281,18 @@ let private lifecycleTestWindow id isDestroyed onSend =
     ]
     |> unbox<BrowserWindow>
 
+let private focusTrackingTestWindow id onFocus =
+    let send: obj = emitJsExpr () "((..._args) => {})"
+
+    createObj [
+        "id" ==> id
+        "title" ==> ""
+        "isDestroyed" ==> (fun () -> false)
+        "focus" ==> onFocus
+        "webContents" ==> createObj [ "send" ==> send ]
+    ]
+    |> unbox<BrowserWindow>
+
 let private registrationTestWindow id (loadError: exn) onLoad =
     let mutable destroyed = false
     let mutable closeHandlerAttached = false
@@ -1293,6 +1305,69 @@ Vitest.describe (
                 | Ok CreateArcOutcome.Cancelled -> Vitest.expect(createdWindowCount).toBe (0)
                 | Ok outcome -> return failwithf "Expected Cancelled, received %A." outcome
                 | Error error -> return failwithf "Expected cancellation to be non-error, received %s." error.Message
+            }
+        )
+
+        Vitest.test (
+            "createARC resolves FocusedExisting without creating or writing another ARC",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-ipc-create-focus-existing-"
+                let originatingWindowId = 40
+                let existingWindowId = 41
+                let identifier = "Already Open ARC"
+                let originatingWindow = lifecycleTestWindow originatingWindowId false ignore
+                let mutable focusCount = 0
+                let mutable createdWindowCount = 0
+
+                let existingWindow =
+                    focusTrackingTestWindow existingWindowId (fun () -> focusCount <- focusCount + 1)
+
+                let expectedPath =
+                    ARCtrl.ArcPathHelper.combine rootPath identifier |> PathHelpers.normalizePath
+
+                let existingVault = ArcVault(existingWindow)
+                existingVault.path <- Some expectedPath
+                existingVault.SetArc(ARC(identifier))
+
+                setBrowserWindowFromWebContents (fun _ -> originatingWindow :> obj)
+
+                setBrowserWindowFactory (fun _ ->
+                    createdWindowCount <- createdWindowCount + 1
+                    failwith "Focusing an existing ARC must not create a BrowserWindow."
+                )
+
+                setShowOpenDialog (fun _ _ -> createObj [ "canceled" ==> false; "filePaths" ==> [| rootPath |] ])
+                ARC_VAULTS.Vaults.Add(existingWindowId, existingVault)
+
+                try
+                    let! existedBeforeCreate = TestHelpers.pathExistsAsync expectedPath
+                    Vitest.expect(existedBeforeCreate).toBe (false)
+
+                    let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
+
+                    let request: CreateArcRequest = {
+                        identifier = identifier
+                        initGit = false
+                    }
+
+                    match! api.createARC request with
+                    | Ok(CreateArcOutcome.FocusedExisting focusedPath) -> Vitest.expect(focusedPath).toBe (expectedPath)
+                    | Ok outcome -> failwithf "Expected FocusedExisting, received %A." outcome
+                    | Error error -> failwithf "Expected focusing to be non-error, received %s." error.Message
+
+                    Vitest.expect(focusCount).toBe (1)
+                    Vitest.expect(createdWindowCount).toBe (0)
+                    Vitest.expect(ARC_VAULTS.TryGetVault(existingWindowId)).toEqual (Some existingVault)
+
+                    let! existsAfterCreate = TestHelpers.pathExistsAsync expectedPath
+                    Vitest.expect(existsAfterCreate).toBe (false)
+
+                    ARC_VAULTS.Vaults.Remove(existingWindowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    ARC_VAULTS.Vaults.Remove(existingWindowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
             }
         )
 

@@ -262,20 +262,25 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     match disposition with
                     | None -> return Ok(CreateArcOutcome.CreatedButClosed arcPath)
                     | Some disposition ->
-                        match!
-                            initGitRepositoryForCreatedArcDisposition
-                                Main.Git.GitProvisioningService.initRepository
-                                request.initGit
-                                disposition
-                        with
-                        | Error failure ->
-                            Swate.Components.console.log (
-                                $"Git init failed for '{ArcOpenDisposition.path disposition}': {failure.Message}"
-                            )
-                        | Ok(Some initializedArcPath) -> notifyGitRepositoryInitialized initializedArcPath
-                        | Ok None -> ()
+                        match disposition with
+                        | ArcOpenDisposition.FocusedExisting path -> return Ok(CreateArcOutcome.FocusedExisting path)
+                        | ArcOpenDisposition.CreatedInCurrent path
+                        | ArcOpenDisposition.CreatedInNewWindow path ->
+                            match!
+                                initGitRepositoryForCreatedArcDisposition
+                                    Main.Git.GitProvisioningService.initRepository
+                                    request.initGit
+                                    disposition
+                            with
+                            | Error failure ->
+                                Swate.Components.console.log ($"Git init failed for '{path}': {failure.Message}")
+                            | Ok(Some initializedArcPath) -> notifyGitRepositoryInitialized initializedArcPath
+                            | Ok None -> ()
 
-                        return Ok(CreateArcOutcome.Created(ArcOpenDisposition.path disposition))
+                            return Ok(CreateArcOutcome.Created path)
+                        | ArcOpenDisposition.OpenedInCurrent path
+                        | ArcOpenDisposition.OpenedInNewWindow path ->
+                            return Error(exn $"Unexpected open disposition while creating ARC at '{path}'.")
             with error ->
                 return Error error
         }

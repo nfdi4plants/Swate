@@ -116,12 +116,6 @@ type ImportExternalFilesResult =
     | Cancelled
 
 [<RequireQualifiedAccess>]
-type CreateArcOutcome =
-    | Created of path: string
-    | Cancelled
-    | CreatedButClosed of path: string
-
-[<RequireQualifiedAccess>]
 type FileImportPhase =
     | Copying
     | Finalizing
