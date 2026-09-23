@@ -59,5 +59,14 @@ jobs:
         working-directory: src/Components
         run: npm run build
 
+      # Vite and Rollup bundle the Electron main process only when the app is packaged. Fable
+      # output that breaks only there, such as a fable-library member the pinned Fable lacks,
+      # passes every other step.
+      - name: Bundle the Electron app
+        working-directory: src/Electron
+        run: |
+          npm run fable
+          npx electron-forge package
+
       - name: Run Tests
         run: dotnet run --project ./build/Build.fsproj -- test
