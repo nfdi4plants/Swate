@@ -373,7 +373,6 @@ let private defaultDependencies: GitDependencies = {
     installDependency = fun _ -> unexpectedPromise "installDependency"
     refreshSynchronization = fun _ -> unexpectedPromise "refreshSynchronization"
     synchronize = fun _ -> unexpectedPromise "synchronize"
-    reportPhase = ignore
     cancelOperation = fun _ -> unexpectedPromise "cancelOperation"
     cloneWorkspace = fun _ -> unexpectedPromise "cloneWorkspace"
     createRef = fun _ -> unexpectedPromise "createRef"

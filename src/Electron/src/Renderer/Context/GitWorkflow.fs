@@ -397,8 +397,6 @@ type GitDependencies = {
     refreshSynchronization:
         OperationRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, string>>
     synchronize: SynchronizeRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, string>>
-    /// The write command replaces this with a dispatch of WritePhaseChanged, and nothing outside writeCmd reports phases.
-    reportPhase: GitBusyOperation -> unit
     cancelOperation: OperationRequestDto -> JS.Promise<Result<bool, string>>
     cloneWorkspace: CloneWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<string>, string>>
     createRef: CreateRefRequestDto -> JS.Promise<Result<OperationResultDto<LogicalRefDto>, string>>
@@ -1747,152 +1745,159 @@ let private runFetchAttemptAsync (deps: GitDependencies) (state: GitState) = pro
 /// Primary save commits the exact selection, then synchronizes the workspace. A partial
 /// commit that needs reconciliation stops here with its recovery. A no-op commit still
 /// continues with synchronization because the workspace may be ahead of the target.
-let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState) (prepared: PreparedCommitOperation) = promise {
-    let! commitAttempt = runCommitAttemptAsync deps state prepared
+let private runPrimarySaveAttemptAsync
+    (deps: GitDependencies)
+    (state: GitState)
+    (prepared: PreparedCommitOperation)
+    (reportPhase: GitBusyOperation -> unit)
+    =
+    promise {
+        let! commitAttempt = runCommitAttemptAsync deps state prepared
 
-    match commitAttempt with
-    | Error message -> return Error message
-    | Ok(Completed(UnitSuccess success)) when success.Partial.IsSome ->
-        // The revision exists but the library asks for reconciliation first.
-        let partial = success.Partial.Value
+        match commitAttempt with
+        | Error message -> return Error message
+        | Ok(Completed(UnitSuccess success)) when success.Partial.IsSome ->
+            // The revision exists but the library asks for reconciliation first.
+            let partial = success.Partial.Value
 
-        return
-            Ok(
-                CompletedWithPendingRemoteFailure(
-                    UnitSuccess {
-                        Refresh = success.Refresh
-                        PageChange = success.PageChange
-                        SelectedChangePath = success.SelectedChangePath
-                        Warning = Some pendingPrimarySaveWarning
-                        Partial = Some partial
-                        Published = None
-                    },
-                    failureMessage partial
+            return
+                Ok(
+                    CompletedWithPendingRemoteFailure(
+                        UnitSuccess {
+                            Refresh = success.Refresh
+                            PageChange = success.PageChange
+                            SelectedChangePath = success.SelectedChangePath
+                            Warning = Some pendingPrimarySaveWarning
+                            Partial = Some partial
+                            Published = None
+                        },
+                        failureMessage partial
+                    )
                 )
-            )
-    | Ok(Completed(UnitSuccess success)) when
-        success.Partial.IsNone
-        && (requireSynchronization (applyRefreshResult success.Refresh state)).IsError
-        ->
-        // The revision exists. Without an online service the local save is the whole outcome.
-        return
-            Ok(
-                Completed(
-                    UnitSuccess {
-                        Refresh = success.Refresh
-                        PageChange = success.PageChange
-                        SelectedChangePath = success.SelectedChangePath
-                        Warning =
-                            Some
-                                "Changes were saved locally. This workspace provider does not support online synchronization."
-                        Partial = None
-                        Published = None
-                    }
+        | Ok(Completed(UnitSuccess success)) when
+            success.Partial.IsNone
+            && (requireSynchronization (applyRefreshResult success.Refresh state)).IsError
+            ->
+            // The revision exists. Without an online service the local save is the whole outcome.
+            return
+                Ok(
+                    Completed(
+                        UnitSuccess {
+                            Refresh = success.Refresh
+                            PageChange = success.PageChange
+                            SelectedChangePath = success.SelectedChangePath
+                            Warning =
+                                Some
+                                    "Changes were saved locally. This workspace provider does not support online synchronization."
+                            Partial = None
+                            Published = None
+                        }
+                    )
                 )
-            )
-    | Ok(Completed(UnitSuccess success)) ->
-        let refreshedState = applyRefreshResult success.Refresh state
+        | Ok(Completed(UnitSuccess success)) ->
+            let refreshedState = applyRefreshResult success.Refresh state
 
-        let runPushAfterLocalCommit (version: string) = promise {
-            deps.reportPhase GitBusyOperation.PushingToRemote
-            let! pushResult = runPublishAsync deps refreshedState version GitUpdateAcceptance.RequirePreview
+            let runPushAfterLocalCommit (version: string) = promise {
+                reportPhase GitBusyOperation.PushingToRemote
+                let! pushResult = runPublishAsync deps refreshedState version GitUpdateAcceptance.RequirePreview
 
-            let followsRefresh =
+                let followsRefresh =
+                    match pushResult with
+                    | Ok _
+                    | Error(PublishFailure.AcceptanceRequired _) -> true
+                    | Error(PublishFailure.Routed(RoutedFailure.Recovery _)) -> false
+                    | Error(PublishFailure.Routed _) -> true
+                    | Error(PublishFailure.ProjectNameRefused _)
+                    | Error(PublishFailure.ProvisioningIncomplete _) -> false
+
+                if followsRefresh then
+                    reportPhase GitBusyOperation.Refreshing
+
                 match pushResult with
-                | Ok _
-                | Error(PublishFailure.AcceptanceRequired _) -> true
-                | Error(PublishFailure.Routed(RoutedFailure.Recovery _)) -> false
-                | Error(PublishFailure.Routed _) -> true
-                | Error(PublishFailure.ProjectNameRefused _)
-                | Error(PublishFailure.ProvisioningIncomplete _) -> false
+                | Ok(outcome, partial) ->
+                    return!
+                        completeAfterSynchronizeAsync
+                            deps
+                            partial
+                            (if partial.IsSome && outcome.Publication <> PublicationStateDto.Published then
+                                 Some pendingPrimarySaveWarning
+                             else
+                                 None)
+                            (Some(outcome.Publication = PublicationStateDto.Published))
+                | Error(PublishFailure.AcceptanceRequired(dialog, target, workspaceVersion)) ->
+                    let! confirmationRefreshResult = refreshAllAsync deps
 
-            if followsRefresh then
-                deps.reportPhase GitBusyOperation.Refreshing
+                    let confirmationRefreshSnapshot =
+                        match confirmationRefreshResult.Status, refreshErrorMessage confirmationRefreshResult with
+                        | Ok _, None -> confirmationRefreshResult
+                        | _ -> success.Refresh
 
-            match pushResult with
-            | Ok(outcome, partial) ->
-                return!
-                    completeAfterSynchronizeAsync
-                        deps
-                        partial
-                        (if partial.IsSome && outcome.Publication <> PublicationStateDto.Published then
-                             Some pendingPrimarySaveWarning
-                         else
-                             None)
-                        (Some(outcome.Publication = PublicationStateDto.Published))
-            | Error(PublishFailure.AcceptanceRequired(dialog, target, workspaceVersion)) ->
-                let! confirmationRefreshResult = refreshAllAsync deps
-
-                let confirmationRefreshSnapshot =
-                    match confirmationRefreshResult.Status, refreshErrorMessage confirmationRefreshResult with
-                    | Ok _, None -> confirmationRefreshResult
-                    | _ -> success.Refresh
-
-                return
-                    Ok(
-                        CompletedWithPendingRemoteConfirmation(
-                            UnitSuccess {
-                                Refresh = confirmationRefreshSnapshot
-                                PageChange = success.PageChange
-                                SelectedChangePath = success.SelectedChangePath
-                                Warning = Some pendingPrimarySaveWarning
-                                Partial = None
-                                Published = None
-                            },
-                            dialog,
-                            GitPendingRemoteAction.PublishAfterUpdate(
-                                GitUpdateAcceptance.Accepted(target, workspaceVersion)
+                    return
+                        Ok(
+                            CompletedWithPendingRemoteConfirmation(
+                                UnitSuccess {
+                                    Refresh = confirmationRefreshSnapshot
+                                    PageChange = success.PageChange
+                                    SelectedChangePath = success.SelectedChangePath
+                                    Warning = Some pendingPrimarySaveWarning
+                                    Partial = None
+                                    Published = None
+                                },
+                                dialog,
+                                GitPendingRemoteAction.PublishAfterUpdate(
+                                    GitUpdateAcceptance.Accepted(target, workspaceVersion)
+                                )
                             )
                         )
-                    )
-            | Error failure ->
-                return!
-                    publishFailureToOutcome
-                        (fun routed -> promise {
-                            match routed with
-                            | RoutedFailure.UpdateAcceptanceRequired _ ->
-                                // The wrapper turns every decision into PublishFailure.AcceptanceRequired.
-                                return!
-                                    pendingPrimarySaveRemoteFailureAsync
-                                        deps
-                                        "The synchronization needs a decision that this write cannot offer."
-                            | RoutedFailure.Recovery(recovery, message) ->
-                                return Ok(RequiresRecovery(recovery, message))
-                            | RoutedFailure.ConflictSession failure ->
-                                return! completeAfterUpdateAsync deps (Some failure) (Some pendingPrimarySaveWarning)
-                            | RoutedFailure.DependencyInstall message
-                            | RoutedFailure.StaleWorkspace(message, _)
-                            | RoutedFailure.Error message
-                            | RoutedFailure.RefreshThenReport message ->
-                                // The local commit already succeeded, so the saved-locally outcome stays.
-                                return! pendingPrimarySaveRemoteFailureAsync deps message
-                            | RoutedFailure.Cancelled _
-                            | RoutedFailure.RefreshAfterCancel _ ->
-                                let! refreshResult = refreshAllAsync deps
+                | Error failure ->
+                    return!
+                        publishFailureToOutcome
+                            (fun routed -> promise {
+                                match routed with
+                                | RoutedFailure.UpdateAcceptanceRequired _ ->
+                                    // The wrapper turns every decision into PublishFailure.AcceptanceRequired.
+                                    return!
+                                        pendingPrimarySaveRemoteFailureAsync
+                                            deps
+                                            "The synchronization needs a decision that this write cannot offer."
+                                | RoutedFailure.Recovery(recovery, message) ->
+                                    return Ok(RequiresRecovery(recovery, message))
+                                | RoutedFailure.ConflictSession failure ->
+                                    return!
+                                        completeAfterUpdateAsync deps (Some failure) (Some pendingPrimarySaveWarning)
+                                | RoutedFailure.DependencyInstall message
+                                | RoutedFailure.StaleWorkspace(message, _)
+                                | RoutedFailure.Error message
+                                | RoutedFailure.RefreshThenReport message ->
+                                    // The local commit already succeeded, so the saved-locally outcome stays.
+                                    return! pendingPrimarySaveRemoteFailureAsync deps message
+                                | RoutedFailure.Cancelled _
+                                | RoutedFailure.RefreshAfterCancel _ ->
+                                    let! refreshResult = refreshAllAsync deps
 
-                                match refreshResult.Status with
-                                | Ok _ ->
-                                    return
-                                        Ok(
-                                            Completed(
-                                                UnitSuccess {
-                                                    unitSuccess refreshResult with
-                                                        Warning = Some pendingPrimarySaveWarning
-                                                }
+                                    match refreshResult.Status with
+                                    | Ok _ ->
+                                        return
+                                            Ok(
+                                                Completed(
+                                                    UnitSuccess {
+                                                        unitSuccess refreshResult with
+                                                            Warning = Some pendingPrimarySaveWarning
+                                                    }
+                                                )
                                             )
-                                        )
-                                | Error refreshFailure -> return Error(failureMessage refreshFailure)
-                        })
-                        failure
-        }
+                                    | Error refreshFailure -> return Error(failureMessage refreshFailure)
+                            })
+                            failure
+            }
 
-        match versionOf success.Refresh with
-        | None ->
-            return! pendingPrimarySaveRemoteFailureAsync deps "The workspace state could not be read after saving."
-        | Some version -> return! runPushAfterLocalCommit version
-    | Ok(Completed(CloneSuccess _)) -> return Error "Primary save produced an invalid result."
-    | Ok other -> return Ok other
-}
+            match versionOf success.Refresh with
+            | None ->
+                return! pendingPrimarySaveRemoteFailureAsync deps "The workspace state could not be read after saving."
+            | Some version -> return! runPushAfterLocalCommit version
+        | Ok(Completed(CloneSuccess _)) -> return Error "Primary save produced an invalid result."
+        | Ok other -> return Ok other
+    }
 
 let private runSaveLfsSettingsAttemptAsync (deps: GitDependencies) (settings: StoragePolicySettingsDto) =
     simpleWriteAsync
@@ -2072,27 +2077,33 @@ let private runRetryMaterializationAttemptAsync (deps: GitDependencies) = promis
         | None -> return! refreshAfterSuccess deps None GitPageChange.NoChange None None
 }
 
-let private executeWriteAttemptOnce (deps: GitDependencies) (state: GitState) (writeRequest: WriteRequest) = promise {
-    match writeRequest with
-    | Fetch -> return! runFetchAttemptAsync deps state
-    | Pull acceptance -> return! runPullAttemptAsync deps state acceptance
-    | Push acceptance -> return! runPushAttemptAsync deps state acceptance
-    | PrimarySave prepared -> return! runPrimarySaveAttemptAsync deps state prepared
-    | Clone(cloneRequest, _) -> return! runCloneAttemptAsync deps cloneRequest
-    | CommitSelection prepared -> return! runCommitAttemptAsync deps state prepared
-    | CommitAll prepared -> return! runCommitAttemptAsync deps state prepared
-    | DiscardSelection paths -> return! runDiscardAttemptAsync deps state paths
-    | SaveLfsSettings(_, settings) -> return! runSaveLfsSettingsAttemptAsync deps settings
-    | PruneLfsCache -> return! simpleWriteAsync deps (fun () -> deps.pruneStorage (request deps))
-    | DedupLfsStorage -> return! simpleWriteAsync deps (fun () -> deps.deduplicateStorage (request deps))
-    | CreateBranch branchRequest -> return! runCreateBranchAttemptAsync deps state branchRequest
-    | SwitchBranch refName -> return! runSwitchBranchAttemptAsync deps state refName
-    | FinalizeMerge -> return! runFinalizeMergeAttemptAsync deps state
-    | AbandonMerge -> return! runAbandonMergeAttemptAsync deps state
-    | ClearStaleLock -> return! runClearStaleLockAttemptAsync deps
-    | RestoreInterruptedPaths paths -> return! runRestoreInterruptedPathsAttemptAsync deps state paths
-    | RetryMaterialization -> return! runRetryMaterializationAttemptAsync deps
-}
+let private executeWriteAttemptOnce
+    (deps: GitDependencies)
+    (state: GitState)
+    (writeRequest: WriteRequest)
+    (reportPhase: GitBusyOperation -> unit)
+    =
+    promise {
+        match writeRequest with
+        | Fetch -> return! runFetchAttemptAsync deps state
+        | Pull acceptance -> return! runPullAttemptAsync deps state acceptance
+        | Push acceptance -> return! runPushAttemptAsync deps state acceptance
+        | PrimarySave prepared -> return! runPrimarySaveAttemptAsync deps state prepared reportPhase
+        | Clone(cloneRequest, _) -> return! runCloneAttemptAsync deps cloneRequest
+        | CommitSelection prepared -> return! runCommitAttemptAsync deps state prepared
+        | CommitAll prepared -> return! runCommitAttemptAsync deps state prepared
+        | DiscardSelection paths -> return! runDiscardAttemptAsync deps state paths
+        | SaveLfsSettings(_, settings) -> return! runSaveLfsSettingsAttemptAsync deps settings
+        | PruneLfsCache -> return! simpleWriteAsync deps (fun () -> deps.pruneStorage (request deps))
+        | DedupLfsStorage -> return! simpleWriteAsync deps (fun () -> deps.deduplicateStorage (request deps))
+        | CreateBranch branchRequest -> return! runCreateBranchAttemptAsync deps state branchRequest
+        | SwitchBranch refName -> return! runSwitchBranchAttemptAsync deps state refName
+        | FinalizeMerge -> return! runFinalizeMergeAttemptAsync deps state
+        | AbandonMerge -> return! runAbandonMergeAttemptAsync deps state
+        | ClearStaleLock -> return! runClearStaleLockAttemptAsync deps
+        | RestoreInterruptedPaths paths -> return! runRestoreInterruptedPathsAttemptAsync deps state paths
+        | RetryMaterialization -> return! runRetryMaterializationAttemptAsync deps
+    }
 
 /// Writes that change the working tree from a state the user reviewed are not replayed
 /// against a workspace that moved in between. A discard or a restore would drop content
@@ -2120,28 +2131,35 @@ let private staleWithoutReplayMessage =
 /// when the workspace moved between the refresh and the click. The state is refreshed
 /// and the write runs once more against the current token, unless replaying it could
 /// discard content the user has not reviewed.
-let private executeWriteAttempt (deps: GitDependencies) (state: GitState) (writeRequest: WriteRequest) = promise {
-    let! first = executeWriteAttemptOnce deps state writeRequest
+let private executeWriteAttempt
+    (deps: GitDependencies)
+    (state: GitState)
+    (writeRequest: WriteRequest)
+    (reportPhase: GitBusyOperation -> unit)
+    =
+    promise {
+        let! first = executeWriteAttemptOnce deps state writeRequest reportPhase
 
-    match first with
-    | Ok(StaleWorkspaceVersion(message, targetMoved)) when not (replaysAfterStaleToken writeRequest) ->
-        let reported = if targetMoved then message else staleWithoutReplayMessage
+        match first with
+        | Ok(StaleWorkspaceVersion(message, targetMoved)) when not (replaysAfterStaleToken writeRequest) ->
+            let reported = if targetMoved then message else staleWithoutReplayMessage
 
-        return Ok(StaleWorkspaceVersion(reported, targetMoved))
-    | Ok(StaleWorkspaceVersion(_, _)) ->
-        let! refreshResult = refreshAllAsync deps
+            return Ok(StaleWorkspaceVersion(reported, targetMoved))
+        | Ok(StaleWorkspaceVersion(_, _)) ->
+            let! refreshResult = refreshAllAsync deps
 
-        match refreshResult.Status, refreshErrorMessage refreshResult with
-        | Error failure, _ -> return Error(failureMessage failure)
-        | Ok _, Some message -> return Error message
-        | Ok _, None ->
-            let! second = executeWriteAttemptOnce deps (applyRefreshResult refreshResult state) writeRequest
+            match refreshResult.Status, refreshErrorMessage refreshResult with
+            | Error failure, _ -> return Error(failureMessage failure)
+            | Ok _, Some message -> return Error message
+            | Ok _, None ->
+                let! second =
+                    executeWriteAttemptOnce deps (applyRefreshResult refreshResult state) writeRequest reportPhase
 
-            match second with
-            | Ok(StaleWorkspaceVersion(message, _)) -> return Error message
-            | other -> return other
-    | other -> return other
-}
+                match second with
+                | Ok(StaleWorkspaceVersion(message, _)) -> return Error message
+                | other -> return other
+        | other -> return other
+    }
 
 /// Resolves one conflicted file with the content the user reviewed, against the handle
 /// and token captured with the page. When nothing remains, the merge is finalized.
@@ -2338,12 +2356,10 @@ let private writeCmd
             try
                 let writeDeps = withFirstOperationId deps operationId
 
-                let writeDeps = {
-                    writeDeps with
-                        reportPhase = fun phase -> dispatch (WritePhaseChanged(sessionId, writeRequestId, phase))
-                }
+                let reportPhase =
+                    fun phase -> dispatch (WritePhaseChanged(sessionId, writeRequestId, phase))
 
-                let! result = executeWriteAttempt writeDeps model writeRequest
+                let! result = executeWriteAttempt writeDeps model writeRequest reportPhase
 
                 dispatch (WriteCompleted(sessionId, writeRequestId, writeRequest, result))
             with err ->
