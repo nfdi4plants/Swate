@@ -715,19 +715,82 @@ Vitest.describe (
             "RegisterVault shows a successfully loaded renderer and keeps its vault registered",
             fun () -> promise {
                 let windowId = 14
+                let mutable constructorOptions: obj option = None
 
                 let window, wasShown, isDestroyed, _ =
                     successfulRegistrationTestWindow windowId ignore ignore
 
-                setBrowserWindowFactory (fun _ -> window :> obj)
+                setBrowserWindowFactory (fun options ->
+                    constructorOptions <- Some options
+                    window :> obj
+                )
 
                 let vaults = ArcVaults()
                 let! registeredWindowId = vaults.RegisterVault()
 
                 Vitest.expect(registeredWindowId).toBe (windowId)
+                Vitest.expect(constructorOptions.IsSome).toBe (true)
+                Vitest.expect(constructorOptions.Value?show).toBe (false)
                 Vitest.expect(wasShown ()).toBe (true)
                 Vitest.expect(vaults.Vaults.ContainsKey(windowId)).toBe (true)
                 Vitest.expect(isDestroyed ()).toBe (false)
+            }
+        )
+
+        Vitest.test (
+            "OpenOrFocusArc rejects an invalid target before creating a window for an occupied caller",
+            fun () -> promise {
+                let! invalidTargetPath = TestHelpers.createTempDirectoryAsync "swate-open-invalid-occupied-"
+                let callingWindowId = 42
+                let targetWindowId = 43
+                let existingArcPath = "C:/already-open-validation-guard"
+                let callingWindow = lifecycleTestWindow callingWindowId false ignore
+                let callingVault = ArcVault(callingWindow)
+                let existingArc = ARC("Existing ARC")
+                let seededEntry = FileEntry.create ("existing.txt", "existing.txt", false)
+                let mutable createdWindowCount = 0
+
+                callingVault.path <- Some existingArcPath
+                callingVault.SetArc(existingArc)
+                callingVault.fileTree.Add(seededEntry.path, seededEntry)
+
+                let targetWindow, _, _, _ =
+                    successfulRegistrationTestWindow targetWindowId ignore ignore
+
+                setBrowserWindowFactory (fun _ ->
+                    createdWindowCount <- createdWindowCount + 1
+                    targetWindow :> obj
+                )
+
+                let vaults = ArcVaults()
+                vaults.Vaults.Add(callingWindowId, callingVault)
+                let mutable openError: exn option = None
+
+                try
+                    try
+                        let! _ = vaults.OpenOrFocusArc(callingWindowId, invalidTargetPath)
+                        ()
+                    with error ->
+                        openError <- Some error
+
+                    Vitest.expect(openError.IsSome).toBe (true)
+                    Vitest.expect(openError.Value.Message).toContain (ARCtrl.ArcPathHelper.InvestigationFileName)
+                    Vitest.expect(createdWindowCount).toBe (0)
+                    Vitest.expect(vaults.TryGetVault(callingWindowId)).toEqual (Some callingVault)
+                    Vitest.expect(callingVault.path).toEqual (Some existingArcPath)
+                    Vitest.expect(callingVault.arc.IsSome).toBe (true)
+                    Vitest.expect(callingVault.arc.Value).toBe (existingArc)
+                    Vitest.expect(callingVault.watcher).toEqual (None)
+                    Vitest.expect(callingVault.fileTree.Count).toBe (1)
+                    Vitest.expect(callingVault.fileTree.ContainsKey(seededEntry.path)).toBe (true)
+
+                    vaults.Vaults.Remove(callingWindowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync invalidTargetPath
+                with error ->
+                    vaults.Vaults.Remove(callingWindowId) |> ignore
+                    vaults.Vaults.Remove(targetWindowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync invalidTargetPath
+                    return raise error
             }
         )
 
@@ -2311,13 +2374,17 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "OpenARC restores an empty vault after opening a non-ARC folder fails",
+            "OpenARC clears pre-existing vault state after opening a non-ARC folder fails",
             fun () -> promise {
                 let! folderPath = TestHelpers.createTempDirectoryAsync "swate-open-invalid-arc-"
 
                 try
                     let vault = ArcVault(TestHelpers.testWindow ())
+                    let seededEntry = FileEntry.create ("seeded.txt", "seeded.txt", false)
+                    vault.fileTree.Add(seededEntry.path, seededEntry)
                     let mutable failed = false
+
+                    Vitest.expect(vault.fileTree.Count).toBe (1)
 
                     try
                         do! vault.OpenARC folderPath
@@ -2328,6 +2395,7 @@ Vitest.describe (
                     Vitest.expect(vault.path).toEqual (None)
                     Vitest.expect(vault.arc).toEqual (None)
                     Vitest.expect(vault.watcher).toEqual (None)
+                    Vitest.expect(vault.fileTree.Count).toBe (0)
                     do! TestHelpers.removeDirectoryAsync folderPath
                 with error ->
                     do! TestHelpers.removeDirectoryAsync folderPath
@@ -2343,12 +2411,16 @@ Vitest.describe (
                 try
                     let vault = ArcVault(TestHelpers.testWindow ())
                     vault.path <- Some folderPath
+                    let mutable startupError: exn option = None
 
                     try
                         do! vault.Startup()
-                    with _ ->
-                        ()
+                    with error ->
+                        startupError <- Some error
 
+                    Vitest.expect(startupError.IsSome).toBe (true)
+                    Vitest.expect(startupError.Value.Message).toContain (ARCtrl.ArcPathHelper.InvestigationFileName)
+                    Vitest.expect(vault.arc).toEqual (None)
                     Vitest.expect(vault.watcher).toEqual (None)
                     do! TestHelpers.removeDirectoryAsync folderPath
                 with error ->
