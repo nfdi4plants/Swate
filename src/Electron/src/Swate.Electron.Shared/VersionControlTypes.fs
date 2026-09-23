@@ -335,8 +335,8 @@ type RepositoryLocationDto = {
     ConnectionProfileId: string option
 }
 
-/// Which optional services the open session offers. The renderer enables matching
-/// controls from this record and never calls an absent service.
+/// Which optional services the open session offers. The renderer reads Synchronization and
+/// RepositoryBrowser. A call to an absent service answers service_unavailable.
 type ServiceAvailabilityDto = {
     Synchronization: bool
     TextDiff: bool
