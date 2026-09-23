@@ -2,22 +2,13 @@ module Swate.Electron.Shared.FileIOTypes
 
 open System.Collections.Generic
 open Fable.Core
-
-/// A large object of the workspace (for Git a file tracked with LFS): whether its
-/// content is present in the file and in the local store, its size and object id.
-type LargeObjectState = {
-    path: string
-    sizeBytes: float option
-    isMaterialized: bool
-    isLocallyAvailable: bool
-    objectId: string option
-}
+open Swate.Electron.Shared.VersionControlTypes
 
 type FileEntry = {
     name: string
     isDirectory: bool
     path: string
-    largeObject: LargeObjectState option
+    largeObject: ObjectStateDto option
 }
 
 [<AutoOpen>]
@@ -31,7 +22,7 @@ module FileEntryExtensions =
     type FileEntry with
 
         static member create
-            (name: string, path: string, isDirectory: bool, ?largeObject: LargeObjectState option)
+            (name: string, path: string, isDirectory: bool, ?largeObject: ObjectStateDto option)
             : FileEntry =
             {
                 name = name
@@ -44,7 +35,7 @@ type FileTreeNode = {
     name: string
     isDirectory: bool
     path: string
-    largeObject: LargeObjectState option
+    largeObject: ObjectStateDto option
     children: Dictionary<string, FileTreeNode>
 } with
 
@@ -54,7 +45,7 @@ type FileTreeNode = {
             isDirectory: bool,
             path: string,
             children: Dictionary<string, FileTreeNode>,
-            ?largeObject: LargeObjectState option
+            ?largeObject: ObjectStateDto option
         ) =
         {
             name = name

@@ -81,10 +81,10 @@ let private runGitAsync (repoPath: string) (args: string[]) : Fable.Core.JS.Prom
     return output
 }
 
-let private expectHexObjectId (largeObject: LargeObjectState) =
-    Vitest.expect(largeObject.objectId.IsSome).toBe (true)
+let private expectHexObjectId (largeObject: ObjectStateDto) =
+    Vitest.expect(largeObject.ObjectId.IsSome).toBe (true)
 
-    let objectId = largeObject.objectId |> Option.get
+    let objectId = largeObject.ObjectId |> Option.get
     Vitest.expect(objectId.Length).toBe (64)
     Vitest.expect(System.Text.RegularExpressions.Regex.IsMatch(objectId, "^[0-9a-fA-F]{64}$")).toBe (true)
 
@@ -192,16 +192,16 @@ Vitest.describe (
                         let pointerLargeObject = pointerEntry.largeObject |> Option.get
                         let downloadedLargeObject = downloadedEntry.largeObject |> Option.get
 
-                        Vitest.expect(pointerLargeObject.path).toBe ("pointer.psd")
-                        Vitest.expect(pointerLargeObject.sizeBytes |> Option.get).toBeGreaterThan (0)
-                        Vitest.expect(pointerLargeObject.isMaterialized).toBe (false)
-                        Vitest.expect(pointerLargeObject.isLocallyAvailable).toBe (true)
+                        Vitest.expect(pointerLargeObject.Path).toBe ("pointer.psd")
+                        Vitest.expect(pointerLargeObject.SizeBytes |> Option.get).toBeGreaterThan (0)
+                        Vitest.expect(pointerLargeObject.IsMaterialized).toBe (false)
+                        Vitest.expect(pointerLargeObject.IsLocallyAvailable).toBe (true)
                         expectHexObjectId pointerLargeObject
 
-                        Vitest.expect(downloadedLargeObject.path).toBe ("downloaded.psd")
-                        Vitest.expect(downloadedLargeObject.sizeBytes |> Option.get).toBeGreaterThan (0)
-                        Vitest.expect(downloadedLargeObject.isMaterialized).toBe (true)
-                        Vitest.expect(downloadedLargeObject.isLocallyAvailable).toBe (true)
+                        Vitest.expect(downloadedLargeObject.Path).toBe ("downloaded.psd")
+                        Vitest.expect(downloadedLargeObject.SizeBytes |> Option.get).toBeGreaterThan (0)
+                        Vitest.expect(downloadedLargeObject.IsMaterialized).toBe (true)
+                        Vitest.expect(downloadedLargeObject.IsLocallyAvailable).toBe (true)
                         expectHexObjectId downloadedLargeObject
                     })
             }
@@ -227,10 +227,10 @@ Vitest.describe (
                         Vitest.expect(enrichedEntry.largeObject.IsSome).toBe (true)
                         let largeObject = enrichedEntry.largeObject |> Option.get
 
-                        Vitest.expect(largeObject.path).toBe ("single-pointer.psd")
-                        Vitest.expect(largeObject.sizeBytes |> Option.get).toBeGreaterThan (0)
-                        Vitest.expect(largeObject.isMaterialized).toBe (true)
-                        Vitest.expect(largeObject.isLocallyAvailable).toBe (true)
+                        Vitest.expect(largeObject.Path).toBe ("single-pointer.psd")
+                        Vitest.expect(largeObject.SizeBytes |> Option.get).toBeGreaterThan (0)
+                        Vitest.expect(largeObject.IsMaterialized).toBe (true)
+                        Vitest.expect(largeObject.IsLocallyAvailable).toBe (true)
                         expectHexObjectId largeObject
                     })
             }

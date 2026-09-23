@@ -20,12 +20,12 @@ let private mapLfsSize (sizeBytes: float option) =
 
 let getFileTreeNodeLfsState (node: FileTreeNode) : FileTreeNodeLfsState =
     let lfsSize, lfsSizeFormatted =
-        mapLfsSize (node.largeObject |> Option.bind _.sizeBytes)
+        mapLfsSize (node.largeObject |> Option.bind _.SizeBytes)
 
     {
         IsLFS = node.largeObject |> Option.map (fun _ -> true)
-        IsLFSPointer = node.largeObject |> Option.map (fun info -> not info.isMaterialized)
-        Downloaded = node.largeObject |> Option.map _.isLocallyAvailable
+        IsLFSPointer = node.largeObject |> Option.map (fun info -> not info.IsMaterialized)
+        Downloaded = node.largeObject |> Option.map _.IsLocallyAvailable
         Size = lfsSize
         SizeFormatted = lfsSizeFormatted
     }

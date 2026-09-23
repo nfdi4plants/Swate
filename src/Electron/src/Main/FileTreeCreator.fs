@@ -10,6 +10,7 @@ open Main.VersionControl
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.VersionControlTypes
 open VersionControlService.Abstractions
 
 let normalizeRootPath (path: string) =
@@ -24,7 +25,7 @@ let private shouldIgnorePath (path: string) =
     System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
     || isLegacyDataMapPath normalizedPath
 
-let private tryListLargeObjects (repoRoot: string) : Fable.Core.JS.Promise<Map<string, LargeObjectState>> = promise {
+let private tryListLargeObjects (repoRoot: string) : Fable.Core.JS.Promise<Map<string, ObjectStateDto>> = promise {
     try
         let context = OperationContext.detached "file-tree-objects"
 
@@ -46,16 +47,8 @@ let private tryListLargeObjects (repoRoot: string) : Fable.Core.JS.Promise<Map<s
                     return
                         outcome.Value
                         |> Array.map (fun (objectState: ObjectState) ->
-                            let path = RepositoryPath.value objectState.Path
-
-                            path,
-                            {
-                                path = path
-                                sizeBytes = objectState.SizeBytes
-                                isMaterialized = objectState.IsMaterialized
-                                isLocallyAvailable = objectState.IsLocallyAvailable
-                                objectId = objectState.ObjectId
-                            }
+                            let dto = Mappings.objectState objectState
+                            dto.Path, dto
                         )
                         |> Map.ofArray
                 | Failed _ -> return Map.empty
@@ -66,7 +59,7 @@ let private tryListLargeObjects (repoRoot: string) : Fable.Core.JS.Promise<Map<s
 
 let private withFileEntryLfsMetadata
     (repoRoot: string)
-    (largeObjectsByRelativePath: Map<string, LargeObjectState>)
+    (largeObjectsByRelativePath: Map<string, ObjectStateDto>)
     (entry: FileEntry)
     : FileEntry =
     if entry.isDirectory then
@@ -86,7 +79,7 @@ let private withFileEntryLfsMetadata
 
 let private withFileEntriesLfsMetadata
     (repoRoot: string)
-    (largeObjectsByRelativePath: Map<string, LargeObjectState>)
+    (largeObjectsByRelativePath: Map<string, ObjectStateDto>)
     (entries: FileEntry[])
     : FileEntry[] =
     entries

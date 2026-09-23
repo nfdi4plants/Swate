@@ -5,6 +5,7 @@ module FileTreeCreator = Main.FileTreeCreator
 
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.VersionControlTypes
 open Swate.Components.Shared
 open Vitest
 
@@ -115,12 +116,12 @@ Vitest.describe (
         Vitest.test (
             "preserves Git LFS ls-files metadata from FileEntry to root FileTreeNode",
             fun () ->
-                let largeObject: LargeObjectState = {
-                    path = "arc/sample.bin"
-                    sizeBytes = Some 2048.0
-                    isMaterialized = false
-                    isLocallyAvailable = false
-                    objectId = Some "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                let largeObject: ObjectStateDto = {
+                    Path = "arc/sample.bin"
+                    SizeBytes = Some 2048.0
+                    IsMaterialized = false
+                    IsLocallyAvailable = false
+                    ObjectId = Some "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                 }
 
                 let rootEntry: FileEntry = {
@@ -268,12 +269,12 @@ Vitest.describe (
             largeObject = largeObject
         }
 
-        let pointerInfo: LargeObjectState = {
-            path = "data.bin"
-            sizeBytes = Some 128.0
-            isMaterialized = false
-            isLocallyAvailable = false
-            objectId = Some "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        let pointerInfo: ObjectStateDto = {
+            Path = "data.bin"
+            SizeBytes = Some 128.0
+            IsMaterialized = false
+            IsLocallyAvailable = false
+            ObjectId = Some "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         }
 
         Vitest.test (
