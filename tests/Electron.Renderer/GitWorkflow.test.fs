@@ -1518,6 +1518,57 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "A stale branch preflight reports the error and refreshes",
+            fun () -> promise {
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
+                let failure = {
+                    makeFailure Concurrency VersionControlCodes.PreconditionFailed "The workspace token is stale." None [||] with
+                        StateChanged = false
+                }
+
+                let deps = {
+                    defaultDependencies with
+                        preflightSwitchRef = fun _ -> promise { return Ok(OperationResultDto.Failed failure) }
+                        reportError = reportedErrors.Add
+                }
+
+                let stateAfterRequest, preflightCmd =
+                    update deps ignore (SwitchBranchRequested "feature") {
+                        runningState with
+                            Refs = [| localBranch "feature" false false |]
+                    }
+
+                let! preflightMessages = collectMessages preflightCmd
+
+                let nextState, finishCmd =
+                    match preflightMessages with
+                    | [| SwitchBranchPreflightCompleted(_, _, Ok(OperationResultDto.Failed _)) |] ->
+                        update deps ignore preflightMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected the branch preflight to return a stale token failure."
+
+                let! finishMessages = collectMessages finishCmd
+
+                Vitest.expect(nextState.BusyOperation).toEqual (None)
+                Vitest.expect(nextState.ErrorNotice).toEqual (Some(failureMessage failure))
+                Vitest.expect(reportedErrors.Count).toBe (1)
+                Vitest.expect(reportedErrors[0].Title).toBe ("Could not switch branch")
+                Vitest.expect(finishMessages).toEqual ([| RefreshRequested |])
+
+                Vitest
+                    .expect(
+                        finishMessages
+                        |> Array.exists (
+                            function
+                            | WriteRequested(SwitchBranch _) -> true
+                            | _ -> false
+                        )
+                    )
+                    .toBe (false)
+            }
+        )
+
+        Vitest.test (
             "A stale branch preflight reply is ignored",
             fun () -> promise {
                 let state = {

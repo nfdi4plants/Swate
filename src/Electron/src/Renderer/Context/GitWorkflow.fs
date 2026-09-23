@@ -1146,6 +1146,18 @@ let private routeFailure (targetPath: string option) (failure: OperationFailureD
         | _ when failure.StateChanged -> RoutedFailure.RefreshThenReport(failureMessage failure)
         | _ -> RoutedFailure.Error(failureMessage failure)
 
+let private routedFailureMessage (originalFailure: OperationFailureDto) (routed: RoutedFailure) =
+    match routed with
+    | RoutedFailure.Cancelled message
+    | RoutedFailure.DependencyInstall message
+    | RoutedFailure.Recovery(_, message)
+    | RoutedFailure.RefreshAfterCancel message
+    | RoutedFailure.RefreshThenReport message
+    | RoutedFailure.StaleWorkspace(message, _)
+    | RoutedFailure.Error message -> message
+    | RoutedFailure.ConflictSession failure -> failureMessage failure
+    | RoutedFailure.UpdateAcceptanceRequired _ -> failureMessage originalFailure
+
 /// A dependency failure names no component. The dependency report does: the first
 /// component that is missing or incompatible decides whether an installation can be
 /// offered (only the provider's configuration component is installable).
@@ -2999,14 +3011,26 @@ let private updateCore
         },
         Cmd.none
     | SwitchBranchPreflightCompleted(_, _, Ok(OperationResultDto.Failed failure)) ->
-        let message = failureMessage failure
+        match routeFailure None failure with
+        | RoutedFailure.StaleWorkspace(message, _) ->
+            {
+                clearBusy model with
+                    ErrorNotice = Some message
+                    WarningNotice = None
+            },
+            Cmd.batch [
+                reportErrorCmd deps "Could not switch branch" message
+                Cmd.ofMsg RefreshRequested
+            ]
+        | routed ->
+            let message = routedFailureMessage failure routed
 
-        {
-            clearBusy model with
-                ErrorNotice = Some message
-                WarningNotice = None
-        },
-        reportErrorCmd deps "Could not switch branch" message
+            {
+                clearBusy model with
+                    ErrorNotice = Some message
+                    WarningNotice = None
+            },
+            reportErrorCmd deps "Could not switch branch" message
     | SwitchBranchPreflightCompleted(_, _, Error message) ->
         {
             clearBusy model with
