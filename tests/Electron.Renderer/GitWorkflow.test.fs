@@ -3659,7 +3659,7 @@ Vitest.describe (
                     .expect(recoveryState.PendingConfirmation |> Option.map _.Message)
                     .toEqual (
                         Some
-                            "Git's index is locked. Another program may be using the repository, or an interrupted operation left the lock behind."
+                            "Git's index is locked. Another program may be using the repository, or an interrupted operation left the lock behind. Close other Git programs for this ARC, then remove the lock."
                     )
             }
         )

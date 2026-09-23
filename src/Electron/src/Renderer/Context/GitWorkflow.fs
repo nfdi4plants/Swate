@@ -788,9 +788,9 @@ let recoveryDialog (recovery: GitPendingRecovery) : GitSidebarConfirmationDialog
         CancelLabel = "Later"
       }
     | GitPendingRecovery.ClearStaleLock _ -> {
-        Title = "Repository lock left behind"
+        Title = "Repository is locked"
         Message =
-            "Git's index is locked. Another program may be using the repository, or an interrupted operation left the lock behind."
+            "Git's index is locked. Another program may be using the repository, or an interrupted operation left the lock behind. Close other Git programs for this ARC, then remove the lock."
         ConfirmLabel = "Remove lock"
         CancelLabel = "Leave it"
       }
