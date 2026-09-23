@@ -1088,7 +1088,11 @@ let private lifecycleTestWindow id isDestroyed onSend =
     createObj [
         "id" ==> id
         "isDestroyed" ==> (fun () -> isDestroyed)
-        "webContents" ==> createObj [ "send" ==> send ]
+        "webContents"
+        ==> createObj [
+            "send" ==> send
+            "isDestroyed" ==> (fun () -> isDestroyed)
+        ]
     ]
     |> unbox<BrowserWindow>
 
@@ -1191,7 +1195,11 @@ Vitest.describe (
                             if eventName = "close" then
                                 closeHandler <- handler
                         )
-                        "webContents" ==> createObj [ "send" ==> (fun (_: string) (_: obj) -> ()) ]
+                        "webContents"
+                        ==> createObj [
+                            "send" ==> (fun (_: string) (_: obj) -> ())
+                            "isDestroyed" ==> (fun () -> false)
+                        ]
                     ]
                     |> unbox<BrowserWindow>
 

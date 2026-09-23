@@ -264,6 +264,7 @@ Vitest.describe (
                         fixture.Host.BeginOperation(
                             "op-1",
                             Some fixture.RepoRoot,
+                            None,
                             fun progress -> reported <- progress :: reported
                         )
 
@@ -273,7 +274,7 @@ Vitest.describe (
                     let otherRoot = join [| fixture.Root; "elsewhere" |]
 
                     let otherWorkspaceOperation =
-                        fixture.Host.BeginOperation("op-other-root", Some otherRoot, ignore)
+                        fixture.Host.BeginOperation("op-other-root", Some otherRoot, None, ignore)
 
                     Vitest.expect(fixture.Host.IsIdle otherRoot).toBe false
                     Vitest.expect(fixture.Host.RunningOperationIds fixture.RepoRoot).toEqual [| "op-1" |]
@@ -302,6 +303,59 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "operations are tracked by window id and their completion can be awaited",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let otherRoot = join [| fixture.Root; "window-two-workspace" |]
+
+                    let windowOneOperation =
+                        fixture.Host.BeginOperation("op-w1", Some fixture.RepoRoot, Some 1, ignore)
+
+                    let windowOneClone =
+                        fixture.Host.BeginOperation("op-w1-clone", Some otherRoot, Some 1, ignore)
+
+                    let windowTwoOperation =
+                        fixture.Host.BeginOperation("op-w2", Some fixture.RepoRoot, Some 2, ignore)
+
+                    Vitest.expect(fixture.Host.RunningOperationIdsForWindow 1 |> Array.sort).toEqual [|
+                        "op-w1"
+                        "op-w1-clone"
+                    |]
+
+                    Vitest.expect(fixture.Host.RunningOperationIdsForWindow 2).toEqual [| "op-w2" |]
+
+                    let mutable resolved = false
+
+                    let completion = promise {
+                        do! fixture.Host.WhenOperationsComplete [| "op-w1"; "op-w1-clone"; "unknown" |]
+
+                        resolved <- true
+                    }
+
+                    windowOneOperation.Complete()
+                    do! Promise.sleep 0
+                    Vitest.expect(resolved).toBe false
+
+                    windowOneClone.Complete()
+                    do! completion
+                    Vitest.expect(resolved).toBe true
+                    Vitest.expect(fixture.Host.RunningOperationIdsForWindow 1).toEqual [||]
+                    Vitest.expect(fixture.Host.RunningOperationIdsForWindow 2).toEqual [| "op-w2" |]
+
+                    let mutable emptyResolved = false
+
+                    let emptyCompletion = promise {
+                        do! fixture.Host.WhenOperationsComplete [||]
+                        emptyResolved <- true
+                    }
+
+                    do! emptyCompletion
+                    Vitest.expect(emptyResolved).toBe true
+                    windowTwoOperation.Complete()
+                })
+        )
+
+        Vitest.test (
             "a library operation run with a canceled context fails structurally as canceled",
             fun () ->
                 withFixture (fun fixture -> promise {
@@ -312,7 +366,7 @@ Vitest.describe (
                     let hosted = expectValue "open" opened
 
                     let tracked =
-                        fixture.Host.BeginOperation("op-cancel", Some hosted.Binding.WorkspaceRoot, ignore)
+                        fixture.Host.BeginOperation("op-cancel", Some hosted.Binding.WorkspaceRoot, None, ignore)
 
                     fixture.Host.Cancel "op-cancel" |> ignore
 
@@ -1458,7 +1512,7 @@ Vitest.describe (
                     let otherWorkspace = join [| fixture.Root; "other-workspace" |]
 
                     let unrelatedClone =
-                        fixture.Host.BeginOperation("clone-other-workspace", Some otherWorkspace, ignore)
+                        fixture.Host.BeginOperation("clone-other-workspace", Some otherWorkspace, None, ignore)
 
                     let! unrelatedClear = api.clearStaleLock (request "clear-lock-other-workspace")
 
@@ -1469,7 +1523,7 @@ Vitest.describe (
                     unrelatedClone.Complete()
 
                     let sameWorkspaceOperation =
-                        fixture.Host.BeginOperation("clone-same-workspace", Some fixture.RepoRoot, ignore)
+                        fixture.Host.BeginOperation("clone-same-workspace", Some fixture.RepoRoot, None, ignore)
 
                     let! sameWorkspaceClear = api.clearStaleLock (request "clear-lock-same-workspace")
                     sameWorkspaceOperation.Complete()
@@ -1484,7 +1538,7 @@ Vitest.describe (
                         |> Option.defaultWith (fun () -> failwith "session missing")
 
                     let other =
-                        fixture.Host.BeginOperation("busy", Some session.Binding.WorkspaceRoot, ignore)
+                        fixture.Host.BeginOperation("busy", Some session.Binding.WorkspaceRoot, None, ignore)
 
                     let! refused = api.clearStaleLock (request "clear-lock-3")
                     other.Complete()

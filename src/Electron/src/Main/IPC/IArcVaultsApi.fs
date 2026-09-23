@@ -4,7 +4,6 @@ open System
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
-open Fable.Electron.Remoting.Main
 open Swate.Components.Shared
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
@@ -105,10 +104,9 @@ let private runLoadedArcPathAction
 let private notifyGitRepositoryInitialized (arcPath: string) =
     ARC_VAULTS.TryGetVaultByPath arcPath
     |> Option.iter (fun vault ->
-        Remoting.createIpc ()
-        |> Remoting.withWindow vault.window
-        |> Remoting.buildProxySender<IGitRepositoryRendererApi>
-        |> fun rendererApi -> rendererApi.gitRepositoryInitialized arcPath
+        WindowSend.send<IGitRepositoryRendererApi>
+            vault.window
+            (fun rendererApi -> rendererApi.gitRepositoryInitialized arcPath)
     )
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/

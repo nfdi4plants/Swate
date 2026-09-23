@@ -8,7 +8,6 @@ module Main.IPC.IVersionControlApi
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
-open Fable.Electron.Remoting.Main
 open Main
 open Main.VersionControl
 open Main.VersionControl.VersionControlSettings
@@ -24,16 +23,14 @@ type private RendererBridge = {
 
 let private silentBridge: RendererBridge = { Progress = ignore; Started = ignore }
 
-let private bridgeForWindow (window: BrowserWindow) : RendererBridge =
-    let rendererApi =
-        Remoting.createIpc ()
-        |> Remoting.withWindow window
-        |> Remoting.buildProxySender<IVersionControlRendererApi>
-
-    {
-        Progress = fun progress -> rendererApi.versionControlProgress progress
-        Started = fun key -> rendererApi.versionControlOperationStarted key
-    }
+let private bridgeForWindow (window: BrowserWindow) : RendererBridge = {
+    Progress =
+        fun progress ->
+            WindowSend.send<IVersionControlRendererApi> window (fun api -> api.versionControlProgress progress)
+    Started =
+        fun key ->
+            WindowSend.send<IVersionControlRendererApi> window (fun api -> api.versionControlOperationStarted key)
+}
 
 let private tryBridgeFromEvent (event: IpcMainInvokeEvent) =
     windowFromIpcEvent event
@@ -77,6 +74,7 @@ let private runTracked
     (bridge: RendererBridge)
     (operationId: string)
     (workspaceRoot: string option)
+    (windowId: int option)
     (operation: OperationContext -> Async<OperationResult<'T>>)
     : JS.Promise<OperationResult<'T>> =
     promise {
@@ -84,6 +82,7 @@ let private runTracked
             host.BeginOperation(
                 operationId,
                 workspaceRoot,
+                windowId,
                 fun progress -> bridge.Progress(Mappings.progress operationId progress)
             )
 
@@ -119,6 +118,7 @@ let private withSession
                     bridge
                     operationId
                     (Some arcPath)
+                    (windowFromIpcEvent event |> Option.map _.id)
                     (fun context -> async {
                         let! opened = host.OpenSession(arcPath, context)
 
@@ -326,10 +326,11 @@ let private provision
     (bridge: RendererBridge)
     (operationId: string)
     (workspaceRoot: string)
+    (windowId: int option)
     (run: OperationContext -> Async<OperationResult<WorkspaceBinding>>)
     : JS.Promise<Result<OperationResultDto<string>, exn>> =
     promise {
-        let! result = runTracked host bridge operationId (Some workspaceRoot) run
+        let! result = runTracked host bridge operationId (Some workspaceRoot) windowId run
 
         return Ok(Mappings.result (fun (binding: WorkspaceBinding) -> binding.WorkspaceRoot) result)
     }
@@ -379,6 +380,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 bridge
                 request.OperationId
                 request.TargetPath
+                (windowFromIpcEvent event |> Option.map _.id)
                 (fun context -> async {
                     let! cloned =
                         match locationFor host request.ProviderLocation request.DisplayName with
@@ -409,6 +411,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 bridge
                 request.OperationId
                 request.TargetPath
+                (windowFromIpcEvent event |> Option.map _.id)
                 (fun context -> initializeLocalWorkspace host request.TargetPath context)
     // Bind changes the vault's repository configuration, so it runs as a mutation of
     // the open vault and refreshes the tree afterwards.
@@ -463,6 +466,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                     bridge
                                     request.OperationId
                                     (Some arcPath)
+                                    (windowFromIpcEvent event |> Option.map _.id)
                                     (fun context -> async {
                                         match locationFor host request.ProviderLocation request.DisplayName with
                                         | Error failure -> return Failed failure
@@ -529,6 +533,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     bridge
                     request.OperationId
                     None
+                    (windowFromIpcEvent event |> Option.map _.id)
                     (fun context -> async {
                         let factories = ProviderResolver.factories host.Runtime.Catalog
                         let mutable statuses: DependencyStatus[] = [||]
@@ -583,6 +588,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     bridge
                     request.OperationId
                     None
+                    (windowFromIpcEvent event |> Option.map _.id)
                     (fun context -> async {
                         let factories = ProviderResolver.factories host.Runtime.Catalog
                         let mutable outcome: OperationResult<DependencyStatus> option = None

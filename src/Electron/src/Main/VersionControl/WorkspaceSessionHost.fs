@@ -24,9 +24,14 @@ type TrackedOperation = {
     Complete: unit -> unit
 }
 
+/// A running operation keeps its workspace root and window id, and a completion that
+/// close handling can await.
 type private RunningOperation = {
     WorkspaceRoot: string option
+    WindowId: int option
     Source: OperationCancellation.Source
+    Completion: JS.Promise<unit>
+    ResolveCompletion: unit -> unit
 }
 
 let private ambiguousFailure (candidates: ProviderResolver.DetectionCandidate[]) =
@@ -345,20 +350,37 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
 
     /// Registers an operation before any library call so a cancel that arrives before
     /// the first progress event still lands. Each operation retains its workspace root
-    /// so lock cleanup can scope it correctly.
+    /// and window id for lock cleanup and close handling.
     member _.BeginOperation
-        (operationId: string, workspaceRoot: string option, reportProgress: OperationProgress -> unit)
-        : TrackedOperation =
+        (
+            operationId: string,
+            workspaceRoot: string option,
+            windowId: int option,
+            reportProgress: OperationProgress -> unit
+        ) : TrackedOperation =
         let source = OperationCancellation.Source()
+        let mutable resolveCompletion: unit -> unit = ignore
+
+        let completion: JS.Promise<unit> =
+            JS.Constructors.Promise.Create(fun resolve _ -> resolveCompletion <- fun () -> resolve ())
 
         operations[operationId] <- {
             WorkspaceRoot = workspaceRoot
+            WindowId = windowId
             Source = source
+            Completion = completion
+            ResolveCompletion = fun () -> resolveCompletion ()
         }
 
         {
             Context = OperationContext.create operationId source.Cancellation reportProgress
-            Complete = fun () -> operations.Remove operationId |> ignore
+            Complete =
+                fun () ->
+                    match operations.TryGetValue operationId with
+                    | true, running ->
+                        operations.Remove operationId |> ignore
+                        running.ResolveCompletion()
+                    | _ -> ()
         }
 
     /// Cancels a tracked operation by its operation id.
@@ -375,6 +397,31 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
         |> Seq.filter (fun entry -> entry.Value.WorkspaceRoot |> Option.exists (sameRoot workspaceRoot))
         |> Seq.map (fun entry -> entry.Key)
         |> Seq.toArray
+
+    /// Returns operations registered for the queried window id.
+    member _.RunningOperationIdsForWindow(windowId: int) : string[] =
+        operations
+        |> Seq.filter (fun entry -> entry.Value.WindowId = Some windowId)
+        |> Seq.map (fun entry -> entry.Key)
+        |> Seq.toArray
+
+    /// Resolves after every operation id that is still registered has completed.
+    member _.WhenOperationsComplete(operationIds: string[]) : JS.Promise<unit> =
+        let completions =
+            operationIds
+            |> Array.choose (fun operationId ->
+                match operations.TryGetValue operationId with
+                | true, running -> Some running.Completion
+                | _ -> None
+            )
+
+        if completions.Length = 0 then
+            JS.Constructors.Promise.resolve ()
+        else
+            promise {
+                for completion in completions do
+                    do! completion
+            }
 
     member this.IsIdle(workspaceRoot: string) : bool =
         (this.RunningOperationIds workspaceRoot).Length = 0

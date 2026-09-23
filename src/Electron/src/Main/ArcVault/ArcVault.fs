@@ -5,7 +5,6 @@ open System.Collections.Generic
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
-open Fable.Electron.Remoting.Main
 open Main
 open Main.ARCtrlExtensions
 open Main.Bindings
@@ -74,6 +73,7 @@ type ArcVault(window: BrowserWindow) =
     member val private fileWatcherOwnWriteArcMergeSuppressionTimeout: int option = None with get, set
     member val activeFileImport: ActiveFileImport option = None with get, set
     member val isWaitingForImportCleanup = false with get, set
+    member val isWaitingForOperationsOnClose = false with get, set
 
     /// Runs ARC merges sequentially so every operation observes the result of the preceding merge.
     member this.EnqueueArcMerge<'T>(operation: unit -> Fable.Core.JS.Promise<'T>) : Fable.Core.JS.Promise<'T> =
@@ -637,17 +637,12 @@ module ArcVaultExtensions =
         member this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
             this.fileTree <- fileTree
 
-            let sendMsg =
-                Remoting.createIpc ()
-                |> Remoting.withWindow this.window
-                |> Remoting.buildProxySender<IFileTreeRendererApi>
-
             let rendererFileTree =
                 match this.path with
                 | Some arcPath -> toRendererFileTree arcPath fileTree.Values
                 | None -> Dictionary<string, FileEntry>()
 
-            sendMsg.fileTreeUpdate rendererFileTree
+            WindowSend.send<IFileTreeRendererApi> this.window (fun api -> api.fileTreeUpdate rendererFileTree)
 
         member this.GetRendererFileTreeSnapshot() = promise {
             match this.path with
@@ -678,10 +673,13 @@ module ArcVaultExtensions =
                 | None ->
                     let watcher = createFileWatcher this.path.Value usePolling
 
-                    let sendMsgApi =
-                        Remoting.createIpc ()
-                        |> Remoting.withWindow this.window
-                        |> Remoting.buildProxySender<IArcFileWatcherApi>
+                    let sendMsgApi: IArcFileWatcherApi = {
+                        IsLoadingChanges =
+                            fun isLoading ->
+                                WindowSend.send<IArcFileWatcherApi>
+                                    this.window
+                                    (fun api -> api.IsLoadingChanges isLoading)
+                    }
 
                     watcher.on (Chokidar.Events.All, this._FileEventController sendMsgApi) |> ignore
                     this.watcher <- Some watcher
@@ -723,15 +721,10 @@ module ArcVaultExtensions =
             | None ->
                 let normalizedPath = PathHelpers.normalizePath path
 
-                let sendMsg =
-                    Remoting.createIpc ()
-                    |> Remoting.withWindow this.window
-                    |> Remoting.buildProxySender<IPathChangeRendererApi>
-
                 swatelogfn this.window.id "path: %s" normalizedPath
                 this.path <- Some normalizedPath
                 do! this.Startup()
-                sendMsg.pathChange (Some normalizedPath)
+                WindowSend.send<IPathChangeRendererApi> this.window (fun api -> api.pathChange (Some normalizedPath))
         }
 
         member this.CreateARC(path: string, identifier: string) = promise {
@@ -740,11 +733,6 @@ module ArcVaultExtensions =
             | _, Some _ -> swatefailfn this.window.id "Unable to create ARC in vault bound to ARC."
             | None, None ->
                 let normalizedPath = PathHelpers.normalizePath path
-
-                let sendMsg =
-                    Remoting.createIpc ()
-                    |> Remoting.withWindow this.window
-                    |> Remoting.buildProxySender<IPathChangeRendererApi>
 
                 let arc = ARC(identifier)
                 this.path <- Some normalizedPath
@@ -762,7 +750,7 @@ module ArcVaultExtensions =
                     })
 
                 do! this.Startup()
-                sendMsg.pathChange (Some normalizedPath)
+                WindowSend.send<IPathChangeRendererApi> this.window (fun api -> api.pathChange (Some normalizedPath))
         }
 
         member this.RenameOpenArcRoot(newName: string) : Fable.Core.JS.Promise<Result<string, exn>> = promise {
@@ -832,12 +820,9 @@ module ArcVaultExtensions =
                             refreshError.Message
 
                     try
-                        let sendMsg =
-                            Remoting.createIpc ()
-                            |> Remoting.withWindow this.window
-                            |> Remoting.buildProxySender<IPathChangeRendererApi>
-
-                        sendMsg.pathChange (Some renamedPath)
+                        WindowSend.send<IPathChangeRendererApi>
+                            this.window
+                            (fun api -> api.pathChange (Some renamedPath))
                     with notifyError ->
                         swatelogfn
                             this.window.id
@@ -891,11 +876,7 @@ type ArcVaults() =
             if arr.Length > 0 then
                 arr
                 |> Array.iter (fun vault ->
-                    if not (vault.window.isDestroyed ()) then
-                        Remoting.createIpc ()
-                        |> Remoting.withWindow vault.window
-                        |> Remoting.buildProxySender<IRecentArcsRendererApi>
-                        |> fun client -> client.recentARCsUpdate recentARCs
+                    WindowSend.send<IRecentArcsRendererApi> vault.window (fun api -> api.recentARCsUpdate recentARCs)
                 )
 
     /// Centralized side-effect: update recent ARCs store and broadcast to all windows.
@@ -912,7 +893,15 @@ type ArcVaults() =
             this.Vaults.Remove(id) |> ignore
 
             match Main.VersionControl.WorkspaceSessionHost.tryCurrent (), vault.path with
-            | Some host, Some path -> host.CloseSession path |> Async.StartAsPromise |> Promise.start
+            | Some host, Some path ->
+                if host.IsIdle path then
+                    host.CloseSession path |> Async.StartAsPromise |> Promise.start
+                else
+                    promise {
+                        do! host.WhenOperationsComplete(host.RunningOperationIds path)
+                        do! host.CloseSession path |> Async.StartAsPromise
+                    }
+                    |> Promise.start
             | _ -> ()
 
             vault.path |> Option.iter (fun p -> RECENT_ARCS.Inactivate(p) |> ignore)
@@ -958,6 +947,8 @@ type ArcVaults() =
 
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
         window.onClose (fun closeEvent ->
+            let host = Main.VersionControl.WorkspaceSessionHost.tryCurrent ()
+
             if not vault.isCloseApproved then
                 if vault.activeFileImport.IsSome then
                     closeEvent.preventDefault ()
@@ -992,24 +983,77 @@ type ArcVaults() =
                                     )
                         }
                         |> Promise.start
+                elif
+                    host
+                    |> Option.exists (fun currentHost -> (currentHost.RunningOperationIdsForWindow id).Length > 0)
+                then
+                    closeEvent.preventDefault ()
+
+                    if not vault.isWaitingForOperationsOnClose then
+                        vault.isWaitingForOperationsOnClose <- true
+
+                        promise {
+                            try
+                                match host with
+                                | Some currentHost ->
+                                    let! response =
+                                        dialog.showMessageBox (
+                                            ?window = Some(unbox<BaseWindow> window),
+                                            ?options =
+                                                Some(
+                                                    Dialog.ShowMessageBox.Options(
+                                                        message =
+                                                            "A version control operation is still running in this window.",
+                                                        ``type`` = Enums.Dialog.ShowMessageBox.Options.Type.Question,
+                                                        detail =
+                                                            "Closing the window cancels it. The window closes as soon as the operation has stopped.",
+                                                        buttons = [|
+                                                            "Cancel operation and close"
+                                                            "Keep window open"
+                                                        |],
+                                                        defaultId = 1,
+                                                        cancelId = 1
+                                                    )
+                                                )
+                                        )
+
+                                    if response.response = 0.0 then
+                                        let operationIds = currentHost.RunningOperationIdsForWindow id
+
+                                        operationIds
+                                        |> Array.iter (fun operationId -> currentHost.Cancel operationId |> ignore)
+
+                                        do! currentHost.WhenOperationsComplete operationIds
+                                        vault.isWaitingForOperationsOnClose <- false
+
+                                        if not (window.isDestroyed ()) then
+                                            window.close ()
+                                    else
+                                        vault.isWaitingForOperationsOnClose <- false
+                                | None -> vault.isWaitingForOperationsOnClose <- false
+                            with closeError ->
+                                vault.isWaitingForOperationsOnClose <- false
+
+                                swatelogfn
+                                    id
+                                    "Unable to close while a version control operation is running: %s"
+                                    closeError.Message
+                        }
+                        |> Promise.start
                 elif vault.hasUnsavedArcChanges then
                     closeEvent.preventDefault ()
 
                     if not vault.isCloseRequestPending then
                         vault.isCloseRequestPending <- true
 
-                        let saveBeforeQuitClient =
-                            Remoting.createIpc ()
-                            |> Remoting.withWindow vault.window
-                            |> Remoting.buildProxySender<IMainSaveBeforeQuitApi>
-
-                        saveBeforeQuitClient.requestSaveBeforeQuit ()
+                        WindowSend.send<IMainSaveBeforeQuitApi> vault.window (fun api -> api.requestSaveBeforeQuit ())
                 else
                     swatelogfn id "Closing window directly because no unsaved ARC changes are present."
         )
 
         window.onClosed (fun () ->
             vault.isWaitingForImportCleanup <- false
+            vault.isWaitingForOperationsOnClose <- false
             vault.isCloseRequestPending <- false
             vault.isCloseApproved <- false
             this.DisposeVault(id)
