@@ -19,19 +19,8 @@ module LakeFsTypes = VersionControlService.LakeFs.LakeFsTypes
 module LakeFsWorkspaceSession = VersionControlService.LakeFs.LakeFsWorkspaceSession
 module RuntimeNodeInterop = VersionControlService.Runtime.Node.Interop
 
-let private electronMock: obj = import "__electronMock" "electron"
-
-[<Emit("require('node:child_process').execFileSync($0, $1, { cwd: $2, stdio: 'pipe' }).toString()")>]
-let private execFile (_file: string) (_args: string[]) (_cwd: string) : string = jsNative
-
-let private writeText (filePath: string) (content: string) =
-    Main.Bindings.Filesystem.writeFileSync filePath content Main.Bindings.Filesystem.TextEncoding.Utf8
-
 [<Emit("process.env[$0] ?? null")>]
 let private getEnvironmentVariable (_name: string) : string = jsNative
-
-[<Emit("(() => { let resolve; const promise = new Promise((r) => { resolve = r; }); return [promise, resolve]; })()")>]
-let private deferred () : JS.Promise<unit> * (unit -> unit) = jsNative
 
 [<Emit("Promise.race($0)")>]
 let private promiseRace (_promises: JS.Promise<'T>[]) : JS.Promise<'T> = jsNative
@@ -57,23 +46,6 @@ let private lakeFsConnection () : LakeFsTypes.LakeFsConnection = {
         |> Option.defaultValue "integration-secret"
 }
 
-let private noAccounts: DataHubStrategies.DataHubAccountSource = {
-    GetState = fun () -> AuthStateDto.Empty
-    TryGetTokenForAccount = fun _ -> None
-    TryGetTokenForHost = fun _ -> None
-}
-
-let private memoryBindings () =
-    let mutable content: string option = None
-
-    WorkspaceBindingStore.create
-        CaseInsensitive
-        (fun () -> content)
-        (fun next ->
-            content <- Some next
-            Ok()
-        )
-
 let private createRuntimeWithFactory
     (bindings: WorkspaceBindingStore.IWorkspaceBindingStore)
     (lakeFsFactory: ProviderFactory)
@@ -87,17 +59,6 @@ let private createRuntimeWithFactory
         Bindings = bindings
         PathCaseSensitivity = CaseInsensitive
     }
-
-let private createRuntime
-    (settingsRoot: string)
-    (connection: LakeFsTypes.LakeFsConnection)
-    (bindings: WorkspaceBindingStore.IWorkspaceBindingStore)
-    : VersionControlRuntime.VersionControlRuntime =
-    createRuntimeWithFactory
-        bindings
-        (ProviderComposition.createLakeFsFactory
-            (ProviderComposition.lakeFsOptions settingsRoot CaseInsensitive)
-            (LakeFsCredentials.fixedConnection connection))
 
 let private createRuntimeWithHooks
     (settingsRoot: string)
@@ -115,31 +76,12 @@ let private createRuntimeWithHooks
             (LakeFsCredentials.fixedConnection connection)
             ProviderComposition.dataHubRevisionPolicy)
 
-let private expectValue (operation: string) (result: OperationResult<'T>) =
-    match result with
-    | Succeeded outcome
-    | PartiallySucceeded(outcome, _) -> outcome.Value
-    | Failed failure -> failwith $"{operation} failed ({failure.Code}): {failure.Message}"
-
 let private expectDtoSucceeded (operation: string) (result: Result<OperationResultDto<'T>, exn>) =
     match result with
     | Ok(OperationResultDto.Succeeded outcome) -> outcome
     | Ok(OperationResultDto.PartiallySucceeded(_, failure)) ->
         failwith $"{operation} partially succeeded ({failure.Code}): {failure.Message}"
     | Ok(OperationResultDto.Failed failure) -> failwith $"{operation} failed ({failure.Code}): {failure.Message}"
-    | Error error -> failwith $"{operation} threw: {error.Message}"
-
-let private expectDtoValue (operation: string) (result: Result<OperationResultDto<'T>, exn>) =
-    match result with
-    | Ok(OperationResultDto.Succeeded outcome)
-    | Ok(OperationResultDto.PartiallySucceeded(outcome, _)) -> outcome
-    | Ok(OperationResultDto.Failed failure) -> failwith $"{operation} failed ({failure.Code}): {failure.Message}"
-    | Error error -> failwith $"{operation} threw: {error.Message}"
-
-let private expectDtoFailure (operation: string) (result: Result<OperationResultDto<'T>, exn>) =
-    match result with
-    | Ok(OperationResultDto.Failed failure) -> failure
-    | Ok _ -> failwith $"{operation} unexpectedly succeeded."
     | Error error -> failwith $"{operation} threw: {error.Message}"
 
 let private expectDtoFailureOrPartial (operation: string) (result: Result<OperationResultDto<'T>, exn>) =
@@ -242,14 +184,14 @@ let private createFixtureWithRuntime
     }
 
 let private createFixture () =
-    createFixtureWithRuntime (fun settings connection bindings -> createRuntime settings connection bindings)
+    createFixtureWithRuntime (fun settings connection bindings ->
+        ElectronCore.TestHelpers.createRuntime settings (LakeFsCredentials.fixedConnection connection) bindings
+    )
 
 let private createHookFixture hooks =
     createFixtureWithRuntime (fun settings connection bindings ->
         createRuntimeWithHooks settings connection bindings hooks
     )
-
-let private detached name = OperationContext.detached name
 
 let private deleteRepository (fixture: Fixture) = promise {
     let! result =
@@ -305,29 +247,6 @@ let private withFixture body = withFixtureFrom createFixture body
 
 let private withHookFixture hooks body =
     withFixtureFrom (fun () -> createHookFixture hooks) body
-
-let private ipcEvent (windowId: int) : IpcMainInvokeEvent =
-    createObj [ "sender" ==> createObj [ "id" ==> windowId ] ]
-    |> unbox<IpcMainInvokeEvent>
-
-let private registerVault (windowId: int) (arcPath: string) =
-    let window = testWindow ()
-    window?id <- windowId
-    let vault = ArcVault(window)
-    vault.path <- Some arcPath
-    ARC_VAULTS.Vaults.[windowId] <- vault
-
-    electronMock?setBrowserWindowFromWebContents (fun (webContents: obj) ->
-        if unbox<int> webContents?id = windowId then
-            box window
-        else
-            null
-    )
-    |> ignore
-
-    vault
-
-let private request (operationId: string) : OperationRequestDto = { OperationId = operationId }
 
 let private bindWorkspaceViaClone
     (fixture: Fixture)
@@ -1037,7 +956,12 @@ Vitest.describe (
                                 Endpoint = "http://127.0.0.1:9"
                         }
 
-                        let badRuntime = createRuntime fixture.Settings badConnection fixture.Bindings
+                        let badRuntime =
+                            createRuntime
+                                fixture.Settings
+                                (LakeFsCredentials.fixedConnection badConnection)
+                                fixture.Bindings
+
                         let badHost = WorkspaceSessionHost.WorkspaceSessionHost(badRuntime)
                         WorkspaceSessionHost.initialize badHost
                         VersionControlRuntime.initialize badRuntime

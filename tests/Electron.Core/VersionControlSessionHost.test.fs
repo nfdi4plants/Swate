@@ -12,72 +12,17 @@ open VersionControlService.Abstractions
 open Vitest
 open ElectronCore.TestHelpers
 
-let private electronMock: obj = import "__electronMock" "electron"
 let private electron: obj = importAll "electron"
 
 [<Emit("$0.mockResolvedValue($1)")>]
 let private mockResolvedValue (mock: obj) (value: obj) : unit = jsNative
 
-[<Emit("require('node:child_process').execFileSync($0, $1, { cwd: $2, stdio: 'pipe' }).toString()")>]
-let private execFile (_file: string) (_args: string[]) (_cwd: string) : string = jsNative
-
 let private git (cwd: string) (args: string list) = execFile "git" (List.toArray args) cwd
-
-let private writeText (filePath: string) (content: string) =
-    Main.Bindings.Filesystem.writeFileSync filePath content Main.Bindings.Filesystem.TextEncoding.Utf8
-
-let private noAccounts: DataHubStrategies.DataHubAccountSource = {
-    GetState = fun () -> AuthStateDto.Empty
-    TryGetTokenForAccount = fun _ -> None
-    TryGetTokenForHost = fun _ -> None
-}
-
-let private memoryBindings () =
-    let mutable content: string option = None
-
-    WorkspaceBindingStore.create
-        CaseInsensitive
-        (fun () -> content)
-        (fun next ->
-            content <- Some next
-            Ok()
-        )
-
-let private createRuntime (settingsRoot: string) : VersionControlRuntime.VersionControlRuntime = {
-    Catalog =
-        ProviderComposition.createCatalog [
-            ProviderComposition.createGitFactory noAccounts
-            ProviderComposition.createLakeFsFactory
-                (ProviderComposition.lakeFsOptions settingsRoot CaseInsensitive)
-                VersionControlService.LakeFs.LakeFsCredentials.unconfigured
-        ]
-    Bindings = memoryBindings ()
-    PathCaseSensitivity = CaseInsensitive
-}
-
-let private expectValue (operation: string) (result: OperationResult<'T>) =
-    match result with
-    | Succeeded outcome
-    | PartiallySucceeded(outcome, _) -> outcome.Value
-    | Failed failure -> failwith $"{operation} failed ({failure.Code}): {failure.Message}"
 
 let private expectFailure (operation: string) (result: OperationResult<'T>) =
     match result with
     | Failed failure -> failure
     | _ -> failwith $"{operation} unexpectedly succeeded."
-
-let private expectDtoValue (operation: string) (result: Result<OperationResultDto<'T>, exn>) =
-    match result with
-    | Ok(OperationResultDto.Succeeded outcome)
-    | Ok(OperationResultDto.PartiallySucceeded(outcome, _)) -> outcome
-    | Ok(OperationResultDto.Failed failure) -> failwith $"{operation} failed ({failure.Code}): {failure.Message}"
-    | Error error -> failwith $"{operation} threw: {error.Message}"
-
-let private expectDtoFailure (operation: string) (result: Result<OperationResultDto<'T>, exn>) =
-    match result with
-    | Ok(OperationResultDto.Failed failure) -> failure
-    | Ok _ -> failwith $"{operation} unexpectedly succeeded."
-    | Error error -> failwith $"{operation} threw: {error.Message}"
 
 /// A git repository with one published base revision and a local bare remote, plus
 /// an unmanaged folder next to it.
@@ -120,7 +65,9 @@ let private createFixture () = promise {
     git repoRoot [ "remote"; "add"; "origin"; remoteRoot ] |> ignore
     git repoRoot [ "push"; "-u"; "origin"; "main" ] |> ignore
 
-    let runtime = createRuntime settingsRoot
+    let runtime =
+        createRuntime settingsRoot VersionControlService.LakeFs.LakeFsCredentials.unconfigured (memoryBindings ())
+
     let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
     WorkspaceSessionHost.initialize host
     VersionControlRuntime.initialize runtime
@@ -147,8 +94,6 @@ let private withFixture (body: Fixture -> JS.Promise<unit>) = promise {
         do! removeDirectoryAsync fixture.Root
         return raise error
 }
-
-let private detached name = OperationContext.detached name
 
 Vitest.describe (
     "Workspace session host",
@@ -396,27 +341,6 @@ Vitest.describe (
         )
 )
 
-let private ipcEvent (windowId: int) : IpcMainInvokeEvent =
-    createObj [ "sender" ==> createObj [ "id" ==> windowId ] ]
-    |> unbox<IpcMainInvokeEvent>
-
-let private registerVault (windowId: int) (arcPath: string) =
-    let window = testWindow ()
-    window?id <- windowId
-    let vault = ArcVault(window)
-    vault.path <- Some arcPath
-    ARC_VAULTS.Vaults.[windowId] <- vault
-
-    electronMock?setBrowserWindowFromWebContents (fun (webContents: obj) ->
-        if unbox<int> webContents?id = windowId then
-            box window
-        else
-            null
-    )
-    |> ignore
-
-    vault
-
 let private registerEmptyVault (windowId: int) =
     let window = testWindow ()
     window?id <- windowId
@@ -434,14 +358,9 @@ let private registerEmptyVault (windowId: int) =
 
     vault
 
-let private request (operationId: string) : OperationRequestDto = { OperationId = operationId }
-
 /// Restores of the fake core provider wait on these gates, keyed by the first path.
 let private restoreGates =
     System.Collections.Generic.Dictionary<string, JS.Promise<unit>>()
-
-[<Emit("(() => { let resolve; const promise = new Promise((r) => { resolve = r; }); return [promise, resolve]; })()")>]
-let private deferred () : JS.Promise<unit> * (unit -> unit) = jsNative
 
 let private openGates =
     System.Collections.Generic.Dictionary<string, JS.Promise<unit>>()
@@ -641,6 +560,79 @@ let private fakeProviderRuntimeThatThrowsOnInitialize coreOnlyRoot failingRoot =
             Catalog = ProviderComposition.createCatalog (Array.toList factories)
     }
 
+let private withCreateArcSetup
+    (tempPrefix: string)
+    (windowId: int)
+    (identifier: string)
+    (createArcRuntime: string -> string -> string -> string -> VersionControlRuntime.VersionControlRuntime)
+    (createExplicitHost: bool)
+    testBody
+    =
+    promise {
+        let! root = createTempDirectoryAsync tempPrefix
+        let settingsRoot = join [| root; "settings" |]
+        let container = join [| root; "container" |]
+
+        let expectedArcPath =
+            ARCtrl.ArcPathHelper.combine container identifier
+            |> Swate.Components.Shared.PathHelpers.normalizePath
+
+        let folders =
+            if createExplicitHost then
+                [ settingsRoot; container ]
+            else
+                [ container ]
+
+        for folder in folders do
+            Main.Bindings.Filesystem.mkdirSync folder (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+        let runtime = createArcRuntime root settingsRoot container expectedArcPath
+
+        let host =
+            if createExplicitHost then
+                Some(WorkspaceSessionHost.WorkspaceSessionHost(runtime))
+            else
+                None
+
+        VersionControlRuntime.initialize runtime
+        WorkspaceSessionHost.resetForTests ()
+        registerEmptyVault windowId |> ignore
+        let dialogSpy = Vitest.vi.spyOn (electron?dialog, "showOpenDialog")
+
+        mockResolvedValue dialogSpy (createObj [ "canceled" ==> false; "filePaths" ==> [| container |] ])
+
+        let cleanup () = promise {
+            Vitest.vi.restoreAllMocks ()
+            electronMock?reset () |> ignore
+            ARC_VAULTS.Vaults.Clear()
+
+            if createExplicitHost then
+                match WorkspaceSessionHost.tryCurrent () with
+                | Some currentHost -> do! currentHost.CloseAll() |> Async.StartAsPromise
+                | None -> ()
+
+                match host with
+                | Some explicitHost -> do! explicitHost.CloseAll() |> Async.StartAsPromise
+                | None -> ()
+
+            do! removeDirectoryAsync root
+        }
+
+        try
+            try
+                let api = Main.IPC.ArcVaultsApi.api (ipcEvent windowId)
+                do! testBody expectedArcPath api
+            with error ->
+                do! cleanup ()
+                return raise error
+
+            do! cleanup ()
+        finally
+            match host with
+            | Some explicitHost -> WorkspaceSessionHost.initialize explicitHost
+            | None -> WorkspaceSessionHost.resetForTests ()
+    }
+
 Vitest.describe (
     "Version control IPC over a git vault",
     fun () ->
@@ -651,41 +643,20 @@ Vitest.describe (
 
         Vitest.test (
             "creating an ARC on a fresh process initializes its repository through a lazily built host",
-            fun () -> promise {
-                let! root = createTempDirectoryAsync "swate-vc-arc-create-"
-                let settingsRoot = join [| root; "settings" |]
-                let container = join [| root; "container" |]
-
-                for folder in [ settingsRoot; container ] do
-                    Main.Bindings.Filesystem.mkdirSync folder (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
-
-                let runtime = createRuntime settingsRoot
-                let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
-                VersionControlRuntime.initialize runtime
-                WorkspaceSessionHost.resetForTests ()
-                Vitest.expect(WorkspaceSessionHost.tryCurrent ()).toEqual None
-
-                registerEmptyVault 60 |> ignore
-                let dialogSpy = Vitest.vi.spyOn (electron?dialog, "showOpenDialog")
-
-                mockResolvedValue dialogSpy (createObj [ "canceled" ==> false; "filePaths" ==> [| container |] ])
-
-                let cleanup () = promise {
-                    Vitest.vi.restoreAllMocks ()
-                    electronMock?reset () |> ignore
-                    ARC_VAULTS.Vaults.Clear()
-
-                    match WorkspaceSessionHost.tryCurrent () with
-                    | Some currentHost -> do! currentHost.CloseAll() |> Async.StartAsPromise
-                    | None -> ()
-
-                    do! host.CloseAll() |> Async.StartAsPromise
-                    do! removeDirectoryAsync root
-                }
-
-                try
-                    try
-                        let api = Main.IPC.ArcVaultsApi.api (ipcEvent 60)
+            fun () ->
+                withCreateArcSetup
+                    "swate-vc-arc-create-"
+                    60
+                    "fresh"
+                    (fun _ settingsRoot _ _ ->
+                        createRuntime
+                            settingsRoot
+                            VersionControlService.LakeFs.LakeFsCredentials.unconfigured
+                            (memoryBindings ())
+                    )
+                    true
+                    (fun _ api -> promise {
+                        Vitest.expect(WorkspaceSessionHost.tryCurrent ()).toEqual None
 
                         let! created = api.createARC { identifier = "fresh"; initGit = true }
 
@@ -698,61 +669,22 @@ Vitest.describe (
                             | Some _ -> ()
                             | None -> failwith "The workspace session host was not built lazily."
                         | Error error -> return raise error
-                    with error ->
-                        do! cleanup ()
-                        return raise error
-
-                    do! cleanup ()
-                finally
-                    WorkspaceSessionHost.initialize host
-            }
+                    })
         )
 
         Vitest.test (
             "an ARC whose repository initialization fails is still created",
-            fun () -> promise {
-                let! root = createTempDirectoryAsync "swate-vc-arc-init-failure-"
-                let settingsRoot = join [| root; "settings" |]
-                let container = join [| root; "container" |]
-                let identifier = "failed-init"
-
-                let expectedArcPath =
-                    ARCtrl.ArcPathHelper.combine container identifier
-                    |> Swate.Components.Shared.PathHelpers.normalizePath
-
-                for folder in [ settingsRoot; container ] do
-                    Main.Bindings.Filesystem.mkdirSync folder (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
-
-                let runtime = fakeProviderRuntime expectedArcPath (join [| root; "unused" |])
-                let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
-                VersionControlRuntime.initialize runtime
-                WorkspaceSessionHost.resetForTests ()
-
-                registerEmptyVault 64 |> ignore
-                let dialogSpy = Vitest.vi.spyOn (electron?dialog, "showOpenDialog")
-
-                mockResolvedValue dialogSpy (createObj [ "canceled" ==> false; "filePaths" ==> [| container |] ])
-
-                let cleanup () = promise {
-                    Vitest.vi.restoreAllMocks ()
-                    electronMock?reset () |> ignore
-                    ARC_VAULTS.Vaults.Clear()
-
-                    match WorkspaceSessionHost.tryCurrent () with
-                    | Some currentHost -> do! currentHost.CloseAll() |> Async.StartAsPromise
-                    | None -> ()
-
-                    do! host.CloseAll() |> Async.StartAsPromise
-                    do! removeDirectoryAsync root
-                }
-
-                try
-                    try
-                        let api = Main.IPC.ArcVaultsApi.api (ipcEvent 64)
-
+            fun () ->
+                withCreateArcSetup
+                    "swate-vc-arc-init-failure-"
+                    64
+                    "failed-init"
+                    (fun root _ _ expectedArcPath -> fakeProviderRuntime expectedArcPath (join [| root; "unused" |]))
+                    true
+                    (fun expectedArcPath api -> promise {
                         let! created =
                             api.createARC {
-                                identifier = identifier
+                                identifier = "failed-init"
                                 initGit = true
                             }
 
@@ -764,53 +696,25 @@ Vitest.describe (
                             Vitest.expect(Main.Bindings.Filesystem.existsSync (join [| createdPath; ".git" |])).toBe
                                 false
                         | Error error -> return raise error
-                    with error ->
-                        do! cleanup ()
-                        return raise error
-
-                    do! cleanup ()
-                finally
-                    WorkspaceSessionHost.initialize host
-            }
+                    })
         )
 
         Vitest.test (
             "an ARC whose repository initialization throws is still created",
-            fun () -> promise {
-                let! root = createTempDirectoryAsync "swate-vc-arc-init-throw-"
-                let container = join [| root; "container" |]
-                let identifier = "throwing-init"
-                Main.Bindings.Filesystem.mkdirSync container (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
-
-                let expectedArcPath =
-                    ARCtrl.ArcPathHelper.combine container identifier
-                    |> Swate.Components.Shared.PathHelpers.normalizePath
-
-                let runtime =
-                    fakeProviderRuntimeThatThrowsOnInitialize expectedArcPath (join [| root; "unused" |])
-
-                VersionControlRuntime.initialize runtime
+            fun () ->
                 // The handler uses the host that WorkspaceSessionHost.get () builds lazily.
-                WorkspaceSessionHost.resetForTests ()
-
-                registerEmptyVault 66 |> ignore
-                let dialogSpy = Vitest.vi.spyOn (electron?dialog, "showOpenDialog")
-                mockResolvedValue dialogSpy (createObj [ "canceled" ==> false; "filePaths" ==> [| container |] ])
-
-                let cleanup () = promise {
-                    Vitest.vi.restoreAllMocks ()
-                    electronMock?reset () |> ignore
-                    ARC_VAULTS.Vaults.Clear()
-                    do! removeDirectoryAsync root
-                }
-
-                try
-                    try
-                        let api = Main.IPC.ArcVaultsApi.api (ipcEvent 66)
-
+                withCreateArcSetup
+                    "swate-vc-arc-init-throw-"
+                    66
+                    "throwing-init"
+                    (fun root _ _ expectedArcPath ->
+                        fakeProviderRuntimeThatThrowsOnInitialize expectedArcPath (join [| root; "unused" |])
+                    )
+                    false
+                    (fun expectedArcPath api -> promise {
                         let! created =
                             api.createARC {
-                                identifier = identifier
+                                identifier = "throwing-init"
                                 initGit = true
                             }
 
@@ -819,14 +723,7 @@ Vitest.describe (
                             Vitest.expect(createdPath).toBe expectedArcPath
                             Vitest.expect(Main.Bindings.Filesystem.existsSync createdPath).toBe true
                         | Error error -> return raise error
-                    with error ->
-                        do! cleanup ()
-                        return raise error
-
-                    do! cleanup ()
-                finally
-                    WorkspaceSessionHost.resetForTests ()
-            }
+                    })
         )
 
         Vitest.test (

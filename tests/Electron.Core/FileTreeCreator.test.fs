@@ -11,6 +11,7 @@ open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.VersionControlTypes
 open VersionControlService.Abstractions
 open Vitest
+open ElectronCore.TestHelpers
 
 module FileTreeCreator = Main.FileTreeCreator
 
@@ -87,35 +88,6 @@ let private expectHexObjectId (largeObject: LargeObjectState) =
     Vitest.expect(objectId.Length).toBe (64)
     Vitest.expect(System.Text.RegularExpressions.Regex.IsMatch(objectId, "^[0-9a-fA-F]{64}$")).toBe (true)
 
-let private noAccounts: DataHubStrategies.DataHubAccountSource = {
-    GetState = fun () -> AuthStateDto.Empty
-    TryGetTokenForAccount = fun _ -> None
-    TryGetTokenForHost = fun _ -> None
-}
-
-let private memoryBindings () =
-    let mutable content: string option = None
-
-    WorkspaceBindingStore.create
-        CaseInsensitive
-        (fun () -> content)
-        (fun next ->
-            content <- Some next
-            Ok()
-        )
-
-let private createRuntime (settingsRoot: string) : VersionControlRuntime.VersionControlRuntime = {
-    Catalog =
-        ProviderComposition.createCatalog [
-            ProviderComposition.createGitFactory noAccounts
-            ProviderComposition.createLakeFsFactory
-                (ProviderComposition.lakeFsOptions settingsRoot CaseInsensitive)
-                VersionControlService.LakeFs.LakeFsCredentials.unconfigured
-        ]
-    Bindings = memoryBindings ()
-    PathCaseSensitivity = CaseInsensitive
-}
-
 let private withTempRepository
     (testBody: TempRepositoryContext -> Fable.Core.JS.Promise<unit>)
     : Fable.Core.JS.Promise<unit> =
@@ -124,7 +96,10 @@ let private withTempRepository
 
         try
             let repoPath = join [| rootPath; "repo" |]
-            let runtime = createRuntime rootPath
+
+            let runtime =
+                createRuntime rootPath VersionControlService.LakeFs.LakeFsCredentials.unconfigured (memoryBindings ())
+
             let gitFactory = ProviderComposition.createGitFactory noAccounts
 
             let! initialized =

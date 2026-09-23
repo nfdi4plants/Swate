@@ -2,9 +2,88 @@ module ElectronCore.TestHelpers
 
 open Fable.Core
 open Fable.Core.JsInterop
+open Fable.Electron
 open Fable.Electron.Main
+open Main
 open Main.Bindings.Path
+open Main.VersionControl
+open Swate.Components.Composite.Authentication.Types
+open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.VersionControlTypes
+open VersionControlService.Abstractions
 open ARCtrl
+
+let electronMock: obj = import "__electronMock" "electron"
+
+[<Emit("require('node:child_process').execFileSync($0, $1, { cwd: $2, stdio: 'pipe' }).toString()")>]
+let execFile (_file: string) (_args: string[]) (_cwd: string) : string = jsNative
+
+let writeText (filePath: string) (content: string) =
+    Main.Bindings.Filesystem.writeFileSync filePath content Main.Bindings.Filesystem.TextEncoding.Utf8
+
+let noAccounts: DataHubStrategies.DataHubAccountSource = {
+    GetState = fun () -> AuthStateDto.Empty
+    TryGetTokenForAccount = fun _ -> None
+    TryGetTokenForHost = fun _ -> None
+}
+
+let memoryBindings () =
+    let mutable content: string option = None
+
+    WorkspaceBindingStore.create
+        CaseInsensitive
+        (fun () -> content)
+        (fun next ->
+            content <- Some next
+            Ok()
+        )
+
+let createRuntime
+    (settingsRoot: string)
+    lakeFsCredentials
+    (bindings: WorkspaceBindingStore.IWorkspaceBindingStore)
+    : VersionControlRuntime.VersionControlRuntime =
+    {
+        Catalog =
+            ProviderComposition.createCatalog [
+                ProviderComposition.createGitFactory noAccounts
+                ProviderComposition.createLakeFsFactory
+                    (ProviderComposition.lakeFsOptions settingsRoot CaseInsensitive)
+                    lakeFsCredentials
+            ]
+        Bindings = bindings
+        PathCaseSensitivity = CaseInsensitive
+    }
+
+let expectValue (operation: string) (result: OperationResult<'T>) =
+    match result with
+    | Succeeded outcome
+    | PartiallySucceeded(outcome, _) -> outcome.Value
+    | Failed failure -> failwith $"{operation} failed ({failure.Code}): {failure.Message}"
+
+let expectDtoValue (operation: string) (result: Result<OperationResultDto<'T>, exn>) =
+    match result with
+    | Ok(OperationResultDto.Succeeded outcome)
+    | Ok(OperationResultDto.PartiallySucceeded(outcome, _)) -> outcome
+    | Ok(OperationResultDto.Failed failure) -> failwith $"{operation} failed ({failure.Code}): {failure.Message}"
+    | Error error -> failwith $"{operation} threw: {error.Message}"
+
+let expectDtoFailure (operation: string) (result: Result<OperationResultDto<'T>, exn>) =
+    match result with
+    | Ok(OperationResultDto.Failed failure) -> failure
+    | Ok _ -> failwith $"{operation} unexpectedly succeeded."
+    | Error error -> failwith $"{operation} threw: {error.Message}"
+
+[<Emit("(() => { let resolve; const promise = new Promise((r) => { resolve = r; }); return [promise, resolve]; })()")>]
+let deferred () : JS.Promise<unit> * (unit -> unit) = jsNative
+
+let detached name = OperationContext.detached name
+
+let ipcEvent (windowId: int) : IpcMainInvokeEvent =
+    createObj [ "sender" ==> createObj [ "id" ==> windowId ] ]
+    |> unbox<IpcMainInvokeEvent>
+
+let request (operationId: string) : OperationRequestDto = { OperationId = operationId }
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private osDynamic: obj = importAll "os"
@@ -80,3 +159,20 @@ let testWindow () =
         "webContents" ==> createObj [ "send" ==> noopSend ]
     ]
     |> unbox<BrowserWindow>
+
+let registerVault (windowId: int) (arcPath: string) =
+    let window = testWindow ()
+    window?id <- windowId
+    let vault = ArcVault(window)
+    vault.path <- Some arcPath
+    ARC_VAULTS.Vaults.[windowId] <- vault
+
+    electronMock?setBrowserWindowFromWebContents (fun (webContents: obj) ->
+        if unbox<int> webContents?id = windowId then
+            box window
+        else
+            null
+    )
+    |> ignore
+
+    vault
