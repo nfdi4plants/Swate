@@ -273,6 +273,22 @@ type WriteSuccess =
     | UnitSuccess of WriteUnitSuccess
     | CloneSuccess of string
 
+let private unitSuccess (refresh: GitRefreshResult) = {
+    Refresh = refresh
+    PageChange = GitPageChange.NoChange
+    SelectedChangePath = None
+    Warning = None
+    Partial = None
+    Published = None
+}
+
+let private joinMessages first second =
+    match first, second with
+    | Some firstMessage, Some secondMessage -> Some $"{firstMessage} {secondMessage}"
+    | Some message, None
+    | None, Some message -> Some message
+    | None, None -> None
+
 type WriteAttemptOutcome =
     | Completed of WriteSuccess
     | CompletedWithPendingRemoteConfirmation of WriteSuccess * GitSidebarConfirmationDialog * GitPendingRemoteAction
@@ -1227,12 +1243,9 @@ let private completeAfterUpdateAsync
                     Ok(
                         CompletedWithPendingRemoteConfirmation(
                             UnitSuccess {
-                                Refresh = refreshResult
-                                PageChange = GitPageChange.NoChange
-                                SelectedChangePath = None
-                                Warning = pendingWarning
-                                Partial = partialToKeep
-                                Published = None
+                                unitSuccess refreshResult with
+                                    Warning = pendingWarning
+                                    Partial = partialToKeep
                             },
                             {
                                 Title = "All conflicts resolved"
@@ -1248,14 +1261,7 @@ let private completeAfterUpdateAsync
                 return
                     Ok(
                         CompletedWithPendingRemoteFailure(
-                            UnitSuccess {
-                                Refresh = refreshResult
-                                PageChange = GitPageChange.NoChange
-                                SelectedChangePath = None
-                                Warning = None
-                                Partial = None
-                                Published = None
-                            },
+                            UnitSuccess(unitSuccess refreshResult),
                             partial
                             |> Option.map failureMessage
                             |> Option.defaultValue "The update reported conflicts."
@@ -1266,12 +1272,9 @@ let private completeAfterUpdateAsync
                     Ok(
                         Completed(
                             UnitSuccess {
-                                Refresh = refreshResult
-                                PageChange = GitPageChange.NoChange
-                                SelectedChangePath = None
-                                Warning = partial |> Option.map failureMessage
-                                Partial = partial
-                                Published = None
+                                unitSuccess refreshResult with
+                                    Warning = partial |> Option.map failureMessage
+                                    Partial = partial
                             }
                         )
                     )
@@ -1291,12 +1294,8 @@ let private routedToOutcome (deps: GitDependencies) (routed: RoutedFailure) = pr
                 Ok(
                     Completed(
                         UnitSuccess {
-                            Refresh = refreshResult
-                            PageChange = GitPageChange.NoChange
-                            SelectedChangePath = None
-                            Warning = Some message
-                            Partial = None
-                            Published = None
+                            unitSuccess refreshResult with
+                                Warning = Some message
                         }
                     )
                 )
@@ -1305,21 +1304,7 @@ let private routedToOutcome (deps: GitDependencies) (routed: RoutedFailure) = pr
         let! refreshResult = refreshAllAsync deps
 
         match refreshResult.Status with
-        | Ok _ ->
-            return
-                Ok(
-                    CompletedWithPendingRemoteFailure(
-                        UnitSuccess {
-                            Refresh = refreshResult
-                            PageChange = GitPageChange.NoChange
-                            SelectedChangePath = None
-                            Warning = None
-                            Partial = None
-                            Published = None
-                        },
-                        message
-                    )
-                )
+        | Ok _ -> return Ok(CompletedWithPendingRemoteFailure(UnitSuccess(unitSuccess refreshResult), message))
         | Error refreshFailure ->
             let refreshMessage = failureMessage refreshFailure
 
@@ -1334,22 +1319,16 @@ let private routedToOutcome (deps: GitDependencies) (routed: RoutedFailure) = pr
     | RoutedFailure.Error message -> return Error message
 }
 
-let private refreshAfterSuccess
+let private refreshAfterSuccessWithOutcome
     (deps: GitDependencies)
     (partial: OperationFailureDto option)
     (pageChange: GitPageChange)
     (selectedChangePathOverride: string option option)
     (warningMessage: string option)
+    (published: bool option)
     =
     promise {
         let! refreshResult = refreshAllAsync deps
-
-        let combinedWarningMessage =
-            match warningMessage, partial |> Option.map failureMessage with
-            | Some warning, Some partialMessage -> Some $"{warning} {partialMessage}"
-            | Some warning, None -> Some warning
-            | None, Some partialMessage -> Some partialMessage
-            | None, None -> None
 
         return
             match refreshResult.Status, refreshErrorMessage refreshResult with
@@ -1362,13 +1341,25 @@ let private refreshAfterSuccess
                             Refresh = refreshResult
                             PageChange = pageChange
                             SelectedChangePath = selectedChangePathOverride
-                            Warning = combinedWarningMessage
+                            Warning = warningMessage
                             Partial = partial
-                            Published = None
+                            Published = published
                         }
                     )
                 )
     }
+
+let private refreshAfterSuccess
+    (deps: GitDependencies)
+    (partial: OperationFailureDto option)
+    (pageChange: GitPageChange)
+    (selectedChangePathOverride: string option option)
+    (warningMessage: string option)
+    =
+    let combinedWarningMessage =
+        joinMessages warningMessage (partial |> Option.map failureMessage)
+
+    refreshAfterSuccessWithOutcome deps partial pageChange selectedChangePathOverride combinedWarningMessage None
 
 let private completeAfterSynchronizeAsync
     (deps: GitDependencies)
@@ -1380,35 +1371,14 @@ let private completeAfterSynchronizeAsync
         if partial |> Option.exists isConflictPartial then
             return! completeAfterUpdateAsync deps partial pendingWarning
         else
-            let! result = refreshAfterSuccess deps partial GitPageChange.NoChange None None
+            let partialMessage = partial |> Option.map failureMessage
 
-            return
-                result
-                |> Result.map (fun outcome ->
-                    match outcome with
-                    | Completed(UnitSuccess success) ->
-                        let finalWarning =
-                            match recoveryOfPartial success.Partial with
-                            | None ->
-                                match pendingWarning, success.Warning with
-                                | Some pending, Some partialMessage -> Some $"{pending} {partialMessage}"
-                                | Some pending, None -> Some pending
-                                | None, Some partialMessage -> Some partialMessage
-                                | None, None -> None
-                            | Some _ -> pendingWarning |> Option.orElse success.Warning
+            let finalWarning =
+                match recoveryOfPartial partial with
+                | None -> joinMessages pendingWarning partialMessage
+                | Some _ -> pendingWarning |> Option.orElse partialMessage
 
-                        Completed(
-                            UnitSuccess {
-                                Refresh = success.Refresh
-                                PageChange = success.PageChange
-                                SelectedChangePath = success.SelectedChangePath
-                                Warning = finalWarning
-                                Partial = success.Partial
-                                Published = published
-                            }
-                        )
-                    | other -> other
-                )
+            return! refreshAfterSuccessWithOutcome deps partial GitPageChange.NoChange None finalWarning published
     }
 
 let private acceptanceConfirmation
@@ -1428,12 +1398,8 @@ let private acceptanceConfirmation
                 Ok(
                     CompletedWithPendingRemoteConfirmation(
                         UnitSuccess {
-                            Refresh = refreshResult
-                            PageChange = GitPageChange.NoChange
-                            SelectedChangePath = None
-                            Warning = pendingWarning
-                            Partial = None
-                            Published = None
+                            unitSuccess refreshResult with
+                                Warning = pendingWarning
                         },
                         dialog,
                         action
@@ -1607,12 +1573,8 @@ let private pendingPrimarySaveRemoteFailureAsync (deps: GitDependencies) (messag
             Ok(
                 CompletedWithPendingRemoteFailure(
                     UnitSuccess {
-                        Refresh = refreshResult
-                        PageChange = GitPageChange.NoChange
-                        SelectedChangePath = None
-                        Warning = Some pendingPrimarySaveWarning
-                        Partial = None
-                        Published = None
+                        unitSuccess refreshResult with
+                            Warning = Some pendingPrimarySaveWarning
                     },
                     message
                 )
@@ -1914,12 +1876,8 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
                                         Ok(
                                             Completed(
                                                 UnitSuccess {
-                                                    Refresh = refreshResult
-                                                    PageChange = GitPageChange.NoChange
-                                                    SelectedChangePath = None
-                                                    Warning = Some pendingPrimarySaveWarning
-                                                    Partial = None
-                                                    Published = None
+                                                    unitSuccess refreshResult with
+                                                        Warning = Some pendingPrimarySaveWarning
                                                 }
                                             )
                                         )
