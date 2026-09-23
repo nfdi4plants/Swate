@@ -121,6 +121,10 @@ let private makeFailure category code message recovery paths : OperationFailureD
 let private failed category code message : OperationResultDto<'T> =
     OperationResultDto.Failed(makeFailure category code message None [||])
 
+let private staleTokenReply<'T> message : JS.Promise<Result<OperationResultDto<'T>, string>> = promise {
+    return Ok(failed Concurrency VersionControlCodes.PreconditionFailed message)
+}
+
 let private lfsSettings n materialize : StoragePolicySettingsDto = {
     AutoPolicyThresholdMb = Some n
     MaterializeLargeObjects = materialize
@@ -235,54 +239,10 @@ globalThis.__swateGitLabCreateProjectFetches = [];
 globalThis.fetch = async (url, options) => {
   const body = options && options.body ? JSON.parse(options.body) : null;
   globalThis.__swateGitLabCreateProjectFetches.push({ url, options, body });
-  return {
-    ok: true,
-    status: 201,
-    headers: { get: () => null },
-    json: async () => ({
-      id: 123,
-      name: body.name,
-      path_with_namespace: "carol/my-arc-project",
-      name_with_namespace: "carol / " + body.name,
-      description: null,
-      web_url: "https://gitlab.example/carol/my-arc-project",
-      http_url_to_repo: "https://gitlab.example/carol/my-arc-project.git",
-      ssh_url_to_repo: null,
-      avatar_url: null,
-      visibility: "private",
-      star_count: 0,
-      created_at: "2026-04-13T00:00:00Z",
-      last_activity_at: "2026-04-13T00:00:00Z",
-      topics: [],
-      tag_list: [],
-      namespace: {
-        id: 5,
-        name: "carol",
-        kind: "user",
-        full_path: "carol"
-      }
-    })
-  };
+  return $0(body);
 };
 """)>]
-let private installGitLabCreateProjectFetchSpy () : unit = jsNative
-
-[<Emit("""
-globalThis.__swateOriginalFetch = globalThis.fetch;
-globalThis.__swateGitLabCreateProjectFetches = [];
-globalThis.fetch = async (url, options) => {
-  const body = options && options.body ? JSON.parse(options.body) : null;
-  globalThis.__swateGitLabCreateProjectFetches.push({ url, options, body });
-  return {
-    ok: false,
-    status: 400,
-    headers: { get: () => null },
-    text: async () => JSON.stringify({ message: { name: ["has already been taken"], path: ["has already been taken"] } }),
-    json: async () => ({ message: { name: ["has already been taken"], path: ["has already been taken"] } })
-  };
-};
-""")>]
-let private installGitLabCreateProjectFailureFetchSpy () : unit = jsNative
+let private installGitLabCreateProjectFetchSpy (response: obj -> obj) : unit = jsNative
 
 [<Emit("globalThis.__swateGitLabCreateProjectFetches[globalThis.__swateGitLabCreateProjectFetches.length - 1].body")>]
 let private lastGitLabCreateProjectBody () : obj = jsNative
@@ -394,6 +354,13 @@ let private defaultDependencies: GitDependencies = {
     reportError = fun _ -> ()
 }
 
+let private withRefresh (status: WorkspaceStatusDto) (deps: GitDependencies) : GitDependencies = {
+    deps with
+        getStatus = fun _ -> promise { return Ok(succeeded status) }
+        listRefs = fun _ -> promise { return Ok(succeeded refs) }
+        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+}
+
 let private renderToBody element = promise {
     let c = document.createElement ("div") :?> HTMLDivElement
     document.body.appendChild c |> ignore
@@ -440,6 +407,8 @@ let private collectMessages cmd = promise {
     do! Promise.sleep 0
     return messages |> Seq.toArray
 }
+
+let private hasMessage predicate messages = Array.exists predicate messages
 
 /// A primary save reports its phases before it completes. Tests that only care about the
 /// completion collect through this helper.
@@ -545,7 +514,41 @@ Vitest.describe (
         Vitest.test (
             "GitLabApi.CreateProject lets GitLab generate the project path from the submitted name",
             fun () -> promise {
-                installGitLabCreateProjectFetchSpy ()
+                installGitLabCreateProjectFetchSpy (fun body ->
+                    createObj [
+                        "ok" ==> true
+                        "status" ==> 201
+                        "headers" ==> createObj [ "get" ==> (fun _ -> null) ]
+                        "json"
+                        ==> (fun () -> promise {
+                            return
+                                createObj [
+                                    "id" ==> 123
+                                    "name" ==> getProperty<string> body "name"
+                                    "path_with_namespace" ==> "carol/my-arc-project"
+                                    "name_with_namespace" ==> "carol / " + getProperty<string> body "name"
+                                    "description" ==> null
+                                    "web_url" ==> "https://gitlab.example/carol/my-arc-project"
+                                    "http_url_to_repo" ==> "https://gitlab.example/carol/my-arc-project.git"
+                                    "ssh_url_to_repo" ==> null
+                                    "avatar_url" ==> null
+                                    "visibility" ==> "private"
+                                    "star_count" ==> 0
+                                    "created_at" ==> "2026-04-13T00:00:00Z"
+                                    "last_activity_at" ==> "2026-04-13T00:00:00Z"
+                                    "topics" ==> [||]
+                                    "tag_list" ==> [||]
+                                    "namespace"
+                                    ==> createObj [
+                                        "id" ==> 5
+                                        "name" ==> "carol"
+                                        "kind" ==> "user"
+                                        "full_path" ==> "carol"
+                                    ]
+                                ]
+                        })
+                    ]
+                )
 
                 try
                     let! result = GitLabApi.CreateProject("https://gitlab.example/", "token-123", " My ARC Project ")
@@ -569,7 +572,28 @@ Vitest.describe (
         Vitest.test (
             "GitLabApi.CreateProject includes GitLab's duplicate-name response in the error",
             fun () -> promise {
-                installGitLabCreateProjectFailureFetchSpy ()
+                let duplicateNameError =
+                    createObj [
+                        "message"
+                        ==> createObj [
+                            "name" ==> [| "has already been taken" |]
+                            "path" ==> [| "has already been taken" |]
+                        ]
+                    ]
+
+                installGitLabCreateProjectFetchSpy (fun _ ->
+                    createObj [
+                        "ok" ==> false
+                        "status" ==> 400
+                        "headers" ==> createObj [ "get" ==> (fun _ -> null) ]
+                        "text"
+                        ==> (fun () -> promise {
+                            return
+                                """{"message":{"name":["has already been taken"],"path":["has already been taken"]}}"""
+                        })
+                        "json" ==> (fun () -> promise { return duplicateNameError })
+                    ]
+                )
 
                 try
                     let! result = GitLabApi.CreateProject("https://gitlab.example/", "token-123", "Existing ARC")
@@ -1331,14 +1355,11 @@ Vitest.describe (
                 let pageStates = ResizeArray<PageState option>()
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         restorePaths =
                             fun request ->
                                 captured <- Some request
                                 promise { return Ok(succeeded ()) }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let model, command =
@@ -1521,7 +1542,7 @@ Vitest.describe (
                 Vitest
                     .expect(
                         finishMessages
-                        |> Array.exists (
+                        |> hasMessage (
                             function
                             | WriteRequested(SwitchBranch _) -> true
                             | _ -> false
@@ -2301,7 +2322,7 @@ Vitest.describe (
                 Vitest
                     .expect(
                         retryMessages
-                        |> Array.exists (
+                        |> hasMessage (
                             function
                             | RefreshRequested -> true
                             | _ -> false
@@ -2522,7 +2543,7 @@ Vitest.describe (
                 let sync = cleanStatus.Synchronization.Value
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         createRevision =
                             fun _ ->
                                 revisionCalls <- revisionCalls + 1
@@ -2531,9 +2552,6 @@ Vitest.describe (
                             fun request ->
                                 synchronizeRequests.Add request
                                 promise { return Ok(succeededWithPublication PublicationStateDto.Published sync) }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let state = {
@@ -2581,15 +2599,12 @@ Vitest.describe (
                 let mutable synchronizeRequest = None
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
                         synchronize =
                             fun request ->
                                 synchronizeRequest <- Some request
                                 Promise.create (fun resolve _reject -> releaseSynchronize <- Some resolve)
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let state = {
@@ -2768,15 +2783,12 @@ Vitest.describe (
                 let mutable materializeCalls = 0
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
                         synchronize =
                             fun _ -> promise {
                                 return Ok(OperationResultDto.PartiallySucceeded(partialOutcome, recovery))
                             }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                         listObjects =
                             fun _ -> promise {
                                 return
@@ -2863,7 +2875,7 @@ Vitest.describe (
                 Vitest
                     .expect(
                         finishMessages
-                        |> Array.exists (
+                        |> hasMessage (
                             function
                             | WriteRequested(Push GitUpdateAcceptance.RequirePreview) -> true
                             | _ -> false
@@ -2924,16 +2936,13 @@ Vitest.describe (
                 }
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
                         getSessionInfo = fun _ -> promise { return Ok(succeeded localOnly) }
                         synchronize =
                             fun _ ->
                                 synchronizeCalled <- true
                                 unexpectedPromise "unexpected synchronize"
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let state = {
@@ -2992,7 +3001,7 @@ Vitest.describe (
                 let synchronizeRequests = ResizeArray<SynchronizeRequestDto>()
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
                         synchronize =
                             fun request ->
@@ -3002,9 +3011,6 @@ Vitest.describe (
                                     promise { return Ok(OperationResultDto.Failed failure) }
                                 else
                                     promise { return Ok(succeeded sync) }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let state = {
@@ -3249,12 +3255,9 @@ Vitest.describe (
             "Primary save preserves the local commit warning when synchronize fails after commit",
             fun () -> promise {
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
                         synchronize = fun _ -> promise { return Error "Network unavailable during synchronize." }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let state = {
@@ -3307,7 +3310,7 @@ Vitest.describe (
                         [||]
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
                         synchronize =
                             fun request ->
@@ -3315,9 +3318,6 @@ Vitest.describe (
                                     promise { return Ok(OperationResultDto.Failed canceled) }
                                 else
                                     unexpectedPromise "unexpected pull"
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                         reportError = reportedErrors.Add
                 }
 
@@ -3370,7 +3370,7 @@ Vitest.describe (
                     makeFailure Canceled VersionControlCodes.OperationCanceled "Publish was canceled." None [||]
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
                         synchronize =
                             fun request ->
@@ -3378,9 +3378,6 @@ Vitest.describe (
                                     promise { return Ok(OperationResultDto.Failed canceled) }
                                 else
                                     unexpectedPromise "unexpected pull"
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                         reportError = reportedErrors.Add
                 }
 
@@ -3450,7 +3447,7 @@ Vitest.describe (
                 let synchronizeRequests = ResizeArray<SynchronizeRequestDto>()
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         synchronize =
                             fun request ->
                                 synchronizeRequests.Add request
@@ -3459,9 +3456,6 @@ Vitest.describe (
                                     promise { return Ok(OperationResultDto.Failed failure) }
                                 else
                                     promise { return Ok(succeeded cleanStatus.Synchronization.Value) }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let state = {
@@ -3896,7 +3890,7 @@ Vitest.describe (
                 }
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh decidingStatus defaultDependencies) with
                         synchronize =
                             fun request ->
                                 synchronizeRequests.Add request
@@ -3912,9 +3906,6 @@ Vitest.describe (
                                                     cleanStatus.Synchronization.Value
                                             )
                                     }
-                        getStatus = fun _ -> promise { return Ok(succeeded decidingStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let state = {
@@ -4008,7 +3999,7 @@ Vitest.describe (
                 }
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh decidingStatus defaultDependencies) with
                         synchronize =
                             fun request ->
                                 synchronizeRequests.Add request
@@ -4019,9 +4010,6 @@ Vitest.describe (
                                     promise { return Ok(OperationResultDto.Failed decisionFailure) }
                         createRemoteProject = fun _ -> promise { return Ok remoteProject }
                         bindWorkspace = fun _ -> promise { return Ok(succeeded sessionInfo) }
-                        getStatus = fun _ -> promise { return Ok(succeeded decidingStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let requested, writeCmd =
@@ -4147,15 +4135,12 @@ Vitest.describe (
                 let mutable restoredPaths = None
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         synchronize = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
                         restorePaths =
                             fun request ->
                                 restoredPaths <- Some request.Paths
                                 promise { return Ok(succeeded ()) }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let stateAfterRequest, requestCmd =
@@ -4222,12 +4207,7 @@ Vitest.describe (
                     }
                 |]
 
-                let refreshDependencies = {
-                    defaultDependencies with
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
-                }
+                let refreshDependencies = withRefresh cleanStatus defaultDependencies
 
                 let runClear result = promise {
                     let deps = {
@@ -4320,12 +4300,9 @@ Vitest.describe (
                 let conflicted = conflictedStatus [| "conflict.txt" |]
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh conflicted defaultDependencies) with
                         synchronize = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
                         clearStaleLock = fun _ -> promise { return Ok(succeeded conflicted) }
-                        getStatus = fun _ -> promise { return Ok(succeeded conflicted) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let stateAfterRequest, requestCmd =
@@ -4425,11 +4402,8 @@ Vitest.describe (
                         [||]
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         synchronize = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let stateAfterRequest, requestCmd =
@@ -4469,7 +4443,7 @@ Vitest.describe (
                 }
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         synchronize =
                             fun _ -> promise {
                                 return
@@ -4483,9 +4457,6 @@ Vitest.describe (
                                         )
                                     )
                             }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let requested, writeCmd =
@@ -4543,7 +4514,7 @@ Vitest.describe (
                 }
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         synchronize =
                             fun _ -> promise {
                                 return
@@ -4557,9 +4528,6 @@ Vitest.describe (
                                         )
                                     )
                             }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let requested, writeCmd =
@@ -4592,7 +4560,7 @@ Vitest.describe (
                 Vitest
                     .expect(
                         dispatchedMessages
-                        |> Array.exists (
+                        |> hasMessage (
                             function
                             | WriteRequested(Push _) -> true
                             | _ -> false
@@ -4621,7 +4589,7 @@ Vitest.describe (
                 }
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
                         synchronize =
                             fun _ -> promise {
@@ -4636,9 +4604,6 @@ Vitest.describe (
                                         )
                                     )
                             }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let saveState = {
@@ -4694,7 +4659,7 @@ Vitest.describe (
                 }
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         synchronize =
                             fun _ -> promise {
                                 return
@@ -4708,9 +4673,6 @@ Vitest.describe (
                                         )
                                     )
                             }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let requested, writeCmd =
@@ -4758,11 +4720,8 @@ Vitest.describe (
                         [||]
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         refreshSynchronization = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let stateAfterRequest, requestCmd =
@@ -4979,7 +4938,7 @@ Vitest.describe (
                 let mutable refreshTreeValues = ResizeArray<bool option>()
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         synchronize =
                             fun _ -> promise {
                                 return
@@ -5017,9 +4976,6 @@ Vitest.describe (
                                 materializedPaths.Add request.Path
                                 refreshTreeValues.Add request.RefreshTree
                                 promise { return Ok(succeeded ()) }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let stateAfterRequest, requestCmd =
@@ -5093,7 +5049,7 @@ Vitest.describe (
                 let mutable loaded = None
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh conflictStatus defaultDependencies) with
                         synchronize =
                             fun _ -> promise {
                                 return
@@ -5104,9 +5060,6 @@ Vitest.describe (
                                         )
                                     )
                             }
-                        getStatus = fun _ -> promise { return Ok(succeeded conflictStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                         loadConflictPage =
                             fun session version path ->
                                 loaded <- Some(session, version, path)
@@ -5309,7 +5262,7 @@ Vitest.describe (
                 |]
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         synchronize =
                             fun _ ->
                                 publishCalls <- publishCalls + 1
@@ -5336,9 +5289,6 @@ Vitest.describe (
                                 installedComponent <- Some request.Component
                                 installCalls <- installCalls + 1
                                 promise { return Ok(succeeded dependencies[2]) }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let stateAfterRequest, requestCmd =
@@ -5392,7 +5342,12 @@ Vitest.describe (
                 let requests = ResizeArray<CreateRevisionRequestDto>()
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh
+                        {
+                            cleanStatus with
+                                WorkspaceVersion = "v2"
+                        }
+                        defaultDependencies) with
                         createRevision =
                             fun request ->
                                 requests.Add request
@@ -5409,18 +5364,6 @@ Vitest.describe (
                                     }
                                 else
                                     promise { return Ok(succeeded "revision-2") }
-                        getStatus =
-                            fun _ -> promise {
-                                return
-                                    Ok(
-                                        succeeded {
-                                            cleanStatus with
-                                                WorkspaceVersion = "v2"
-                                        }
-                                    )
-                            }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let state = {
@@ -5453,7 +5396,7 @@ Vitest.describe (
                 let mutable calls = 0
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         reportError = reportedErrors.Add
                         createRevision =
                             fun _ ->
@@ -5462,9 +5405,6 @@ Vitest.describe (
                                 promise {
                                     return Ok(failed Concurrency VersionControlCodes.PreconditionFailed "still stale")
                                 }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let state = {
@@ -5534,32 +5474,17 @@ Vitest.describe (
                 let reportedErrors = ResizeArray<GitErrorNotification>()
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh
+                        {
+                            cleanStatus with
+                                WorkspaceVersion = "v2"
+                        }
+                        defaultDependencies) with
                         restorePaths =
                             fun request ->
                                 restoreRequests.Add request
 
-                                promise {
-                                    return
-                                        Ok(
-                                            failed
-                                                Concurrency
-                                                VersionControlCodes.PreconditionFailed
-                                                "workspace version is stale"
-                                        )
-                                }
-                        getStatus =
-                            fun _ -> promise {
-                                return
-                                    Ok(
-                                        succeeded {
-                                            cleanStatus with
-                                                WorkspaceVersion = "v2"
-                                        }
-                                    )
-                            }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                                staleTokenReply "workspace version is stale"
                         reportError = reportedErrors.Add
                 }
 
@@ -5620,32 +5545,17 @@ Vitest.describe (
                 let reportedErrors = ResizeArray<GitErrorNotification>()
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh
+                        {
+                            cleanStatus with
+                                WorkspaceVersion = "v2"
+                        }
+                        defaultDependencies) with
                         synchronize =
                             fun request ->
                                 synchronizeRequests.Add request
 
-                                promise {
-                                    return
-                                        Ok(
-                                            failed
-                                                Concurrency
-                                                VersionControlCodes.PreconditionFailed
-                                                "workspace version is stale"
-                                        )
-                                }
-                        getStatus =
-                            fun _ -> promise {
-                                return
-                                    Ok(
-                                        succeeded {
-                                            cleanStatus with
-                                                WorkspaceVersion = "v2"
-                                        }
-                                    )
-                            }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                                staleTokenReply "workspace version is stale"
                         reportError = reportedErrors.Add
                 }
 
@@ -5676,7 +5586,7 @@ Vitest.describe (
                 Vitest
                     .expect(
                         finishMessages
-                        |> Array.exists (
+                        |> hasMessage (
                             function
                             | RefreshRequested -> true
                             | _ -> false
@@ -5693,32 +5603,17 @@ Vitest.describe (
                 let reportedErrors = ResizeArray<GitErrorNotification>()
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh
+                        {
+                            cleanStatus with
+                                WorkspaceVersion = "v2"
+                        }
+                        defaultDependencies) with
                         synchronize =
                             fun request ->
                                 synchronizeRequests.Add request
 
-                                promise {
-                                    return
-                                        Ok(
-                                            failed
-                                                Concurrency
-                                                VersionControlCodes.PreconditionFailed
-                                                "The target moved after the update was accepted."
-                                        )
-                                }
-                        getStatus =
-                            fun _ -> promise {
-                                return
-                                    Ok(
-                                        succeeded {
-                                            cleanStatus with
-                                                WorkspaceVersion = "v2"
-                                        }
-                                    )
-                            }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                                staleTokenReply "The target moved after the update was accepted."
                         reportError = reportedErrors.Add
                 }
 
@@ -5758,7 +5653,7 @@ Vitest.describe (
                 Vitest
                     .expect(
                         finishMessages
-                        |> Array.exists (
+                        |> hasMessage (
                             function
                             | WriteRequested(Pull _) -> true
                             | _ -> false
@@ -5794,23 +5689,16 @@ Vitest.describe (
                 }
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh
+                        {
+                            cleanStatus with
+                                WorkspaceVersion = "v2"
+                        }
+                        defaultDependencies) with
                         synchronize =
                             fun request ->
                                 synchronizeRequests.Add request
                                 promise { return Ok(OperationResultDto.Failed staleFailure) }
-                        getStatus =
-                            fun _ -> promise {
-                                return
-                                    Ok(
-                                        succeeded {
-                                            cleanStatus with
-                                                WorkspaceVersion = "v2"
-                                        }
-                                    )
-                            }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                         reportError = reportedErrors.Add
                 }
 
@@ -5843,7 +5731,7 @@ Vitest.describe (
                 Vitest
                     .expect(
                         finishMessages
-                        |> Array.exists (
+                        |> hasMessage (
                             function
                             | RefreshRequested -> true
                             | _ -> false
@@ -5865,15 +5753,7 @@ Vitest.describe (
                             fun _ ->
                                 calls <- calls + 1
 
-                                promise {
-                                    return
-                                        Ok(
-                                            failed
-                                                Concurrency
-                                                VersionControlCodes.PreconditionFailed
-                                                "workspace version is stale"
-                                        )
-                                }
+                                staleTokenReply "workspace version is stale"
                 }
 
                 let state = {
@@ -5914,7 +5794,7 @@ Vitest.describe (
 
                 let hasRefresh =
                     pathMessages
-                    |> Array.exists (
+                    |> hasMessage (
                         function
                         | RefreshRequested -> true
                         | _ -> false
@@ -5958,7 +5838,7 @@ Vitest.describe (
                 Vitest
                     .expect(
                         messages
-                        |> Array.exists (
+                        |> hasMessage (
                             function
                             | RefreshRequested -> true
                             | _ -> false
@@ -6078,15 +5958,7 @@ Vitest.describe (
                             fun _ ->
                                 calls <- calls + 1
 
-                                promise {
-                                    return
-                                        Ok(
-                                            failed
-                                                Concurrency
-                                                VersionControlCodes.PreconditionFailed
-                                                "workspace version is stale"
-                                        )
-                                }
+                                staleTokenReply "workspace version is stale"
                 }
 
                 let state = {
@@ -6129,24 +6001,13 @@ Vitest.describe (
                         affectedPaths
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         synchronize = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
                         restorePaths =
                             fun _ ->
                                 restoreCalls <- restoreCalls + 1
 
-                                promise {
-                                    return
-                                        Ok(
-                                            failed
-                                                Concurrency
-                                                VersionControlCodes.PreconditionFailed
-                                                "workspace version is stale"
-                                        )
-                                }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
+                                staleTokenReply "workspace version is stale"
                 }
 
                 let stateAfterRequest, requestCmd =
@@ -6205,7 +6066,12 @@ Vitest.describe (
                 let mutable preflightCalls = 0
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh
+                        {
+                            cleanStatus with
+                                WorkspaceVersion = "v2"
+                        }
+                        defaultDependencies) with
                         preflightSwitchRef =
                             fun _ ->
                                 preflightCalls <- preflightCalls + 1
@@ -6215,29 +6081,9 @@ Vitest.describe (
                                 requests.Add request
 
                                 if requests.Count = 1 then
-                                    promise {
-                                        return
-                                            Ok(
-                                                failed
-                                                    Concurrency
-                                                    VersionControlCodes.PreconditionFailed
-                                                    "workspace version is stale"
-                                            )
-                                    }
+                                    staleTokenReply "workspace version is stale"
                                 else
                                     promise { return Ok(succeeded cleanStatus) }
-                        getStatus =
-                            fun _ -> promise {
-                                return
-                                    Ok(
-                                        succeeded {
-                                            cleanStatus with
-                                                WorkspaceVersion = "v2"
-                                        }
-                                    )
-                            }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let state = {
@@ -6284,7 +6130,7 @@ Vitest.describe (
                 let conflicted = conflictedStatus [| "conflict.txt" |]
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh conflicted defaultDependencies) with
                         createRevision =
                             fun _ -> promise {
                                 return
@@ -6295,9 +6141,6 @@ Vitest.describe (
                                             "a conflict session is open"
                                     )
                             }
-                        getStatus = fun _ -> promise { return Ok(succeeded conflicted) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                         loadConflictPage = fun _ _ path -> promise { return Ok(diffPage path) }
                 }
 
@@ -6455,7 +6298,7 @@ Vitest.describe (
                 let mutable ids = 0
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         newOperationId =
                             fun () ->
                                 ids <- ids + 1
@@ -6468,9 +6311,6 @@ Vitest.describe (
                             fun key ->
                                 cancelKeys.Add key
                                 promise { return Ok true }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let requested, writeCmd =
@@ -6601,12 +6441,9 @@ Vitest.describe (
                 }
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         getSessionInfo = fun _ -> promise { return Ok(succeeded localOnly) }
                         createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let state = {
@@ -6645,7 +6482,7 @@ Vitest.describe (
                 let mutable publishCalls = 0
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         synchronize =
                             fun _ ->
                                 publishCalls <- publishCalls + 1
@@ -6674,9 +6511,6 @@ Vitest.describe (
                                     promise { return Ok(failed ProviderError "bind_failed" "bind failed") }
                                 else
                                     promise { return Ok(succeeded sessionInfo) }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let requested, writeCmd =
@@ -6803,15 +6637,12 @@ Vitest.describe (
                 let mutable restoredPaths = None
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         refreshSynchronization = fun _ -> promise { return Ok(OperationResultDto.Failed canceled) }
                         restorePaths =
                             fun request ->
                                 restoredPaths <- Some request.Paths
                                 promise { return Ok(succeeded ()) }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let stateAfterRequest, requestCmd =
@@ -6956,12 +6787,7 @@ Vitest.describe (
                 Vitest.expect(pendingState.RefreshPending).toBe (true)
                 Vitest.expect(pendingMessages).toEqual ([||])
 
-                let deps = {
-                    defaultDependencies with
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
-                }
+                let deps = withRefresh cleanStatus defaultDependencies
 
                 let standaloneState = {
                     runningState with
@@ -6983,12 +6809,9 @@ Vitest.describe (
             "A refresh requested during a write runs when the write completes",
             fun () -> promise {
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
                         refreshSynchronization =
                             fun _ -> promise { return Ok(succeeded cleanStatus.Synchronization.Value) }
-                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        listRefs = fun _ -> promise { return Ok(succeeded refs) }
-                        getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
                 }
 
                 let stateAfterRequest, requestCmd =
@@ -7013,7 +6836,7 @@ Vitest.describe (
                 Vitest
                     .expect(
                         finishMessages
-                        |> Array.exists (
+                        |> hasMessage (
                             function
                             | RefreshRequested -> true
                             | _ -> false
