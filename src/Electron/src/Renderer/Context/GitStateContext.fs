@@ -52,9 +52,6 @@ module private Helper =
         RefreshTree = None
     }
 
-    let private unsupportedPage (path: string) (reason: string option) =
-        Ok(PageState.GitUnsupportedPage { Path = path; Reason = reason })
-
     /// The current content comes from the vault file itself, the rest from the provider.
     let loadDiffPage (change: GitSidebarChange) : JS.Promise<Result<PageState, string>> =
         GitDiffPageLoader.load
@@ -72,51 +69,7 @@ module private Helper =
         (workspaceVersion: string)
         (requestedPath: string)
         : JS.Promise<Result<PageState, string>> =
-        promise {
-            match conflict.Items |> Array.tryFind (fun item -> item.Path = requestedPath) with
-            | None -> return Error $"'{requestedPath}' is not part of the open conflict session anymore."
-            | Some item ->
-                let unsupportedReason =
-                    match item.CombinedPreview with
-                    | Some(ContentViewDto.Unsupported reason) -> reason
-                    | _ -> Some "The provider offers no text preview for this conflict."
-
-                match item.SupportsResolvedContent, item.CombinedPreview with
-                | true, Some(ContentViewDto.Text content) ->
-                    return
-                        Ok(
-                            PageState.GitMergeConflictPage {
-                                Path = requestedPath
-                                ConflictContent = content
-                                Handle = conflict.Handle
-                                WorkspaceVersion = workspaceVersion
-                            }
-                        )
-                | false, _ ->
-                    let workspaceCandidate =
-                        item.Candidates
-                        |> Array.tryFind (fun candidate -> candidate.CandidateId = "workspace")
-
-                    let targetCandidate =
-                        item.Candidates
-                        |> Array.tryFind (fun candidate -> candidate.CandidateId = "target")
-
-                    match workspaceCandidate, targetCandidate with
-                    | Some workspace, Some target ->
-                        return
-                            Ok(
-                                PageState.GitFileChoiceConflictPage {
-                                    Path = requestedPath
-                                    Handle = conflict.Handle
-                                    WorkspaceVersion = workspaceVersion
-                                    Mine = candidateToFileChoiceVersion workspace
-                                    Online = candidateToFileChoiceVersion target
-                                }
-                            )
-                    | _ -> return unsupportedPage requestedPath unsupportedReason
-                | _, Some(ContentViewDto.Unsupported reason) -> return unsupportedPage requestedPath reason
-                | _ -> return unsupportedPage requestedPath unsupportedReason
-        }
+        promise { return conflictPageFor conflict workspaceVersion requestedPath }
 
     let dependencies (reportError: GitErrorNotification -> unit) : GitDependencies = {
         getSessionInfo = Renderer.VersionControlApiClient.getSessionInfo

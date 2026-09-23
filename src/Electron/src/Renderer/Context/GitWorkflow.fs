@@ -141,6 +141,7 @@ type GitState = {
     PendingRefreshWarningNotice: string option
     SelectedChangePath: string option
     MergeResolutionPendingPath: string option
+    PendingMaterializations: string list
     InstallRetryState: GitInstallRetryState
     PageLoadRequestId: int
     WriteRequestId: int
@@ -188,6 +189,7 @@ type GitState = {
         PendingRefreshWarningNotice = None
         SelectedChangePath = None
         MergeResolutionPendingPath = None
+        PendingMaterializations = []
         InstallRetryState = GitInstallRetryState.Idle
         PageLoadRequestId = 0
         WriteRequestId = 0
@@ -221,9 +223,13 @@ type ConfirmMergeResolutionOutcome = {
     NextConflictedPath: string option
     PageChange: GitPageChange
     Notice: string option
+    PendingMaterializationPath: string option
     /// True when the last item was resolved and the merge was finalized.
     Finalized: bool
 }
+
+let keepMineCandidateId = "workspace"
+let useOnlineCandidateId = "target"
 
 let candidateToFileChoiceVersion (candidate: ConflictCandidateDto) : FileChoiceVersion = {
     CandidateId = candidate.CandidateId
@@ -237,6 +243,7 @@ let candidateToFileChoiceVersion (candidate: ConflictCandidateDto) : FileChoiceV
             else
                 revision
         )
+    IsDeleted = candidate.Preview.IsNone && candidate.Object.IsNone
 }
 
 let private formatSizeBytes (sizeBytes: float) =
@@ -256,24 +263,92 @@ let private formatSizeBytes (sizeBytes: float) =
         + " "
         + unit
 
-let versionLine (label: string) (version: FileChoiceVersion) =
-    let parts =
-        [
-            version.SizeBytes |> Option.map formatSizeBytes
-            version.IsDownloaded
-            |> Option.map (fun isDownloaded -> if isDownloaded then "downloaded" else "not downloaded")
-            if label = "Online version" then
-                version.Revision |> Option.map (fun revision -> $"from {revision}")
-            else
-                None
-        ]
-        |> List.choose id
-
-    if List.isEmpty parts then
-        label
+let versionLine (label: string) (showRevision: bool) (version: FileChoiceVersion) =
+    if version.IsDeleted then
+        Some $"{label}: deleted"
     else
-        let joinedParts = String.concat ", " parts
-        $"{label}: {joinedParts}"
+        let parts =
+            [
+                version.SizeBytes |> Option.map formatSizeBytes
+                version.IsDownloaded
+                |> Option.map (fun isDownloaded -> if isDownloaded then "downloaded" else "not downloaded")
+                if showRevision then
+                    version.Revision |> Option.map (fun revision -> $"from {revision}")
+                else
+                    None
+            ]
+            |> List.choose id
+
+        if List.isEmpty parts then
+            None
+        else
+            let joinedParts = String.concat ", " parts
+            Some $"{label}: {joinedParts}"
+
+let conflictPageFor
+    (conflict: ConflictSessionSummaryDto)
+    (workspaceVersion: string)
+    (requestedPath: string)
+    : Result<PageState, string> =
+    match conflict.Items |> Array.tryFind (fun item -> item.Path = requestedPath) with
+    | None -> Error $"'{requestedPath}' is not part of the open conflict session anymore."
+    | Some item ->
+        let unsupportedReason =
+            match item.CombinedPreview with
+            | Some(ContentViewDto.Unsupported reason) -> reason
+            | _ -> Some "The provider offers no text preview for this conflict."
+
+        match item.SupportsResolvedContent, item.CombinedPreview with
+        | true, Some(ContentViewDto.Text content) ->
+            Ok(
+                PageState.GitMergeConflictPage {
+                    Path = requestedPath
+                    ConflictContent = content
+                    Handle = conflict.Handle
+                    WorkspaceVersion = workspaceVersion
+                }
+            )
+        | false, _ ->
+            let workspaceCandidate =
+                item.Candidates
+                |> Array.tryFind (fun candidate -> candidate.CandidateId = keepMineCandidateId)
+
+            let targetCandidate =
+                item.Candidates
+                |> Array.tryFind (fun candidate -> candidate.CandidateId = useOnlineCandidateId)
+
+            match workspaceCandidate, targetCandidate with
+            | Some workspace, Some target ->
+                Ok(
+                    PageState.GitFileChoiceConflictPage {
+                        Path = requestedPath
+                        Handle = conflict.Handle
+                        WorkspaceVersion = workspaceVersion
+                        Mine = candidateToFileChoiceVersion workspace
+                        Online = candidateToFileChoiceVersion target
+                    }
+                )
+            | _ ->
+                Ok(
+                    PageState.GitUnsupportedPage {
+                        Path = requestedPath
+                        Reason = unsupportedReason
+                    }
+                )
+        | _, Some(ContentViewDto.Unsupported reason) ->
+            Ok(
+                PageState.GitUnsupportedPage {
+                    Path = requestedPath
+                    Reason = reason
+                }
+            )
+        | _ ->
+            Ok(
+                PageState.GitUnsupportedPage {
+                    Path = requestedPath
+                    Reason = unsupportedReason
+                }
+            )
 
 [<RequireQualifiedAccess>]
 type ConfirmMergeResolutionError =
@@ -750,6 +825,11 @@ let applyStatus (status: WorkspaceStatusDto) (model: GitState) =
             SelectedChangePath = nextSelectedPath
             WorkspaceVersion = Some status.WorkspaceVersion
             ActiveConflict = status.ActiveConflictSession
+            PendingMaterializations =
+                if status.ActiveConflictSession.IsNone then
+                    []
+                else
+                    model.PendingMaterializations
     }
 
 let private applyRefreshResult (refreshResult: GitRefreshResult) (model: GitState) =
@@ -763,6 +843,7 @@ let private applyRefreshResult (refreshResult: GitRefreshResult) (model: GitStat
                 SelectedChangePath = None
                 WorkspaceVersion = None
                 ActiveConflict = None
+                PendingMaterializations = []
           }
 
     let modelWithBranches =
@@ -2204,6 +2285,8 @@ let private executeWriteAttempt
 let private confirmMergeResolutionAsync
     (deps: GitDependencies)
     (downloadLargeFiles: bool)
+    (pendingMaterializations: string list)
+    (deletedCandidatePick: bool)
     (resolution: GitMergeResolutionRequest)
     =
     promise {
@@ -2229,7 +2312,7 @@ let private confirmMergeResolutionAsync
 
         match resolved with
         | Error failure -> return Error(staleOrFailed failure)
-        | Ok(outcome, _) ->
+        | Ok(outcome, partialFailure) ->
             let isCandidatePick =
                 match resolution.Resolution with
                 | ConflictResolutionDto.PickCandidate _ -> true
@@ -2240,29 +2323,37 @@ let private confirmMergeResolutionAsync
                 && (outcome.Warnings
                     |> Array.exists (fun warning -> warning.Code = VersionControlCodes.ObjectNotMaterialized))
 
-            let! notice =
-                if not objectWasNotMaterialized then
-                    promise { return None }
-                elif not downloadLargeFiles then
-                    promise { return Some "The online version isn't downloaded yet. Use Download LFS file to get it." }
-                else
-                    promise {
-                        let! materialized =
-                            toResult (
-                                deps.materializeObject {
-                                    OperationId = deps.newOperationId ()
-                                    Path = resolution.Path
-                                    RefreshTree = Some true
-                                }
-                            )
+            let partialNeedsMaterialization =
+                isCandidatePick
+                && (partialFailure
+                    |> Option.exists (fun failure ->
+                        recoveryCode failure = Some VersionControlCodes.Recovery.RetryMaterialization
+                    ))
 
-                        return
-                            match materialized with
-                            | Ok(_, None) -> None
-                            | Ok(_, Some _)
-                            | Error _ ->
-                                Some $"Could not download '{resolution.Path}'. Use Download LFS file to try again."
-                    }
+            let pendingMaterializationPath =
+                if
+                    not deletedCandidatePick
+                    && (objectWasNotMaterialized || partialNeedsMaterialization)
+                then
+                    Some resolution.Path
+                else
+                    None
+
+            let notice =
+                if pendingMaterializationPath.IsNone then
+                    None
+                elif objectWasNotMaterialized && not downloadLargeFiles then
+                    match resolution.Resolution with
+                    | ConflictResolutionDto.PickCandidate candidateId when candidateId = useOnlineCandidateId ->
+                        Some "The online version isn't downloaded yet. Use Download LFS file to get it after the merge."
+                    | ConflictResolutionDto.PickCandidate candidateId when candidateId = keepMineCandidateId ->
+                        Some "Your version is not in the local cache. Use Download LFS file to get it after the merge."
+                    | _ -> Some "Use Download LFS file to get this file after the merge."
+                elif partialNeedsMaterialization then
+                    Some
+                        "The file was resolved, but its content could not be restored from the local cache. Swate downloads it after the merge when Download Large Files is on."
+                else
+                    None
 
             let! statusResult = toResult (deps.getStatus (request deps))
 
@@ -2285,6 +2376,40 @@ let private confirmMergeResolutionAsync
                     match finalized with
                     | Error failure -> return Error(staleOrFailed failure)
                     | Ok _ ->
+                        let pathsToMaterialize =
+                            pendingMaterializations @ (pendingMaterializationPath |> Option.toList)
+
+                        let! materializationNotice =
+                            if downloadLargeFiles then
+                                promise {
+                                    let mutable firstFailedPath = None
+
+                                    for path in pathsToMaterialize do
+                                        let! materialized =
+                                            toResult (
+                                                deps.materializeObject {
+                                                    OperationId = deps.newOperationId ()
+                                                    Path = path
+                                                    RefreshTree = Some true
+                                                }
+                                            )
+
+                                        match materialized with
+                                        | Ok(_, None) -> ()
+                                        | Ok(_, Some _)
+                                        | Error _ ->
+                                            if firstFailedPath.IsNone then
+                                                firstFailedPath <- Some path
+
+                                    return
+                                        firstFailedPath
+                                        |> Option.map (fun path ->
+                                            $"Could not download '{path}'. Use Download LFS file to try again."
+                                        )
+                                }
+                            else
+                                promise { return None }
+
                         let! afterFinalize = toResult (deps.getStatus (request deps))
 
                         match afterFinalize with
@@ -2295,7 +2420,8 @@ let private confirmMergeResolutionAsync
                                     UpdatedStatus = finalStatus.Value
                                     NextConflictedPath = None
                                     PageChange = GitPageChange.Clear
-                                    Notice = notice
+                                    Notice = materializationNotice |> Option.orElse notice
+                                    PendingMaterializationPath = pendingMaterializationPath
                                     Finalized = true
                                 }
                 else
@@ -2318,6 +2444,7 @@ let private confirmMergeResolutionAsync
                             NextConflictedPath = Some nextPath
                             PageChange = GitPageChange.Set page
                             Notice = notice
+                            PendingMaterializationPath = pendingMaterializationPath
                             Finalized = false
                         })
                         |> Result.mapError ConfirmMergeResolutionError.Failed
@@ -2688,6 +2815,20 @@ let private updateCore
         | Some _ -> model, Cmd.none
         | None when model.MergeResolutionPendingPath = Some resolution.Path -> model, Cmd.none
         | None ->
+            let deletedCandidatePick =
+                match resolution.Resolution with
+                | ConflictResolutionDto.PickCandidate candidateId ->
+                    model.ActiveConflict
+                    |> Option.bind (fun conflict ->
+                        conflict.Items |> Array.tryFind (fun item -> item.Path = resolution.Path)
+                    )
+                    |> Option.bind (fun item ->
+                        item.Candidates
+                        |> Array.tryFind (fun candidate -> candidate.CandidateId = candidateId)
+                    )
+                    |> Option.exists (fun candidate -> candidate.Preview.IsNone && candidate.Object.IsNone)
+                | ConflictResolutionDto.SupplyResolvedContent _ -> false
+
             let nextModel =
                 model
                 |> withBusyOperation (Some(GitBusyOperation.ConfirmingMergeResolution resolution.Path))
@@ -2695,15 +2836,24 @@ let private updateCore
                     state with
                         MergeResolutionPendingPath = Some resolution.Path
                         ErrorNotice = None
-                        WarningNotice = None
+                        WarningNotice =
+                            if List.isEmpty state.PendingMaterializations then
+                                None
+                            else
+                                state.WarningNotice
                 }
 
             let cmd =
                 Cmd.OfPromise.either
-                    (fun (deps, downloadLargeFiles, resolution) ->
-                        confirmMergeResolutionAsync deps downloadLargeFiles resolution
+                    (fun (deps, downloadLargeFiles, pendingMaterializations, deletedCandidatePick, resolution) ->
+                        confirmMergeResolutionAsync
+                            deps
+                            downloadLargeFiles
+                            pendingMaterializations
+                            deletedCandidatePick
+                            resolution
                     )
-                    (deps, model.DownloadLargeFiles, resolution)
+                    (deps, model.DownloadLargeFiles, model.PendingMaterializations, deletedCandidatePick, resolution)
                     (fun result -> ConfirmMergeResolutionCompleted(model.ArcSessionId, result))
                     (fun err ->
                         ConfirmMergeResolutionCompleted(
@@ -2755,7 +2905,24 @@ let private updateCore
                     MergeResolutionPendingPath = None
                     SelectedChangePath = outcome.NextConflictedPath
                     ErrorNotice = None
-                    WarningNotice = outcome.Notice
+                    WarningNotice =
+                        outcome.Notice
+                        |> Option.orElse (
+                            if
+                                not (List.isEmpty model.PendingMaterializations)
+                                && (not outcome.Finalized || not model.DownloadLargeFiles)
+                            then
+                                model.WarningNotice
+                            else
+                                None
+                        )
+                    PendingMaterializations =
+                        if outcome.Finalized then
+                            []
+                        else
+                            match outcome.PendingMaterializationPath with
+                            | Some path -> model.PendingMaterializations @ [ path ]
+                            | None -> model.PendingMaterializations
             }
 
         if outcome.Finalized && shouldRunPostMergePush nextModel then
@@ -3444,6 +3611,7 @@ let private updateCore
             | AbandonMerge -> {
                 nextModel with
                     PendingPostMergePush = false
+                    PendingMaterializations = []
               }
             // Only a materialization recovery leaves the publish undone with nothing else
             // offering it. The publish resumes after that recovery. The retry_publish partial

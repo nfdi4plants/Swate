@@ -43,7 +43,12 @@ let Main (choiceData: VersionControlFileChoicePage) =
                     Html.h2 [
                         prop.testId "renderer-git-file-choice-heading"
                         prop.className "swt:text-lg swt:font-semibold"
-                        prop.text "This file was changed here and online"
+                        prop.text (
+                            if choiceData.Mine.IsDeleted || choiceData.Online.IsDeleted then
+                                "This file was changed on one side and deleted on the other"
+                            else
+                                "This file was changed here and online"
+                        )
                     ]
                     Html.p [
                         prop.className "swt:mt-2 swt:text-sm swt:text-base-content/70"
@@ -52,14 +57,20 @@ let Main (choiceData: VersionControlFileChoicePage) =
                     Html.div [
                         prop.className "swt:mt-5 swt:space-y-2 swt:text-sm"
                         prop.children [
-                            Html.p [
-                                prop.testId "renderer-git-file-choice-mine-version"
-                                prop.text (versionLine "Your version" choiceData.Mine)
-                            ]
-                            Html.p [
-                                prop.testId "renderer-git-file-choice-online-version"
-                                prop.text (versionLine "Online version" choiceData.Online)
-                            ]
+                            match versionLine "Your version" false choiceData.Mine with
+                            | Some line ->
+                                Html.p [
+                                    prop.testId "renderer-git-file-choice-mine-version"
+                                    prop.text line
+                                ]
+                            | None -> Html.none
+                            match versionLine "Online version" true choiceData.Online with
+                            | Some line ->
+                                Html.p [
+                                    prop.testId "renderer-git-file-choice-online-version"
+                                    prop.text line
+                                ]
+                            | None -> Html.none
                         ]
                     ]
                     Html.div [
@@ -74,13 +85,17 @@ let Main (choiceData: VersionControlFileChoicePage) =
                                         prop.className "swt:btn swt:btn-primary"
                                         prop.disabled isBusy
                                         prop.text "Keep my version"
-                                        prop.onClick (fun _ -> pickCandidate "workspace")
+                                        prop.onClick (fun _ -> pickCandidate keepMineCandidateId)
                                     ]
                                     Html.p [
                                         prop.testId "renderer-git-file-choice-keep-mine-hint"
                                         prop.className "swt:text-xs swt:text-base-content/70"
-                                        prop.text
-                                            "Keeps the file as it is on this computer. The online changes to this file are discarded."
+                                        prop.text (
+                                            if choiceData.Mine.IsDeleted then
+                                                "You deleted this file. Keeping your version deletes it and discards the online changes to it."
+                                            else
+                                                "Keeps the file as it is on this computer. The online changes to this file are discarded."
+                                        )
                                     ]
                                 ]
                             ]
@@ -93,13 +108,17 @@ let Main (choiceData: VersionControlFileChoicePage) =
                                         prop.className "swt:btn swt:btn-primary"
                                         prop.disabled isBusy
                                         prop.text "Use online version"
-                                        prop.onClick (fun _ -> pickCandidate "target")
+                                        prop.onClick (fun _ -> pickCandidate useOnlineCandidateId)
                                     ]
                                     Html.p [
                                         prop.testId "renderer-git-file-choice-use-online-hint"
                                         prop.className "swt:text-xs swt:text-base-content/70"
-                                        prop.text
-                                            "Replaces your version of this file with the online one. Your changes to this file are discarded."
+                                        prop.text (
+                                            if choiceData.Online.IsDeleted then
+                                                "The online version deleted this file. Choosing it deletes the file here and discards your changes to it."
+                                            else
+                                                "Replaces your version of this file with the online one. Your changes to this file are discarded."
+                                        )
                                     ]
                                 ]
                             ]

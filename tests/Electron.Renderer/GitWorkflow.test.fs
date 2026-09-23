@@ -479,6 +479,7 @@ Vitest.describe (
                     SizeBytes = Some 3250585.6
                     IsDownloaded = Some false
                     Revision = Some "e8955bc"
+                    IsDeleted = false
                 }
 
                 Vitest.expect(candidateToFileChoiceVersion withoutObject).toEqual {
@@ -486,17 +487,19 @@ Vitest.describe (
                     SizeBytes = None
                     IsDownloaded = None
                     Revision = None
+                    IsDeleted = true
                 }
         )
 
         Vitest.test (
-            "version lines format known details and keep a bare label when details are absent",
+            "version lines omit unknown details and render deleted versions",
             fun () ->
                 let yourVersion: FileChoiceVersion = {
                     CandidateId = "workspace"
                     SizeBytes = Some(3.1 * 1024.0 * 1024.0)
                     IsDownloaded = Some true
                     Revision = None
+                    IsDeleted = false
                 }
 
                 let onlineVersion = {
@@ -511,14 +514,85 @@ Vitest.describe (
                     SizeBytes = None
                     IsDownloaded = None
                     Revision = None
+                    IsDeleted = false
                 }
 
-                Vitest.expect(versionLine "Your version" yourVersion).toBe "Your version: 3.1 MB, downloaded"
+                Vitest
+                    .expect(versionLine "Your version" false yourVersion)
+                    .toEqual (Some "Your version: 3.1 MB, downloaded")
 
-                Vitest.expect(versionLine "Online version" onlineVersion).toBe
-                    "Online version: 3.1 MB, not downloaded, from e8955bc"
+                Vitest
+                    .expect(versionLine "Online version" true onlineVersion)
+                    .toEqual (Some "Online version: 3.1 MB, not downloaded, from e8955bc")
 
-                Vitest.expect(versionLine "Your version" unknownVersion).toBe "Your version"
+                Vitest.expect(versionLine "Your version" false unknownVersion).toEqual None
+
+                Vitest
+                    .expect(versionLine "Online version" true { unknownVersion with IsDeleted = true })
+                    .toEqual (Some "Online version: deleted")
+        )
+
+        Vitest.test (
+            "conflictPageFor selects file choice and merge pages",
+            fun () ->
+                let workspaceCandidate: ConflictCandidateDto = {
+                    CandidateId = keepMineCandidateId
+                    Label = "Workspace"
+                    Revision = None
+                    Preview = None
+                    Object = None
+                }
+
+                let targetCandidate: ConflictCandidateDto = {
+                    CandidateId = useOnlineCandidateId
+                    Label = "Online"
+                    Revision = Some "e8955bc"
+                    Preview = None
+                    Object = None
+                }
+
+                let fileChoiceConflict: ConflictSessionSummaryDto = {
+                    Handle = {
+                        SessionId = "conflict-1"
+                        Version = "1"
+                    }
+                    Items = [|
+                        {
+                            Path = "data/file.bin"
+                            Candidates = [| workspaceCandidate; targetCandidate |]
+                            CombinedPreview = Some(ContentViewDto.Unsupported None)
+                            SupportsResolvedContent = false
+                        }
+                    |]
+                }
+
+                match conflictPageFor fileChoiceConflict "v1" "data/file.bin" with
+                | Ok(PageState.GitFileChoiceConflictPage page) ->
+                    Vitest.expect(page.Mine.IsDeleted).toBe (true)
+                    Vitest.expect(page.Online.IsDeleted).toBe (true)
+                | _ -> failwith "Expected the file-choice conflict page."
+
+                let textConflict = {
+                    fileChoiceConflict with
+                        Items = [|
+                            {
+                                fileChoiceConflict.Items[0] with
+                                    CombinedPreview = Some(ContentViewDto.Text "combined")
+                                    SupportsResolvedContent = true
+                            }
+                        |]
+                }
+
+                match conflictPageFor textConflict "v1" "data/file.bin" with
+                | Ok(PageState.GitMergeConflictPage page) -> Vitest.expect(page.ConflictContent).toBe "combined"
+                | _ -> failwith "Expected the text merge conflict page."
+        )
+
+        Vitest.test (
+            "file choice candidate ids match the button mappings",
+            fun () ->
+                Vitest.expect(keepMineCandidateId).toBe "workspace"
+                Vitest.expect(useOnlineCandidateId).toBe "target"
         )
 )
 
@@ -3792,6 +3866,7 @@ Vitest.describe (
                                 NextConflictedPath = None
                                 PageChange = GitPageChange.Clear
                                 Notice = None
+                                PendingMaterializationPath = None
                                 Finalized = true
                             }
                         ))
@@ -5256,12 +5331,13 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "Picking a candidate downloads an unmaterialized object when the preference is on",
+            "Picking an unmaterialized candidate waits until the finalization succeeds",
             fun () -> promise {
                 let conflict = (conflictedStatus [| "data/big.bin" |]).ActiveConflictSession.Value
                 let mutable resolveRequest = None
                 let mutable materializeRequest = None
                 let mutable callOrder = []
+                let mutable finalized = false
 
                 let warning = {
                     Code = VersionControlCodes.ObjectNotMaterialized
@@ -5288,9 +5364,13 @@ Vitest.describe (
                         finalizeConflict =
                             fun _ ->
                                 callOrder <- callOrder @ [ "finalize" ]
+                                finalized <- true
                                 promise { return Ok(succeeded (Some "rev")) }
                         materializeObject =
                             fun request ->
+                                if not finalized then
+                                    failwith "Materialization ran before conflict finalization."
+
                                 materializeRequest <- Some request
                                 callOrder <- callOrder @ [ "materialize" ]
                                 promise { return Ok(succeeded ()) }
@@ -5326,8 +5406,224 @@ Vitest.describe (
                 Vitest.expect(resolveRequest.Value.Resolution).toEqual (ConflictResolutionDto.PickCandidate "target")
                 Vitest.expect(materializeRequest.Value.Path).toBe "data/big.bin"
                 Vitest.expect(materializeRequest.Value.RefreshTree).toEqual (Some true)
-                Vitest.expect(callOrder).toEqual [ "resolve"; "materialize"; "finalize" ]
+                Vitest.expect(callOrder).toEqual [ "resolve"; "finalize"; "materialize" ]
                 Vitest.expect(nextState.WarningNotice).toEqual None
+            }
+        )
+
+        Vitest.test (
+            "Two conflict picks materialize only the warned path after finalization",
+            fun () -> promise {
+                let conflict =
+                    (conflictedStatus [| "first.bin"; "second.txt" |]).ActiveConflictSession.Value
+
+                let refreshedHandle = {
+                    SessionId = "conflict-2"
+                    Version = "2"
+                }
+
+                let mutable finalized = false
+                let resolvedPaths = ResizeArray<string>()
+                let materializedPaths = ResizeArray<string>()
+
+                let deps = {
+                    defaultDependencies with
+                        resolveConflict =
+                            fun request ->
+                                resolvedPaths.Add request.Path
+
+                                if request.Path = "first.bin" then
+                                    promise {
+                                        return
+                                            Ok(
+                                                succeededWithWarnings
+                                                    [|
+                                                        {
+                                                            Code = VersionControlCodes.ObjectNotMaterialized
+                                                            Message = "The selected file holds a pointer."
+                                                        }
+                                                    |]
+                                                    {
+                                                        RefreshedHandle = refreshedHandle
+                                                        RemainingItems = [| conflict.Items[1] |]
+                                                    }
+                                            )
+                                    }
+                                else
+                                    promise {
+                                        return
+                                            Ok(
+                                                succeeded {
+                                                    RefreshedHandle = {
+                                                        SessionId = "conflict-3"
+                                                        Version = "3"
+                                                    }
+                                                    RemainingItems = [||]
+                                                }
+                                            )
+                                    }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        loadConflictPage = fun _ _ path -> promise { return Ok(diffPage path) }
+                        finalizeConflict =
+                            fun _ ->
+                                finalized <- true
+                                promise { return Ok(succeeded (Some "rev")) }
+                        materializeObject =
+                            fun request ->
+                                if not finalized then
+                                    failwith "Materialization ran before conflict finalization."
+
+                                materializedPaths.Add request.Path
+                                promise { return Error "The local cache is unavailable." }
+                }
+
+                let state = {
+                    runningState with
+                        ActiveConflict = Some conflict
+                        DownloadLargeFiles = true
+                }
+
+                let firstRequest = {
+                    Path = "first.bin"
+                    Handle = conflict.Handle
+                    WorkspaceVersion = "v1"
+                    Resolution = ConflictResolutionDto.PickCandidate useOnlineCandidateId
+                }
+
+                let stateAfterFirst, firstCmd =
+                    update deps ignore (ConfirmMergeResolutionRequested firstRequest) state
+
+                let! firstMessages = collectMessages firstCmd
+
+                let stateAfterFirst, firstFinishCmd =
+                    match firstMessages with
+                    | [| ConfirmMergeResolutionCompleted(_, Ok outcome) |] ->
+                        let nextState, finishCmd = update deps ignore firstMessages[0] stateAfterFirst
+                        Vitest.expect(outcome.Finalized).toBe (false)
+                        nextState, finishCmd
+                    | _ -> failwith "Expected the first conflict resolution to complete."
+
+                let! _ = collectMessages firstFinishCmd
+                Vitest.expect(stateAfterFirst.PendingMaterializations).toEqual [ "first.bin" ]
+
+                let secondRequest = {
+                    Path = "second.txt"
+                    Handle = refreshedHandle
+                    WorkspaceVersion = "v1"
+                    Resolution = ConflictResolutionDto.PickCandidate useOnlineCandidateId
+                }
+
+                let stateAfterSecond, secondCmd =
+                    update deps ignore (ConfirmMergeResolutionRequested secondRequest) stateAfterFirst
+
+                let! secondMessages = collectMessages secondCmd
+
+                let finalState, secondFinishCmd =
+                    match secondMessages with
+                    | [| ConfirmMergeResolutionCompleted(_, Ok outcome) |] ->
+                        let nextState, finishCmd = update deps ignore secondMessages[0] stateAfterSecond
+                        Vitest.expect(outcome.Finalized).toBe (true)
+                        nextState, finishCmd
+                    | _ -> failwith "Expected the second conflict resolution to complete."
+
+                let! _ = collectMessages secondFinishCmd
+
+                Vitest.expect(resolvedPaths.ToArray()).toEqual [| "first.bin"; "second.txt" |]
+                Vitest.expect(materializedPaths.ToArray()).toEqual [| "first.bin" |]
+                Vitest.expect(finalState.PendingMaterializations).toEqual []
+
+                Vitest
+                    .expect(finalState.WarningNotice)
+                    .toEqual (Some "Could not download 'first.bin'. Use Download LFS file to try again.")
+            }
+        )
+
+        Vitest.test (
+            "A partial candidate resolve queues its path and explains the delayed download",
+            fun () -> promise {
+                let conflict =
+                    (conflictedStatus [| "partial.bin"; "next.txt" |]).ActiveConflictSession.Value
+
+                let refreshedHandle = {
+                    SessionId = "conflict-partial"
+                    Version = "2"
+                }
+
+                let failure =
+                    makeFailure
+                        Conflict
+                        "object_materialization_failed"
+                        "The selected object could not be restored."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RetryMaterialization
+                            Instructions = None
+                        })
+                        [| "partial.bin" |]
+
+                let deps = {
+                    defaultDependencies with
+                        resolveConflict =
+                            fun _ -> promise {
+                                return
+                                    Ok(
+                                        OperationResultDto.PartiallySucceeded(
+                                            operation {
+                                                RefreshedHandle = refreshedHandle
+                                                RemainingItems = [| conflict.Items[1] |]
+                                            },
+                                            failure
+                                        )
+                                    )
+                            }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        loadConflictPage = fun _ _ path -> promise { return Ok(diffPage path) }
+                }
+
+                let request = {
+                    Path = "partial.bin"
+                    Handle = conflict.Handle
+                    WorkspaceVersion = "v1"
+                    Resolution = ConflictResolutionDto.PickCandidate useOnlineCandidateId
+                }
+
+                let state = {
+                    runningState with
+                        ActiveConflict = Some conflict
+                        DownloadLargeFiles = true
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (ConfirmMergeResolutionRequested request) state
+
+                let! messages = collectMessages requestCmd
+
+                let nextState, finishCmd =
+                    match messages with
+                    | [| ConfirmMergeResolutionCompleted(_, Ok outcome) |] ->
+                        let nextState, finishCmd = update deps ignore messages[0] stateAfterRequest
+                        Vitest.expect(outcome.Finalized).toBe (false)
+
+                        Vitest
+                            .expect(outcome.Notice)
+                            .toEqual (
+                                Some
+                                    "The file was resolved, but its content could not be restored from the local cache. Swate downloads it after the merge when Download Large Files is on."
+                            )
+
+                        nextState, finishCmd
+                    | _ -> failwith "Expected the partial conflict resolution to continue."
+
+                let! _ = collectMessages finishCmd
+                Vitest.expect(nextState.PendingMaterializations).toEqual [ "partial.bin" ]
+
+                Vitest
+                    .expect(nextState.WarningNotice)
+                    .toEqual (
+                        Some
+                            "The file was resolved, but its content could not be restored from the local cache. Swate downloads it after the merge when Download Large Files is on."
+                    )
+
+                Vitest.expect(nextState.ActiveConflict |> Option.map _.Handle).toEqual (Some refreshedHandle)
             }
         )
 
@@ -5387,7 +5683,10 @@ Vitest.describe (
                     | [| ConfirmMergeResolutionCompleted(_, Ok outcome) |] ->
                         Vitest
                             .expect(outcome.Notice)
-                            .toEqual (Some "The online version isn't downloaded yet. Use Download LFS file to get it.")
+                            .toEqual (
+                                Some
+                                    "The online version isn't downloaded yet. Use Download LFS file to get it after the merge."
+                            )
 
                         update deps ignore completionMessages[0] stateAfterRequest
                     | _ -> failwith "Expected merge resolution completion."
@@ -5398,7 +5697,204 @@ Vitest.describe (
 
                 Vitest
                     .expect(nextState.WarningNotice)
-                    .toEqual (Some "The online version isn't downloaded yet. Use Download LFS file to get it.")
+                    .toEqual (
+                        Some "The online version isn't downloaded yet. Use Download LFS file to get it after the merge."
+                    )
+
+                Vitest.expect(nextState.PendingMaterializations).toEqual []
+            }
+        )
+
+        Vitest.test (
+            "Picking an unmaterialized workspace version explains where to download it",
+            fun () -> promise {
+                let conflict = (conflictedStatus [| "workspace.bin" |]).ActiveConflictSession.Value
+
+                let warning = {
+                    Code = VersionControlCodes.ObjectNotMaterialized
+                    Message = "The selected file holds a pointer."
+                }
+
+                let deps = {
+                    defaultDependencies with
+                        resolveConflict =
+                            fun _ -> promise {
+                                return
+                                    Ok(
+                                        succeededWithWarnings [| warning |] {
+                                            RefreshedHandle = conflict.Handle
+                                            RemainingItems = [||]
+                                        }
+                                    )
+                            }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        finalizeConflict = fun _ -> promise { return Ok(succeeded (Some "rev")) }
+                }
+
+                let request = {
+                    Path = "workspace.bin"
+                    Handle = conflict.Handle
+                    WorkspaceVersion = "v1"
+                    Resolution = ConflictResolutionDto.PickCandidate keepMineCandidateId
+                }
+
+                let state = {
+                    runningState with
+                        ActiveConflict = Some conflict
+                        DownloadLargeFiles = false
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (ConfirmMergeResolutionRequested request) state
+
+                let! messages = collectMessages requestCmd
+
+                let finalState, finishCmd =
+                    match messages with
+                    | [| ConfirmMergeResolutionCompleted(_, Ok outcome) |] ->
+                        Vitest
+                            .expect(outcome.Notice)
+                            .toEqual (
+                                Some
+                                    "Your version is not in the local cache. Use Download LFS file to get it after the merge."
+                            )
+
+                        update deps ignore messages[0] stateAfterRequest
+                    | _ -> failwith "Expected merge resolution completion."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest
+                    .expect(finalState.WarningNotice)
+                    .toEqual (
+                        Some "Your version is not in the local cache. Use Download LFS file to get it after the merge."
+                    )
+            }
+        )
+
+        Vitest.test (
+            "Abandoning a merge clears queued materializations",
+            fun () -> promise {
+                let conflict = (conflictedStatus [| "pending.bin" |]).ActiveConflictSession.Value
+
+                let deps = {
+                    (withRefresh cleanStatus defaultDependencies) with
+                        cancelConflict = fun _ -> promise { return Ok(succeeded ()) }
+                }
+
+                let state = {
+                    runningState with
+                        ActiveConflict = Some conflict
+                        PendingMaterializations = [ "pending.bin" ]
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested AbandonMerge) state
+
+                let! messages = collectMessages requestCmd
+
+                let nextState, finishCmd =
+                    match messages with
+                    | [| WriteCompleted(_, _, AbandonMerge, Ok(Completed _)) |] ->
+                        update deps ignore messages[0] stateAfterRequest
+                    | _ -> failwith "Expected the merge abandonment to complete."
+
+                let! _ = collectMessages finishCmd
+                Vitest.expect(nextState.PendingMaterializations).toEqual []
+            }
+        )
+
+        Vitest.test (
+            "Picking a deleted candidate uses its id and skips materialization",
+            fun () -> promise {
+                let baseConflict =
+                    (conflictedStatus [| "deleted.bin" |]).ActiveConflictSession.Value
+
+                let deletedTarget: ConflictCandidateDto = {
+                    CandidateId = useOnlineCandidateId
+                    Label = "Online"
+                    Revision = Some "abc1234"
+                    Preview = None
+                    Object = None
+                }
+
+                let item = {
+                    baseConflict.Items[0] with
+                        Candidates = [| deletedTarget |]
+                        CombinedPreview = Some(ContentViewDto.Unsupported None)
+                        SupportsResolvedContent = false
+                }
+
+                let conflict = { baseConflict with Items = [| item |] }
+                let mutable resolveRequest = None
+                let mutable materializeCalls = 0
+
+                let warning = {
+                    Code = VersionControlCodes.ObjectNotMaterialized
+                    Message = "The selected file holds a pointer."
+                }
+
+                let deps = {
+                    defaultDependencies with
+                        resolveConflict =
+                            fun request ->
+                                resolveRequest <- Some request
+
+                                promise {
+                                    return
+                                        Ok(
+                                            succeededWithWarnings [| warning |] {
+                                                RefreshedHandle = conflict.Handle
+                                                RemainingItems = [||]
+                                            }
+                                        )
+                                }
+                        getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
+                        finalizeConflict = fun _ -> promise { return Ok(succeeded (Some "rev")) }
+                        materializeObject =
+                            fun _ ->
+                                materializeCalls <- materializeCalls + 1
+                                promise { return Ok(succeeded ()) }
+                }
+
+                let request = {
+                    Path = "deleted.bin"
+                    Handle = conflict.Handle
+                    WorkspaceVersion = "v1"
+                    Resolution = ConflictResolutionDto.PickCandidate useOnlineCandidateId
+                }
+
+                let state = {
+                    runningState with
+                        ActiveConflict = Some conflict
+                        DownloadLargeFiles = true
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (ConfirmMergeResolutionRequested request) state
+
+                let! messages = collectMessages requestCmd
+
+                let _, finishCmd =
+                    match messages with
+                    | [| ConfirmMergeResolutionCompleted(_, Ok _) |] -> update deps ignore messages[0] stateAfterRequest
+                    | _ -> failwith "Expected the deleted file resolution to complete."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(candidateToFileChoiceVersion deletedTarget).toEqual {
+                    CandidateId = useOnlineCandidateId
+                    SizeBytes = None
+                    IsDownloaded = None
+                    Revision = Some "abc1234"
+                    IsDeleted = true
+                }
+
+                Vitest
+                    .expect(resolveRequest.Value.Resolution)
+                    .toEqual (ConflictResolutionDto.PickCandidate useOnlineCandidateId)
+
+                Vitest.expect(materializeCalls).toBe 0
             }
         )
 

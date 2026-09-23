@@ -124,8 +124,7 @@ module VersionControlCodes =
     [<Literal>]
     let BaseContentNotFound = "base_content_not_found"
 
-    // Produced by the library as an operation warning.
-    /// The library reports this warning when a picked file holds a pointer whose content is not in the local cache.
+    /// The library reports this warning when a picked file's content is not in the local cache.
     [<Literal>]
     let ObjectNotMaterialized = "object_not_materialized"
 

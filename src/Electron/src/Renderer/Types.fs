@@ -38,6 +38,7 @@ type FileChoiceVersion = {
     IsDownloaded: bool option
     /// Short source revision of the version (first 7 characters), when the provider names one.
     Revision: string option
+    IsDeleted: bool
 }
 
 type VersionControlFileChoicePage = {
