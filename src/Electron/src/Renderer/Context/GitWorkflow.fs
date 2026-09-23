@@ -1017,6 +1017,22 @@ let private titleForWriteRequest =
 let private reportWriteErrorCmd deps request message =
     reportErrorCmd deps (titleForWriteRequest request) message
 
+let private isLocalPrimarySaveFailure (success: WriteSuccess) =
+    let partialFailure =
+        match success with
+        | UnitSuccess success -> success.Partial
+        | CloneSuccess _ -> None
+
+    partialFailure
+    |> Option.exists (fun failure ->
+        let recovery = recoveryCode failure
+
+        recovery = Some VersionControlCodes.Recovery.ReconcileIndex
+        || recovery = Some VersionControlCodes.Recovery.RemoveIndexLock
+        || (failure.Category = FailureCategoryDto.Concurrency
+            && failure.Code = "index_locked")
+    )
+
 let private withBusyOperation busyOperation model = {
     model with
         BusyOperation = busyOperation
@@ -3650,6 +3666,8 @@ let private updateCore
 
         let report =
             match writeRequest with
+            | PrimarySave _ when isLocalPrimarySaveFailure success ->
+                reportErrorCmd deps "Could not save changes" message
             | PrimarySave _ -> reportErrorCmd deps "Could not push saved changes" message
             | _ -> reportWriteErrorCmd deps writeRequest message
 

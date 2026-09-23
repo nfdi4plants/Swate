@@ -3463,6 +3463,63 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "A primary save reconciliation failure reports that saving failed",
+            fun () -> promise {
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
+                let failure =
+                    makeFailure
+                        ProviderError
+                        "index_reconciliation_failed"
+                        "The index needs reconciliation."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.ReconcileIndex
+                            Instructions = None
+                        })
+                        [||]
+
+                let state = {
+                    runningState with
+                        WriteRequestId = 4
+                        BusyOperation = Some GitBusyOperation.PushingToRemote
+                }
+
+                let success =
+                    UnitSuccess {
+                        Refresh = refreshed cleanStatus
+                        PageChange = GitPageChange.NoChange
+                        SelectedChangePath = None
+                        Warning = None
+                        Partial = Some failure
+                        Published = None
+                    }
+
+                let deps = {
+                    defaultDependencies with
+                        reportError = reportedErrors.Add
+                }
+
+                let _, command =
+                    update
+                        deps
+                        ignore
+                        (WriteCompleted(
+                            state.ArcSessionId,
+                            state.WriteRequestId,
+                            PrimarySave(prepareCommitAll runningState "Save locally first"),
+                            Ok(CompletedWithPendingRemoteFailure(success, failure.Message))
+                        ))
+                        state
+
+                let! _ = collectMessages command
+
+                Vitest.expect(reportedErrors.Count).toBe (1)
+                Vitest.expect(reportedErrors[0].Title).toBe ("Could not save changes")
+                Vitest.expect(reportedErrors[0].Message).toBe (failure.Message)
+            }
+        )
+
+        Vitest.test (
             "Primary save preserves the local commit warning when synchronize fails after commit",
             fun () -> promise {
                 let deps = {

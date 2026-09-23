@@ -5,6 +5,7 @@
 module Main.VersionControl.ProviderComposition
 
 open Main.Bindings.Path
+open Fable.Core
 open VersionControlService.Abstractions
 
 module GitWorkspaceSession = VersionControlService.Git.GitWorkspaceSession
@@ -130,13 +131,20 @@ let tryCreateLocation (providerLocation: string) (displayName: string option) : 
 
 /// Lock files a killed provider process can leave behind in a workspace. The library
 /// reports such a lock with the recovery code remove_index_lock and refuses to delete
-/// it because it cannot prove who owns the lock. Swate can: it is the only process
-/// that runs git in a vault window, so once its own operations are idle the lock is
-/// stale. Only a plain repository (a .git directory) is handled here. A .git file
+/// it because it cannot prove who owns the lock. Swate manages Git operations in a vault
+/// window, so it can clear an old lock after its operations are idle and the age threshold
+/// has passed. Only a plain repository (a .git directory) is handled here. A .git file
 /// (linked worktree or submodule) keeps its git directory elsewhere, and for those the
-/// lock is left to the user together with the library's instructions. This reads the
-/// filesystem once to tell the two cases apart.
-let staleLockPaths (providerId: ProviderId) (workspaceRoot: string) : string[] =
+/// lock is left to the user together with the library's instructions. The provider checks
+/// the repository layout before checking the lock age.
+// Editors and other tools can hold an index lock for a moment.
+[<Literal>]
+let private staleLockMinimumAgeSeconds = 10.0
+
+[<Emit("Date.now()")>]
+let private currentTimeMilliseconds () : float = jsNative
+
+let private indexLockPaths (providerId: ProviderId) (workspaceRoot: string) : string[] =
     let gitDirectory = join [| workspaceRoot; ".git" |]
 
     let isPlainGitDirectory () =
@@ -147,6 +155,24 @@ let staleLockPaths (providerId: ProviderId) (workspaceRoot: string) : string[] =
         [| join [| gitDirectory; "index.lock" |] |]
     else
         [||]
+
+let private indexLockAgeSeconds (path: string) =
+    VersionControlService.Runtime.Node.FileSystem.tryLstatSync path
+    |> Option.map (fun stats -> (currentTimeMilliseconds () - stats.mtimeMs) / 1000.0)
+
+let staleLockPaths (providerId: ProviderId) (workspaceRoot: string) : string[] =
+    indexLockPaths providerId workspaceRoot
+    |> Array.filter (fun path ->
+        indexLockAgeSeconds path
+        |> Option.forall (fun ageSeconds -> ageSeconds >= staleLockMinimumAgeSeconds)
+    )
+
+let recentLockPaths (providerId: ProviderId) (workspaceRoot: string) : string[] =
+    indexLockPaths providerId workspaceRoot
+    |> Array.filter (fun path ->
+        indexLockAgeSeconds path
+        |> Option.exists (fun ageSeconds -> ageSeconds < staleLockMinimumAgeSeconds)
+    )
 
 /// Resolution outcome for one vault root, as the session host consumes it.
 type VaultResolution =

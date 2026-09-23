@@ -153,6 +153,10 @@ module VersionControlCodes =
     [<Literal>]
     let LockRemovalRefused = "lock_removal_refused"
 
+    /// The Swate main process refuses to clear a recently created index lock.
+    [<Literal>]
+    let LockInUse = "lock_in_use"
+
     [<Literal>]
     let LockRemoved = "lock_removed"
 
@@ -191,6 +195,9 @@ module VersionControlCodes =
 
         [<Literal>]
         let RemoveIndexLock = "remove_index_lock"
+
+        [<Literal>]
+        let ReconcileIndex = "reconcile_index"
 
         [<Literal>]
         let RestoreWorkspace = "restore_workspace"

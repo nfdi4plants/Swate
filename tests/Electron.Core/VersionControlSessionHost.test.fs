@@ -1557,7 +1557,21 @@ Vitest.describe (
                     let lockPath = join [| fixture.RepoRoot; ".git"; "index.lock" |]
                     writeText lockPath ""
 
-                    let! cleared = api.clearStaleLock (request "clear-lock")
+                    let! recentLock = api.clearStaleLock (request "clear-lock-recent")
+                    let recentFailure = expectDtoFailure "recent lock removal" recentLock
+                    Vitest.expect(recentFailure.Category).toEqual FailureCategoryDto.Concurrency
+                    Vitest.expect(recentFailure.Code).toBe VersionControlCodes.LockInUse
+
+                    Vitest.expect(recentFailure.Message).toBe
+                        "Another program is using the repository right now. Try again in a moment."
+
+                    Vitest.expect(Main.Bindings.Filesystem.existsSync lockPath).toBe true
+
+                    let oldTime = System.DateTime.UtcNow.AddSeconds(-60.0)
+
+                    VersionControlService.Runtime.Node.FileSystem.utimesSync lockPath oldTime oldTime
+
+                    let! cleared = api.clearStaleLock (request "clear-lock-old")
                     let outcome = expectDtoValue "clear lock" cleared
                     Vitest.expect(outcome.Effect).toEqual OperationEffectDto.Performed
                     Vitest.expect(outcome.AffectedPaths).toEqual [||]

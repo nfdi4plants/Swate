@@ -997,52 +997,66 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                     Retryable = true
                             }
                     else
-                        let lockPaths =
-                            ProviderComposition.staleLockPaths hosted.Binding.ProviderId hosted.Binding.WorkspaceRoot
+                        let recentLockPaths =
+                            ProviderComposition.recentLockPaths hosted.Binding.ProviderId hosted.Binding.WorkspaceRoot
 
-                        let removed = lockPaths |> Array.filter removeExistingFile
+                        if recentLockPaths.Length > 0 then
+                            return
+                                Failed(
+                                    OperationFailure.create
+                                        Concurrency
+                                        VersionControlCodes.LockInUse
+                                        "Another program is using the repository right now. Try again in a moment."
+                                )
+                        else
+                            let lockPaths =
+                                ProviderComposition.staleLockPaths
+                                    hosted.Binding.ProviderId
+                                    hosted.Binding.WorkspaceRoot
 
-                        match hosted.Session.Synchronization with
-                        | Some synchronization ->
-                            let! _ = synchronization.Refresh context
-                            ()
-                        | None -> ()
+                            let removed = lockPaths |> Array.filter removeExistingFile
 
-                        let! status = hosted.Session.Core.GetStatus context
+                            match hosted.Session.Synchronization with
+                            | Some synchronization ->
+                                let! _ = synchronization.Refresh context
+                                ()
+                            | None -> ()
 
-                        let removedWarnings =
-                            removed
-                            |> Array.map (fun path -> {
-                                Code = VersionControlCodes.LockRemoved
-                                Message = path
-                            })
+                            let! status = hosted.Session.Core.GetStatus context
 
-                        let effect =
-                            if removed.Length > 0 then
-                                Performed
-                            else
-                                NoOp(Some "no stale lock")
+                            let removedWarnings =
+                                removed
+                                |> Array.map (fun path -> {
+                                    Code = VersionControlCodes.LockRemoved
+                                    Message = path
+                                })
 
-                        // A partial status refresh still reports the removed lock files, since these
-                        // warnings are the only evidence of the removal.
-                        return
-                            match status with
-                            | Succeeded outcome ->
-                                Succeeded {
-                                    outcome with
-                                        Effect = effect
-                                        Warnings = Array.append outcome.Warnings removedWarnings
-                                }
-                            | PartiallySucceeded(outcome, failure) ->
-                                PartiallySucceeded(
-                                    {
+                            let effect =
+                                if removed.Length > 0 then
+                                    Performed
+                                else
+                                    NoOp(Some "no stale lock")
+
+                            // A partial status refresh still reports the removed lock files, since these
+                            // warnings are the only evidence of the removal.
+                            return
+                                match status with
+                                | Succeeded outcome ->
+                                    Succeeded {
                                         outcome with
                                             Effect = effect
                                             Warnings = Array.append outcome.Warnings removedWarnings
-                                    },
-                                    failure
-                                )
-                            | Failed failure -> Failed failure
+                                    }
+                                | PartiallySucceeded(outcome, failure) ->
+                                    PartiallySucceeded(
+                                        {
+                                            outcome with
+                                                Effect = effect
+                                                Warnings = Array.append outcome.Warnings removedWarnings
+                                        },
+                                        failure
+                                    )
+                                | Failed failure -> Failed failure
                 })
                 Mappings.workspaceStatus
 }
