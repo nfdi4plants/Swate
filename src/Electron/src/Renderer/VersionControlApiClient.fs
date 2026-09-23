@@ -31,7 +31,7 @@ let initializeWorkspace (dto: InitializeWorkspaceRequestDto) =
 
 let bindWorkspace (dto: BindWorkspaceRequestDto) = call (fun () -> api.bindWorkspace dto)
 
-let cancelOperation (key: OperationKeyDto) =
+let cancelOperation (key: OperationRequestDto) =
     call (fun () -> api.cancelOperation key)
 
 let checkDependencies (dto: OperationRequestDto) =

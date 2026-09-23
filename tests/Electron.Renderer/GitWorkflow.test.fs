@@ -1263,27 +1263,12 @@ Vitest.describe (
                 let model, _ =
                     update deps ignore (WriteRequested(Push GitUpdateAcceptance.RequirePreview)) runningState
 
-                let model, _ =
-                    update
-                        deps
-                        ignore
-                        (OperationStarted {
-                            SessionId = "s-1"
-                            OperationId = "op-1"
-                        })
-                        model
+                let model, _ = update deps ignore (OperationStarted { OperationId = "op-1" }) model
 
                 let _, command = update deps ignore CancelCurrentOperationRequested model
                 let! _ = collectMessages command
 
-                Vitest
-                    .expect(captured)
-                    .toEqual (
-                        Some {
-                            SessionId = "s-1"
-                            OperationId = "op-1"
-                        }
-                    )
+                Vitest.expect(captured).toEqual (Some { OperationId = "op-1" })
             }
         )
 
@@ -1297,32 +1282,15 @@ Vitest.describe (
                     update
                         defaultDependencies
                         ignore
-                        (OperationStarted {
-                            SessionId = "s"
-                            OperationId = "explorer-materialize"
-                        })
+                        (OperationStarted { OperationId = "explorer-materialize" })
                         requested
 
                 let afterOwned, _ =
-                    update
-                        defaultDependencies
-                        ignore
-                        (OperationStarted {
-                            SessionId = "s"
-                            OperationId = "op-1/2"
-                        })
-                        afterUnrelated
+                    update defaultDependencies ignore (OperationStarted { OperationId = "op-1/2" }) afterUnrelated
 
-                Vitest.expect(afterUnrelated.CurrentOperation).toEqual (Some { SessionId = ""; OperationId = "op-1" })
+                Vitest.expect(afterUnrelated.CurrentOperation).toEqual (Some { OperationId = "op-1" })
 
-                Vitest
-                    .expect(afterOwned.CurrentOperation)
-                    .toEqual (
-                        Some {
-                            SessionId = "s"
-                            OperationId = "op-1/2"
-                        }
-                    )
+                Vitest.expect(afterOwned.CurrentOperation).toEqual (Some { OperationId = "op-1/2" })
             }
         )
 
@@ -1484,11 +1452,7 @@ Vitest.describe (
                     runningState with
                         BusyOperation = Some GitBusyOperation.SwitchingBranch
                         BusyNotice = Some "Switching branch"
-                        CurrentOperation =
-                            Some {
-                                SessionId = ""
-                                OperationId = "switch-op"
-                            }
+                        CurrentOperation = Some { OperationId = "switch-op" }
                 }
 
                 let nextState, command =
@@ -1574,11 +1538,7 @@ Vitest.describe (
                 let state = {
                     runningState with
                         BusyOperation = Some GitBusyOperation.SwitchingBranch
-                        CurrentOperation =
-                            Some {
-                                SessionId = ""
-                                OperationId = "switch-op"
-                            }
+                        CurrentOperation = Some { OperationId = "switch-op" }
                         Refs = [| localBranch "feature" false false |]
                 }
 
@@ -2667,7 +2627,6 @@ Vitest.describe (
                 Vitest.expect(synchronizeRequest.IsSome).toBe (true)
 
                 let synchronizeKey = {
-                    SessionId = "synchronize-session"
                     OperationId = synchronizeRequest.Value.OperationId
                 }
 
@@ -6041,11 +6000,7 @@ Vitest.describe (
                         ArcSessionId = runningState.ArcSessionId + 1
                         BusyOperation = Some GitBusyOperation.PushingToRemote
                         BusyNotice = Some "Pushing to remote"
-                        CurrentOperation =
-                            Some {
-                                SessionId = "s-2"
-                                OperationId = "write-op"
-                            }
+                        CurrentOperation = Some { OperationId = "write-op" }
                 }
 
                 let nextState, command =
@@ -6497,7 +6452,7 @@ Vitest.describe (
             "Cancel before the started event uses the id allocated at request time",
             fun () -> promise {
                 let publishIds = ResizeArray<string>()
-                let cancelKeys = ResizeArray<OperationKeyDto>()
+                let cancelKeys = ResizeArray<OperationRequestDto>()
                 let mutable ids = 0
 
                 let deps = {
@@ -6528,16 +6483,16 @@ Vitest.describe (
                 let! cancelMessages = collectMessages cancelCmd
                 let! _ = collectMessages writeCmd
 
-                Vitest.expect(requested.CurrentOperation).toEqual (Some { SessionId = ""; OperationId = "op-1" })
+                Vitest.expect(requested.CurrentOperation).toEqual (Some { OperationId = "op-1" })
                 Vitest.expect(canceling.WarningNotice).toEqual (None)
-                Vitest.expect(cancelKeys |> Seq.toArray).toEqual ([| { SessionId = ""; OperationId = "op-1" } |])
+                Vitest.expect(cancelKeys |> Seq.toArray).toEqual ([| { OperationId = "op-1" } |])
                 Vitest.expect(publishIds |> Seq.toArray).toEqual ([| "op-1" |])
 
                 Vitest
                     .expect(cancelMessages)
                     .toEqual (
                         [|
-                            CancelCurrentOperationCompleted(1, { SessionId = ""; OperationId = "op-1" }, Ok true)
+                            CancelCurrentOperationCompleted(1, { OperationId = "op-1" }, Ok true)
                         |]
                     )
             }
@@ -6556,7 +6511,7 @@ Vitest.describe (
                 let state = {
                     runningState with
                         BusyOperation = Some GitBusyOperation.PushingToRemote
-                        CurrentOperation = Some { SessionId = ""; OperationId = "op-1" }
+                        CurrentOperation = Some { OperationId = "op-1" }
                         WarningNotice = Some "existing warning"
                         ErrorNotice = Some "existing error"
                 }
@@ -6579,10 +6534,7 @@ Vitest.describe (
         Vitest.test (
             "A late cancel reply from another operation is ignored",
             fun () -> promise {
-                let currentKey = {
-                    SessionId = "s-1"
-                    OperationId = "op-1/1"
-                }
+                let currentKey = { OperationId = "op-1/1" }
 
                 let state = {
                     runningState with
@@ -6597,10 +6549,7 @@ Vitest.describe (
                         ignore
                         (CancelCurrentOperationCompleted(
                             state.ArcSessionId,
-                            {
-                                SessionId = "s-1"
-                                OperationId = "op-2/1"
-                            },
+                            { OperationId = "op-2/1" },
                             Error "late failure"
                         ))
                         state
@@ -6624,22 +6573,14 @@ Vitest.describe (
 
                 let model = {
                     runningState with
-                        CurrentOperation =
-                            Some {
-                                SessionId = "s-1"
-                                OperationId = "op-1/1"
-                            }
+                        CurrentOperation = Some { OperationId = "op-1/1" }
                 }
 
                 let nextState, command =
                     update
                         deps
                         ignore
-                        (CancelCurrentOperationCompleted(
-                            model.ArcSessionId,
-                            { SessionId = ""; OperationId = "op-1" },
-                            Error "boom"
-                        ))
+                        (CancelCurrentOperationCompleted(model.ArcSessionId, { OperationId = "op-1" }, Error "boom"))
                         model
 
                 let! _ = collectMessages command
@@ -6999,10 +6940,7 @@ Vitest.describe (
         Vitest.test (
             "A refresh requested during the save's refresh phase waits for the write",
             fun () -> promise {
-                let writeKey = {
-                    SessionId = "save-session"
-                    OperationId = "save-op"
-                }
+                let writeKey = { OperationId = "save-op" }
 
                 let savingState = {
                     runningState with

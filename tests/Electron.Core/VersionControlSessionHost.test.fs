@@ -208,7 +208,7 @@ Vitest.describe (
                     let firstSession = expectValue "first open" firstResult
                     let secondSession = expectValue "second open" secondResult
                     Vitest.expect(secondSession.SessionId).toBe firstSession.SessionId
-                    Vitest.expect(fixture.Host.RunningOperationIds firstSession.SessionId).toEqual [||]
+                    Vitest.expect(fixture.Host.RunningOperationIds firstSession.Binding.WorkspaceRoot).toEqual [||]
                 })
         )
 
@@ -229,7 +229,7 @@ Vitest.describe (
 
                     Vitest.expect(moved).toEqual (Ok())
 
-                    Vitest.expect(fixture.Host.TryGetSessionById hosted.SessionId).toEqual None
+                    Vitest.expect(fixture.Host.TryGetSession fixture.RepoRoot).toEqual None
                     Vitest.expect(fixture.Runtime.Bindings.TryFind fixture.RepoRoot).toEqual None
 
                     let moved =
@@ -256,38 +256,34 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "operations are cancelable by operation id before any progress and keyed by session",
+            "operations are cancelable by id and tracked by workspace root",
             fun () ->
                 withFixture (fun fixture -> promise {
-                    let mutable reported: VersionControlProgressDto list = []
+                    let mutable reported: OperationProgress list = []
 
                     let tracked =
                         fixture.Host.BeginOperation(
-                            "session-a",
                             "op-1",
-                            None,
+                            Some fixture.RepoRoot,
                             fun progress -> reported <- progress :: reported
                         )
 
-                    Vitest.expect(fixture.Host.IsIdle "session-a").toBe false
-                    Vitest.expect(fixture.Host.Cancel("session-b", "op-1")).toBe false
+                    Vitest.expect(fixture.Host.IsIdle fixture.RepoRoot).toBe false
+                    Vitest.expect(fixture.Host.RunningOperationIds fixture.RepoRoot).toEqual [| "op-1" |]
 
-                    // A sessionless operation does not count for a session id the host cannot
-                    // resolve, whatever its root, and it can still be canceled by id.
-                    let unassigned =
-                        fixture.Host.BeginOperation(
-                            "",
-                            "op-unassigned",
-                            Some(join [| fixture.Root; "elsewhere" |]),
-                            ignore
-                        )
+                    let otherRoot = join [| fixture.Root; "elsewhere" |]
 
-                    Vitest.expect(fixture.Host.IsIdle "session-b").toBe true
-                    Vitest.expect(fixture.Host.Cancel("session-b", "op-unassigned")).toBe true
-                    unassigned.Complete()
-                    Vitest.expect(fixture.Host.IsIdle "session-b").toBe true
+                    let otherWorkspaceOperation =
+                        fixture.Host.BeginOperation("op-other-root", Some otherRoot, ignore)
+
+                    Vitest.expect(fixture.Host.IsIdle otherRoot).toBe false
+                    Vitest.expect(fixture.Host.RunningOperationIds fixture.RepoRoot).toEqual [| "op-1" |]
+                    Vitest.expect(fixture.Host.RunningOperationIds otherRoot).toEqual [| "op-other-root" |]
+                    Vitest.expect(fixture.Host.Cancel "op-other-root").toBe true
+                    Vitest.expect(otherWorkspaceOperation.Context.Cancellation.IsCancellationRequested()).toBe true
                     Vitest.expect(tracked.Context.Cancellation.IsCancellationRequested()).toBe false
-                    Vitest.expect(fixture.Host.Cancel("", "op-1")).toBe true
+                    otherWorkspaceOperation.Complete()
+                    Vitest.expect(fixture.Host.Cancel "op-1").toBe true
                     Vitest.expect(tracked.Context.Cancellation.IsCancellationRequested()).toBe true
 
                     tracked.Context.ReportProgress {
@@ -298,14 +294,11 @@ Vitest.describe (
                         DisplayMessage = None
                     }
 
-                    Vitest
-                        .expect(reported |> List.map (fun progress -> progress.SessionId, progress.OperationId))
-                        .toEqual
-                        [ "session-a", "op-1" ]
+                    Vitest.expect(reported |> List.map _.PhaseCode).toEqual [ "transfer" ]
 
                     tracked.Complete()
-                    Vitest.expect(fixture.Host.IsIdle "session-a").toBe true
-                    Vitest.expect(fixture.Host.Cancel("session-a", "op-1")).toBe false
+                    Vitest.expect(fixture.Host.IsIdle fixture.RepoRoot).toBe true
+                    Vitest.expect(fixture.Host.Cancel "op-1").toBe false
                 })
         )
 
@@ -320,14 +313,9 @@ Vitest.describe (
                     let hosted = expectValue "open" opened
 
                     let tracked =
-                        fixture.Host.BeginOperation(
-                            hosted.SessionId,
-                            "op-cancel",
-                            Some hosted.Binding.WorkspaceRoot,
-                            ignore
-                        )
+                        fixture.Host.BeginOperation("op-cancel", Some hosted.Binding.WorkspaceRoot, ignore)
 
-                    fixture.Host.Cancel(hosted.SessionId, "op-cancel") |> ignore
+                    fixture.Host.Cancel "op-cancel" |> ignore
 
                     let synchronization =
                         hosted.Session.Synchronization
@@ -1491,11 +1479,7 @@ Vitest.describe (
                             PublishLocalRevisions = false
                         }
 
-                    let! canceled =
-                        api.cancelOperation {
-                            SessionId = ""
-                            OperationId = "synchronize-cancel"
-                        }
+                    let! canceled = api.cancelOperation { OperationId = "synchronize-cancel" }
 
                     Vitest.expect(canceled).toEqual (Ok true)
 
@@ -1503,11 +1487,7 @@ Vitest.describe (
                     let failure = expectDtoFailure "canceled update" result
                     Vitest.expect(failure.Category).toEqual FailureCategoryDto.Canceled
 
-                    let! unknown =
-                        api.cancelOperation {
-                            SessionId = ""
-                            OperationId = "never-started"
-                        }
+                    let! unknown = api.cancelOperation { OperationId = "never-started" }
 
                     Vitest.expect(unknown).toEqual (Ok false)
                 })
@@ -1539,7 +1519,7 @@ Vitest.describe (
                     let otherWorkspace = join [| fixture.Root; "other-workspace" |]
 
                     let unrelatedClone =
-                        fixture.Host.BeginOperation("", "clone-other-workspace", Some otherWorkspace, ignore)
+                        fixture.Host.BeginOperation("clone-other-workspace", Some otherWorkspace, ignore)
 
                     let! unrelatedClear = api.clearStaleLock (request "clear-lock-other-workspace")
 
@@ -1550,7 +1530,7 @@ Vitest.describe (
                     unrelatedClone.Complete()
 
                     let sameWorkspaceOperation =
-                        fixture.Host.BeginOperation("", "clone-same-workspace", Some fixture.RepoRoot, ignore)
+                        fixture.Host.BeginOperation("clone-same-workspace", Some fixture.RepoRoot, ignore)
 
                     let! sameWorkspaceClear = api.clearStaleLock (request "clear-lock-same-workspace")
                     sameWorkspaceOperation.Complete()
@@ -1564,7 +1544,9 @@ Vitest.describe (
                         fixture.Host.TryGetSession fixture.RepoRoot
                         |> Option.defaultWith (fun () -> failwith "session missing")
 
-                    let other = fixture.Host.BeginOperation(session.SessionId, "busy", None, ignore)
+                    let other =
+                        fixture.Host.BeginOperation("busy", Some session.Binding.WorkspaceRoot, ignore)
+
                     let! refused = api.clearStaleLock (request "clear-lock-3")
                     other.Complete()
                     let failure = expectDtoFailure "refused lock removal" refused

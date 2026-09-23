@@ -24,7 +24,7 @@ getSessionInfo: OperationRequestDto -> JS.Promise<Result<OperationResultDto<Work
 cloneWorkspace: CloneWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<string>, string>>
 initializeWorkspace: InitializeWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<string>, string>>
 bindWorkspace: BindWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceSessionInfoDto>, string>>
-cancelOperation: OperationKeyDto -> JS.Promise<Result<bool, string>>
+cancelOperation: OperationRequestDto -> JS.Promise<Result<bool, string>>
 checkDependencies: OperationRequestDto -> JS.Promise<Result<OperationResultDto<DependencyStatusDto[]>, string>>
 installDependency: InstallDependencyRequestDto -> JS.Promise<Result<OperationResultDto<DependencyStatusDto>, string>>
 getStatus, listRefs, createRef, preflightSwitchRef, switchRef
@@ -37,7 +37,7 @@ getStoragePolicySettings, setStoragePolicySettings, setPathStoragePolicy, pruneS
 getRepositoryWebUrl, clearStaleLock
 ```
 
-The main process sends two events to the renderer (`MainToRendererIpc.IVersionControlRendererApi`): `versionControlOperationStarted` with the final `OperationKeyDto` (session id and operation id) as soon as the operation is registered, and `versionControlProgress` with float `Completed` and `Total` counters plus a phase code.
+The main process sends two events to the renderer (`MainToRendererIpc.IVersionControlRendererApi`): `versionControlOperationStarted` with the final `OperationRequestDto` (operation id) as soon as the operation is registered, and `versionControlProgress` with float `Completed` and `Total` counters plus a phase code.
 
 Do not call `Api.ipcVersionControlApi` from feature code. Go through the client, or through `GitWorkflow.GitDependencies` when the sidebar state has to follow.
 
@@ -156,9 +156,9 @@ Mutations run under the vault busy flag so the file watcher does not merge Swate
 
 Progress arrives through `versionControlProgress` with float `Completed` and `Total` counters. Clone reports progress to the window that requested it.
 
-Every operation can be canceled with `cancelOperation` and the key from `versionControlOperationStarted`. Operations without a session (clone, initialize, dependency checks) register with an empty session id, which acts as a wildcard on both sides. Cancellation kills the underlying process. The library then restores a clean state where it can and reports what is left through the recovery code.
+Every operation can be canceled with `cancelOperation` and the operation id from `versionControlOperationStarted`. The running-operation registry stores each operation id with its workspace root. Cancellation kills the underlying process. The library then restores a clean state where it can and reports what is left through the recovery code.
 
-A stale `.git/index.lock` left by a killed process is removed by `clearStaleLock`, which refuses with `lock_removal_refused` while another operation of the session runs. After clearing, an open merge is abandoned through the normal path.
+A stale `.git/index.lock` left by a killed process is removed by `clearStaleLock`, which refuses with `lock_removal_refused` while another operation runs in that workspace. After clearing, an open merge is abandoned through the normal path.
 
 ## 12. Extending the functionality
 

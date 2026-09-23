@@ -21,13 +21,12 @@ type HostedSession = {
 /// A registered operation: its context for the library call and the completion
 /// callback that removes it from the registry.
 type TrackedOperation = {
-    Key: OperationKeyDto
+    Key: OperationRequestDto
     Context: OperationContext
     Complete: unit -> unit
 }
 
 type private RunningOperation = {
-    SessionId: string
     WorkspaceRoot: string option
     Source: OperationCancellation.Source
 }
@@ -205,11 +204,6 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
 
     member _.TryGetSession(workspaceRoot: string) : HostedSession option = tryFindSession workspaceRoot
 
-    member _.TryGetSessionById(sessionId: string) : HostedSession option =
-        match sessions.TryGetValue sessionId with
-        | true, hosted -> Some hosted
-        | _ -> None
-
     member _.GetSettings(workspaceRoot: string) : VersionControlSettings =
         tryFindSession workspaceRoot
         |> Option.map (fun hosted -> hosted.Settings)
@@ -366,88 +360,41 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
     }
 
     /// Registers an operation before any library call so a cancel that arrives before
-    /// the first progress event still lands. Sessionless operations retain the
-    /// workspace they target so lock cleanup can scope them correctly.
+    /// the first progress event still lands. Each operation retains its workspace root
+    /// so lock cleanup can scope it correctly.
     member _.BeginOperation
-        (
-            sessionId: string,
-            operationId: string,
-            workspaceRoot: string option,
-            reportProgress: VersionControlProgressDto -> unit
-        ) : TrackedOperation =
+        (operationId: string, workspaceRoot: string option, reportProgress: OperationProgress -> unit)
+        : TrackedOperation =
         let source = OperationCancellation.Source()
 
         operations[operationId] <- {
-            SessionId = sessionId
             WorkspaceRoot = workspaceRoot
             Source = source
         }
 
-        let currentSessionId () =
-            match operations.TryGetValue operationId with
-            | true, running -> running.SessionId
-            | _ -> sessionId
-
         {
-            Key = {
-                SessionId = sessionId
-                OperationId = operationId
-            }
-            Context =
-                OperationContext.create
-                    operationId
-                    source.Cancellation
-                    (fun progress -> reportProgress (Mappings.progress (currentSessionId ()) operationId progress))
+            Key = { OperationId = operationId }
+            Context = OperationContext.create operationId source.Cancellation reportProgress
             Complete = fun () -> operations.Remove operationId |> ignore
         }
 
-    /// Attaches a session to an operation that was registered before its session was
-    /// known. Progress and cancellation keys reported afterwards carry the session id.
-    member _.AssignSession(operationId: string, sessionId: string) =
+    /// Cancels a tracked operation by its operation id.
+    member _.Cancel(operationId: string) : bool =
         match operations.TryGetValue operationId with
-        | true, running -> operations[operationId] <- { running with SessionId = sessionId }
-        | _ -> ()
-
-    /// Cancels a tracked operation. An empty session id on either side matches: the
-    /// renderer may not know the session yet, and an operation may not have one.
-    member _.Cancel(sessionId: string, operationId: string) : bool =
-        match operations.TryGetValue operationId with
-        | true, running when
-            String.IsNullOrEmpty sessionId
-            || String.IsNullOrEmpty running.SessionId
-            || running.SessionId = sessionId
-            ->
+        | true, running ->
             running.Source.Cancel()
             true
         | _ -> false
 
-    /// An operation assigned to the queried session always counts. A sessionless operation
-    /// counts when its root equals the root of the queried session. An unknown session id
-    /// matches no sessionless operation, and the empty id matches every sessionless one,
-    /// as it does in Cancel.
-    member this.RunningOperationIds(sessionId: string) : string[] =
-        let sessionRoot =
-            this.TryGetSessionById sessionId
-            |> Option.map (fun hosted -> hosted.Binding.WorkspaceRoot)
-
+    /// Returns operations registered for the queried workspace root.
+    member _.RunningOperationIds(workspaceRoot: string) : string[] =
         operations
-        |> Seq.filter (fun entry ->
-            let running = entry.Value
-
-            if running.SessionId = sessionId then
-                true
-            elif String.IsNullOrEmpty running.SessionId then
-                match sessionRoot, running.WorkspaceRoot with
-                | Some queriedRoot, Some operationRoot -> sameRoot queriedRoot operationRoot
-                | _ -> false
-            else
-                false
-        )
+        |> Seq.filter (fun entry -> entry.Value.WorkspaceRoot |> Option.exists (sameRoot workspaceRoot))
         |> Seq.map (fun entry -> entry.Key)
         |> Seq.toArray
 
-    member this.IsIdle(sessionId: string) : bool =
-        (this.RunningOperationIds sessionId).Length = 0
+    member this.IsIdle(workspaceRoot: string) : bool =
+        (this.RunningOperationIds workspaceRoot).Length = 0
 
 let mutable private current: WorkspaceSessionHost option = None
 

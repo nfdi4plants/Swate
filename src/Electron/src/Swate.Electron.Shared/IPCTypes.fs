@@ -96,7 +96,7 @@ type IVersionControlApi = {
     cloneWorkspace: CloneWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<string>, exn>>
     initializeWorkspace: InitializeWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<string>, exn>>
     bindWorkspace: BindWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceSessionInfoDto>, exn>>
-    cancelOperation: OperationKeyDto -> JS.Promise<Result<bool, exn>>
+    cancelOperation: OperationRequestDto -> JS.Promise<Result<bool, exn>>
     checkDependencies: OperationRequestDto -> JS.Promise<Result<OperationResultDto<DependencyStatusDto[]>, exn>>
     installDependency: InstallDependencyRequestDto -> JS.Promise<Result<OperationResultDto<DependencyStatusDto>, exn>>
     getStatus: OperationRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceStatusDto>, exn>>
@@ -183,7 +183,7 @@ module MainToRendererIpc =
 
     type IVersionControlRendererApi = {
         versionControlProgress: VersionControlProgressDto -> unit
-        versionControlOperationStarted: OperationKeyDto -> unit
+        versionControlOperationStarted: OperationRequestDto -> unit
     }
 
     type IHasUnsavedArcChangesRendererApi = {

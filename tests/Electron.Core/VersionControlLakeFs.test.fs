@@ -1073,7 +1073,6 @@ Vitest.describe (
                                 | None ->
                                     let! canceled =
                                         api.cancelOperation {
-                                            SessionId = ""
                                             OperationId = "lakefs-cancel-publish"
                                         }
 

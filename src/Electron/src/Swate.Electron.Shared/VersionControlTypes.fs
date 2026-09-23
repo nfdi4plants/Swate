@@ -69,13 +69,6 @@ type OperationResultDto<'T> =
     | PartiallySucceeded of OperationOutcomeDto<'T> * OperationFailureDto
     | Failed of OperationFailureDto
 
-/// Identity of one running operation. The renderer chooses the operation id, the main
-/// process reports the session id it ran under.
-type OperationKeyDto = {
-    SessionId: string
-    OperationId: string
-}
-
 type VersionControlProgressDto = {
     SessionId: string
     OperationId: string
@@ -383,7 +376,8 @@ type WorkspaceSessionInfoDto = {
     Services: ServiceAvailabilityDto
 }
 
-/// A request without payload. Every call carries an operation id so it can be canceled.
+/// A request without payload. Every call carries an operation id so it can be canceled, and the
+/// same record names a running operation in cancelOperation and versionControlOperationStarted.
 type OperationRequestDto = { OperationId: string }
 
 type CloneWorkspaceRequestDto = {

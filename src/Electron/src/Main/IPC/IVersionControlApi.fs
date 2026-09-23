@@ -19,7 +19,7 @@ open VersionControlService.Abstractions
 
 type private RendererBridge = {
     Progress: VersionControlProgressDto -> unit
-    Started: OperationKeyDto -> unit
+    Started: OperationRequestDto -> unit
 }
 
 let private silentBridge: RendererBridge = { Progress = ignore; Started = ignore }
@@ -71,19 +71,22 @@ let private storagePolicySettingsDto (settings: VersionControlSettings) : Storag
     MaterializeLargeObjects = settings.DownloadLargeFiles
 }
 
-/// Runs one tracked operation against a session-independent target. The operation is
-/// registered and announced before any await, and every exception becomes a failure.
+/// Registers and announces one operation before any await, and turns exceptions into failures.
 let private runTracked
     (host: WorkspaceSessionHost.WorkspaceSessionHost)
     (bridge: RendererBridge)
-    (sessionId: string)
     (operationId: string)
     (workspaceRoot: string option)
+    (progressSessionId: unit -> string)
     (operation: OperationContext -> Async<OperationResult<'T>>)
     : JS.Promise<OperationResult<'T>> =
     promise {
         let tracked =
-            host.BeginOperation(sessionId, operationId, workspaceRoot, bridge.Progress)
+            host.BeginOperation(
+                operationId,
+                workspaceRoot,
+                fun progress -> bridge.Progress(Mappings.progress (progressSessionId ()) operationId progress)
+            )
 
         try
             try
@@ -111,44 +114,45 @@ let private withSession
             let host = WorkspaceSessionHost.get ()
             let bridge = tryBridgeFromEvent event
 
-            let knownSessionId =
+            let mutable progressSessionId =
                 host.TryGetSession arcPath
                 |> Option.map (fun hosted -> hosted.SessionId)
                 |> Option.defaultValue ""
 
-            let tracked =
-                host.BeginOperation(knownSessionId, operationId, Some arcPath, bridge.Progress)
+            let! result =
+                runTracked
+                    host
+                    bridge
+                    operationId
+                    (Some arcPath)
+                    (fun () -> progressSessionId)
+                    (fun context -> async {
+                        let! opened = host.OpenSession(arcPath, context)
+
+                        match opened with
+                        | Succeeded outcome ->
+                            let hosted = outcome.Value
+                            progressSessionId <- hosted.SessionId
+                            return! operation hosted context
+                        | PartiallySucceeded(outcome, openFailure) ->
+                            // Only a fresh open is partial, a reuse is not, so the failure of
+                            // the open (a rejected settings push, say) reaches the renderer
+                            // once, on the call that opened the session.
+                            let hosted = outcome.Value
+                            progressSessionId <- hosted.SessionId
+                            let! result = operation hosted context
+
+                            return
+                                match result with
+                                | Succeeded valueOutcome -> PartiallySucceeded(valueOutcome, openFailure)
+                                | other -> other
+                        | Failed failure -> return Failed(sessionUnavailable failure)
+                    })
 
             try
-                try
-                    bridge.Started tracked.Key
-                    let! opened = host.OpenSession(arcPath, tracked.Context) |> Async.StartAsPromise
-
-                    match opened with
-                    | Succeeded outcome ->
-                        let hosted = outcome.Value
-                        host.AssignSession(operationId, hosted.SessionId)
-                        let! result = operation hosted tracked.Context |> Async.StartAsPromise
-                        return Ok(Mappings.result mapValue result)
-                    | PartiallySucceeded(outcome, openFailure) ->
-                        // Only a fresh open is partial, a reuse is not, so the failure of
-                        // the open (a rejected settings push, say) reaches the renderer
-                        // once, on the call that opened the session.
-                        let hosted = outcome.Value
-                        host.AssignSession(operationId, hosted.SessionId)
-                        let! result = operation hosted tracked.Context |> Async.StartAsPromise
-
-                        let merged =
-                            match result with
-                            | Succeeded valueOutcome -> PartiallySucceeded(valueOutcome, openFailure)
-                            | other -> other
-
-                        return Ok(Mappings.result mapValue merged)
-                    | Failed failure -> return Ok(failedDto (sessionUnavailable failure))
-                with error ->
-                    return Ok(failedDto (unexpectedFailure error))
-            finally
-                tracked.Complete()
+                return Ok(Mappings.result mapValue result)
+            with error ->
+                return Ok(failedDto (unexpectedFailure error))
     }
 
 /// Whether a result reports a change of the workspace, which is when the file tree
@@ -334,7 +338,7 @@ let private provision
     (run: OperationContext -> Async<OperationResult<WorkspaceBinding>>)
     : JS.Promise<Result<OperationResultDto<string>, exn>> =
     promise {
-        let! result = runTracked host bridge "" operationId (Some workspaceRoot) run
+        let! result = runTracked host bridge operationId (Some workspaceRoot) (fun () -> "") run
 
         return Ok(Mappings.result (fun (binding: WorkspaceBinding) -> binding.WorkspaceRoot) result)
     }
@@ -466,9 +470,9 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                 runTracked
                                     host
                                     bridge
-                                    ""
                                     request.OperationId
                                     (Some arcPath)
+                                    (fun () -> "")
                                     (fun context -> async {
                                         match locationFor host request.ProviderLocation request.DisplayName with
                                         | Error failure -> return Failed failure
@@ -520,7 +524,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     cancelOperation =
         fun key -> promise {
             let host = WorkspaceSessionHost.get ()
-            return Ok(host.Cancel(key.SessionId, key.OperationId))
+            return Ok(host.Cancel key.OperationId)
         }
     // Every registered provider reports its components. A provider whose check fails
     // does not hide the others: its failure rides along as the partial failure.
@@ -533,9 +537,9 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 runTracked
                     host
                     bridge
-                    ""
                     request.OperationId
                     None
+                    (fun () -> "")
                     (fun context -> async {
                         let factories = ProviderResolver.factories host.Runtime.Catalog
                         let mutable statuses: DependencyStatus[] = [||]
@@ -588,9 +592,9 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 runTracked
                     host
                     bridge
-                    ""
                     request.OperationId
                     None
+                    (fun () -> "")
                     (fun context -> async {
                         let factories = ProviderResolver.factories host.Runtime.Catalog
                         let mutable outcome: OperationResult<DependencyStatus> option = None
@@ -997,7 +1001,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     let host = WorkspaceSessionHost.get ()
 
                     let otherOperations =
-                        host.RunningOperationIds hosted.SessionId
+                        host.RunningOperationIds hosted.Binding.WorkspaceRoot
                         |> Array.filter (fun id -> id <> request.OperationId)
 
                     if otherOperations.Length > 0 then

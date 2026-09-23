@@ -135,7 +135,7 @@ type GitState = {
     BusyNotice: string option
     /// The operation the renderer can cancel. The id is known before the call starts,
     /// the session id arrives with the started event.
-    CurrentOperation: OperationKeyDto option
+    CurrentOperation: OperationRequestDto option
     CurrentProgress: GitSidebarProgress option
     ErrorNotice: string option
     WarningNotice: string option
@@ -319,7 +319,7 @@ type private RoutedFailure =
 type Msg =
     | ResetWorkflow
     | SetCurrentProgress of GitSidebarProgress option
-    | OperationStarted of OperationKeyDto
+    | OperationStarted of OperationRequestDto
     | ArcPathChanged of ArcRootPath
     | GitRepositoryInitialized of arcPath: string
     | RefreshRequested
@@ -342,7 +342,7 @@ type Msg =
     | PullRequested
     | PushRequested
     | CancelCurrentOperationRequested
-    | CancelCurrentOperationCompleted of sessionId: int * operationKey: OperationKeyDto * Result<bool, string>
+    | CancelCurrentOperationCompleted of sessionId: int * operationKey: OperationRequestDto * Result<bool, string>
     | UpdateFromOnlineRequested
     | CloneRequested of CloneWorkspaceRequestDto * Reply<string>
     | PrimarySaveSelectionRequested of GitSidebarCommitSelectionRequest
@@ -399,7 +399,7 @@ type GitDependencies = {
     synchronize: SynchronizeRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, string>>
     /// The write command replaces this with a dispatch of WritePhaseChanged, and nothing outside writeCmd reports phases.
     reportPhase: GitBusyOperation -> unit
-    cancelOperation: OperationKeyDto -> JS.Promise<Result<bool, string>>
+    cancelOperation: OperationRequestDto -> JS.Promise<Result<bool, string>>
     cloneWorkspace: CloneWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<string>, string>>
     createRef: CreateRefRequestDto -> JS.Promise<Result<OperationResultDto<LogicalRefDto>, string>>
     switchRef: SwitchRefRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceStatusDto>, string>>
@@ -2913,11 +2913,7 @@ let private updateCore
                         state with
                             ErrorNotice = None
                             WarningNotice = None
-                            CurrentOperation =
-                                Some {
-                                    SessionId = ""
-                                    OperationId = operationId
-                                }
+                            CurrentOperation = Some { OperationId = operationId }
                     }
 
                 let cmd =
@@ -3053,11 +3049,7 @@ let private updateCore
                     ErrorNotice = None
                     WarningNotice = None
                     WriteRequestId = writeRequestId
-                    CurrentOperation =
-                        Some {
-                            SessionId = ""
-                            OperationId = operationId
-                        }
+                    CurrentOperation = Some { OperationId = operationId }
             }
 
         nextModel, writeCmd deps model writeRequest model.ArcSessionId writeRequestId operationId
@@ -3195,11 +3187,7 @@ let private updateCore
                 InstallRetryState = GitInstallRetryState.InstallingForRetry busyOperation
                 BusyOperation = Some installing
                 BusyNotice = busyNoticeFromOperation installing
-                CurrentOperation =
-                    Some {
-                        SessionId = ""
-                        OperationId = installOperationId
-                    }
+                CurrentOperation = Some { OperationId = installOperationId }
         }
 
         let cmd =
@@ -3256,11 +3244,7 @@ let private updateCore
                 InstallRetryState = GitInstallRetryState.Idle
                 BusyOperation = Some busyOperation
                 BusyNotice = busyNoticeFromOperation busyOperation
-                CurrentOperation =
-                    Some {
-                        SessionId = ""
-                        OperationId = operationId
-                    }
+                CurrentOperation = Some { OperationId = operationId }
         }
 
         nextModel, writeCmd deps model writeRequest sessionId model.WriteRequestId operationId
