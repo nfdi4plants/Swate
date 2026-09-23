@@ -951,6 +951,8 @@ Vitest.describe (
                         RefreshState = GitRefreshState.Loading
                         LfsAutoTrackThresholdMb = 42
                         DownloadLargeFiles = true
+                        PendingMaterializations = [ ("pending.bin", false) ]
+                        PendingMaterializationSessionId = Some "conflict-1"
                 }
 
                 let settingsFailedRefresh = {
@@ -983,6 +985,8 @@ Vitest.describe (
 
                 Vitest.expect(secondState.LfsAutoTrackThresholdMb).toBe (9)
                 Vitest.expect(secondState.DownloadLargeFiles).toBe (false)
+                Vitest.expect(secondState.PendingMaterializations).toEqual [ ("pending.bin", false) ]
+                Vitest.expect(secondState.PendingMaterializationSessionId).toEqual (Some "conflict-1")
             }
         )
 
@@ -1294,7 +1298,7 @@ Vitest.describe (
                         clearedPages.Add
                         (ConfirmMergeResolutionCompleted(
                             state.ArcSessionId,
-                            Error(ConfirmMergeResolutionError.Stale("stale conflict handle", None, false))
+                            Error(ConfirmMergeResolutionError.Stale("stale conflict handle", None, false, "conflict-1"))
                         ))
                         state
 
@@ -3986,6 +3990,7 @@ Vitest.describe (
                                 PageChange = GitPageChange.Clear
                                 Notice = None
                                 PendingMaterializationPath = None
+                                ResolutionSessionId = "session-1"
                                 Finalized = true
                             }
                         ))
@@ -5649,7 +5654,7 @@ Vitest.describe (
                     (conflictedStatus [| "first.bin"; "second.txt" |]).ActiveConflictSession.Value
 
                 let refreshedHandle = {
-                    SessionId = "conflict-2"
+                    SessionId = conflict.Handle.SessionId
                     Version = "2"
                 }
 
@@ -5686,7 +5691,7 @@ Vitest.describe (
                                             Ok(
                                                 succeeded {
                                                     RefreshedHandle = {
-                                                        SessionId = "conflict-3"
+                                                        SessionId = conflict.Handle.SessionId
                                                         Version = "3"
                                                     }
                                                     RemainingItems = [||]
@@ -5736,6 +5741,7 @@ Vitest.describe (
 
                 let! _ = collectMessages firstFinishCmd
                 Vitest.expect(stateAfterFirst.PendingMaterializations).toEqual [ ("first.bin", false) ]
+                Vitest.expect(stateAfterFirst.PendingMaterializationSessionId).toEqual (Some conflict.Handle.SessionId)
 
                 let secondRequest = {
                     Path = "second.txt"
@@ -5762,6 +5768,7 @@ Vitest.describe (
                 Vitest.expect(resolvedPaths.ToArray()).toEqual [| "first.bin"; "second.txt" |]
                 Vitest.expect(materializedPaths.ToArray()).toEqual [| "first.bin" |]
                 Vitest.expect(finalState.PendingMaterializations).toEqual []
+                Vitest.expect(finalState.PendingMaterializationSessionId).toEqual None
 
                 Vitest
                     .expect(finalState.WarningNotice)
@@ -5776,7 +5783,7 @@ Vitest.describe (
                     (conflictedStatus [| "partial.bin"; "next.txt" |]).ActiveConflictSession.Value
 
                 let refreshedHandle = {
-                    SessionId = "conflict-partial"
+                    SessionId = conflict.Handle.SessionId
                     Version = "2"
                 }
 
@@ -5865,12 +5872,12 @@ Vitest.describe (
                     (conflictedStatus [| "partial.bin"; "warning.bin" |]).ActiveConflictSession.Value
 
                 let partialHandle = {
-                    SessionId = "conflict-partial"
+                    SessionId = conflict.Handle.SessionId
                     Version = "2"
                 }
 
                 let warningHandle = {
-                    SessionId = "conflict-warning"
+                    SessionId = conflict.Handle.SessionId
                     Version = "3"
                 }
 
@@ -5940,7 +5947,7 @@ Vitest.describe (
                         materializeObject =
                             fun request ->
                                 materializedPaths.Add request.Path
-                                promise { return Ok(succeeded ()) }
+                                promise { return Error "The local cache is unavailable." }
                 }
 
                 let state = {
@@ -6000,6 +6007,13 @@ Vitest.describe (
 
                 Vitest.expect(materializedPaths.ToArray()).toEqual [| "partial.bin" |]
                 Vitest.expect(finalState.PendingMaterializations).toEqual []
+                Vitest.expect(finalState.PendingMaterializationSessionId).toEqual None
+
+                Vitest
+                    .expect(finalState.WarningNotice)
+                    .toEqual (
+                        Some "Could not restore 'partial.bin' from the local cache. Use Download LFS file to try again."
+                    )
             }
         )
 
@@ -6162,6 +6176,7 @@ Vitest.describe (
                     runningState with
                         ActiveConflict = Some conflict
                         PendingMaterializations = [ ("pending.bin", false) ]
+                        PendingMaterializationSessionId = Some conflict.Handle.SessionId
                 }
 
                 let stateAfterRequest, requestCmd =
@@ -6177,6 +6192,7 @@ Vitest.describe (
 
                 let! _ = collectMessages finishCmd
                 Vitest.expect(nextState.PendingMaterializations).toEqual []
+                Vitest.expect(nextState.PendingMaterializationSessionId).toEqual None
             }
         )
 
@@ -8035,6 +8051,57 @@ Vitest.describe (
                     }
 
                     Vitest.expect((applyStatus cleanStatus model).SelectedChangePath).toEqual (None)
+            )
+
+        let _ =
+            Vitest.test (
+                "applyStatus clears pending materializations when no conflict session remains",
+                fun () ->
+                    let model = {
+                        runningState with
+                            PendingMaterializations = [ ("pending.bin", false) ]
+                            PendingMaterializationSessionId = Some "conflict-1"
+                    }
+
+                    let nextState = applyStatus cleanStatus model
+
+                    Vitest.expect(nextState.PendingMaterializations).toEqual []
+                    Vitest.expect(nextState.PendingMaterializationSessionId).toEqual None
+            )
+
+        let _ =
+            Vitest.test (
+                "applyStatus clears pending materializations when the conflict session changes",
+                fun () ->
+                    let model = {
+                        runningState with
+                            PendingMaterializations = [ ("pending.bin", false) ]
+                            PendingMaterializationSessionId = Some "conflict-1"
+                    }
+
+                    let matchingState = applyStatus (conflictedStatus [||]) model
+                    Vitest.expect(matchingState.PendingMaterializations).toEqual [ ("pending.bin", false) ]
+                    Vitest.expect(matchingState.PendingMaterializationSessionId).toEqual (Some "conflict-1")
+
+                    let status = conflictedStatus [||]
+                    let conflict = status.ActiveConflictSession.Value
+
+                    let differentSessionStatus = {
+                        status with
+                            ActiveConflictSession =
+                                Some {
+                                    conflict with
+                                        Handle = {
+                                            conflict.Handle with
+                                                SessionId = "conflict-2"
+                                        }
+                                }
+                    }
+
+                    let nextState = applyStatus differentSessionStatus matchingState
+
+                    Vitest.expect(nextState.PendingMaterializations).toEqual []
+                    Vitest.expect(nextState.PendingMaterializationSessionId).toEqual None
             )
 
         let _ =

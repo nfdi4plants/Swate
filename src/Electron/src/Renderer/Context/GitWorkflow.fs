@@ -142,6 +142,7 @@ type GitState = {
     SelectedChangePath: string option
     MergeResolutionPendingPath: string option
     PendingMaterializations: (string * bool) list
+    PendingMaterializationSessionId: string option
     InstallRetryState: GitInstallRetryState
     PageLoadRequestId: int
     WriteRequestId: int
@@ -190,6 +191,7 @@ type GitState = {
         SelectedChangePath = None
         MergeResolutionPendingPath = None
         PendingMaterializations = []
+        PendingMaterializationSessionId = None
         InstallRetryState = GitInstallRetryState.Idle
         PageLoadRequestId = 0
         WriteRequestId = 0
@@ -224,6 +226,7 @@ type ConfirmMergeResolutionOutcome = {
     PageChange: GitPageChange
     Notice: string option
     PendingMaterializationPath: (string * bool) option
+    ResolutionSessionId: string
     /// True when the last item was resolved and the merge was finalized.
     Finalized: bool
 }
@@ -375,8 +378,16 @@ let conflictPageFor
 [<RequireQualifiedAccess>]
 type ConfirmMergeResolutionError =
     /// The handle or the workspace changed since the preview was shown.
-    | Stale of message: string * pendingMaterializationPath: (string * bool) option * materializationsConsumed: bool
-    | Failed of message: string * pendingMaterializationPath: (string * bool) option * materializationsConsumed: bool
+    | Stale of
+        message: string *
+        pendingMaterializationPath: (string * bool) option *
+        materializationsConsumed: bool *
+        resolutionSessionId: string
+    | Failed of
+        message: string *
+        pendingMaterializationPath: (string * bool) option *
+        materializationsConsumed: bool *
+        resolutionSessionId: string
 
 type PreparedCommitOperation = {
     BusyOperation: GitBusyOperation
@@ -835,25 +846,46 @@ let isMissingRepository (failure: OperationFailureDto) =
     failure.Code = VersionControlCodes.WorkspaceUnmanaged
 
 let private enqueuePendingMaterialization
+    (sessionId: string)
     (pendingMaterializationPath: (string * bool) option)
     (pendingMaterializations: (string * bool) list)
+    (pendingMaterializationSessionId: string option)
     =
     match pendingMaterializationPath with
-    | None -> pendingMaterializations
+    | None -> pendingMaterializations, pendingMaterializationSessionId
     | Some(path, localObject) ->
+        let existingMaterializations =
+            if pendingMaterializationSessionId = Some sessionId then
+                pendingMaterializations
+            else
+                []
+
         if
-            pendingMaterializations
+            existingMaterializations
             |> List.exists (fun (queuedPath, _) -> queuedPath = path)
         then
-            pendingMaterializations
-            |> List.map (fun (queuedPath, queuedLocalObject) ->
-                if queuedPath = path then
-                    queuedPath, (queuedLocalObject || localObject)
-                else
-                    queuedPath, queuedLocalObject
-            )
+            let updatedMaterializations =
+                existingMaterializations
+                |> List.map (fun (queuedPath, queuedLocalObject) ->
+                    if queuedPath = path then
+                        queuedPath, (queuedLocalObject || localObject)
+                    else
+                        queuedPath, queuedLocalObject
+                )
+
+            updatedMaterializations, Some sessionId
         else
-            pendingMaterializations @ [ (path, localObject) ]
+            existingMaterializations @ [ (path, localObject) ], Some sessionId
+
+let private pendingMaterializationsForSession
+    (sessionId: string)
+    (pendingMaterializationSessionId: string option)
+    (pendingMaterializations: (string * bool) list)
+    =
+    if pendingMaterializationSessionId = Some sessionId then
+        pendingMaterializations
+    else
+        []
 
 let applyStatus (status: WorkspaceStatusDto) (model: GitState) =
     let mappedChanges = mapChanges status
@@ -862,6 +894,12 @@ let applyStatus (status: WorkspaceStatusDto) (model: GitState) =
         model.SelectedChangePath
         |> Option.filter (fun selectedPath -> mappedChanges |> Array.exists (fun change -> change.Path = selectedPath))
 
+    let pendingMaterializations, pendingMaterializationSessionId =
+        match status.ActiveConflictSession, model.PendingMaterializationSessionId with
+        | Some conflict, Some sessionId when conflict.Handle.SessionId = sessionId ->
+            model.PendingMaterializations, model.PendingMaterializationSessionId
+        | _ -> [], None
+
     {
         model with
             Status = mapStatus status
@@ -869,7 +907,8 @@ let applyStatus (status: WorkspaceStatusDto) (model: GitState) =
             SelectedChangePath = nextSelectedPath
             WorkspaceVersion = Some status.WorkspaceVersion
             ActiveConflict = status.ActiveConflictSession
-            PendingMaterializations = model.PendingMaterializations
+            PendingMaterializations = pendingMaterializations
+            PendingMaterializationSessionId = pendingMaterializationSessionId
     }
 
 let private applyRefreshResult (refreshResult: GitRefreshResult) (model: GitState) =
@@ -883,7 +922,6 @@ let private applyRefreshResult (refreshResult: GitRefreshResult) (model: GitStat
                 SelectedChangePath = None
                 WorkspaceVersion = None
                 ActiveConflict = None
-                PendingMaterializations = []
           }
 
     let modelWithBranches =
@@ -2147,14 +2185,14 @@ let private materializePendingAfterFinalizeAsync
             pendingMaterializations
             |> List.choose (fun (path, localObject) ->
                 if downloadLargeFiles || localObject then
-                    Some path
+                    Some(path, localObject)
                 else
                     None
             )
 
         let mutable firstFailedPath = None
 
-        for path in pathsToMaterialize do
+        for (path, localObject) in pathsToMaterialize do
             let! materialized =
                 toResult (
                     deps.materializeObject {
@@ -2169,11 +2207,16 @@ let private materializePendingAfterFinalizeAsync
             | Ok(_, Some _)
             | Error _ ->
                 if firstFailedPath.IsNone then
-                    firstFailedPath <- Some path
+                    firstFailedPath <- Some(path, localObject)
 
         return
             firstFailedPath
-            |> Option.map (fun path -> $"Could not download '{path}'. Use Download LFS file to try again.")
+            |> Option.map (fun (path, localObject) ->
+                if localObject then
+                    $"Could not restore '{path}' from the local cache. Use Download LFS file to try again."
+                else
+                    $"Could not download '{path}'. Use Download LFS file to try again."
+            )
     }
 
 let private runFinalizeMergeAttemptAsync (deps: GitDependencies) (state: GitState) = promise {
@@ -2181,6 +2224,12 @@ let private runFinalizeMergeAttemptAsync (deps: GitDependencies) (state: GitStat
     | Error message, _ -> return Error message
     | Ok _, None -> return Error "There is no merge to finalize."
     | Ok version, Some conflict ->
+        let pendingMaterializations =
+            pendingMaterializationsForSession
+                conflict.Handle.SessionId
+                state.PendingMaterializationSessionId
+                state.PendingMaterializations
+
         return!
             runTrackedWriteAsync
                 deps
@@ -2194,10 +2243,7 @@ let private runFinalizeMergeAttemptAsync (deps: GitDependencies) (state: GitStat
                 )
                 (fun _ partial -> promise {
                     let! materializationNotice =
-                        materializePendingAfterFinalizeAsync
-                            deps
-                            state.DownloadLargeFiles
-                            state.PendingMaterializations
+                        materializePendingAfterFinalizeAsync deps state.DownloadLargeFiles pendingMaterializations
 
                     let! refreshed =
                         refreshAfterSuccess deps partial GitPageChange.Clear (Some None) materializationNotice
@@ -2395,6 +2441,7 @@ let private confirmMergeResolutionAsync
     (deps: GitDependencies)
     (downloadLargeFiles: bool)
     (pendingMaterializations: (string * bool) list)
+    (pendingMaterializationSessionId: string option)
     (deletedCandidatePick: bool)
     (resolution: GitMergeResolutionRequest)
     =
@@ -2418,13 +2465,15 @@ let private confirmMergeResolutionAsync
                 ConfirmMergeResolutionError.Stale(
                     failureMessage failure,
                     pendingMaterializationPath,
-                    materializationsConsumed
+                    materializationsConsumed,
+                    resolution.Handle.SessionId
                 )
             else
                 ConfirmMergeResolutionError.Failed(
                     failureMessage failure,
                     pendingMaterializationPath,
-                    materializationsConsumed
+                    materializationsConsumed,
+                    resolution.Handle.SessionId
                 )
 
         match resolved with
@@ -2499,8 +2548,18 @@ let private confirmMergeResolutionAsync
                     match finalized with
                     | Error failure -> return Error(staleOrFailed pendingMaterializationPath false failure)
                     | Ok _ ->
-                        let pathsToMaterialize =
-                            enqueuePendingMaterialization pendingMaterializationPath pendingMaterializations
+                        let sessionMaterializations =
+                            pendingMaterializationsForSession
+                                resolution.Handle.SessionId
+                                pendingMaterializationSessionId
+                                pendingMaterializations
+
+                        let pathsToMaterialize, _ =
+                            enqueuePendingMaterialization
+                                resolution.Handle.SessionId
+                                pendingMaterializationPath
+                                sessionMaterializations
+                                (Some resolution.Handle.SessionId)
 
                         let! materializationNotice =
                             materializePendingAfterFinalizeAsync deps downloadLargeFiles pathsToMaterialize
@@ -2509,7 +2568,15 @@ let private confirmMergeResolutionAsync
 
                         match afterFinalize with
                         | Error failure ->
-                            return Error(ConfirmMergeResolutionError.Failed(failureMessage failure, None, true))
+                            return
+                                Error(
+                                    ConfirmMergeResolutionError.Failed(
+                                        failureMessage failure,
+                                        None,
+                                        true,
+                                        resolution.Handle.SessionId
+                                    )
+                                )
                         | Ok(finalStatus, _) ->
                             return
                                 Ok {
@@ -2518,6 +2585,7 @@ let private confirmMergeResolutionAsync
                                     PageChange = GitPageChange.Clear
                                     Notice = materializationNotice |> Option.orElse notice
                                     PendingMaterializationPath = pendingMaterializationPath
+                                    ResolutionSessionId = resolution.Handle.SessionId
                                     Finalized = true
                                 }
                 else
@@ -2541,10 +2609,16 @@ let private confirmMergeResolutionAsync
                             PageChange = GitPageChange.Set page
                             Notice = notice
                             PendingMaterializationPath = pendingMaterializationPath
+                            ResolutionSessionId = resolution.Handle.SessionId
                             Finalized = false
                         })
                         |> Result.mapError (fun message ->
-                            ConfirmMergeResolutionError.Failed(message, pendingMaterializationPath, false)
+                            ConfirmMergeResolutionError.Failed(
+                                message,
+                                pendingMaterializationPath,
+                                false,
+                                resolution.Handle.SessionId
+                            )
                         )
     }
 
@@ -2944,39 +3018,69 @@ let private updateCore
 
             let cmd =
                 Cmd.OfPromise.either
-                    (fun (deps, downloadLargeFiles, pendingMaterializations, deletedCandidatePick, resolution) ->
+                    (fun
+                        (deps,
+                         downloadLargeFiles,
+                         pendingMaterializations,
+                         pendingMaterializationSessionId,
+                         deletedCandidatePick,
+                         resolution) ->
                         confirmMergeResolutionAsync
                             deps
                             downloadLargeFiles
                             pendingMaterializations
+                            pendingMaterializationSessionId
                             deletedCandidatePick
                             resolution
                     )
-                    (deps, model.DownloadLargeFiles, model.PendingMaterializations, deletedCandidatePick, resolution)
+                    (deps,
+                     model.DownloadLargeFiles,
+                     model.PendingMaterializations,
+                     model.PendingMaterializationSessionId,
+                     deletedCandidatePick,
+                     resolution)
                     (fun result -> ConfirmMergeResolutionCompleted(model.ArcSessionId, result))
                     (fun err ->
                         ConfirmMergeResolutionCompleted(
                             model.ArcSessionId,
-                            Error(ConfirmMergeResolutionError.Failed(string err, None, false))
+                            Error(
+                                ConfirmMergeResolutionError.Failed(
+                                    string err,
+                                    None,
+                                    false,
+                                    resolution.Handle.SessionId
+                                )
+                            )
                         )
                     )
 
             nextModel, cmd
     | ConfirmMergeResolutionCompleted(sessionId, _) when sessionId <> model.ArcSessionId -> model, Cmd.none
-    | ConfirmMergeResolutionCompleted(_, Error(ConfirmMergeResolutionError.Stale(message, pendingPath, consumed))) ->
+    | ConfirmMergeResolutionCompleted(_,
+                                      Error(ConfirmMergeResolutionError.Stale(message,
+                                                                              pendingPath,
+                                                                              consumed,
+                                                                              resolutionSessionId))) ->
         // The handle or the workspace changed underneath the resolution. Reload both
         // and let the user redo the choice deliberately.
+        let pendingMaterializations, pendingMaterializationSessionId =
+            if consumed then
+                [], None
+            else
+                enqueuePendingMaterialization
+                    resolutionSessionId
+                    pendingPath
+                    model.PendingMaterializations
+                    model.PendingMaterializationSessionId
+
         let nextModel = {
             clearBusy model with
                 MergeResolutionPendingPath = None
                 SelectedChangePath = None
                 ErrorNotice = Some message
                 WarningNotice = None
-                PendingMaterializations =
-                    if consumed then
-                        []
-                    else
-                        enqueuePendingMaterialization pendingPath model.PendingMaterializations
+                PendingMaterializations = pendingMaterializations
+                PendingMaterializationSessionId = pendingMaterializationSessionId
         }
 
         nextModel,
@@ -2985,17 +3089,28 @@ let private updateCore
             Cmd.ofMsg RefreshRequested
             reportErrorCmd deps "Could not confirm merge resolution" message
         ]
-    | ConfirmMergeResolutionCompleted(_, Error(ConfirmMergeResolutionError.Failed(message, pendingPath, consumed))) ->
+    | ConfirmMergeResolutionCompleted(_,
+                                      Error(ConfirmMergeResolutionError.Failed(message,
+                                                                               pendingPath,
+                                                                               consumed,
+                                                                               resolutionSessionId))) ->
+        let pendingMaterializations, pendingMaterializationSessionId =
+            if consumed then
+                [], None
+            else
+                enqueuePendingMaterialization
+                    resolutionSessionId
+                    pendingPath
+                    model.PendingMaterializations
+                    model.PendingMaterializationSessionId
+
         let nextModel = {
             clearBusy model with
                 MergeResolutionPendingPath = None
                 ErrorNotice = Some message
                 WarningNotice = None
-                PendingMaterializations =
-                    if consumed then
-                        []
-                    else
-                        enqueuePendingMaterialization pendingPath model.PendingMaterializations
+                PendingMaterializations = pendingMaterializations
+                PendingMaterializationSessionId = pendingMaterializationSessionId
         }
 
         // Resolve may have written the file before failing, so the state is reloaded.
@@ -3009,30 +3124,36 @@ let private updateCore
             model
             |> applyStatus outcome.UpdatedStatus
             |> clearBusy
-            |> fun state -> {
-                state with
-                    MergeResolutionPendingPath = None
-                    SelectedChangePath = outcome.NextConflictedPath
-                    ErrorNotice = None
-                    WarningNotice =
-                        outcome.Notice
-                        |> Option.orElse (
-                            if
-                                not (List.isEmpty model.PendingMaterializations)
-                                && (not outcome.Finalized || not model.DownloadLargeFiles)
-                            then
-                                model.WarningNotice
-                            else
-                                None
-                        )
-                    PendingMaterializations =
-                        if outcome.Finalized then
-                            []
-                        else
-                            enqueuePendingMaterialization
-                                outcome.PendingMaterializationPath
-                                model.PendingMaterializations
-            }
+            |> fun state ->
+                let pendingMaterializations, pendingMaterializationSessionId =
+                    if outcome.Finalized then
+                        [], None
+                    else
+                        enqueuePendingMaterialization
+                            outcome.ResolutionSessionId
+                            outcome.PendingMaterializationPath
+                            state.PendingMaterializations
+                            state.PendingMaterializationSessionId
+
+                {
+                    state with
+                        MergeResolutionPendingPath = None
+                        SelectedChangePath = outcome.NextConflictedPath
+                        ErrorNotice = None
+                        WarningNotice =
+                            outcome.Notice
+                            |> Option.orElse (
+                                if
+                                    not (List.isEmpty model.PendingMaterializations)
+                                    && (not outcome.Finalized || not model.DownloadLargeFiles)
+                                then
+                                    model.WarningNotice
+                                else
+                                    None
+                            )
+                        PendingMaterializations = pendingMaterializations
+                        PendingMaterializationSessionId = pendingMaterializationSessionId
+                }
 
         if outcome.Finalized && shouldRunPostMergePush nextModel then
             {
@@ -3681,6 +3802,7 @@ let private updateCore
         let nextModel = {
             writeErrorModel message model with
                 PendingMaterializations = []
+                PendingMaterializationSessionId = None
                 PendingPostMergePush = false
         }
 
@@ -3704,6 +3826,10 @@ let private updateCore
                     match writeRequest with
                     | FinalizeMerge -> []
                     | _ -> baseModel.PendingMaterializations
+                PendingMaterializationSessionId =
+                    match writeRequest with
+                    | FinalizeMerge -> None
+                    | _ -> baseModel.PendingMaterializationSessionId
                 ProvisionedRemote =
                     match writeRequest with
                     | Push _
@@ -3735,6 +3861,7 @@ let private updateCore
                 nextModel with
                     PendingPostMergePush = false
                     PendingMaterializations = []
+                    PendingMaterializationSessionId = None
               }
             // Only a materialization recovery leaves the publish undone with nothing else
             // offering it. The publish resumes after that recovery. The retry_publish partial
