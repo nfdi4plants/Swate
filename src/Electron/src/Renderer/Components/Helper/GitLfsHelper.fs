@@ -13,23 +13,15 @@ let private operationId () =
 
 let private toUnitResult = Renderer.Context.GitWorkflow.toUnitResult
 
-/// The size is not known here, so the size rule is left to the context menu, which
-/// has it. The path rules are checked for both directions.
-let private tryGetToggleBlockedReason (relativePath: string) (markAsLfs: bool) =
-    GitLfsRules.tryGetToggleBlockedReason relativePath None markAsLfs
-
 let runToggleLfsMark (relativePath: string) (markAsLfs: bool) : JS.Promise<Result<unit, string>> = promise {
-    match tryGetToggleBlockedReason relativePath markAsLfs with
-    | Some reason -> return Error reason
-    | None ->
-        let! result =
-            Renderer.VersionControlApiClient.setPathStoragePolicy {
-                OperationId = operationId ()
-                Path = PathHelpers.normalizeSeparators relativePath
-                UseLargeObjectStorage = markAsLfs
-            }
+    let! result =
+        Renderer.VersionControlApiClient.setPathStoragePolicy {
+            OperationId = operationId ()
+            Path = PathHelpers.normalizeSeparators relativePath
+            UseLargeObjectStorage = markAsLfs
+        }
 
-        return toUnitResult result
+    return toUnitResult result
 }
 
 let runFreeLocalLfsCopy (relativePath: string) : JS.Promise<Result<unit, string>> = promise {
