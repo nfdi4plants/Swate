@@ -59,9 +59,10 @@ jobs:
         working-directory: src/Components
         run: npm run build
 
-      # Vite and Rollup bundle the Electron main process only when the app is packaged. Fable
-      # output that breaks only there, such as a fable-library member the pinned Fable lacks,
-      # passes every other step.
+      # No other step bundles the Electron main process with Vite and Rollup, so Fable output
+      # that breaks only there (a fable-library member the pinned Fable lacks) would pass.
+      # Packaging does not load the bundle. A namespace import that crashes at load time is
+      # caught by the library's package-consumer check, for the library's own code only.
       - name: Bundle the Electron app
         working-directory: src/Electron
         run: |
