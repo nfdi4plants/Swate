@@ -2192,6 +2192,75 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "A partial clone reports the missing large files and does not complete CloneSuccess",
+            fun () -> promise {
+                let failure =
+                    makeFailure
+                        ProviderError
+                        "lfs_pull_failed"
+                        "The large-file download failed."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RetryMaterialization
+                            Instructions = None
+                        })
+                        [||]
+
+                let mutable replyResult = None
+                let reply result = replyResult <- Some result
+
+                let cloneRequest = {
+                    OperationId = "clone-op"
+                    ProviderLocation = "https://gitlab.example/carol/my-arc.git"
+                    DisplayName = Some "my-arc"
+                    TargetPath = "C:/clone-target"
+                    TargetRef = None
+                    MaterializeAllObjects = true
+                }
+
+                let deps = {
+                    defaultDependencies with
+                        cloneWorkspace =
+                            fun _ -> promise {
+                                return Ok(OperationResultDto.PartiallySucceeded(operation "C:/clone-target", failure))
+                            }
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested(Clone(cloneRequest, reply))) GitState.Empty
+
+                let! completionMessages = collectMessages requestCmd
+
+                let _, finishCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, Clone _, Error message) |] ->
+                        Vitest
+                            .expect(message)
+                            .toBe (
+                                "The ARC was cloned to 'C:/clone-target', but its large files could not be downloaded: The large-file download failed. Open the folder and use Download LFS file to get them."
+                            )
+
+                        update deps ignore completionMessages[0] stateAfterRequest
+                    | [| WriteCompleted(_, _, Clone _, Ok(Completed(CloneSuccess _))) |] ->
+                        failwith "A partial clone must not complete CloneSuccess."
+                    | _ -> failwith "Expected a partial clone to report an error."
+
+                let! finishMessages = collectMessages finishCmd
+
+                Vitest.expect(finishMessages).toEqual ([||])
+
+                Vitest
+                    .expect(replyResult)
+                    .toEqual (
+                        Some(
+                            Error(
+                                "The ARC was cloned to 'C:/clone-target', but its large files could not be downloaded: The large-file download failed. Open the folder and use Download LFS file to get them."
+                            )
+                        )
+                    )
+            }
+        )
+
+        Vitest.test (
             "A clone runs under the operation id allocated for cancellation",
             fun () -> promise {
                 let mutable capturedRequest = None
