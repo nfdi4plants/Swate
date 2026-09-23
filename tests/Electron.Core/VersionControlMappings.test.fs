@@ -195,18 +195,6 @@ Vitest.describe (
         }
 
         Vitest.test (
-            "isCanceled sees a canceled partial success as canceled",
-            fun () ->
-                Vitest
-                    .expect(OperationResultDto.isCanceled (OperationResultDto.PartiallySucceeded(outcome, canceled)))
-                    .toBe
-                    true
-
-                Vitest.expect(OperationResultDto.isCanceled (OperationResultDto.Failed canceled)).toBe true
-                Vitest.expect(OperationResultDto.isCanceled (OperationResultDto.Succeeded outcome)).toBe false
-        )
-
-        Vitest.test (
             "resultChangedState is true for a performed success, a partial success and a state-changing failure only",
             fun () ->
                 let changed = Main.IPC.IVersionControlApi.resultChangedState
@@ -234,22 +222,13 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "map, tryValue, tryFailure and recoveryCode follow the three shapes",
+            "tryValue follows the three shapes",
             fun () ->
-                let mapped =
-                    OperationResultDto.map
-                        (fun value -> value + 1)
-                        (OperationResultDto.PartiallySucceeded(outcome, canceled))
+                let partial = OperationResultDto.PartiallySucceeded(outcome, canceled)
 
-                Vitest.expect(OperationResultDto.tryValue mapped).toEqual (Some 2)
-
-                Vitest
-                    .expect(OperationResultDto.tryFailure mapped |> Option.map _.Code)
-                    .toEqual (Some "operation_canceled")
-
+                Vitest.expect(OperationResultDto.tryValue (OperationResultDto.Succeeded outcome)).toEqual (Some 1)
+                Vitest.expect(OperationResultDto.tryValue partial).toEqual (Some 1)
                 Vitest.expect(OperationResultDto.tryValue (OperationResultDto.Failed canceled)).toEqual None
-                Vitest.expect(OperationResultDto.tryFailure (OperationResultDto.Succeeded outcome)).toEqual None
-                Vitest.expect(OperationResultDto.recoveryCode canceled).toEqual (Some "retry_materialization")
         )
 )
 

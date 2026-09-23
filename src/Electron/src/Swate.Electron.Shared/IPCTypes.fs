@@ -106,14 +106,10 @@ type IVersionControlApi = {
     switchRef: SwitchRefRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceStatusDto>, exn>>
     createRevision: CreateRevisionRequestDto -> JS.Promise<Result<OperationResultDto<string>, exn>>
     restorePaths: RestorePathsRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
-    getDiffSummary: OperationRequestDto -> JS.Promise<Result<OperationResultDto<DiffSummaryDto>, exn>>
-    getTextDiff: ObjectPathRequestDto -> JS.Promise<Result<OperationResultDto<ContentViewDto>, exn>>
     getWordDiff: ObjectPathRequestDto -> JS.Promise<Result<OperationResultDto<ContentViewDto>, exn>>
     getBaseContent: ObjectPathRequestDto -> JS.Promise<Result<OperationResultDto<ContentViewDto>, exn>>
     refreshSynchronization: OperationRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, exn>>
     synchronize: SynchronizeRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, exn>>
-    getActiveConflictSession:
-        OperationRequestDto -> JS.Promise<Result<OperationResultDto<ConflictSessionSummaryDto option>, exn>>
     resolveConflict:
         ResolveConflictRequestDto -> JS.Promise<Result<OperationResultDto<ConflictResolutionOutcomeDto>, exn>>
     finalizeConflict: FinalizeConflictRequestDto -> JS.Promise<Result<OperationResultDto<string option>, exn>>

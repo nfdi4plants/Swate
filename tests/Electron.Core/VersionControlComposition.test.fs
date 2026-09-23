@@ -103,16 +103,26 @@ let private bindingFor (providerId: ProviderId) (root: string) : WorkspaceBindin
     ConnectionProfileId = Some "acc-gitlab"
 }
 
-let private memoryStore (sensitivity: PathCaseSensitivity) =
+let private memoryStoreWithState (sensitivity: PathCaseSensitivity) =
     let mutable content: string option = None
 
-    WorkspaceBindingStore.create
-        sensitivity
-        (fun () -> content)
-        (fun next ->
-            content <- Some next
-            Ok()
-        )
+    let store =
+        WorkspaceBindingStore.create
+            sensitivity
+            (fun () -> content)
+            (fun next ->
+                content <- Some next
+                Ok()
+            )
+
+    let storedBindings () =
+        content
+        |> Option.map WorkspaceBindingStore.deserialize
+        |> Option.defaultValue [||]
+
+    store, storedBindings
+
+let private memoryStore (sensitivity: PathCaseSensitivity) = memoryStoreWithState sensitivity |> fst
 
 let private failingStore () =
     WorkspaceBindingStore.create CaseInsensitive (fun () -> None) (fun _ -> Error "disk full")
@@ -433,15 +443,15 @@ Vitest.describe (
         Vitest.test (
             "saving a binding for the same root replaces the previous one and remove drops it",
             fun () ->
-                let store = memoryStore CaseInsensitive
+                let store, storedBindings = memoryStoreWithState CaseInsensitive
                 store.Save(bindingFor gitProviderId "C:/arcs/demo") |> ignore
                 store.Save(bindingFor lakeFsProviderId "c:/ARCS/demo") |> ignore
 
-                Vitest.expect(store.List().Length).toBe 1
+                Vitest.expect(storedBindings().Length).toBe 1
                 Vitest.expect(store.TryFind "C:/arcs/demo" |> Option.map _.ProviderId).toEqual (Some lakeFsProviderId)
 
                 Vitest.expect(store.Remove "C:/arcs/demo").toEqual (Ok())
-                Vitest.expect(store.List().Length).toBe 0
+                Vitest.expect(storedBindings().Length).toBe 0
         )
 
         Vitest.test (

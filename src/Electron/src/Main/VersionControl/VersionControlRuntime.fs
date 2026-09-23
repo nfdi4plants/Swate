@@ -26,8 +26,6 @@ let createProduction () : VersionControlRuntime =
         PathCaseSensitivity = sensitivity
     }
 
-let tryGet () = current
-
 /// Fails when nothing initialized the runtime, so a call before the app is ready or a
 /// test that forgot to install its runtime fails loudly instead of building a
 /// production runtime as a side effect.
@@ -35,7 +33,3 @@ let get () =
     match current with
     | Some runtime -> runtime
     | None -> failwith "The version control runtime has not been initialized."
-
-let resolveVault (workspaceRoot: string) =
-    let runtime = get ()
-    ProviderComposition.resolveVault runtime.Catalog runtime.Bindings runtime.PathCaseSensitivity workspaceRoot

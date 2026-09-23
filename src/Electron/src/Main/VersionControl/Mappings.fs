@@ -181,18 +181,6 @@ let switchPreflight (preflight: SwitchPreflight) : SwitchPreflightDto = {
     IsSafe = preflight.IsSafe
 }
 
-let diffSummary (summary: DiffSummary) : DiffSummaryDto = {
-    Entries =
-        summary.Entries
-        |> Array.map (fun entry -> {
-            Path = RepositoryPath.value entry.Path
-            OldPath = entry.OldPath |> Option.map RepositoryPath.value
-            Kind = fileChangeKind entry.Kind
-            LineInsertions = entry.LineInsertions
-            LineDeletions = entry.LineDeletions
-        })
-}
-
 let objectState (state: ObjectState) : ObjectStateDto = {
     Path = RepositoryPath.value state.Path
     IsMaterialized = state.IsMaterialized

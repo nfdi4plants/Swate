@@ -463,16 +463,6 @@ Vitest.describe (
                         Vitest.expect(services.Maintenance).toBe false
                         Vitest.expect(services.RepositoryBrowser).toBe false
 
-                        let! diffSummary = api.getDiffSummary (request "lakefs-diff-summary")
-                        expectDtoSucceeded "getDiffSummary" diffSummary |> ignore
-
-                        let! textDiff =
-                            api.getTextDiff {
-                                OperationId = "lakefs-text-diff"
-                                Path = "data.txt"
-                                RefreshTree = None
-                            }
-
                         let! wordDiff =
                             api.getWordDiff {
                                 OperationId = "lakefs-word-diff"
@@ -525,7 +515,6 @@ Vitest.describe (
                         let! deduplicate = api.deduplicateStorage (request "lakefs-deduplicate")
                         let! repositoryUrl = api.getRepositoryWebUrl (request "lakefs-repository-url")
 
-                        expectServiceUnavailable "getTextDiff" textDiff
                         expectServiceUnavailable "getWordDiff" wordDiff
                         expectServiceUnavailable "getBaseContent" baseContent
                         expectServiceUnavailable "listObjects" objects
@@ -771,14 +760,6 @@ Vitest.describe (
                         let conflict =
                             conflictStatusValue.ActiveConflictSession
                             |> Option.defaultWith (fun () -> failwith "Expected an active lakeFS conflict session.")
-
-                        let! activeConflict = api.getActiveConflictSession (request "lakefs-active-conflict")
-
-                        let activeConflictValue =
-                            (expectDtoSucceeded "getActiveConflictSession" activeConflict).Value
-                            |> Option.defaultWith (fun () -> failwith "Expected the active lakeFS conflict session.")
-
-                        Vitest.expect(activeConflictValue.Handle).toEqual conflict.Handle
 
                         Vitest.expect(conflict.Items |> Array.exists (fun item -> item.Path = "shared.txt")).toBe true
 

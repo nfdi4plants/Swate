@@ -13,7 +13,6 @@ open VersionControlService.Abstractions
 type HostedSession = {
     SessionId: string
     Binding: WorkspaceBinding
-    Factory: ProviderFactory
     Session: WorkspaceSession
     Settings: VersionControlSettings
 }
@@ -106,7 +105,6 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
             let hosted = {
                 SessionId = Guid.NewGuid().ToString()
                 Binding = binding
-                Factory = factory
                 Session = outcome.Value
                 Settings = VersionControlSettings.defaults
             }

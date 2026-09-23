@@ -79,14 +79,12 @@ type VersionControlProgressDto = {
     DisplayMessage: string option
 }
 
-/// Stable codes the renderer routes on, listed here so nothing spells them inline.
+/// Codes the library and the host report. The renderer routes on some of them,
+/// and tests build failures with others.
 /// Each group below names its producer.
 module VersionControlCodes =
 
     // Produced by the library (failure codes of its providers).
-
-    [<Literal>]
-    let IdentityMissing = "identity_missing"
 
     [<Literal>]
     let PublishTargetMissing = "publish_target_missing"
@@ -96,9 +94,6 @@ module VersionControlCodes =
 
     [<Literal>]
     let NetworkFailure = "network_failure"
-
-    [<Literal>]
-    let ConfiguredTargetInvalid = "configured_target_invalid"
 
     [<Literal>]
     let PreconditionFailed = "precondition_failed"
@@ -190,12 +185,6 @@ module VersionControlCodes =
 
         [<Literal>]
         let RetryMaterialization = "retry_materialization"
-
-        [<Literal>]
-        let ReconcileMaterialization = "reconcile_materialization"
-
-        [<Literal>]
-        let ReconcileIndex = "reconcile_index"
 
         [<Literal>]
         let RemoveIndexLock = "remove_index_lock"
@@ -316,16 +305,6 @@ type WorkspaceStatusDto = {
 }
 
 type SwitchPreflightDto = { PathsAtRisk: string[]; IsSafe: bool }
-
-type DiffEntryDto = {
-    Path: string
-    OldPath: string option
-    Kind: FileChangeKindDto
-    LineInsertions: int option
-    LineDeletions: int option
-}
-
-type DiffSummaryDto = { Entries: DiffEntryDto[] }
 
 /// Materialization state of one large object whose content may not be downloaded yet.
 type ObjectStateDto = {
@@ -494,42 +473,9 @@ type InstallDependencyRequestDto = {
 
 module OperationResultDto =
 
-    let map (mapping: 'T -> 'U) (result: OperationResultDto<'T>) : OperationResultDto<'U> =
-        let mapOutcome (outcome: OperationOutcomeDto<'T>) : OperationOutcomeDto<'U> = {
-            Value = mapping outcome.Value
-            Effect = outcome.Effect
-            Warnings = outcome.Warnings
-            AffectedPaths = outcome.AffectedPaths
-            ResultingRevision = outcome.ResultingRevision
-            ResultingWorkspaceVersion = outcome.ResultingWorkspaceVersion
-            Publication = outcome.Publication
-        }
-
-        match result with
-        | OperationResultDto.Succeeded outcome -> OperationResultDto.Succeeded(mapOutcome outcome)
-        | OperationResultDto.PartiallySucceeded(outcome, failure) ->
-            OperationResultDto.PartiallySucceeded(mapOutcome outcome, failure)
-        | OperationResultDto.Failed failure -> OperationResultDto.Failed failure
-
-    /// The failure of a failed or partially successful result.
-    let tryFailure (result: OperationResultDto<'T>) : OperationFailureDto option =
-        match result with
-        | OperationResultDto.Succeeded _ -> None
-        | OperationResultDto.PartiallySucceeded(_, failure)
-        | OperationResultDto.Failed failure -> Some failure
-
     /// The value of a successful or partially successful result.
     let tryValue (result: OperationResultDto<'T>) : 'T option =
         match result with
         | OperationResultDto.Succeeded outcome
         | OperationResultDto.PartiallySucceeded(outcome, _) -> Some outcome.Value
         | OperationResultDto.Failed _ -> None
-
-    /// True for a canceled failure and for a partial success whose failure is the
-    /// cancellation, such as a clone whose large-object download was canceled.
-    let isCanceled (result: OperationResultDto<'T>) =
-        tryFailure result
-        |> Option.exists (fun failure -> failure.Category = FailureCategoryDto.Canceled)
-
-    let recoveryCode (failure: OperationFailureDto) =
-        failure.RecoveryAction |> Option.map _.Code

@@ -16,7 +16,6 @@ type IWorkspaceBindingStore =
     abstract TryFind: workspaceRoot: string -> WorkspaceBinding option
     abstract Save: WorkspaceBinding -> Result<unit, string>
     abstract Remove: workspaceRoot: string -> Result<unit, string>
-    abstract List: unit -> WorkspaceBinding[]
 
 /// Fails as a decode error, never as an exception, so a bad provider id counts as a
 /// damaged entry and the other entries survive.
@@ -146,8 +145,6 @@ let create
                 Ok()
             else
                 persist remaining
-
-        member _.List() = load ()
     }
 
 /// The production store in the application settings folder.

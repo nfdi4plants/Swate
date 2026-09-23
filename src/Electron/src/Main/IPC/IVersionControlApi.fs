@@ -725,23 +725,6 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                         )
                 )
                 id
-    getDiffSummary =
-        fun request ->
-            withSession
-                event
-                request.OperationId
-                (fun hosted context -> hosted.Session.Core.GetDiffSummary context)
-                Mappings.diffSummary
-    getTextDiff =
-        fun request ->
-            withSession
-                event
-                request.OperationId
-                (withService
-                    _.TextDiff
-                    "text diffs"
-                    (fun service context -> withPath request.Path (fun path -> service.GetDiff path context)))
-                Mappings.contentView
     getWordDiff =
         fun request ->
             withSession
@@ -793,16 +776,6 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                             )
                     ))
                 Mappings.synchronizationState
-    getActiveConflictSession =
-        fun request ->
-            withSession
-                event
-                request.OperationId
-                (withService
-                    _.ConflictResolution
-                    "conflict resolution"
-                    (fun service context -> service.GetActiveSession context))
-                (Option.map Mappings.conflictSession)
     resolveConflict =
         fun request ->
             withMutatingSession

@@ -19,9 +19,6 @@ let private call (invoke: unit -> JS.Promise<Result<'T, exn>>) : JS.Promise<Resu
 /// A fresh operation id.
 let newOperationId () = Guid.NewGuid().ToString()
 
-/// A request without payload for the given operation id.
-let request (operationId: string) : OperationRequestDto = { OperationId = operationId }
-
 let getSessionInfo (dto: OperationRequestDto) = call (fun () -> api.getSessionInfo dto)
 
 let cloneWorkspace (dto: CloneWorkspaceRequestDto) = call (fun () -> api.cloneWorkspace dto)
@@ -55,10 +52,6 @@ let createRevision (dto: CreateRevisionRequestDto) = call (fun () -> api.createR
 
 let restorePaths (dto: RestorePathsRequestDto) = call (fun () -> api.restorePaths dto)
 
-let getDiffSummary (dto: OperationRequestDto) = call (fun () -> api.getDiffSummary dto)
-
-let getTextDiff (dto: ObjectPathRequestDto) = call (fun () -> api.getTextDiff dto)
-
 let getWordDiff (dto: ObjectPathRequestDto) = call (fun () -> api.getWordDiff dto)
 
 let getBaseContent (dto: ObjectPathRequestDto) = call (fun () -> api.getBaseContent dto)
@@ -67,9 +60,6 @@ let refreshSynchronization (dto: OperationRequestDto) =
     call (fun () -> api.refreshSynchronization dto)
 
 let synchronize (dto: SynchronizeRequestDto) = call (fun () -> api.synchronize dto)
-
-let getActiveConflictSession (dto: OperationRequestDto) =
-    call (fun () -> api.getActiveConflictSession dto)
 
 let resolveConflict (dto: ResolveConflictRequestDto) =
     call (fun () -> api.resolveConflict dto)

@@ -29,9 +29,9 @@ checkDependencies: OperationRequestDto -> JS.Promise<Result<OperationResultDto<D
 installDependency: InstallDependencyRequestDto -> JS.Promise<Result<OperationResultDto<DependencyStatusDto>, string>>
 getStatus, listRefs, createRef, preflightSwitchRef, switchRef
 createRevision, restorePaths
-getDiffSummary, getTextDiff, getWordDiff, getBaseContent
+getWordDiff, getBaseContent
 refreshSynchronization, synchronize
-getActiveConflictSession, resolveConflict, finalizeConflict, cancelConflict
+resolveConflict, finalizeConflict, cancelConflict
 listObjects, materializeObject, dematerializeObject
 getStoragePolicySettings, setStoragePolicySettings, setPathStoragePolicy, pruneStorage, deduplicateStorage
 getRepositoryWebUrl, clearStaleLock
@@ -60,10 +60,10 @@ Categories: `Validation`, `NotFound`, `Concurrency`, `Authentication`, `Authoriz
 
 Codes the renderer handles are literals in `VersionControlCodes` (`VersionControlTypes.fs`). Library codes include `identity_missing`, `publish_target_missing`, `target_unreachable`, `precondition_failed`, `conflicts_detected`, `conflict_session_active`, `operation_in_progress` (a rebase, cherry-pick, revert, bisect or unmerged paths block the workspace), `publish_rejected` (the remote refused the push, the message carries its reason), `inspection_timeout` (the state read after an applied update exceeded its deadline), `target_not_empty` and `operation_canceled`. The three codes in the middle reach the user through the generic error modal with the library's message. Swate host codes include `service_unavailable` (the provider has no such optional service), `session_unavailable`, `workspace_unmanaged`, `workspace_ambiguous`, `location_unsupported`, `lock_removal_refused`, `binding_not_persisted`, `transport_error` (the IPC call failed before a structured result existed) and `storage_policy_blocked` (the DataHub ruleset refused a manual storage policy change, see section 8). A threshold outside 1 to 100 MiB is refused with the library's `invalid_lfs_threshold`.
 
-Recovery codes (`VersionControlCodes.Recovery`) tell the renderer which dialog to open after a canceled or partial operation: `remove_index_lock`, `restore_workspace`, `refresh_workspace`, `inspect_workspace`, `abort_merge`, `retry_materialization`, `reconcile_materialization`, `reconcile_index`, `resolve_conflict_session`, `refresh_conflict_session`, `remove_clone_target`.
+Recovery codes (`VersionControlCodes.Recovery`) tell the renderer which dialog to open after a canceled or partial operation: `remove_index_lock`, `restore_workspace`, `refresh_workspace`, `inspect_workspace`, `abort_merge`, `retry_materialization`, `resolve_conflict_session`, `refresh_conflict_session`, `remove_clone_target`.
 When a failure that is not canceled reports a state change, the renderer refreshes the workspace before it shows the error. If that refresh fails too, the error names both failures and the sidebar keeps its old snapshot. A failed clone skips the refresh, because no workspace is open yet.
 
-Helpers on `OperationResultDto` (`map`, `tryValue`, `tryFailure`, `isCanceled`, `recoveryCode`) cover the common checks.
+Helpers on `OperationResultDto` (`tryValue`) cover the common checks.
 
 ## 4. Common calls
 
@@ -71,10 +71,10 @@ Refresh the sidebar state:
 
 ```fsharp
 promise {
-    let request () = VersionControlApiClient.request (VersionControlApiClient.newOperationId ())
-    let! status = VersionControlApiClient.getStatus (request ())
-    let! refs = VersionControlApiClient.listRefs (request ())
-    let! settings = VersionControlApiClient.getStoragePolicySettings (request ())
+    let operationRequest () : OperationRequestDto = { OperationId = VersionControlApiClient.newOperationId () }
+    let! status = VersionControlApiClient.getStatus (operationRequest ())
+    let! refs = VersionControlApiClient.listRefs (operationRequest ())
+    let! settings = VersionControlApiClient.getStoragePolicySettings (operationRequest ())
 
     match status, refs, settings with
     | Ok(OperationResultDto.Succeeded status), Ok(OperationResultDto.Succeeded refs), Ok(OperationResultDto.Succeeded settings) ->

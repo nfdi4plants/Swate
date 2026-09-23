@@ -2124,14 +2124,14 @@ Vitest.describe (
         )
 
         // The library only documents these literals and exposes no constants for them:
-        // IdentityMissing, PublishTargetMissing, TargetUnreachable, NetworkFailure,
-        // ConfiguredTargetInvalid, ConflictsDetected, PreviewIndeterminate,
+        // PublishTargetMissing, TargetUnreachable, NetworkFailure,
+        // ConflictsDetected, PreviewIndeterminate,
         // TargetNotEmpty, OperationCanceled, BaseContentNotFound, InvalidLfsThreshold,
         // ServiceUnavailable, SessionUnavailable, WorkspaceUnmanaged, WorkspaceAmbiguous,
         // LocationUnsupported, UnexpectedException, LockRemovalRefused, LockRemoved,
         // InvalidPath, InvalidRef, InvalidRevision, BindingNotPersisted, TransportError,
         // StoragePolicyBlocked, Recovery.ResolveConflictSession,
-        // Recovery.RetryMaterialization, Recovery.ReconcileMaterialization, Recovery.ReconcileIndex,
+        // Recovery.RetryMaterialization,
         // Recovery.RemoveIndexLock, Recovery.RestoreWorkspace, Recovery.RefreshWorkspace,
         // Recovery.InspectWorkspace, Recovery.ReopenWorkspace, Recovery.CheckDependencies,
         // Recovery.AbortMerge, Recovery.RemoveCloneTarget.
