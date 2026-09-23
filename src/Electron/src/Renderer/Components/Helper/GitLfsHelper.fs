@@ -1,7 +1,7 @@
 /// Large-object actions of the file explorer over the provider-neutral storage
-/// policy and materialization services. The DataHub ruleset (isa.*.xlsx never in
-/// large-object storage, dataset files always) is checked here before the provider is
-/// asked, so a refused toggle never reaches the repository.
+/// policy and materialization services. The file explorer checks the DataHub ruleset
+/// (isa.*.xlsx never in large-object storage, dataset files always) before it calls
+/// here, and the main process checks it again.
 module Renderer.Components.Helper.GitLfsHelper
 
 open Fable.Core
