@@ -863,6 +863,31 @@ type ArcVaults() =
         this.Vaults.Values
         |> Seq.tryFind (fun v -> v.path |> Option.exists (fun vaultPath -> PathHelpers.pathsEqual vaultPath path))
 
+    member private this.EnsureVaultIsStillActive(windowId: int, expectedVault: ArcVault) =
+        match this.TryGetVault windowId with
+        | Some registeredVault when
+            obj.ReferenceEquals(registeredVault, expectedVault)
+            && not (expectedVault.window.isDestroyed ())
+            ->
+            ()
+        | _ -> raise (ArcLoadCancelledException windowId)
+
+    member private this.InitializeFileTreeForActiveVault(windowId: int, expectedVault: ArcVault, arcPath: string) = promise {
+        let! fileTreeResult = promise {
+            try
+                let! fileTree = getFileTree arcPath
+                return Ok fileTree
+            with error ->
+                return Error error
+        }
+
+        this.EnsureVaultIsStillActive(windowId, expectedVault)
+
+        match fileTreeResult with
+        | Ok fileTree -> expectedVault.SetFileTree fileTree
+        | Error error -> return raise error
+    }
+
     // ── ARC Lifecycle Controller ──────────────────────────────────────────
     // All open/create/focus decisions are made here.
     // IPC handlers should delegate to these methods.
@@ -884,19 +909,18 @@ type ArcVaults() =
                 match this.TryGetVault callingWindowId with
                 | Some vault when vault.path.IsNone ->
                     do! vault.OpenARC(normalizedArcPath)
-                    let! fileTree = getFileTree normalizedArcPath
-                    vault.SetFileTree fileTree
+                    do! this.InitializeFileTreeForActiveVault(callingWindowId, vault, normalizedArcPath)
                     this.TrackRecentAndBroadcast(normalizedArcPath)
                     return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
                 | _ ->
                     let! newWindowId = this.RegisterVaultWithValidatedArc(normalizedArcPath)
 
-                    match this.TryGetVault newWindowId with
-                    | Some newVault ->
-                        let! fileTree = getFileTree normalizedArcPath
-                        newVault.SetFileTree fileTree
-                    | None -> ()
+                    let newVault =
+                        match this.TryGetVault newWindowId with
+                        | Some vault -> vault
+                        | None -> raise (ArcLoadCancelledException newWindowId)
 
+                    do! this.InitializeFileTreeForActiveVault(newWindowId, newVault, normalizedArcPath)
                     this.TrackRecentAndBroadcast(normalizedArcPath)
                     return ArcOpenDisposition.OpenedInNewWindow normalizedArcPath
     }
@@ -915,19 +939,18 @@ type ArcVaults() =
             match this.TryGetVault callingWindowId with
             | Some vault when vault.path.IsNone ->
                 do! vault.CreateARC(normalizedArcPath, identifier)
-                let! fileTree = getFileTree normalizedArcPath
-                vault.SetFileTree fileTree
+                do! this.InitializeFileTreeForActiveVault(callingWindowId, vault, normalizedArcPath)
                 this.TrackRecentAndBroadcast(normalizedArcPath)
                 return ArcOpenDisposition.CreatedInCurrent normalizedArcPath
             | _ ->
                 let! newWindowId = this.RegisterVaultWithNewArc(normalizedArcPath, identifier)
 
-                match this.TryGetVault newWindowId with
-                | Some newVault ->
-                    let! fileTree = getFileTree normalizedArcPath
-                    newVault.SetFileTree fileTree
-                | None -> ()
+                let newVault =
+                    match this.TryGetVault newWindowId with
+                    | Some vault -> vault
+                    | None -> raise (ArcLoadCancelledException newWindowId)
 
+                do! this.InitializeFileTreeForActiveVault(newWindowId, newVault, normalizedArcPath)
                 this.TrackRecentAndBroadcast(normalizedArcPath)
                 return ArcOpenDisposition.CreatedInNewWindow normalizedArcPath
     }

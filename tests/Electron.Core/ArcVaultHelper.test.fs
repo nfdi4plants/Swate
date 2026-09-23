@@ -1117,6 +1117,112 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "openARCByPath treats closing a new window after startup but before file-tree publication as cancellation",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-ipc-close-during-open-tree-"
+                    "Closing During Open Tree Scan"
+                    ignore
+                    (fun arcPath -> promise {
+                        let originatingWindowId = 44
+                        let targetWindowId = 45
+                        let expectedPath = PathHelpers.normalizePath arcPath
+                        let originatingWindow = lifecycleTestWindow originatingWindowId false ignore
+                        let originatingVault = ArcVault(originatingWindow)
+                        originatingVault.path <- Some "C:/already-open-tree-race"
+                        originatingVault.SetArc(ARC("Originating ARC"))
+                        let mutable createdWindowCount = 0
+                        let mutable targetVault: ArcVault option = None
+                        let mutable targetWasRegistered = false
+                        let mutable pathWasAssigned = false
+                        let mutable arcWasLoaded = false
+                        let mutable watcherWasRunning = false
+                        let mutable fileTreeWasEmpty = false
+
+                        let isArcStartedBeforeFileTreePublication () =
+                            targetVault <- ARC_VAULTS.TryGetVault(targetWindowId)
+
+                            match targetVault with
+                            | Some vault ->
+                                targetWasRegistered <- true
+                                pathWasAssigned <- vault.path = Some expectedPath
+                                arcWasLoaded <- vault.arc.IsSome
+                                watcherWasRunning <- vault.watcher.IsSome
+                                fileTreeWasEmpty <- vault.fileTree.Count = 0
+
+                                pathWasAssigned && arcWasLoaded && watcherWasRunning && fileTreeWasEmpty
+                            | None -> false
+
+                        let (targetWindow,
+                             wasShown,
+                             lifecycleWasAttached,
+                             arcWasStarted,
+                             isTargetDestroyed,
+                             sendsAfterDestroy,
+                             titleWritesAfterDestroy) =
+                            closingWhileArcLoadsRegistrationTestWindow
+                                targetWindowId
+                                isArcStartedBeforeFileTreePublication
+                                1
+                                ignore
+
+                        let mutable dialogCount = 0
+
+                        setBrowserWindowFromWebContents (fun _ -> originatingWindow :> obj)
+
+                        setBrowserWindowFactory (fun _ ->
+                            createdWindowCount <- createdWindowCount + 1
+                            targetWindow :> obj
+                        )
+
+                        setShowMessageBox (fun _ _ ->
+                            dialogCount <- dialogCount + 1
+                            createObj [ "response" ==> 0; "checkboxChecked" ==> false ]
+                        )
+
+                        ARC_VAULTS.Vaults.Add(originatingWindowId, originatingVault)
+
+                        try
+                            let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
+
+                            match! api.openARCByPath arcPath with
+                            | Ok _ -> failwith "Expected closing during the file-tree scan to cancel ARC opening."
+                            | Error cancellation ->
+                                match cancellation with
+                                | ArcLoadCancelledException cancelledWindowId ->
+                                    Vitest.expect(cancelledWindowId).toBe (targetWindowId)
+                                | _ -> failwith "Expected an explicit ARC-load cancellation marker."
+
+                            Vitest.expect(createdWindowCount).toBe (1)
+                            Vitest.expect(targetWasRegistered).toBe (true)
+                            Vitest.expect(lifecycleWasAttached ()).toBe (true)
+                            Vitest.expect(wasShown ()).toBe (true)
+                            Vitest.expect(pathWasAssigned).toBe (true)
+                            Vitest.expect(arcWasLoaded).toBe (true)
+                            Vitest.expect(watcherWasRunning).toBe (true)
+                            Vitest.expect(fileTreeWasEmpty).toBe (true)
+                            Vitest.expect(arcWasStarted ()).toBe (true)
+                            Vitest.expect(isTargetDestroyed ()).toBe (true)
+                            Vitest.expect(targetVault.IsSome).toBe (true)
+                            Vitest.expect(targetVault.Value.fileTree.Count).toBe (0)
+                            Vitest.expect(ARC_VAULTS.Vaults.ContainsKey(targetWindowId)).toBe (false)
+                            Vitest.expect(sendsAfterDestroy ()).toBe (0)
+                            Vitest.expect(titleWritesAfterDestroy ()).toBe (0)
+                            Vitest.expect(dialogCount).toBe (0)
+
+                            ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
+                        with error ->
+                            match targetVault with
+                            | Some vault -> do! vault.StopFileWatcher()
+                            | None -> ()
+
+                            ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
+                            ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
+                            return raise error
+                    })
+        )
+
+        Vitest.test (
             "openARCByPath treats closing the current window during ARC loading as cancellation",
             fun () ->
                 TestHelpers.withTempArcWith
@@ -1618,6 +1724,129 @@ Vitest.describe (
                     do! TestHelpers.removeDirectoryAsync rootPath
                 with error ->
                     match loadingVault with
+                    | Some vault -> do! vault.StopFileWatcher()
+                    | None -> ()
+
+                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
+                    ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "createARC resolves CreatedButClosed when the new window closes after startup but before file-tree publication",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-ipc-create-close-during-tree-"
+                let originatingWindowId = 46
+                let targetWindowId = 47
+                let identifier = "Created During Tree Scan ARC"
+                let originatingWindow = lifecycleTestWindow originatingWindowId false ignore
+                let originatingVault = ArcVault(originatingWindow)
+                originatingVault.path <- Some "C:/already-open-create-tree-race"
+                originatingVault.SetArc(ARC("Originating ARC"))
+
+                let expectedPath =
+                    ARCtrl.ArcPathHelper.combine rootPath identifier |> PathHelpers.normalizePath
+
+                let mutable createdWindowCount = 0
+                let mutable targetVault: ArcVault option = None
+                let mutable targetWasRegistered = false
+                let mutable pathWasAssigned = false
+                let mutable arcWasLoaded = false
+                let mutable watcherWasRunning = false
+                let mutable fileTreeWasEmpty = false
+                let mutable vaultWasEmptyWhenShown = false
+
+                let isArcStartedBeforeFileTreePublication () =
+                    targetVault <- ARC_VAULTS.TryGetVault(targetWindowId)
+
+                    match targetVault with
+                    | Some vault ->
+                        targetWasRegistered <- true
+                        pathWasAssigned <- vault.path = Some expectedPath
+                        arcWasLoaded <- vault.arc.IsSome
+                        watcherWasRunning <- vault.watcher.IsSome
+                        fileTreeWasEmpty <- vault.fileTree.Count = 0
+
+                        pathWasAssigned
+                        && arcWasLoaded
+                        && watcherWasRunning
+                        && fileTreeWasEmpty
+                        && not vault.hasUnsavedArcChanges
+                    | None -> false
+
+                let (targetWindow,
+                     wasShown,
+                     lifecycleWasAttached,
+                     arcWasStarted,
+                     isTargetDestroyed,
+                     sendsAfterDestroy,
+                     titleWritesAfterDestroy) =
+                    closingWhileArcLoadsRegistrationTestWindow
+                        targetWindowId
+                        isArcStartedBeforeFileTreePublication
+                        1
+                        (fun () ->
+                            vaultWasEmptyWhenShown <-
+                                ARC_VAULTS.TryGetVault(targetWindowId)
+                                |> Option.exists (fun vault -> vault.path.IsNone && vault.arc.IsNone)
+                        )
+
+                setBrowserWindowFromWebContents (fun _ -> originatingWindow :> obj)
+
+                setBrowserWindowFactory (fun _ ->
+                    createdWindowCount <- createdWindowCount + 1
+                    targetWindow :> obj
+                )
+
+                setShowOpenDialog (fun _ _ -> createObj [ "canceled" ==> false; "filePaths" ==> [| rootPath |] ])
+                ARC_VAULTS.Vaults.Add(originatingWindowId, originatingVault)
+
+                try
+                    let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
+
+                    let request: CreateArcRequest = {
+                        identifier = identifier
+                        initGit = false
+                    }
+
+                    match! api.createARC request with
+                    | Ok(CreateArcOutcome.CreatedButClosed createdPath) ->
+                        Vitest.expect(createdPath).toBe (expectedPath)
+                    | Ok outcome -> failwithf "Expected CreatedButClosed, received %A." outcome
+                    | Error error -> failwithf "Expected close-after-create to be non-error, received %s." error.Message
+
+                    Vitest.expect(createdWindowCount).toBe (1)
+                    Vitest.expect(targetWasRegistered).toBe (true)
+                    Vitest.expect(lifecycleWasAttached ()).toBe (true)
+                    Vitest.expect(wasShown ()).toBe (true)
+                    Vitest.expect(vaultWasEmptyWhenShown).toBe (true)
+                    Vitest.expect(pathWasAssigned).toBe (true)
+                    Vitest.expect(arcWasLoaded).toBe (true)
+                    Vitest.expect(watcherWasRunning).toBe (true)
+                    Vitest.expect(fileTreeWasEmpty).toBe (true)
+                    Vitest.expect(arcWasStarted ()).toBe (true)
+                    Vitest.expect(isTargetDestroyed ()).toBe (true)
+                    Vitest.expect(targetVault.IsSome).toBe (true)
+                    Vitest.expect(targetVault.Value.fileTree.Count).toBe (0)
+                    Vitest.expect(ARC_VAULTS.Vaults.ContainsKey(targetWindowId)).toBe (false)
+                    Vitest.expect(sendsAfterDestroy ()).toBe (0)
+                    Vitest.expect(titleWritesAfterDestroy ()).toBe (0)
+
+                    let! arcDirectoryExists = TestHelpers.pathExistsAsync expectedPath
+
+                    let investigationPath =
+                        ARCtrl.ArcPathHelper.combine expectedPath ARCtrl.ArcPathHelper.InvestigationFileName
+
+                    let! investigationFileExists = TestHelpers.pathExistsAsync investigationPath
+                    Vitest.expect(arcDirectoryExists).toBe (true)
+                    Vitest.expect(investigationFileExists).toBe (true)
+
+                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    match targetVault with
                     | Some vault -> do! vault.StopFileWatcher()
                     | None -> ()
 
