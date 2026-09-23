@@ -440,11 +440,10 @@ type FileTree =
 
         let runToggleLfsMark (relativePath: string) (markAsLfs: bool) = promise {
             let! result = Renderer.Components.Helper.GitLfsHelper.runToggleLfsMark relativePath markAsLfs
+            gitStateCtx.refresh ()
 
             match result with
-            | Ok() ->
-                gitStateCtx.refresh ()
-                return Ok()
+            | Ok() -> return Ok()
             | Error errorMessage -> return Error errorMessage
         }
 

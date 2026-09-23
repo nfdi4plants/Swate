@@ -3467,9 +3467,10 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "A primary save reconciliation failure reports that saving failed",
+            "A primary save reconciliation failure reports a saved commit that needs attention",
             fun () -> promise {
                 let reportedErrors = ResizeArray<GitErrorNotification>()
+                let mutable synchronizeCalls = 0
 
                 let failure =
                     makeFailure
@@ -3482,44 +3483,169 @@ Vitest.describe (
                         })
                         [||]
 
-                let state = {
-                    runningState with
-                        WriteRequestId = 4
-                        BusyOperation = Some GitBusyOperation.PushingToRemote
-                }
-
-                let success =
-                    UnitSuccess {
-                        Refresh = refreshed cleanStatus
-                        PageChange = GitPageChange.NoChange
-                        SelectedChangePath = None
-                        Warning = None
-                        Partial = Some failure
-                        Published = None
-                    }
+                let partialOutcome =
+                    operationWithPublication PublicationStateDto.NotApplicable "revision-1"
 
                 let deps = {
-                    defaultDependencies with
+                    (withRefresh cleanStatus defaultDependencies) with
+                        createRevision =
+                            fun _ -> promise {
+                                return Ok(OperationResultDto.PartiallySucceeded(partialOutcome, failure))
+                            }
+                        synchronize =
+                            fun _ ->
+                                synchronizeCalls <- synchronizeCalls + 1
+
+                                promise {
+                                    return
+                                        Ok(
+                                            succeededWithPublication
+                                                PublicationStateDto.Published
+                                                cleanStatus.Synchronization.Value
+                                        )
+                                }
                         reportError = reportedErrors.Add
                 }
 
-                let _, command =
-                    update
-                        deps
-                        ignore
-                        (WriteCompleted(
-                            state.ArcSessionId,
-                            state.WriteRequestId,
-                            PrimarySave(prepareCommitAll runningState "Save locally first"),
-                            Ok(CompletedWithPendingRemoteFailure(success, failure.Message))
-                        ))
-                        state
+                let state = {
+                    runningState with
+                        ChangedFiles = [| changedFile "README.md" "M" " " false |]
+                }
 
-                let! _ = collectMessages command
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (PrimarySaveAllRequested "Save locally first") state
+
+                let! requestMessages = collectMessages requestCmd
+
+                let stateAfterWrite, writeCmd =
+                    match requestMessages with
+                    | [| WriteRequested(PrimarySave _) |] -> update deps ignore requestMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected the primary save request."
+
+                let! completionMessages = collectWriteMessages writeCmd
+
+                let finalState, completionCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, PrimarySave _, Ok(CompletedWithPendingRemoteFailure(_, message))) |] ->
+                        Vitest.expect(message).toBe failure.Message
+                        update deps ignore completionMessages[0] stateAfterWrite
+                    | _ -> failwith "Expected the saved commit to report index reconciliation."
+
+                let! _ = collectMessages completionCmd
 
                 Vitest.expect(reportedErrors.Count).toBe (1)
-                Vitest.expect(reportedErrors[0].Title).toBe ("Could not save changes")
+                Vitest.expect(reportedErrors[0].Title).toBe ("Changes saved, but Git's index needs attention")
                 Vitest.expect(reportedErrors[0].Message).toBe (failure.Message)
+                Vitest.expect(finalState.WarningNotice).toEqual (None)
+                Vitest.expect(synchronizeCalls).toBe (0)
+            }
+        )
+
+        Vitest.test (
+            "A RestorePaths failure with a locked index offers stale-lock recovery",
+            fun () -> promise {
+                let failure =
+                    makeFailure
+                        Concurrency
+                        VersionControlCodes.IndexLocked
+                        "Git's index is locked."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RemoveIndexLock
+                            Instructions = None
+                        })
+                        [||]
+
+                let deps = {
+                    defaultDependencies with
+                        restorePaths = fun _ -> promise { return Ok(OperationResultDto.Failed failure) }
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (DiscardSelectionRequested [| "a.txt" |]) runningState
+
+                let! requestMessages = collectMessages requestCmd
+
+                let stateAfterWrite, writeCmd =
+                    match requestMessages with
+                    | [| WriteRequested(DiscardSelection _) |] ->
+                        update deps ignore requestMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected the discard request."
+
+                let! completionMessages = collectMessages writeCmd
+
+                let recoveryState, recoveryCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_,
+                                        _,
+                                        DiscardSelection _,
+                                        Ok(RequiresRecovery(GitPendingRecovery.ClearStaleLock _, _))) |] ->
+                        update deps ignore completionMessages[0] stateAfterWrite
+                    | _ -> failwith "Expected stale-lock recovery after RestorePaths failed."
+
+                let! _ = collectMessages recoveryCmd
+
+                Vitest.expect(recoveryState.PendingRecovery).toEqual (Some(GitPendingRecovery.ClearStaleLock None))
+
+                Vitest
+                    .expect(recoveryState.PendingConfirmation |> Option.map _.Message)
+                    .toEqual (
+                        Some
+                            "Git's index is locked. Another program may be using the repository, or an interrupted operation left the lock behind."
+                    )
+            }
+        )
+
+        Vitest.test (
+            "A CreateRevision failure with a locked index offers stale-lock recovery",
+            fun () -> promise {
+                let failure =
+                    makeFailure
+                        Concurrency
+                        VersionControlCodes.IndexLocked
+                        "Git's index is locked."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RemoveIndexLock
+                            Instructions = None
+                        })
+                        [||]
+
+                let mutable createRevisionCalls = 0
+
+                let deps = {
+                    defaultDependencies with
+                        createRevision =
+                            fun _ ->
+                                createRevisionCalls <- createRevisionCalls + 1
+                                promise { return Ok(OperationResultDto.Failed failure) }
+                }
+
+                let state = {
+                    runningState with
+                        ChangedFiles = [| changedFile "a.txt" "M" " " false |]
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (CommitAllRequested "Save") state
+
+                let! requestMessages = collectMessages requestCmd
+
+                let stateAfterWrite, writeCmd =
+                    match requestMessages with
+                    | [| WriteRequested(CommitAll _) |] -> update deps ignore requestMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected the commit request."
+
+                let! completionMessages = collectMessages writeCmd
+
+                let recoveryState, recoveryCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, CommitAll _, Ok(RequiresRecovery(GitPendingRecovery.ClearStaleLock _, _))) |] ->
+                        update deps ignore completionMessages[0] stateAfterWrite
+                    | _ -> failwith "Expected stale-lock recovery after CreateRevision failed."
+
+                let! _ = collectMessages recoveryCmd
+
+                Vitest.expect(createRevisionCalls).toBe (1)
+                Vitest.expect(recoveryState.PendingRecovery).toEqual (Some(GitPendingRecovery.ClearStaleLock None))
             }
         )
 

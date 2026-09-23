@@ -153,9 +153,9 @@ module VersionControlCodes =
     [<Literal>]
     let LockRemovalRefused = "lock_removal_refused"
 
-    /// The Swate main process refuses to clear a recently created index lock.
+    /// The library's code for a held index lock.
     [<Literal>]
-    let LockInUse = "lock_in_use"
+    let IndexLocked = "index_locked"
 
     [<Literal>]
     let LockRemoved = "lock_removed"

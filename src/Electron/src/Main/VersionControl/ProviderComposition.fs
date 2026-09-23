@@ -129,15 +129,6 @@ let tryCreateLocation (providerLocation: string) (displayName: string option) : 
     else
         Error "The repository location must be an https://, ssh:// or lakefs:// address."
 
-/// Lock files a killed provider process can leave behind in a workspace. The library
-/// reports such a lock with the recovery code remove_index_lock and refuses to delete
-/// it because it cannot prove who owns the lock. Swate manages Git operations in a vault
-/// window, so it can clear an old lock after its operations are idle and the age threshold
-/// has passed. Only a plain repository (a .git directory) is handled here. A .git file
-/// (linked worktree or submodule) keeps its git directory elsewhere, and for those the
-/// lock is left to the user together with the library's instructions. The provider checks
-/// the repository layout before checking the lock age.
-// Editors and other tools can hold an index lock for a moment.
 [<Literal>]
 let private staleLockMinimumAgeSeconds = 10.0
 
@@ -158,8 +149,28 @@ let private indexLockPaths (providerId: ProviderId) (workspaceRoot: string) : st
 
 let private indexLockAgeSeconds (path: string) =
     VersionControlService.Runtime.Node.FileSystem.tryLstatSync path
-    |> Option.map (fun stats -> (currentTimeMilliseconds () - stats.mtimeMs) / 1000.0)
+    |> Option.map (fun stats ->
+        let ageSeconds = (currentTimeMilliseconds () - stats.mtimeMs) / 1000.0
 
+        if ageSeconds < 0.0 then
+            staleLockMinimumAgeSeconds
+        else
+            ageSeconds
+    )
+
+let indexLockWaitMilliseconds (path: string) =
+    indexLockAgeSeconds path
+    |> Option.map (fun ageSeconds ->
+        System.Math.Ceiling(max 0.0 (staleLockMinimumAgeSeconds - ageSeconds) * 1000.0)
+        |> int
+    )
+    |> Option.defaultValue 0
+
+/// Lock paths old enough for cleanup in a plain Git repository. Any Git process can
+/// leave an index lock behind, including a killed Swate process or another tool. Swate
+/// removes a lock only after its workspace operations are idle and it is old enough. The
+/// clear operation waits out a young lock. Linked worktrees and submodules store `.git`
+/// as a file, so this returns no path for them.
 let staleLockPaths (providerId: ProviderId) (workspaceRoot: string) : string[] =
     indexLockPaths providerId workspaceRoot
     |> Array.filter (fun path ->

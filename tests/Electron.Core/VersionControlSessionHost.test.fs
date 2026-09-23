@@ -1557,22 +1557,23 @@ Vitest.describe (
                     let lockPath = join [| fixture.RepoRoot; ".git"; "index.lock" |]
                     writeText lockPath ""
 
-                    let! recentLock = api.clearStaleLock (request "clear-lock-recent")
-                    let recentFailure = expectDtoFailure "recent lock removal" recentLock
-                    Vitest.expect(recentFailure.Category).toEqual FailureCategoryDto.Concurrency
-                    Vitest.expect(recentFailure.Code).toBe VersionControlCodes.LockInUse
+                    let waitDurations = ResizeArray<int>()
+                    let previousWait = Main.IPC.IVersionControlApi.waitForStaleLock
 
-                    Vitest.expect(recentFailure.Message).toBe
-                        "Another program is using the repository right now. Try again in a moment."
+                    Main.IPC.IVersionControlApi.waitForStaleLock <-
+                        fun milliseconds -> async {
+                            waitDurations.Add milliseconds
+                            do! Async.Sleep 1
+                            let oldTime = System.DateTime.UtcNow.AddSeconds(-60.0)
+                            VersionControlService.Runtime.Node.FileSystem.utimesSync lockPath oldTime oldTime
+                        }
 
-                    Vitest.expect(Main.Bindings.Filesystem.existsSync lockPath).toBe true
+                    let! cleared = api.clearStaleLock (request "clear-lock-fresh")
+                    Main.IPC.IVersionControlApi.waitForStaleLock <- previousWait
 
-                    let oldTime = System.DateTime.UtcNow.AddSeconds(-60.0)
-
-                    VersionControlService.Runtime.Node.FileSystem.utimesSync lockPath oldTime oldTime
-
-                    let! cleared = api.clearStaleLock (request "clear-lock-old")
-                    let outcome = expectDtoValue "clear lock" cleared
+                    let outcome = expectDtoValue "clear fresh lock" cleared
+                    Vitest.expect(waitDurations.Count).toBe (1)
+                    Vitest.expect(waitDurations[0] > 0 && waitDurations[0] <= 10_000).toBe true
                     Vitest.expect(outcome.Effect).toEqual OperationEffectDto.Performed
                     Vitest.expect(outcome.AffectedPaths).toEqual [||]
                     Vitest.expect(outcome.Warnings |> Array.map _.Code).toEqual [| VersionControlCodes.LockRemoved |]
@@ -1621,6 +1622,33 @@ Vitest.describe (
                     let failure = expectDtoFailure "refused lock removal" refused
                     Vitest.expect(failure.Code).toBe VersionControlCodes.LockRemovalRefused
                     Vitest.expect(failure.Retryable).toBe true
+                })
+        )
+
+        Vitest.test (
+            "clearStaleLock succeeds without a warning when the lock disappears during its wait",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    registerVault 90 fixture.RepoRoot |> ignore
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 90)
+                    let lockPath = join [| fixture.RepoRoot; ".git"; "index.lock" |]
+                    writeText lockPath ""
+
+                    let previousWait = Main.IPC.IVersionControlApi.waitForStaleLock
+
+                    Main.IPC.IVersionControlApi.waitForStaleLock <-
+                        fun _ -> async {
+                            do! Async.Sleep 1
+                            Main.Bindings.Filesystem.unlinkSync lockPath
+                        }
+
+                    let! cleared = api.clearStaleLock (request "clear-lock-disappeared")
+                    Main.IPC.IVersionControlApi.waitForStaleLock <- previousWait
+
+                    let outcome = expectDtoValue "clear disappeared lock" cleared
+                    Vitest.expect(outcome.Effect).toEqual (OperationEffectDto.NoOp(Some "no stale lock"))
+                    Vitest.expect(outcome.Warnings).toEqual [||]
+                    Vitest.expect(Main.Bindings.Filesystem.existsSync lockPath).toBe false
                 })
         )
 
@@ -2557,7 +2585,7 @@ Vitest.describe (
         // ConflictsDetected, PreviewIndeterminate,
         // TargetNotEmpty, OperationCanceled, BaseContentNotFound, InvalidLfsThreshold,
         // ServiceUnavailable, SessionUnavailable, WorkspaceUnmanaged, WorkspaceAmbiguous,
-        // LocationUnsupported, UnexpectedException, LockRemovalRefused, LockRemoved,
+        // LocationUnsupported, UnexpectedException, IndexLocked, LockRemovalRefused, LockRemoved,
         // InvalidPath, InvalidRef, InvalidRevision, BindingNotPersisted, TransportError,
         // StoragePolicyBlocked, Recovery.ResolveConflictSession,
         // Recovery.RetryMaterialization,

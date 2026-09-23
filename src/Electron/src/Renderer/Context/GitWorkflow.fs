@@ -787,17 +787,13 @@ let recoveryDialog (recovery: GitPendingRecovery) : GitSidebarConfirmationDialog
         ConfirmLabel = "Publish now"
         CancelLabel = "Later"
       }
-    | GitPendingRecovery.ClearStaleLock instructions ->
-        let detail =
-            instructions |> Option.map (fun text -> $" {text}") |> Option.defaultValue ""
-
-        {
-            Title = "Repository lock left behind"
-            Message =
-                $"A canceled operation left a lock in the repository.{detail} Swate can remove it now because no other operation of this ARC is running."
-            ConfirmLabel = "Remove lock"
-            CancelLabel = "Leave it"
-        }
+    | GitPendingRecovery.ClearStaleLock _ -> {
+        Title = "Repository lock left behind"
+        Message =
+            "Git's index is locked. Another program may be using the repository, or an interrupted operation left the lock behind."
+        ConfirmLabel = "Remove lock"
+        CancelLabel = "Leave it"
+      }
     | GitPendingRecovery.ClearCloneTarget(targetPath, instructions) ->
         let detail =
             instructions |> Option.map (fun text -> $" {text}") |> Option.defaultValue ""
@@ -1064,11 +1060,7 @@ let private isLocalPrimarySaveFailure (success: WriteSuccess) =
     partialFailure
     |> Option.exists (fun failure ->
         let recovery = recoveryCode failure
-
         recovery = Some VersionControlCodes.Recovery.ReconcileIndex
-        || recovery = Some VersionControlCodes.Recovery.RemoveIndexLock
-        || (failure.Category = FailureCategoryDto.Concurrency
-            && failure.Code = "index_locked")
     )
 
 let private withBusyOperation busyOperation model = {
@@ -1324,7 +1316,12 @@ let private movedTargetMessage =
 
 /// Routes a structured failure. Categories and codes decide, never the message.
 let private routeFailure (targetPath: string option) (failure: OperationFailureDto) : RoutedFailure =
-    if isCanceled failure then
+    if recoveryCode failure = Some VersionControlCodes.Recovery.RemoveIndexLock then
+        RoutedFailure.Recovery(
+            GitPendingRecovery.ClearStaleLock(failure.RecoveryAction |> Option.bind _.Instructions),
+            failureMessage failure
+        )
+    elif isCanceled failure then
         match recoveryCode failure with
         | Some code when code = VersionControlCodes.Recovery.RestoreWorkspace ->
             RoutedFailure.Recovery(
@@ -1340,11 +1337,6 @@ let private routeFailure (targetPath: string option) (failure: OperationFailureD
                     targetPath |> Option.defaultValue "",
                     failure.RecoveryAction |> Option.bind _.Instructions
                 ),
-                failureMessage failure
-            )
-        | Some code when code = VersionControlCodes.Recovery.RemoveIndexLock ->
-            RoutedFailure.Recovery(
-                GitPendingRecovery.ClearStaleLock(failure.RecoveryAction |> Option.bind _.Instructions),
                 failureMessage failure
             )
         | Some code when code = VersionControlCodes.Recovery.RefreshWorkspace ->
@@ -1989,7 +1981,11 @@ let private runPrimarySaveAttemptAsync
                     CompletedWithPendingRemoteFailure(
                         UnitSuccess {
                             success with
-                                Warning = Some pendingPrimarySaveWarning
+                                Warning =
+                                    if recoveryCode partial = Some VersionControlCodes.Recovery.ReconcileIndex then
+                                        None
+                                    else
+                                        Some pendingPrimarySaveWarning
                         },
                         failureMessage partial
                     )
@@ -3788,7 +3784,7 @@ let private updateCore
         let report =
             match writeRequest with
             | PrimarySave _ when isLocalPrimarySaveFailure success ->
-                reportErrorCmd deps "Could not save changes" message
+                reportErrorCmd deps "Changes saved, but Git's index needs attention" message
             | PrimarySave _ -> reportErrorCmd deps "Could not push saved changes" message
             | _ -> reportWriteErrorCmd deps writeRequest message
 
