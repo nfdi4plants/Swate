@@ -353,13 +353,6 @@ module ArcVaultExtensions =
         }
 
         member internal this._FileEventController(sendMsgApi: IArcFileWatcherApi) =
-            // Appending restored events is enough because both consumers re-check the disk at apply time.
-            let restorePendingEvents
-                (events: ArcVaultFileSystemEvent list)
-                (pendingEvents: ResizeArray<ArcVaultFileSystemEvent>)
-                =
-                pendingEvents.AddRange events
-
             // A long write retries every 500 ms, so only the first deferral and the limit crossing are logged.
             let logWatcherDeferral deferralCount =
                 match deferralCount with
@@ -488,9 +481,9 @@ module ArcVaultExtensions =
                                                     // ARC batch merges after the write. A tree that hides every external change
                                                     // for the whole duration of a long write would be worse.
                                                     // The ARC batch is restored first, so a rejected tree update cannot lose it.
-                                                    restorePendingEvents
+                                                    // Appending is enough because both consumers re-check the disk at apply time.
+                                                    this.fileWatcherPendingArcMergeEvents.AddRange
                                                         pendingArcMergeEvents
-                                                        this.fileWatcherPendingArcMergeEvents
 
                                                     do! this.ApplyWatcherFileTreeEvents pendingEvents
                                                 else
@@ -498,13 +491,10 @@ module ArcVaultExtensions =
 
                                                 if callbackEpoch = this.WatcherEpoch then
                                                     if not reachedDeferralLimit then
-                                                        restorePendingEvents
+                                                        this.fileWatcherPendingArcMergeEvents.AddRange
                                                             pendingArcMergeEvents
-                                                            this.fileWatcherPendingArcMergeEvents
 
-                                                        restorePendingEvents
-                                                            pendingEvents
-                                                            this.fileWatcherPendingEvents
+                                                        this.fileWatcherPendingEvents.AddRange pendingEvents
                                                     else
                                                         ()
 
