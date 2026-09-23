@@ -438,6 +438,16 @@ type FileTree =
             yield! FileTreeContextMenu.renameContextMenuItems requestRenameItem item
         ]
 
+        let runToggleLfsMark (relativePath: string) (markAsLfs: bool) = promise {
+            let! result = Renderer.Components.Helper.GitLfsHelper.runToggleLfsMark relativePath markAsLfs
+
+            match result with
+            | Ok() ->
+                gitStateCtx.refresh ()
+                return Ok()
+            | Error errorMessage -> return Error errorMessage
+        }
+
         let contextMenuConfig: ContextMenuConfig = {
             openItem = openPreview
             arcRootPath = appStateCtx
@@ -455,7 +465,7 @@ type FileTree =
                 enqueueError = errorModal.enqueue
             }
             enqueueError = errorModal.enqueue
-            runToggleLfsMark = Renderer.Components.Helper.GitLfsHelper.runToggleLfsMark
+            runToggleLfsMark = runToggleLfsMark
             runDownloadLfsFile = Renderer.Components.Helper.GitLfsHelper.runDownloadLfsFile
             runFreeLocalLfsCopy = Renderer.Components.Helper.GitLfsHelper.runFreeLocalLfsCopy
         }
