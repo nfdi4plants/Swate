@@ -150,7 +150,7 @@ Vitest.describe (
             "progress keeps float counters",
             fun () ->
                 let mapped =
-                    Mappings.progress "session-1" "op-1" {
+                    Mappings.progress "op-1" {
                         PhaseCode = "transfer"
                         Item = Some "data/big.bin"
                         Completed = Some 3221225472.0
@@ -158,7 +158,6 @@ Vitest.describe (
                         DisplayMessage = None
                     }
 
-                Vitest.expect(mapped.SessionId).toBe "session-1"
                 Vitest.expect(mapped.OperationId).toBe "op-1"
                 Vitest.expect(mapped.Completed).toEqual (Some 3221225472.0)
                 Vitest.expect(mapped.Total).toEqual (Some 6442450944.0)

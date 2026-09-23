@@ -75,8 +75,7 @@ let result (mapValue: 'T -> 'U) (result: OperationResult<'T>) : OperationResultD
     | PartiallySucceeded(value, error) -> OperationResultDto.PartiallySucceeded(outcome mapValue value, failure error)
     | Failed error -> OperationResultDto.Failed(failure error)
 
-let progress (sessionId: string) (operationId: string) (progress: OperationProgress) : VersionControlProgressDto = {
-    SessionId = sessionId
+let progress (operationId: string) (progress: OperationProgress) : VersionControlProgressDto = {
     OperationId = operationId
     PhaseCode = progress.PhaseCode
     Item = progress.Item

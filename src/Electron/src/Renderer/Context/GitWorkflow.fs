@@ -133,8 +133,7 @@ type GitState = {
     RefreshPending: bool
     BusyOperation: GitBusyOperation option
     BusyNotice: string option
-    /// The operation the renderer can cancel. The id is known before the call starts,
-    /// the session id arrives with the started event.
+    /// The operation the renderer can cancel. The renderer chooses its id before the call starts.
     CurrentOperation: OperationRequestDto option
     CurrentProgress: GitSidebarProgress option
     ErrorNotice: string option

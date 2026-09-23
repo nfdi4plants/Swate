@@ -20,7 +20,6 @@ type HostedSession = {
 /// A registered operation: its context for the library call and the completion
 /// callback that removes it from the registry.
 type TrackedOperation = {
-    Key: OperationRequestDto
     Context: OperationContext
     Complete: unit -> unit
 }
@@ -358,7 +357,6 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
         }
 
         {
-            Key = { OperationId = operationId }
             Context = OperationContext.create operationId source.Cancellation reportProgress
             Complete = fun () -> operations.Remove operationId |> ignore
         }

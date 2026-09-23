@@ -77,7 +77,6 @@ let private runTracked
     (bridge: RendererBridge)
     (operationId: string)
     (workspaceRoot: string option)
-    (progressSessionId: unit -> string)
     (operation: OperationContext -> Async<OperationResult<'T>>)
     : JS.Promise<OperationResult<'T>> =
     promise {
@@ -85,12 +84,12 @@ let private runTracked
             host.BeginOperation(
                 operationId,
                 workspaceRoot,
-                fun progress -> bridge.Progress(Mappings.progress (progressSessionId ()) operationId progress)
+                fun progress -> bridge.Progress(Mappings.progress operationId progress)
             )
 
         try
             try
-                bridge.Started tracked.Key
+                bridge.Started { OperationId = operationId }
                 return! operation tracked.Context |> Async.StartAsPromise
             with error ->
                 return Failed(unexpectedFailure error)
@@ -114,32 +113,24 @@ let private withSession
             let host = WorkspaceSessionHost.get ()
             let bridge = tryBridgeFromEvent event
 
-            let mutable progressSessionId =
-                host.TryGetSession arcPath
-                |> Option.map (fun hosted -> hosted.SessionId)
-                |> Option.defaultValue ""
-
             let! result =
                 runTracked
                     host
                     bridge
                     operationId
                     (Some arcPath)
-                    (fun () -> progressSessionId)
                     (fun context -> async {
                         let! opened = host.OpenSession(arcPath, context)
 
                         match opened with
                         | Succeeded outcome ->
                             let hosted = outcome.Value
-                            progressSessionId <- hosted.SessionId
                             return! operation hosted context
                         | PartiallySucceeded(outcome, openFailure) ->
                             // Only a fresh open is partial, a reuse is not, so the failure of
                             // the open (a rejected settings push, say) reaches the renderer
                             // once, on the call that opened the session.
                             let hosted = outcome.Value
-                            progressSessionId <- hosted.SessionId
                             let! result = operation hosted context
 
                             return
@@ -338,7 +329,7 @@ let private provision
     (run: OperationContext -> Async<OperationResult<WorkspaceBinding>>)
     : JS.Promise<Result<OperationResultDto<string>, exn>> =
     promise {
-        let! result = runTracked host bridge operationId (Some workspaceRoot) (fun () -> "") run
+        let! result = runTracked host bridge operationId (Some workspaceRoot) run
 
         return Ok(Mappings.result (fun (binding: WorkspaceBinding) -> binding.WorkspaceRoot) result)
     }
@@ -472,7 +463,6 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                     bridge
                                     request.OperationId
                                     (Some arcPath)
-                                    (fun () -> "")
                                     (fun context -> async {
                                         match locationFor host request.ProviderLocation request.DisplayName with
                                         | Error failure -> return Failed failure
@@ -539,7 +529,6 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     bridge
                     request.OperationId
                     None
-                    (fun () -> "")
                     (fun context -> async {
                         let factories = ProviderResolver.factories host.Runtime.Catalog
                         let mutable statuses: DependencyStatus[] = [||]
@@ -594,7 +583,6 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     bridge
                     request.OperationId
                     None
-                    (fun () -> "")
                     (fun context -> async {
                         let factories = ProviderResolver.factories host.Runtime.Catalog
                         let mutable outcome: OperationResult<DependencyStatus> option = None

@@ -37,7 +37,7 @@ getStoragePolicySettings, setStoragePolicySettings, setPathStoragePolicy, pruneS
 getRepositoryWebUrl, clearStaleLock
 ```
 
-The main process sends two events to the renderer (`MainToRendererIpc.IVersionControlRendererApi`): `versionControlOperationStarted` with the final `OperationRequestDto` (operation id) as soon as the operation is registered, and `versionControlProgress` with float `Completed` and `Total` counters plus a phase code.
+The main process sends two events to the renderer (`MainToRendererIpc.IVersionControlRendererApi`): `versionControlOperationStarted` with the operation id the renderer sent as soon as the operation is registered, and `versionControlProgress` with float `Completed` and `Total` counters plus a phase code.
 
 Do not call `Api.ipcVersionControlApi` from feature code. Go through the client, or through `GitWorkflow.GitDependencies` when the sidebar state has to follow.
 

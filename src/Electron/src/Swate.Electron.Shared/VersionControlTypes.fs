@@ -70,7 +70,6 @@ type OperationResultDto<'T> =
     | Failed of OperationFailureDto
 
 type VersionControlProgressDto = {
-    SessionId: string
     OperationId: string
     PhaseCode: string
     Item: string option
