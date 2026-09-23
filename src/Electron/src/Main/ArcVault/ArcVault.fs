@@ -3,6 +3,7 @@ module Main.ArcVault
 
 open System.Collections.Generic
 open Fable.Core
+open Fable.Core.JsInterop
 open Fable.Electron
 open Fable.Electron.Main
 open Main
@@ -19,6 +20,12 @@ open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
+
+/// Tests shorten this delay to cover timeout behavior without waiting 30 seconds.
+let mutable closeWaitTimeoutMilliseconds = 30000
+
+[<Emit("Promise.race($0)")>]
+let private promiseRace (promises: Fable.Core.JS.Promise<'T>[]) : Fable.Core.JS.Promise<'T> = jsNative
 
 let private startFileWatcherOwnWriteArcMergeSuppression suppressionMs currentTimeout onElapsed =
     currentTimeout |> Option.iter Fable.Core.JS.clearTimeout
@@ -74,6 +81,7 @@ type ArcVault(window: BrowserWindow) =
     member val activeFileImport: ActiveFileImport option = None with get, set
     member val isWaitingForImportCleanup = false with get, set
     member val isWaitingForOperationsOnClose = false with get, set
+    member val isOperationCloseApproved = false with get, set
 
     /// Runs ARC merges sequentially so every operation observes the result of the preceding merge.
     member this.EnqueueArcMerge<'T>(operation: unit -> Fable.Core.JS.Promise<'T>) : Fable.Core.JS.Promise<'T> =
@@ -673,12 +681,11 @@ module ArcVaultExtensions =
                 | None ->
                     let watcher = createFileWatcher this.path.Value usePolling
 
+                    let sendWatcherMessage = WindowSend.sender<IArcFileWatcherApi> this.window
+
                     let sendMsgApi: IArcFileWatcherApi = {
                         IsLoadingChanges =
-                            fun isLoading ->
-                                WindowSend.send<IArcFileWatcherApi>
-                                    this.window
-                                    (fun api -> api.IsLoadingChanges isLoading)
+                            fun isLoading -> sendWatcherMessage (fun api -> api.IsLoadingChanges isLoading)
                     }
 
                     watcher.on (Chokidar.Events.All, this._FileEventController sendMsgApi) |> ignore
@@ -895,13 +902,18 @@ type ArcVaults() =
             match Main.VersionControl.WorkspaceSessionHost.tryCurrent (), vault.path with
             | Some host, Some path ->
                 if host.IsIdle path then
-                    host.CloseSession path |> Async.StartAsPromise |> Promise.start
+                    if this.TryGetVaultByPath path |> Option.isNone then
+                        host.CloseSession path |> Async.StartAsPromise |> Promise.start
                 else
-                    promise {
+                    let rec closeWhenIdle () = promise {
                         do! host.WhenOperationsComplete(host.RunningOperationIds path)
-                        do! host.CloseSession path |> Async.StartAsPromise
+
+                        if this.TryGetVaultByPath path |> Option.isSome then ()
+                        elif not (host.IsIdle path) then do! closeWhenIdle ()
+                        else do! host.CloseSession path |> Async.StartAsPromise
                     }
-                    |> Promise.start
+
+                    closeWhenIdle () |> Promise.start
             | _ -> ()
 
             vault.path |> Option.iter (fun p -> RECENT_ARCS.Inactivate(p) |> ignore)
@@ -949,6 +961,23 @@ type ArcVaults() =
         window.onClose (fun closeEvent ->
             let host = Main.VersionControl.WorkspaceSessionHost.tryCurrent ()
 
+            let windowOperationIds =
+                host
+                |> Option.map (fun currentHost -> currentHost.RunningOperationIdsForWindow id)
+                |> Option.defaultValue [||]
+
+            let windowMutationIds =
+                host
+                |> Option.map (fun currentHost -> currentHost.RunningMutationIdsForWindow id)
+                |> Option.defaultValue [||]
+
+            if windowMutationIds.Length = 0 then
+                host
+                |> Option.iter (fun currentHost ->
+                    windowOperationIds
+                    |> Array.iter (fun operationId -> currentHost.Cancel operationId |> ignore)
+                )
+
             if not vault.isCloseApproved then
                 if vault.activeFileImport.IsSome then
                     closeEvent.preventDefault ()
@@ -985,7 +1014,10 @@ type ArcVaults() =
                         |> Promise.start
                 elif
                     host
-                    |> Option.exists (fun currentHost -> (currentHost.RunningOperationIdsForWindow id).Length > 0)
+                    |> Option.exists (fun currentHost ->
+                        (currentHost.RunningMutationIdsForWindow id).Length > 0
+                        && not vault.isOperationCloseApproved
+                    )
                 then
                     closeEvent.preventDefault ()
 
@@ -1006,7 +1038,7 @@ type ArcVaults() =
                                                             "A version control operation is still running in this window.",
                                                         ``type`` = Enums.Dialog.ShowMessageBox.Options.Type.Question,
                                                         detail =
-                                                            "Closing the window cancels it. The window closes as soon as the operation has stopped.",
+                                                            "Closing the window cancels it. The window closes once the operation has stopped, or after 30 seconds if it does not stop.",
                                                         buttons = [|
                                                             "Cancel operation and close"
                                                             "Keep window open"
@@ -1023,7 +1055,28 @@ type ArcVaults() =
                                         operationIds
                                         |> Array.iter (fun operationId -> currentHost.Cancel operationId |> ignore)
 
-                                        do! currentHost.WhenOperationsComplete operationIds
+                                        let waitForOperations = promise {
+                                            do! currentHost.WhenOperationsComplete operationIds
+                                            return true
+                                        }
+
+                                        let waitForTimeout = promise {
+                                            do! Promise.sleep closeWaitTimeoutMilliseconds
+                                            return false
+                                        }
+
+                                        let! operationsCompleted = promiseRace [| waitForOperations; waitForTimeout |]
+
+                                        if not operationsCompleted then
+                                            let stillRunning = currentHost.RunningOperationIdsForWindow id
+
+                                            if stillRunning.Length > 0 then
+                                                swatelogfn
+                                                    id
+                                                    "Timed out waiting for version control operations before close: %s"
+                                                    (String.concat ", " stillRunning)
+
+                                        vault.isOperationCloseApproved <- true
                                         vault.isWaitingForOperationsOnClose <- false
 
                                         if not (window.isDestroyed ()) then
@@ -1054,6 +1107,7 @@ type ArcVaults() =
         window.onClosed (fun () ->
             vault.isWaitingForImportCleanup <- false
             vault.isWaitingForOperationsOnClose <- false
+            vault.isOperationCloseApproved <- false
             vault.isCloseRequestPending <- false
             vault.isCloseApproved <- false
             this.DisposeVault(id)

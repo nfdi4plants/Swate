@@ -39,6 +39,7 @@ export class BrowserWindow {
 export const contextBridge = { exposeInMainWorld: noop };
 export const dialog = {
     showOpenDialog: () => Promise.resolve({ canceled: true, filePaths: [] }),
+    showMessageBox: () => Promise.resolve({ response: 1, checkboxChecked: false }),
     showErrorBox: noop,
 };
 export const ipcMain = { handle: noop, on: noop };

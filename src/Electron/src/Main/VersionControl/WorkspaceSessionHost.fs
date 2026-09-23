@@ -29,6 +29,7 @@ type TrackedOperation = {
 type private RunningOperation = {
     WorkspaceRoot: string option
     WindowId: int option
+    Mutating: bool
     Source: OperationCancellation.Source
     Completion: JS.Promise<unit>
     ResolveCompletion: unit -> unit
@@ -356,6 +357,7 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
             operationId: string,
             workspaceRoot: string option,
             windowId: int option,
+            mutating: bool,
             reportProgress: OperationProgress -> unit
         ) : TrackedOperation =
         let source = OperationCancellation.Source()
@@ -367,6 +369,7 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
         operations[operationId] <- {
             WorkspaceRoot = workspaceRoot
             WindowId = windowId
+            Mutating = mutating
             Source = source
             Completion = completion
             ResolveCompletion = fun () -> resolveCompletion ()
@@ -398,10 +401,17 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
         |> Seq.map (fun entry -> entry.Key)
         |> Seq.toArray
 
-    /// Returns operations registered for the queried window id.
+    /// Operations started outside a window have no window id and never match.
     member _.RunningOperationIdsForWindow(windowId: int) : string[] =
         operations
         |> Seq.filter (fun entry -> entry.Value.WindowId = Some windowId)
+        |> Seq.map (fun entry -> entry.Key)
+        |> Seq.toArray
+
+    /// Mutations started outside a window have no window id and never match.
+    member _.RunningMutationIdsForWindow(windowId: int) : string[] =
+        operations
+        |> Seq.filter (fun entry -> entry.Value.WindowId = Some windowId && entry.Value.Mutating)
         |> Seq.map (fun entry -> entry.Key)
         |> Seq.toArray
 

@@ -23,14 +23,13 @@ type private RendererBridge = {
 
 let private silentBridge: RendererBridge = { Progress = ignore; Started = ignore }
 
-let private bridgeForWindow (window: BrowserWindow) : RendererBridge = {
-    Progress =
-        fun progress ->
-            WindowSend.send<IVersionControlRendererApi> window (fun api -> api.versionControlProgress progress)
-    Started =
-        fun key ->
-            WindowSend.send<IVersionControlRendererApi> window (fun api -> api.versionControlOperationStarted key)
-}
+let private bridgeForWindow (window: BrowserWindow) : RendererBridge =
+    let send = WindowSend.sender<IVersionControlRendererApi> window
+
+    {
+        Progress = fun progress -> send (fun api -> api.versionControlProgress progress)
+        Started = fun key -> send (fun api -> api.versionControlOperationStarted key)
+    }
 
 let private tryBridgeFromEvent (event: IpcMainInvokeEvent) =
     windowFromIpcEvent event
@@ -75,6 +74,7 @@ let private runTracked
     (operationId: string)
     (workspaceRoot: string option)
     (windowId: int option)
+    (mutating: bool)
     (operation: OperationContext -> Async<OperationResult<'T>>)
     : JS.Promise<OperationResult<'T>> =
     promise {
@@ -83,6 +83,7 @@ let private runTracked
                 operationId,
                 workspaceRoot,
                 windowId,
+                mutating,
                 fun progress -> bridge.Progress(Mappings.progress operationId progress)
             )
 
@@ -102,6 +103,7 @@ let private runTracked
 let private withSession
     (event: IpcMainInvokeEvent)
     (operationId: string)
+    (mutating: bool)
     (operation: WorkspaceSessionHost.HostedSession -> OperationContext -> Async<OperationResult<'T>>)
     (mapValue: 'T -> 'U)
     : JS.Promise<Result<OperationResultDto<'U>, exn>> =
@@ -119,6 +121,7 @@ let private withSession
                     operationId
                     (Some arcPath)
                     (windowFromIpcEvent event |> Option.map _.id)
+                    mutating
                     (fun context -> async {
                         let! opened = host.OpenSession(arcPath, context)
 
@@ -181,9 +184,9 @@ let private withMutatingSessionUsingRefreshPredicate
                 withBusyWritingScope
                     vault
                     (fun () -> promise {
-                        let! result = withSession event operationId operation mapValue
+                        let! result = withSession event operationId true operation mapValue
 
-                        if shouldRefresh result then
+                        if shouldRefresh result && WindowSend.isAlive vault.window then
                             let! fileTree = getFileTree arcPath
                             vault.SetFileTree fileTree
 
@@ -330,7 +333,7 @@ let private provision
     (run: OperationContext -> Async<OperationResult<WorkspaceBinding>>)
     : JS.Promise<Result<OperationResultDto<string>, exn>> =
     promise {
-        let! result = runTracked host bridge operationId (Some workspaceRoot) windowId run
+        let! result = runTracked host bridge operationId (Some workspaceRoot) windowId true run
 
         return Ok(Mappings.result (fun (binding: WorkspaceBinding) -> binding.WorkspaceRoot) result)
     }
@@ -368,6 +371,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             withSession
                 event
                 request.OperationId
+                false
                 (fun hosted _ -> async { return OperationResult.succeeded hosted })
                 (fun hosted -> Mappings.sessionInfo hosted.SessionId hosted.Session)
     cloneWorkspace =
@@ -467,6 +471,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                     request.OperationId
                                     (Some arcPath)
                                     (windowFromIpcEvent event |> Option.map _.id)
+                                    true
                                     (fun context -> async {
                                         match locationFor host request.ProviderLocation request.DisplayName with
                                         | Error failure -> return Failed failure
@@ -534,6 +539,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     request.OperationId
                     None
                     (windowFromIpcEvent event |> Option.map _.id)
+                    false
                     (fun context -> async {
                         let factories = ProviderResolver.factories host.Runtime.Catalog
                         let mutable statuses: DependencyStatus[] = [||]
@@ -589,6 +595,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     request.OperationId
                     None
                     (windowFromIpcEvent event |> Option.map _.id)
+                    true
                     (fun context -> async {
                         let factories = ProviderResolver.factories host.Runtime.Catalog
                         let mutable outcome: OperationResult<DependencyStatus> option = None
@@ -613,6 +620,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             withSession
                 event
                 request.OperationId
+                false
                 (fun hosted context -> hosted.Session.Core.GetStatus context)
                 Mappings.workspaceStatus
     listRefs =
@@ -620,6 +628,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             withSession
                 event
                 request.OperationId
+                false
                 (fun hosted context -> hosted.Session.Core.ListRefs context)
                 (Array.map Mappings.logicalRef)
     createRef =
@@ -648,6 +657,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             withSession
                 event
                 request.OperationId
+                false
                 (fun hosted context ->
                     withProviderRef
                         request.TargetRef
@@ -724,6 +734,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             withSession
                 event
                 request.OperationId
+                false
                 (withService
                     _.TextDiff
                     "text diffs"
@@ -734,6 +745,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             withSession
                 event
                 request.OperationId
+                false
                 (withService
                     _.TextDiff
                     "text diffs"
@@ -744,6 +756,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             withSession
                 event
                 request.OperationId
+                false
                 (withService _.Synchronization "synchronization" (fun service context -> service.Refresh context))
                 Mappings.synchronizationState
     synchronize =
@@ -836,6 +849,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             withSession
                 event
                 request.OperationId
+                false
                 (withService
                     _.ObjectMaterialization
                     "large object materialization"
@@ -868,6 +882,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             withSession
                 event
                 request.OperationId
+                false
                 (fun hosted _ -> async {
                     let host = WorkspaceSessionHost.get ()
 
@@ -949,6 +964,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             withSession
                 event
                 request.OperationId
+                false
                 (withService
                     _.RepositoryBrowser
                     "a repository browser"

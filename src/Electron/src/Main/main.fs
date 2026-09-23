@@ -44,9 +44,10 @@ app.onWindowAllClosed (fun () ->
     app.quit ()
 )
 
-app.onBeforeQuit (fun _ ->
-    Browser.Dom.console.log ("Quitting")
+app.onBeforeQuit (fun _ -> Browser.Dom.console.log ("Quitting"))
 
+app.onWillQuit (fun _ ->
+    // The before-quit event runs before the windows' close handlers, which may still wait for running operations.
     match Main.VersionControl.WorkspaceSessionHost.tryCurrent () with
     | Some host ->
         host.CloseAll()

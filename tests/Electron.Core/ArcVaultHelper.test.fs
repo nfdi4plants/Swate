@@ -65,6 +65,48 @@ let private recordingWatcherApiWithPendingState
 
 let private nowMs () : float = emitJsExpr () "Date.now()"
 
+let private windowWithStates (windowDestroyed: unit -> bool) (webContentsDestroyed: unit -> bool) (send: obj) =
+    createObj [
+        "id" ==> 1
+        "isDestroyed" ==> windowDestroyed
+        "webContents"
+        ==> createObj [ "send" ==> send; "isDestroyed" ==> webContentsDestroyed ]
+    ]
+    |> unbox<BrowserWindow>
+
+Vitest.describe (
+    "WindowSend",
+    fun () ->
+        Vitest.test (
+            "isAlive is false when web contents are destroyed",
+            fun () ->
+                let send: obj = emitJsExpr () "((..._args) => {})"
+
+                let window = windowWithStates (fun () -> false) (fun () -> true) send
+
+                Vitest.expect(Main.WindowSend.isAlive window).toBe false
+        )
+
+        Vitest.test (
+            "sender drops messages after the window is destroyed",
+            fun () ->
+                let mutable windowDestroyed = false
+                let mutable sendCount = 0
+
+                let send: obj =
+                    emitJsExpr (fun () -> sendCount <- sendCount + 1) "((..._args) => $0())"
+
+                let window = windowWithStates (fun () -> windowDestroyed) (fun () -> false) send
+
+                let deliver = Main.WindowSend.sender<IArcFileWatcherApi> window
+                deliver (fun api -> api.IsLoadingChanges true)
+                windowDestroyed <- true
+                deliver (fun api -> api.IsLoadingChanges false)
+
+                Vitest.expect(sendCount).toBe 1
+        )
+)
+
 let private expectWatcherAssayTitle (vault: ArcVault) expectedTitle = promise {
     let titleMatches () =
         vault.arc.Value.GetAssay("DiskAssay").Title = Some expectedTitle

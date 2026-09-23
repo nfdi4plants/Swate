@@ -17,6 +17,9 @@ let private electron: obj = importAll "electron"
 [<Emit("$0.mockResolvedValue($1)")>]
 let private mockResolvedValue (mock: obj) (value: obj) : unit = jsNative
 
+[<Emit("$0.mock.calls.length")>]
+let private mockCallCount (mock: obj) : int = jsNative
+
 let private git (cwd: string) (args: string list) = execFile "git" (List.toArray args) cwd
 
 let private expectFailure (operation: string) (result: OperationResult<'T>) =
@@ -265,6 +268,7 @@ Vitest.describe (
                             "op-1",
                             Some fixture.RepoRoot,
                             None,
+                            false,
                             fun progress -> reported <- progress :: reported
                         )
 
@@ -274,7 +278,7 @@ Vitest.describe (
                     let otherRoot = join [| fixture.Root; "elsewhere" |]
 
                     let otherWorkspaceOperation =
-                        fixture.Host.BeginOperation("op-other-root", Some otherRoot, None, ignore)
+                        fixture.Host.BeginOperation("op-other-root", Some otherRoot, None, false, ignore)
 
                     Vitest.expect(fixture.Host.IsIdle otherRoot).toBe false
                     Vitest.expect(fixture.Host.RunningOperationIds fixture.RepoRoot).toEqual [| "op-1" |]
@@ -309,13 +313,16 @@ Vitest.describe (
                     let otherRoot = join [| fixture.Root; "window-two-workspace" |]
 
                     let windowOneOperation =
-                        fixture.Host.BeginOperation("op-w1", Some fixture.RepoRoot, Some 1, ignore)
+                        fixture.Host.BeginOperation("op-w1", Some fixture.RepoRoot, Some 1, true, ignore)
 
                     let windowOneClone =
-                        fixture.Host.BeginOperation("op-w1-clone", Some otherRoot, Some 1, ignore)
+                        fixture.Host.BeginOperation("op-w1-clone", Some otherRoot, Some 1, false, ignore)
 
                     let windowTwoOperation =
-                        fixture.Host.BeginOperation("op-w2", Some fixture.RepoRoot, Some 2, ignore)
+                        fixture.Host.BeginOperation("op-w2", Some fixture.RepoRoot, Some 2, false, ignore)
+
+                    let operationWithoutWindow =
+                        fixture.Host.BeginOperation("op-no-window", Some otherRoot, None, true, ignore)
 
                     Vitest.expect(fixture.Host.RunningOperationIdsForWindow 1 |> Array.sort).toEqual [|
                         "op-w1"
@@ -323,6 +330,10 @@ Vitest.describe (
                     |]
 
                     Vitest.expect(fixture.Host.RunningOperationIdsForWindow 2).toEqual [| "op-w2" |]
+                    Vitest.expect(fixture.Host.RunningMutationIdsForWindow 1).toEqual [| "op-w1" |]
+                    Vitest.expect(fixture.Host.RunningMutationIdsForWindow 2).toEqual [||]
+                    Vitest.expect(fixture.Host.RunningOperationIdsForWindow 0).toEqual [||]
+                    Vitest.expect(fixture.Host.RunningMutationIdsForWindow 0).toEqual [||]
 
                     let mutable resolved = false
 
@@ -351,6 +362,7 @@ Vitest.describe (
 
                     do! emptyCompletion
                     Vitest.expect(emptyResolved).toBe true
+                    operationWithoutWindow.Complete()
                     windowTwoOperation.Complete()
                 })
         )
@@ -366,7 +378,13 @@ Vitest.describe (
                     let hosted = expectValue "open" opened
 
                     let tracked =
-                        fixture.Host.BeginOperation("op-cancel", Some hosted.Binding.WorkspaceRoot, None, ignore)
+                        fixture.Host.BeginOperation(
+                            "op-cancel",
+                            Some hosted.Binding.WorkspaceRoot,
+                            None,
+                            false,
+                            ignore
+                        )
 
                     fixture.Host.Cancel "op-cancel" |> ignore
 
@@ -398,6 +416,50 @@ let private registerEmptyVault (windowId: int) =
     |> ignore
 
     vault
+
+let private captureCloseWindow (windowId: int) =
+    let mutable closeHandler: obj -> unit = ignore
+    let mutable closeCount = 0
+
+    let window =
+        createObj [
+            "id" ==> windowId
+            "title" ==> ""
+            "isDestroyed" ==> (fun () -> false)
+            "close"
+            ==> (fun () ->
+                closeCount <- closeCount + 1
+                closeHandler (createObj [ "preventDefault" ==> (fun () -> ()) ])
+            )
+            "on"
+            ==> (fun (eventName: string) (handler: obj -> unit) ->
+                if eventName = "close" then
+                    closeHandler <- handler
+            )
+            "webContents"
+            ==> createObj [
+                "send" ==> (fun (_: string) (_: obj) -> ())
+                "isDestroyed" ==> (fun () -> false)
+            ]
+        ]
+        |> unbox<BrowserWindow>
+
+    let vault = ArcVault(window)
+    let vaults = ArcVaults()
+    vaults.Vaults.Add(windowId, vault)
+    vaults.OnCloseWindow(window, vault, windowId)
+
+    vaults, vault, (fun event -> closeHandler event), (fun () -> closeCount)
+
+let private waitForSessionToClose (host: WorkspaceSessionHost.WorkspaceSessionHost) (workspaceRoot: string) = promise {
+    let mutable attempts = 0
+
+    while attempts < 100 && (host.TryGetSession workspaceRoot |> Option.isSome) do
+        do! Promise.sleep 5
+        attempts <- attempts + 1
+
+    Vitest.expect(host.TryGetSession workspaceRoot |> Option.isSome).toBe false
+}
 
 /// Restores of the fake core provider wait on these gates, keyed by the first path.
 let private restoreGates =
@@ -1512,7 +1574,7 @@ Vitest.describe (
                     let otherWorkspace = join [| fixture.Root; "other-workspace" |]
 
                     let unrelatedClone =
-                        fixture.Host.BeginOperation("clone-other-workspace", Some otherWorkspace, None, ignore)
+                        fixture.Host.BeginOperation("clone-other-workspace", Some otherWorkspace, None, false, ignore)
 
                     let! unrelatedClear = api.clearStaleLock (request "clear-lock-other-workspace")
 
@@ -1523,7 +1585,7 @@ Vitest.describe (
                     unrelatedClone.Complete()
 
                     let sameWorkspaceOperation =
-                        fixture.Host.BeginOperation("clone-same-workspace", Some fixture.RepoRoot, None, ignore)
+                        fixture.Host.BeginOperation("clone-same-workspace", Some fixture.RepoRoot, None, false, ignore)
 
                     let! sameWorkspaceClear = api.clearStaleLock (request "clear-lock-same-workspace")
                     sameWorkspaceOperation.Complete()
@@ -1538,7 +1600,7 @@ Vitest.describe (
                         |> Option.defaultWith (fun () -> failwith "session missing")
 
                     let other =
-                        fixture.Host.BeginOperation("busy", Some session.Binding.WorkspaceRoot, None, ignore)
+                        fixture.Host.BeginOperation("busy", Some session.Binding.WorkspaceRoot, None, false, ignore)
 
                     let! refused = api.clearStaleLock (request "clear-lock-3")
                     other.Complete()
@@ -1890,6 +1952,8 @@ Vitest.describe (
                                 ExpectedWorkspaceVersion = "v1"
                             }
 
+                        Vitest.expect(fakeHost.RunningMutationIdsForWindow 52).toEqual [| "restore-first" |]
+
                         let second =
                             api.restorePaths {
                                 OperationId = "restore-second"
@@ -1907,6 +1971,299 @@ Vitest.describe (
                     finally
                         restoreGates.Clear()
                         WorkspaceSessionHost.initialize fixture.Host
+                })
+        )
+
+        Vitest.test (
+            "closing a window cancels a mutation and waits for its completion",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let vaults, vault, invokeClose, getCloseCount = captureCloseWindow 70
+
+                    let tracked =
+                        fixture.Host.BeginOperation("close-mutation", Some fixture.RepoRoot, Some 70, true, ignore)
+
+                    let dialogSpy = Vitest.vi.spyOn (electron?dialog, "showMessageBox")
+                    mockResolvedValue dialogSpy (createObj [ "response" ==> 0.0 ])
+                    let mutable preventedCloseCount = 0
+
+                    let closeEvent =
+                        createObj [
+                            "preventDefault" ==> (fun () -> preventedCloseCount <- preventedCloseCount + 1)
+                        ]
+
+                    try
+                        invokeClose closeEvent
+                        do! Promise.sleep 0
+                        do! Promise.sleep 0
+
+                        Vitest.expect(tracked.Context.Cancellation.IsCancellationRequested()).toBe true
+                        Vitest.expect(preventedCloseCount).toBe 1
+                        Vitest.expect(getCloseCount ()).toBe 0
+
+                        tracked.Complete()
+                        do! Promise.sleep 0
+                        do! Promise.sleep 0
+                        Vitest.expect(getCloseCount ()).toBe 1
+                        Vitest.expect(mockCallCount dialogSpy).toBe 1
+                    finally
+                        tracked.Complete()
+                        vaults.Vaults.Clear()
+                        vault.isWaitingForOperationsOnClose <- false
+                        Vitest.vi.restoreAllMocks ()
+                })
+        )
+
+        Vitest.test (
+            "declining a running mutation leaves the window open and prompts again",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let vaults, vault, invokeClose, getCloseCount = captureCloseWindow 71
+
+                    let tracked =
+                        fixture.Host.BeginOperation(
+                            "close-mutation-declined",
+                            Some fixture.RepoRoot,
+                            Some 71,
+                            true,
+                            ignore
+                        )
+
+                    let dialogSpy = Vitest.vi.spyOn (electron?dialog, "showMessageBox")
+                    mockResolvedValue dialogSpy (createObj [ "response" ==> 1.0 ])
+                    let mutable preventedCloseCount = 0
+
+                    let closeEvent =
+                        createObj [
+                            "preventDefault" ==> (fun () -> preventedCloseCount <- preventedCloseCount + 1)
+                        ]
+
+                    try
+                        invokeClose closeEvent
+                        do! Promise.sleep 0
+                        do! Promise.sleep 0
+
+                        Vitest.expect(getCloseCount ()).toBe 0
+                        Vitest.expect(vault.isWaitingForOperationsOnClose).toBe false
+                        Vitest.expect(mockCallCount dialogSpy).toBe 1
+
+                        invokeClose closeEvent
+                        do! Promise.sleep 0
+                        do! Promise.sleep 0
+
+                        Vitest.expect(getCloseCount ()).toBe 0
+                        Vitest.expect(vault.isWaitingForOperationsOnClose).toBe false
+                        Vitest.expect(mockCallCount dialogSpy).toBe 2
+                        Vitest.expect(preventedCloseCount).toBe 2
+                    finally
+                        tracked.Complete()
+                        vaults.Vaults.Clear()
+                        Vitest.vi.restoreAllMocks ()
+                })
+        )
+
+        Vitest.test (
+            "a second close while the close dialog waits does not open another dialog",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let vaults, vault, invokeClose, getCloseCount = captureCloseWindow 72
+
+                    let tracked =
+                        fixture.Host.BeginOperation(
+                            "close-mutation-waiting",
+                            Some fixture.RepoRoot,
+                            Some 72,
+                            true,
+                            ignore
+                        )
+
+                    let dialogSpy = Vitest.vi.spyOn (electron?dialog, "showMessageBox")
+                    mockResolvedValue dialogSpy (createObj [ "response" ==> 0.0 ])
+                    let mutable preventedCloseCount = 0
+
+                    let closeEvent =
+                        createObj [
+                            "preventDefault" ==> (fun () -> preventedCloseCount <- preventedCloseCount + 1)
+                        ]
+
+                    try
+                        invokeClose closeEvent
+                        do! Promise.sleep 0
+                        do! Promise.sleep 0
+                        Vitest.expect(vault.isWaitingForOperationsOnClose).toBe true
+                        Vitest.expect(mockCallCount dialogSpy).toBe 1
+
+                        invokeClose closeEvent
+                        do! Promise.sleep 0
+                        Vitest.expect(mockCallCount dialogSpy).toBe 1
+                        Vitest.expect(preventedCloseCount).toBe 2
+                        Vitest.expect(getCloseCount ()).toBe 0
+
+                        tracked.Complete()
+                        do! Promise.sleep 0
+                        do! Promise.sleep 0
+                        Vitest.expect(getCloseCount ()).toBe 1
+                    finally
+                        tracked.Complete()
+                        vaults.Vaults.Clear()
+                        Vitest.vi.restoreAllMocks ()
+                })
+        )
+
+        Vitest.test (
+            "a close timeout approves the close and restores the timeout setting",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let vaults, vault, invokeClose, getCloseCount = captureCloseWindow 73
+
+                    let tracked =
+                        fixture.Host.BeginOperation(
+                            "close-mutation-timeout",
+                            Some fixture.RepoRoot,
+                            Some 73,
+                            true,
+                            ignore
+                        )
+
+                    let dialogSpy = Vitest.vi.spyOn (electron?dialog, "showMessageBox")
+                    mockResolvedValue dialogSpy (createObj [ "response" ==> 0.0 ])
+                    let mutable preventedCloseCount = 0
+
+                    let closeEvent =
+                        createObj [
+                            "preventDefault" ==> (fun () -> preventedCloseCount <- preventedCloseCount + 1)
+                        ]
+
+                    closeWaitTimeoutMilliseconds <- 5
+
+                    try
+                        invokeClose closeEvent
+                        do! Promise.sleep 20
+
+                        Vitest.expect(mockCallCount dialogSpy).toBe 1
+                        Vitest.expect(preventedCloseCount).toBe 1
+                        Vitest.expect(vault.isWaitingForOperationsOnClose).toBe false
+                        Vitest.expect(vault.isOperationCloseApproved).toBe true
+                        Vitest.expect(getCloseCount ()).toBe 1
+                    finally
+                        closeWaitTimeoutMilliseconds <- 30000
+                        tracked.Complete()
+                        vaults.Vaults.Clear()
+                        Vitest.vi.restoreAllMocks ()
+                })
+        )
+
+        Vitest.test (
+            "a read-only operation is canceled during close without a dialog or prevented close",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let vaults, vault, invokeClose, getCloseCount = captureCloseWindow 74
+
+                    let tracked =
+                        fixture.Host.BeginOperation("close-read-only", Some fixture.RepoRoot, Some 74, false, ignore)
+
+                    let dialogSpy = Vitest.vi.spyOn (electron?dialog, "showMessageBox")
+                    mockResolvedValue dialogSpy (createObj [ "response" ==> 1.0 ])
+                    let mutable preventedCloseCount = 0
+
+                    let closeEvent =
+                        createObj [
+                            "preventDefault" ==> (fun () -> preventedCloseCount <- preventedCloseCount + 1)
+                        ]
+
+                    try
+                        invokeClose closeEvent
+
+                        Vitest.expect(tracked.Context.Cancellation.IsCancellationRequested()).toBe true
+                        Vitest.expect(preventedCloseCount).toBe 0
+                        Vitest.expect(mockCallCount dialogSpy).toBe 0
+                        Vitest.expect(vault.isWaitingForOperationsOnClose).toBe false
+                        Vitest.expect(getCloseCount ()).toBe 0
+                    finally
+                        tracked.Complete()
+                        vaults.Vaults.Clear()
+                        Vitest.vi.restoreAllMocks ()
+                })
+        )
+
+        Vitest.test (
+            "DisposeVault waits for running session operations before closing the session",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let! opened =
+                        fixture.Host.OpenSession(fixture.RepoRoot, detached "dispose-wait-open")
+                        |> Async.StartAsPromise
+
+                    expectValue "dispose wait open" opened |> ignore
+
+                    let tracked =
+                        fixture.Host.BeginOperation(
+                            "dispose-wait-operation",
+                            Some fixture.RepoRoot,
+                            None,
+                            false,
+                            ignore
+                        )
+
+                    try
+                        let vaults = ArcVaults()
+                        let window = testWindow ()
+                        window?id <- 75
+                        let vault = ArcVault(window)
+                        vault.path <- Some fixture.RepoRoot
+                        vaults.Vaults.Add(75, vault)
+
+                        vaults.DisposeVault 75
+                        Vitest.expect(fixture.Host.TryGetSession fixture.RepoRoot |> Option.isSome).toBe true
+
+                        tracked.Complete()
+                        do! fixture.Host.WhenOperationsComplete [| "dispose-wait-operation" |]
+                        do! waitForSessionToClose fixture.Host fixture.RepoRoot
+                    finally
+                        tracked.Complete()
+                })
+        )
+
+        Vitest.test (
+            "DisposeVault skips closing a session when another vault owns the path",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let! opened =
+                        fixture.Host.OpenSession(fixture.RepoRoot, detached "dispose-owner-open")
+                        |> Async.StartAsPromise
+
+                    expectValue "dispose owner open" opened |> ignore
+
+                    let tracked =
+                        fixture.Host.BeginOperation(
+                            "dispose-owner-operation",
+                            Some fixture.RepoRoot,
+                            None,
+                            false,
+                            ignore
+                        )
+
+                    try
+                        let vaults = ArcVaults()
+                        let firstWindow = testWindow ()
+                        firstWindow?id <- 76
+                        let firstVault = ArcVault(firstWindow)
+                        firstVault.path <- Some fixture.RepoRoot
+                        vaults.Vaults.Add(76, firstVault)
+                        vaults.DisposeVault 76
+
+                        let secondWindow = testWindow ()
+                        secondWindow?id <- 77
+                        let secondVault = ArcVault(secondWindow)
+                        secondVault.path <- Some fixture.RepoRoot
+                        vaults.Vaults.Add(77, secondVault)
+
+                        tracked.Complete()
+                        do! fixture.Host.WhenOperationsComplete [| "dispose-owner-operation" |]
+                        do! Promise.sleep 10
+                        Vitest.expect(fixture.Host.TryGetSession fixture.RepoRoot |> Option.isSome).toBe true
+                    finally
+                        tracked.Complete()
                 })
         )
 

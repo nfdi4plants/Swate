@@ -185,23 +185,37 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             | Some createdArcPath -> promise {
                                 try
                                     let host = WorkspaceSessionHost.get ()
-                                    let context = OperationContext.detached "create-arc-initialize"
 
-                                    let! initResult =
-                                        IVersionControlApi.initializeLocalWorkspace host createdArcPath context
-                                        |> Async.StartAsPromise
-
-                                    match initResult with
-                                    | Failed failure ->
-                                        Browser.Dom.console.error (
-                                            $"The ARC was created, but its Git repository could not be initialized: {failure.Code}: {failure.Message}"
+                                    let tracked =
+                                        host.BeginOperation(
+                                            "create-arc-initialize-" + createdArcPath,
+                                            Some createdArcPath,
+                                            Some(windowIdFromIpcEvent event),
+                                            true,
+                                            ignore
                                         )
 
-                                        return ()
-                                    | Succeeded _
-                                    | PartiallySucceeded _ ->
-                                        notifyGitRepositoryInitialized createdArcPath
-                                        return ()
+                                    try
+                                        let! initResult =
+                                            IVersionControlApi.initializeLocalWorkspace
+                                                host
+                                                createdArcPath
+                                                tracked.Context
+                                            |> Async.StartAsPromise
+
+                                        match initResult with
+                                        | Failed failure ->
+                                            Browser.Dom.console.error (
+                                                $"The ARC was created, but its Git repository could not be initialized: {failure.Code}: {failure.Message}"
+                                            )
+
+                                            return ()
+                                        | Succeeded _
+                                        | PartiallySucceeded _ ->
+                                            notifyGitRepositoryInitialized createdArcPath
+                                            return ()
+                                    finally
+                                        tracked.Complete()
                                 with error ->
                                     Browser.Dom.console.error (
                                         $"The ARC was created, but Git initialization failed: {error.Message}"
