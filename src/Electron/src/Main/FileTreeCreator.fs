@@ -25,37 +25,51 @@ let private shouldIgnorePath (path: string) =
     System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
     || isLegacyDataMapPath normalizedPath
 
-let private tryListLargeObjects (repoRoot: string) : Fable.Core.JS.Promise<Map<string, ObjectStateDto>> = promise {
-    try
-        let context = OperationContext.detached "file-tree-objects"
+let private tryListLargeObjects
+    (repoRoot: string)
+    (openSession: bool)
+    : Fable.Core.JS.Promise<Map<string, ObjectStateDto>> =
+    promise {
+        try
+            let context = OperationContext.detached "file-tree-objects"
+            let host = WorkspaceSessionHost.get ()
 
-        let! opened =
-            WorkspaceSessionHost.get().OpenSession(repoRoot, context)
-            |> Async.StartAsPromise
+            let! hostedSession =
+                if openSession then
+                    promise {
+                        let! opened = host.OpenSession(repoRoot, context) |> Async.StartAsPromise
 
-        match opened with
-        | Succeeded outcome
-        | PartiallySucceeded(outcome, _) ->
-            match outcome.Value.Session.ObjectMaterialization with
+                        return
+                            match opened with
+                            | Succeeded outcome
+                            | PartiallySucceeded(outcome, _) -> Some outcome.Value
+                            | Failed _ -> None
+                    }
+                else
+                    promise { return host.TryGetSession repoRoot }
+
+            match hostedSession with
             | None -> return Map.empty
-            | Some materialization ->
-                let! listed = materialization.ListObjects context |> Async.StartAsPromise
+            | Some hosted ->
+                match hosted.Session.ObjectMaterialization with
+                | None -> return Map.empty
+                | Some materialization ->
+                    let! listed = materialization.ListObjects context |> Async.StartAsPromise
 
-                match listed with
-                | Succeeded outcome
-                | PartiallySucceeded(outcome, _) ->
-                    return
-                        outcome.Value
-                        |> Array.map (fun (objectState: ObjectState) ->
-                            let dto = Mappings.objectState objectState
-                            dto.Path, dto
-                        )
-                        |> Map.ofArray
-                | Failed _ -> return Map.empty
-        | Failed _ -> return Map.empty
-    with _ ->
-        return Map.empty
-}
+                    match listed with
+                    | Succeeded outcome
+                    | PartiallySucceeded(outcome, _) ->
+                        return
+                            outcome.Value
+                            |> Array.map (fun (objectState: ObjectState) ->
+                                let dto = Mappings.objectState objectState
+                                dto.Path, dto
+                            )
+                            |> Map.ofArray
+                    | Failed _ -> return Map.empty
+        with _ ->
+            return Map.empty
+    }
 
 let private withFileEntryLfsMetadata
     (repoRoot: string)
@@ -147,12 +161,12 @@ let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
     if entry.isDirectory then
         return entry
     else
-        let! largeObjectsByRelativePath = tryListLargeObjects normalizedRepoRoot
+        let! largeObjectsByRelativePath = tryListLargeObjects normalizedRepoRoot true
         return withFileEntryLfsMetadata normalizedRepoRoot largeObjectsByRelativePath entry
 }
 
 /// Finds all files and subfolders of the given filepath
-let getFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise {
+let getFileEntries (path: string) (openSession: bool) : Fable.Core.JS.Promise<FileEntry[]> = promise {
     let repoRoot = normalizeRootPath path
 
     let! rootStats = statAsync repoRoot
@@ -194,12 +208,18 @@ let getFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise
             )
 
         let scannedEntries = entries.ToArray()
-        let! largeObjectsByRelativePath = tryListLargeObjects repoRoot
+        let! largeObjectsByRelativePath = tryListLargeObjects repoRoot openSession
         return withFileEntriesLfsMetadata repoRoot largeObjectsByRelativePath scannedEntries
 }
 
 /// Scans a path and builds its keyed file tree.
 let getFileTree (path: string) : Fable.Core.JS.Promise<Dictionary<string, FileEntry>> = promise {
-    let! fileEntries = getFileEntries path
+    let! fileEntries = getFileEntries path true
+    return createFileEntryTree fileEntries
+}
+
+/// Refreshes the tree without reopening a session that is being closed.
+let getFileTreeFromOpenSession (path: string) : Fable.Core.JS.Promise<Dictionary<string, FileEntry>> = promise {
+    let! fileEntries = getFileEntries path false
     return createFileEntryTree fileEntries
 }

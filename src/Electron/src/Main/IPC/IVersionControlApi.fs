@@ -186,8 +186,8 @@ let private withMutatingSessionUsingRefreshPredicate
                     (fun () -> promise {
                         let! result = withSession event operationId true operation mapValue
 
-                        if shouldRefresh result && WindowSend.isAlive vault.window then
-                            let! fileTree = getFileTree arcPath
+                        if shouldRefresh result then
+                            let! fileTree = getFileTreeFromOpenSession arcPath
                             vault.SetFileTree fileTree
 
                         return result

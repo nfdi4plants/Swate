@@ -190,7 +190,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                         host.BeginOperation(
                                             "create-arc-initialize-" + createdArcPath,
                                             Some createdArcPath,
-                                            Some(windowIdFromIpcEvent event),
+                                            Some(
+                                                ARC_VAULTS.TryGetVaultByPath createdArcPath
+                                                |> Option.map (fun vault -> vault.window.id)
+                                                |> Option.defaultValue (windowIdFromIpcEvent event)
+                                            ),
                                             true,
                                             ignore
                                         )
@@ -614,7 +618,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             if vault.fileTree.Count > 0 then
                                 promise { return vault.fileTree.Values |> Seq.toArray }
                             else
-                                getFileEntries arcPath
+                                getFileEntries arcPath true
 
                         let! notes = Main.NoteSearchReader.readNotes arcPath fileEntries
                         return Ok(notes |> Array.map NoteSearchNoteDto.ofNote)

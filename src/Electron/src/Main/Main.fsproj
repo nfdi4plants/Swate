@@ -11,6 +11,7 @@
     <Compile Include="Bindings\Filesystem.fs" />
     <Compile Include="Bindings\Path.fs" />
     <Compile Include="Bindings\NodeBindings.fs" />
+    <Compile Include="Bindings\PromiseRace.fs" />
     <Compile Include="Helper\Assets.fs" />
     <Compile Include="Helper\WindowSend.fs" />
     <Compile Include="Notes\NoteConstants.fs" />

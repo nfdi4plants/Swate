@@ -171,7 +171,7 @@ Vitest.describe (
 
                         do! writeUtf8FileAsync pointerFilePath pointerContents
 
-                        let! entries = FileTreeCreator.getFileEntries context.RepoPath
+                        let! entries = FileTreeCreator.getFileEntries context.RepoPath true
 
                         let pointerEntry =
                             entries
@@ -266,7 +266,7 @@ Vitest.describe (
                         let plainFilePath = join [| context.RepoPath; "plain.txt" |]
                         do! writeUtf8FileAsync plainFilePath "Plain text.\n"
 
-                        let! entries = FileTreeCreator.getFileEntries context.RepoPath
+                        let! entries = FileTreeCreator.getFileEntries context.RepoPath true
 
                         let plainEntry =
                             entries

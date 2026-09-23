@@ -7,6 +7,7 @@ open Fable.Core.JsInterop
 open Fable.Electron
 open Fable.Electron.Main
 open Main
+open Main.Bindings.PromiseRace
 open Main.ARCtrlExtensions
 open Main.Bindings
 open Main.Bindings.Filesystem
@@ -23,9 +24,6 @@ open ARCtrl
 
 /// Tests shorten this delay to cover timeout behavior without waiting 30 seconds.
 let mutable closeWaitTimeoutMilliseconds = 30000
-
-[<Emit("Promise.race($0)")>]
-let private promiseRace (promises: Fable.Core.JS.Promise<'T>[]) : Fable.Core.JS.Promise<'T> = jsNative
 
 let private startFileWatcherOwnWriteArcMergeSuppression suppressionMs currentTimeout onElapsed =
     currentTimeout |> Option.iter Fable.Core.JS.clearTimeout
@@ -959,22 +957,18 @@ type ArcVaults() =
 
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
         window.onClose (fun closeEvent ->
+            let operationCloseApproved = vault.isOperationCloseApproved
+            vault.isOperationCloseApproved <- false
+
             let host = Main.VersionControl.WorkspaceSessionHost.tryCurrent ()
 
-            let windowOperationIds =
-                host
-                |> Option.map (fun currentHost -> currentHost.RunningOperationIdsForWindow id)
-                |> Option.defaultValue [||]
-
-            let windowMutationIds =
-                host
-                |> Option.map (fun currentHost -> currentHost.RunningMutationIdsForWindow id)
-                |> Option.defaultValue [||]
-
-            if windowMutationIds.Length = 0 then
+            let cancelWindowReads () =
                 host
                 |> Option.iter (fun currentHost ->
-                    windowOperationIds
+                    let mutationIds = currentHost.RunningMutationIdsForWindow id |> Set.ofArray
+
+                    currentHost.RunningOperationIdsForWindow id
+                    |> Array.filter (fun operationId -> not (Set.contains operationId mutationIds))
                     |> Array.iter (fun operationId -> currentHost.Cancel operationId |> ignore)
                 )
 
@@ -1016,7 +1010,7 @@ type ArcVaults() =
                     host
                     |> Option.exists (fun currentHost ->
                         (currentHost.RunningMutationIdsForWindow id).Length > 0
-                        && not vault.isOperationCloseApproved
+                        && not operationCloseApproved
                     )
                 then
                     closeEvent.preventDefault ()
@@ -1038,7 +1032,7 @@ type ArcVaults() =
                                                             "A version control operation is still running in this window.",
                                                         ``type`` = Enums.Dialog.ShowMessageBox.Options.Type.Question,
                                                         detail =
-                                                            "Closing the window cancels it. The window closes once the operation has stopped, or after 30 seconds if it does not stop.",
+                                                            $"Closing the window cancels it. The window closes once the operation has stopped, or after {closeWaitTimeoutMilliseconds / 1000} seconds if it does not stop.",
                                                         buttons = [|
                                                             "Cancel operation and close"
                                                             "Keep window open"
@@ -1065,7 +1059,7 @@ type ArcVaults() =
                                             return false
                                         }
 
-                                        let! operationsCompleted = promiseRace [| waitForOperations; waitForTimeout |]
+                                        let! operationsCompleted = race [| waitForOperations; waitForTimeout |]
 
                                         if not operationsCompleted then
                                             let stillRunning = currentHost.RunningOperationIdsForWindow id
@@ -1080,6 +1074,7 @@ type ArcVaults() =
                                         vault.isWaitingForOperationsOnClose <- false
 
                                         if not (window.isDestroyed ()) then
+                                            cancelWindowReads ()
                                             window.close ()
                                     else
                                         vault.isWaitingForOperationsOnClose <- false
@@ -1101,7 +1096,10 @@ type ArcVaults() =
 
                         WindowSend.send<IMainSaveBeforeQuitApi> vault.window (fun api -> api.requestSaveBeforeQuit ())
                 else
+                    cancelWindowReads ()
                     swatelogfn id "Closing window directly because no unsaved ARC changes are present."
+            else
+                cancelWindowReads ()
         )
 
         window.onClosed (fun () ->

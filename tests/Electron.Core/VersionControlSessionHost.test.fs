@@ -2111,6 +2111,71 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "operation close approval applies to one retry close",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let vaults, vault, invokeClose, getCloseCount = captureCloseWindow 78
+
+                    let firstTracked =
+                        fixture.Host.BeginOperation(
+                            "close-mutation-retry-first",
+                            Some fixture.RepoRoot,
+                            Some 78,
+                            true,
+                            ignore
+                        )
+
+                    let dialogSpy = Vitest.vi.spyOn (electron?dialog, "showMessageBox")
+                    mockResolvedValue dialogSpy (createObj [ "response" ==> 0.0 ])
+
+                    let closeEvent = createObj [ "preventDefault" ==> (fun () -> ()) ]
+
+                    try
+                        invokeClose closeEvent
+                        do! Promise.sleep 0
+                        do! Promise.sleep 0
+                        Vitest.expect(mockCallCount dialogSpy).toBe 1
+
+                        firstTracked.Complete()
+                        do! Promise.sleep 0
+                        do! Promise.sleep 0
+
+                        Vitest.expect(getCloseCount ()).toBe 1
+                        Vitest.expect(mockCallCount dialogSpy).toBe 1
+                        Vitest.expect(vault.isOperationCloseApproved).toBe false
+                        Vitest.expect(vaults.TryGetVault 78 |> Option.isSome).toBe true
+
+                        let secondTracked =
+                            fixture.Host.BeginOperation(
+                                "close-mutation-retry-second",
+                                Some fixture.RepoRoot,
+                                Some 78,
+                                true,
+                                ignore
+                            )
+
+                        try
+                            invokeClose closeEvent
+                            do! Promise.sleep 0
+                            do! Promise.sleep 0
+                            Vitest.expect(mockCallCount dialogSpy).toBe 2
+
+                            secondTracked.Complete()
+                            do! Promise.sleep 0
+                            do! Promise.sleep 0
+
+                            Vitest.expect(getCloseCount ()).toBe 2
+                            Vitest.expect(mockCallCount dialogSpy).toBe 2
+                        finally
+                            secondTracked.Complete()
+                    finally
+                        firstTracked.Complete()
+                        vaults.Vaults.Clear()
+                        Vitest.vi.restoreAllMocks ()
+                })
+        )
+
+        Vitest.test (
             "a close timeout approves the close and restores the timeout setting",
             fun () ->
                 withFixture (fun fixture -> promise {
@@ -2143,7 +2208,7 @@ Vitest.describe (
                         Vitest.expect(mockCallCount dialogSpy).toBe 1
                         Vitest.expect(preventedCloseCount).toBe 1
                         Vitest.expect(vault.isWaitingForOperationsOnClose).toBe false
-                        Vitest.expect(vault.isOperationCloseApproved).toBe true
+                        Vitest.expect(vault.isOperationCloseApproved).toBe false
                         Vitest.expect(getCloseCount ()).toBe 1
                     finally
                         closeWaitTimeoutMilliseconds <- 30000
