@@ -51,9 +51,6 @@ type ArcVault(window: BrowserWindow) =
     let mutable fileTreeUpdateTail: Fable.Core.JS.Promise<unit> =
         JS.Constructors.Promise.resolve ()
 
-    let mutable restoredPendingEventCount = 0
-    let mutable restoredPendingArcMergeEventCount = 0
-
     member val window: BrowserWindow = window with get
     member val path: string option = None with get, set
     member val arc: ARC option = None with get, private set
@@ -102,18 +99,6 @@ type ArcVault(window: BrowserWindow) =
     member internal this.FileTreeUpdateTail
         with get () = fileTreeUpdateTail
         and set value = fileTreeUpdateTail <- value
-
-    /// The restore counters place a restored batch after the batches restored since the last
-    /// drain and ahead of events admitted since. Across overlapping reloads the counters give
-    /// deferral order. Both consumers normalize every event against the disk at apply time, so
-    /// the outcome does not depend on the order.
-    member internal this.RestoredPendingEventCount
-        with get () = restoredPendingEventCount
-        and set value = restoredPendingEventCount <- value
-
-    member internal this.RestoredPendingArcMergeEventCount
-        with get () = restoredPendingArcMergeEventCount
-        and set value = restoredPendingArcMergeEventCount <- value
 
     /// Indicates whether the vault is currently busy writing changes to disk.
     /// When a write finishes, watcher ARC merges stay suppressed briefly to cover delayed own-write events.
@@ -308,9 +293,6 @@ module ArcVaultExtensions =
                     return WatcherMergeOutcome.Deferred
                 elif capturedWatcherEpoch <> this.WatcherEpoch then
                     return WatcherMergeOutcome.Deferred
-                elif this.RestoredPendingArcMergeEventCount > 0 then
-                    // An older batch was restored while this one waited. The next reload takes both in order.
-                    return WatcherMergeOutcome.Deferred
                 else
                     let capturedWriteGeneration = this.WriteGeneration
 
@@ -372,24 +354,12 @@ module ArcVaultExtensions =
         }
 
         member internal this._FileEventController(sendMsgApi: IArcFileWatcherApi) =
+            // Appending restored events is enough because both consumers re-check the disk at apply time.
             let restorePendingEvents
                 (events: ArcVaultFileSystemEvent list)
                 (pendingEvents: ResizeArray<ArcVaultFileSystemEvent>)
-                isArcMergeEvents
                 =
-                let restoreIndex =
-                    if isArcMergeEvents then
-                        this.RestoredPendingArcMergeEventCount
-                    else
-                        this.RestoredPendingEventCount
-
-                events
-                |> List.iteri (fun offset event -> pendingEvents.Insert(restoreIndex + offset, event))
-
-                if isArcMergeEvents then
-                    this.RestoredPendingArcMergeEventCount <- restoreIndex + events.Length
-                else
-                    this.RestoredPendingEventCount <- restoreIndex + events.Length
+                pendingEvents.AddRange events
 
             // A long write retries every 500 ms, so only the first deferral and the limit crossing are logged.
             let logWatcherDeferral deferralCount =
@@ -449,7 +419,6 @@ module ArcVaultExtensions =
                                         if this.HasReachedWatcherDeferralLimit then
                                             let pendingEvents = this.fileWatcherPendingEvents |> Seq.toList
                                             this.fileWatcherPendingEvents.Clear()
-                                            this.RestoredPendingEventCount <- 0
 
                                             do!
                                                 this.ApplyWatcherFileTreeEvents(
@@ -476,8 +445,6 @@ module ArcVaultExtensions =
                                     let pendingArcMergeEvents = this.fileWatcherPendingArcMergeEvents |> Seq.toList
                                     this.fileWatcherPendingEvents.Clear()
                                     this.fileWatcherPendingArcMergeEvents.Clear()
-                                    this.RestoredPendingEventCount <- 0
-                                    this.RestoredPendingArcMergeEventCount <- 0
 
                                     if pendingArcMergeEvents.IsEmpty then
                                         this.ResetWatcherDeferralCount()
@@ -538,7 +505,6 @@ module ArcVaultExtensions =
                                                     restorePendingEvents
                                                         pendingArcMergeEvents
                                                         this.fileWatcherPendingArcMergeEvents
-                                                        true
 
                                                     do!
                                                         this.ApplyWatcherFileTreeEvents(
@@ -552,12 +518,10 @@ module ArcVaultExtensions =
                                                         restorePendingEvents
                                                             pendingArcMergeEvents
                                                             this.fileWatcherPendingArcMergeEvents
-                                                            true
 
                                                         restorePendingEvents
                                                             pendingEvents
                                                             this.fileWatcherPendingEvents
-                                                            false
                                                     else
                                                         ()
 
@@ -758,8 +722,6 @@ module ArcVaultExtensions =
             this.fileWatcherReloadArcTimeout <- None
             this.fileWatcherPendingEvents.Clear()
             this.fileWatcherPendingArcMergeEvents.Clear()
-            this.RestoredPendingEventCount <- 0
-            this.RestoredPendingArcMergeEventCount <- 0
             this.importedFileWatcherPaths.Clear()
 
         member this.StopFileWatcher() = promise {

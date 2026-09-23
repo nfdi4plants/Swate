@@ -870,54 +870,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "a queued merge defers behind a restored batch",
-            fun () ->
-                withTempArc
-                    (fun arc -> arc.AddAssay(ArcAssay("DiskAssay", title = "Old title")))
-                    (fun arcPath -> promise {
-                        let! loadedArc = TestHelpers.loadArcAsync arcPath
-                        let vault = ArcVault(TestHelpers.testWindow ())
-                        vault.path <- Some arcPath
-                        vault.SetArc loadedArc
-
-                        let! diskArc = TestHelpers.loadArcAsync arcPath
-                        diskArc.GetAssay("DiskAssay").Title <- Some "Changed on disk"
-                        do! diskArc.UpdateAsync arcPath
-
-                        let mutable releaseMergeQueue = ignore
-
-                        let mergeQueueGate =
-                            JS.Constructors.Promise.Create(fun resolve _ -> releaseMergeQueue <- fun () -> resolve ())
-
-                        let queuedMerge = vault.EnqueueArcMerge(fun () -> mergeQueueGate)
-                        let changeEvent = watcherEvent arcPath "change" "assays/DiskAssay/isa.assay.xlsx"
-                        let watcherMerge = vault.TryApplyWatcherArcMergeIfEligible [ changeEvent ]
-
-                        // An older batch is restored while the merge waits in the queue.
-                        vault.fileWatcherPendingArcMergeEvents.Add changeEvent
-                        vault.RestoredPendingArcMergeEventCount <- 1
-
-                        releaseMergeQueue ()
-                        do! queuedMerge
-
-                        match! watcherMerge with
-                        | WatcherMergeOutcome.Deferred -> ()
-                        | _ -> return failwith "The queued merge should defer behind a restored batch."
-
-                        Vitest.expect(vault.arc.Value.GetAssay("DiskAssay").Title).toEqual (Some "Old title")
-
-                        vault.fileWatcherPendingArcMergeEvents.Clear()
-                        vault.RestoredPendingArcMergeEventCount <- 0
-
-                        match! vault.TryApplyWatcherArcMergeIfEligible [ changeEvent ] with
-                        | WatcherMergeOutcome.Applied -> ()
-                        | _ -> return failwith "The merge should apply once the restored batch was drained."
-
-                        Vitest.expect(vault.arc.Value.GetAssay("DiskAssay").Title).toEqual (Some "Changed on disk")
-                    })
-        )
-
-        Vitest.test (
             "a busy reload with nothing pending finishes",
             fun () ->
                 withTempArc
