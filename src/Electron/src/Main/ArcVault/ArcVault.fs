@@ -216,8 +216,8 @@ module ArcVaultExtensions =
                     Ok()
 
         member internal this.ApplyWatcherFileTreeEvents(events: ArcVaultFileSystemEvent list) =
-            // Captured at the call: an update queued before a pending-state reset must not
-            // publish a tree built under the old root after it.
+            // Normalize against disk when the queued update reaches the serialized tail, so tree events use apply-time state.
+            // Capture the epoch at the call so an update queued before a pending-state reset cannot publish the old root.
             let capturedWatcherEpoch = this.WatcherEpoch
 
             let queuedUpdate =
@@ -227,10 +227,11 @@ module ArcVaultExtensions =
                     | None -> ()
                     | Some _ when capturedWatcherEpoch <> this.WatcherEpoch -> ()
                     | Some arcPath ->
+                        let normalizedEvents = WatcherHelpers.normalizeAgainstDisk events
                         let mutable nextFileTree = this.fileTree
                         let mutable hasFileTreeChanges = false
 
-                        for event in events do
+                        for event in normalizedEvents do
                             try
                                 if
                                     WatcherHelpers.eventNameEquals Chokidar.Events.Add event.EventName
@@ -244,14 +245,12 @@ module ArcVaultExtensions =
                                     nextFileTree <- upsertFileEntry addedDirectory nextFileTree
                                     hasFileTreeChanges <- true
                                 elif
-                                    (WatcherHelpers.eventNameEquals Chokidar.Events.Unlink event.EventName
-                                     || WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName)
-                                    && not (existsSync event.AbsolutePath)
+                                    WatcherHelpers.eventNameEquals Chokidar.Events.Unlink event.EventName
+                                    || (WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName
+                                        && not (existsSync event.AbsolutePath))
                                 then
-                                    // A delete for a path that exists again is stale. The events that
-                                    // recreated it keep the entry current. This is one more stat per delete
-                                    // event, so the cost grows with the batch (a branch switch can carry
-                                    // thousands).
+                                    // Normalization above already turned the unlink of an existing file into a change. Directory unlinks
+                                    // stay admitted, so they still need this check.
                                     nextFileTree <- removePathAndDescendants event.AbsolutePath nextFileTree
                                     hasFileTreeChanges <- true
                             with fileTreeError ->
@@ -420,10 +419,7 @@ module ArcVaultExtensions =
                                             let pendingEvents = this.fileWatcherPendingEvents |> Seq.toList
                                             this.fileWatcherPendingEvents.Clear()
 
-                                            do!
-                                                this.ApplyWatcherFileTreeEvents(
-                                                    WatcherHelpers.normalizeAgainstDisk pendingEvents
-                                                )
+                                            do! this.ApplyWatcherFileTreeEvents pendingEvents
 
                                     if
                                         this.fileWatcherPendingEvents.Count = 0
@@ -459,10 +455,7 @@ module ArcVaultExtensions =
                                             // Merge first so that call reads the same ARC state represented by the published tree.
                                             // A batch snapshotted before a pending-state reset carries paths under the old root.
                                             if callbackEpoch = this.WatcherEpoch then
-                                                do!
-                                                    this.ApplyWatcherFileTreeEvents(
-                                                        WatcherHelpers.normalizeAgainstDisk pendingEvents
-                                                    )
+                                                do! this.ApplyWatcherFileTreeEvents pendingEvents
 
                                             finishReload ()
                                         | WatcherMergeOutcome.Failed mergeError ->
@@ -474,10 +467,7 @@ module ArcVaultExtensions =
                                             this.ResetWatcherDeferralCount()
 
                                             if callbackEpoch = this.WatcherEpoch then
-                                                do!
-                                                    this.ApplyWatcherFileTreeEvents(
-                                                        WatcherHelpers.normalizeAgainstDisk pendingEvents
-                                                    )
+                                                do! this.ApplyWatcherFileTreeEvents pendingEvents
 
                                             finishReload ()
                                         | WatcherMergeOutcome.Deferred ->
@@ -506,10 +496,7 @@ module ArcVaultExtensions =
                                                         pendingArcMergeEvents
                                                         this.fileWatcherPendingArcMergeEvents
 
-                                                    do!
-                                                        this.ApplyWatcherFileTreeEvents(
-                                                            WatcherHelpers.normalizeAgainstDisk pendingEvents
-                                                        )
+                                                    do! this.ApplyWatcherFileTreeEvents pendingEvents
                                                 else
                                                     ()
 
