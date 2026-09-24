@@ -808,7 +808,7 @@ type GitSidebar =
                         props.SubmitUpdateFromOnline,
                         testId = "GitSidebarUpdateArcButton",
                         tooltipText =
-                            "Update ARC from Online:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git pull origin"
+                            "Update ARC from Online:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git merge origin/<branch>\n- git lfs pull origin (when Download Large Files is on)"
                     )
                     GitSidebar.ActionButton(
                         "More Git Actions",
@@ -873,7 +873,8 @@ type GitSidebar =
                                     props.IsBusy || not props.RemoteActionsEnabled,
                                     props.SubmitPull,
                                     testId = "GitSidebarPullButton",
-                                    tooltipText = "Download Changes:\n- git pull origin"
+                                    tooltipText =
+                                        "Download Changes:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git merge origin/<branch>\n- git lfs pull origin (when Download Large Files is on)"
                                 )
                                 GitSidebar.ActionButton(
                                     "Upload Changes",
@@ -906,7 +907,7 @@ type GitSidebar =
                                     props.SubmitPruneLfsCache,
                                     testId = "GitSidebarLfsPruneButton",
                                     tooltipText =
-                                        "Clean LFS Cache:\n- git lfs prune --verify-remote --verify-unreachable --when-unverified=halt"
+                                        "Clean LFS Cache:\n- git lfs prune --verify-remote --no-verify-unreachable --when-unverified=halt"
                                 )
                                 GitSidebar.ActionButton(
                                     "Reduce LFS Storage",

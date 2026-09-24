@@ -384,7 +384,7 @@ export const ActionTooltipsAndResponsiveLabels: Story = {
 
     await expect(canvas.getByTestId("GitSidebarUpdateArcButton")).toHaveAttribute(
       "title",
-      "Update ARC from Online:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git pull origin",
+      "Update ARC from Online:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git merge origin/<branch>\n- git lfs pull origin (when Download Large Files is on)",
     );
     await expect(canvas.getByTestId("GitSidebarUpdateArcButtonLabel")).toHaveClass("swt:truncate");
     await expect(canvas.getByTestId("GitSidebarUpdateArcButtonLabel")).toHaveClass(
@@ -398,7 +398,7 @@ export const ActionTooltipsAndResponsiveLabels: Story = {
     );
     await expect(canvas.getByTestId("GitSidebarPullButton")).toHaveAttribute(
       "title",
-      "Download Changes:\n- git pull origin",
+      "Download Changes:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git merge origin/<branch>\n- git lfs pull origin (when Download Large Files is on)",
     );
     await expect(canvas.getByTestId("GitSidebarPushButton")).toHaveAttribute(
       "title",
@@ -406,7 +406,7 @@ export const ActionTooltipsAndResponsiveLabels: Story = {
     );
     await expect(canvas.getByTestId("GitSidebarLfsPruneButton")).toHaveAttribute(
       "title",
-      "Clean LFS Cache:\n- git lfs prune --verify-remote --verify-unreachable --when-unverified=halt",
+      "Clean LFS Cache:\n- git lfs prune --verify-remote --no-verify-unreachable --when-unverified=halt",
     );
     await expect(canvas.getByTestId("GitSidebarLfsDedupButton")).toHaveAttribute(
       "title",
