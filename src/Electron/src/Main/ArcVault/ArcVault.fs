@@ -36,14 +36,14 @@ type ArcVault(window: BrowserWindow) =
 
     member val window: BrowserWindow = window with get
     member val path: string option = None with get, set
-    member val arc: ARC option = None with get, internal set
+    member val arc: ARC option = None with get, private set
     // This flag is intentionally coarse and can remain true even if later edits restore the previous logical state.
     //Good workaround, for a missing member 👍 Might even be more performant, than calculating a isDirty flag. On the other hand, it is unable to detect if changes are removed again. For example:
     //Add Assay 1 -> Set hasUnsavedArcChanges <- true
     //Remove Assay 1 -> Still true, even tough changes were removed again and it is in its original state.
     //I am not sure if performance of calculating changes or precision should be more important. Lets see in the future. Maybe you can add this comment as /// comment on this member?
     /// Dirty marker for unsaved in-memory ARC mutations.
-    member val hasUnsavedArcChanges: bool = false with get, internal set
+    member val hasUnsavedArcChanges: bool = false with get, private set
     member val fileTree: Dictionary<string, FileEntry> = Dictionary<string, FileEntry>() with get, set
     member val watcher: Chokidar.IWatcher option = None with get, set
     member val fileWatcherReloadArcTimeout: int option = None with get, set
@@ -92,6 +92,18 @@ type ArcVault(window: BrowserWindow) =
 
         if not (this.window.isDestroyed ()) then
             this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle (Some arc.Identifier)
+
+    member this.ClearArc() =
+        this.arc <- None
+
+        if not (this.window.isDestroyed ()) then
+            this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle None
+
+    member internal this.ResetArcStateAfterFailedInitialization() =
+        let hadUnsavedArcChanges = this.hasUnsavedArcChanges
+        this.arc <- None
+        this.hasUnsavedArcChanges <- false
+        hadUnsavedArcChanges
 
     /// Sets the dirty marker for unsaved in-memory ARC mutations.
     member this.RefreshHasUnsavedArcChangesFlag() =
@@ -426,15 +438,13 @@ module ArcVaultExtensions =
             this.ClearPendingFileWatcherState()
         }
 
-        member private this.ClearArc() = promise {
+        member private this.RestoreEmptyVaultAfterFailedInitialization() = promise {
             do! this.StopFileWatcher()
 
-            let hadUnsavedArcChanges = this.hasUnsavedArcChanges
+            let hadUnsavedArcChanges = this.ResetArcStateAfterFailedInitialization()
 
             this.path <- None
             this.fileTree.Clear()
-            this.arc <- None
-            this.hasUnsavedArcChanges <- false
 
             if not (this.window.isDestroyed ()) then
                 try
@@ -480,7 +490,7 @@ module ArcVaultExtensions =
                     do! this.Startup()
                     sendMsg.pathChange (Some normalizedPath)
                 with error ->
-                    do! this.ClearArc()
+                    do! this.RestoreEmptyVaultAfterFailedInitialization()
                     return raise error
         }
 
@@ -516,7 +526,7 @@ module ArcVaultExtensions =
                     do! this.Startup()
                     sendMsg.pathChange (Some normalizedPath)
                 with error ->
-                    do! this.ClearArc()
+                    do! this.RestoreEmptyVaultAfterFailedInitialization()
                     return raise error
         }
 

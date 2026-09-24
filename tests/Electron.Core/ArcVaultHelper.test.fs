@@ -3096,4 +3096,16 @@ Vitest.describe (
             }
         )
 
+        Vitest.test (
+            "ClearArc resets the window title",
+            fun () ->
+                let vault = ArcVault(TestHelpers.testWindow ())
+                vault.SetArc(ARC("LoadedArc"))
+
+                vault.ClearArc()
+
+                Vitest.expect(vault.arc).toEqual (None)
+                Vitest.expect(vault.window.title).toBe (Swate.Electron.Shared.ApplicationVersion.windowTitle None)
+        )
+
 )
