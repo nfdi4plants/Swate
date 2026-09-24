@@ -629,6 +629,40 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "normalizeAgainstDisk keeps case-only rename unlinks",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-watcher-case-rename-"
+
+                try
+                    let oldFilePath = join [| rootPath; "sample_metadata_neg.csv" |]
+                    let newFilePath = join [| rootPath; "Sample_Metadata_NEG.csv" |]
+                    let existingFilePath = join [| rootPath; "existing-file.txt" |]
+                    do! writeWatcherTextFileAsync oldFilePath "renamed"
+                    do! writeWatcherTextFileAsync existingFilePath "existing"
+                    do! renameAsync oldFilePath newFilePath
+
+                    let caseOnlyUnlink = watcherEvent rootPath "unlink" "sample_metadata_neg.csv"
+                    let existingUnlink = watcherEvent rootPath "unlink" "existing-file.txt"
+
+                    let normalized =
+                        WatcherHelpers.normalizeAgainstDisk [ caseOnlyUnlink; existingUnlink ]
+
+                    Vitest.expect(normalized |> List.exists (fun event -> event = caseOnlyUnlink)).toBe (true)
+
+                    let existingFileEvent =
+                        normalized
+                        |> List.find (fun event -> event.RelativePath = existingUnlink.RelativePath)
+
+                    Vitest.expect(existingFileEvent.EventName).toBe ("change")
+
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
             "overlapping tree updates keep both entries",
             fun () ->
                 withTempArc

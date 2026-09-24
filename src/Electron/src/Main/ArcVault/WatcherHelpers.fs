@@ -15,6 +15,11 @@ open Swate.Electron.Shared.FileIOTypes
 let eventNameEquals (expected: Chokidar.Events) (actual: string) =
     String.Equals(actual, expected.ToString(), StringComparison.OrdinalIgnoreCase)
 
+let existsSyncWithExactName (path: string) =
+    existsSync path
+    && (readdirSync (dirname path)
+        |> Array.exists (fun name -> String.Equals(name, basename path, StringComparison.Ordinal)))
+
 /// Builds an ARC-root-relative watcher event from the raw chokidar payload.
 let buildWatcherEvent (arcPath: string) (eventName: string) (path: string) =
     let normalizedPath = PathHelpers.normalizePath path
@@ -95,7 +100,7 @@ let normalizeAgainstDisk (events: ArcVaultFileSystemEvent list) =
             Some event
         elif
             eventNameEquals Chokidar.Events.Unlink event.EventName
-            && existsSync event.AbsolutePath
+            && existsSyncWithExactName event.AbsolutePath
         then
             Some {
                 event with

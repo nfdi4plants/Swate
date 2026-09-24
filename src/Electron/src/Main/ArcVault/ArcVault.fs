@@ -253,7 +253,7 @@ module ArcVaultExtensions =
                                 elif
                                     WatcherHelpers.eventNameEquals Chokidar.Events.Unlink event.EventName
                                     || (WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName
-                                        && not (existsSync event.AbsolutePath))
+                                        && not (WatcherHelpers.existsSyncWithExactName event.AbsolutePath))
                                 then
                                     // Normalization above already turned the unlink of an existing file into a change. Directory unlinks
                                     // stay admitted, so they still need this check.
@@ -337,7 +337,7 @@ module ArcVaultExtensions =
                                     |> List.filter (fun event ->
                                         event.EventName <> EventName.Unlink
                                         || not (
-                                            existsSync (
+                                            WatcherHelpers.existsSyncWithExactName (
                                                 if isAbsolute event.Path then
                                                     event.Path
                                                 else
