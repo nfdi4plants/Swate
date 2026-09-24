@@ -14,6 +14,7 @@ open Swate.Electron.Shared.VersionControlTypes
 
 /// Large copies need time to settle before Git hashes their contents again.
 let private externalChangesRefreshDelayMs = 1500
+let private ownWriteRefreshSuppressionMs = 2000.0
 
 [<RequireQualifiedAccess>]
 type GitRefreshState =
@@ -139,6 +140,8 @@ type GitState = {
     ExternalRefreshGeneration: int
     /// A refresh requested while a write is active runs after the write completes.
     RefreshPending: bool
+    RefreshPendingSilently: bool
+    LastWriteCompletedAt: float option
     BusyOperation: GitBusyOperation option
     BusyNotice: string option
     /// The operation the renderer can cancel. The renderer chooses its id before the call starts.
@@ -192,6 +195,8 @@ type GitState = {
         ExternalChangesSeen = false
         ExternalRefreshGeneration = 0
         RefreshPending = false
+        RefreshPendingSilently = false
+        LastWriteCompletedAt = None
         BusyOperation = None
         BusyNotice = None
         CurrentOperation = None
@@ -492,10 +497,12 @@ type Msg =
     | ArcPathChanged of ArcRootPath
     | GitRepositoryInitialized of arcPath: string
     | RefreshRequested
+    | RefreshRequestedSilently
     | ExternalChangesDetected
     | ExternalRefreshDue of generation: int
     | SidebarVisibilityChanged of bool
     | RefreshCompleted of requestId: int * result: Result<GitRefreshResult, string>
+    | SilentRefreshCompleted of requestId: int * result: Result<GitRefreshResult, string>
     | InitRepositoryRequested
     | InitRepositoryCompleted of sessionId: int * result: Result<unit, string>
     | SelectChangeRequested of GitSidebarChange * Reply<unit>
@@ -587,6 +594,7 @@ type GitDependencies = {
     clearStaleLock: OperationRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceStatusDto>, string>>
     hasUsableAccount: unit -> bool
     delay: int -> JS.Promise<unit>
+    now: unit -> float
     newOperationId: unit -> string
     confirmLfsPrune: string -> bool
     confirmInstall: string -> bool
@@ -685,6 +693,12 @@ let mapBranches (targetRef: LogicalRefDto option) (refs: LogicalRefDto[]) : GitS
             |> Option.exists (fun target -> target.ProviderRef = reference.ProviderRef)
     })
 
+let hasRemote (model: GitState) =
+    model.Status.TrackingBranch.IsSome
+    || (model.BranchOptions
+        |> Array.exists (fun branch -> branch.Kind = GitSidebarBranchKind.Remote))
+    || (model.Refs |> Array.exists (fun reference -> reference.Kind = RefKindDto.Remote))
+
 /// The opaque provider ref behind a branch option. The sidebar works with names, the
 /// provider only accepts the ref it handed out.
 let providerRefOf (model: GitState) (refName: string) =
@@ -731,10 +745,15 @@ let private mergeProgressUpdate (model: GitState) (incoming: GitSidebarProgress)
 /// The message shown for a structured failure: the library message plus its
 /// recovery instructions when it has any.
 let failureMessage (failure: OperationFailureDto) =
+    let usesIndexRecoveryText =
+        failure.Code = "index_reconciliation_failed"
+        || failure.Code = VersionControlCodes.IndexLocked
+
     let instructions =
         match failure.RecoveryAction with
-        | Some recovery when recovery.Code = VersionControlCodes.Recovery.ReconcileIndex ->
-            Some "Close other Git programs for this ARC, then refresh the Git sidebar."
+        | Some _ when usesIndexRecoveryText ->
+            Some
+                "The changes are saved in a commit, but Git's file index is out of date. Close other Git programs for this ARC, then run \"git reset\" in the ARC folder."
         | Some recovery -> recovery.Instructions
         | None -> None
 
@@ -2688,7 +2707,7 @@ let init () : GitState * Cmd<Msg> = GitState.Empty, Cmd.none
 let private resetFor (model: GitState) = {
     GitState.Empty with
         SidebarVisible = model.SidebarVisible
-        ExternalRefreshGeneration = model.ExternalRefreshGeneration
+        ExternalRefreshGeneration = model.ExternalRefreshGeneration + 1
 }
 
 let private missingRepositoryModel (model: GitState) = {
@@ -2819,6 +2838,13 @@ let private writeCmd
 let private shouldRunPostMergePush (model: GitState) =
     model.PendingPostMergePush && model.ActiveConflict.IsNone
 
+let private followsOwnWrite (deps: GitDependencies) (model: GitState) =
+    match model.LastWriteCompletedAt with
+    | Some completedAt ->
+        let elapsed = deps.now () - completedAt
+        elapsed >= 0.0 && elapsed < ownWriteRefreshSuppressionMs
+    | None -> false
+
 let private updateCore
     (deps: GitDependencies)
     (setPageState: PageState option -> unit)
@@ -2882,6 +2908,13 @@ let private updateCore
             | None -> applyPageChangeCmd setPageState GitPageChange.Clear
 
         nextModel, cmd
+    | SidebarVisibilityChanged false ->
+        {
+            model with
+                SidebarVisible = false
+                ExternalRefreshGeneration = model.ExternalRefreshGeneration + 1
+        },
+        Cmd.none
     | SidebarVisibilityChanged true when model.ExternalChangesSeen ->
         {
             model with
@@ -2889,12 +2922,8 @@ let private updateCore
                 ExternalChangesSeen = false
         },
         Cmd.ofMsg RefreshRequested
-    | SidebarVisibilityChanged isVisible ->
-        {
-            model with
-                SidebarVisible = isVisible
-        },
-        Cmd.none
+    | SidebarVisibilityChanged true -> { model with SidebarVisible = true }, Cmd.none
+    | ExternalChangesDetected when model.BusyOperation.IsSome || followsOwnWrite deps model -> model, Cmd.none
     | ExternalChangesDetected when not model.SidebarVisible ->
         {
             model with
@@ -2913,7 +2942,7 @@ let private updateCore
             ()
             (fun () -> ExternalRefreshDue generation)
     | ExternalRefreshDue generation when generation <> model.ExternalRefreshGeneration -> model, Cmd.none
-    | ExternalRefreshDue _ -> model, Cmd.ofMsg RefreshRequested
+    | ExternalRefreshDue _ -> model, Cmd.ofMsg RefreshRequestedSilently
     | GitRepositoryInitialized arcPath ->
         match model.CurrentArcPath with
         | Some currentArcPath when Swate.Components.Shared.PathHelpers.pathsEqual currentArcPath arcPath ->
@@ -2935,7 +2964,12 @@ let private updateCore
         ->
         // A write may report Refreshing while it still owns CurrentOperation. Queue the
         // refresh until the write completes so it does not clear the write state.
-        { model with RefreshPending = true }, Cmd.none
+        {
+            model with
+                RefreshPending = true
+                RefreshPendingSilently = false
+        },
+        Cmd.none
     | RefreshRequested ->
         let requestId = nextRefreshRequestId model
 
@@ -2958,6 +2992,45 @@ let private updateCore
                 deps
                 (fun refreshResult -> RefreshCompleted(requestId, Ok refreshResult))
                 (fun err -> RefreshCompleted(requestId, Error(string err)))
+
+        nextModel, cmd
+    | RefreshRequestedSilently when model.CurrentArcPath.IsNone ->
+        {
+            resetFor model with
+                CurrentArcPath = model.CurrentArcPath
+                ArcSessionId = model.ArcSessionId
+        },
+        Cmd.none
+    | RefreshRequestedSilently when
+        model.BusyOperation.IsSome
+        && not (
+            model.BusyOperation = Some GitBusyOperation.Refreshing
+            && model.CurrentOperation.IsNone
+        )
+        ->
+        if model.RefreshPending then
+            model, Cmd.none
+        else
+            {
+                model with
+                    RefreshPending = true
+                    RefreshPendingSilently = true
+            },
+            Cmd.none
+    | RefreshRequestedSilently ->
+        let requestId = nextRefreshRequestId model
+
+        let nextModel =
+            model
+            |> withBusyOperation (Some GitBusyOperation.Refreshing)
+            |> startRefreshRequest requestId
+
+        let cmd =
+            Cmd.OfPromise.either
+                refreshAllAsync
+                deps
+                (fun refreshResult -> SilentRefreshCompleted(requestId, Ok refreshResult))
+                (fun err -> SilentRefreshCompleted(requestId, Error(string err)))
 
         nextModel, cmd
     | RefreshCompleted(requestId, _) when requestId <> model.RefreshRequestId -> model, Cmd.none
@@ -2996,6 +3069,35 @@ let private updateCore
                 PendingPublishAfterRefresh = false
         },
         cmd
+    | SilentRefreshCompleted(requestId, _) when requestId <> model.RefreshRequestId -> model, Cmd.none
+    | SilentRefreshCompleted(_, Error _) ->
+        {
+            clearBusy model with
+                RefreshState = GitRefreshState.Idle
+        },
+        Cmd.none
+    | SilentRefreshCompleted(_, Ok refreshResult) when refreshFailure refreshResult |> Option.exists isMissingRepository ->
+        missingRepositoryModel model, applyPageChangeCmd setPageState GitPageChange.Clear
+    | SilentRefreshCompleted(_, Ok refreshResult) when refreshFailure refreshResult |> Option.isSome ->
+        {
+            clearBusy model with
+                RefreshState = GitRefreshState.Idle
+        },
+        Cmd.none
+    | SilentRefreshCompleted(_, Ok refreshResult) ->
+        let nextModel = model |> applyRefreshResult refreshResult |> clearBusy
+
+        {
+            nextModel with
+                ErrorNotice = model.ErrorNotice
+                WarningNotice = model.WarningNotice
+                PendingRefreshWarningNotice = model.PendingRefreshWarningNotice
+                PendingPublishAfterRefresh = false
+        },
+        (if nextModel.PendingPublishAfterRefresh then
+             Cmd.ofMsg (WriteRequested(Push GitUpdateAcceptance.RequirePreview))
+         else
+             Cmd.none)
     | InitRepositoryRequested when model.CurrentArcPath.IsNone -> model, Cmd.none
     | InitRepositoryRequested ->
         let nextModel =
@@ -4037,13 +4139,35 @@ let update
     : GitState * Cmd<Msg> =
     let next, cmd = updateCore deps setPageState msg model
 
+    let next =
+        match msg with
+        | WriteCompleted(sessionId, writeRequestId, _, _) when
+            sessionId = model.ArcSessionId && writeRequestId = model.WriteRequestId
+              ->
+              {
+                  next with
+                      LastWriteCompletedAt = Some(deps.now ())
+              }
+        | _ -> next
+
     if
         next.RefreshPending
         && next.BusyOperation.IsNone
         && next.PendingConfirmation.IsNone
         && next.PendingRecovery.IsNone
     then
-        { next with RefreshPending = false }, Cmd.batch [ cmd; Cmd.ofMsg RefreshRequested ]
+        let refreshMessage =
+            if next.RefreshPendingSilently then
+                RefreshRequestedSilently
+            else
+                RefreshRequested
+
+        {
+            next with
+                RefreshPending = false
+                RefreshPendingSilently = false
+        },
+        Cmd.batch [ cmd; Cmd.ofMsg refreshMessage ]
     else
         next, cmd
 

@@ -21,10 +21,10 @@ type GitDiffViewer =
             wordDiffText: string,
             previousContent: string,
             currentContent: string,
-            ?changeKind: GitDiffChangeKind,
             ?previousTitle: string,
             ?currentTitle: string,
-            ?testIdPrefix: string
+            ?testIdPrefix: string,
+            ?changeKind: GitDiffChangeKind
         ) =
         let previousHeaderLabel, currentHeaderLabel, rows, previousLineCount, currentLineCount, changeBadgeText =
             React.useMemo (

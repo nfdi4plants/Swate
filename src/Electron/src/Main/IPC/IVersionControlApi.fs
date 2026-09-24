@@ -111,7 +111,9 @@ let private runTracked
             )
 
         let startedAt = System.DateTime.UtcNow
-        logOperationStarted operationName operationId
+
+        if mutating then
+            logOperationStarted operationName operationId
 
         let! result = promise {
             try
@@ -127,7 +129,10 @@ let private runTracked
         let durationMilliseconds =
             int64 (System.DateTime.UtcNow.Subtract(startedAt).TotalMilliseconds)
 
-        logOperationFinished operationName operationId result durationMilliseconds
+        match mutating, result with
+        | false, Succeeded _ -> ()
+        | _ -> logOperationFinished operationName operationId result durationMilliseconds
+
         return result
     }
 

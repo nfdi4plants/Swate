@@ -351,6 +351,7 @@ let private defaultDependencies: GitDependencies = {
     clearStaleLock = fun _ -> unexpectedPromise "clearStaleLock"
     hasUsableAccount = fun () -> true
     delay = fun milliseconds -> Promise.sleep milliseconds
+    now = fun () -> JS.Date.now ()
     newOperationId = fun () -> "op-1"
     confirmLfsPrune = fun _ -> false
     confirmInstall = fun _ -> false
@@ -514,7 +515,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "reconcile_index uses Swate's recovery instructions",
+            "index_reconciliation_failed uses Swate's recovery instructions",
             fun () ->
                 let failure =
                     makeFailure
@@ -531,8 +532,41 @@ Vitest.describe (
                 Vitest
                     .expect(failureMessage failure)
                     .toBe (
-                        "The selected changes were committed, but the index could not be reconciled. Close other Git programs for this ARC, then refresh the Git sidebar."
+                        "The selected changes were committed, but the index could not be reconciled. The changes are saved in a commit, but Git's file index is out of date. Close other Git programs for this ARC, then run \"git reset\" in the ARC folder."
                     )
+
+                let attributesFailure =
+                    makeFailure
+                        ProviderError
+                        "attributes_reconciliation_failed"
+                        "The attributes update failed."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.ReconcileIndex
+                            Instructions = Some "Retry the attributes update."
+                        })
+                        [||]
+
+                Vitest
+                    .expect(failureMessage attributesFailure)
+                    .toBe ("The attributes update failed. Retry the attributes update.")
+        )
+
+        Vitest.test (
+            "hasRemote uses synchronization and listed refs without a web URL",
+            fun () ->
+                let synchronizedState = {
+                    GitState.Empty with
+                        Status = mapStatus cleanStatus
+                }
+
+                let listedRemoteState = {
+                    GitState.Empty with
+                        Refs = [| remoteBranch "main" |]
+                        OriginRemoteRepositoryWebUrl = None
+                }
+
+                Vitest.expect(hasRemote synchronizedState).toBe (true)
+                Vitest.expect(hasRemote listedRemoteState).toBe (true)
         )
 )
 
@@ -987,6 +1021,7 @@ Vitest.describe (
                                 ArcSessionId = 1
                                 RefreshRequestId = 1
                                 PageLoadRequestId = 1
+                                ExternalRefreshGeneration = 1
                         }
                     )
 
@@ -1021,6 +1056,44 @@ Vitest.describe (
                 Vitest.expect(reportedErrors.Count).toBe (1)
                 Vitest.expect(reportedErrors[0].Title).toBe ("Could not refresh Git state")
                 Vitest.expect(reportedErrors[0].Message).toBe ("remote status failed")
+            }
+        )
+
+        Vitest.test (
+            "A silent refresh failure keeps the current notices and opens no modal",
+            fun () -> promise {
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+                let pageStates = ResizeArray<PageState option>()
+
+                let deps = {
+                    defaultDependencies with
+                        getSessionInfo = fun _ -> promise { return Error "silent refresh failed" }
+                        reportError = reportedErrors.Add
+                }
+
+                let state = {
+                    runningState with
+                        ErrorNotice = Some "existing error"
+                        WarningNotice = Some "existing warning"
+                }
+
+                let requestingState, requestCmd =
+                    update deps pageStates.Add RefreshRequestedSilently state
+
+                let! requestMessages = collectMessages requestCmd
+
+                let nextState, nextCmd =
+                    match requestMessages with
+                    | [| (SilentRefreshCompleted _ as message) |] -> update deps pageStates.Add message requestingState
+                    | _ -> failwith "Expected a silent refresh completion."
+
+                let! nextMessages = collectMessages nextCmd
+
+                Vitest.expect(nextState.ErrorNotice).toEqual (Some "existing error")
+                Vitest.expect(nextState.WarningNotice).toEqual (Some "existing warning")
+                Vitest.expect(reportedErrors.Count).toBe (0)
+                Vitest.expect(pageStates |> Seq.toArray).toEqual ([||])
+                Vitest.expect(nextMessages).toEqual ([||])
             }
         )
 
@@ -1465,6 +1538,7 @@ Vitest.describe (
                                 ArcSessionId = 1
                                 RefreshRequestId = 1
                                 PageLoadRequestId = 1
+                                ExternalRefreshGeneration = 1
                         }
                     )
 
@@ -1514,7 +1588,7 @@ Vitest.describe (
                 let! latestTimerMessages = collectMessages latestTimerCmd
 
                 Vitest.expect(oldTimerMessages).toEqual ([||])
-                Vitest.expect(latestTimerMessages).toEqual ([| RefreshRequested |])
+                Vitest.expect(latestTimerMessages).toEqual ([| RefreshRequestedSilently |])
 
                 let hiddenState, hiddenCmd =
                     update deps ignore ExternalChangesDetected GitState.Empty
@@ -1530,6 +1604,99 @@ Vitest.describe (
                 Vitest.expect(hiddenState.ExternalChangesSeen).toBe (true)
                 Vitest.expect(revealedState.ExternalChangesSeen).toBe (false)
                 Vitest.expect(revealMessages).toEqual ([| RefreshRequested |])
+            }
+        )
+
+        Vitest.test (
+            "Hiding the sidebar invalidates a pending external refresh",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        delay = fun _ -> Promise.sleep 0
+                }
+
+                let pendingState, timerCmd =
+                    update deps ignore ExternalChangesDetected {
+                        runningState with
+                            SidebarVisible = true
+                    }
+
+                let! timerMessages = collectMessages timerCmd
+
+                let hiddenState, hideCmd =
+                    update deps ignore (SidebarVisibilityChanged false) pendingState
+
+                let! hideMessages = collectMessages hideCmd
+
+                let _, dueCmd =
+                    match timerMessages with
+                    | [| ExternalRefreshDue generation |] ->
+                        update deps ignore (ExternalRefreshDue generation) hiddenState
+                    | _ -> failwith "Expected an external refresh timer."
+
+                let! dueMessages = collectMessages dueCmd
+
+                Vitest.expect(hiddenState.SidebarVisible).toBe (false)
+                Vitest.expect(hideMessages).toEqual ([||])
+                Vitest.expect(dueMessages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
+            "An external batch within 2000 ms after a write schedules nothing",
+            fun () -> promise {
+                let mutable currentTime = 1000.0
+
+                let deps = {
+                    defaultDependencies with
+                        now = fun () -> currentTime
+                }
+
+                let writingState = {
+                    runningState with
+                        BusyOperation = Some GitBusyOperation.FetchingFromRemote
+                        WriteRequestId = 1
+                }
+
+                let completedState, completedCmd =
+                    update
+                        deps
+                        ignore
+                        (WriteCompleted(
+                            writingState.ArcSessionId,
+                            writingState.WriteRequestId,
+                            Fetch,
+                            Ok(
+                                Completed(
+                                    UnitSuccess {
+                                        Refresh = refreshed cleanStatus
+                                        PageChange = GitPageChange.NoChange
+                                        SelectedChangePath = None
+                                        Warning = None
+                                        Partial = None
+                                        Published = None
+                                    }
+                                )
+                            )
+                        ))
+                        writingState
+
+                let! completedMessages = collectMessages completedCmd
+                currentTime <- 2999.0
+
+                let afterExternalBatch, externalCmd =
+                    update deps ignore ExternalChangesDetected completedState
+
+                let! externalMessages = collectMessages externalCmd
+
+                Vitest.expect(completedState.LastWriteCompletedAt).toEqual (Some 1000.0)
+                Vitest.expect(completedMessages).toEqual ([||])
+
+                Vitest
+                    .expect(afterExternalBatch.ExternalRefreshGeneration)
+                    .toBe (completedState.ExternalRefreshGeneration)
+
+                Vitest.expect(externalMessages).toEqual ([||])
             }
         )
 
@@ -3013,6 +3180,7 @@ Vitest.describe (
                                 ArcSessionId = 1
                                 RefreshRequestId = 1
                                 PageLoadRequestId = 1
+                                ExternalRefreshGeneration = 1
                         }
                     )
             }
@@ -3886,7 +4054,7 @@ Vitest.describe (
                         [||]
 
                 let expectedMessage =
-                    $"{failure.Message} Close other Git programs for this ARC, then refresh the Git sidebar."
+                    $"{failure.Message} The changes are saved in a commit, but Git's file index is out of date. Close other Git programs for this ARC, then run \"git reset\" in the ARC folder."
 
                 let partialOutcome =
                     operationWithPublication PublicationStateDto.NotApplicable "revision-1"
