@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <None Include="ChokidarTest.fsx" />
+    <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Bindings\Chokidar.fs" />
     <Compile Include="Bindings\Abort.fs" />
     <Compile Include="Bindings\Filesystem.fs" />
