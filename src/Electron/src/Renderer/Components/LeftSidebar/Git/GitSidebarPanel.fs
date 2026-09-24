@@ -51,11 +51,22 @@ let private isCancellableBusyOperation (busyOperation: Renderer.Context.GitWorkf
 let Main () =
 
     let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
+
+    let leftSidebarCtx =
+        Swate.Components.Composite.Layout.LeftSidebarContext.useLeftSidebarCtx ()
+
     let authState = Renderer.Context.AuthStateContext.useAuthStateCtx ()
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let runStatus = Renderer.Context.GitWorkflow.currentRunStatus gitStateCtx.state
     let errorCtx = useErrorModalCtx ()
     let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
+
+    React.useEffect ((fun () -> fun () -> gitStateCtx.sidebarVisibilityChanged false), [||])
+
+    React.useEffect (
+        (fun () -> gitStateCtx.sidebarVisibilityChanged leftSidebarCtx.state),
+        [| box leftSidebarCtx.state |]
+    )
 
     let onOpenArcError =
         createErrorModalCallback errorCtx.enqueue "Error opening ARC" appStateCtx

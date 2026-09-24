@@ -17,6 +17,7 @@ open Renderer.Context.GitWorkflow
 type GitStateController = {
     state: GitState
     refresh: unit -> unit
+    sidebarVisibilityChanged: bool -> unit
     initRepository: unit -> unit
     fetch: unit -> unit
     pull: unit -> unit
@@ -71,7 +72,7 @@ module private Helper =
         : JS.Promise<Result<PageState, string>> =
         promise { return conflictPageFor conflict workspaceVersion requestedPath }
 
-    let dependencies (reportError: GitErrorNotification -> unit) : GitDependencies = {
+    let dependencies (reportError: GitErrorNotification -> unit) (hasUsableAccount: unit -> bool) : GitDependencies = {
         getSessionInfo = Renderer.VersionControlApiClient.getSessionInfo
         getStatus = Renderer.VersionControlApiClient.getStatus
         listRefs = Renderer.VersionControlApiClient.listRefs
@@ -107,6 +108,8 @@ module private Helper =
         pruneStorage = Renderer.VersionControlApiClient.pruneStorage
         deduplicateStorage = Renderer.VersionControlApiClient.deduplicateStorage
         clearStaleLock = Renderer.VersionControlApiClient.clearStaleLock
+        hasUsableAccount = hasUsableAccount
+        delay = fun milliseconds -> Promise.sleep milliseconds
         newOperationId = Renderer.VersionControlApiClient.newOperationId
         confirmLfsPrune = fun message -> window.confirm message
         confirmInstall = fun message -> window.confirm message
@@ -118,6 +121,7 @@ let GitStateCtx =
         {
             state = GitState.Empty
             refresh = fun () -> ()
+            sidebarVisibilityChanged = fun _ -> ()
             initRepository = fun () -> ()
             fetch = fun () -> ()
             pull = fun () -> ()
@@ -154,6 +158,9 @@ let GitStateCtxProvider (children: ReactElement) =
 
     let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+    let authStateCtx = Renderer.Context.AuthStateContext.useAuthStateCtx ()
+    let usableAccountRef = React.useRef false
+    usableAccountRef.current <- authStateCtx.UsableActiveUser().IsSome
     let errorModalCtx = useErrorModalCtx ()
     let errorModalCtxRef = React.useRef errorModalCtx
     errorModalCtxRef.current <- errorModalCtx
@@ -169,12 +176,15 @@ let GitStateCtxProvider (children: ReactElement) =
         )
 
     let dependencies =
-        React.useMemo ((fun _ -> Helper.dependencies reportGitError), [||])
+        React.useMemo ((fun _ -> Helper.dependencies reportGitError (fun () -> usableAccountRef.current)), [||])
 
     let gitState, dispatch =
         React.useElmish ((fun () -> init ()), update dependencies pageStateCtx.setState, subscribe, [||])
 
     let refresh () = dispatch RefreshRequested
+
+    let sidebarVisibilityChanged isVisible =
+        dispatch (SidebarVisibilityChanged isVisible)
 
     let initRepository () = dispatch InitRepositoryRequested
 
@@ -248,6 +258,7 @@ let GitStateCtxProvider (children: ReactElement) =
             (fun _ -> {
                 state = gitState
                 refresh = refresh
+                sidebarVisibilityChanged = sidebarVisibilityChanged
                 initRepository = initRepository
                 fetch = fetch
                 pull = pull

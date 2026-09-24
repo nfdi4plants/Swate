@@ -8,8 +8,12 @@ open Renderer.Types
 open Swate.Components.Api.GitLabApi
 open Swate.Components.Page.GitSidebarTypes
 open Swate.Electron.Shared
+open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.VersionControlTypes
+
+/// Large copies need time to settle before Git hashes their contents again.
+let private externalChangesRefreshDelayMs = 1500
 
 [<RequireQualifiedAccess>]
 type GitRefreshState =
@@ -71,6 +75,7 @@ type GitUpdateAcceptance =
 [<RequireQualifiedAccess>]
 type GitPendingRemoteAction =
     | None
+    | DiscardSelection of string[]
     | UpdateFromOnline of GitUpdateAcceptance
     | PublishAfterUpdate of GitUpdateAcceptance
     | FinalizeMerge
@@ -129,6 +134,9 @@ type GitState = {
     RepositoryAvailability: GitRepositoryAvailability
     RefreshState: GitRefreshState
     RefreshRequestId: int
+    SidebarVisible: bool
+    ExternalChangesSeen: bool
+    ExternalRefreshGeneration: int
     /// A refresh requested while a write is active runs after the write completes.
     RefreshPending: bool
     BusyOperation: GitBusyOperation option
@@ -180,6 +188,9 @@ type GitState = {
         RepositoryAvailability = GitRepositoryAvailability.Ready
         RefreshState = GitRefreshState.Idle
         RefreshRequestId = 0
+        SidebarVisible = false
+        ExternalChangesSeen = false
+        ExternalRefreshGeneration = 0
         RefreshPending = false
         BusyOperation = None
         BusyNotice = None
@@ -481,6 +492,9 @@ type Msg =
     | ArcPathChanged of ArcRootPath
     | GitRepositoryInitialized of arcPath: string
     | RefreshRequested
+    | ExternalChangesDetected
+    | ExternalRefreshDue of generation: int
+    | SidebarVisibilityChanged of bool
     | RefreshCompleted of requestId: int * result: Result<GitRefreshResult, string>
     | InitRepositoryRequested
     | InitRepositoryCompleted of sessionId: int * result: Result<unit, string>
@@ -571,6 +585,8 @@ type GitDependencies = {
     pruneStorage: OperationRequestDto -> JS.Promise<Result<OperationResultDto<string>, string>>
     deduplicateStorage: OperationRequestDto -> JS.Promise<Result<OperationResultDto<string>, string>>
     clearStaleLock: OperationRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceStatusDto>, string>>
+    hasUsableAccount: unit -> bool
+    delay: int -> JS.Promise<unit>
     newOperationId: unit -> string
     confirmLfsPrune: string -> bool
     confirmInstall: string -> bool
@@ -1781,6 +1797,9 @@ let private runDiscardAttemptAsync (deps: GitDependencies) (state: GitState) (pa
 let private pendingPrimarySaveWarning =
     "Changes were saved locally. Online sync is still pending."
 
+let private missingPublishAccountNotice =
+    "Saved locally. Sign in to a DataHub account to publish this ARC."
+
 /// The saved-locally outcome after a remote step failed. The snapshot is refreshed
 /// first, because the failed step may have changed the workspace.
 let private pendingPrimarySaveRemoteFailureAsync (deps: GitDependencies) (message: string) = promise {
@@ -1816,6 +1835,7 @@ type private PublishFailure =
     | AcceptanceRequired of dialog: GitSidebarConfirmationDialog * observedTarget: string * workspaceVersion: string
     | ProjectNameRefused of string
     | ProvisioningIncomplete of GitProvisionedRemote * string
+    | NoUsableAccount
 
 /// Synchronizes the workspace. Without a publication target the repository is created on the
 /// DataHub of the signed-in account (or the one created earlier is reused), the workspace is
@@ -1903,13 +1923,18 @@ let private runPublishAsync
         }
 
         match model.ProvisionedRemote with
+        | Some _ when not (deps.hasUsableAccount ()) -> return Error PublishFailure.NoUsableAccount
         | Some _ -> return! provisionAndPublish acceptance
         | None ->
             let! first = publishOnce version acceptance
 
             match first with
+            | Ok(_, Some partial) when needsPublishTarget partial && not (deps.hasUsableAccount ()) ->
+                return Error PublishFailure.NoUsableAccount
             | Ok(_, Some partial) when needsPublishTarget partial -> return! provisionAndPublish acceptance
             | Ok(outcome, partial) -> return Ok(outcome, partial)
+            | Error failure when needsPublishTarget failure && not (deps.hasUsableAccount ()) ->
+                return Error PublishFailure.NoUsableAccount
             | Error failure when needsPublishTarget failure -> return! provisionAndPublish acceptance
             | Error failure ->
                 match routeFailure None failure with
@@ -1925,6 +1950,7 @@ let private publishFailureToOutcome
     promise {
         match failure with
         | PublishFailure.Routed routed -> return! onRouted routed
+        | PublishFailure.NoUsableAccount -> return Error missingPublishAccountNotice
         | PublishFailure.AcceptanceRequired _ ->
             return Error "The synchronization needs a decision that this write cannot offer."
         | PublishFailure.ProjectNameRefused message -> return Ok(RequiresRemoteProjectRename message)
@@ -2025,7 +2051,8 @@ let private runPrimarySaveAttemptAsync
                     | Error(PublishFailure.Routed(RoutedFailure.Recovery _)) -> false
                     | Error(PublishFailure.Routed _) -> true
                     | Error(PublishFailure.ProjectNameRefused _)
-                    | Error(PublishFailure.ProvisioningIncomplete _) -> false
+                    | Error(PublishFailure.ProvisioningIncomplete _)
+                    | Error PublishFailure.NoUsableAccount -> false
 
                 if followsRefresh then
                     reportPhase GitBusyOperation.Refreshing
@@ -2063,6 +2090,21 @@ let private runPrimarySaveAttemptAsync
                                 )
                             )
                         )
+                | Error PublishFailure.NoUsableAccount ->
+                    let! refreshResult = refreshAllAsync deps
+
+                    match refreshResult.Status with
+                    | Ok _ ->
+                        return
+                            Ok(
+                                Completed(
+                                    UnitSuccess {
+                                        unitSuccess refreshResult with
+                                            Warning = Some missingPublishAccountNotice
+                                    }
+                                )
+                            )
+                    | Error failure -> return Error(failureMessage failure)
                 | Error failure ->
                     return!
                         publishFailureToOutcome
@@ -2625,8 +2667,14 @@ let private confirmMergeResolutionAsync
 
 let init () : GitState * Cmd<Msg> = GitState.Empty, Cmd.none
 
-let private missingRepositoryModel (model: GitState) = {
+let private resetFor (model: GitState) = {
     GitState.Empty with
+        SidebarVisible = model.SidebarVisible
+        ExternalRefreshGeneration = model.ExternalRefreshGeneration
+}
+
+let private missingRepositoryModel (model: GitState) = {
+    resetFor model with
         CurrentArcPath = model.CurrentArcPath
         ArcSessionId = model.ArcSessionId
         RefreshRequestId = model.RefreshRequestId
@@ -2760,7 +2808,7 @@ let private updateCore
     (model: GitState)
     : GitState * Cmd<Msg> =
     match msg with
-    | ResetWorkflow -> GitState.Empty, Cmd.none
+    | ResetWorkflow -> resetFor model, Cmd.none
     | SetCurrentProgress(Some progress) when model.BusyOperation.IsSome ->
         {
             model with
@@ -2795,7 +2843,7 @@ let private updateCore
             | _ -> false
 
         let nextModel = {
-            GitState.Empty with
+            resetFor model with
                 CurrentArcPath = arcPath
                 ArcSessionId = nextArcSessionId model
                 // The request counters keep counting across ARCs. Resetting them let a
@@ -2816,6 +2864,38 @@ let private updateCore
             | None -> applyPageChangeCmd setPageState GitPageChange.Clear
 
         nextModel, cmd
+    | SidebarVisibilityChanged true when model.ExternalChangesSeen ->
+        {
+            model with
+                SidebarVisible = true
+                ExternalChangesSeen = false
+        },
+        Cmd.ofMsg RefreshRequested
+    | SidebarVisibilityChanged isVisible ->
+        {
+            model with
+                SidebarVisible = isVisible
+        },
+        Cmd.none
+    | ExternalChangesDetected when not model.SidebarVisible ->
+        {
+            model with
+                ExternalChangesSeen = true
+        },
+        Cmd.none
+    | ExternalChangesDetected ->
+        let generation = model.ExternalRefreshGeneration + 1
+
+        {
+            model with
+                ExternalRefreshGeneration = generation
+        },
+        Cmd.OfPromise.perform
+            (fun () -> deps.delay externalChangesRefreshDelayMs)
+            ()
+            (fun () -> ExternalRefreshDue generation)
+    | ExternalRefreshDue generation when generation <> model.ExternalRefreshGeneration -> model, Cmd.none
+    | ExternalRefreshDue _ -> model, Cmd.ofMsg RefreshRequested
     | GitRepositoryInitialized arcPath ->
         match model.CurrentArcPath with
         | Some currentArcPath when Swate.Components.Shared.PathHelpers.pathsEqual currentArcPath arcPath ->
@@ -2823,7 +2903,7 @@ let private updateCore
         | _ -> model, Cmd.none
     | RefreshRequested when model.CurrentArcPath.IsNone ->
         {
-            GitState.Empty with
+            resetFor model with
                 CurrentArcPath = model.CurrentArcPath
                 ArcSessionId = model.ArcSessionId
         },
@@ -3233,9 +3313,39 @@ let private updateCore
     | CommitSelectionRequested selection ->
         model, Cmd.ofMsg (WriteRequested(CommitSelection(prepareCommitSelection selection)))
     | CommitAllRequested message -> model, Cmd.ofMsg (WriteRequested(CommitAll(prepareCommitAll model message)))
-    | DiscardSelectionRequested paths -> model, Cmd.ofMsg (WriteRequested(DiscardSelection paths))
+    | DiscardSelectionRequested _ when model.PendingConfirmation.IsSome -> model, Cmd.none
+    | DiscardSelectionRequested paths ->
+        let message =
+            if paths.Length = 1 then
+                $"Discard your changes to '{paths[0]}'? This can't be undone."
+            else
+                let shownPaths = paths |> Array.truncate 5 |> String.concat "\n"
+                let moreCount = paths.Length - min paths.Length 5
+                let moreMessage = if moreCount > 0 then $"\nand {moreCount} more" else ""
+                $"Discard your changes to {paths.Length} files? This can't be undone.\n{shownPaths}{moreMessage}"
+
+        let dialog = {
+            Title = "Discard changes?"
+            Message = message
+            ConfirmLabel = "Discard"
+            CancelLabel = "Keep changes"
+        }
+
+        {
+            model with
+                PendingConfirmation = Some dialog
+                PendingRemoteAction = GitPendingRemoteAction.DiscardSelection paths
+        },
+        Cmd.none
     | ConfirmPendingRemoteActionRequested ->
         match model.PendingRemoteAction with
+        | GitPendingRemoteAction.DiscardSelection paths ->
+            {
+                model with
+                    PendingConfirmation = None
+                    PendingRemoteAction = GitPendingRemoteAction.None
+            },
+            Cmd.ofMsg (WriteRequested(DiscardSelection paths))
         | GitPendingRemoteAction.UpdateFromOnline acceptance ->
             {
                 model with
@@ -3934,6 +4044,19 @@ let subscribe (_model: GitState) : Sub<Msg> = [
         let dispose =
             Renderer.IpcReceiver.subscribeProxyReceiver<IGitRepositoryRendererApi> {
                 gitRepositoryInitialized = fun arcPath -> dispatch (GitRepositoryInitialized arcPath)
+            }
+
+        { new System.IDisposable with
+            member _.Dispose() = dispose ()
+        }
+    [ "arcFileWatcher" ],
+    fun dispatch ->
+        let dispose =
+            Renderer.IpcReceiver.subscribeProxyReceiver<IArcFileWatcherApi> {
+                IsLoadingChanges =
+                    fun isLoading ->
+                        if not isLoading then
+                            dispatch ExternalChangesDetected
             }
 
         { new System.IDisposable with

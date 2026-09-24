@@ -348,6 +348,8 @@ let private defaultDependencies: GitDependencies = {
     pruneStorage = fun _ -> unexpectedPromise "pruneStorage"
     deduplicateStorage = fun _ -> unexpectedPromise "deduplicateStorage"
     clearStaleLock = fun _ -> unexpectedPromise "clearStaleLock"
+    hasUsableAccount = fun () -> true
+    delay = fun milliseconds -> Promise.sleep milliseconds
     newOperationId = fun () -> "op-1"
     confirmLfsPrune = fun _ -> false
     confirmInstall = fun _ -> false
@@ -430,6 +432,12 @@ let private runningState = {
         ArcSessionId = 1
         WorkspaceVersion = Some "v1"
 }
+
+let private requestAndConfirmDiscard deps state paths =
+    let pendingConfirmation, _ =
+        update deps ignore (DiscardSelectionRequested paths) state
+
+    update deps ignore ConfirmPendingRemoteActionRequested pendingConfirmation
 
 let private completeOne deps model cmd = promise {
     let! messages = collectMessages cmd
@@ -1388,6 +1396,63 @@ Vitest.describe (
     "GitWorkflow write request flow",
     fun () ->
         Vitest.test (
+            "Watcher batches refresh a visible sidebar once and defer hidden changes",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        delay = fun _ -> Promise.sleep 0
+                }
+
+                let visibleState, firstCmd =
+                    update deps ignore ExternalChangesDetected {
+                        runningState with
+                            SidebarVisible = true
+                    }
+
+                let! firstMessages = collectMessages firstCmd
+
+                let nextVisibleState, secondCmd =
+                    update deps ignore ExternalChangesDetected visibleState
+
+                let! secondMessages = collectMessages secondCmd
+
+                let afterOldTimer, oldTimerCmd =
+                    match firstMessages with
+                    | [| ExternalRefreshDue generation |] ->
+                        update deps ignore (ExternalRefreshDue generation) nextVisibleState
+                    | _ -> failwith "Expected the first external refresh timer."
+
+                let! oldTimerMessages = collectMessages oldTimerCmd
+
+                let _, latestTimerCmd =
+                    match secondMessages with
+                    | [| ExternalRefreshDue generation |] ->
+                        update deps ignore (ExternalRefreshDue generation) afterOldTimer
+                    | _ -> failwith "Expected the latest external refresh timer."
+
+                let! latestTimerMessages = collectMessages latestTimerCmd
+
+                Vitest.expect(oldTimerMessages).toEqual ([||])
+                Vitest.expect(latestTimerMessages).toEqual ([| RefreshRequested |])
+
+                let hiddenState, hiddenCmd =
+                    update deps ignore ExternalChangesDetected GitState.Empty
+
+                let! hiddenMessages = collectMessages hiddenCmd
+
+                let revealedState, revealCmd =
+                    update deps ignore (SidebarVisibilityChanged true) hiddenState
+
+                let! revealMessages = collectMessages revealCmd
+
+                Vitest.expect(hiddenMessages).toEqual ([||])
+                Vitest.expect(hiddenState.ExternalChangesSeen).toBe (true)
+                Vitest.expect(revealedState.ExternalChangesSeen).toBe (false)
+                Vitest.expect(revealMessages).toEqual ([| RefreshRequested |])
+            }
+        )
+
+        Vitest.test (
             "Primary save creates the revision with exactly the selected paths and never stages separately",
             fun () -> promise {
                 let mutable captured = None
@@ -1564,10 +1629,20 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "Discard sends restorePaths with the exact paths and the current workspace version",
+            "Discard confirmation shows paths, cancels safely, and restores on confirmation",
             fun () -> promise {
                 let mutable captured = None
                 let pageStates = ResizeArray<PageState option>()
+
+                let paths = [|
+                    "a.txt"
+                    "b.txt"
+                    "c.txt"
+                    "d.txt"
+                    "e.txt"
+                    "f.txt"
+                    "g.txt"
+                |]
 
                 let deps = {
                     (withRefresh cleanStatus defaultDependencies) with
@@ -1577,24 +1652,79 @@ Vitest.describe (
                                 promise { return Ok(succeeded ()) }
                 }
 
-                let model, command =
-                    update deps pageStates.Add (DiscardSelectionRequested [| " leading.txt"; "b.txt"; "b.txt" |]) {
-                        runningState with
-                            SelectedChangePath = Some "b.txt"
-                    }
+                let singlePathState, singlePathCmd =
+                    update deps pageStates.Add (DiscardSelectionRequested [| "single.txt" |]) runningState
 
-                let! messages = collectMessages command
-                let requested, write = update deps pageStates.Add messages[0] model
-                let! completion = collectMessages write
+                let! singlePathMessages = collectMessages singlePathCmd
+                let singlePathDialog = singlePathState.PendingConfirmation.Value
+
+                Vitest.expect(singlePathMessages).toEqual ([||])
+                Vitest.expect(singlePathDialog.Title).toBe ("Discard changes?")
+
+                Vitest
+                    .expect(singlePathDialog.Message)
+                    .toBe ("Discard your changes to 'single.txt'? This can't be undone.")
+
+                Vitest.expect(singlePathDialog.ConfirmLabel).toBe ("Discard")
+                Vitest.expect(singlePathDialog.CancelLabel).toBe ("Keep changes")
+
+                Vitest
+                    .expect(singlePathState.PendingRemoteAction)
+                    .toEqual (GitPendingRemoteAction.DiscardSelection [| "single.txt" |])
+
+                let pendingAgain, ignoredCmd =
+                    update deps pageStates.Add (DiscardSelectionRequested [| "ignored.txt" |]) singlePathState
+
+                let! ignoredMessages = collectMessages ignoredCmd
+
+                Vitest.expect(ignoredMessages).toEqual ([||])
+                Vitest.expect(pendingAgain.PendingConfirmation).toEqual (singlePathState.PendingConfirmation)
+                Vitest.expect(pendingAgain.PendingRemoteAction).toEqual (singlePathState.PendingRemoteAction)
+
+                let canceledState, cancelCmd =
+                    update deps pageStates.Add CancelPendingRemoteActionRequested pendingAgain
+
+                let! cancelMessages = collectMessages cancelCmd
+
+                Vitest.expect(cancelMessages).toEqual ([||])
+                Vitest.expect(canceledState.PendingConfirmation).toEqual (None)
+                Vitest.expect(captured.IsNone).toBe (true)
+
+                let manyPathState, manyPathCmd =
+                    update deps pageStates.Add (DiscardSelectionRequested paths) canceledState
+
+                let! manyPathMessages = collectMessages manyPathCmd
+
+                Vitest.expect(manyPathMessages).toEqual ([||])
+
+                Vitest
+                    .expect(manyPathState.PendingConfirmation.Value.Message)
+                    .toBe (
+                        "Discard your changes to 7 files? This can't be undone.\na.txt\nb.txt\nc.txt\nd.txt\ne.txt\nand 2 more"
+                    )
+
+                let confirmingState, confirmCmd =
+                    update deps pageStates.Add ConfirmPendingRemoteActionRequested manyPathState
+
+                let! confirmMessages = collectMessages confirmCmd
+
+                let requestedState, writeCmd =
+                    match confirmMessages with
+                    | [| WriteRequested(DiscardSelection confirmedPaths) |] ->
+                        Vitest.expect(confirmedPaths).toEqual paths
+                        update deps pageStates.Add confirmMessages[0] confirmingState
+                    | _ -> failwith "Expected the confirmed discard write request."
+
+                let! completionMessages = collectMessages writeCmd
 
                 let finalState, finishCmd =
-                    match completion with
+                    match completionMessages with
                     | [| WriteCompleted(_, _, DiscardSelection _, Ok(Completed _)) |] ->
-                        update deps pageStates.Add completion[0] requested
+                        update deps pageStates.Add completionMessages[0] requestedState
                     | _ -> failwith "Expected discard to complete successfully."
 
                 let! _ = collectMessages finishCmd
-                Vitest.expect(captured.Value.Paths).toEqual ([| " leading.txt"; "b.txt" |])
+                Vitest.expect(captured.Value.Paths).toEqual paths
                 Vitest.expect(captured.Value.ExpectedWorkspaceVersion).toBe ("v1")
                 Vitest.expect(pageStates |> Seq.toArray).toEqual ([| None |])
                 Vitest.expect(finalState.SelectedChangePath).toEqual (None)
@@ -3630,7 +3760,7 @@ Vitest.describe (
                 }
 
                 let stateAfterRequest, requestCmd =
-                    update deps ignore (DiscardSelectionRequested [| "a.txt" |]) runningState
+                    requestAndConfirmDiscard deps runningState [| "a.txt" |]
 
                 let! requestMessages = collectMessages requestCmd
 
@@ -4215,6 +4345,64 @@ Vitest.describe (
 
                 Vitest.expect(nextState.CurrentArcPath).toEqual (Some "C:/arc-b")
                 Vitest.expect(messages).toEqual ([| RefreshRequested |])
+            }
+        )
+
+        Vitest.test (
+            "Primary save stays local when its publish target is missing without a DataHub account",
+            fun () -> promise {
+                let mutable createProjectCalls = 0
+                let notice = "Saved locally. Sign in to a DataHub account to publish this ARC."
+
+                let deps = {
+                    (withRefresh cleanStatus defaultDependencies) with
+                        createRevision = fun _ -> promise { return Ok(succeeded "revision-1") }
+                        synchronize =
+                            fun _ -> promise {
+                                return
+                                    Ok(
+                                        failed
+                                            Validation
+                                            VersionControlCodes.PublishTargetMissing
+                                            "publish target missing"
+                                    )
+                            }
+                        hasUsableAccount = fun () -> false
+                        createRemoteProject =
+                            fun _ ->
+                                createProjectCalls <- createProjectCalls + 1
+                                unexpectedGitLab "createRemoteProject should not run without a usable account"
+                }
+
+                let state = {
+                    runningState with
+                        ChangedFiles = [| changedFile "README.md" "M" " " false |]
+                }
+
+                let requested, requestCmd =
+                    update deps ignore (PrimarySaveAllRequested "Save") state
+
+                let! requestMessages = collectMessages requestCmd
+
+                let stateAfterWrite, writeCmd =
+                    match requestMessages with
+                    | [| WriteRequested(PrimarySave _) |] -> update deps ignore requestMessages[0] requested
+                    | _ -> failwith "Expected the primary save request."
+
+                let! completionMessages = collectWriteMessages writeCmd
+
+                let finalState, finalCmd =
+                    match completionMessages with
+                    | [| WriteCompleted(_, _, PrimarySave _, Ok(Completed(UnitSuccess success))) |] ->
+                        Vitest.expect(success.Warning).toEqual (Some notice)
+                        update deps ignore completionMessages[0] stateAfterWrite
+                    | _ -> failwith "Expected the local save to finish with a publication notice."
+
+                let! _ = collectMessages finalCmd
+
+                Vitest.expect(createProjectCalls).toBe (0)
+                Vitest.expect(finalState.ErrorNotice).toEqual (None)
+                Vitest.expect(finalState.WarningNotice).toEqual (Some notice)
             }
         )
 
@@ -6804,8 +6992,7 @@ Vitest.describe (
                         ChangedFiles = [| changedFile "a.txt" "M" " " false |]
                 }
 
-                let model, command =
-                    update deps ignore (DiscardSelectionRequested [| "a.txt" |]) state
+                let model, command = requestAndConfirmDiscard deps state [| "a.txt" |]
 
                 let! messages = collectMessages command
 
