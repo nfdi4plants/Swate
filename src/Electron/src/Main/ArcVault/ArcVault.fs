@@ -99,10 +99,16 @@ type ArcVault(window: BrowserWindow) =
         this.hasUnsavedArcChanges <- false
 
         if not (this.window.isDestroyed ()) then
-            this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle None
+            try
+                this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle None
+            with error ->
+                swatelogfn this.window.id "Failed to reset ARC window title: %s" error.Message
 
             if hadUnsavedArcChanges then
-                sendArcHasUnsavedChangesUpdate false this.window
+                try
+                    sendArcHasUnsavedChangesUpdate false this.window
+                with error ->
+                    swatelogfn this.window.id "Failed to reset ARC dirty state in renderer: %s" error.Message
 
     /// Sets the dirty marker for unsaved in-memory ARC mutations.
     member this.RefreshHasUnsavedArcChangesFlag() =
@@ -440,8 +446,8 @@ module ArcVaultExtensions =
         member private this.RestoreEmptyVaultAfterFailedInitialization() = promise {
             do! this.StopFileWatcher()
             this.path <- None
-            this.ClearArc()
             this.fileTree.Clear()
+            this.ClearArc()
         }
 
         /// This functions should be called once, when an vault is first started with a path

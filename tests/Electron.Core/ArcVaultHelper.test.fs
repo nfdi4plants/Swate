@@ -735,13 +735,27 @@ let private addDataMapToAllEntityTypes (arc: ARC) =
     run.DataMap <- Some(DataMap.init ())
     arc.AddRun(run)
 
-let private createRollbackTestWindow id failOnTitleWrite =
+let private tryGetDirtyStateMessage (args: obj array) =
+    if args.Length = 2 && (string args.[0]).Contains("arcUnsavedChangesUpdate") then
+        Some(unbox<bool> args.[1])
+    else
+        None
+
+let private createRollbackTestWindow id failOnTitleWrite failOnDirtyReset =
     let mutable title = Swate.Electron.Shared.ApplicationVersion.windowTitle None
     let mutable titleWriteCount = 0
-    let sentMessages = ResizeArray<string>()
+    let sentMessages = ResizeArray<obj array>()
 
     let send: obj =
-        emitJsExpr (fun (args: obj array) -> sentMessages.Add(JS.JSON.stringify args)) "((...args) => $0(args))"
+        emitJsExpr
+            (fun (args: obj array) ->
+                sentMessages.Add(args)
+
+                match tryGetDirtyStateMessage args, failOnDirtyReset with
+                | Some false, Some error -> raise error
+                | _ -> ()
+            )
+            "((...args) => $0(args))"
 
     let windowObject =
         createObj [
@@ -2865,7 +2879,7 @@ Vitest.describe (
                 let failedArcPath = join [| blockedParent; "failed-arc" |]
                 let reusableArcPath = join [| rootPath; "reusable-arc" |]
                 let windowId = 71
-                let window, sentMessages = createRollbackTestWindow windowId None
+                let window, sentMessages = createRollbackTestWindow windowId None None
                 let vault = ArcVault(window)
                 let vaults = ArcVaults()
                 let seededEntry = FileEntry.create ("seeded.txt", "seeded.txt", false)
@@ -2889,6 +2903,7 @@ Vitest.describe (
                         creationError <- Some error
 
                     Vitest.expect(creationError.IsSome).toBe (true)
+                    Vitest.expect(creationError.Value.Message).toContain ("Could not write ARC")
                     Vitest.expect(vault.path).toEqual (None)
                     Vitest.expect(vault.arc).toEqual (None)
                     Vitest.expect(vault.watcher).toEqual (None)
@@ -2899,9 +2914,16 @@ Vitest.describe (
                     Vitest
                         .expect(
                             sentMessages
-                            |> Seq.exists (fun message -> message.Contains(PathHelpers.normalizePath failedArcPath))
+                            |> Seq.exists (fun message ->
+                                JS.JSON.stringify(message).Contains(PathHelpers.normalizePath failedArcPath)
+                            )
                         )
                         .toBe (false)
+
+                    let dirtyStateMessages =
+                        sentMessages |> Seq.choose tryGetDirtyStateMessage |> Seq.toArray
+
+                    Vitest.expect(dirtyStateMessages).toEqual ([| true; false |])
 
                     match! vaults.CreateOrFocusArc(windowId, reusableArcPath, "Reusable ARC") with
                     | ArcOpenDisposition.CreatedInCurrent createdPath ->
@@ -2923,12 +2945,56 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "CreateARC preserves the write failure when rollback dirty-state notification throws",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-create-notification-rollback-"
+                let blockedParent = join [| rootPath; "not-a-directory" |]
+                let failedArcPath = join [| blockedParent; "failed-arc" |]
+                let rollbackError = exn "Expected rollback renderer notification failure."
+                let window, sentMessages = createRollbackTestWindow 73 None (Some rollbackError)
+                let vault = ArcVault(window)
+                let seededEntry = FileEntry.create ("seeded.txt", "seeded.txt", false)
+                vault.fileTree.Add(seededEntry.path, seededEntry)
+                do! writeTextFileAsync blockedParent "This file prevents creation of a nested ARC directory."
+
+                try
+                    let mutable creationError: exn option = None
+
+                    try
+                        do! vault.CreateARC(failedArcPath, "Failed ARC")
+                    with error ->
+                        creationError <- Some error
+
+                    Vitest.expect(creationError.IsSome).toBe (true)
+                    Vitest.expect(vault.path).toEqual (None)
+                    Vitest.expect(vault.arc).toEqual (None)
+                    Vitest.expect(vault.watcher).toEqual (None)
+                    Vitest.expect(vault.fileTree.Count).toBe (0)
+                    Vitest.expect(vault.hasUnsavedArcChanges).toBe (false)
+                    Vitest.expect(creationError.Value).not.toBe (rollbackError)
+                    Vitest.expect(creationError.Value.Message).toContain ("Could not write ARC")
+                    Vitest.expect(creationError.Value.Message).not.toContain (rollbackError.Message)
+
+                    let dirtyStateMessages =
+                        sentMessages |> Seq.choose tryGetDirtyStateMessage |> Seq.toArray
+
+                    Vitest.expect(dirtyStateMessages).toEqual ([| true; false |])
+
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! vault.StopFileWatcher()
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
             "CreateARC Startup failure preserves the written ARC while restoring the empty vault",
             fun () -> promise {
                 let! rootPath = TestHelpers.createTempDirectoryAsync "swate-create-startup-rollback-"
                 let arcPath = join [| rootPath; "written-arc" |]
                 let startupError = exn "Expected Startup title failure."
-                let window, sentMessages = createRollbackTestWindow 72 (Some(3, startupError))
+                let window, sentMessages = createRollbackTestWindow 72 (Some(3, startupError)) None
                 let vault = ArcVault(window)
                 let seededEntry = FileEntry.create ("seeded.txt", "seeded.txt", false)
                 vault.fileTree.Add(seededEntry.path, seededEntry)
@@ -2952,7 +3018,9 @@ Vitest.describe (
                     Vitest
                         .expect(
                             sentMessages
-                            |> Seq.exists (fun message -> message.Contains(PathHelpers.normalizePath arcPath))
+                            |> Seq.exists (fun message ->
+                                JS.JSON.stringify(message).Contains(PathHelpers.normalizePath arcPath)
+                            )
                         )
                         .toBe (false)
 
