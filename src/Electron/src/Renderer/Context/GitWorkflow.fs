@@ -14,7 +14,6 @@ open Swate.Electron.Shared.VersionControlTypes
 
 /// Large copies need time to settle before Git hashes their contents again.
 let private externalChangesRefreshDelayMs = 1500
-let private ownWriteRefreshSuppressionMs = 2000.0
 
 [<RequireQualifiedAccess>]
 type GitRefreshState =
@@ -141,7 +140,6 @@ type GitState = {
     /// A refresh requested while a write is active runs after the write completes.
     RefreshPending: bool
     RefreshPendingSilently: bool
-    LastWriteCompletedAt: float option
     BusyOperation: GitBusyOperation option
     BusyNotice: string option
     /// The operation the renderer can cancel. The renderer chooses its id before the call starts.
@@ -196,7 +194,6 @@ type GitState = {
         ExternalRefreshGeneration = 0
         RefreshPending = false
         RefreshPendingSilently = false
-        LastWriteCompletedAt = None
         BusyOperation = None
         BusyNotice = None
         CurrentOperation = None
@@ -594,7 +591,6 @@ type GitDependencies = {
     clearStaleLock: OperationRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceStatusDto>, string>>
     hasUsableAccount: unit -> bool
     delay: int -> JS.Promise<unit>
-    now: unit -> float
     newOperationId: unit -> string
     confirmLfsPrune: string -> bool
     confirmInstall: string -> bool
@@ -745,13 +741,18 @@ let private mergeProgressUpdate (model: GitState) (incoming: GitSidebarProgress)
 /// The message shown for a structured failure: the library message plus its
 /// recovery instructions when it has any.
 let failureMessage (failure: OperationFailureDto) =
+    // Only a commit that exists while the index lags behind gets Swate's text. A held
+    // lock without a commit keeps the library's instructions for the lock dialog.
     let usesIndexRecoveryText =
         failure.Code = "index_reconciliation_failed"
         || failure.Code = VersionControlCodes.IndexLocked
 
     let instructions =
         match failure.RecoveryAction with
-        | Some _ when usesIndexRecoveryText ->
+        | Some recovery when
+            usesIndexRecoveryText
+            && recovery.Code = VersionControlCodes.Recovery.ReconcileIndex
+            ->
             Some
                 "The changes are saved in a commit, but Git's file index is out of date. Close other Git programs for this ARC, then run \"git reset\" in the ARC folder."
         | Some recovery -> recovery.Instructions
@@ -2838,13 +2839,6 @@ let private writeCmd
 let private shouldRunPostMergePush (model: GitState) =
     model.PendingPostMergePush && model.ActiveConflict.IsNone
 
-let private followsOwnWrite (deps: GitDependencies) (model: GitState) =
-    match model.LastWriteCompletedAt with
-    | Some completedAt ->
-        let elapsed = deps.now () - completedAt
-        elapsed >= 0.0 && elapsed < ownWriteRefreshSuppressionMs
-    | None -> false
-
 let private updateCore
     (deps: GitDependencies)
     (setPageState: PageState option -> unit)
@@ -2923,7 +2917,6 @@ let private updateCore
         },
         Cmd.ofMsg RefreshRequested
     | SidebarVisibilityChanged true -> { model with SidebarVisible = true }, Cmd.none
-    | ExternalChangesDetected when model.BusyOperation.IsSome || followsOwnWrite deps model -> model, Cmd.none
     | ExternalChangesDetected when not model.SidebarVisible ->
         {
             model with
@@ -4138,17 +4131,6 @@ let update
     (model: GitState)
     : GitState * Cmd<Msg> =
     let next, cmd = updateCore deps setPageState msg model
-
-    let next =
-        match msg with
-        | WriteCompleted(sessionId, writeRequestId, _, _) when
-            sessionId = model.ArcSessionId && writeRequestId = model.WriteRequestId
-              ->
-              {
-                  next with
-                      LastWriteCompletedAt = Some(deps.now ())
-              }
-        | _ -> next
 
     if
         next.RefreshPending

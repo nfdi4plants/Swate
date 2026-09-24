@@ -351,7 +351,6 @@ let private defaultDependencies: GitDependencies = {
     clearStaleLock = fun _ -> unexpectedPromise "clearStaleLock"
     hasUsableAccount = fun () -> true
     delay = fun milliseconds -> Promise.sleep milliseconds
-    now = fun () -> JS.Date.now ()
     newOperationId = fun () -> "op-1"
     confirmLfsPrune = fun _ -> false
     confirmInstall = fun _ -> false
@@ -512,6 +511,29 @@ Vitest.describe (
 
                 // A later update without a display message keeps the stage it already shows.
                 Vitest.expect(busyNoticeState.CurrentProgress.Value.Stage).toEqual (Some "Uploading objects")
+        )
+
+        Vitest.test (
+            "a held index lock without a commit keeps the library's instructions",
+            fun () ->
+                let failure =
+                    makeFailure
+                        Concurrency
+                        VersionControlCodes.IndexLocked
+                        "Another git process holds the repository index, or a previous one left its lock behind."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.RemoveIndexLock
+                            Instructions =
+                                Some
+                                    "Make sure no git process is running on the repository, remove the lock file, then retry."
+                        })
+                        [||]
+
+                Vitest
+                    .expect(failureMessage failure)
+                    .toBe (
+                        "Another git process holds the repository index, or a previous one left its lock behind. Make sure no git process is running on the repository, remove the lock file, then retry."
+                    )
         )
 
         Vitest.test (
@@ -1639,64 +1661,6 @@ Vitest.describe (
                 Vitest.expect(hiddenState.SidebarVisible).toBe (false)
                 Vitest.expect(hideMessages).toEqual ([||])
                 Vitest.expect(dueMessages).toEqual ([||])
-            }
-        )
-
-        Vitest.test (
-            "An external batch within 2000 ms after a write schedules nothing",
-            fun () -> promise {
-                let mutable currentTime = 1000.0
-
-                let deps = {
-                    defaultDependencies with
-                        now = fun () -> currentTime
-                }
-
-                let writingState = {
-                    runningState with
-                        BusyOperation = Some GitBusyOperation.FetchingFromRemote
-                        WriteRequestId = 1
-                }
-
-                let completedState, completedCmd =
-                    update
-                        deps
-                        ignore
-                        (WriteCompleted(
-                            writingState.ArcSessionId,
-                            writingState.WriteRequestId,
-                            Fetch,
-                            Ok(
-                                Completed(
-                                    UnitSuccess {
-                                        Refresh = refreshed cleanStatus
-                                        PageChange = GitPageChange.NoChange
-                                        SelectedChangePath = None
-                                        Warning = None
-                                        Partial = None
-                                        Published = None
-                                    }
-                                )
-                            )
-                        ))
-                        writingState
-
-                let! completedMessages = collectMessages completedCmd
-                currentTime <- 2999.0
-
-                let afterExternalBatch, externalCmd =
-                    update deps ignore ExternalChangesDetected completedState
-
-                let! externalMessages = collectMessages externalCmd
-
-                Vitest.expect(completedState.LastWriteCompletedAt).toEqual (Some 1000.0)
-                Vitest.expect(completedMessages).toEqual ([||])
-
-                Vitest
-                    .expect(afterExternalBatch.ExternalRefreshGeneration)
-                    .toBe (completedState.ExternalRefreshGeneration)
-
-                Vitest.expect(externalMessages).toEqual ([||])
             }
         )
 
@@ -8636,6 +8600,25 @@ Vitest.describe (
                 Vitest.expect(recoveryMessages).toEqual ([||])
                 Vitest.expect(dismissedState.RefreshPending).toBe (false)
                 Vitest.expect(refreshCount).toBe (1)
+            }
+        )
+
+        Vitest.test (
+            "A silent refresh requested during a write stays pending",
+            fun () -> promise {
+                let writingState = {
+                    runningState with
+                        BusyOperation = Some GitBusyOperation.PushingToRemote
+                }
+
+                let pendingState, pendingCmd =
+                    update defaultDependencies ignore RefreshRequestedSilently writingState
+
+                let! pendingMessages = collectMessages pendingCmd
+
+                Vitest.expect(pendingState.RefreshPending).toBe (true)
+                Vitest.expect(pendingState.RefreshPendingSilently).toBe (true)
+                Vitest.expect(pendingMessages).toEqual ([||])
             }
         )
 

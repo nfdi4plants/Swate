@@ -110,7 +110,6 @@ module private Helper =
         clearStaleLock = Renderer.VersionControlApiClient.clearStaleLock
         hasUsableAccount = hasUsableAccount
         delay = fun milliseconds -> Promise.sleep milliseconds
-        now = fun () -> JS.Constructors.Date.now ()
         newOperationId = Renderer.VersionControlApiClient.newOperationId
         confirmLfsPrune = fun message -> window.confirm message
         confirmInstall = fun message -> window.confirm message
