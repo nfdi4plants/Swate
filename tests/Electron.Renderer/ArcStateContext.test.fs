@@ -107,6 +107,42 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "mutate republishes context for in-place updates",
+            fun () -> promise {
+                let arcFile = makeAssay "mutate-republish"
+                let persisted = ResizeArray<ArcFiles>()
+                let publishedContexts = ResizeArray<ArcState>()
+                let mutable arcState = Unchecked.defaultof<ArcState>
+
+                let root, container =
+                    renderProvider
+                        (fun arcFile -> promise {
+                            persisted.Add arcFile
+                            return Ok()
+                        })
+                        (fun _ -> ())
+                        (fun state ->
+                            arcState <- state
+                            publishedContexts.Add state
+                        )
+
+                try
+                    do! waitForEffect (fun () -> publishedContexts.Count > 0)
+                    arcState.replace arcFile
+                    do! waitForEffect (fun () -> persisted.Count = 1 && publishedContexts.Count > 1)
+
+                    let publishCountBeforeMutate = publishedContexts.Count
+
+                    arcState.mutate (fun current -> current.Tables().[0].AddColumn(CompositeHeader.Comment "Republish"))
+                    do! waitForEffect (fun () -> persisted.Count = 2)
+                    do! waitForEffect (fun () -> publishedContexts.Count > publishCountBeforeMutate)
+                finally
+                    root.unmount ()
+                    container.remove ()
+            }
+        )
+
+        Vitest.test (
             "mutate is a no-op while no arc file is open",
             fun () -> promise {
                 let persisted = ResizeArray<ArcFiles>()

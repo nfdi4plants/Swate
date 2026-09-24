@@ -27,7 +27,9 @@ let useArcStateCtx () = React.useContext ArcStateCtx
 
 [<ReactComponent>]
 let ArcStateProvider (persistArcFile: ArcFiles -> JS.Promise<Result<unit, exn>>, children: ReactElement) =
-    let arcFile, mutateStore, setStore, _ = useMutableStore (None: ArcFiles option)
+    let arcFile, mutateStore, setStore, version =
+        useMutableStore (None: ArcFiles option)
+
     let errorModal = useErrorModalCtx ()
 
     let persist (nextArcFile: ArcFiles) =
@@ -62,7 +64,7 @@ let ArcStateProvider (persistArcFile: ArcFiles -> JS.Promise<Result<unit, exn>>,
                 replace = replace
                 clear = clear
             }),
-            [| box arcFile |]
+            [| box arcFile; box version |]
         )
 
     ArcStateCtx.Provider(state, children)
