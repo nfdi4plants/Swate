@@ -94,10 +94,15 @@ type ArcVault(window: BrowserWindow) =
             this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle (Some arc.Identifier)
 
     member this.ClearArc() =
+        let hadUnsavedArcChanges = this.hasUnsavedArcChanges
         this.arc <- None
+        this.hasUnsavedArcChanges <- false
 
         if not (this.window.isDestroyed ()) then
             this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle None
+
+            if hadUnsavedArcChanges then
+                sendArcHasUnsavedChangesUpdate false this.window
 
     /// Sets the dirty marker for unsaved in-memory ARC mutations.
     member this.RefreshHasUnsavedArcChangesFlag() =
@@ -432,6 +437,13 @@ module ArcVaultExtensions =
             this.ClearPendingFileWatcherState()
         }
 
+        member private this.RestoreEmptyVaultAfterFailedInitialization() = promise {
+            do! this.StopFileWatcher()
+            this.path <- None
+            this.ClearArc()
+            this.fileTree.Clear()
+        }
+
         /// This functions should be called once, when an vault is first started with a path
         member this.Startup() = promise {
             do! this.LoadArc()
@@ -463,12 +475,7 @@ module ArcVaultExtensions =
                     do! this.Startup()
                     sendMsg.pathChange (Some normalizedPath)
                 with error ->
-                    // The path is assigned before loading so ARCtrl can use it. Restore the empty-vault state
-                    // when startup fails; otherwise the window remains bound to a path that was never opened.
-                    do! this.StopFileWatcher()
-                    this.path <- None
-                    this.ClearArc()
-                    this.fileTree.Clear()
+                    do! this.RestoreEmptyVaultAfterFailedInitialization()
                     return raise error
         }
 
@@ -484,24 +491,28 @@ module ArcVaultExtensions =
                     |> Remoting.withWindow this.window
                     |> Remoting.buildProxySender<IPathChangeRendererApi>
 
-                let arc = ARC(identifier)
-                this.path <- Some normalizedPath
-                this.SetArc(arc)
-                this.RefreshHasUnsavedArcChangesFlag()
-                this.isBusyWriting <- true
-
                 try
-                    match! arc.TryWriteAsyncSwate(normalizedPath) with
-                    | Ok _ -> ()
-                    | Error errors ->
-                        failwithf
-                            "Could not write ARC, failed with the following errors %s"
-                            (PathHelpers.formatContractErrors errors)
-                finally
-                    this.isBusyWriting <- false
+                    let arc = ARC(identifier)
+                    this.path <- Some normalizedPath
+                    this.SetArc(arc)
+                    this.RefreshHasUnsavedArcChangesFlag()
+                    this.isBusyWriting <- true
 
-                do! this.Startup()
-                sendMsg.pathChange (Some normalizedPath)
+                    try
+                        match! arc.TryWriteAsyncSwate(normalizedPath) with
+                        | Ok _ -> ()
+                        | Error errors ->
+                            failwithf
+                                "Could not write ARC, failed with the following errors %s"
+                                (PathHelpers.formatContractErrors errors)
+                    finally
+                        this.isBusyWriting <- false
+
+                    do! this.Startup()
+                    sendMsg.pathChange (Some normalizedPath)
+                with error ->
+                    do! this.RestoreEmptyVaultAfterFailedInitialization()
+                    return raise error
         }
 
         member this.RenameOpenArcRoot(newName: string) : Fable.Core.JS.Promise<Result<string, exn>> = promise {

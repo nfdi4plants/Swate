@@ -735,6 +735,35 @@ let private addDataMapToAllEntityTypes (arc: ARC) =
     run.DataMap <- Some(DataMap.init ())
     arc.AddRun(run)
 
+let private createRollbackTestWindow id failOnTitleWrite =
+    let mutable title = Swate.Electron.Shared.ApplicationVersion.windowTitle None
+    let mutable titleWriteCount = 0
+    let sentMessages = ResizeArray<string>()
+
+    let send: obj =
+        emitJsExpr (fun (args: obj array) -> sentMessages.Add(JS.JSON.stringify args)) "((...args) => $0(args))"
+
+    let windowObject =
+        createObj [
+            "id" ==> id
+            "isDestroyed" ==> (fun () -> false)
+            "webContents" ==> createObj [ "send" ==> send ]
+        ]
+
+    let setTitle (value: string) =
+        titleWriteCount <- titleWriteCount + 1
+
+        match failOnTitleWrite with
+        | Some(failingWrite, error) when titleWriteCount = failingWrite -> raise error
+        | _ -> title <- value
+
+    emitJsExpr
+        (windowObject, (fun () -> title), setTitle)
+        "Object.defineProperty($0, 'title', { configurable: true, get: () => $1(), set: value => $2(value) })"
+    |> ignore
+
+    windowObject |> unbox<BrowserWindow>, sentMessages
+
 Vitest.describe (
     "ArcVaultHelper",
     fun () ->
@@ -2826,6 +2855,121 @@ Vitest.describe (
 
                         Vitest.expect(loadedArc.GetRun("Run With DataMap").DataMap.Value.StaticHash).not.toBe (0)
                     })
+        )
+
+        Vitest.test (
+            "CreateARC write failure restores the current empty vault and leaves it reusable",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-create-write-rollback-"
+                let blockedParent = join [| rootPath; "not-a-directory" |]
+                let failedArcPath = join [| blockedParent; "failed-arc" |]
+                let reusableArcPath = join [| rootPath; "reusable-arc" |]
+                let windowId = 71
+                let window, sentMessages = createRollbackTestWindow windowId None
+                let vault = ArcVault(window)
+                let vaults = ArcVaults()
+                let seededEntry = FileEntry.create ("seeded.txt", "seeded.txt", false)
+                let mutable createdWindowCount = 0
+
+                vault.fileTree.Add(seededEntry.path, seededEntry)
+                vaults.Vaults.Add(windowId, vault)
+                do! writeTextFileAsync blockedParent "This file prevents creation of a nested ARC directory."
+
+                setBrowserWindowFactory (fun _ ->
+                    createdWindowCount <- createdWindowCount + 1
+                    failwith "A reusable current vault must not create another BrowserWindow."
+                )
+
+                try
+                    let mutable creationError: exn option = None
+
+                    try
+                        do! vault.CreateARC(failedArcPath, "Failed ARC")
+                    with error ->
+                        creationError <- Some error
+
+                    Vitest.expect(creationError.IsSome).toBe (true)
+                    Vitest.expect(vault.path).toEqual (None)
+                    Vitest.expect(vault.arc).toEqual (None)
+                    Vitest.expect(vault.watcher).toEqual (None)
+                    Vitest.expect(vault.fileTree.Count).toBe (0)
+                    Vitest.expect(vault.hasUnsavedArcChanges).toBe (false)
+                    Vitest.expect(vault.window.title).toBe (Swate.Electron.Shared.ApplicationVersion.windowTitle None)
+
+                    Vitest
+                        .expect(
+                            sentMessages
+                            |> Seq.exists (fun message -> message.Contains(PathHelpers.normalizePath failedArcPath))
+                        )
+                        .toBe (false)
+
+                    match! vaults.CreateOrFocusArc(windowId, reusableArcPath, "Reusable ARC") with
+                    | ArcOpenDisposition.CreatedInCurrent createdPath ->
+                        Vitest.expect(createdPath).toBe (PathHelpers.normalizePath reusableArcPath)
+                    | disposition -> failwithf "Expected the current vault to be reused, received %A." disposition
+
+                    Vitest.expect(createdWindowCount).toBe (0)
+                    Vitest.expect(vault.path).toEqual (Some(PathHelpers.normalizePath reusableArcPath))
+                    Vitest.expect(vault.arc.IsSome).toBe (true)
+                    Vitest.expect(vault.watcher.IsSome).toBe (true)
+
+                    do! vault.StopFileWatcher()
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! vault.StopFileWatcher()
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "CreateARC Startup failure preserves the written ARC while restoring the empty vault",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-create-startup-rollback-"
+                let arcPath = join [| rootPath; "written-arc" |]
+                let startupError = exn "Expected Startup title failure."
+                let window, sentMessages = createRollbackTestWindow 72 (Some(3, startupError))
+                let vault = ArcVault(window)
+                let seededEntry = FileEntry.create ("seeded.txt", "seeded.txt", false)
+                vault.fileTree.Add(seededEntry.path, seededEntry)
+
+                try
+                    let mutable creationError: exn option = None
+
+                    try
+                        do! vault.CreateARC(arcPath, "Persisted ARC")
+                    with error ->
+                        creationError <- Some error
+
+                    Vitest.expect(creationError).toEqual (Some startupError)
+                    Vitest.expect(vault.path).toEqual (None)
+                    Vitest.expect(vault.arc).toEqual (None)
+                    Vitest.expect(vault.watcher).toEqual (None)
+                    Vitest.expect(vault.fileTree.Count).toBe (0)
+                    Vitest.expect(vault.hasUnsavedArcChanges).toBe (false)
+                    Vitest.expect(vault.window.title).toBe (Swate.Electron.Shared.ApplicationVersion.windowTitle None)
+
+                    Vitest
+                        .expect(
+                            sentMessages
+                            |> Seq.exists (fun message -> message.Contains(PathHelpers.normalizePath arcPath))
+                        )
+                        .toBe (false)
+
+                    let investigationPath =
+                        ARCtrl.ArcPathHelper.combine arcPath ARCtrl.ArcPathHelper.InvestigationFileName
+
+                    let! arcDirectoryExists = TestHelpers.pathExistsAsync arcPath
+                    let! investigationExists = TestHelpers.pathExistsAsync investigationPath
+                    Vitest.expect(arcDirectoryExists).toBe (true)
+                    Vitest.expect(investigationExists).toBe (true)
+
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! vault.StopFileWatcher()
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
         )
 
         Vitest.test (
