@@ -1716,12 +1716,12 @@ let private runCloneAttemptAsync (deps: GitDependencies) (cloneRequest: CloneWor
         )
 
     match result with
-    | Ok(outcome, Some failure) ->
+    | Ok(outcome, Some failure) when recoveryCode failure = Some VersionControlCodes.Recovery.RetryMaterialization ->
         return
             Error(
-                $"The ARC was cloned to '{outcome.Value}', but its large files could not be downloaded: {failure.Message.TrimEnd('.')}. Open the folder and use Download LFS file to get them."
+                $"The ARC was cloned to '{outcome.Value}', but its large files could not be downloaded. Open the folder and use Download LFS file to get them."
             )
-    | Ok(outcome, None) -> return Ok(Completed(CloneSuccess outcome.Value))
+    | Ok(outcome, _) -> return Ok(Completed(CloneSuccess outcome.Value))
     | Error failure ->
         let routed = routeFailure (Some cloneRequest.TargetPath) failure
 
