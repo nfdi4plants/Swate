@@ -23,6 +23,28 @@ let private fileTreeCreatorTestOptions = TestOptions(timeout = 20000)
 
 let private normalizeSlashes (path: string) = path.Replace("\\", "/")
 
+let private createFileEntry name path =
+    ({
+        name = name
+        isDirectory = false
+        path = path
+        largeObject = None
+    }
+    : FileEntry)
+
+let private createObjectState path =
+    ({
+        Path = path
+        IsMaterialized = false
+        IsLocallyAvailable = true
+        SizeBytes = Some 10.0
+        ObjectId = Some(String.replicate 64 "a")
+    }
+    : ObjectStateDto)
+
+let private enrichFileEntries (objects: (string * ObjectStateDto) list) (entries: FileEntry[]) =
+    FileTreeCreator.withFileEntriesLfsMetadata "/repo" (Map.ofList objects) entries
+
 type private TempRepositoryContext = { RootPath: string; RepoPath: string }
 
 let private createTempDirectoryAsync () : Fable.Core.JS.Promise<string> =
@@ -204,6 +226,59 @@ Vitest.describe (
                         expectHexObjectId downloadedLargeObject
                     })
             }
+        )
+
+        Vitest.test (
+            "exact LFS metadata path match remains available",
+            fun () ->
+                let largeObject = createObjectState "data.csv"
+
+                let entries =
+                    enrichFileEntries [ "data.csv", largeObject ] [| createFileEntry "data.csv" "/repo/data.csv" |]
+
+                Vitest.expect(entries.[0].largeObject).toEqual (Some largeObject)
+        )
+
+        Vitest.test (
+            "case-only disk path difference finds LFS metadata",
+            fun () ->
+                let largeObject = createObjectState "data.csv"
+
+                let entries =
+                    enrichFileEntries [ "data.csv", largeObject ] [| createFileEntry "Data.csv" "/repo/Data.csv" |]
+
+                Vitest.expect(entries.[0].largeObject).toEqual (Some largeObject)
+        )
+
+        Vitest.test (
+            "NFD disk path finds NFC Git metadata",
+            fun () ->
+                let gitName = "Messung_\u00E4.csv"
+                let diskName = "Messung_a\u0308.csv"
+                let largeObject = createObjectState gitName
+
+                let entries =
+                    enrichFileEntries [ gitName, largeObject ] [| createFileEntry diskName $"/repo/{diskName}" |]
+
+                Vitest.expect(entries.[0].largeObject).toEqual (Some largeObject)
+        )
+
+        Vitest.test (
+            "ambiguous case keys only match exact Git paths",
+            fun () ->
+                let lowerCaseObject = createObjectState "data.csv"
+                let upperCaseObject = createObjectState "Data.csv"
+
+                let entries =
+                    enrichFileEntries [ "data.csv", lowerCaseObject; "Data.csv", upperCaseObject ] [|
+                        createFileEntry "data.csv" "/repo/data.csv"
+                        createFileEntry "Data.csv" "/repo/Data.csv"
+                        createFileEntry "DaTa.csv" "/repo/DaTa.csv"
+                    |]
+
+                Vitest.expect(entries.[0].largeObject).toEqual (Some lowerCaseObject)
+                Vitest.expect(entries.[1].largeObject).toEqual (Some upperCaseObject)
+                Vitest.expect(entries.[2].largeObject).toEqual (None)
         )
 
         Vitest.test (

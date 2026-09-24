@@ -74,6 +74,7 @@ let private tryListLargeObjects
 let private withFileEntryLfsMetadata
     (repoRoot: string)
     (largeObjectsByRelativePath: Map<string, ObjectStateDto>)
+    (largeObjectsByComparisonKey: Map<string, ObjectStateDto>)
     (entry: FileEntry)
     : FileEntry =
     if entry.isDirectory then
@@ -83,21 +84,38 @@ let private withFileEntryLfsMetadata
         | Some relativePath ->
             let normalizedRelativePath = PathHelpers.normalizeSeparators relativePath
 
-            match Map.tryFind normalizedRelativePath largeObjectsByRelativePath with
-            | Some largeObject -> {
-                entry with
-                    largeObject = Some largeObject
-              }
-            | None -> { entry with largeObject = None }
+            let largeObject =
+                match Map.tryFind normalizedRelativePath largeObjectsByRelativePath with
+                | Some largeObject -> Some largeObject
+                | None ->
+                    normalizedRelativePath
+                    |> PathHelpers.normalizeForUnicodeComparison
+                    |> fun comparisonKey -> Map.tryFind comparisonKey largeObjectsByComparisonKey
+
+            { entry with largeObject = largeObject }
         | None -> { entry with largeObject = None }
 
-let private withFileEntriesLfsMetadata
+let private buildLargeObjectsByComparisonKey (largeObjectsByRelativePath: Map<string, ObjectStateDto>) =
+    largeObjectsByRelativePath
+    |> Map.toSeq
+    |> Seq.groupBy (fun (relativePath, _) -> PathHelpers.normalizeForUnicodeComparison relativePath)
+    |> Seq.choose (fun (comparisonKey, matchingObjects) ->
+        match matchingObjects |> Seq.toList with
+        | [ (_, largeObject) ] -> Some(comparisonKey, largeObject)
+        | _ -> None
+    )
+    |> Map.ofSeq
+
+let withFileEntriesLfsMetadata
     (repoRoot: string)
     (largeObjectsByRelativePath: Map<string, ObjectStateDto>)
     (entries: FileEntry[])
     : FileEntry[] =
+    let largeObjectsByComparisonKey =
+        buildLargeObjectsByComparisonKey largeObjectsByRelativePath
+
     entries
-    |> Array.map (withFileEntryLfsMetadata repoRoot largeObjectsByRelativePath)
+    |> Array.map (withFileEntryLfsMetadata repoRoot largeObjectsByRelativePath largeObjectsByComparisonKey)
 
 /// Build the renderer snapshot using ARC-relative dictionary keys and FileEntry paths.
 let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary<string, FileEntry> =
@@ -162,7 +180,11 @@ let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
         return entry
     else
         let! largeObjectsByRelativePath = tryListLargeObjects normalizedRepoRoot true
-        return withFileEntryLfsMetadata normalizedRepoRoot largeObjectsByRelativePath entry
+
+        let largeObjectsByComparisonKey =
+            buildLargeObjectsByComparisonKey largeObjectsByRelativePath
+
+        return withFileEntryLfsMetadata normalizedRepoRoot largeObjectsByRelativePath largeObjectsByComparisonKey entry
 }
 
 /// Finds all files and subfolders of the given filepath
