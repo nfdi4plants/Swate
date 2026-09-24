@@ -3537,7 +3537,15 @@ Vitest.describe (
                             Code = VersionControlCodes.Recovery.AcceptUpdateRisks
                             Instructions = None
                         })
-                        [| "isa.study.xlsx" |] with
+                        [|
+                            "isa.study.xlsx"
+                            "a1.txt"
+                            "a2.txt"
+                            "a3.txt"
+                            "a4.txt"
+                            "a5.txt"
+                            "a6.txt"
+                        |] with
                         RevisionEvidence = [|
                             {
                                 Label = "observed_target"
@@ -3617,6 +3625,8 @@ Vitest.describe (
 
                 Vitest.expect(nextState.PendingConfirmation.Value.Title).toBe ("Merge resolution required")
                 Vitest.expect(nextState.PendingConfirmation.Value.Message).toContain ("isa.study.xlsx")
+                Vitest.expect(nextState.PendingConfirmation.Value.Message).toContain ("a4.txt and 2 more.")
+                Vitest.expect(nextState.PendingConfirmation.Value.Message).not.toContain ("a5.txt")
                 Vitest.expect(nextState.WarningNotice |> Option.defaultValue "").toContain ("saved locally")
                 Vitest.expect(cancelMessages).toEqual ([||])
                 Vitest.expect(stateAfterCancel.PendingConfirmation).toEqual (None)

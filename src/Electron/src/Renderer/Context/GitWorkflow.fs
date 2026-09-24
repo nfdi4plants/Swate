@@ -1305,8 +1305,10 @@ let private loadPageAsync
 let private conflictSessionConfirmationDialog (overlappingPaths: string[]) : GitSidebarConfirmationDialog =
     let overlapping =
         if overlappingPaths.Length > 0 then
-            let joined = String.Join(", ", overlappingPaths)
-            $" Changed both locally and online: {joined}."
+            let joined = String.Join(", ", overlappingPaths |> Array.truncate 5)
+            let moreCount = overlappingPaths.Length - min overlappingPaths.Length 5
+            let more = if moreCount > 0 then $" and {moreCount} more" else ""
+            $" Changed both locally and online: {joined}{more}."
         else
             ""
 
