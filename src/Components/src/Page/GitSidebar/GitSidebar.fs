@@ -588,6 +588,7 @@ type GitSidebar =
                                 prop.className "swt:flex swt:min-w-0 swt:flex-col"
                                 prop.children [
                                     Html.span [
+                                        prop.testId "GitSidebarTitle"
                                         prop.className "swt:truncate swt:text-sm swt:font-semibold"
                                         prop.text "Source Control"
                                     ]
