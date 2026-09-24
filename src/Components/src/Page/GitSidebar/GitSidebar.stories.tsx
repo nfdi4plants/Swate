@@ -384,7 +384,7 @@ export const ActionTooltipsAndResponsiveLabels: Story = {
 
     await expect(canvas.getByTestId("GitSidebarUpdateArcButton")).toHaveAttribute(
       "title",
-      "Gets the online changes and merges them into this ARC. Swate checks for conflicts first.",
+      "Update ARC from Online:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git pull origin",
     );
     await expect(canvas.getByTestId("GitSidebarUpdateArcButtonLabel")).toHaveClass("swt:truncate");
     await expect(canvas.getByTestId("GitSidebarUpdateArcButtonLabel")).toHaveClass(

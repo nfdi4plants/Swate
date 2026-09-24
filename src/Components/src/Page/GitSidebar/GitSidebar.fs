@@ -808,7 +808,7 @@ type GitSidebar =
                         props.SubmitUpdateFromOnline,
                         testId = "GitSidebarUpdateArcButton",
                         tooltipText =
-                            "Gets the online changes and merges them into this ARC. Swate checks for conflicts first."
+                            "Update ARC from Online:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git pull origin"
                     )
                     GitSidebar.ActionButton(
                         "More Git Actions",
