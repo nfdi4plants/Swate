@@ -165,6 +165,7 @@ let Main () =
             changedFiles = gitStateCtx.state.ChangedFiles,
             branchOptions = gitStateCtx.state.BranchOptions,
             ?runStatus = runStatus,
+            ?hasRemote = Some(gitStateCtx.state.OriginRemoteRepositoryWebUrl.IsSome),
             ?selectedFile = gitStateCtx.state.SelectedChangePath,
             ?errorNotice = gitStateCtx.state.ErrorNotice,
             ?warningNotice = gitStateCtx.state.WarningNotice,

@@ -140,6 +140,7 @@ type private ActiveDialog =
 
 type private BranchHeaderProps = {
     Status: GitSidebarStatus
+    HasRemote: bool
     HasConflicts: bool
     IsBusy: bool
     CanOpenRemoteRepository: bool
@@ -191,6 +192,7 @@ type private CommitSectionProps = {
 }
 
 type private ChangedFilesListProps = {
+    Status: GitSidebarStatus
     ChangedFiles: GitSidebarChange[]
     MarkedPaths: Set<string>
     IsBusy: bool
@@ -702,8 +704,12 @@ type GitSidebar =
                                             ]
                                             Html.span [
                                                 prop.className "swt:min-w-0 swt:wrap-anywhere"
-                                                prop.text
-                                                    $"No upstream configured yet. Push will publish and track origin/{currentBranch}."
+                                                prop.text (
+                                                    if props.HasRemote then
+                                                        $"No upstream configured yet. Push will publish and track origin/{currentBranch}."
+                                                    else
+                                                        "Not published yet. Save to create the online ARC."
+                                                )
                                             ]
                                         ]
                                     ]
@@ -802,7 +808,7 @@ type GitSidebar =
                         props.SubmitUpdateFromOnline,
                         testId = "GitSidebarUpdateArcButton",
                         tooltipText =
-                            "Update ARC from Online:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git pull origin"
+                            "Gets the online changes and merges them into this ARC. Swate checks for conflicts first."
                     )
                     GitSidebar.ActionButton(
                         "More Git Actions",
@@ -1332,7 +1338,16 @@ type GitSidebar =
                         Html.div [
                             prop.className
                                 "swt:mt-2 swt:min-w-0 swt:wrap-break-word swt:rounded-box swt:border swt:border-dashed swt:border-base-content/15 swt:bg-base-200/40 swt:px-4 swt:py-6 swt:text-sm swt:text-base-content/60 swt:@max-xs:px-2"
-                            prop.text "No changed files. Your repository is in sync."
+                            prop.text (
+                                if
+                                    props.Status.TrackingBranch.IsSome
+                                    && props.Status.Ahead = 0
+                                    && props.Status.Behind = 0
+                                then
+                                    "No changed files. Your repository is in sync."
+                                else
+                                    "No changed files."
+                            )
                         ]
                     else
                         Html.div [
@@ -1640,6 +1655,7 @@ type GitSidebar =
             ?publishRenamePrompt: GitSidebarPublishRenamePrompt,
             ?remoteActionsEnabled: bool,
             ?remoteActionsWarning: string,
+            ?hasRemote: bool,
             ?canOpenRemoteRepository: bool,
             ?canCancelOperation: bool,
             ?onOpenRemoteRepository: unit -> unit,
@@ -1654,6 +1670,7 @@ type GitSidebar =
         let publishRenamePrompt = publishRenamePrompt
         let remoteActionsEnabled = defaultArg remoteActionsEnabled true
         let remoteActionsWarning = remoteActionsWarning
+        let hasRemote = defaultArg hasRemote true
         let canOpenRemoteRepository = defaultArg canOpenRemoteRepository false
         let canCancelOperation = defaultArg canCancelOperation false
         let onOpenRemoteRepository = defaultArg onOpenRemoteRepository (fun () -> ())
@@ -1994,6 +2011,7 @@ type GitSidebar =
 
         let branchHeaderProps = {
             Status = status
+            HasRemote = hasRemote
             HasConflicts = hasConflicts
             IsBusy = isBusy
             CanOpenRemoteRepository = canOpenRemoteRepository
@@ -2114,6 +2132,7 @@ type GitSidebar =
 
                 GitSidebar.ChangedFilesList(
                     {
+                        Status = status
                         ChangedFiles = changedFiles
                         MarkedPaths = markedPaths
                         IsBusy = isBusy

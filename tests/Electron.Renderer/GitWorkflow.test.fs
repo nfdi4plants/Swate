@@ -313,6 +313,7 @@ let private diffPage path =
         Path = path
         PreviousContent = "before"
         CurrentContent = "after"
+        ChangeKind = None
         WordDiffText = "diff"
     }
 
@@ -454,6 +455,86 @@ let private refreshed status = {
     LfsSettings = Ok(lfsSettings 5 true)
     OriginRemoteRepositoryWebUrl = None
 }
+
+Vitest.describe (
+    "GitWorkflow wording",
+    fun () ->
+        Vitest.test (
+            "progress uses a display message, then the current stage, then BusyNotice, and keeps its percent",
+            fun () ->
+                let busyState = {
+                    runningState with
+                        BusyOperation = Some GitBusyOperation.PushingToRemote
+                        BusyNotice = Some "Pushing to remote"
+                }
+
+                let progressWithoutDisplay = {
+                    OperationId = "op-1"
+                    PhaseCode = "git"
+                    Item = None
+                    Completed = Some 3.0
+                    Total = Some 4.0
+                    DisplayMessage = None
+                }
+
+                let fallbackState, _ =
+                    update
+                        defaultDependencies
+                        ignore
+                        (SetCurrentProgress(Some(mapProgress progressWithoutDisplay)))
+                        busyState
+
+                Vitest.expect(fallbackState.CurrentProgress.Value.Stage).toEqual (Some "Pushing to remote")
+                Vitest.expect(fallbackState.CurrentProgress.Value.Stage).not.toEqual (Some "git")
+                Vitest.expect(fallbackState.CurrentProgress.Value.ProgressPercent).toEqual (Some 75.0)
+
+                let progressWithDisplay = {
+                    progressWithoutDisplay with
+                        DisplayMessage = Some "Uploading objects"
+                }
+
+                let displayState, _ =
+                    update
+                        defaultDependencies
+                        ignore
+                        (SetCurrentProgress(Some(mapProgress progressWithDisplay)))
+                        busyState
+
+                Vitest.expect(displayState.CurrentProgress.Value.Stage).toEqual (Some "Uploading objects")
+
+                let busyNoticeState, _ =
+                    update
+                        defaultDependencies
+                        ignore
+                        (SetCurrentProgress(Some(mapProgress progressWithoutDisplay)))
+                        displayState
+
+                // A later update without a display message keeps the stage it already shows.
+                Vitest.expect(busyNoticeState.CurrentProgress.Value.Stage).toEqual (Some "Uploading objects")
+        )
+
+        Vitest.test (
+            "reconcile_index uses Swate's recovery instructions",
+            fun () ->
+                let failure =
+                    makeFailure
+                        ProviderError
+                        "index_reconciliation_failed"
+                        "The selected changes were committed, but the index could not be reconciled."
+                        (Some {
+                            Code = VersionControlCodes.Recovery.ReconcileIndex
+                            Instructions =
+                                Some "Reconcile the affected paths in the index (for example with git reset)."
+                        })
+                        [||]
+
+                Vitest
+                    .expect(failureMessage failure)
+                    .toBe (
+                        "The selected changes were committed, but the index could not be reconciled. Close other Git programs for this ARC, then refresh the Git sidebar."
+                    )
+        )
+)
 
 Vitest.describe (
     "File-choice conflict helpers",
@@ -1547,6 +1628,59 @@ Vitest.describe (
                 let next, finish = update deps ignore messages[0] model
                 let! _ = collectMessages finish
                 Vitest.expect(next.PendingPublishRename |> Option.map _.CurrentName).toEqual (Some "Existing ARC")
+
+                Vitest
+                    .expect(next.PendingPublishRename |> Option.map _.Message)
+                    .toEqual (Some "A DataHub repository with this name already exists. Enter a different name.")
+            }
+        )
+
+        Vitest.test (
+            "Canceling the publish rename refreshes the committed status and keeps the saved locally notice",
+            fun () -> promise {
+                let deps = withRefresh cleanStatus defaultDependencies
+
+                let initialState = {
+                    runningState with
+                        ChangedFiles = [| changedFile "saved.txt" "M" " " false |]
+                        PendingPublishRename =
+                            Some {
+                                CurrentName = "Existing ARC"
+                                Message = "A DataHub repository with this name already exists. Enter a different name."
+                            }
+                }
+
+                let canceledState, cancelCmd =
+                    update deps ignore CancelPublishRenameRequested initialState
+
+                let! cancelMessages = collectMessages cancelCmd
+
+                Vitest.expect(cancelMessages).toEqual ([| RefreshRequested |])
+                Vitest.expect(canceledState.PendingPublishRename).toEqual (None)
+
+                Vitest
+                    .expect(canceledState.PendingRefreshWarningNotice)
+                    .toEqual (Some "Changes were saved locally. Online sync is still pending.")
+
+                let refreshingState, refreshCmd = update deps ignore cancelMessages[0] canceledState
+
+                let! refreshMessages = collectMessages refreshCmd
+
+                let refreshedState, afterRefreshCmd =
+                    match refreshMessages with
+                    | [| (RefreshCompleted _ as message) |] -> update deps ignore message refreshingState
+                    | _ -> failwith "Expected the status refresh to complete."
+
+                let! afterRefreshMessages = collectMessages afterRefreshCmd
+
+                Vitest.expect(afterRefreshMessages).toEqual ([||])
+                Vitest.expect(refreshedState.ChangedFiles).toEqual ([||])
+
+                Vitest
+                    .expect(refreshedState.WarningNotice)
+                    .toEqual (Some "Changes were saved locally. Online sync is still pending.")
+
+                Vitest.expect(refreshedState.PendingRefreshWarningNotice).toEqual (None)
             }
         )
 
@@ -3682,6 +3816,9 @@ Vitest.describe (
                         })
                         [||]
 
+                let expectedMessage =
+                    $"{failure.Message} Close other Git programs for this ARC, then refresh the Git sidebar."
+
                 let partialOutcome =
                     operationWithPublication PublicationStateDto.NotApplicable "revision-1"
 
@@ -3726,7 +3863,7 @@ Vitest.describe (
                 let finalState, completionCmd =
                     match completionMessages with
                     | [| WriteCompleted(_, _, PrimarySave _, Ok(CompletedWithPendingRemoteFailure(_, message))) |] ->
-                        Vitest.expect(message).toBe failure.Message
+                        Vitest.expect(message).toBe expectedMessage
                         update deps ignore completionMessages[0] stateAfterWrite
                     | _ -> failwith "Expected the saved commit to report index reconciliation."
 
@@ -3734,7 +3871,7 @@ Vitest.describe (
 
                 Vitest.expect(reportedErrors.Count).toBe (1)
                 Vitest.expect(reportedErrors[0].Title).toBe ("Changes saved, but Git's index needs attention")
-                Vitest.expect(reportedErrors[0].Message).toBe (failure.Message)
+                Vitest.expect(reportedErrors[0].Message).toBe (expectedMessage)
                 Vitest.expect(finalState.WarningNotice).toEqual (None)
                 Vitest.expect(synchronizeCalls).toBe (0)
             }
@@ -8606,7 +8743,7 @@ Vitest.describe (
                     )
 
                 Vitest.expect(markup.Contains("Draft line")).toBe (true)
-                Vitest.expect(markup.Contains("Changed")).toBe (true)
+                Vitest.expect(markup.Contains("Added")).toBe (true)
         )
 
         Vitest.test (
@@ -9851,6 +9988,7 @@ Vitest.describe (
                 | Ok(PageState.GitDiffPage page) ->
                     Vitest.expect(page.PreviousContent).toBe ("")
                     Vitest.expect(page.CurrentContent).toBe ("new content")
+                    Vitest.expect(page.ChangeKind).toEqual (Some Swate.Components.Page.GitDiffChangeKind.Added)
                 | _ -> failwith "Expected an added-file diff page."
             }
         )
@@ -9878,6 +10016,7 @@ Vitest.describe (
                 | Ok(PageState.GitDiffPage page) ->
                     Vitest.expect(page.PreviousContent).toBe ("old")
                     Vitest.expect(page.CurrentContent).toBe ("")
+                    Vitest.expect(page.ChangeKind).toEqual (Some Swate.Components.Page.GitDiffChangeKind.Deleted)
                     Vitest.expect(currentRead).toBe (false)
                 | _ -> failwith "Expected a deleted-file diff page."
             }

@@ -18,6 +18,7 @@ type VersionControlDiffPage = {
     Path: string
     PreviousContent: string
     CurrentContent: string
+    ChangeKind: Swate.Components.Page.GitDiffChangeKind option
     WordDiffText: string
 }
 

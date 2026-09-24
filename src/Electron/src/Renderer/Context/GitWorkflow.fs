@@ -692,10 +692,11 @@ let providerRefOf (model: GitState) (refName: string) =
     |> Array.tryFind (fun reference -> String.Equals(reference.Name, refName, StringComparison.Ordinal))
     |> Option.map _.ProviderRef
 
-/// Percentages come from the float counters. The phase code is the stage label.
+/// The provider's display message is the user-facing stage.
+/// mergeProgressUpdate supplies BusyNotice when that message is absent.
 let mapProgress (progress: VersionControlProgressDto) : GitSidebarProgress = {
     Method = None
-    Stage = Some progress.PhaseCode
+    Stage = progress.DisplayMessage
     ProgressPercent =
         match progress.Completed, progress.Total with
         | Some completed, Some total when total > 0.0 -> Some(Math.Min(100.0, completed / total * 100.0))
@@ -722,7 +723,7 @@ let private mergeProgressUpdate (model: GitState) (incoming: GitSidebarProgress)
 
     {
         Method = incoming.Method |> Option.orElse current.Method
-        Stage = incoming.Stage |> Option.orElse current.Stage
+        Stage = incoming.Stage |> Option.orElse current.Stage |> Option.orElse model.BusyNotice
         ProgressPercent = incoming.ProgressPercent |> Option.orElse current.ProgressPercent
         Output = appendProgressOutput current.Output incoming.Output
     }
@@ -730,7 +731,14 @@ let private mergeProgressUpdate (model: GitState) (incoming: GitSidebarProgress)
 /// The message shown for a structured failure: the library message plus its
 /// recovery instructions when it has any.
 let failureMessage (failure: OperationFailureDto) =
-    match failure.RecoveryAction |> Option.bind _.Instructions with
+    let instructions =
+        match failure.RecoveryAction with
+        | Some recovery when recovery.Code = VersionControlCodes.Recovery.ReconcileIndex ->
+            Some "Close other Git programs for this ARC, then refresh the Git sidebar."
+        | Some recovery -> recovery.Instructions
+        | None -> None
+
+    match instructions with
     | Some instructions when not (String.IsNullOrWhiteSpace instructions) -> $"{failure.Message} {instructions}"
     | _ -> failure.Message
 
@@ -1255,6 +1263,11 @@ module GitDiffPageLoader =
                                 Path = requestedPath
                                 PreviousContent = previousText |> Option.defaultValue ""
                                 CurrentContent = current |> Option.defaultValue ""
+                                ChangeKind =
+                                    match previousText, current with
+                                    | None, Some _ -> Some Swate.Components.Page.GitDiffChangeKind.Added
+                                    | Some _, None -> Some Swate.Components.Page.GitDiffChangeKind.Deleted
+                                    | _ -> None
                                 WordDiffText = wordDiffText
                             }
                         )
@@ -1797,6 +1810,9 @@ let private runDiscardAttemptAsync (deps: GitDependencies) (state: GitState) (pa
 let private pendingPrimarySaveWarning =
     "Changes were saved locally. Online sync is still pending."
 
+let private projectNameRefusedMessage =
+    "A DataHub repository with this name already exists. Enter a different name."
+
 let private missingPublishAccountNotice =
     "Saved locally. Sign in to a DataHub account to publish this ARC."
 
@@ -1911,7 +1927,7 @@ let private runPublishAsync
 
                 match created with
                 | Error error when isProjectNameRefused error ->
-                    return Error(PublishFailure.ProjectNameRefused error.GitLabErrorToString)
+                    return Error(PublishFailure.ProjectNameRefused projectNameRefusedMessage)
                 | Error error -> return Error(PublishFailure.Routed(RoutedFailure.Error error.GitLabErrorToString))
                 | Ok project ->
                     return!
@@ -3412,8 +3428,10 @@ let private updateCore
             clearBusy model with
                 PendingPublishRename = None
                 ErrorNotice = None
+                WarningNotice = None
+                PendingRefreshWarningNotice = Some pendingPrimarySaveWarning
         },
-        Cmd.none
+        Cmd.ofMsg RefreshRequested
     | SubmitPublishRenameRequested _ when model.PendingPublishRename.IsNone -> model, Cmd.none
     | SubmitPublishRenameRequested newName ->
         let normalizedName =

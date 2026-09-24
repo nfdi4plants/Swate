@@ -201,7 +201,57 @@ export const CleanRepo: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent(
-      "No changed files. Your repository is in sync.",
+      "Your repository is in sync.",
+    );
+  },
+};
+
+export const CleanRepoWithoutUpstream: Story = {
+  args: {
+    status: {
+      ...baseStatus,
+      TrackingBranch: undefined,
+      IsClean: true,
+      Ahead: 0,
+      Behind: 0,
+    },
+    changedFiles: [],
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent(
+      "No changed files.",
+    );
+    await expect(canvas.getByTestId("GitSidebar")).not.toHaveTextContent(
+      "Your repository is in sync.",
+    );
+  },
+};
+
+export const NotPublishedYet: Story = {
+  args: {
+    status: {
+      ...baseStatus,
+      TrackingBranch: undefined,
+      IsClean: true,
+      Ahead: 0,
+      Behind: 0,
+    },
+    changedFiles: [],
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+    hasRemote: false,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent(
+      "Not published yet. Save to create the online ARC.",
     );
   },
 };
@@ -334,7 +384,7 @@ export const ActionTooltipsAndResponsiveLabels: Story = {
 
     await expect(canvas.getByTestId("GitSidebarUpdateArcButton")).toHaveAttribute(
       "title",
-      "Update ARC from Online:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git pull origin",
+      "Gets the online changes and merges them into this ARC. Swate checks for conflicts first.",
     );
     await expect(canvas.getByTestId("GitSidebarUpdateArcButtonLabel")).toHaveClass("swt:truncate");
     await expect(canvas.getByTestId("GitSidebarUpdateArcButtonLabel")).toHaveClass(

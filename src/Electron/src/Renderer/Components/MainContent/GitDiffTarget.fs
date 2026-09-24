@@ -34,6 +34,7 @@ let Main (diffData: VersionControlDiffPage) =
                         wordDiffText = diffData.WordDiffText,
                         previousContent = diffData.PreviousContent,
                         currentContent = diffData.CurrentContent,
+                        ?changeKind = diffData.ChangeKind,
                         currentTitle = diffData.Path,
                         testIdPrefix = "renderer-git-diff"
                     )

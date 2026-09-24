@@ -26,6 +26,25 @@ let private silentBridge: RendererBridge = { Progress = ignore; Started = ignore
 // Tests replace this delay to avoid waiting ten seconds.
 let mutable waitForStaleLock: int -> Async<unit> = Async.Sleep
 
+let private logOperationStarted (operationName: string) (operationId: string) =
+    Browser.Dom.console.log ($"[version-control] started operation={operationName} id={operationId}")
+
+let private logOperationFinished
+    (operationName: string)
+    (operationId: string)
+    (result: OperationResult<'T>)
+    (durationMilliseconds: int64)
+    =
+    let resultKind =
+        match result with
+        | Succeeded _ -> "Succeeded"
+        | PartiallySucceeded(_, failure) -> $"PartiallySucceeded failureCode={failure.Code}"
+        | Failed failure -> $"Failed failureCode={failure.Code}"
+
+    Browser.Dom.console.log (
+        $"[version-control] ended operation={operationName} id={operationId} result={resultKind} durationMs={durationMilliseconds}"
+    )
+
 let private bridgeForWindow (window: BrowserWindow) : RendererBridge =
     let send = WindowSend.sender<IVersionControlRendererApi> window
 
@@ -74,6 +93,7 @@ let private storagePolicySettingsDto (settings: VersionControlSettings) : Storag
 let private runTracked
     (host: WorkspaceSessionHost.WorkspaceSessionHost)
     (bridge: RendererBridge)
+    (operationName: string)
     (operationId: string)
     (workspaceRoot: string option)
     (windowId: int option)
@@ -90,20 +110,32 @@ let private runTracked
                 fun progress -> bridge.Progress(Mappings.progress operationId progress)
             )
 
-        try
+        let startedAt = System.DateTime.UtcNow
+        logOperationStarted operationName operationId
+
+        let! result = promise {
             try
-                bridge.Started { OperationId = operationId }
-                return! operation tracked.Context |> Async.StartAsPromise
-            with error ->
-                return Failed(unexpectedFailure error)
-        finally
-            tracked.Complete()
+                try
+                    bridge.Started { OperationId = operationId }
+                    return! operation tracked.Context |> Async.StartAsPromise
+                with error ->
+                    return Failed(unexpectedFailure error)
+            finally
+                tracked.Complete()
+        }
+
+        let durationMilliseconds =
+            int64 (System.DateTime.UtcNow.Subtract(startedAt).TotalMilliseconds)
+
+        logOperationFinished operationName operationId result durationMilliseconds
+        return result
     }
 
 /// Opens the vault session of the calling window and runs the operation in it. The
 /// operation is registered and announced before the first await, so a cancel that
 /// arrives right after the call started is honored even while the session opens.
 let private withSession
+    (operationName: string)
     (event: IpcMainInvokeEvent)
     (operationId: string)
     (mutating: bool)
@@ -121,6 +153,7 @@ let private withSession
                 runTracked
                     host
                     bridge
+                    operationName
                     operationId
                     (Some arcPath)
                     (windowFromIpcEvent event |> Option.map _.id)
@@ -173,6 +206,7 @@ let private shouldRefreshObjectTree (request: ObjectPathRequestDto) (result: Res
 /// Same as withSession, with the vault marked busy for the duration and the file tree
 /// refreshed afterwards when the result predicate allows it.
 let private withMutatingSessionUsingRefreshPredicate
+    (operationName: string)
     (event: IpcMainInvokeEvent)
     (operationId: string)
     (shouldRefresh: Result<OperationResultDto<'U>, exn> -> bool)
@@ -187,7 +221,7 @@ let private withMutatingSessionUsingRefreshPredicate
                 withBusyWritingScope
                     vault
                     (fun () -> promise {
-                        let! result = withSession event operationId true operation mapValue
+                        let! result = withSession operationName event operationId true operation mapValue
 
                         if shouldRefresh result then
                             let! fileTree = getFileTreeFromOpenSession arcPath
@@ -200,6 +234,7 @@ let private withMutatingSessionUsingRefreshPredicate
 /// Same as withSession, with the vault marked busy for the duration and the file tree
 /// refreshed afterwards when the operation changed the workspace.
 let private withMutatingSession
+    (operationName: string)
     (event: IpcMainInvokeEvent)
     (operationId: string)
     (refreshTree: bool)
@@ -207,6 +242,7 @@ let private withMutatingSession
     (mapValue: 'T -> 'U)
     : JS.Promise<Result<OperationResultDto<'U>, exn>> =
     withMutatingSessionUsingRefreshPredicate
+        operationName
         event
         operationId
         (fun result -> refreshTree && resultChangedState result)
@@ -330,13 +366,14 @@ let initializeLocalWorkspace
 let private provision
     (host: WorkspaceSessionHost.WorkspaceSessionHost)
     (bridge: RendererBridge)
+    (operationName: string)
     (operationId: string)
     (workspaceRoot: string)
     (windowId: int option)
     (run: OperationContext -> Async<OperationResult<WorkspaceBinding>>)
     : JS.Promise<Result<OperationResultDto<string>, exn>> =
     promise {
-        let! result = runTracked host bridge operationId (Some workspaceRoot) windowId true run
+        let! result = runTracked host bridge operationName operationId (Some workspaceRoot) windowId true run
 
         return Ok(Mappings.result (fun (binding: WorkspaceBinding) -> binding.WorkspaceRoot) result)
     }
@@ -372,6 +409,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     getSessionInfo =
         fun request ->
             withSession
+                "getSessionInfo"
                 event
                 request.OperationId
                 false
@@ -385,6 +423,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             provision
                 host
                 bridge
+                "cloneWorkspace"
                 request.OperationId
                 request.TargetPath
                 (windowFromIpcEvent event |> Option.map _.id)
@@ -416,6 +455,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             provision
                 host
                 bridge
+                "initializeWorkspace"
                 request.OperationId
                 request.TargetPath
                 (windowFromIpcEvent event |> Option.map _.id)
@@ -471,6 +511,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                 runTracked
                                     host
                                     bridge
+                                    "bindWorkspace"
                                     request.OperationId
                                     (Some arcPath)
                                     (windowFromIpcEvent event |> Option.map _.id)
@@ -525,8 +566,18 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
         }
     cancelOperation =
         fun key -> promise {
+            let operationName = "cancelOperation"
+            let startedAt = System.DateTime.UtcNow
+            logOperationStarted operationName key.OperationId
+
             let host = WorkspaceSessionHost.get ()
-            return Ok(host.Cancel key.OperationId)
+            let canceled = host.Cancel key.OperationId
+
+            let durationMilliseconds =
+                int64 (System.DateTime.UtcNow.Subtract(startedAt).TotalMilliseconds)
+
+            logOperationFinished operationName key.OperationId (OperationResult.succeeded canceled) durationMilliseconds
+            return Ok canceled
         }
     // Every registered provider reports its components. A provider whose check fails
     // does not hide the others: its failure rides along as the partial failure.
@@ -539,6 +590,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 runTracked
                     host
                     bridge
+                    "checkDependencies"
                     request.OperationId
                     None
                     (windowFromIpcEvent event |> Option.map _.id)
@@ -595,6 +647,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 runTracked
                     host
                     bridge
+                    "installDependency"
                     request.OperationId
                     None
                     (windowFromIpcEvent event |> Option.map _.id)
@@ -621,6 +674,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     getStatus =
         fun request ->
             withSession
+                "getStatus"
                 event
                 request.OperationId
                 false
@@ -629,6 +683,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     listRefs =
         fun request ->
             withSession
+                "listRefs"
                 event
                 request.OperationId
                 false
@@ -637,6 +692,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     createRef =
         fun request ->
             withMutatingSession
+                "createRef"
                 event
                 request.OperationId
                 request.SwitchTo
@@ -658,6 +714,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     preflightSwitchRef =
         fun request ->
             withSession
+                "preflightSwitchRef"
                 event
                 request.OperationId
                 false
@@ -677,6 +734,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     switchRef =
         fun request ->
             withMutatingSession
+                "switchRef"
                 event
                 request.OperationId
                 true
@@ -696,6 +754,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     createRevision =
         fun request ->
             withMutatingSession
+                "createRevision"
                 event
                 request.OperationId
                 true
@@ -716,6 +775,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     restorePaths =
         fun request ->
             withMutatingSession
+                "restorePaths"
                 event
                 request.OperationId
                 true
@@ -735,6 +795,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     getWordDiff =
         fun request ->
             withSession
+                "getWordDiff"
                 event
                 request.OperationId
                 false
@@ -746,6 +807,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     getBaseContent =
         fun request ->
             withSession
+                "getBaseContent"
                 event
                 request.OperationId
                 false
@@ -757,6 +819,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     refreshSynchronization =
         fun request ->
             withSession
+                "refreshSynchronization"
                 event
                 request.OperationId
                 false
@@ -765,6 +828,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     synchronize =
         fun request ->
             withMutatingSession
+                "synchronize"
                 event
                 request.OperationId
                 true
@@ -789,6 +853,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     resolveConflict =
         fun request ->
             withMutatingSession
+                "resolveConflict"
                 event
                 request.OperationId
                 true
@@ -813,6 +878,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     finalizeConflict =
         fun request ->
             withMutatingSession
+                "finalizeConflict"
                 event
                 request.OperationId
                 true
@@ -832,6 +898,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     cancelConflict =
         fun request ->
             withMutatingSession
+                "cancelConflict"
                 event
                 request.OperationId
                 true
@@ -850,6 +917,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     listObjects =
         fun request ->
             withSession
+                "listObjects"
                 event
                 request.OperationId
                 false
@@ -861,6 +929,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     materializeObject =
         fun request ->
             withMutatingSessionUsingRefreshPredicate
+                "materializeObject"
                 event
                 request.OperationId
                 (shouldRefreshObjectTree request)
@@ -872,6 +941,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     dematerializeObject =
         fun request ->
             withMutatingSessionUsingRefreshPredicate
+                "dematerializeObject"
                 event
                 request.OperationId
                 (shouldRefreshObjectTree request)
@@ -883,6 +953,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     getStoragePolicySettings =
         fun request ->
             withSession
+                "getStoragePolicySettings"
                 event
                 request.OperationId
                 false
@@ -898,6 +969,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     setStoragePolicySettings =
         fun request ->
             withMutatingSession
+                "setStoragePolicySettings"
                 event
                 request.OperationId
                 false
@@ -921,6 +993,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     setPathStoragePolicy =
         fun request ->
             withMutatingSession
+                "setPathStoragePolicy"
                 event
                 request.OperationId
                 true
@@ -949,6 +1022,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     pruneStorage =
         fun request ->
             withMutatingSession
+                "pruneStorage"
                 event
                 request.OperationId
                 false
@@ -957,6 +1031,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     deduplicateStorage =
         fun request ->
             withMutatingSession
+                "deduplicateStorage"
                 event
                 request.OperationId
                 false
@@ -965,6 +1040,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     getRepositoryWebUrl =
         fun request ->
             withSession
+                "getRepositoryWebUrl"
                 event
                 request.OperationId
                 false
@@ -980,6 +1056,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     clearStaleLock =
         fun request ->
             withMutatingSession
+                "clearStaleLock"
                 event
                 request.OperationId
                 true
