@@ -25,6 +25,13 @@ open IPCTypesHelper
 
 type CreateArcRequest = { identifier: string; initGit: bool }
 
+[<RequireQualifiedAccess>]
+type CreateArcOutcome =
+    | Created of path: string
+    | FocusedExisting of path: string
+    | Cancelled
+    | CreatedButClosed of path: string
+
 /// TEMPORARY DUCT-TAPE WORKAROUND: This IPC API only exists because template loading currently cannot run
 /// through ARCtrl on the Swate .NET server or directly in the renderer due to GitHub CORS.
 /// Remove it when ARCtrl provides a working .NET implementation or a CORS-enabled template source.
@@ -45,7 +52,7 @@ type IArcVaultsApi = {
     /// Open ARC at a known path (e.g. recent-ARC click). Main decides disposition.
     openARCByPath: string -> JS.Promise<Result<string, exn>>
     /// Create ARC via folder dialog. Main decides disposition.
-    createARC: CreateArcRequest -> JS.Promise<Result<string, exn>>
+    createARC: CreateArcRequest -> JS.Promise<Result<CreateArcOutcome, exn>>
     /// Ensure ARC notes scaffolding exists for the ARCVault root path.
     ensureNotesFolder: unit -> JS.Promise<Result<unit, exn>>
     closeARC: unit -> JS.Promise<Result<unit, exn>>

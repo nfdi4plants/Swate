@@ -1,12 +1,34 @@
 const noop = () => {};
 let fromWebContentsMock: ((webContents: unknown) => unknown) | undefined;
+let browserWindowFactoryMock: ((options: unknown) => object) | undefined;
+let showOpenDialogMock: ((...args: unknown[]) => unknown) | undefined;
+let showMessageBoxMock: ((...args: unknown[]) => unknown) | undefined;
+
+// Electron Forge supplies these globals to the main process at build time.
+Object.assign(globalThis, {
+    MAIN_WINDOW_VITE_DEV_SERVER_URL: undefined,
+    MAIN_WINDOW_VITE_NAME: "main_window",
+    __dirname: "",
+});
 
 export const __electronMock = {
     reset: () => {
         fromWebContentsMock = undefined;
+        browserWindowFactoryMock = undefined;
+        showOpenDialogMock = undefined;
+        showMessageBoxMock = undefined;
+    },
+    setBrowserWindowFactory: (handler: (options: unknown) => object) => {
+        browserWindowFactoryMock = handler;
     },
     setBrowserWindowFromWebContents: (handler: (webContents: unknown) => unknown) => {
         fromWebContentsMock = handler;
+    },
+    setShowOpenDialog: (handler: (...args: unknown[]) => unknown) => {
+        showOpenDialogMock = handler;
+    },
+    setShowMessageBox: (handler: (...args: unknown[]) => unknown) => {
+        showMessageBoxMock = handler;
     },
 };
 
@@ -32,13 +54,23 @@ export const safeStorage = {
 };
 
 export class BrowserWindow {
+    constructor(options: unknown) {
+        if (browserWindowFactoryMock) {
+            const mockWindow = browserWindowFactoryMock(options);
+            Object.defineProperties(this, Object.getOwnPropertyDescriptors(mockWindow));
+        }
+    }
+
     static getAllWindows = () => [];
     static fromWebContents = (webContents: unknown) => fromWebContentsMock?.(webContents);
 }
 
 export const contextBridge = { exposeInMainWorld: noop };
 export const dialog = {
-    showOpenDialog: () => Promise.resolve({ canceled: true, filePaths: [] }),
+    showOpenDialog: (...args: unknown[]) =>
+        Promise.resolve(showOpenDialogMock?.(...args) ?? { canceled: true, filePaths: [] }),
+    showMessageBox: (...args: unknown[]) =>
+        Promise.resolve(showMessageBoxMock?.(...args) ?? { response: 0, checkboxChecked: false }),
     showErrorBox: noop,
 };
 export const ipcMain = { handle: noop, on: noop };

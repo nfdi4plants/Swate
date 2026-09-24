@@ -67,6 +67,7 @@ let testWindow () =
     createObj [
         "id" ==> 0
         "title" ==> ""
+        "isDestroyed" ==> (fun () -> false)
         "webContents" ==> createObj [ "send" ==> noopSend ]
     ]
     |> unbox<BrowserWindow>
