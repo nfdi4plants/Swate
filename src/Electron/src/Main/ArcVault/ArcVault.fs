@@ -99,9 +99,8 @@ type ArcVault(window: BrowserWindow) =
         if not (this.window.isDestroyed ()) then
             this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle None
 
-    member internal this.ResetArcStateAfterFailedInitialization() =
+    member internal this.ResetUnsavedStateAfterFailedInitialization() =
         let hadUnsavedArcChanges = this.hasUnsavedArcChanges
-        this.arc <- None
         this.hasUnsavedArcChanges <- false
         hadUnsavedArcChanges
 
@@ -441,17 +440,17 @@ module ArcVaultExtensions =
         member private this.RestoreEmptyVaultAfterFailedInitialization() = promise {
             do! this.StopFileWatcher()
 
-            let hadUnsavedArcChanges = this.ResetArcStateAfterFailedInitialization()
+            let hadUnsavedArcChanges = this.ResetUnsavedStateAfterFailedInitialization()
 
             this.path <- None
             this.fileTree.Clear()
 
-            if not (this.window.isDestroyed ()) then
-                try
-                    this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle None
-                with error ->
-                    swatelogfn this.window.id "Failed to reset ARC window title: %s" error.Message
+            try
+                this.ClearArc()
+            with error ->
+                swatelogfn this.window.id "Failed to reset ARC window presentation: %s" error.Message
 
+            if not (this.window.isDestroyed ()) then
                 if hadUnsavedArcChanges then
                     try
                         sendArcHasUnsavedChangesUpdate false this.window
