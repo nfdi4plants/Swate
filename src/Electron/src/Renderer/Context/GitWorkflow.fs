@@ -145,6 +145,7 @@ type GitState = {
     /// The operation the renderer can cancel. The renderer chooses its id before the call starts.
     CurrentOperation: OperationRequestDto option
     CurrentProgress: GitSidebarProgress option
+    CurrentProgressPhase: string option
     ErrorNotice: string option
     WarningNotice: string option
     PendingRefreshWarningNotice: string option
@@ -198,6 +199,7 @@ type GitState = {
         BusyNotice = None
         CurrentOperation = None
         CurrentProgress = None
+        CurrentProgressPhase = None
         ErrorNotice = None
         WarningNotice = None
         PendingRefreshWarningNotice = None
@@ -489,7 +491,7 @@ type private RoutedFailure =
 
 type Msg =
     | ResetWorkflow
-    | SetCurrentProgress of GitSidebarProgress option
+    | SetCurrentProgress of VersionControlProgressDto option
     | OperationStarted of OperationRequestDto
     | ArcPathChanged of ArcRootPath
     | GitRepositoryInitialized of arcPath: string
@@ -702,26 +704,15 @@ let providerRefOf (model: GitState) (refName: string) =
     |> Array.tryFind (fun reference -> String.Equals(reference.Name, refName, StringComparison.Ordinal))
     |> Option.map _.ProviderRef
 
-/// The provider's display message is the user-facing stage.
-/// mergeProgressUpdate supplies BusyNotice when that message is absent.
-let mapProgress (progress: VersionControlProgressDto) : GitSidebarProgress = {
-    Method = None
-    Stage = progress.DisplayMessage
-    ProgressPercent =
-        match progress.Completed, progress.Total with
-        | Some completed, Some total when total > 0.0 -> Some(Math.Min(100.0, completed / total * 100.0))
-        | _ -> None
-    Output = progress.DisplayMessage |> Option.map (fun message -> message + "\n")
-}
+let private progressPercent (progress: VersionControlProgressDto) =
+    match progress.Completed, progress.Total with
+    | Some completed, Some total when total > 0.0 -> Some(Math.Min(100.0, completed / total * 100.0))
+    | _ -> None
 
-let private appendProgressOutput current incoming =
-    match current, incoming with
-    | None, None -> None
-    | Some output, None -> Some output
-    | None, Some output -> Some output
-    | Some currentOutput, Some incomingOutput -> Some(currentOutput + incomingOutput)
+let private mergeProgressUpdate (model: GitState) (progress: VersionControlProgressDto) =
+    let incomingPercent = progressPercent progress
+    let samePhase = model.CurrentProgressPhase = Some progress.PhaseCode
 
-let private mergeProgressUpdate (model: GitState) (incoming: GitSidebarProgress) =
     let current =
         model.CurrentProgress
         |> Option.defaultValue {
@@ -731,12 +722,23 @@ let private mergeProgressUpdate (model: GitState) (incoming: GitSidebarProgress)
             Output = None
         }
 
-    {
-        Method = incoming.Method |> Option.orElse current.Method
-        Stage = incoming.Stage |> Option.orElse current.Stage |> Option.orElse model.BusyNotice
-        ProgressPercent = incoming.ProgressPercent |> Option.orElse current.ProgressPercent
-        Output = appendProgressOutput current.Output incoming.Output
-    }
+    if samePhase then
+        {
+            Method = current.Method
+            Stage =
+                progress.DisplayMessage
+                |> Option.orElse current.Stage
+                |> Option.orElse model.BusyNotice
+            ProgressPercent = incomingPercent |> Option.orElse current.ProgressPercent
+            Output = None
+        }
+    else
+        {
+            Method = None
+            Stage = progress.DisplayMessage |> Option.orElse model.BusyNotice
+            ProgressPercent = incomingPercent
+            Output = None
+        }
 
 /// The message shown for a structured failure: the library message plus its
 /// recovery instructions when it has any.
@@ -1112,6 +1114,7 @@ let private withBusyOperation busyOperation model = {
         BusyOperation = busyOperation
         BusyNotice = busyOperation |> Option.bind busyNoticeFromOperation
         CurrentProgress = None
+        CurrentProgressPhase = None
         CurrentOperation = None
 }
 
@@ -2726,6 +2729,7 @@ let private clearBusy (model: GitState) = {
         BusyOperation = None
         BusyNotice = None
         CurrentProgress = None
+        CurrentProgressPhase = None
         CurrentOperation = None
 }
 
@@ -2851,9 +2855,16 @@ let private updateCore
         {
             model with
                 CurrentProgress = Some(mergeProgressUpdate model progress)
+                CurrentProgressPhase = Some progress.PhaseCode
         },
         Cmd.none
-    | SetCurrentProgress _ -> { model with CurrentProgress = None }, Cmd.none
+    | SetCurrentProgress _ ->
+        {
+            model with
+                CurrentProgress = None
+                CurrentProgressPhase = None
+        },
+        Cmd.none
     | OperationStarted key when model.BusyOperation.IsSome ->
         match model.CurrentOperation with
         | Some currentOperation ->
@@ -3784,6 +3795,7 @@ let private updateCore
                 BusyOperation = Some phase
                 BusyNotice = busyNoticeFromOperation phase
                 CurrentProgress = None
+                CurrentProgressPhase = None
         },
         Cmd.none
     | WriteCompleted(sessionId, writeRequestId, writeRequest, result) when
@@ -4158,7 +4170,7 @@ let subscribe (_model: GitState) : Sub<Msg> = [
     fun dispatch ->
         let dispose =
             Renderer.IpcReceiver.subscribeProxyReceiver<IVersionControlRendererApi> {
-                versionControlProgress = fun progress -> dispatch (SetCurrentProgress(Some(mapProgress progress)))
+                versionControlProgress = fun progress -> dispatch (SetCurrentProgress(Some progress))
                 versionControlOperationStarted = fun key -> dispatch (OperationStarted key)
             }
 

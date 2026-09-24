@@ -199,18 +199,26 @@ let private sidebarRemoteBranch name tracking : GitSidebarBranchOption = {
     IsTracking = tracking
 }
 
-let private sidebarProgress stage percent = {
-    Method = Some "git"
+let private progressDto phaseCode displayMessage completed total : VersionControlProgressDto = {
+    OperationId = "op-1"
+    PhaseCode = phaseCode
+    Item = None
+    Completed = completed
+    Total = total
+    DisplayMessage = displayMessage
+}
+
+let private sidebarProgress stage percent =
+    progressDto "git" (Some stage) (Some percent) (Some 100.0)
+
+let private sidebarOutput output =
+    progressDto "git" (Some output) None None
+
+let private expectedSidebarProgress stage percent : GitSidebarProgress = {
+    Method = None
     Stage = Some stage
     ProgressPercent = Some percent
     Output = None
-}
-
-let private sidebarOutput output = {
-    Method = None
-    Stage = None
-    ProgressPercent = None
-    Output = Some output
 }
 
 [<Emit("new Event($0, { bubbles: true })")>]
@@ -478,11 +486,7 @@ Vitest.describe (
                 }
 
                 let fallbackState, _ =
-                    update
-                        defaultDependencies
-                        ignore
-                        (SetCurrentProgress(Some(mapProgress progressWithoutDisplay)))
-                        busyState
+                    update defaultDependencies ignore (SetCurrentProgress(Some progressWithoutDisplay)) busyState
 
                 Vitest.expect(fallbackState.CurrentProgress.Value.Stage).toEqual (Some "Pushing to remote")
                 Vitest.expect(fallbackState.CurrentProgress.Value.Stage).not.toEqual (Some "git")
@@ -494,23 +498,94 @@ Vitest.describe (
                 }
 
                 let displayState, _ =
-                    update
-                        defaultDependencies
-                        ignore
-                        (SetCurrentProgress(Some(mapProgress progressWithDisplay)))
-                        busyState
+                    update defaultDependencies ignore (SetCurrentProgress(Some progressWithDisplay)) busyState
 
                 Vitest.expect(displayState.CurrentProgress.Value.Stage).toEqual (Some "Uploading objects")
 
                 let busyNoticeState, _ =
-                    update
-                        defaultDependencies
-                        ignore
-                        (SetCurrentProgress(Some(mapProgress progressWithoutDisplay)))
-                        displayState
+                    update defaultDependencies ignore (SetCurrentProgress(Some progressWithoutDisplay)) displayState
 
                 // A later update without a display message keeps the stage it already shows.
                 Vitest.expect(busyNoticeState.CurrentProgress.Value.Stage).toEqual (Some "Uploading objects")
+        )
+
+        Vitest.test (
+            "progress starts a new stage and percent when the phase changes",
+            fun () ->
+                let busyState = {
+                    runningState with
+                        BusyOperation = Some GitBusyOperation.PushingToRemote
+                        BusyNotice = Some "Pushing to remote"
+                }
+
+                let lfsListState, _ =
+                    update
+                        defaultDependencies
+                        ignore
+                        (SetCurrentProgress(Some(progressDto "lfs-list" None (Some 10.0) (Some 10.0))))
+                        busyState
+
+                Vitest.expect(lfsListState.CurrentProgress.Value.ProgressPercent).toEqual (Some 100.0)
+
+                let lfsUploadState, _ =
+                    update
+                        defaultDependencies
+                        ignore
+                        (SetCurrentProgress(
+                            Some(progressDto "lfs-upload" (Some "Uploading LFS objects (0/1)") (Some 0.0) (Some 100.0))
+                        ))
+                        lfsListState
+
+                Vitest.expect(lfsUploadState.CurrentProgress.Value.ProgressPercent).toEqual (Some 0.0)
+                Vitest.expect(lfsUploadState.CurrentProgress.Value.Stage).toEqual (Some "Uploading LFS objects (0/1)")
+        )
+
+        Vitest.test (
+            "progress keeps values within a phase and clears them for the next phase",
+            fun () ->
+                let busyState = {
+                    runningState with
+                        BusyOperation = Some GitBusyOperation.PushingToRemote
+                        BusyNotice = Some "Pushing to remote"
+                }
+
+                let firstState, _ =
+                    update
+                        defaultDependencies
+                        ignore
+                        (SetCurrentProgress(
+                            Some(
+                                progressDto
+                                    "lfs-upload"
+                                    (Some "Uploading LFS objects (45/100)")
+                                    (Some 45.0)
+                                    (Some 100.0)
+                            )
+                        ))
+                        busyState
+
+                let samePhaseState, _ =
+                    update
+                        defaultDependencies
+                        ignore
+                        (SetCurrentProgress(Some(progressDto "lfs-upload" None None None)))
+                        firstState
+
+                Vitest.expect(samePhaseState.CurrentProgress.Value.ProgressPercent).toEqual (Some 45.0)
+
+                Vitest
+                    .expect(samePhaseState.CurrentProgress.Value.Stage)
+                    .toEqual (Some "Uploading LFS objects (45/100)")
+
+                let nextPhaseState, _ =
+                    update
+                        defaultDependencies
+                        ignore
+                        (SetCurrentProgress(Some(progressDto "git" None None None)))
+                        samePhaseState
+
+                Vitest.expect(nextPhaseState.CurrentProgress.Value.ProgressPercent).toEqual (None)
+                Vitest.expect(nextPhaseState.CurrentProgress.Value.Stage).toEqual busyState.BusyNotice
         )
 
         Vitest.test (
@@ -2388,9 +2463,9 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "SetCurrentProgress appends Git output to the active progress notice",
+            "SetCurrentProgress keeps Output empty for display messages",
             fun () -> promise {
-                let current = sidebarProgress "Receiving objects" 72.
+                let current = expectedSidebarProgress "Receiving objects" 72.
 
                 let state = {
                     GitState.Empty with
@@ -2398,22 +2473,27 @@ Vitest.describe (
                         CurrentProgress = Some current
                 }
 
+                let firstState, _ =
+                    update
+                        defaultDependencies
+                        ignore
+                        (SetCurrentProgress(Some(sidebarProgress "Receiving objects" 72.)))
+                        state
+
                 let nextState, cmd =
                     update
                         defaultDependencies
                         ignore
-                        (SetCurrentProgress(Some(sidebarOutput "remote: counting objects\n")))
-                        state
+                        (SetCurrentProgress(Some(sidebarOutput "Resolving deltas")))
+                        firstState
 
                 let! messages = collectMessages cmd
 
-                let expectedProgress = {
-                    current with
-                        Output = Some "remote: counting objects\n"
-                }
+                let expectedProgress = expectedSidebarProgress "Resolving deltas" 72.
 
                 Vitest.expect(nextState.CurrentProgress).toEqual (Some expectedProgress)
                 Vitest.expect(currentRunStatus nextState).toEqual (Some(GitSidebarRunStatus.Progress expectedProgress))
+                Vitest.expect(nextState.CurrentProgress.Value.Output).toEqual (None)
                 Vitest.expect(messages).toEqual ([||])
             }
         )
@@ -2424,7 +2504,7 @@ Vitest.describe (
                 let state = {
                     runningState with
                         BusyOperation = None
-                        CurrentProgress = Some(sidebarProgress "Receiving objects" 72.)
+                        CurrentProgress = Some(expectedSidebarProgress "Receiving objects" 72.)
                 }
 
                 let nextState, _ =
@@ -2782,14 +2862,15 @@ Vitest.describe (
                     update defaultDependencies ignore (WriteRequested(Clone(cloneRequest, reply))) GitState.Empty
 
                 let progress = sidebarProgress "Receiving objects" 72.
+                let expectedProgress = expectedSidebarProgress "Receiving objects" 72.
 
                 let nextState, cmd =
                     update defaultDependencies ignore (SetCurrentProgress(Some progress)) stateAfterRequest
 
                 let! messages = collectMessages cmd
 
-                Vitest.expect(nextState.CurrentProgress).toEqual (Some progress)
-                Vitest.expect(currentRunStatus nextState).toEqual (Some(GitSidebarRunStatus.Progress progress))
+                Vitest.expect(nextState.CurrentProgress).toEqual (Some expectedProgress)
+                Vitest.expect(currentRunStatus nextState).toEqual (Some(GitSidebarRunStatus.Progress expectedProgress))
                 Vitest.expect(messages).toEqual ([||])
             }
         )
@@ -3157,7 +3238,7 @@ Vitest.describe (
                     GitState.Empty with
                         CurrentArcPath = Some "C:/arc-a"
                         BusyOperation = Some GitBusyOperation.PushingToRemote
-                        CurrentProgress = Some(sidebarProgress "pushing" 50.)
+                        CurrentProgress = Some(expectedSidebarProgress "pushing" 50.)
                         InstallRetryState =
                             GitInstallRetryState.PromptingForInstall(
                                 "Install Git LFS now?",
@@ -3197,7 +3278,7 @@ Vitest.describe (
                     GitState.Empty with
                         CurrentArcPath = Some "C:/arc-a"
                         BusyOperation = Some(GitBusyOperation.InstallingDependency "git-lfs-configuration")
-                        CurrentProgress = Some(sidebarProgress "installing" 75.)
+                        CurrentProgress = Some(expectedSidebarProgress "installing" 75.)
                         InstallRetryState = GitInstallRetryState.InstallingForRetry GitBusyOperation.PushingToRemote
                 }
 
