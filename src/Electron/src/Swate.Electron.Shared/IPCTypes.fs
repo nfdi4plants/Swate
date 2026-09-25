@@ -11,7 +11,7 @@ open Swate.Electron.Shared.DTOs.NoteSearchDto
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
 open AuthTypes
 open FileIOTypes
-open GitTypes
+open VersionControlTypes
 
 module IPCTypesHelper =
 
@@ -84,44 +84,49 @@ type IArcVaultsApi = {
     movePath: MovePathRequest -> JS.Promise<Result<unit, exn>>
     renameOpenArcRoot: string -> JS.Promise<Result<string, exn>>
     writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
-    runGitLfs: GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
-    cancelGitLfs: string -> JS.Promise<Result<string, exn>>
     resolveCloseRequest: SaveBeforeQuitDecision -> JS.Promise<Result<unit, exn>>
 }
 
 /// Two Way Bridge: Renderer <-> Main
-type IGitApi = {
-    checkGitVersions: unit -> JS.Promise<Result<unit, exn>>
-    getGitStatus: unit -> JS.Promise<Result<GitStatusDto, exn>>
-    getGitBranches: unit -> JS.Promise<Result<GitBranchRefDto[], exn>>
-    getOriginRepositoryWebUrl: unit -> JS.Promise<Result<string option, exn>>
-    getGitLfsSettings: unit -> JS.Promise<Result<GitLfsSettingsDto, exn>>
-    previewGitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitPullPreflightResult, exn>>
-    getGitDiffSummary: unit -> JS.Promise<Result<GitDiffSummaryDto, exn>>
-    getGitWordDiff: GitPathspecRequest -> JS.Promise<Result<string, exn>>
-    getGitDiffViewData: string -> JS.Promise<Result<GitPageLoadResultDto<GitDiffViewDataDto>, exn>>
-    getGitMergeConflictViewData: string -> JS.Promise<Result<GitPageLoadResultDto<GitMergeConflictViewDataDto>, exn>>
-    installGitLfs: unit -> JS.Promise<Result<GitOperationResult, exn>>
-    gitFetch: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitPush: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitCancelOperation: GitCancelOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitInitRepository: string -> JS.Promise<Result<GitOperationResult, exn>>
-    gitAddRemote: GitRemoteConfigRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitCloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitStagePaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitUnstagePaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitDiscardPaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitCommit: GitCommitRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    setGitLfsSettings: GitLfsSettingsDto -> JS.Promise<Result<GitOperationResult, exn>>
-    gitLfsPrune: unit -> JS.Promise<Result<GitOperationResult, exn>>
-    gitLfsDedup: unit -> JS.Promise<Result<GitOperationResult, exn>>
-    gitLfsDownloadFile: GitLfsFileRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitLfsFreeLocalCopy: GitLfsFileRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    createBranch: GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    checkoutBranch: GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    confirmGitMergeResolution:
-        GitConfirmMergeResolutionRequest -> JS.Promise<Result<GitConfirmMergeResolutionResult, exn>>
+/// Provider-neutral version control over the active vault. Every call names an
+/// operation id so the renderer can cancel it, and every result keeps the library's
+/// structured outcome.
+type IVersionControlApi = {
+    getSessionInfo: OperationRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceSessionInfoDto>, exn>>
+    cloneWorkspace: CloneWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<string>, exn>>
+    initializeWorkspace: InitializeWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<string>, exn>>
+    bindWorkspace: BindWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceSessionInfoDto>, exn>>
+    cancelOperation: OperationRequestDto -> JS.Promise<Result<bool, exn>>
+    checkDependencies: OperationRequestDto -> JS.Promise<Result<OperationResultDto<DependencyStatusDto[]>, exn>>
+    installDependency: InstallDependencyRequestDto -> JS.Promise<Result<OperationResultDto<DependencyStatusDto>, exn>>
+    getStatus: OperationRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceStatusDto>, exn>>
+    listRefs: OperationRequestDto -> JS.Promise<Result<OperationResultDto<LogicalRefDto[]>, exn>>
+    createRef: CreateRefRequestDto -> JS.Promise<Result<OperationResultDto<LogicalRefDto>, exn>>
+    preflightSwitchRef: SwitchRefRequestDto -> JS.Promise<Result<OperationResultDto<SwitchPreflightDto>, exn>>
+    switchRef: SwitchRefRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceStatusDto>, exn>>
+    createRevision: CreateRevisionRequestDto -> JS.Promise<Result<OperationResultDto<string>, exn>>
+    restorePaths: RestorePathsRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
+    getWordDiff: ObjectPathRequestDto -> JS.Promise<Result<OperationResultDto<ContentViewDto>, exn>>
+    getBaseContent: ObjectPathRequestDto -> JS.Promise<Result<OperationResultDto<ContentViewDto>, exn>>
+    refreshSynchronization: OperationRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, exn>>
+    synchronize: SynchronizeRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, exn>>
+    resolveConflict:
+        ResolveConflictRequestDto -> JS.Promise<Result<OperationResultDto<ConflictResolutionOutcomeDto>, exn>>
+    finalizeConflict: FinalizeConflictRequestDto -> JS.Promise<Result<OperationResultDto<string option>, exn>>
+    cancelConflict: CancelConflictRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
+    listObjects: OperationRequestDto -> JS.Promise<Result<OperationResultDto<ObjectStateDto[]>, exn>>
+    materializeObject: ObjectPathRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
+    dematerializeObject: ObjectPathRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
+    getStoragePolicySettings:
+        OperationRequestDto -> JS.Promise<Result<OperationResultDto<StoragePolicySettingsDto>, exn>>
+    setStoragePolicySettings: StoragePolicySettingsRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
+    setPathStoragePolicy: PathStoragePolicyRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
+    pruneStorage: OperationRequestDto -> JS.Promise<Result<OperationResultDto<string>, exn>>
+    deduplicateStorage: OperationRequestDto -> JS.Promise<Result<OperationResultDto<string>, exn>>
+    getRepositoryWebUrl: OperationRequestDto -> JS.Promise<Result<OperationResultDto<string option>, exn>>
+    /// Removes a stale provider lock left by a killed process, only while no operation
+    /// of this session runs, then refreshes and returns the status.
+    clearStaleLock: OperationRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceStatusDto>, exn>>
 }
 
 /// Two Way Bridge: Renderer <-> Main
@@ -168,16 +173,13 @@ module MainToRendererIpc =
         fileImportStateUpdate: ActiveFileImportState option -> unit
     }
 
-    type IGitProgressRendererApi = {
-        gitProgressUpdate: GitProgressDto -> unit
-    }
-
     type IGitRepositoryRendererApi = {
         gitRepositoryInitialized: string -> unit
     }
 
-    type IGitLfsProgressRendererApi = {
-        gitLfsProgressUpdate: GitLfsProgressDto -> unit
+    type IVersionControlRendererApi = {
+        versionControlProgress: VersionControlProgressDto -> unit
+        versionControlOperationStarted: OperationRequestDto -> unit
     }
 
     type IHasUnsavedArcChangesRendererApi = {

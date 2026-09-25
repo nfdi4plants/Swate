@@ -16,6 +16,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ✨ Added
+
+-   Conflicts in files without editable text (binary files, `isa.*.xlsx` workbooks, Git LFS files) get a file-choice panel with "Keep my version" and "Use online version". It shows each version's size, object id, whether it is downloaded and the online commit.
+-   The conflict page can abandon the merge, after a confirmation.
+-   A modify/delete conflict can be resolved by accepting the deletion.
+-   A stale `.git/index.lock` opens a dialog with "Remove lock" at Save, Discard, Download Changes and when downloading a Git LFS file. A lock younger than a few seconds is waited for first.
+-   Closing a window while a version control operation runs asks whether to keep the window open or cancel the operation and close.
+-   The Git sidebar follows file changes made outside Swate without pressing Refresh.
+-   The merge confirmation names up to five paths that would conflict.
+-   Discard asks for confirmation.
+-   The cancel button also covers the upload step of a save. Canceling it keeps the saved-locally notice and opens no error dialog.
+-   The main process logs the start and end of every version control operation with its result.
+
+### 🔄 Changed
+
+-   All Git operations of the Electron app run through the VersionControlService library (0.1.0 on nuget.org), which offers one provider-neutral interface for Git and lakeFS. Swate uses its Git provider. The old built-in Git implementation is removed.
+-   Save, Download Changes and Upload Changes run one synchronize operation: refresh, update when the online copy is ahead, then publish. It asks first only when the update needs merge resolution, and it refuses an update or a branch switch that would overwrite local changes and names the files.
+-   A push the online copy refuses (a protected branch, a declined hook) shows the remote's reason, and the save stays local.
+-   The Git LFS threshold and the download preference are held in memory for each open ARC. Every ARC starts at 1 MiB and no download, and the `swate.lfs.*` keys of earlier versions are no longer read.
+-   Swate requires Git 2.38 or newer and Git LFS 3.7 or newer, with the Git LFS filter configured.
+-   Merges Swate creates are titled "Merge online changes".
+-   The busy notice shows the operation and git's progress lines. The raw "Git output" log is removed.
+-   The tooltips of Update ARC from Online, Download Changes and Clean LFS Cache list the git commands that run now.
+
+### 🐛 Fixed
+
+-   The diff of a changed, downloaded Git LFS text file shows the changed lines instead of the pointer text, without downloading anything.
+-   Mark and Unmark Git LFS take effect on the next save, so the file's storage changes. Unmark is refused when the file's object is not local.
+-   Discarding a downloaded Git LFS file keeps it downloaded.
+-   Git LFS conflicts are no longer shown as editable pointer text.
+-   The DataHub storage rules apply to every save: `isa.*.xlsx` workbooks are never stored as Git LFS pointers, and dataset files and files above 25 MB always are.
+-   Saving more than about 1000 files at once works on Windows, and a save starts a fixed number of git processes whatever the file count.
+-   Clean LFS Cache works after a discarded Git LFS edit.
+-   A clone whose Git LFS download fails keeps the clone, opens it and offers to download the large files.
+-   "Open ARC in DataHUB" keeps the remote's port.
+-   The busy notice resets its progress when an operation moves to its next step, and the bar follows the percentage git reports.
+-   On macOS, a file whose name is stored decomposed on disk keeps its Git LFS badge and actions.
+-   Closing a window during an operation no longer crashes the main process with "Object has been destroyed". Every message to a window checks that the window still exists.
+-   The file watcher no longer overwrites the in-memory ARC in the middle of one of Swate's own writes.
+-   A Git operation that fails after it already changed the workspace refreshes the sidebar before it shows the error.
+
 ## 2.3.1 - 2026-09-16
 
 ### 🐛 Fixed

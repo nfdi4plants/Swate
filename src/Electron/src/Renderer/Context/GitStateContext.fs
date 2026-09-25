@@ -9,14 +9,15 @@ open Renderer.Types
 open Swate.Components.Page.GitSidebarTypes
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
-open Swate.Electron.Shared.GitTypes
 open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.VersionControlTypes
 
 open Renderer.Context.GitWorkflow
 
 type GitStateController = {
     state: GitState
     refresh: unit -> unit
+    sidebarVisibilityChanged: bool -> unit
     initRepository: unit -> unit
     fetch: unit -> unit
     pull: unit -> unit
@@ -25,7 +26,7 @@ type GitStateController = {
     updateFromOnline: unit -> unit
     primarySaveSelection: GitSidebarCommitSelectionRequest -> unit
     primarySaveAll: string -> unit
-    cloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<string, string>>
+    cloneRepository: CloneWorkspaceRequestDto -> JS.Promise<Result<string, string>>
     commitSelection: GitSidebarCommitSelectionRequest -> unit
     commitAll: string -> unit
     discardSelection: string[] -> unit
@@ -38,63 +39,78 @@ type GitStateController = {
     createBranch: GitSidebarCreateBranchRequest -> unit
     switchBranch: string -> unit
     selectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>
-    confirmMergeResolution: GitConfirmMergeResolutionRequest -> unit
+    confirmMergeResolution: GitMergeResolutionRequest -> unit
+    abandonMerge: unit -> unit
     pruneLfsCache: unit -> unit
     dedupLfsStorage: unit -> unit
 }
 
 module private Helper =
 
-    let mapDiffPageResult (_requestedPath: string) =
-        function
-        | Ok(GitPageLoadResultDto.Loaded diffData) -> Ok(PageState.GitDiffPage diffData)
-        | Ok(GitPageLoadResultDto.Unsupported unsupportedPage) -> Ok(PageState.GitUnsupportedPage unsupportedPage)
-        | Error message -> Error message
+    let private pathRequest (path: string) : ObjectPathRequestDto = {
+        OperationId = Renderer.VersionControlApiClient.newOperationId ()
+        Path = path
+        RefreshTree = None
+    }
 
-    let mapMergeConflictPageResult (_requestedPath: string) =
-        function
-        | Ok(GitPageLoadResultDto.Loaded mergeData) -> Ok(PageState.GitMergeConflictPage mergeData)
-        | Ok(GitPageLoadResultDto.Unsupported unsupportedPage) -> Ok(PageState.GitUnsupportedPage unsupportedPage)
-        | Error message -> Error message
+    /// The current content comes from the vault file itself, the rest from the provider.
+    let loadDiffPage (change: GitSidebarChange) : JS.Promise<Result<PageState, string>> =
+        GitDiffPageLoader.load
+            (fun path -> Renderer.VersionControlApiClient.getBaseContent (pathRequest path))
+            (fun path -> Renderer.VersionControlApiClient.getWordDiff (pathRequest path))
+            (fun path -> promise {
+                let! file = Api.ipcArcVaultApi.openFile path
+                return file |> Result.map _.content |> Result.mapError _.Message
+            })
+            change
 
-    let dependencies (reportError: GitErrorNotification -> unit) : GitDependencies = {
-        getGitStatus = Renderer.GitApiClient.getGitStatus
-        getGitBranches = Renderer.GitApiClient.getGitBranches
-        getOriginRemoteRepositoryWebUrl = Renderer.GitApiClient.getOriginRepositoryWebUrl
-        getGitLfsSettings = Renderer.GitApiClient.getGitLfsSettings
-        loadDiffPage =
-            fun requestedPath -> promise {
-                let! result = Renderer.GitApiClient.getGitDiffViewData requestedPath
-                return mapDiffPageResult requestedPath result
-            }
-        loadMergeConflictPage =
-            fun requestedPath -> promise {
-                let! result = Renderer.GitApiClient.getGitMergeConflictViewData requestedPath
-                return mapMergeConflictPageResult requestedPath result
-            }
-        initGitRepository = Renderer.GitApiClient.gitInitRepository
+    /// The conflict page captures the handle and workspace token used to validate its resolution request.
+    let loadConflictPage
+        (conflict: ConflictSessionSummaryDto)
+        (workspaceVersion: string)
+        (requestedPath: string)
+        : JS.Promise<Result<PageState, string>> =
+        promise { return conflictPageFor conflict workspaceVersion requestedPath }
+
+    let dependencies (reportError: GitErrorNotification -> unit) (hasUsableAccount: unit -> bool) : GitDependencies = {
+        getSessionInfo = Renderer.VersionControlApiClient.getSessionInfo
+        getStatus = Renderer.VersionControlApiClient.getStatus
+        listRefs = Renderer.VersionControlApiClient.listRefs
+        getRepositoryWebUrl = Renderer.VersionControlApiClient.getRepositoryWebUrl
+        getStoragePolicySettings = Renderer.VersionControlApiClient.getStoragePolicySettings
+        setStoragePolicySettings = Renderer.VersionControlApiClient.setStoragePolicySettings
+        loadDiffPage = loadDiffPage
+        loadConflictPage = loadConflictPage
+        initializeWorkspace = Renderer.VersionControlApiClient.initializeWorkspace
+        bindWorkspace = Renderer.VersionControlApiClient.bindWorkspace
+        createRemoteProject = Api.ipcGitLabApi.createProject
         renameOpenArcRoot =
             fun newName -> promise {
                 let! result = Api.ipcArcVaultApi.renameOpenArcRoot newName
                 return result |> Result.mapError _.Message
             }
-        installGitLfs = Renderer.GitApiClient.installGitLfs
-        previewGitPull = Renderer.GitApiClient.previewGitPull
-        gitFetch = Renderer.GitApiClient.gitFetch
-        gitPull = Renderer.GitApiClient.gitPull
-        gitPush = Renderer.GitApiClient.gitPush
-        gitCancelOperation = Renderer.GitApiClient.gitCancelOperation
-        gitCloneRepository = Renderer.GitApiClient.gitCloneRepository
-        createBranch = Renderer.GitApiClient.createBranch
-        checkoutBranch = Renderer.GitApiClient.checkoutBranch
-        gitStagePaths = Renderer.GitApiClient.gitStagePaths
-        gitUnstagePaths = Renderer.GitApiClient.gitUnstagePaths
-        gitDiscardPaths = Renderer.GitApiClient.gitDiscardPaths
-        gitCommit = Renderer.GitApiClient.gitCommit
-        setGitLfsSettings = Renderer.GitApiClient.setGitLfsSettings
-        gitLfsPrune = Renderer.GitApiClient.gitLfsPrune
-        gitLfsDedup = Renderer.GitApiClient.gitLfsDedup
-        confirmGitMergeResolution = Renderer.GitApiClient.confirmGitMergeResolution
+        checkDependencies = Renderer.VersionControlApiClient.checkDependencies
+        installDependency = Renderer.VersionControlApiClient.installDependency
+        refreshSynchronization = Renderer.VersionControlApiClient.refreshSynchronization
+        synchronize = Renderer.VersionControlApiClient.synchronize
+        cancelOperation = Renderer.VersionControlApiClient.cancelOperation
+        cloneWorkspace = Renderer.VersionControlApiClient.cloneWorkspace
+        createRef = Renderer.VersionControlApiClient.createRef
+        preflightSwitchRef = Renderer.VersionControlApiClient.preflightSwitchRef
+        switchRef = Renderer.VersionControlApiClient.switchRef
+        createRevision = Renderer.VersionControlApiClient.createRevision
+        restorePaths = Renderer.VersionControlApiClient.restorePaths
+        resolveConflict = Renderer.VersionControlApiClient.resolveConflict
+        finalizeConflict = Renderer.VersionControlApiClient.finalizeConflict
+        cancelConflict = Renderer.VersionControlApiClient.cancelConflict
+        listObjects = Renderer.VersionControlApiClient.listObjects
+        materializeObject = Renderer.VersionControlApiClient.materializeObject
+        pruneStorage = Renderer.VersionControlApiClient.pruneStorage
+        deduplicateStorage = Renderer.VersionControlApiClient.deduplicateStorage
+        clearStaleLock = Renderer.VersionControlApiClient.clearStaleLock
+        hasUsableAccount = hasUsableAccount
+        delay = fun milliseconds -> Promise.sleep milliseconds
+        newOperationId = Renderer.VersionControlApiClient.newOperationId
         confirmLfsPrune = fun message -> window.confirm message
         confirmInstall = fun message -> window.confirm message
         reportError = reportError
@@ -105,6 +121,7 @@ let GitStateCtx =
         {
             state = GitState.Empty
             refresh = fun () -> ()
+            sidebarVisibilityChanged = fun _ -> ()
             initRepository = fun () -> ()
             fetch = fun () -> ()
             pull = fun () -> ()
@@ -127,6 +144,7 @@ let GitStateCtx =
             switchBranch = fun _ -> ()
             selectChange = fun _ -> promise { return Ok() }
             confirmMergeResolution = fun _ -> ()
+            abandonMerge = fun () -> ()
             pruneLfsCache = fun () -> ()
             dedupLfsStorage = fun () -> ()
         }
@@ -140,6 +158,9 @@ let GitStateCtxProvider (children: ReactElement) =
 
     let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+    let authStateCtx = Renderer.Context.AuthStateContext.useAuthStateCtx ()
+    let usableAccountRef = React.useRef false
+    usableAccountRef.current <- authStateCtx.UsableActiveUser().IsSome
     let errorModalCtx = useErrorModalCtx ()
     let errorModalCtxRef = React.useRef errorModalCtx
     errorModalCtxRef.current <- errorModalCtx
@@ -155,12 +176,15 @@ let GitStateCtxProvider (children: ReactElement) =
         )
 
     let dependencies =
-        React.useMemo ((fun _ -> Helper.dependencies reportGitError), [||])
+        React.useMemo ((fun _ -> Helper.dependencies reportGitError (fun () -> usableAccountRef.current)), [||])
 
     let gitState, dispatch =
         React.useElmish ((fun () -> init ()), update dependencies pageStateCtx.setState, subscribe, [||])
 
     let refresh () = dispatch RefreshRequested
+
+    let sidebarVisibilityChanged isVisible =
+        dispatch (SidebarVisibilityChanged isVisible)
 
     let initRepository () = dispatch InitRepositoryRequested
 
@@ -181,7 +205,7 @@ let GitStateCtxProvider (children: ReactElement) =
     let primarySaveAll (message: string) =
         dispatch (PrimarySaveAllRequested message)
 
-    let cloneRepository (request: GitCloneRepositoryRequest) =
+    let cloneRepository (request: CloneWorkspaceRequestDto) =
         Promise.create (fun resolve _reject -> dispatch (CloneRequested(request, resolve)))
 
     let commitSelection (request: GitSidebarCommitSelectionRequest) =
@@ -218,8 +242,10 @@ let GitStateCtxProvider (children: ReactElement) =
     let selectChange (change: GitSidebarChange) =
         Promise.create (fun resolve _reject -> dispatch (SelectChangeRequested(change, resolve)))
 
-    let confirmMergeResolutionAction request =
+    let confirmMergeResolutionAction (request: GitMergeResolutionRequest) =
         dispatch (ConfirmMergeResolutionRequested request)
+
+    let abandonMerge () = dispatch (WriteRequested AbandonMerge)
 
     let pruneLfsCache () = dispatch PruneLfsCacheRequested
 
@@ -232,6 +258,7 @@ let GitStateCtxProvider (children: ReactElement) =
             (fun _ -> {
                 state = gitState
                 refresh = refresh
+                sidebarVisibilityChanged = sidebarVisibilityChanged
                 initRepository = initRepository
                 fetch = fetch
                 pull = pull
@@ -254,6 +281,7 @@ let GitStateCtxProvider (children: ReactElement) =
                 switchBranch = switchBranchTo
                 selectChange = selectChange
                 confirmMergeResolution = confirmMergeResolutionAction
+                abandonMerge = abandonMerge
                 pruneLfsCache = pruneLfsCache
                 dedupLfsStorage = dedupLfsStorage
             }),

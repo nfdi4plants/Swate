@@ -140,6 +140,7 @@ type private ActiveDialog =
 
 type private BranchHeaderProps = {
     Status: GitSidebarStatus
+    HasRemote: bool
     HasConflicts: bool
     IsBusy: bool
     CanOpenRemoteRepository: bool
@@ -191,6 +192,7 @@ type private CommitSectionProps = {
 }
 
 type private ChangedFilesListProps = {
+    Status: GitSidebarStatus
     ChangedFiles: GitSidebarChange[]
     MarkedPaths: Set<string>
     IsBusy: bool
@@ -586,6 +588,7 @@ type GitSidebar =
                                 prop.className "swt:flex swt:min-w-0 swt:flex-col"
                                 prop.children [
                                     Html.span [
+                                        prop.testId "GitSidebarTitle"
                                         prop.className "swt:truncate swt:text-sm swt:font-semibold"
                                         prop.text "Source Control"
                                     ]
@@ -702,8 +705,12 @@ type GitSidebar =
                                             ]
                                             Html.span [
                                                 prop.className "swt:min-w-0 swt:wrap-anywhere"
-                                                prop.text
-                                                    $"No upstream configured yet. Push will publish and track origin/{currentBranch}."
+                                                prop.text (
+                                                    if props.HasRemote then
+                                                        $"No upstream configured yet. Push will publish and track origin/{currentBranch}."
+                                                    else
+                                                        "Not published yet. Save to create the online ARC."
+                                                )
                                             ]
                                         ]
                                     ]
@@ -802,7 +809,7 @@ type GitSidebar =
                         props.SubmitUpdateFromOnline,
                         testId = "GitSidebarUpdateArcButton",
                         tooltipText =
-                            "Update ARC from Online:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git pull origin"
+                            "Update ARC from Online:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git merge origin/<branch>\n- git lfs pull origin (when Download Large Files is on)"
                     )
                     GitSidebar.ActionButton(
                         "More Git Actions",
@@ -867,7 +874,8 @@ type GitSidebar =
                                     props.IsBusy || not props.RemoteActionsEnabled,
                                     props.SubmitPull,
                                     testId = "GitSidebarPullButton",
-                                    tooltipText = "Download Changes:\n- git pull origin"
+                                    tooltipText =
+                                        "Download Changes:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git merge origin/<branch>\n- git lfs pull origin (when Download Large Files is on)"
                                 )
                                 GitSidebar.ActionButton(
                                     "Upload Changes",
@@ -900,7 +908,7 @@ type GitSidebar =
                                     props.SubmitPruneLfsCache,
                                     testId = "GitSidebarLfsPruneButton",
                                     tooltipText =
-                                        "Clean LFS Cache:\n- git lfs prune --verify-remote --verify-unreachable --when-unverified=halt"
+                                        "Clean LFS Cache:\n- git lfs prune --verify-remote --no-verify-unreachable --when-unverified=halt"
                                 )
                                 GitSidebar.ActionButton(
                                     "Reduce LFS Storage",
@@ -1220,26 +1228,28 @@ type GitSidebar =
                                     else
                                         $"Discard {props.DiscardPaths.Length} selected changes"
 
-                                Html.button [
-                                    prop.testId $"GitSidebarDiscardChangeButton-{props.Index}"
-                                    prop.type'.button
-                                    prop.className
-                                        "swt:btn swt:btn-ghost swt:btn-square swt:btn-xs swt:opacity-0 swt:transition-opacity swt:group-hover:opacity-100 swt:focus:opacity-100"
-                                    prop.ariaLabel discardLabel
-                                    prop.title discardLabel
-                                    prop.disabled props.IsBusy
-                                    prop.onClick (fun (event: MouseEvent) ->
-                                        event.preventDefault ()
-                                        event.stopPropagation ()
-                                        props.DiscardChanges props.DiscardPaths
-                                    )
-                                    prop.children [
-                                        Html.span [
-                                            prop.className
-                                                "swt:iconify swt:fluent--arrow-undo-24-regular swt:size-4 swt:text-error"
+                                // The row offers no discard for a conflicted file, since discarding it would drop one side of the merge.
+                                if not change.IsConflicted && props.DiscardPaths.Length > 0 then
+                                    Html.button [
+                                        prop.testId $"GitSidebarDiscardChangeButton-{props.Index}"
+                                        prop.type'.button
+                                        prop.className
+                                            "swt:btn swt:btn-ghost swt:btn-square swt:btn-xs swt:opacity-0 swt:transition-opacity swt:group-hover:opacity-100 swt:focus:opacity-100"
+                                        prop.ariaLabel discardLabel
+                                        prop.title discardLabel
+                                        prop.disabled props.IsBusy
+                                        prop.onClick (fun (event: MouseEvent) ->
+                                            event.preventDefault ()
+                                            event.stopPropagation ()
+                                            props.DiscardChanges props.DiscardPaths
+                                        )
+                                        prop.children [
+                                            Html.span [
+                                                prop.className
+                                                    "swt:iconify swt:fluent--arrow-undo-24-regular swt:size-4 swt:text-error"
+                                            ]
                                         ]
                                     ]
-                                ]
 
                                 GitSidebar.ChangeStatusTooltip(props.Index, change)
                             ]
@@ -1257,13 +1267,22 @@ type GitSidebar =
         let overscan = 8
 
         let discardPathsForChange (change: GitSidebarChange) =
-            if
-                Set.contains change.Path props.MarkedPaths
-                && not (Set.isEmpty props.MarkedPaths)
-            then
-                props.MarkedPaths |> Set.toArray |> Array.sort
-            else
-                [| change.Path |]
+            let conflictedPaths =
+                props.ChangedFiles
+                |> Array.filter _.IsConflicted
+                |> Array.map _.Path
+                |> Set.ofArray
+
+            let paths =
+                if
+                    Set.contains change.Path props.MarkedPaths
+                    && not (Set.isEmpty props.MarkedPaths)
+                then
+                    props.MarkedPaths |> Set.toArray |> Array.sort
+                else
+                    [| change.Path |]
+
+            paths |> Array.filter (fun path -> not (Set.contains path conflictedPaths))
 
         let changedFileListVirtualizer =
             Virtual.useVirtualizer (
@@ -1321,7 +1340,16 @@ type GitSidebar =
                         Html.div [
                             prop.className
                                 "swt:mt-2 swt:min-w-0 swt:wrap-break-word swt:rounded-box swt:border swt:border-dashed swt:border-base-content/15 swt:bg-base-200/40 swt:px-4 swt:py-6 swt:text-sm swt:text-base-content/60 swt:@max-xs:px-2"
-                            prop.text "No changed files. Your repository is in sync."
+                            prop.text (
+                                if
+                                    props.Status.TrackingBranch.IsSome
+                                    && props.Status.Ahead = 0
+                                    && props.Status.Behind = 0
+                                then
+                                    "No changed files. Your repository is in sync."
+                                else
+                                    "No changed files."
+                            )
                         ]
                     else
                         Html.div [
@@ -1629,6 +1657,7 @@ type GitSidebar =
             ?publishRenamePrompt: GitSidebarPublishRenamePrompt,
             ?remoteActionsEnabled: bool,
             ?remoteActionsWarning: string,
+            ?hasRemote: bool,
             ?canOpenRemoteRepository: bool,
             ?canCancelOperation: bool,
             ?onOpenRemoteRepository: unit -> unit,
@@ -1643,6 +1672,7 @@ type GitSidebar =
         let publishRenamePrompt = publishRenamePrompt
         let remoteActionsEnabled = defaultArg remoteActionsEnabled true
         let remoteActionsWarning = remoteActionsWarning
+        let hasRemote = defaultArg hasRemote true
         let canOpenRemoteRepository = defaultArg canOpenRemoteRepository false
         let canCancelOperation = defaultArg canCancelOperation false
         let onOpenRemoteRepository = defaultArg onOpenRemoteRepository (fun () -> ())
@@ -1983,6 +2013,7 @@ type GitSidebar =
 
         let branchHeaderProps = {
             Status = status
+            HasRemote = hasRemote
             HasConflicts = hasConflicts
             IsBusy = isBusy
             CanOpenRemoteRepository = canOpenRemoteRepository
@@ -2103,6 +2134,7 @@ type GitSidebar =
 
                 GitSidebar.ChangedFilesList(
                     {
+                        Status = status
                         ChangedFiles = changedFiles
                         MarkedPaths = markedPaths
                         IsBusy = isBusy

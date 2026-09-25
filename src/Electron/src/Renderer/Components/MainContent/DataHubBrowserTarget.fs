@@ -9,7 +9,7 @@ open Swate.Components.Page.DataHub.DataHubTypes
 open Swate.Components.Api.GitLabApi
 open Swate.Components.Composite.Actionbar.Types
 open Swate.Components.Primitive.ErrorModal.Context
-open Swate.Electron.Shared.GitTypes
+open Swate.Electron.Shared.VersionControlTypes
 
 module DataHubBrowserHelper =
     let isCancelError (error: exn) =
@@ -65,11 +65,13 @@ let DataHubBrowserTarget () =
                         destinationFolder
                         (DataHubBrowserHelper.toRepositoryFolderName projectInfo)
 
-                let cloneRequest: GitCloneRepositoryRequest = {
-                    RemoteUrl = projectInfo.http_url_to_repo
+                let cloneRequest: CloneWorkspaceRequestDto = {
+                    OperationId = Renderer.VersionControlApiClient.newOperationId ()
+                    ProviderLocation = projectInfo.http_url_to_repo
+                    DisplayName = Some projectInfo.name
                     TargetPath = targetPath
-                    Branch = None
-                    DownloadLargeFiles = gitStateCtx.state.DownloadLargeFiles
+                    TargetRef = None
+                    MaterializeAllObjects = gitStateCtx.state.DownloadLargeFiles
                 }
 
                 match! gitStateCtx.cloneRepository cloneRequest with

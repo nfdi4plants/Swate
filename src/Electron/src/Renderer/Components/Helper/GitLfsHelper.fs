@@ -1,51 +1,47 @@
+/// Large-object actions of the file explorer over the provider-neutral storage
+/// policy and materialization services. The file explorer checks the DataHub ruleset
+/// (isa.*.xlsx never in large-object storage, dataset files always) before it calls
+/// here, and the main process checks it again.
 module Renderer.Components.Helper.GitLfsHelper
 
-open System
 open Fable.Core
-open Swate.Electron.Shared.GitTypes
+open Swate.Components.Shared
+open Swate.Electron.Shared.VersionControlTypes
+
+let private operationId () =
+    Renderer.VersionControlApiClient.newOperationId ()
+
+let private toUnitResult = Renderer.Context.GitWorkflow.toUnitResult
 
 let runToggleLfsMark (relativePath: string) (markAsLfs: bool) : JS.Promise<Result<unit, string>> = promise {
-    let request: GitLfsRequest = {
-        RequestId = Guid.NewGuid().ToString()
-        RepoPath = ""
-        Command =
-            if markAsLfs then
-                GitLfsCommand.Track
-            else
-                GitLfsCommand.Untrack
-        FilePath = Some relativePath
-        TimeoutMs = Some 10000
-    }
+    let! result =
+        Renderer.VersionControlApiClient.setPathStoragePolicy {
+            OperationId = operationId ()
+            Path = PathHelpers.normalizeSeparators relativePath
+            UseLargeObjectStorage = markAsLfs
+        }
 
-    let! result = Api.ipcArcVaultApi.runGitLfs request
-
-    return
-        match result with
-        | Ok _ -> Ok()
-        | Error exn -> Error exn.Message
+    return toUnitResult result
 }
 
 let runFreeLocalLfsCopy (relativePath: string) : JS.Promise<Result<unit, string>> = promise {
-    let request: GitLfsFileRequest = { Path = relativePath }
+    let! result =
+        Renderer.VersionControlApiClient.dematerializeObject {
+            OperationId = operationId ()
+            Path = PathHelpers.normalizeSeparators relativePath
+            RefreshTree = None
+        }
 
-    let! result = Renderer.GitApiClient.gitLfsFreeLocalCopy request
-
-    return
-        match result with
-        | Ok operation when operation.Success -> Ok()
-        | Ok operation -> Error(operation.Message |> Option.defaultValue "Git LFS cleanup failed.")
-        | Error message -> Error message
+    return toUnitResult result
 }
 
-let runDownloadLfsFile (relativePath: string) = promise {
+let runDownloadLfsFile (relativePath: string) : JS.Promise<Result<unit, string>> = promise {
+    let! result =
+        Renderer.VersionControlApiClient.materializeObject {
+            OperationId = operationId ()
+            Path = PathHelpers.normalizeSeparators relativePath
+            RefreshTree = None
+        }
 
-    let request: GitLfsFileRequest = { Path = relativePath }
-
-    let! result = Renderer.GitApiClient.gitLfsDownloadFile request
-
-    return
-        match result with
-        | Ok operation when operation.Success -> Ok()
-        | Ok operation -> Error(operation.Message |> Option.defaultValue "Git LFS download failed.")
-        | Error message -> Error message
+    return toUnitResult result
 }

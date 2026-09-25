@@ -59,5 +59,15 @@ jobs:
         working-directory: src/Components
         run: npm run build
 
+      # No other step bundles the Electron main process with Vite and Rollup, so Fable output
+      # that breaks only there (a fable-library member the pinned Fable lacks) would pass.
+      # Packaging does not load the bundle. A namespace import that crashes at load time is
+      # caught by the library's package-consumer check, for the library's own code only.
+      - name: Bundle the Electron app
+        working-directory: src/Electron
+        run: |
+          npm run fable
+          npx electron-forge package
+
       - name: Run Tests
         run: dotnet run --project ./build/Build.fsproj -- test
