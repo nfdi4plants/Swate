@@ -55,6 +55,8 @@ type ArcVault(window: BrowserWindow) =
     member val private fileWatcherOwnWriteArcMergeSuppressionTimeout: int option = None with get, set
     member val activeFileImport: ActiveFileImport option = None with get, set
     member val isWaitingForImportCleanup = false with get, set
+    /// True only while an ARC is being opened or initially created in this vault.
+    member val isInitializingArc = false with get, set
 
     /// Runs ARC merges sequentially so every operation observes the result of the preceding merge.
     member this.EnqueueArcMerge<'T>(operation: unit -> Fable.Core.JS.Promise<'T>) : Fable.Core.JS.Promise<'T> =
@@ -483,12 +485,15 @@ module ArcVaultExtensions =
                     |> Remoting.buildProxySender<IPathChangeRendererApi>
 
                 swatelogfn this.window.id "path: %s" normalizedPath
+                this.isInitializingArc <- true
                 this.path <- Some normalizedPath
 
                 try
                     do! this.Startup()
+                    this.isInitializingArc <- false
                     sendMsg.pathChange (Some normalizedPath)
                 with error ->
+                    this.isInitializingArc <- false
                     do! this.RestoreEmptyVaultAfterFailedInitialization()
                     return raise error
         }
@@ -506,6 +511,7 @@ module ArcVaultExtensions =
                     |> Remoting.buildProxySender<IPathChangeRendererApi>
 
                 try
+                    this.isInitializingArc <- true
                     let arc = ARC(identifier)
                     this.path <- Some normalizedPath
                     this.SetArc(arc)
@@ -523,8 +529,10 @@ module ArcVaultExtensions =
                         this.isBusyWriting <- false
 
                     do! this.Startup()
+                    this.isInitializingArc <- false
                     sendMsg.pathChange (Some normalizedPath)
                 with error ->
+                    this.isInitializingArc <- false
                     do! this.RestoreEmptyVaultAfterFailedInitialization()
                     return raise error
         }
@@ -738,6 +746,8 @@ type ArcVaults() =
                                     )
                         }
                         |> Promise.start
+                elif vault.isInitializingArc then
+                    swatelogfn id "Closing window directly because ARC initialization is still in progress."
                 elif vault.hasUnsavedArcChanges then
                     closeEvent.preventDefault ()
 
@@ -815,8 +825,13 @@ type ArcVaults() =
 
             return id
         with error ->
+            let targetWasDestroyed = window.isDestroyed ()
             do! this.CleanupFailedRegistration(window, vault, id)
-            return raise error
+
+            if targetWasDestroyed then
+                return raise (ArcLoadCancelledException id)
+            else
+                return raise error
     }
 
     member private this.ValidateArcRoot(path: string) = promise {
@@ -856,8 +871,13 @@ type ArcVaults() =
 
             return id
         with error ->
+            let targetWasDestroyed = window.isDestroyed ()
             do! this.CleanupFailedRegistration(window, vault, id)
-            return raise error
+
+            if targetWasDestroyed then
+                return raise (ArcLoadCancelledException id)
+            else
+                return raise error
     }
 
     member this.OpenARCInVault(windowId: int, path: string) = promise {
@@ -931,23 +951,29 @@ type ArcVaults() =
             match! this.ValidateArcRoot normalizedArcPath with
             | Error error -> return raise error
             | Ok() ->
-                match this.TryGetVault callingWindowId with
-                | Some vault when vault.path.IsNone ->
-                    do! vault.OpenARC(normalizedArcPath)
-                    do! this.InitializeFileTreeForActiveVault(callingWindowId, vault, normalizedArcPath)
+                match this.TryGetVaultByPath normalizedArcPath with
+                | Some vault ->
+                    vault.window.focus ()
                     this.TrackRecentAndBroadcast(normalizedArcPath)
-                    return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
-                | _ ->
-                    let! newWindowId = this.RegisterVaultWithValidatedArc(normalizedArcPath)
+                    return ArcOpenDisposition.FocusedExisting normalizedArcPath
+                | None ->
+                    match this.TryGetVault callingWindowId with
+                    | Some vault when vault.path.IsNone ->
+                        do! vault.OpenARC(normalizedArcPath)
+                        do! this.InitializeFileTreeForActiveVault(callingWindowId, vault, normalizedArcPath)
+                        this.TrackRecentAndBroadcast(normalizedArcPath)
+                        return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
+                    | _ ->
+                        let! newWindowId = this.RegisterVaultWithValidatedArc(normalizedArcPath)
 
-                    let newVault =
-                        match this.TryGetVault newWindowId with
-                        | Some vault -> vault
-                        | None -> raise (ArcLoadCancelledException newWindowId)
+                        let newVault =
+                            match this.TryGetVault newWindowId with
+                            | Some vault -> vault
+                            | None -> raise (ArcLoadCancelledException newWindowId)
 
-                    do! this.InitializeFileTreeForActiveVault(newWindowId, newVault, normalizedArcPath)
-                    this.TrackRecentAndBroadcast(normalizedArcPath)
-                    return ArcOpenDisposition.OpenedInNewWindow normalizedArcPath
+                        do! this.InitializeFileTreeForActiveVault(newWindowId, newVault, normalizedArcPath)
+                        this.TrackRecentAndBroadcast(normalizedArcPath)
+                        return ArcOpenDisposition.OpenedInNewWindow normalizedArcPath
     }
 
     /// Create a new ARC at the given path with the given identifier.

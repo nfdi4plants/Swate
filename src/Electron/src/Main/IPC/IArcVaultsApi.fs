@@ -254,14 +254,19 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     let! disposition = promise {
                         try
                             let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, request.identifier)
-                            return Some disposition
+                            return Ok disposition
                         with ArcLoadCancelledException _ ->
-                            return None
+                            let investigationPath =
+                                ARCtrl.ArcPathHelper.combine arcPath ARCtrl.ArcPathHelper.InvestigationFileName
+
+                            let! arcWasCreated = ARCtrl.FileSystemHelper.fileExistsAsync investigationPath
+                            return Error arcWasCreated
                     }
 
                     match disposition with
-                    | None -> return Ok(CreateArcOutcome.CreatedButClosed arcPath)
-                    | Some disposition ->
+                    | Error true -> return Ok(CreateArcOutcome.CreatedButClosed arcPath)
+                    | Error false -> return Ok CreateArcOutcome.Cancelled
+                    | Ok disposition ->
                         match disposition with
                         | ArcOpenDisposition.FocusedExisting path -> return Ok(CreateArcOutcome.FocusedExisting path)
                         | ArcOpenDisposition.CreatedInCurrent path
