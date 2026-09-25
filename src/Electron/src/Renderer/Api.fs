@@ -8,8 +8,10 @@ open Fable.Core.JsInterop
 open Fable.Remoting.Client
 open Fable.Electron.Remoting.Renderer
 
-let ipcGitApi = Remoting.createIpc () |> Remoting.buildProxySender<IGitApi>
 let ipcGitLabApi = Remoting.createIpc () |> Remoting.buildProxySender<IGitLabApi>
+
+let ipcVersionControlApi =
+    Remoting.createIpc () |> Remoting.buildProxySender<IVersionControlApi>
 
 let ipcArcVaultApi =
     Remoting.createIpc () |> Remoting.buildProxySender<IArcVaultsApi>

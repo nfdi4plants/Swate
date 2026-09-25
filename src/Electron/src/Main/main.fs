@@ -1,5 +1,6 @@
 module Main.Main
 
+open Fable.Core
 open Fable.Electron
 open Fable.Electron.Remoting.Main
 open Main
@@ -13,9 +14,18 @@ app
         // Restore persisted auth before any IPC handlers fire
         Main.Auth.AuthService.tryRestoreFromStorage ()
 
+        // The provider catalog needs the settings root, which exists only once the app is
+        // ready. A failure here must not take the IPC registrations below with it.
+        try
+            let runtime = Main.VersionControl.VersionControlRuntime.createProduction ()
+            let host = Main.VersionControl.WorkspaceSessionHost.WorkspaceSessionHost(runtime)
+            Main.VersionControl.WorkspaceSessionHost.initialize host
+        with error ->
+            Browser.Dom.console.error ("Version control host initialization failed", error.Message)
+
         ARC_VAULTS.RegisterVault() |> ignore
 
-        Remoting.createIpc () |> Remoting.fromIpcMainEvent IPC.IGitApi.api
+        Remoting.createIpc () |> Remoting.fromIpcMainEvent IPC.IVersionControlApi.api
         Remoting.createIpc () |> Remoting.fromValue IPC.IGitLabApi.api
         Remoting.createIpc () |> Remoting.fromIpcMainEvent IPC.ArcVaultsApi.api
         Remoting.createIpc () |> Remoting.fromValue Main.IPC.AuthApi.api
@@ -35,3 +45,14 @@ app.onWindowAllClosed (fun () ->
 )
 
 app.onBeforeQuit (fun _ -> Browser.Dom.console.log ("Quitting"))
+
+app.onWillQuit (fun _ ->
+    // The before-quit event runs before the windows' close handlers, which may still wait for running operations.
+    match Main.VersionControl.WorkspaceSessionHost.tryCurrent () with
+    | Some host ->
+        host.CloseAll()
+        |> Async.StartAsPromise
+        |> Promise.catch (fun _ -> ())
+        |> Promise.start
+    | None -> ()
+)

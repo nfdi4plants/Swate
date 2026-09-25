@@ -2,7 +2,7 @@ module Main.FileImportCoordinator
 
 open Fable.Core
 open Fable.Electron.Main
-open Fable.Electron.Remoting.Main
+open Main
 open Main.Bindings.Abort
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
@@ -14,10 +14,9 @@ type ActiveFileImport = {
 }
 
 let publishState (window: BrowserWindow) activeImport =
-    Remoting.createIpc ()
-    |> Remoting.withWindow window
-    |> Remoting.buildProxySender<IFileImportRendererApi>
-    |> fun sender -> sender.fileImportStateUpdate (activeImport |> Option.map _.State)
+    WindowSend.send<IFileImportRendererApi>
+        window
+        (fun sender -> sender.fileImportStateUpdate (activeImport |> Option.map _.State))
 
 let run
     (window: BrowserWindow)

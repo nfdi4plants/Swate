@@ -63,10 +63,10 @@ let private reloadsWhenSelectedFileChanges =
     | _ -> false
 
 let private isCheckedOutLfsFile (entry: FileEntry) =
-    entry.lfs |> Option.exists (fun lfsInfo -> lfsInfo.checkout)
+    entry.largeObject |> Option.exists (fun state -> state.IsMaterialized)
 
 let private isPointerLfsFile (entry: FileEntry) =
-    entry.lfs |> Option.exists (fun lfsInfo -> not lfsInfo.checkout)
+    entry.largeObject |> Option.exists (fun state -> not state.IsMaterialized)
 
 let private shouldReloadSelectedFile pageState entry =
     if isPointerLfsFile entry then
