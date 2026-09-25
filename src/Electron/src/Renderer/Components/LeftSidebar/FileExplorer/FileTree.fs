@@ -62,6 +62,46 @@ type FileTree =
         let activeDialog, setActiveDialog = React.useState<FileTreeDialog option> None
         let isDialogBusy, setIsDialogBusy = React.useState false
 
+        let lfsActivityByPath, setLfsActivityByPath =
+            React.useState<Map<string, string>> Map.empty
+
+        let lfsActivityByPathRef = React.useRef lfsActivityByPath
+
+        let setLfsActivity (relativePath: string) (activity: string option) =
+            let next =
+                match activity with
+                | Some activity -> Map.add relativePath activity lfsActivityByPathRef.current
+                | None -> Map.remove relativePath lfsActivityByPathRef.current
+
+            lfsActivityByPathRef.current <- next
+            setLfsActivityByPath next
+
+        let runLfsActionWithActivity
+            (activity: string)
+            (runAction: string -> JS.Promise<Result<unit, string>>)
+            (relativePath: string)
+            : JS.Promise<Result<unit, string>> =
+            promise {
+                if Map.containsKey relativePath lfsActivityByPathRef.current then
+                    return Ok()
+                else
+                    setLfsActivity relativePath (Some activity)
+
+                    try
+                        return! runAction relativePath
+                    finally
+                        setLfsActivity relativePath None
+            }
+
+        let runDownloadLfsFile relativePath =
+            runLfsActionWithActivity
+                "Downloading"
+                Renderer.Components.Helper.GitLfsHelper.runDownloadLfsFile
+                relativePath
+
+        let runFreeLocalLfsCopy relativePath =
+            runLfsActionWithActivity "Freeing" Renderer.Components.Helper.GitLfsHelper.runFreeLocalLfsCopy relativePath
+
         // The file watcher emits the initial tree too; only later tree updates should refresh open previews.
         let hasObservedFileTreeUpdateRef = React.useRef false
 
@@ -125,7 +165,16 @@ type FileTree =
         let fileItem =
             fileTree
             |> Option.map (
-                FileTreeMaterialization.toMaterializedFileItemTree Helper.createItem reconciledMaterializedState.Paths
+                FileTreeMaterialization.toMaterializedFileItemTree
+                    (fun node ->
+                        let item = Helper.createItem node
+
+                        {
+                            item with
+                                LfsActivity = item.Path |> Option.bind (fun path -> Map.tryFind path lfsActivityByPath)
+                        }
+                    )
+                    reconciledMaterializedState.Paths
             )
 
         let applyPreviewResult itemName result =
@@ -465,8 +514,8 @@ type FileTree =
             }
             enqueueError = errorModal.enqueue
             runToggleLfsMark = runToggleLfsMark
-            runDownloadLfsFile = Renderer.Components.Helper.GitLfsHelper.runDownloadLfsFile
-            runFreeLocalLfsCopy = Renderer.Components.Helper.GitLfsHelper.runFreeLocalLfsCopy
+            runDownloadLfsFile = runDownloadLfsFile
+            runFreeLocalLfsCopy = runFreeLocalLfsCopy
         }
 
         let createContextMenuItems =
@@ -492,8 +541,8 @@ type FileTree =
             Renderer.Components.FileExplorerLfs.createLfsPillAction
                 errorModal.enqueue
                 arcScopeId
-                Renderer.Components.Helper.GitLfsHelper.runDownloadLfsFile
-                Renderer.Components.Helper.GitLfsHelper.runFreeLocalLfsCopy
+                runDownloadLfsFile
+                runFreeLocalLfsCopy
 
         let confirmRenameItem (newName: string) =
             if not isDialogBusy then

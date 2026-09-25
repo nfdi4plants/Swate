@@ -45,6 +45,7 @@ let private createLfsFileItem (name: string) (path: string) (downloaded: bool) (
         IsLFS = Some true
         Downloaded = Some downloaded
         IsLFSPointer = Some isPointer
+        LfsActivity = None
         SizeFormatted = Some "42 MB"
 }
 

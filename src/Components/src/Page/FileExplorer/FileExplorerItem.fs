@@ -119,10 +119,12 @@ type FileExplorerItem =
         let isPointer = item.IsLFSPointer = Some true
         let isDownloaded = Helper.hasLocalLfsCopy item
 
-        let statusText =
+        let currentStatusText =
             if isDownloaded then "LFS Downloaded"
             elif isPointer then "LFS Pointer"
             else "LFS Not Downloaded"
+
+        let statusText = defaultArg item.LfsActivity currentStatusText
 
         let statusAccessibilityText =
             item.SizeFormatted
@@ -130,9 +132,10 @@ type FileExplorerItem =
             |> Option.defaultValue statusText
 
         let isActionDisabled =
-            statusAction
-            |> Option.bind (fun action -> action.Disabled)
-            |> Option.defaultValue false
+            item.LfsActivity.IsSome
+            || (statusAction
+                |> Option.bind (fun action -> action.Disabled)
+                |> Option.defaultValue false)
 
         let pillAccessibilityText =
             match statusAction with
@@ -180,10 +183,17 @@ type FileExplorerItem =
                     else "not-downloaded"
                 )
                 prop.children [
-                    Html.i [
-                        prop.className $"swt:iconify {statusIconClassName} swt:size-3"
-                    ]
-                    Html.span [ prop.text "LFS" ]
+                    if item.LfsActivity.IsSome then
+                        Html.span [
+                            prop.className "swt:loading swt:loading-spinner swt:loading-xs"
+                            prop.ariaHidden true
+                        ]
+                    else
+                        Html.i [
+                            prop.className $"swt:iconify {statusIconClassName} swt:size-3"
+                        ]
+
+                    Html.span [ prop.text (defaultArg item.LfsActivity "LFS") ]
                 ]
             ]
 
