@@ -19,7 +19,14 @@ open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
 
-exception ArcLoadCancelledException of targetWindowId: int
+type ArcLoadCancelledException(targetWindowId: int) =
+    inherit exn($"Loading the ARC was cancelled because window {targetWindowId} was closed.")
+    member _.targetWindowId = targetWindowId
+
+let (|ArcLoadCancelledException|_|) (error: exn) =
+    match error with
+    | :? ArcLoadCancelledException as cancellation -> Some cancellation.targetWindowId
+    | _ -> None
 
 let private startFileWatcherOwnWriteArcMergeSuppression suppressionMs currentTimeout onElapsed =
     currentTimeout |> Option.iter Fable.Core.JS.clearTimeout
@@ -96,14 +103,13 @@ type ArcVault(window: BrowserWindow) =
             this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle (Some arc.Identifier)
 
     member this.ClearArc() =
+        let hadUnsavedArcChanges = this.hasUnsavedArcChanges
         this.arc <- None
+        this.hasUnsavedArcChanges <- false
 
         if not (this.window.isDestroyed ()) then
             this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle None
 
-    member internal this.ResetUnsavedStateAfterFailedInitialization() =
-        let hadUnsavedArcChanges = this.hasUnsavedArcChanges
-        this.hasUnsavedArcChanges <- false
         hadUnsavedArcChanges
 
     /// Sets the dirty marker for unsaved in-memory ARC mutations.
@@ -442,13 +448,13 @@ module ArcVaultExtensions =
         member private this.RestoreEmptyVaultAfterFailedInitialization() = promise {
             do! this.StopFileWatcher()
 
-            let hadUnsavedArcChanges = this.ResetUnsavedStateAfterFailedInitialization()
+            let hadUnsavedArcChanges = this.hasUnsavedArcChanges
 
             this.path <- None
             this.fileTree.Clear()
 
             try
-                this.ClearArc()
+                this.ClearArc() |> ignore
             with error ->
                 swatelogfn this.window.id "Failed to reset ARC window presentation: %s" error.Message
 
@@ -468,9 +474,6 @@ module ArcVaultExtensions =
                 return raise (ArcLoadCancelledException this.window.id)
             else
                 this.StartFileWatcher()
-
-                this.window.title <-
-                    Swate.Electron.Shared.ApplicationVersion.windowTitle (Some this.arc.Value.Identifier)
         }
 
         member this.OpenARC(path: string) = promise {
@@ -769,9 +772,8 @@ type ArcVaults() =
             vault.isCloseRequestPending <- false
             vault.isCloseApproved <- false
 
-            match this.TryGetVault(id) with
-            | Some registeredVault when obj.ReferenceEquals(registeredVault, vault) -> this.DisposeVault(id)
-            | _ -> ()
+            if this.Vaults.ContainsKey(id) then
+                this.DisposeVault(id)
         )
 
     member private this.CleanupFailedRegistration(window: BrowserWindow, vault: ArcVault, id: int) = promise {
@@ -782,57 +784,51 @@ type ArcVaults() =
             window.destroy ()
     }
 
-    member this.RegisterVault(?onFailureBeforeCleanup: exn -> unit) : Fable.Core.JS.Promise<int> = promise {
-        let window = createWindow ()
-        let id = window.id
-        let vault = ArcVault(window)
-        this.Vaults.Add(id, vault)
-        this.OnCloseWindow(window, vault, id)
+    member private this.RegisterVaultCore
+        (initialize: ArcVault -> JS.Promise<unit>, ?onFailureBeforeCleanup: exn -> unit)
+        : JS.Promise<ArcVault> =
+        promise {
+            let window = createWindow ()
+            let id = window.id
+            let vault = ArcVault(window)
+            this.Vaults.Add(id, vault)
+            this.OnCloseWindow(window, vault, id)
 
-        try
-            do! loadWindow window
+            try
+                do! loadWindow window
+                do! initialize vault
 
-            window.focus ()
-            swatelogfn id "Register window"
+                window.focus ()
+                swatelogfn id "Register window"
 
-            return id
-        with error ->
-            onFailureBeforeCleanup
-            |> Option.iter (fun notifyFailure ->
-                try
-                    notifyFailure error
-                with notificationError ->
-                    swatelogfn id "Failed to report window registration error: %s" notificationError.Message
-            )
+                return vault
+            with error ->
+                onFailureBeforeCleanup
+                |> Option.iter (fun notifyFailure ->
+                    try
+                        notifyFailure error
+                    with notificationError ->
+                        swatelogfn id "Failed to report window registration error: %s" notificationError.Message
+                )
 
-            do! this.CleanupFailedRegistration(window, vault, id)
-            return raise error
+                let targetWasDestroyed = window.isDestroyed ()
+                do! this.CleanupFailedRegistration(window, vault, id)
+
+                match error with
+                | ArcLoadCancelledException _ -> return raise error
+                | _ when targetWasDestroyed -> return raise (ArcLoadCancelledException id)
+                | _ -> return raise error
+        }
+
+    member this.RegisterVault(?onFailureBeforeCleanup: exn -> unit) : JS.Promise<int> = promise {
+        let! vault =
+            this.RegisterVaultCore((fun _ -> promise { return () }), ?onFailureBeforeCleanup = onFailureBeforeCleanup)
+
+        return vault.window.id
     }
 
-    member private this.RegisterVaultWithValidatedArc(path: string) = promise {
-        let window = createWindow ()
-        let id = window.id
-        let vault = ArcVault(window)
-        this.Vaults.Add(id, vault)
-        this.OnCloseWindow(window, vault, id)
-
-        try
-            do! loadWindow window
-            do! vault.OpenARC(path)
-
-            window.focus ()
-            swatelogfn id "Register window"
-
-            return id
-        with error ->
-            let targetWasDestroyed = window.isDestroyed ()
-            do! this.CleanupFailedRegistration(window, vault, id)
-
-            if targetWasDestroyed then
-                return raise (ArcLoadCancelledException id)
-            else
-                return raise error
-    }
+    member private this.RegisterVaultWithValidatedArc(path: string) =
+        this.RegisterVaultCore(fun vault -> vault.OpenARC(path))
 
     member private this.ValidateArcRoot(path: string) = promise {
         let! arcRootExists = ARCtrl.FileSystemHelper.directoryExistsAsync path
@@ -855,30 +851,8 @@ type ArcVaults() =
                     )
     }
 
-    member this.RegisterVaultWithNewArc(path: string, newIdentifier: string) : Fable.Core.JS.Promise<int> = promise {
-        let window = createWindow ()
-        let id = window.id
-        let vault = ArcVault(window)
-        this.Vaults.Add(id, vault)
-        this.OnCloseWindow(window, vault, id)
-
-        try
-            do! loadWindow window
-            do! vault.CreateARC(path, newIdentifier)
-
-            window.focus ()
-            swatelogfn id "Register window"
-
-            return id
-        with error ->
-            let targetWasDestroyed = window.isDestroyed ()
-            do! this.CleanupFailedRegistration(window, vault, id)
-
-            if targetWasDestroyed then
-                return raise (ArcLoadCancelledException id)
-            else
-                return raise error
-    }
+    member this.RegisterVaultWithNewArc(path: string, newIdentifier: string) : JS.Promise<ArcVault> =
+        this.RegisterVaultCore(fun vault -> vault.CreateARC(path, newIdentifier))
 
     member this.OpenARCInVault(windowId: int, path: string) = promise {
         let normalizedArcPath = PathHelpers.normalizePath path
@@ -910,21 +884,11 @@ type ArcVaults() =
 
     member private this.EnsureVaultIsStillActive(windowId: int, expectedVault: ArcVault) =
         match this.TryGetVault windowId with
-        | Some registeredVault when
-            obj.ReferenceEquals(registeredVault, expectedVault)
-            && not (expectedVault.window.isDestroyed ())
-            ->
-            ()
+        | Some _ when not (expectedVault.window.isDestroyed ()) -> ()
         | _ -> raise (ArcLoadCancelledException windowId)
 
     member private this.InitializeFileTreeForActiveVault(windowId: int, expectedVault: ArcVault, arcPath: string) = promise {
-        let! fileTreeResult = promise {
-            try
-                let! fileTree = getFileTree arcPath
-                return Ok fileTree
-            with error ->
-                return Error error
-        }
+        let! fileTreeResult = promise { return! getFileTree arcPath } |> Promise.result
 
         this.EnsureVaultIsStillActive(windowId, expectedVault)
 
@@ -964,12 +928,8 @@ type ArcVaults() =
                         this.TrackRecentAndBroadcast(normalizedArcPath)
                         return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
                     | _ ->
-                        let! newWindowId = this.RegisterVaultWithValidatedArc(normalizedArcPath)
-
-                        let newVault =
-                            match this.TryGetVault newWindowId with
-                            | Some vault -> vault
-                            | None -> raise (ArcLoadCancelledException newWindowId)
+                        let! newVault = this.RegisterVaultWithValidatedArc(normalizedArcPath)
+                        let newWindowId = newVault.window.id
 
                         do! this.InitializeFileTreeForActiveVault(newWindowId, newVault, normalizedArcPath)
                         this.TrackRecentAndBroadcast(normalizedArcPath)
@@ -994,12 +954,8 @@ type ArcVaults() =
                 this.TrackRecentAndBroadcast(normalizedArcPath)
                 return ArcOpenDisposition.CreatedInCurrent normalizedArcPath
             | _ ->
-                let! newWindowId = this.RegisterVaultWithNewArc(normalizedArcPath, identifier)
-
-                let newVault =
-                    match this.TryGetVault newWindowId with
-                    | Some vault -> vault
-                    | None -> raise (ArcLoadCancelledException newWindowId)
+                let! newVault = this.RegisterVaultWithNewArc(normalizedArcPath, identifier)
+                let newWindowId = newVault.window.id
 
                 do! this.InitializeFileTreeForActiveVault(newWindowId, newVault, normalizedArcPath)
                 this.TrackRecentAndBroadcast(normalizedArcPath)

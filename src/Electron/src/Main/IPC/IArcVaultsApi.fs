@@ -175,7 +175,7 @@ let private openArcAtPath (event: IpcMainInvokeEvent) (requestedPath: string) = 
             let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
             return Ok disposition
         with
-        | ArcLoadCancelledException targetWindowId -> return Error(ArcLoadCancelledException targetWindowId)
+        | ArcLoadCancelledException _ as error -> return Error error
         | error -> return! reportArcOpenError event window (Some arcPath) error
 }
 
@@ -186,20 +186,17 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             try
                 let window = dialogParentFromIpcEvent event
 
-                let! selectionResult = promise {
-                    try
-                        let! selection =
+                let! selectionResult =
+                    promise {
+                        return!
                             dialog.showOpenDialog (
                                 ?window = window,
                                 properties = [|
                                     Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
                                 |]
                             )
-
-                        return Ok selection
-                    with error ->
-                        return Error error
-                }
+                    }
+                    |> Promise.result
 
                 match selectionResult with
                 | Error error -> return! reportArcOpenError event window None error

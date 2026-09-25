@@ -9,7 +9,7 @@ let private registerRequiredWindow (failureContext: string) =
     ARC_VAULTS.RegisterVault(
         onFailureBeforeCleanup =
             fun error ->
-                Browser.Dom.console.error ($"{failureContext}: {error.Message}")
+                eprintfn "%s: %s" failureContext error.Message
 
                 dialog.showErrorBox ("Swate could not start", $"{failureContext}\n\n{error.Message}")
     )

@@ -648,6 +648,7 @@ let private closingAfterStartupTestWindow id isStartupComplete scheduleFromFocus
     let mutable titleWritesAfterDestroy = 0
     let mutable closeHandler: (obj -> unit) option = None
     let mutable closedHandler: (unit -> unit) option = None
+    let mutable scheduleCloseAfterStartup = ignore
     let noop: obj = emitJsExpr () "((..._args) => {})"
 
     let send: obj =
@@ -655,6 +656,8 @@ let private closingAfterStartupTestWindow id isStartupComplete scheduleFromFocus
             (fun () ->
                 if destroyed then
                     sendsAfterDestroy <- sendsAfterDestroy + 1
+                elif not scheduleFromFocus then
+                    scheduleCloseAfterStartup ()
             )
             "((..._args) => $0())"
 
@@ -689,6 +692,8 @@ let private closingAfterStartupTestWindow id isStartupComplete scheduleFromFocus
         if not closeScheduledAfterStartup && isStartupComplete () then
             closeScheduledAfterStartup <- true
             scheduleAfterMicrotaskTurns microtaskTurns closeAfterStartup
+
+    scheduleCloseAfterStartup <- scheduleCloseIfStartupComplete
 
     let show () =
         shown <- true
@@ -817,7 +822,7 @@ let private expectRegistrationLoadFailure
     (vaults: ArcVaults)
     (windowId: int)
     (isDestroyed: unit -> bool)
-    (registration: unit -> JS.Promise<int>)
+    (registration: unit -> JS.Promise<'T>)
     =
     promise {
         let mutable capturedError: exn option = None
@@ -828,7 +833,7 @@ let private expectRegistrationLoadFailure
         with error ->
             capturedError <- Some error
 
-        Vitest.expect(capturedError).toEqual (Some expectedError)
+        Vitest.expect(capturedError.Value).toBe (expectedError)
         Vitest.expect(vaults.Vaults.ContainsKey(windowId)).toBe (false)
         Vitest.expect(isDestroyed ()).toBe (true)
     }
@@ -2615,9 +2620,9 @@ Vitest.describe (
                     vaultsRef <- Some vaults
                     setBrowserWindowFactory (fun _ -> window :> obj)
 
-                    let! registeredWindowId = vaults.RegisterVaultWithNewArc(arcPath, "New ARC")
+                    let! returnedVault = vaults.RegisterVaultWithNewArc(arcPath, "New ARC")
 
-                    Vitest.expect(registeredWindowId).toBe (windowId)
+                    Vitest.expect(returnedVault.window.id).toBe (windowId)
                     Vitest.expect(lifecycleWasAttachedWhenLoadStarted ()).toBe (true)
                     Vitest.expect(wasShown ()).toBe (true)
                     Vitest.expect(vaultWasEmptyWhenShown).toBe (true)
@@ -2625,6 +2630,7 @@ Vitest.describe (
                     Vitest.expect(existsSync arcPath).toBe (true)
                     Vitest.expect(isDestroyed ()).toBe (false)
                     Vitest.expect(registeredVault.IsSome).toBe (true)
+                    Vitest.expect(returnedVault).toBe (registeredVault.Value)
                     Vitest.expect(vaults.Vaults.ContainsKey(windowId)).toBe (true)
 
                     do! registeredVault.Value.StopFileWatcher()
@@ -3383,8 +3389,8 @@ Vitest.describe (
             fun () -> promise {
                 let! rootPath = TestHelpers.createTempDirectoryAsync "swate-create-startup-rollback-"
                 let arcPath = join [| rootPath; "written-arc" |]
-                let startupError = exn "Expected Startup title failure."
-                let window, sentMessages = createRollbackTestWindow 72 (Some(3, startupError)) None
+                let startupError = exn "Expected ARC reload title failure."
+                let window, sentMessages = createRollbackTestWindow 72 (Some(2, startupError)) None
                 let vault = ArcVault(window)
                 let seededEntry = FileEntry.create ("seeded.txt", "seeded.txt", false)
                 vault.fileTree.Add(seededEntry.path, seededEntry)
@@ -3487,15 +3493,25 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "ClearArc resets the window title",
+            "ClearArc resets the dirty state and window title",
             fun () ->
                 let vault = ArcVault(TestHelpers.testWindow ())
                 vault.SetArc(ARC("LoadedArc"))
+                vault.RefreshHasUnsavedArcChangesFlag()
 
-                vault.ClearArc()
+                let hadUnsavedArcChanges = vault.ClearArc()
 
+                Vitest.expect(hadUnsavedArcChanges).toBe (true)
                 Vitest.expect(vault.arc).toEqual (None)
+                Vitest.expect(vault.hasUnsavedArcChanges).toBe (false)
                 Vitest.expect(vault.window.title).toBe (Swate.Electron.Shared.ApplicationVersion.windowTitle None)
+        )
+
+        Vitest.test (
+            "ArcLoadCancelledException includes the closed window id in its message",
+            fun () ->
+                let error = ArcLoadCancelledException 42
+                Vitest.expect(error.Message).toContain ("window 42")
         )
 
 )
