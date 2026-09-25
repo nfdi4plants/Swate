@@ -10384,6 +10384,37 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "An unsupported base content result skips the word diff and current file readers",
+            fun () -> promise {
+                let path = "binary.dat"
+                let mutable wordDiffCalls = 0
+                let mutable currentReadCalls = 0
+
+                let getBaseContent =
+                    fun _ -> promise { return Ok(failed Unsupported "binary" "binary content") }
+
+                let getWordDiff =
+                    fun _ ->
+                        wordDiffCalls <- wordDiffCalls + 1
+                        promise { return Ok(succeeded (ContentViewDto.Text "")) }
+
+                let readCurrentContent =
+                    fun _ ->
+                        currentReadCalls <- currentReadCalls + 1
+                        promise { return Ok "must not be read" }
+
+                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "M")
+
+                match result with
+                | Ok(PageState.GitUnsupportedPage _) -> ()
+                | _ -> failwith "Expected an unsupported diff page."
+
+                Vitest.expect(wordDiffCalls).toBe (0)
+                Vitest.expect(currentReadCalls).toBe (0)
+            }
+        )
+
+        Vitest.test (
             "An unsupported word diff opens the unsupported page",
             fun () -> promise {
                 let path = "binary.dat"

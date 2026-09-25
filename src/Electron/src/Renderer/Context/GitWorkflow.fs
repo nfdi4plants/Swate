@@ -1247,16 +1247,6 @@ module GitDiffPageLoader =
             let requestedPath = change.Path
             let isDeleted = change.IndexStatus = "D" || change.WorkingTreeStatus = "D"
             let! baseContent = getBaseContent requestedPath
-            let! wordDiff = getWordDiff requestedPath
-
-            let! currentContent =
-                if isDeleted then
-                    promise { return Ok None }
-                else
-                    promise {
-                        let! content = readCurrentContent requestedPath
-                        return content |> Result.map Some
-                    }
 
             let baseView =
                 match baseContent with
@@ -1264,36 +1254,64 @@ module GitDiffPageLoader =
                     Ok None
                 | other -> contentOf other |> Result.map Some
 
-            match baseView, contentOf wordDiff with
-            | Error message, _
-            | _, Error message -> return Error message
-            | Ok(Some(ContentViewDto.Unsupported reason)), _
-            | _, Ok(ContentViewDto.Unsupported reason) -> return unsupportedPage requestedPath reason
-            | Ok previous, Ok(ContentViewDto.Text wordDiffText) ->
-                let previousText =
-                    match previous with
-                    | Some(ContentViewDto.Text text) -> Some text
-                    | _ -> None
+            let baseUnsupportedReason =
+                match baseView with
+                | Ok(Some(ContentViewDto.Unsupported reason)) -> Some reason
+                | _ -> None
 
-                match currentContent with
-                | Error message -> return Error $"Could not read the current content of '{requestedPath}': {message}"
-                | Ok None when previousText.IsNone ->
-                    return Error $"'{requestedPath}' has no content on either side of the diff."
-                | Ok current ->
-                    return
-                        Ok(
-                            PageState.GitDiffPage {
-                                Path = requestedPath
-                                PreviousContent = previousText |> Option.defaultValue ""
-                                CurrentContent = current |> Option.defaultValue ""
-                                ChangeKind =
-                                    match previousText, current with
-                                    | None, Some _ -> Some Swate.Components.Page.GitDiffChangeKind.Added
-                                    | Some _, None -> Some Swate.Components.Page.GitDiffChangeKind.Deleted
-                                    | _ -> None
-                                WordDiffText = wordDiffText
-                            }
-                        )
+            // A promise block does not stop at a `return` inside an `if` without `else`, so the
+            // comparison is a separate step that only runs when the base can be shown.
+            let loadComparison () = promise {
+                let! wordDiff = getWordDiff requestedPath
+
+                let! currentContent =
+                    if isDeleted then
+                        promise { return Ok None }
+                    else
+                        promise {
+                            let! content = readCurrentContent requestedPath
+                            return content |> Result.map Some
+                        }
+
+                return baseView, wordDiff, currentContent
+            }
+
+            match baseUnsupportedReason with
+            | Some reason -> return unsupportedPage requestedPath reason
+            | None ->
+                let! baseView, wordDiff, currentContent = loadComparison ()
+
+                match baseView, contentOf wordDiff with
+                | Error message, _
+                | _, Error message -> return Error message
+                | Ok(Some(ContentViewDto.Unsupported reason)), _
+                | _, Ok(ContentViewDto.Unsupported reason) -> return unsupportedPage requestedPath reason
+                | Ok previous, Ok(ContentViewDto.Text wordDiffText) ->
+                    let previousText =
+                        match previous with
+                        | Some(ContentViewDto.Text text) -> Some text
+                        | _ -> None
+
+                    match currentContent with
+                    | Error message ->
+                        return Error $"Could not read the current content of '{requestedPath}': {message}"
+                    | Ok None when previousText.IsNone ->
+                        return Error $"'{requestedPath}' has no content on either side of the diff."
+                    | Ok current ->
+                        return
+                            Ok(
+                                PageState.GitDiffPage {
+                                    Path = requestedPath
+                                    PreviousContent = previousText |> Option.defaultValue ""
+                                    CurrentContent = current |> Option.defaultValue ""
+                                    ChangeKind =
+                                        match previousText, current with
+                                        | None, Some _ -> Some Swate.Components.Page.GitDiffChangeKind.Added
+                                        | Some _, None -> Some Swate.Components.Page.GitDiffChangeKind.Deleted
+                                        | _ -> None
+                                    WordDiffText = wordDiffText
+                                }
+                            )
         }
 
 let private loadPageAsync
