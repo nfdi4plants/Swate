@@ -211,14 +211,29 @@ let rootContextMenuItems (config: ContextMenuConfig) (rootItem: FileItem) =
         arcCreateContextMenuItems config.openCreateModal config.openNoteDraft rootItem
     ]
 
-/// Moving or removing a path while a Download or Free runs on it would race the running action.
-let private disableWhileLfsActive (item: FileItem) (menuItem: ContextMenuItem) =
-    if item.LfsActivity.IsSome then
+/// True when a Download or Free runs on the item or on a path inside the item's folder.
+/// Moving or removing such a path makes the running action fail after its transfer.
+let isLockedByLfsActivity (lfsActivePaths: string seq) (item: FileItem) =
+    item.LfsActivity.IsSome
+    || (item.IsDirectory
+        && item.Path
+           |> Option.map PathHelpers.normalizeCanonicalRelativePath
+           |> Option.exists (fun folderPath ->
+               lfsActivePaths
+               |> Seq.exists (fun activePath ->
+                   PathHelpers.isSameOrDescendantPathForFsComparison
+                       (PathHelpers.normalizeCanonicalRelativePath activePath)
+                       folderPath
+               )
+           ))
+
+let private disableWhileLfsActive (lfsActivePaths: string seq) (item: FileItem) (menuItem: ContextMenuItem) =
+    if isLockedByLfsActivity lfsActivePaths item then
         { menuItem with Disabled = Some true }
     else
         menuItem
 
-let renameContextMenuItems (requestRenameItem: FileItem -> unit) (item: FileItem) =
+let renameContextMenuItems (lfsActivePaths: string seq) (requestRenameItem: FileItem -> unit) (item: FileItem) =
     if
         item.Path
         |> Option.map PathHelpers.normalizeCanonicalRelativePath
@@ -226,12 +241,12 @@ let renameContextMenuItems (requestRenameItem: FileItem -> unit) (item: FileItem
     then
         [
             ContextMenuItem.create "Rename" "swt:fluent--edit-24-regular" (fun () -> requestRenameItem item)
-            |> disableWhileLfsActive item
+            |> disableWhileLfsActive lfsActivePaths item
         ]
     else
         []
 
-let deleteContextMenuItems (requestDeleteItem: FileItem -> unit) (item: FileItem) =
+let deleteContextMenuItems (lfsActivePaths: string seq) (requestDeleteItem: FileItem -> unit) (item: FileItem) =
     if
         item.Path
         |> Option.map PathHelpers.normalizeCanonicalRelativePath
@@ -243,7 +258,7 @@ let deleteContextMenuItems (requestDeleteItem: FileItem -> unit) (item: FileItem
                 "swt:fluent--delete-24-regular"
                 "swt:text-error"
                 (fun () -> requestDeleteItem item)
-            |> disableWhileLfsActive item
+            |> disableWhileLfsActive lfsActivePaths item
         ]
     else
         []
@@ -277,7 +292,7 @@ let createContextMenuItems (config: ContextMenuConfig) arcScopeId =
                 (Some freeLocalLfsCopy)
             arcCreateContextMenuItems config.openCreateModal config.openNoteDraft item
             [
-                yield! renameContextMenuItems config.requestRenameItem item
-                yield! deleteContextMenuItems config.requestDeleteItem item
+                yield! renameContextMenuItems config.lfsActivePaths config.requestRenameItem item
+                yield! deleteContextMenuItems config.lfsActivePaths config.requestDeleteItem item
             ]
         ]

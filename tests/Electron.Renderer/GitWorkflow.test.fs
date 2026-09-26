@@ -10472,6 +10472,46 @@ Vitest.describe (
                 Vitest.expect(currentReadCalls).toBe (0)
             }
         )
+
+        // The provider also returns the pointer when the object is local but above its base diff
+        // size limit. The loader only sees the pointer text, so the page stays unsupported.
+        Vitest.test (
+            "A previous version held as an LFS pointer whose object is local and large opens the unsupported page",
+            fun () -> promise {
+                let path = "runs/large.bin"
+                let mutable wordDiffCalls = 0
+                let mutable currentReadCalls = 0
+
+                let oid = String.replicate 64 "b"
+
+                let pointer =
+                    $"version https://git-lfs.github.com/spec/v1\noid sha256:{oid}\nsize 52428800\n"
+
+                let getBaseContent =
+                    fun _ -> promise { return Ok(succeeded (ContentViewDto.Text pointer)) }
+
+                let getWordDiff =
+                    fun _ ->
+                        wordDiffCalls <- wordDiffCalls + 1
+                        promise { return Ok(succeeded (ContentViewDto.Text "")) }
+
+                let readCurrentContent =
+                    fun _ ->
+                        currentReadCalls <- currentReadCalls + 1
+                        promise { return Ok "large binary bytes" }
+
+                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "M")
+
+                match result with
+                | Ok(PageState.GitUnsupportedPage page) ->
+                    Vitest.expect(page.Path).toBe (path)
+                    Vitest.expect(page.Reason.IsSome).toBe (true)
+                | _ -> failwith "Expected an unsupported diff page."
+
+                Vitest.expect(wordDiffCalls).toBe (0)
+                Vitest.expect(currentReadCalls).toBe (0)
+            }
+        )
 )
 
 Vitest.describe (

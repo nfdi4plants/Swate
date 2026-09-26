@@ -31,6 +31,7 @@ let private createContextMenuConfig () : ContextMenuConfig = {
     runToggleLfsMark = fun _ _ -> promise { return Ok() }
     runDownloadLfsFile = fun _ -> promise { return Ok() }
     runFreeLocalLfsCopy = fun _ -> promise { return Ok() }
+    lfsActivePaths = []
 }
 
 let private createComposedContextMenuItems config item = createContextMenuItems config None item
@@ -697,6 +698,52 @@ Vitest.describe (
 
                 Vitest.expect(renameItem.Disabled).toEqual (None)
                 Vitest.expect(deleteItem.Disabled).toEqual (None)
+        )
+
+        Vitest.test (
+            "rename and delete are disabled on every folder above a file with a running LFS action",
+            fun () ->
+                let config = {
+                    createContextMenuConfig () with
+                        lfsActivePaths = [ "Data/raw/busy.bin" ]
+                }
+
+                for folder in
+                    [
+                        createFolderItem "data" (Some "data")
+                        createFolderItem "raw" (Some "data/raw")
+                    ] do
+                    let menuItems = createComposedContextMenuItems config folder
+                    let renameItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Rename")
+                    let deleteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Delete")
+
+                    Vitest.expect(renameItem.Disabled).toEqual (Some true)
+                    Vitest.expect(deleteItem.Disabled).toEqual (Some true)
+                    Vitest.expect(isLockedByLfsActivity config.lfsActivePaths folder).toBe (true)
+        )
+
+        Vitest.test (
+            "rename and delete stay enabled on sibling and unrelated folders of a file with a running LFS action",
+            fun () ->
+                let config = {
+                    createContextMenuConfig () with
+                        lfsActivePaths = [ "data/raw/busy.bin" ]
+                }
+
+                let folders = [
+                    createFolderItem "other" (Some "data/other")
+                    createFolderItem "raw-copy" (Some "data/raw-copy")
+                    createFolderItem "results" (Some "results")
+                ]
+
+                for folder in folders do
+                    let menuItems = createComposedContextMenuItems config folder
+                    let renameItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Rename")
+                    let deleteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Delete")
+
+                    Vitest.expect(renameItem.Disabled).toEqual (None)
+                    Vitest.expect(deleteItem.Disabled).toEqual (None)
+                    Vitest.expect(isLockedByLfsActivity config.lfsActivePaths folder).toBe (false)
         )
 
         Vitest.test (

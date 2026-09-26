@@ -1237,7 +1237,8 @@ module GitDiffPageLoader =
 
     /// True when the text is a Git LFS pointer file: the version line first, then one oid line and
     /// one size line, with optional `ext-` lines. The provider returns the pointer as the base
-    /// content when the previous version's object is not in the local cache.
+    /// content when it does not read the previous version's object, for example because the object
+    /// is missing locally or exceeds the provider's base diff size limit.
     let isLfsPointerText (text: string) =
         // Git LFS never writes a pointer of 1024 bytes or more.
         if isNull text || text.Length >= 1024 then
@@ -1256,8 +1257,8 @@ module GitDiffPageLoader =
                 && oidLines.Length + sizeLines.Length + extensionLines.Length = rest.Length
             | _ -> false
 
-    let private previousNotDownloadedReason (path: string) =
-        Some $"The previous version of '{path}' is not downloaded, so it cannot be compared."
+    let private lfsPointerBaseReason (path: string) =
+        Some $"The previous version of the Git LFS file '{path}' cannot be shown here."
 
     let private contentOf (result: Result<OperationResultDto<ContentViewDto>, string>) =
         match result with
@@ -1289,12 +1290,13 @@ module GitDiffPageLoader =
                     Ok None
                 | other -> contentOf other |> Result.map Some
 
-            // A previous version that would have to be downloaded before comparing gets no diff.
+            // A pointer as the base means the provider did not read the previous version's object.
+            // Comparing the pointer text with the current bytes would show a false diff, so the loader opens the unsupported page.
             let baseUnsupportedReason =
                 match baseView with
                 | Ok(Some(ContentViewDto.Unsupported reason)) -> Some reason
                 | Ok(Some(ContentViewDto.Text text)) when isLfsPointerText text ->
-                    Some(previousNotDownloadedReason requestedPath)
+                    Some(lfsPointerBaseReason requestedPath)
                 | _ -> None
 
             // A promise block does not stop at a `return` inside an `if` without `else`, so the
