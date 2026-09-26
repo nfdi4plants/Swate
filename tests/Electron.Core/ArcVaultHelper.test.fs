@@ -434,12 +434,29 @@ let private createTestWindow options =
         SentMessages = sentMessages
     }
 
-let rec private waitUntil predicate = promise {
+let private waitUntilAttemptLimit = 250
+
+let rec private waitUntilWithin phase predicate remaining = promise {
     if predicate () then
         return ()
+    elif remaining <= 0 then
+        return failwithf "Timed out waiting for expected ARC lifecycle phase: %s." phase
     else
         do! Promise.sleep 0
-        return! waitUntil predicate
+        return! waitUntilWithin phase predicate (remaining - 1)
+}
+
+let private waitUntil phase predicate =
+    waitUntilWithin phase predicate waitUntilAttemptLimit
+
+let private withAsyncCleanup cleanup operation = promise {
+    let! operationResult = operation () |> Promise.result
+    let! cleanupResult = cleanup () |> Promise.result
+
+    match operationResult, cleanupResult with
+    | Ok value, Ok() -> return value
+    | Error operationError, _ -> return raise operationError
+    | Ok _, Error cleanupError -> return raise cleanupError
 }
 
 let private expectRegistrationLoadFailure
@@ -718,7 +735,12 @@ Vitest.describe (
                             failwith "Concurrent opens of one ARC must not create a second BrowserWindow."
                         )
 
-                        try
+                        let cleanup () = promise {
+                            do! callingVault.StopFileWatcher()
+                            vaults.Vaults.Remove(callingWindowId) |> ignore
+                        }
+
+                        let operation () = promise {
                             // Both promises begin validation before either filesystem validation has completed.
                             let firstOpen = vaults.OpenOrFocusArc(callingWindowId, normalizedArcPath)
                             let secondOpen = vaults.OpenOrFocusArc(callingWindowId, normalizedArcPath)
@@ -758,12 +780,9 @@ Vitest.describe (
                             Vitest.expect(ownerCount).toBe (1)
                             Vitest.expect(createdWindowCount).toBe (0)
 
-                            do! callingVault.StopFileWatcher()
-                            vaults.Vaults.Remove(callingWindowId) |> ignore
-                        with error ->
-                            do! callingVault.StopFileWatcher()
-                            vaults.Vaults.Remove(callingWindowId) |> ignore
-                            return raise error
+                        }
+
+                        return! withAsyncCleanup cleanup operation
                     })
         )
 
@@ -802,7 +821,13 @@ Vitest.describe (
                             windowState.Window :> obj
                         )
 
-                        try
+                        let cleanup () = promise {
+                            match registeredVault with
+                            | Some vault -> do! vault.StopFileWatcher()
+                            | None -> ()
+                        }
+
+                        let operation () = promise {
                             Vitest.expect(vaults.Vaults.ContainsKey(callingWindowId)).toBe (false)
 
                             let! disposition = vaults.OpenOrFocusArc(callingWindowId, arcPath)
@@ -824,13 +849,9 @@ Vitest.describe (
                             Vitest.expect(registeredVault.Value.path).toEqual (Some normalizedArcPath)
                             Vitest.expect(registeredVault.Value.arc.IsSome).toBe (true)
 
-                            do! registeredVault.Value.StopFileWatcher()
-                        with error ->
-                            match registeredVault with
-                            | Some vault -> do! vault.StopFileWatcher()
-                            | None -> ()
+                        }
 
-                            return raise error
+                        return! withAsyncCleanup cleanup operation
                     })
         )
 
@@ -870,7 +891,7 @@ Vitest.describe (
                             Vitest.expect(vaults.Vaults.ContainsKey(callingWindowId)).toBe (false)
 
                             let openOperation = vaults.OpenOrFocusArc(callingWindowId, arcPath)
-                            do! waitUntil isArcOpening
+                            do! waitUntil "ARC parse pending in a newly opened vault" isArcOpening
                             arcWasOpeningWhenClosed <- isArcOpening ()
                             windowState.TriggerClose()
 
@@ -1128,7 +1149,7 @@ Vitest.describe (
                             let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
 
                             let openOperation = api.openARCByPath arcPath
-                            do! waitUntil isArcOpening
+                            do! waitUntil "ARC parse pending in the IPC-opened vault" isArcOpening
                             arcWasOpeningWhenClosed <- isArcOpening ()
                             targetWindowState.TriggerClose()
 
@@ -1220,10 +1241,24 @@ Vitest.describe (
 
                         ARC_VAULTS.Vaults.Add(originatingWindowId, originatingVault)
 
-                        try
+                        let cleanup () = promise {
+                            match targetVault with
+                            | Some vault -> do! vault.StopFileWatcher()
+                            | None -> ()
+
+                            ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
+                            ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
+                        }
+
+                        let operation () = promise {
                             let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
                             let openOperation = api.openARCByPath arcPath
-                            do! waitUntil isArcStartedBeforeFileTreePublication
+
+                            do!
+                                waitUntil
+                                    "file-tree initialization pending in a newly opened vault"
+                                    isArcStartedBeforeFileTreePublication
+
                             startupWasCompleteWhenClosed <- isArcStartedBeforeFileTreePublication ()
                             targetWindowState.TriggerClose()
                             let! openResult = openOperation
@@ -1246,7 +1281,7 @@ Vitest.describe (
                             Vitest.expect(targetWindowState.TitleWritesAfterDestroy()).toBe (0)
                             Vitest.expect(dialogCount).toBe (0)
 
-                            do! waitUntil (fun () -> targetVault.Value.watcher.IsNone)
+                            do! waitUntil "closed vault watcher cleanup" (fun () -> targetVault.Value.watcher.IsNone)
                             Vitest.expect(targetVault.Value.watcher.IsNone).toBe (true)
 
                             match openResult with
@@ -1257,15 +1292,9 @@ Vitest.describe (
                                     Vitest.expect(cancelledWindowId).toBe (targetWindowId)
                                 | _ -> failwith "Expected an explicit ARC-load cancellation marker."
 
-                            ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
-                        with error ->
-                            match targetVault with
-                            | Some vault -> do! vault.StopFileWatcher()
-                            | None -> ()
+                        }
 
-                            ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
-                            ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
-                            return raise error
+                        return! withAsyncCleanup cleanup operation
                     })
         )
 
@@ -1325,7 +1354,7 @@ Vitest.describe (
                             let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId windowId)
 
                             let openOperation = api.openARCByPath arcPath
-                            do! waitUntil isArcOpening
+                            do! waitUntil "ARC parse pending in the current vault" isArcOpening
                             arcWasOpeningWhenClosed <- isArcOpening ()
                             windowState.TriggerClose()
 
@@ -1409,7 +1438,12 @@ Vitest.describe (
                             let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId windowId)
 
                             let openOperation = api.openARCByPath arcPath
-                            do! waitUntil isArcStartedBeforeFileTreePublication
+
+                            do!
+                                waitUntil
+                                    "file-tree initialization pending in the current vault"
+                                    isArcStartedBeforeFileTreePublication
+
                             startupWasCompleteWhenClosed <- isArcStartedBeforeFileTreePublication ()
                             windowState.TriggerClose()
 
@@ -1654,7 +1688,12 @@ Vitest.describe (
                 setShowOpenDialog (fun _ _ -> createObj [ "canceled" ==> false; "filePaths" ==> [| rootPath |] ])
                 ARC_VAULTS.Vaults.Add(existingWindowId, existingVault)
 
-                try
+                let cleanup () = promise {
+                    ARC_VAULTS.Vaults.Remove(existingWindowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                }
+
+                let operation () = promise {
                     let! existedBeforeCreate = TestHelpers.pathExistsAsync expectedPath
                     Vitest.expect(existedBeforeCreate).toBe (false)
 
@@ -1677,12 +1716,9 @@ Vitest.describe (
                     let! existsAfterCreate = TestHelpers.pathExistsAsync expectedPath
                     Vitest.expect(existsAfterCreate).toBe (false)
 
-                    ARC_VAULTS.Vaults.Remove(existingWindowId) |> ignore
-                    do! TestHelpers.removeDirectoryAsync rootPath
-                with error ->
-                    ARC_VAULTS.Vaults.Remove(existingWindowId) |> ignore
-                    do! TestHelpers.removeDirectoryAsync rootPath
-                    return raise error
+                }
+
+                return! withAsyncCleanup cleanup operation
             }
         )
 
@@ -1719,7 +1755,17 @@ Vitest.describe (
                 setShowOpenDialog (fun _ _ -> createObj [ "canceled" ==> false; "filePaths" ==> [| rootPath |] ])
                 ARC_VAULTS.Vaults.Add(originatingWindowId, originatingVault)
 
-                try
+                let cleanup () = promise {
+                    match targetVault with
+                    | Some vault -> do! vault.StopFileWatcher()
+                    | None -> ()
+
+                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
+                    ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                }
+
+                let operation () = promise {
                     let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
 
                     let request: CreateArcRequest = {
@@ -1746,19 +1792,9 @@ Vitest.describe (
                     let! arcExists = TestHelpers.pathExistsAsync expectedPath
                     Vitest.expect(arcExists).toBe (true)
 
-                    do! targetVault.Value.StopFileWatcher()
-                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
-                    ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
-                    do! TestHelpers.removeDirectoryAsync rootPath
-                with error ->
-                    match targetVault with
-                    | Some vault -> do! vault.StopFileWatcher()
-                    | None -> ()
+                }
 
-                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
-                    ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
-                    do! TestHelpers.removeDirectoryAsync rootPath
-                    return raise error
+                return! withAsyncCleanup cleanup operation
             }
         )
 
@@ -1833,7 +1869,13 @@ Vitest.describe (
                 setShowOpenDialog (fun _ _ -> createObj [ "canceled" ==> false; "filePaths" ==> [| rootPath |] ])
                 ARC_VAULTS.Vaults.Add(originatingWindowId, originatingVault)
 
-                try
+                let cleanup () = promise {
+                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
+                    ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                }
+
+                let operation () = promise {
                     let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
 
                     let request: CreateArcRequest = {
@@ -1859,13 +1901,9 @@ Vitest.describe (
                     let! arcDirectoryExists = TestHelpers.pathExistsAsync expectedPath
                     Vitest.expect(arcDirectoryExists).toBe (false)
 
-                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
-                    do! TestHelpers.removeDirectoryAsync rootPath
-                with error ->
-                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
-                    ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
-                    do! TestHelpers.removeDirectoryAsync rootPath
-                    return raise error
+                }
+
+                return! withAsyncCleanup cleanup operation
             }
         )
 
@@ -1902,7 +1940,13 @@ Vitest.describe (
                 setShowOpenDialog (fun _ _ -> createObj [ "canceled" ==> false; "filePaths" ==> [| rootPath |] ])
                 ARC_VAULTS.Vaults.Add(originatingWindowId, originatingVault)
 
-                try
+                let cleanup () = promise {
+                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
+                    ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                }
+
+                let operation () = promise {
                     let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
 
                     let request: CreateArcRequest = {
@@ -1931,13 +1975,9 @@ Vitest.describe (
                     let! investigationFileExists = TestHelpers.pathExistsAsync investigationPath
                     Vitest.expect(investigationFileExists).toBe (true)
 
-                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
-                    do! TestHelpers.removeDirectoryAsync rootPath
-                with error ->
-                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
-                    ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
-                    do! TestHelpers.removeDirectoryAsync rootPath
-                    return raise error
+                }
+
+                return! withAsyncCleanup cleanup operation
             }
         )
 
@@ -2008,7 +2048,17 @@ Vitest.describe (
                 setShowOpenDialog (fun _ _ -> createObj [ "canceled" ==> false; "filePaths" ==> [| rootPath |] ])
                 ARC_VAULTS.Vaults.Add(originatingWindowId, originatingVault)
 
-                try
+                let cleanup () = promise {
+                    match loadingVault with
+                    | Some vault -> do! vault.StopFileWatcher()
+                    | None -> ()
+
+                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
+                    ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                }
+
+                let operation () = promise {
                     let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
 
                     let request: CreateArcRequest = {
@@ -2017,7 +2067,7 @@ Vitest.describe (
                     }
 
                     let createOperation = api.createARC request
-                    do! waitUntil isArcLoadingAfterWrite
+                    do! waitUntil "post-write ARC reload pending" isArcLoadingAfterWrite
                     arcWasLoadingAfterWriteWhenClosed <- isArcLoadingAfterWrite ()
                     targetWindowState.TriggerClose()
 
@@ -2052,17 +2102,9 @@ Vitest.describe (
                     Vitest.expect(arcDirectoryExists).toBe (true)
                     Vitest.expect(investigationFileExists).toBe (true)
 
-                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
-                    do! TestHelpers.removeDirectoryAsync rootPath
-                with error ->
-                    match loadingVault with
-                    | Some vault -> do! vault.StopFileWatcher()
-                    | None -> ()
+                }
 
-                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
-                    ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
-                    do! TestHelpers.removeDirectoryAsync rootPath
-                    return raise error
+                return! withAsyncCleanup cleanup operation
             }
         )
 
@@ -2133,7 +2175,17 @@ Vitest.describe (
                 setShowOpenDialog (fun _ _ -> createObj [ "canceled" ==> false; "filePaths" ==> [| rootPath |] ])
                 ARC_VAULTS.Vaults.Add(originatingWindowId, originatingVault)
 
-                try
+                let cleanup () = promise {
+                    match targetVault with
+                    | Some vault -> do! vault.StopFileWatcher()
+                    | None -> ()
+
+                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
+                    ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                }
+
+                let operation () = promise {
                     let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
 
                     let request: CreateArcRequest = {
@@ -2142,7 +2194,12 @@ Vitest.describe (
                     }
 
                     let createOperation = api.createARC request
-                    do! waitUntil isArcStartedBeforeFileTreePublication
+
+                    do!
+                        waitUntil
+                            "file-tree initialization pending after ARC creation"
+                            isArcStartedBeforeFileTreePublication
+
                     startupWasCompleteWhenClosed <- isArcStartedBeforeFileTreePublication ()
                     targetWindowState.TriggerClose()
 
@@ -2179,17 +2236,9 @@ Vitest.describe (
                     Vitest.expect(arcDirectoryExists).toBe (true)
                     Vitest.expect(investigationFileExists).toBe (true)
 
-                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
-                    do! TestHelpers.removeDirectoryAsync rootPath
-                with error ->
-                    match targetVault with
-                    | Some vault -> do! vault.StopFileWatcher()
-                    | None -> ()
+                }
 
-                    ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
-                    ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
-                    do! TestHelpers.removeDirectoryAsync rootPath
-                    return raise error
+                return! withAsyncCleanup cleanup operation
             }
         )
 
@@ -2216,7 +2265,12 @@ Vitest.describe (
 
                 setShowOpenDialog (fun _ _ -> createObj [ "canceled" ==> false; "filePaths" ==> [| rootPath |] ])
 
-                try
+                let cleanup () = promise {
+                    ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                }
+
+                let operation () = promise {
                     let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId originatingWindowId)
 
                     let request: Swate.Electron.Shared.IPCTypes.CreateArcRequest = {
@@ -2235,11 +2289,9 @@ Vitest.describe (
                     let! requestedArcExists = TestHelpers.pathExistsAsync requestedArcPath
                     Vitest.expect(requestedArcExists).toBe (false)
 
-                    do! TestHelpers.removeDirectoryAsync rootPath
-                with error ->
-                    ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
-                    do! TestHelpers.removeDirectoryAsync rootPath
-                    return raise error
+                }
+
+                return! withAsyncCleanup cleanup operation
             }
         )
 
@@ -2279,7 +2331,15 @@ Vitest.describe (
                 let mutable arcDirectoryWasAbsentWhenShown = false
                 let mutable registeredVault: ArcVault option = None
 
-                try
+                let cleanup () = promise {
+                    match registeredVault with
+                    | Some vault -> do! vault.StopFileWatcher()
+                    | None -> ()
+
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                }
+
+                let operation () = promise {
                     let windowId = 13
 
                     let windowState =
@@ -2313,15 +2373,9 @@ Vitest.describe (
                     Vitest.expect(returnedVault).toBe (registeredVault.Value)
                     Vitest.expect(vaults.Vaults.ContainsKey(windowId)).toBe (true)
 
-                    do! registeredVault.Value.StopFileWatcher()
-                    do! TestHelpers.removeDirectoryAsync rootPath
-                with error ->
-                    match registeredVault with
-                    | Some vault -> do! vault.StopFileWatcher()
-                    | None -> ()
+                }
 
-                    do! TestHelpers.removeDirectoryAsync rootPath
-                    return raise error
+                return! withAsyncCleanup cleanup operation
             }
         )
 
