@@ -65,6 +65,10 @@ type FileTree =
         let lfsActivityCtx = Renderer.Context.LfsActivityContext.useLfsActivityCtx ()
         let lfsActivityByPath = lfsActivityCtx.activities
         let lfsActivePaths = lfsActivityByPath |> Map.toList |> List.map fst
+        // The delete confirmation reads the paths through this ref, so it sees the actions that
+        // started after the modal opened.
+        let lfsActivePathsRef = React.useRef lfsActivePaths
+        lfsActivePathsRef.current <- lfsActivePaths
 
         let runLfsActionWithActivity
             (activity: string)
@@ -364,6 +368,8 @@ type FileTree =
                     closeDeleteModal = closeDialog
                     setIsDeleting = setIsDialogBusy
                     enqueueError = errorModal.enqueue
+                    getLfsActivePaths = fun () -> lfsActivePathsRef.current
+                    deletePath = Api.ipcArcVaultApi.deletePath
                 }
 
         let createArcEntry kind (identifier: string) =

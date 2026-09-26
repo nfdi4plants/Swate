@@ -211,21 +211,22 @@ let rootContextMenuItems (config: ContextMenuConfig) (rootItem: FileItem) =
         arcCreateContextMenuItems config.openCreateModal config.openNoteDraft rootItem
     ]
 
-/// True when a Download or Free runs on the item or on a path inside the item's folder.
-/// Moving or removing such a path makes the running action fail after its transfer.
+/// True when a Download or Free runs on the item or on a path inside the item's delete scope.
+/// Moving or removing such a path makes the running action fail after its transfer. The delete
+/// scope of a canonical entity workbook is its entity folder, because deleting the workbook
+/// removes that folder.
 let isLockedByLfsActivity (lfsActivePaths: string seq) (item: FileItem) =
     item.LfsActivity.IsSome
-    || (item.IsDirectory
-        && item.Path
-           |> Option.map PathHelpers.normalizeCanonicalRelativePath
-           |> Option.exists (fun folderPath ->
-               lfsActivePaths
-               |> Seq.exists (fun activePath ->
-                   PathHelpers.isSameOrDescendantPathForFsComparison
-                       (PathHelpers.normalizeCanonicalRelativePath activePath)
-                       folderPath
-               )
-           ))
+    || item.Path
+       |> Option.map (PathHelpers.normalizeCanonicalRelativePath >> ArcEntityPathRules.deleteScopePath)
+       |> Option.exists (fun scopePath ->
+           lfsActivePaths
+           |> Seq.exists (fun activePath ->
+               PathHelpers.isSameOrDescendantPathForFsComparison
+                   (PathHelpers.normalizeCanonicalRelativePath activePath)
+                   scopePath
+           )
+       )
 
 let private disableWhileLfsActive (lfsActivePaths: string seq) (item: FileItem) (menuItem: ContextMenuItem) =
     if isLockedByLfsActivity lfsActivePaths item then

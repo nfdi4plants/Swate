@@ -12,6 +12,7 @@
     <Compile Include="FileTreeFileTargetWorkflow.test.fs" />
     <Compile Include="FileTreeMaterialization.test.fs" />
     <Compile Include="FileTreeContextMenu.test.fs" />
+    <Compile Include="FileTreeDeleteWorkflow.test.fs" />
     <Compile Include="FileTreeRenameWorkflow.test.fs" />
     <Compile Include="GitWorkflow.test.fs" />
     <Compile Include="GitWorkflowUnitResult.test.fs" />

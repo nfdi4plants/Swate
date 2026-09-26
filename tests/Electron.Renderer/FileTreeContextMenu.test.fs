@@ -747,6 +747,43 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "delete is disabled on a canonical entity workbook while an LFS action runs inside its entity folder",
+            fun () ->
+                let cases = [
+                    createFileItem "isa.assay.xlsx" (Some "assays/A/isa.assay.xlsx"), "assays/A/dataset/big.bin"
+                    createFileItem "isa.study.xlsx" (Some "studies/S/isa.study.xlsx"), "Studies/S/resources/big.bin"
+                ]
+
+                for workbook, busyPath in cases do
+                    let config = {
+                        createContextMenuConfig () with
+                            lfsActivePaths = [ busyPath ]
+                    }
+
+                    let menuItems = createComposedContextMenuItems config workbook
+                    let deleteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Delete")
+
+                    Vitest.expect(deleteItem.Disabled).toEqual (Some true)
+                    Vitest.expect(isLockedByLfsActivity config.lfsActivePaths workbook).toBe (true)
+        )
+
+        Vitest.test (
+            "delete stays enabled on a canonical entity workbook while an LFS action runs in another entity folder",
+            fun () ->
+                let config = {
+                    createContextMenuConfig () with
+                        lfsActivePaths = [ "assays/B/dataset/big.bin"; "assays/A2/dataset/big.bin" ]
+                }
+
+                let workbook = createFileItem "isa.assay.xlsx" (Some "assays/A/isa.assay.xlsx")
+                let menuItems = createComposedContextMenuItems config workbook
+                let deleteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Delete")
+
+                Vitest.expect(deleteItem.Disabled).toEqual (None)
+                Vitest.expect(isLockedByLfsActivity config.lfsActivePaths workbook).toBe (false)
+        )
+
+        Vitest.test (
             "delete action is styled as destructive ARC action",
             fun () ->
                 let item = createFileItem "protocol.md" (Some "assays/AssayA/protocol.md")
