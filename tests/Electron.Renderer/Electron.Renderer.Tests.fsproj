@@ -15,6 +15,7 @@
     <Compile Include="FileTreeRenameWorkflow.test.fs" />
     <Compile Include="GitWorkflow.test.fs" />
     <Compile Include="GitWorkflowUnitResult.test.fs" />
+    <Compile Include="LfsActivityContext.test.fs" />
     <Compile Include="NoteSearchInterop.test.fs" />
   </ItemGroup>
   <ItemGroup>

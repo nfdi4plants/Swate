@@ -672,6 +672,34 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "rename and delete are disabled while an LFS action runs on the file",
+            fun () ->
+                let item = {
+                    createLfsFileItem "busy.bin" "data/busy.bin" true false with
+                        LfsActivity = Some "Freeing"
+                }
+
+                let menuItems = createComposedContextMenuItems (createContextMenuConfig ()) item
+                let renameItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Rename")
+                let deleteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Delete")
+
+                Vitest.expect(renameItem.Disabled).toEqual (Some true)
+                Vitest.expect(deleteItem.Disabled).toEqual (Some true)
+        )
+
+        Vitest.test (
+            "rename and delete stay enabled for an idle LFS file",
+            fun () ->
+                let item = createLfsFileItem "idle.bin" "data/idle.bin" true false
+                let menuItems = createComposedContextMenuItems (createContextMenuConfig ()) item
+                let renameItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Rename")
+                let deleteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Delete")
+
+                Vitest.expect(renameItem.Disabled).toEqual (None)
+                Vitest.expect(deleteItem.Disabled).toEqual (None)
+        )
+
+        Vitest.test (
             "delete action is styled as destructive ARC action",
             fun () ->
                 let item = createFileItem "protocol.md" (Some "assays/AssayA/protocol.md")

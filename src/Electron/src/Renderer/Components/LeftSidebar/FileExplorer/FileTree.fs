@@ -62,36 +62,19 @@ type FileTree =
         let activeDialog, setActiveDialog = React.useState<FileTreeDialog option> None
         let isDialogBusy, setIsDialogBusy = React.useState false
 
-        let lfsActivityByPath, setLfsActivityByPath =
-            React.useState<Map<string, string>> Map.empty
-
-        let lfsActivityByPathRef = React.useRef lfsActivityByPath
-
-        let setLfsActivity (relativePath: string) (activity: string option) =
-            let next =
-                match activity with
-                | Some activity -> Map.add relativePath activity lfsActivityByPathRef.current
-                | None -> Map.remove relativePath lfsActivityByPathRef.current
-
-            lfsActivityByPathRef.current <- next
-            setLfsActivityByPath next
+        let lfsActivityCtx = Renderer.Context.LfsActivityContext.useLfsActivityCtx ()
+        let lfsActivityByPath = lfsActivityCtx.activities
 
         let runLfsActionWithActivity
             (activity: string)
             (runAction: string -> JS.Promise<Result<unit, string>>)
             (relativePath: string)
             : JS.Promise<Result<unit, string>> =
-            promise {
-                if Map.containsKey relativePath lfsActivityByPathRef.current then
-                    return Ok()
-                else
-                    setLfsActivity relativePath (Some activity)
+            let entry =
+                fileStateCtx.state.FileTree
+                |> Array.tryFind (fun entry -> PathHelpers.pathsEqual entry.path relativePath)
 
-                    try
-                        return! runAction relativePath
-                    finally
-                        setLfsActivity relativePath None
-            }
+            lfsActivityCtx.run activity entry runAction relativePath
 
         let runDownloadLfsFile relativePath =
             runLfsActionWithActivity
@@ -126,18 +109,24 @@ type FileTree =
             |]
         )
 
+        let treeEntries =
+            React.useMemo (
+                (fun () ->
+                    Renderer.Context.LfsActivityContext.LfsActivityState.withBusyEntries
+                        lfsActivityByPath
+                        fileStateCtx.state.FileTree
+                ),
+                [| box fileStateCtx.state.FileTree; box lfsActivityByPath |]
+            )
+
         let fileTree: FileTreeNode option =
             React.useMemo (
                 (fun () ->
-                    match fileStateCtx.state.FileTree with
+                    match treeEntries with
                     | [||] -> None
-                    | _ ->
-                        fileStateCtx.state.FileTree
-                        |> toFileTreeNode
-                        |> collapseSingleChildSameName
-                        |> Some
+                    | _ -> treeEntries |> toFileTreeNode |> collapseSingleChildSameName |> Some
                 ),
-                [| box fileStateCtx.state.FileTree |]
+                [| box treeEntries |]
             )
 
         let materializedState, setMaterializedState =
@@ -171,7 +160,10 @@ type FileTree =
 
                         {
                             item with
-                                LfsActivity = item.Path |> Option.bind (fun path -> Map.tryFind path lfsActivityByPath)
+                                LfsActivity =
+                                    item.Path
+                                    |> Option.bind (fun path -> Map.tryFind path lfsActivityByPath)
+                                    |> Option.map _.Label
                         }
                     )
                     reconciledMaterializedState.Paths
@@ -625,9 +617,10 @@ type FileTree =
                             getItemStatusAction = getItemStatusAction,
                             canDeleteItem =
                                 (fun (item: FileItem) ->
-                                    item.Path
-                                    |> Option.map PathHelpers.normalizeCanonicalRelativePath
-                                    |> Option.exists ArcEntityPathRules.isDeletePathAllowed
+                                    item.LfsActivity.IsNone
+                                    && (item.Path
+                                        |> Option.map PathHelpers.normalizeCanonicalRelativePath
+                                        |> Option.exists ArcEntityPathRules.isDeletePathAllowed)
                                 ),
                             onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,

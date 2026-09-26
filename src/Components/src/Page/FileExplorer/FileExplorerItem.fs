@@ -154,8 +154,12 @@ type FileExplorerItem =
             else
                 "swt:fluent--cloud-arrow-down-24-regular"
 
+        // The activity label is wider than the idle label. Dropping the size segment while an action
+        // runs keeps the pill from taking the row space of the file name. The size stays in the title.
+        let visibleSize = if item.LfsActivity.IsSome then None else item.SizeFormatted
+
         let statusShapeClasses =
-            if item.SizeFormatted.IsSome then
+            if visibleSize.IsSome then
                 [ "swt:rounded-none"; "swt:border-0" ]
             else
                 [ "swt:rounded-full" ]
@@ -200,7 +204,7 @@ type FileExplorerItem =
         let badgeSegments = [
             statusBadge
 
-            match item.SizeFormatted with
+            match visibleSize with
             | Some size ->
                 Html.span [
                     prop.className [

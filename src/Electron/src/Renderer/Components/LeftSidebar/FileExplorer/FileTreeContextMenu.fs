@@ -211,6 +211,13 @@ let rootContextMenuItems (config: ContextMenuConfig) (rootItem: FileItem) =
         arcCreateContextMenuItems config.openCreateModal config.openNoteDraft rootItem
     ]
 
+/// Moving or removing a path while a Download or Free runs on it would race the running action.
+let private disableWhileLfsActive (item: FileItem) (menuItem: ContextMenuItem) =
+    if item.LfsActivity.IsSome then
+        { menuItem with Disabled = Some true }
+    else
+        menuItem
+
 let renameContextMenuItems (requestRenameItem: FileItem -> unit) (item: FileItem) =
     if
         item.Path
@@ -219,6 +226,7 @@ let renameContextMenuItems (requestRenameItem: FileItem -> unit) (item: FileItem
     then
         [
             ContextMenuItem.create "Rename" "swt:fluent--edit-24-regular" (fun () -> requestRenameItem item)
+            |> disableWhileLfsActive item
         ]
     else
         []
@@ -235,6 +243,7 @@ let deleteContextMenuItems (requestDeleteItem: FileItem -> unit) (item: FileItem
                 "swt:fluent--delete-24-regular"
                 "swt:text-error"
                 (fun () -> requestDeleteItem item)
+            |> disableWhileLfsActive item
         ]
     else
         []
