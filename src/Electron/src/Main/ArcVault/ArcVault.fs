@@ -28,6 +28,8 @@ let (|ArcLoadCancelledException|_|) (error: exn) =
     | :? ArcLoadCancelledException as cancellation -> Some cancellation.targetWindowId
     | _ -> None
 
+exception ArcCreatedButClosedException of targetWindowId: int
+
 let private startFileWatcherOwnWriteArcMergeSuppression suppressionMs currentTimeout onElapsed =
     currentTimeout |> Option.iter Fable.Core.JS.clearTimeout
     Fable.Core.JS.setTimeout onElapsed suppressionMs
@@ -103,14 +105,11 @@ type ArcVault(window: BrowserWindow) =
             this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle (Some arc.Identifier)
 
     member this.ClearArc() =
-        let hadUnsavedArcChanges = this.hasUnsavedArcChanges
         this.arc <- None
         this.hasUnsavedArcChanges <- false
 
         if not (this.window.isDestroyed ()) then
             this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle None
-
-        hadUnsavedArcChanges
 
     /// Sets the dirty marker for unsaved in-memory ARC mutations.
     member this.RefreshHasUnsavedArcChangesFlag() =
@@ -454,7 +453,7 @@ module ArcVaultExtensions =
             this.fileTree.Clear()
 
             try
-                this.ClearArc() |> ignore
+                this.ClearArc()
             with error ->
                 swatelogfn this.window.id "Failed to reset ARC window presentation: %s" error.Message
 
@@ -469,11 +468,7 @@ module ArcVaultExtensions =
         /// This functions should be called once, when an vault is first started with a path
         member this.Startup() = promise {
             do! this.LoadArc()
-
-            if this.window.isDestroyed () then
-                return raise (ArcLoadCancelledException this.window.id)
-            else
-                this.StartFileWatcher()
+            this.StartFileWatcher()
         }
 
         member this.OpenARC(path: string) = promise {
@@ -531,7 +526,11 @@ module ArcVaultExtensions =
                     finally
                         this.isBusyWriting <- false
 
-                    do! this.Startup()
+                    try
+                        do! this.Startup()
+                    with ArcLoadCancelledException targetWindowId ->
+                        return raise (ArcCreatedButClosedException targetWindowId)
+
                     this.isInitializingArc <- false
                     sendMsg.pathChange (Some normalizedPath)
                 with error ->
@@ -815,7 +814,8 @@ type ArcVaults() =
                 do! this.CleanupFailedRegistration(window, vault, id)
 
                 match error with
-                | ArcLoadCancelledException _ -> return raise error
+                | ArcLoadCancelledException _
+                | ArcCreatedButClosedException _ -> return raise error
                 | _ when targetWasDestroyed -> return raise (ArcLoadCancelledException id)
                 | _ -> return raise error
         }
@@ -897,6 +897,13 @@ type ArcVaults() =
         | Error error -> return raise error
     }
 
+    member private this.InitializeFileTreeForCreatedVault(windowId: int, expectedVault: ArcVault, arcPath: string) = promise {
+        try
+            do! this.InitializeFileTreeForActiveVault(windowId, expectedVault, arcPath)
+        with ArcLoadCancelledException targetWindowId ->
+            return raise (ArcCreatedButClosedException targetWindowId)
+    }
+
     // ── ARC Lifecycle Controller ──────────────────────────────────────────
     // All open/create/focus decisions are made here.
     // IPC handlers should delegate to these methods.
@@ -950,14 +957,14 @@ type ArcVaults() =
             match this.TryGetVault callingWindowId with
             | Some vault when vault.path.IsNone ->
                 do! vault.CreateARC(normalizedArcPath, identifier)
-                do! this.InitializeFileTreeForActiveVault(callingWindowId, vault, normalizedArcPath)
+                do! this.InitializeFileTreeForCreatedVault(callingWindowId, vault, normalizedArcPath)
                 this.TrackRecentAndBroadcast(normalizedArcPath)
                 return ArcOpenDisposition.CreatedInCurrent normalizedArcPath
             | _ ->
                 let! newVault = this.RegisterVaultWithNewArc(normalizedArcPath, identifier)
                 let newWindowId = newVault.window.id
 
-                do! this.InitializeFileTreeForActiveVault(newWindowId, newVault, normalizedArcPath)
+                do! this.InitializeFileTreeForCreatedVault(newWindowId, newVault, normalizedArcPath)
                 this.TrackRecentAndBroadcast(normalizedArcPath)
                 return ArcOpenDisposition.CreatedInNewWindow normalizedArcPath
     }
