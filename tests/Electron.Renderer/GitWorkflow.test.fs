@@ -10549,13 +10549,14 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "A pointer file with hyphens, underscores or capitals in extension names is detected",
+            "A pointer file with any extension name git-lfs accepts is detected",
             fun () ->
                 let text =
                     [
                         pointerLines.[0]
                         $"ext-0-env-test sha256:{oid}"
                         $"ext-1-Env_Test sha256:{oid}"
+                        $"ext-2-env.test sha256:{oid}"
                         pointerLines.[1]
                         pointerLines.[2]
                     ]

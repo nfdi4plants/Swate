@@ -829,7 +829,7 @@ module ArcVaultExtensions =
 
         member this.RenameOpenArcRoot(newName: string) : Fable.Core.JS.Promise<Result<string, exn>> = promise {
             // A running write, such as a Git LFS download or free, holds absolute paths into the
-            // ARC folder. Moving the folder under it would make its next step fail, so the rename waits.
+            // ARC folder. Moving the folder under it would make its next step fail, so the rename is refused until the write ends.
             let busyWritingError () =
                 exn
                     "Cannot rename the ARC folder while Swate is still writing to it. Wait until the running operation finishes, then try again."
