@@ -741,6 +741,7 @@ module ArcVaultExtensions =
 
             let hadUnsavedArcChanges = this.hasUnsavedArcChanges
 
+            this.isInitializingArc <- false
             this.path <- None
             this.fileTree.Clear()
 
@@ -757,11 +758,23 @@ module ArcVaultExtensions =
                         swatelogfn this.window.id "Failed to reset ARC dirty state in renderer: %s" error.Message
         }
 
-        /// This functions should be called once, when an vault is first started with a path
-        member this.Startup() = promise {
-            do! this.LoadArc()
-            this.StartFileWatcher()
-        }
+        /// Loads the ARC during initialization. The watcher is activated only after the initial
+        /// file-tree snapshot has been installed, so an older scan cannot overwrite watcher updates.
+        member this.Startup() = promise { do! this.LoadArc() }
+
+        /// Finalizes a prepared ARC after every asynchronous initialization step succeeded.
+        member internal this.FinalizeArcInitialization(fileTree: Dictionary<string, FileEntry>) =
+            match this.window.isDestroyed (), this.path with
+            | true, _ -> raise (ArcLoadCancelledException this.window.id)
+            | false, None -> swatefailfn this.window.id "Unable to commit ARC initialization without a path."
+            | false, Some normalizedPath ->
+                this.fileTree <- fileTree
+                this.StartFileWatcher()
+                this.isInitializingArc <- false
+
+                WindowSend.send<IPathChangeRendererApi> this.window (fun api -> api.pathChange (Some normalizedPath))
+
+                this.SetFileTree fileTree
 
         member this.OpenARC(path: string) = promise {
             match this.path with
@@ -775,13 +788,7 @@ module ArcVaultExtensions =
 
                 try
                     do! this.Startup()
-                    this.isInitializingArc <- false
-
-                    WindowSend.send<IPathChangeRendererApi>
-                        this.window
-                        (fun api -> api.pathChange (Some normalizedPath))
                 with error ->
-                    this.isInitializingArc <- false
                     do! this.RestoreEmptyVaultAfterFailedInitialization()
                     return raise error
         }
@@ -815,13 +822,7 @@ module ArcVaultExtensions =
                     with ArcLoadCancelledException targetWindowId ->
                         return raise (ArcCreatedButClosedException targetWindowId)
 
-                    this.isInitializingArc <- false
-
-                    WindowSend.send<IPathChangeRendererApi>
-                        this.window
-                        (fun api -> api.pathChange (Some normalizedPath))
                 with error ->
-                    this.isInitializingArc <- false
                     do! this.RestoreEmptyVaultAfterFailedInitialization()
                     return raise error
         }
@@ -1240,7 +1241,8 @@ type ArcVaults() =
     member private this.RegisterVaultWithValidatedArc(path: string) =
         this.RegisterVaultCore(fun vault -> promise {
             do! vault.OpenARC(path)
-            do! this.InitializeFileTreeForActiveVault(vault.window.id, vault, path)
+            let! fileTree = this.InitializeFileTreeForActiveVault(vault.window.id, vault, path)
+            vault.FinalizeArcInitialization fileTree
         })
 
     member private this.ValidateArcRoot(path: string) = promise {
@@ -1267,7 +1269,12 @@ type ArcVaults() =
     member this.RegisterVaultWithNewArc(path: string, newIdentifier: string) : JS.Promise<ArcVault> =
         this.RegisterVaultCore(fun vault -> promise {
             do! vault.CreateARC(path, newIdentifier)
-            do! this.InitializeFileTreeForCreatedVault(vault.window.id, vault, path)
+            let! fileTree = this.InitializeFileTreeForCreatedVault(vault.window.id, vault, path)
+
+            try
+                vault.FinalizeArcInitialization fileTree
+            with ArcLoadCancelledException targetWindowId ->
+                return raise (ArcCreatedButClosedException targetWindowId)
         })
 
     member this.OpenARCInVault(windowId: int, path: string) = promise {
@@ -1278,13 +1285,29 @@ type ArcVaults() =
         | Ok() ->
             match this.Vaults.TryGetValue windowId with
             | false, _ -> return failwith $"Vault with window-id '{windowId}' not found."
-            | true, vault -> do! vault.OpenARC normalizedArcPath
+            | true, vault ->
+                do!
+                    this.InitializeArcInCurrentVault(
+                        windowId,
+                        vault,
+                        normalizedArcPath,
+                        false,
+                        fun () -> vault.OpenARC(normalizedArcPath)
+                    )
     }
 
     member this.CreateARCInVault(windowId: int, path: string, identifier: string) = promise {
         match this.Vaults.TryGetValue windowId with
         | false, _ -> failwith $"Vault with window-id '{windowId}' not found."
-        | true, vault -> do! vault.CreateARC(path, identifier)
+        | true, vault ->
+            do!
+                this.InitializeArcInCurrentVault(
+                    windowId,
+                    vault,
+                    PathHelpers.normalizePath path,
+                    true,
+                    fun () -> vault.CreateARC(path, identifier)
+                )
 
         return ()
     }
@@ -1309,13 +1332,13 @@ type ArcVaults() =
         this.EnsureVaultIsStillActive(windowId, expectedVault)
 
         match fileTreeResult with
-        | Ok fileTree -> expectedVault.SetFileTree fileTree
+        | Ok fileTree -> return fileTree
         | Error error -> return raise error
     }
 
     member private this.InitializeFileTreeForCreatedVault(windowId: int, expectedVault: ArcVault, arcPath: string) = promise {
         try
-            do! this.InitializeFileTreeForActiveVault(windowId, expectedVault, arcPath)
+            return! this.InitializeFileTreeForActiveVault(windowId, expectedVault, arcPath)
         with ArcLoadCancelledException targetWindowId ->
             return raise (ArcCreatedButClosedException targetWindowId)
     }
@@ -1327,10 +1350,16 @@ type ArcVaults() =
             try
                 do! initialize ()
 
-                if create then
-                    do! this.InitializeFileTreeForCreatedVault(windowId, vault, arcPath)
-                else
-                    do! this.InitializeFileTreeForActiveVault(windowId, vault, arcPath)
+                let! fileTree =
+                    if create then
+                        this.InitializeFileTreeForCreatedVault(windowId, vault, arcPath)
+                    else
+                        this.InitializeFileTreeForActiveVault(windowId, vault, arcPath)
+
+                try
+                    vault.FinalizeArcInitialization fileTree
+                with ArcLoadCancelledException targetWindowId when create ->
+                    return raise (ArcCreatedButClosedException targetWindowId)
             with error ->
                 do! vault.RestoreEmptyVaultAfterFailedInitialization()
                 return raise error
