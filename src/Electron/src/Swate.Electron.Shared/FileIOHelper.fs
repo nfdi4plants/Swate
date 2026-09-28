@@ -119,7 +119,7 @@ let private insertFileTreeEntry (root: FileTreeNode) (rootPath: string) (entry: 
                             (if isLast then entry.isDirectory else true),
                             newPath,
                             Dictionary(),
-                            entry.lfs
+                            entry.largeObject
                         )
 
                     node.children.Add(part, newNode)
@@ -158,7 +158,7 @@ let toFileTreeNode (fileEntries: FileEntry[]) =
             fileEntries
             |> Array.find (fun fileEntry -> PathHelpers.normalizePath fileEntry.path = rootPath)
 
-        FileTreeNode.create (rootEntry.name, rootEntry.isDirectory, rootPath, Dictionary(), rootEntry.lfs)
+        FileTreeNode.create (rootEntry.name, rootEntry.isDirectory, rootPath, Dictionary(), rootEntry.largeObject)
 
     adaptedFileEntries
     |> Array.iter (fun fileEntry -> insertFileTreeEntry rootElement rootPath fileEntry)

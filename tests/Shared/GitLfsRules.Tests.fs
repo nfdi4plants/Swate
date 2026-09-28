@@ -141,6 +141,15 @@ let tests =
                     (GitLfsRules.tryGetUnmarkAsLfsBlockedReason "docs/readme.pdf" (Some 1024L))
                     "Small files outside dataset folders may be unmarked."
 
+            testCase "allows unmarking metadata files even when other rules would block them"
+            <| fun _ ->
+                Expect.isNone
+                    (GitLfsRules.tryGetToggleBlockedReason
+                        "assays/assay_01/dataset/isa.study.xlsx"
+                        (Some(26L * 1024L * 1024L))
+                        false)
+                    "Metadata files stay inline under the revision policy."
+
             testCase "tryGetToggleBlockedReason routes by direction"
             <| fun _ ->
                 Expect.isSome

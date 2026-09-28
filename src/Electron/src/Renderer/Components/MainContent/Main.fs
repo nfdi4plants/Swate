@@ -8,6 +8,7 @@ open Renderer.Components.MainContent.DataHubBrowserTarget
 open Renderer.Components.MainContent.EmptySelectionTarget
 open Renderer.Components.MainContent.ErrorViewTarget
 open Renderer.Components.MainContent.GitDiffTarget
+open Renderer.Components.MainContent.GitFileChoiceConflictTarget
 open Renderer.Components.MainContent.GitMergeConflictTarget
 open Renderer.Components.MainContent.GitUnsupportedTarget
 open Renderer.Components.MainContent.LandingDraftTarget
@@ -115,6 +116,8 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                         )
                     | Some _, Some(PageState.GitDiffPage diffData) -> GitDiffTarget.Main diffData
                     | Some _, Some(PageState.GitMergeConflictPage mergeData) -> GitMergeConflictTarget.Main mergeData
+                    | Some _, Some(PageState.GitFileChoiceConflictPage choiceData) ->
+                        GitFileChoiceConflictTarget.Main choiceData
                     | Some _, Some(PageState.GitUnsupportedPage unsupportedPage) ->
                         GitUnsupportedTarget.Main unsupportedPage
                     | Some _, None -> EmptySelectionTarget()
