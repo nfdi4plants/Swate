@@ -4344,6 +4344,46 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "RenameOpenArcRoot refuses while a write runs and renames after it ends",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-rename-arc-root-busy-"
+                    "RenameRootBusyArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let targetPath =
+                            join [| dirname arcPath; "renamed-arc-busy" |] |> PathHelpers.normalizePath
+
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+                        do! vault.LoadArc()
+
+                        let mutable releaseWrite = ignore
+
+                        let writeGate =
+                            JS.Constructors.Promise.Create(fun resolve _ -> releaseWrite <- fun () -> resolve ())
+
+                        let writeScope = vault.WithBusyWritingScope(fun () -> writeGate)
+
+                        match! vault.RenameOpenArcRoot "renamed-arc-busy" with
+                        | Ok _ -> failwith "Expected the ARC root rename to wait for the running write."
+                        | Error _ ->
+                            Vitest.expect(vault.path).toEqual (Some arcPath)
+                            let! oldPathExists = TestHelpers.pathExistsAsync arcPath
+                            let! targetPathExists = TestHelpers.pathExistsAsync targetPath
+                            Vitest.expect(oldPathExists).toBe (true)
+                            Vitest.expect(targetPathExists).toBe (false)
+
+                        releaseWrite ()
+                        do! writeScope
+
+                        match! vault.RenameOpenArcRoot "renamed-arc-busy" with
+                        | Error error -> failwith error.Message
+                        | Ok renamedPath -> Vitest.expect(renamedPath).toBe (targetPath)
+                    })
+        )
+
+        Vitest.test (
             "tryBuildOpenArcRootRenamePlan applies the shared rename-name validation rules",
             fun () ->
                 match tryBuildOpenArcRootRenamePlan "C:/work/current-arc" "bad\u0000name" with
