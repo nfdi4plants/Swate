@@ -298,7 +298,7 @@ let renameOpenArcRootDirectoryOnDisk arcPath newName : JS.Promise<Result<string,
                     return Error(mapArcRootRenameDiskError plan.SourcePath plan.TargetPath renameError)
 }
 
-let createWindow () = promise {
+let createWindow () =
     printfn "[Swate] Creating new window"
     let screenSize = screen.getPrimaryDisplay().workAreaSize
 
@@ -310,16 +310,11 @@ let createWindow () = promise {
             icon = (windowIconPath |> U2.Case2),
             width = int screenSize.width,
             height = int screenSize.height,
+            show = false,
             webPreferences = WebPreferences(preload = path.join (__dirname, "preload.fs.js"))
         )
 
     let window = BrowserWindow(mainWindowOptions)
-
-    if isNullOrUndefined MAIN_WINDOW_VITE_DEV_SERVER_URL then
-        do! window.loadFile (path.join (__dirname, $"../renderer/{MAIN_WINDOW_VITE_NAME}/index.html"))
-    else
-        window.webContents.openDevTools Enums.WebContents.OpenDevTools.Options.Mode.Right
-        do! window.loadURL MAIN_WINDOW_VITE_DEV_SERVER_URL
 
     // Prevent links from opening new Electron windows
     window.webContents.setWindowOpenHandler (fun details ->
@@ -336,7 +331,16 @@ let createWindow () = promise {
             Fable.Electron.Main.shell.openExternal url |> Promise.start
     )
 
-    return window
+    window
+
+let loadWindow (window: BrowserWindow) = promise {
+    if isNullOrUndefined MAIN_WINDOW_VITE_DEV_SERVER_URL then
+        do! window.loadFile (path.join (__dirname, $"../renderer/{MAIN_WINDOW_VITE_NAME}/index.html"))
+    else
+        window.webContents.openDevTools Enums.WebContents.OpenDevTools.Options.Mode.Right
+        do! window.loadURL MAIN_WINDOW_VITE_DEV_SERVER_URL
+
+    window.show ()
 }
 
 let shouldUsePollingByDefault (platform: string) =
