@@ -1233,7 +1233,8 @@ module GitDiffPageLoader =
         System.Text.RegularExpressions.Regex("^size [0-9]+$")
 
     let private lfsPointerExtensionPattern =
-        System.Text.RegularExpressions.Regex("^ext-[0-9]+-[a-z0-9]+ .+$")
+        // git-lfs accepts hyphens, underscores and capitals in extension names (git lfs pointer --check).
+        System.Text.RegularExpressions.Regex("^ext-[0-9]+-[A-Za-z0-9_-]+ .+$")
 
     /// True when the text is a Git LFS pointer file: the version line first, then one oid line and
     /// one size line, with optional `ext-` lines. The provider returns the pointer as the base

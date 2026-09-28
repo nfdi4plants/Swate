@@ -10549,6 +10549,22 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "A pointer file with hyphens, underscores or capitals in extension names is detected",
+            fun () ->
+                let text =
+                    [
+                        pointerLines.[0]
+                        $"ext-0-env-test sha256:{oid}"
+                        $"ext-1-Env_Test sha256:{oid}"
+                        pointerLines.[1]
+                        pointerLines.[2]
+                    ]
+                    |> String.concat "\n"
+
+                Vitest.expect(GitDiffPageLoader.isLfsPointerText (text + "\n")).toBe (true)
+        )
+
+        Vitest.test (
             "A pointer file with CRLF line endings is detected",
             fun () ->
                 let text = (pointerLines |> String.concat "\r\n") + "\r\n"
