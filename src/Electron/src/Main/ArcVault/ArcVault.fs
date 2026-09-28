@@ -736,7 +736,7 @@ module ArcVaultExtensions =
             this.ClearPendingFileWatcherState()
         }
 
-        member private this.RestoreEmptyVaultAfterFailedInitialization() = promise {
+        member internal this.RestoreEmptyVaultAfterFailedInitialization() = promise {
             do! this.StopFileWatcher()
 
             let hadUnsavedArcChanges = this.hasUnsavedArcChanges
@@ -935,6 +935,8 @@ module ArcOpenDisposition =
 
 
 type ArcVaults() =
+
+    let pathInitializations = Dictionary<string, JS.Promise<unit>>()
 
     /// Key is window.id
     member val Vaults = Dictionary<int, ArcVault>() with get
@@ -1236,7 +1238,10 @@ type ArcVaults() =
     }
 
     member private this.RegisterVaultWithValidatedArc(path: string) =
-        this.RegisterVaultCore(fun vault -> vault.OpenARC(path))
+        this.RegisterVaultCore(fun vault -> promise {
+            do! vault.OpenARC(path)
+            do! this.InitializeFileTreeForActiveVault(vault.window.id, vault, path)
+        })
 
     member private this.ValidateArcRoot(path: string) = promise {
         let! arcRootExists = ARCtrl.FileSystemHelper.directoryExistsAsync path
@@ -1260,7 +1265,10 @@ type ArcVaults() =
     }
 
     member this.RegisterVaultWithNewArc(path: string, newIdentifier: string) : JS.Promise<ArcVault> =
-        this.RegisterVaultCore(fun vault -> vault.CreateARC(path, newIdentifier))
+        this.RegisterVaultCore(fun vault -> promise {
+            do! vault.CreateARC(path, newIdentifier)
+            do! this.InitializeFileTreeForCreatedVault(vault.window.id, vault, path)
+        })
 
     member this.OpenARCInVault(windowId: int, path: string) = promise {
         let normalizedArcPath = PathHelpers.normalizePath path
@@ -1312,6 +1320,51 @@ type ArcVaults() =
             return raise (ArcCreatedButClosedException targetWindowId)
     }
 
+    member private this.InitializeArcInCurrentVault
+        (windowId: int, vault: ArcVault, arcPath: string, create: bool, initialize: unit -> JS.Promise<unit>)
+        =
+        promise {
+            try
+                do! initialize ()
+
+                if create then
+                    do! this.InitializeFileTreeForCreatedVault(windowId, vault, arcPath)
+                else
+                    do! this.InitializeFileTreeForActiveVault(windowId, vault, arcPath)
+            with error ->
+                do! vault.RestoreEmptyVaultAfterFailedInitialization()
+                return raise error
+        }
+
+    member private this.WithPathInitialization<'T>
+        (arcPath: string, operation: unit -> JS.Promise<'T>)
+        : JS.Promise<'T> =
+        let pathKey = PathHelpers.normalizePathForFsComparison arcPath
+
+        let rec waitForTurn () = promise {
+            match pathInitializations.TryGetValue pathKey with
+            | true, pending ->
+                // A failed/cancelled owner must not poison the path. Once it settles, retry and
+                // either use its active vault or become the next initializer.
+                let! _ = pending |> Promise.result
+                return! waitForTurn ()
+            | false, _ ->
+                let mutable release = ignore
+
+                let completion =
+                    JS.Constructors.Promise.Create(fun resolve _ -> release <- fun () -> resolve ())
+
+                pathInitializations.Add(pathKey, completion)
+
+                try
+                    return! operation ()
+                finally
+                    pathInitializations.Remove(pathKey) |> ignore
+                    release ()
+        }
+
+        waitForTurn ()
+
     // ── ARC Lifecycle Controller ──────────────────────────────────────────
     // All open/create/focus decisions are made here.
     // IPC handlers should delegate to these methods.
@@ -1321,34 +1374,38 @@ type ArcVaults() =
     member this.OpenOrFocusArc(callingWindowId: int, arcPath: string) = promise {
         let normalizedArcPath = PathHelpers.normalizePath arcPath
 
-        match this.TryGetVaultByPath normalizedArcPath with
-        | Some vault ->
-            vault.window.focus ()
-            this.TrackRecentAndBroadcast(normalizedArcPath)
-            return ArcOpenDisposition.FocusedExisting normalizedArcPath
-        | None ->
-            match! this.ValidateArcRoot normalizedArcPath with
-            | Error error -> return raise error
-            | Ok() ->
-                match this.TryGetVaultByPath normalizedArcPath with
-                | Some vault ->
-                    vault.window.focus ()
-                    this.TrackRecentAndBroadcast(normalizedArcPath)
-                    return ArcOpenDisposition.FocusedExisting normalizedArcPath
-                | None ->
-                    match this.TryGetVault callingWindowId with
-                    | Some vault when vault.path.IsNone ->
-                        do! vault.OpenARC(normalizedArcPath)
-                        do! this.InitializeFileTreeForActiveVault(callingWindowId, vault, normalizedArcPath)
+        return!
+            this.WithPathInitialization(
+                normalizedArcPath,
+                fun () -> promise {
+                    match this.TryGetVaultByPath normalizedArcPath with
+                    | Some vault ->
+                        vault.window.focus ()
                         this.TrackRecentAndBroadcast(normalizedArcPath)
-                        return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
-                    | _ ->
-                        let! newVault = this.RegisterVaultWithValidatedArc(normalizedArcPath)
-                        let newWindowId = newVault.window.id
+                        return ArcOpenDisposition.FocusedExisting normalizedArcPath
+                    | None ->
+                        match! this.ValidateArcRoot normalizedArcPath with
+                        | Error error -> return raise error
+                        | Ok() ->
+                            match this.TryGetVault callingWindowId with
+                            | Some vault when vault.path.IsNone ->
+                                do!
+                                    this.InitializeArcInCurrentVault(
+                                        callingWindowId,
+                                        vault,
+                                        normalizedArcPath,
+                                        false,
+                                        fun () -> vault.OpenARC(normalizedArcPath)
+                                    )
 
-                        do! this.InitializeFileTreeForActiveVault(newWindowId, newVault, normalizedArcPath)
-                        this.TrackRecentAndBroadcast(normalizedArcPath)
-                        return ArcOpenDisposition.OpenedInNewWindow normalizedArcPath
+                                this.TrackRecentAndBroadcast(normalizedArcPath)
+                                return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
+                            | _ ->
+                                let! _ = this.RegisterVaultWithValidatedArc(normalizedArcPath)
+                                this.TrackRecentAndBroadcast(normalizedArcPath)
+                                return ArcOpenDisposition.OpenedInNewWindow normalizedArcPath
+                }
+            )
     }
 
     /// Create a new ARC at the given path with the given identifier.
@@ -1356,25 +1413,35 @@ type ArcVaults() =
     member this.CreateOrFocusArc(callingWindowId: int, arcPath: string, identifier: string) = promise {
         let normalizedArcPath = PathHelpers.normalizePath arcPath
 
-        match this.TryGetVaultByPath normalizedArcPath with
-        | Some vault ->
-            vault.window.focus ()
-            this.TrackRecentAndBroadcast(normalizedArcPath)
-            return ArcOpenDisposition.FocusedExisting normalizedArcPath
-        | None ->
-            match this.TryGetVault callingWindowId with
-            | Some vault when vault.path.IsNone ->
-                do! vault.CreateARC(normalizedArcPath, identifier)
-                do! this.InitializeFileTreeForCreatedVault(callingWindowId, vault, normalizedArcPath)
-                this.TrackRecentAndBroadcast(normalizedArcPath)
-                return ArcOpenDisposition.CreatedInCurrent normalizedArcPath
-            | _ ->
-                let! newVault = this.RegisterVaultWithNewArc(normalizedArcPath, identifier)
-                let newWindowId = newVault.window.id
+        return!
+            this.WithPathInitialization(
+                normalizedArcPath,
+                fun () -> promise {
+                    match this.TryGetVaultByPath normalizedArcPath with
+                    | Some vault ->
+                        vault.window.focus ()
+                        this.TrackRecentAndBroadcast(normalizedArcPath)
+                        return ArcOpenDisposition.FocusedExisting normalizedArcPath
+                    | None ->
+                        match this.TryGetVault callingWindowId with
+                        | Some vault when vault.path.IsNone ->
+                            do!
+                                this.InitializeArcInCurrentVault(
+                                    callingWindowId,
+                                    vault,
+                                    normalizedArcPath,
+                                    true,
+                                    fun () -> vault.CreateARC(normalizedArcPath, identifier)
+                                )
 
-                do! this.InitializeFileTreeForCreatedVault(newWindowId, newVault, normalizedArcPath)
-                this.TrackRecentAndBroadcast(normalizedArcPath)
-                return ArcOpenDisposition.CreatedInNewWindow normalizedArcPath
+                            this.TrackRecentAndBroadcast(normalizedArcPath)
+                            return ArcOpenDisposition.CreatedInCurrent normalizedArcPath
+                        | _ ->
+                            let! _ = this.RegisterVaultWithNewArc(normalizedArcPath, identifier)
+                            this.TrackRecentAndBroadcast(normalizedArcPath)
+                            return ArcOpenDisposition.CreatedInNewWindow normalizedArcPath
+                }
+            )
     }
 
 

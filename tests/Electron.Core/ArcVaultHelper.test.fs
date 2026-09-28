@@ -411,6 +411,8 @@ type private TestWindowOptions = {
 type private TestWindowState = {
     Window: BrowserWindow
     LoadStarted: JS.Promise<unit>
+    /// Releases a controlled renderer load so concurrency tests can hold initialization at a deterministic boundary.
+    ResolveLoad: unit -> unit
     RejectLoad: exn -> unit
     Destroy: unit -> unit
     TriggerClose: unit -> unit
@@ -448,6 +450,7 @@ let private createTestWindow options =
     let mutable titleWriteCount = 0
     let mutable title = ""
     let mutable signalLoadStarted = ignore
+    let mutable resolveControlledLoad: (unit -> unit) option = None
     let mutable rejectControlledLoad: (exn -> unit) option = None
     let sentMessages = ResizeArray<obj array>()
     let noop: obj = emitJsExpr () "((..._args) => {})"
@@ -464,7 +467,10 @@ let private createTestWindow options =
         | LoadImmediately -> JS.Constructors.Promise.resolve ()
         | FailLoadWith error -> JS.Constructors.Promise.reject error
         | ControlLoad ->
-            JS.Constructors.Promise.Create(fun _ reject -> rejectControlledLoad <- Some(fun error -> reject error))
+            JS.Constructors.Promise.Create(fun resolve reject ->
+                resolveControlledLoad <- Some(fun () -> resolve ())
+                rejectControlledLoad <- Some(fun error -> reject error)
+            )
 
     let triggerClosed () =
         destroyed <- true
@@ -546,6 +552,7 @@ let private createTestWindow options =
     {
         Window = windowObject |> unbox<BrowserWindow>
         LoadStarted = loadStarted
+        ResolveLoad = fun () -> resolveControlledLoad.Value()
         RejectLoad = fun error -> rejectControlledLoad.Value(error)
         Destroy = fun () -> destroyed <- true
         TriggerClose = triggerClose
@@ -1711,6 +1718,164 @@ Vitest.describe (
 
                         return! withAsyncCleanup cleanup operation
                     })
+        )
+
+        Vitest.test (
+            "concurrent OpenOrFocusArc requests use one new-window owner for an occupied caller",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-open-concurrent-window-"
+                    "Concurrent Window ARC"
+                    ignore
+                    (fun arcPath -> promise {
+                        let callingWindowId = 50
+                        let targetWindowId = 51
+                        let normalizedArcPath = PathHelpers.normalizePath arcPath
+
+                        let callingVault =
+                            ArcVault((createTestWindow (testWindowOptions callingWindowId)).Window)
+
+                        callingVault.path <- Some "C:/occupied-concurrent-open"
+                        callingVault.SetArc(ARC("Occupied"))
+
+                        let targetWindow =
+                            createTestWindow {
+                                testWindowOptions targetWindowId with
+                                    LoadBehavior = ControlLoad
+                            }
+
+                        let mutable createdWindowCount = 0
+
+                        setBrowserWindowFactory (fun _ ->
+                            createdWindowCount <- createdWindowCount + 1
+                            targetWindow.Window :> obj
+                        )
+
+                        let vaults = ArcVaults()
+                        vaults.Vaults.Add(callingWindowId, callingVault)
+
+                        let cleanup () = promise {
+                            match vaults.TryGetVault(targetWindowId) with
+                            | Some vault -> do! vault.StopFileWatcher()
+                            | None -> ()
+
+                            vaults.Vaults.Clear()
+                        }
+
+                        let operation () = promise {
+                            let firstOpen = vaults.OpenOrFocusArc(callingWindowId, normalizedArcPath)
+                            let secondOpen = vaults.OpenOrFocusArc(callingWindowId, normalizedArcPath)
+                            do! targetWindow.LoadStarted
+                            Vitest.expect(createdWindowCount).toBe (1)
+                            targetWindow.ResolveLoad()
+
+                            let! firstDisposition = firstOpen
+                            let! secondDisposition = secondOpen
+                            let dispositions = [| firstDisposition; secondDisposition |]
+
+                            let openedInNewWindow =
+                                dispositions
+                                |> Array.exists (
+                                    function
+                                    | ArcOpenDisposition.OpenedInNewWindow path ->
+                                        PathHelpers.pathsEqual path normalizedArcPath
+                                    | _ -> false
+                                )
+
+                            let focusedExisting =
+                                dispositions
+                                |> Array.exists (
+                                    function
+                                    | ArcOpenDisposition.FocusedExisting path ->
+                                        PathHelpers.pathsEqual path normalizedArcPath
+                                    | _ -> false
+                                )
+
+                            Vitest.expect(openedInNewWindow).toBe (true)
+                            Vitest.expect(focusedExisting).toBe (true)
+                            Vitest.expect(createdWindowCount).toBe (1)
+                        }
+
+                        return! withAsyncCleanup cleanup operation
+                    })
+        )
+
+        Vitest.test (
+            "concurrent CreateOrFocusArc requests write once and use one new-window owner",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-create-concurrent-window-"
+                let callingWindowId = 52
+                let targetWindowId = 53
+                let identifier = "Concurrent Created ARC"
+
+                let arcPath =
+                    ARCtrl.ArcPathHelper.combine rootPath identifier |> PathHelpers.normalizePath
+
+                let callingVault =
+                    ArcVault((createTestWindow (testWindowOptions callingWindowId)).Window)
+
+                callingVault.path <- Some "C:/occupied-concurrent-create"
+                callingVault.SetArc(ARC("Occupied"))
+
+                let targetWindow =
+                    createTestWindow {
+                        testWindowOptions targetWindowId with
+                            LoadBehavior = ControlLoad
+                    }
+
+                let mutable createdWindowCount = 0
+
+                setBrowserWindowFactory (fun _ ->
+                    createdWindowCount <- createdWindowCount + 1
+                    targetWindow.Window :> obj
+                )
+
+                let vaults = ArcVaults()
+                vaults.Vaults.Add(callingWindowId, callingVault)
+
+                let cleanup () = promise {
+                    match vaults.TryGetVault(targetWindowId) with
+                    | Some vault -> do! vault.StopFileWatcher()
+                    | None -> ()
+
+                    vaults.Vaults.Clear()
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                }
+
+                let operation () = promise {
+                    let firstCreate = vaults.CreateOrFocusArc(callingWindowId, arcPath, identifier)
+                    let secondCreate = vaults.CreateOrFocusArc(callingWindowId, arcPath, identifier)
+                    do! targetWindow.LoadStarted
+                    Vitest.expect(createdWindowCount).toBe (1)
+                    targetWindow.ResolveLoad()
+
+                    let! firstDisposition = firstCreate
+                    let! secondDisposition = secondCreate
+                    let dispositions = [| firstDisposition; secondDisposition |]
+
+                    let createdInNewWindow =
+                        dispositions
+                        |> Array.exists (
+                            function
+                            | ArcOpenDisposition.CreatedInNewWindow path -> PathHelpers.pathsEqual path arcPath
+                            | _ -> false
+                        )
+
+                    let focusedExisting =
+                        dispositions
+                        |> Array.exists (
+                            function
+                            | ArcOpenDisposition.FocusedExisting path -> PathHelpers.pathsEqual path arcPath
+                            | _ -> false
+                        )
+
+                    Vitest.expect(createdInNewWindow).toBe (true)
+                    Vitest.expect(focusedExisting).toBe (true)
+                    Vitest.expect(createdWindowCount).toBe (1)
+                }
+
+                return! withAsyncCleanup cleanup operation
+            }
         )
 
         Vitest.test (
@@ -2984,6 +3149,14 @@ Vitest.describe (
                 setShowOpenDialog (fun _ _ -> createObj [ "canceled" ==> false; "filePaths" ==> [| rootPath |] ])
                 ARC_VAULTS.Vaults.Add(originatingWindowId, originatingVault)
 
+                Vitest.vi.stubEnv ("SWATE_TEST_USER_DATA", Some rootPath)
+
+                let versionControlHost =
+                    Main.VersionControl.VersionControlRuntime.createProduction ()
+                    |> Main.VersionControl.WorkspaceSessionHost.WorkspaceSessionHost
+
+                Main.VersionControl.WorkspaceSessionHost.initialize versionControlHost
+
                 let cleanup () = promise {
                     match loadingVault with
                     | Some vault -> do! vault.StopFileWatcher()
@@ -2991,6 +3164,8 @@ Vitest.describe (
 
                     ARC_VAULTS.Vaults.Remove(originatingWindowId) |> ignore
                     ARC_VAULTS.Vaults.Remove(targetWindowId) |> ignore
+                    Main.VersionControl.WorkspaceSessionHost.resetForTests ()
+                    Vitest.vi.unstubAllEnvs ()
                     do! TestHelpers.removeDirectoryAsync rootPath
                 }
 
@@ -2999,7 +3174,7 @@ Vitest.describe (
 
                     let request: CreateArcRequest = {
                         identifier = identifier
-                        initGit = false
+                        initGit = true
                     }
 
                     let createOperation = api.createARC request
@@ -3035,8 +3210,10 @@ Vitest.describe (
                         ARCtrl.ArcPathHelper.combine expectedPath ARCtrl.ArcPathHelper.InvestigationFileName
 
                     let! investigationFileExists = TestHelpers.pathExistsAsync investigationPath
+                    let! gitDirectoryExists = TestHelpers.pathExistsAsync (join [| expectedPath; ".git" |])
                     Vitest.expect(arcDirectoryExists).toBe (true)
                     Vitest.expect(investigationFileExists).toBe (true)
+                    Vitest.expect(gitDirectoryExists).toBe (true)
 
                 }
 

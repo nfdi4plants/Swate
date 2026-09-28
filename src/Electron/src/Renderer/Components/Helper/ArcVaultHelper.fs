@@ -72,8 +72,11 @@ let createArc (onError: string -> unit) (identifier: string) (initGit: bool) : J
         onError exn.Message
         return None
     | Ok CreateArcOutcome.Cancelled
-    | Ok(CreateArcOutcome.CreatedButClosed _)
     | Ok(CreateArcOutcome.FocusedExisting _) -> return None
+    // Notes scaffolding depends on the creating renderer's local preference and active vault IPC.
+    // A closed window therefore deliberately skips it; path-only main-process work (such as Git)
+    // has already completed before CreatedButClosed is returned.
+    | Ok(CreateArcOutcome.CreatedButClosed _) -> return None
     | Ok(CreateArcOutcome.Created path) ->
         do! ensureNotesFolderIfEnabled onError
         return Some path

@@ -70,7 +70,7 @@ export const dialog = {
     showOpenDialog: (...args: unknown[]) =>
         Promise.resolve(showOpenDialogMock?.(...args) ?? { canceled: true, filePaths: [] }),
     showMessageBox: (...args: unknown[]) =>
-        Promise.resolve(showMessageBoxMock?.(...args) ?? { response: 0, checkboxChecked: false }),
+        Promise.resolve(showMessageBoxMock?.(...args) ?? { response: 1, checkboxChecked: false }),
     showErrorBox: noop,
 };
 export const ipcMain = { handle: noop, on: noop };

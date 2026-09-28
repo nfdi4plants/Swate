@@ -234,70 +234,76 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                     let windowId = windowIdFromIpcEvent event
 
-                    let! disposition = promise {
+                    let! disposition, terminalOutcome = promise {
                         try
                             let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, request.identifier)
-                            return Ok disposition
+                            return Some disposition, None
                         with
-                        | ArcCreatedButClosedException _ -> return Error(CreateArcOutcome.CreatedButClosed arcPath)
-                        | ArcLoadCancelledException _ -> return Error CreateArcOutcome.Cancelled
+                        | ArcCreatedButClosedException _ -> return None, Some(CreateArcOutcome.CreatedButClosed arcPath)
+                        | ArcLoadCancelledException _ -> return None, Some CreateArcOutcome.Cancelled
                     }
 
-                    match disposition with
-                    | Error outcome -> return Ok outcome
-                    | Ok disposition ->
-                        do!
-                            if request.initGit then
-                                match disposition.CreatedArcPath with
-                                | Some createdArcPath -> promise {
-                                    try
-                                        let host = WorkspaceSessionHost.get ()
+                    let createdArcPath =
+                        match disposition, terminalOutcome with
+                        | Some disposition, _ -> disposition.CreatedArcPath
+                        | None, Some(CreateArcOutcome.CreatedButClosed path) -> Some path
+                        | _ -> None
 
-                                        let tracked =
-                                            host.BeginOperation(
-                                                "create-arc-initialize-" + createdArcPath,
-                                                Some createdArcPath,
-                                                Some(
-                                                    ARC_VAULTS.TryGetVaultByPath createdArcPath
-                                                    |> Option.map (fun vault -> vault.window.id)
-                                                    |> Option.defaultValue (windowIdFromIpcEvent event)
-                                                ),
-                                                true,
-                                                ignore
-                                            )
+                    do!
+                        if request.initGit then
+                            match createdArcPath with
+                            | Some createdArcPath -> promise {
+                                try
+                                    let host = WorkspaceSessionHost.get ()
 
-                                        try
-                                            let! initResult =
-                                                IVersionControlApi.initializeLocalWorkspace
-                                                    host
-                                                    createdArcPath
-                                                    tracked.Context
-                                                |> Async.StartAsPromise
-
-                                            match initResult with
-                                            | Failed failure ->
-                                                Browser.Dom.console.error (
-                                                    $"The ARC was created, but its Git repository could not be initialized: {failure.Code}: {failure.Message}"
-                                                )
-
-                                                return ()
-                                            | Succeeded _
-                                            | PartiallySucceeded _ ->
-                                                notifyGitRepositoryInitialized createdArcPath
-                                                return ()
-                                        finally
-                                            tracked.Complete()
-                                    with error ->
-                                        Browser.Dom.console.error (
-                                            $"The ARC was created, but Git initialization failed: {error.Message}"
+                                    let tracked =
+                                        host.BeginOperation(
+                                            "create-arc-initialize-" + createdArcPath,
+                                            Some createdArcPath,
+                                            Some(
+                                                ARC_VAULTS.TryGetVaultByPath createdArcPath
+                                                |> Option.map (fun vault -> vault.window.id)
+                                                |> Option.defaultValue (windowIdFromIpcEvent event)
+                                            ),
+                                            true,
+                                            ignore
                                         )
 
-                                        return ()
-                                  }
-                                | None -> promise { return () }
-                            else
-                                promise { return () }
+                                    try
+                                        let! initResult =
+                                            IVersionControlApi.initializeLocalWorkspace
+                                                host
+                                                createdArcPath
+                                                tracked.Context
+                                            |> Async.StartAsPromise
 
+                                        match initResult with
+                                        | Failed failure ->
+                                            Browser.Dom.console.error (
+                                                $"The ARC was created, but its Git repository could not be initialized: {failure.Code}: {failure.Message}"
+                                            )
+
+                                            return ()
+                                        | Succeeded _
+                                        | PartiallySucceeded _ ->
+                                            notifyGitRepositoryInitialized createdArcPath
+                                            return ()
+                                    finally
+                                        tracked.Complete()
+                                with error ->
+                                    Browser.Dom.console.error (
+                                        $"The ARC was created, but Git initialization failed: {error.Message}"
+                                    )
+
+                                    return ()
+                              }
+                            | None -> promise { return () }
+                        else
+                            promise { return () }
+
+                    match disposition, terminalOutcome with
+                    | None, Some outcome -> return Ok outcome
+                    | Some disposition, None ->
                         match disposition with
                         | ArcOpenDisposition.FocusedExisting path -> return Ok(CreateArcOutcome.FocusedExisting path)
                         | ArcOpenDisposition.CreatedInCurrent path
@@ -305,6 +311,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         | ArcOpenDisposition.OpenedInCurrent path
                         | ArcOpenDisposition.OpenedInNewWindow path ->
                             return Error(exn $"Unexpected open disposition while creating ARC at '{path}'.")
+                    | _ -> return Error(exn "ARC creation returned an inconsistent lifecycle result.")
             with error ->
                 return Error error
         }
