@@ -7,6 +7,7 @@ open Main
 open Main.Bindings.Path
 open Main.VersionControl
 open Swate.Components.Composite.Authentication.Types
+open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.VersionControlTypes
 open VersionControlService.Abstractions
 open Vitest
@@ -735,12 +736,13 @@ Vitest.describe (
                             }
 
                         match created with
-                        | Ok createdPath ->
+                        | Ok(CreateArcOutcome.Created createdPath) ->
                             Vitest.expect(createdPath).toBe expectedArcPath
                             Vitest.expect(Main.Bindings.Filesystem.existsSync createdPath).toBe true
 
                             Vitest.expect(Main.Bindings.Filesystem.existsSync (join [| createdPath; ".git" |])).toBe
                                 false
+                        | Ok outcome -> return failwithf "Unexpected create outcome: %A" outcome
                         | Error error -> return raise error
                     })
         )
@@ -763,9 +765,10 @@ Vitest.describe (
                             }
 
                         match created with
-                        | Ok createdPath ->
+                        | Ok(CreateArcOutcome.Created createdPath) ->
                             Vitest.expect(createdPath).toBe expectedArcPath
                             Vitest.expect(Main.Bindings.Filesystem.existsSync createdPath).toBe true
+                        | Ok outcome -> return failwithf "Unexpected create outcome: %A" outcome
                         | Error error -> return raise error
                     })
         )
