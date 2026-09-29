@@ -776,6 +776,10 @@ module ArcVaultExtensions =
 
                 this.SetFileTree fileTree
 
+                // Only the first ARC starts the diff workers. Prewarming never throws and
+                // does not hold up the ARC.
+                Main.VersionControl.TextDiffWorkers.prewarm ()
+
         member this.OpenARC(path: string) = promise {
             match this.path with
             | Some _ -> swatefailfn this.window.id "Unable to open ARC in vault bound to ARC."

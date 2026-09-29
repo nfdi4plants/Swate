@@ -10,11 +10,12 @@ type VersionControlRuntime = {
 }
 
 /// Creates production dependencies after the app is ready, when the settings root exists.
-let createProduction () : VersionControlRuntime =
+/// The session host is built after the runtime, so the caller passes its window lookup.
+let createProduction (windowOwnerOf: OperationContext -> string) : VersionControlRuntime =
     let sensitivity = ProviderComposition.currentPathCaseSensitivity ()
 
     {
-        Catalog = ProviderComposition.createProductionCatalog sensitivity
+        Catalog = ProviderComposition.createProductionCatalog sensitivity windowOwnerOf
         Bindings = WorkspaceBindingStore.createSettingsStore sensitivity
         PathCaseSensitivity = sensitivity
     }

@@ -53,7 +53,7 @@ let private createRuntimeWithFactory
     {
         Catalog =
             ProviderComposition.createCatalog [
-                ProviderComposition.createGitFactory noAccounts
+                ProviderComposition.createGitFactory noAccounts WorkspaceSessionHost.windowOwnerOf
                 lakeFsFactory
             ]
         Bindings = bindings

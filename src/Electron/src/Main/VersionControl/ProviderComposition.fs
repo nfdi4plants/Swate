@@ -53,12 +53,60 @@ let dataHubRevisionPolicy: RevisionPolicyStrategy = {
                 RevisionPathPolicy.Automatic
 }
 
-let createGitFactory (source: DataHubStrategies.DataHubAccountSource) : ProviderFactory =
-    GitWorkspaceSession.createFactoryWithCredentialsIdentityAndPolicy
-        GitWorkspaceSession.GitSessionHooks.none
-        (DataHubStrategies.createCredentialStrategy source)
-        (DataHubStrategies.createIdentityStrategy source)
-        dataHubRevisionPolicy
+/// The Git factory whose sessions diff text in the shared worker pool. The pool is set up
+/// asynchronously, so Open waits for it and builds the pooled factory once. When the pool
+/// cannot be set up, sessions open without it and their diff calls fail with
+/// diff_worker_failed. `windowOwnerOf` names the window that started an operation, and
+/// the pool keeps each window's diff handles apart.
+let createGitFactory
+    (source: DataHubStrategies.DataHubAccountSource)
+    (windowOwnerOf: OperationContext -> string)
+    : ProviderFactory =
+    let credentials = DataHubStrategies.createCredentialStrategy source
+    let identity = DataHubStrategies.createIdentityStrategy source
+
+    let factoryWith textDiff =
+        GitWorkspaceSession.createFactoryWithOptions
+            {
+                Hooks = GitWorkspaceSession.GitSessionHooks.none
+                TextDiff = textDiff
+            }
+            credentials
+            identity
+            dataHubRevisionPolicy
+
+    let withoutPool = factoryWith None
+    let mutable pooled: ProviderFactory option = None
+
+    let pooledFactory pool =
+        match pooled with
+        | Some factory -> factory
+        | None ->
+            let factory =
+                factoryWith (
+                    Some {
+                        Pool = pool
+                        WindowOwnerOf = windowOwnerOf
+                    }
+                )
+
+            pooled <- Some factory
+            factory
+
+    {
+        withoutPool with
+            Open =
+                fun binding context -> async {
+                    let! pool = TextDiffWorkers.pool () |> Async.AwaitPromise
+
+                    let factory =
+                        match pool with
+                        | Some pool -> pooledFactory pool
+                        | None -> withoutPool
+
+                    return! factory.Open binding context
+                }
+    }
 
 let lakeFsOptions
     (settingsRoot: string)
@@ -83,11 +131,14 @@ let createCatalog (factories: ProviderFactory list) : ProviderResolver.ProviderC
 /// The production catalog: Git over the DataHub accounts, lakeFS without any
 /// configured connection until lakeFS accounts exist in Swate. The caller passes the
 /// path case sensitivity it also hands to the resolver and the binding store.
-let createProductionCatalog (sensitivity: PathCaseSensitivity) : ProviderResolver.ProviderCatalog =
+let createProductionCatalog
+    (sensitivity: PathCaseSensitivity)
+    (windowOwnerOf: OperationContext -> string)
+    : ProviderResolver.ProviderCatalog =
     let settingsRoot = Main.SettingsStore.getSettingsRootPath ()
 
     createCatalog [
-        createGitFactory dataHubAccountSource
+        createGitFactory dataHubAccountSource windowOwnerOf
         createLakeFsFactory (lakeFsOptions settingsRoot sensitivity) LakeFsCredentials.unconfigured
     ]
 

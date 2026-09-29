@@ -501,11 +501,30 @@ Vitest.describe (
 )
 
 Vitest.describe (
+    "Text diff workers",
+    fun () ->
+        Vitest.test (
+            "development builds load the worker next to the main bundle, packaged builds the unpacked copy",
+            fun () ->
+                let development =
+                    TextDiffWorkers.workerPath false "C:/Swate/resources" "C:/repo/.vite/build"
+
+                let packaged =
+                    TextDiffWorkers.workerPath true "C:/Swate/resources" "C:/repo/.vite/build"
+
+                Vitest.expect(development.Replace('\\', '/')).toBe "C:/repo/.vite/build/text-diff-worker.cjs"
+
+                Vitest.expect(packaged.Replace('\\', '/')).toBe
+                    "C:/Swate/resources/app.asar.unpacked/.vite/build/text-diff-worker.cjs"
+        )
+)
+
+Vitest.describe (
     "Provider composition",
     fun () ->
         let catalog () =
             ProviderComposition.createCatalog [
-                ProviderComposition.createGitFactory (source AuthStateDto.Empty [])
+                ProviderComposition.createGitFactory (source AuthStateDto.Empty []) WorkspaceSessionHost.windowOwnerOf
                 ProviderComposition.createLakeFsFactory
                     (ProviderComposition.lakeFsOptions "C:/settings" CaseInsensitive)
                     VersionControlService.LakeFs.LakeFsCredentials.unconfigured

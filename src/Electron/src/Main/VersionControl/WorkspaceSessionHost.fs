@@ -386,6 +386,13 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
                     | _ -> ()
         }
 
+    /// The window that started a running operation. Operations started outside a window
+    /// and operations that are not registered have none.
+    member _.TryGetOperationWindowId(operationId: string) : int option =
+        match operations.TryGetValue operationId with
+        | true, running -> running.WindowId
+        | _ -> None
+
     /// Cancels a tracked operation by its operation id.
     member _.Cancel(operationId: string) : bool =
         match operations.TryGetValue operationId with
@@ -452,3 +459,12 @@ let get () : WorkspaceSessionHost =
 /// Returns the host only when one was installed. Vault lifecycle hooks use it so they
 /// can tolerate failed initialization without building a host.
 let tryCurrent () = current
+
+/// Names the window that started the operation of the context, for example "window:3".
+/// The text diff pool keeps diff handles apart per window with it. An operation without a
+/// registered window, or any call before the host exists, yields "unknown".
+let windowOwnerOf (context: OperationContext) : string =
+    tryCurrent ()
+    |> Option.bind (fun host -> host.TryGetOperationWindowId context.OperationId)
+    |> Option.map (fun windowId -> $"window:{windowId}")
+    |> Option.defaultValue "unknown"

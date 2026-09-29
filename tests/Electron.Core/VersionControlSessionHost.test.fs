@@ -308,6 +308,36 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "the diff window owner is the window registered for the operation, else unknown",
+            fun () ->
+                let runtime =
+                    createRuntime
+                        "settings"
+                        VersionControlService.LakeFs.LakeFsCredentials.unconfigured
+                        (memoryBindings ())
+
+                let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
+                WorkspaceSessionHost.initialize host
+
+                try
+                    let tracked = host.BeginOperation("op-window-7", None, Some 7, false, ignore)
+                    let withoutWindow = host.BeginOperation("op-no-window", None, None, false, ignore)
+
+                    let unregistered =
+                        OperationContext.create "op-unregistered" OperationCancellation.none ignore
+
+                    Vitest.expect(WorkspaceSessionHost.windowOwnerOf tracked.Context).toBe "window:7"
+                    Vitest.expect(WorkspaceSessionHost.windowOwnerOf withoutWindow.Context).toBe "unknown"
+                    Vitest.expect(WorkspaceSessionHost.windowOwnerOf unregistered).toBe "unknown"
+
+                    tracked.Complete()
+                    withoutWindow.Complete()
+                    Vitest.expect(WorkspaceSessionHost.windowOwnerOf tracked.Context).toBe "unknown"
+                finally
+                    WorkspaceSessionHost.resetForTests ()
+        )
+
+        Vitest.test (
             "operations are tracked by window id and their completion can be awaited",
             fun () ->
                 withFixture (fun fixture -> promise {
