@@ -4,12 +4,10 @@ open System
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
-open Fable.Electron.Remoting.Main
 open Swate.Components.Shared
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
-open Swate.Electron.Shared.GitTypes
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.DTOs.NoteSearchDto
@@ -23,6 +21,8 @@ open Main.IPC.Delete
 open Main.IPC.Rename
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
 open Main.IPC.FileSystemIO
+open Main.VersionControl
+open VersionControlService.Abstractions
 
 let private refreshVaultFileTree (vault: ArcVault) = promise {
     match vault.path with
@@ -101,108 +101,219 @@ let private runLoadedArcPathAction
             return Error e
     }
 
-let private initGitRepositoryForCreatedArcDisposition
-    (initRepository: string -> JS.Promise<Main.Git.GitService.GitResult<string>>)
-    (initGit: bool)
-    (disposition: ArcOpenDisposition)
-    : JS.Promise<Main.Git.GitService.GitResult<string option>> =
-    promise {
-        match initGit, disposition.CreatedArcPath with
-        | true, Some createdArcPath ->
-            let! initResult = initRepository createdArcPath
-            return initResult |> Result.map (fun _ -> Some createdArcPath)
-        | _ -> return Ok None
-    }
-
 let private notifyGitRepositoryInitialized (arcPath: string) =
     ARC_VAULTS.TryGetVaultByPath arcPath
     |> Option.iter (fun vault ->
-        Remoting.createIpc ()
-        |> Remoting.withWindow vault.window
-        |> Remoting.buildProxySender<IGitRepositoryRendererApi>
-        |> fun rendererApi -> rendererApi.gitRepositoryInitialized arcPath
+        WindowSend.send<IGitRepositoryRendererApi>
+            vault.window
+            (fun rendererApi -> rendererApi.gitRepositoryInitialized arcPath)
     )
+
+let private showArcOpenError (window: BaseWindow option) (arcPath: string option) (error: exn) = promise {
+    let detail =
+        arcPath
+        |> Option.filter (String.IsNullOrWhiteSpace >> not)
+        |> Option.map (fun path -> $"Folder: {path}\n\n{error.Message}")
+        |> Option.defaultValue error.Message
+
+    let options =
+        Dialog.ShowMessageBox.Options(
+            "The ARC could not be opened.",
+            ``type`` = Enums.Dialog.ShowMessageBox.Options.Type.Error,
+            title = "Could not open ARC",
+            detail = detail
+        )
+
+    let! _ = dialog.showMessageBox (?window = window, options = options)
+    return ()
+}
+
+let private reportArcOpenError
+    (event: IpcMainInvokeEvent)
+    (window: BaseWindow option)
+    (arcPath: string option)
+    (originalError: exn)
+    =
+    promise {
+        try
+            do! showArcOpenError window arcPath originalError
+        with dialogError ->
+            swatelogfn event.sender.id "Failed to show ARC-open error dialog: %s" dialogError.Message
+
+        return Error originalError
+    }
+
+let private openArcAtPath (event: IpcMainInvokeEvent) (requestedPath: string) = promise {
+    let window = dialogParentFromIpcEvent event
+
+    let normalizedPathResult =
+        try
+            Ok(PathHelpers.normalizePath requestedPath)
+        with error ->
+            Error error
+
+    match normalizedPathResult with
+    | Error error -> return! reportArcOpenError event window None error
+    | Ok arcPath ->
+        let windowId = windowIdFromIpcEvent event
+
+        try
+            let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
+            return Ok disposition
+        with
+        | ArcLoadCancelledException _ as error -> return Error error
+        | error -> return! reportArcOpenError event window (Some arcPath) error
+}
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
 let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
     openARC =
         fun () -> promise {
-            let window = dialogParentFromIpcEvent event
+            try
+                let window = dialogParentFromIpcEvent event
 
-            let! r =
-                dialog.showOpenDialog (
-                    ?window = window,
-                    properties = [|
-                        Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
-                    |]
-                )
+                let! selectionResult =
+                    promise {
+                        return!
+                            dialog.showOpenDialog (
+                                ?window = window,
+                                properties = [|
+                                    Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
+                                |]
+                            )
+                    }
+                    |> Promise.result
 
-            if r.canceled then
-                return Ok None
-            elif r.filePaths.Length <> 1 then
-                return Error(exn "Not exactly one path")
-            else
-                let arcPath = r.filePaths |> Array.exactlyOne |> PathHelpers.normalizePath
-
-                let windowId = windowIdFromIpcEvent event
-                let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
-                return Ok(Some(ArcOpenDisposition.path disposition))
+                match selectionResult with
+                | Error error -> return! reportArcOpenError event window None error
+                | Ok r ->
+                    if r.canceled then
+                        return Ok None
+                    elif r.filePaths.Length <> 1 then
+                        let error = exn "Not exactly one path"
+                        return! reportArcOpenError event window None error
+                    else
+                        match! openArcAtPath event (Array.exactlyOne r.filePaths) with
+                        | Ok disposition -> return Ok(Some(ArcOpenDisposition.path disposition))
+                        | Error error -> return Error error
+            with error ->
+                return Error error
         }
     openARCByPath =
         fun (arcPath: string) -> promise {
             try
-                let arcPath = PathHelpers.normalizePath arcPath
-                let! arcPathExists = pathExistsAsync arcPath
-
-                if not arcPathExists then
-                    return Error(exn $"The ARC cannot be found at location: '{arcPath}'.")
-                else
-                    let windowId = windowIdFromIpcEvent event
-                    let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
-                    return Ok(ArcOpenDisposition.path disposition)
-            with e ->
-                return Error e
+                match! openArcAtPath event arcPath with
+                | Ok disposition -> return Ok(ArcOpenDisposition.path disposition)
+                | Error error -> return Error error
+            with error ->
+                return Error error
         }
     createARC =
         fun (request: CreateArcRequest) -> promise {
-            let window = dialogParentFromIpcEvent event
+            try
+                let window = dialogParentFromIpcEvent event
 
-            let! r =
-                dialog.showOpenDialog (
-                    ?window = window,
-                    properties = [|
-                        Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
-                    |]
-                )
-
-            if r.canceled then
-                return Error(exn "Cancelled")
-            elif r.filePaths.Length <> 1 then
-                return Error(exn "Not exactly one path")
-            else
-                let arcContainerPath = r.filePaths |> Array.exactlyOne
-
-                let arcPath =
-                    ARCtrl.ArcPathHelper.combine arcContainerPath request.identifier
-                    |> PathHelpers.normalizePath
-
-                let windowId = windowIdFromIpcEvent event
-                let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, request.identifier)
-
-                match!
-                    initGitRepositoryForCreatedArcDisposition
-                        Main.Git.GitProvisioningService.initRepository
-                        request.initGit
-                        disposition
-                with
-                | Error failure ->
-                    Swate.Components.console.log (
-                        $"Git init failed for '{ArcOpenDisposition.path disposition}': {failure.Message}"
+                let! r =
+                    dialog.showOpenDialog (
+                        ?window = window,
+                        properties = [|
+                            Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
+                        |]
                     )
-                | Ok(Some initializedArcPath) -> notifyGitRepositoryInitialized initializedArcPath
-                | Ok None -> ()
 
-                return Ok(ArcOpenDisposition.path disposition)
+                if r.canceled then
+                    return Ok CreateArcOutcome.Cancelled
+                elif r.filePaths.Length <> 1 then
+                    return Error(exn "Not exactly one path")
+                else
+                    let arcContainerPath = r.filePaths |> Array.exactlyOne
+
+                    let arcPath =
+                        ARCtrl.ArcPathHelper.combine arcContainerPath request.identifier
+                        |> PathHelpers.normalizePath
+
+                    let windowId = windowIdFromIpcEvent event
+
+                    let! disposition, terminalOutcome = promise {
+                        try
+                            let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, request.identifier)
+                            return Some disposition, None
+                        with
+                        | ArcCreatedButClosedException _ -> return None, Some(CreateArcOutcome.CreatedButClosed arcPath)
+                        | ArcLoadCancelledException _ -> return None, Some CreateArcOutcome.Cancelled
+                    }
+
+                    let createdArcPath =
+                        match disposition, terminalOutcome with
+                        | Some disposition, _ -> disposition.CreatedArcPath
+                        | None, Some(CreateArcOutcome.CreatedButClosed path) -> Some path
+                        | _ -> None
+
+                    do!
+                        if request.initGit then
+                            match createdArcPath with
+                            | Some createdArcPath -> promise {
+                                try
+                                    let host = WorkspaceSessionHost.get ()
+
+                                    let tracked =
+                                        host.BeginOperation(
+                                            "create-arc-initialize-" + createdArcPath,
+                                            Some createdArcPath,
+                                            Some(
+                                                ARC_VAULTS.TryGetVaultByPath createdArcPath
+                                                |> Option.map (fun vault -> vault.window.id)
+                                                |> Option.defaultValue (windowIdFromIpcEvent event)
+                                            ),
+                                            true,
+                                            ignore
+                                        )
+
+                                    try
+                                        let! initResult =
+                                            IVersionControlApi.initializeLocalWorkspace
+                                                host
+                                                createdArcPath
+                                                tracked.Context
+                                            |> Async.StartAsPromise
+
+                                        match initResult with
+                                        | Failed failure ->
+                                            Browser.Dom.console.error (
+                                                $"The ARC was created, but its Git repository could not be initialized: {failure.Code}: {failure.Message}"
+                                            )
+
+                                            return ()
+                                        | Succeeded _
+                                        | PartiallySucceeded _ ->
+                                            notifyGitRepositoryInitialized createdArcPath
+                                            return ()
+                                    finally
+                                        tracked.Complete()
+                                with error ->
+                                    Browser.Dom.console.error (
+                                        $"The ARC was created, but Git initialization failed: {error.Message}"
+                                    )
+
+                                    return ()
+                              }
+                            | None -> promise { return () }
+                        else
+                            promise { return () }
+
+                    match disposition, terminalOutcome with
+                    | None, Some outcome -> return Ok outcome
+                    | Some disposition, None ->
+                        match disposition with
+                        | ArcOpenDisposition.FocusedExisting path -> return Ok(CreateArcOutcome.FocusedExisting path)
+                        | ArcOpenDisposition.CreatedInCurrent path
+                        | ArcOpenDisposition.CreatedInNewWindow path -> return Ok(CreateArcOutcome.Created path)
+                        | ArcOpenDisposition.OpenedInCurrent path
+                        | ArcOpenDisposition.OpenedInNewWindow path ->
+                            return Error(exn $"Unexpected open disposition while creating ARC at '{path}'.")
+                    | _ -> return Error(exn "ARC creation returned an inconsistent lifecycle result.")
+            with error ->
+                return Error error
         }
     ensureNotesFolder =
         fun () -> promise {
@@ -518,29 +629,35 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
         }
     cancelImportExternalFiles =
         fun requestId -> promise {
-            let windowId = windowIdFromIpcEvent event
+            try
+                let windowId = windowIdFromIpcEvent event
 
-            match ARC_VAULTS.TryGetVault(windowId) with
-            | Some vault ->
-                match vault.activeFileImport with
-                | Some activeImport when
-                    activeImport.State.requestId = requestId
-                    && activeImport.State.phase = FileImportPhase.Copying
-                    ->
-                    activeImport.AbortController.abort ()
-                | _ -> ()
-            | None -> ()
+                match ARC_VAULTS.TryGetVault(windowId) with
+                | Some vault ->
+                    match vault.activeFileImport with
+                    | Some activeImport when
+                        activeImport.State.requestId = requestId
+                        && activeImport.State.phase = FileImportPhase.Copying
+                        ->
+                        activeImport.AbortController.abort ()
+                    | _ -> ()
+                | None -> ()
 
-            return Ok()
+                return Ok()
+            with e ->
+                return Error e
         }
     getActiveFileImport =
         fun () -> promise {
-            let windowId = windowIdFromIpcEvent event
+            try
+                let windowId = windowIdFromIpcEvent event
 
-            return
-                match ARC_VAULTS.TryGetVault(windowId) with
-                | Some vault -> Ok(vault.activeFileImport |> Option.map _.State)
-                | None -> Error(exn $"The ARC for window id {windowId} should exist")
+                return
+                    match ARC_VAULTS.TryGetVault(windowId) with
+                    | Some vault -> Ok(vault.activeFileImport |> Option.map _.State)
+                    | None -> Error(exn $"The ARC for window id {windowId} should exist")
+            with e ->
+                return Error e
         }
     getFileTree =
         fun () -> promise {
@@ -581,7 +698,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             if vault.fileTree.Count > 0 then
                                 promise { return vault.fileTree.Values |> Seq.toArray }
                             else
-                                getFileEntries arcPath
+                                getFileEntries arcPath true
 
                         let! notes = Main.NoteSearchReader.readNotes arcPath fileEntries
                         return Ok(notes |> Array.map NoteSearchNoteDto.ofNote)
@@ -689,23 +806,22 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 match vault.arc with
                                 | None -> return Error(arcNotOpenError ())
                                 | Some arcLocal ->
-                                    let wasBusyWriting = vault.isBusyWriting
-                                    vault.isBusyWriting <- true
-
-                                    try
-                                        match!
-                                            ArcDeleteHelper.deleteArcEntityAsync
-                                                arcPath
-                                                normalizedRelativePath
-                                                arcLocal
-                                        with
-                                        | Error deleteError -> return Error deleteError
-                                        | Ok deletedArc ->
-                                            vault.SetArc deletedArc
-                                            vault.RefreshHasUnsavedArcChangesFlag()
-                                            return Ok()
-                                    finally
-                                        vault.isBusyWriting <- wasBusyWriting
+                                    return!
+                                        IPCHelper.withBusyWritingScope
+                                            vault
+                                            (fun () -> promise {
+                                                match!
+                                                    ArcDeleteHelper.deleteArcEntityAsync
+                                                        arcPath
+                                                        normalizedRelativePath
+                                                        arcLocal
+                                                with
+                                                | Error deleteError -> return Error deleteError
+                                                | Ok deletedArc ->
+                                                    vault.SetArc deletedArc
+                                                    vault.RefreshHasUnsavedArcChangesFlag()
+                                                    return Ok()
+                                            })
                             | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile _,
                                                                                               normalizedDataMapPath) ->
                                 match vault.arc, DatamapParentInfo.tryFromPath normalizedDataMapPath with
@@ -717,25 +833,24 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                 "Swate could not determine which assay, study, run, or workflow the selected DataMap belongs to. Refresh the File Explorer and try again."
                                         )
                                 | Some arc, Some parentInfo ->
-                                    let wasBusyWriting = vault.isBusyWriting
-                                    vault.isBusyWriting <- true
+                                    return!
+                                        IPCHelper.withBusyWritingScope
+                                            vault
+                                            (fun () -> promise {
+                                                match! arc.TryDeleteDataMapAsync(arcPath, parentInfo) with
+                                                | Error deleteError -> return Error deleteError
+                                                | Ok() ->
+                                                    vault.RefreshHasUnsavedArcChangesFlag()
 
-                                    try
-                                        match! arc.TryDeleteDataMapAsync(arcPath, parentInfo) with
-                                        | Error deleteError -> return Error deleteError
-                                        | Ok() ->
-                                            vault.RefreshHasUnsavedArcChangesFlag()
+                                                    let absoluteDataMapPath =
+                                                        Main.Bindings.Path.join [| arcPath; normalizedDataMapPath |]
 
-                                            let absoluteDataMapPath =
-                                                Main.Bindings.Path.join [| arcPath; normalizedDataMapPath |]
+                                                    vault.SetFileTree(
+                                                        removePathAndDescendants absoluteDataMapPath vault.fileTree
+                                                    )
 
-                                            vault.SetFileTree(
-                                                removePathAndDescendants absoluteDataMapPath vault.fileTree
-                                            )
-
-                                            return Ok()
-                                    finally
-                                        vault.isBusyWriting <- wasBusyWriting
+                                                    return Ok()
+                                            })
                             | ArcEntityPathRules.DeletePathClassification.GenericTarget normalizedGenericPath
                             | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget(_,
                                                                                                   normalizedGenericPath) ->
@@ -785,18 +900,19 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 match vault.arc with
                                 | None -> return Error(arcNotOpenError ())
                                 | Some arcLocal ->
-                                    let wasBusyWriting = vault.isBusyWriting
-                                    vault.isBusyWriting <- true
-
-                                    try
-                                        match! ArcRenameHelper.renameArcEntityAsync arcPath request arcLocal with
-                                        | Error renameError -> return Error renameError
-                                        | Ok renamedArc ->
-                                            vault.SetArc renamedArc
-                                            vault.RefreshHasUnsavedArcChangesFlag()
-                                            return Ok()
-                                    finally
-                                        vault.isBusyWriting <- wasBusyWriting
+                                    return!
+                                        IPCHelper.withBusyWritingScope
+                                            vault
+                                            (fun () -> promise {
+                                                match!
+                                                    ArcRenameHelper.renameArcEntityAsync arcPath request arcLocal
+                                                with
+                                                | Error renameError -> return Error renameError
+                                                | Ok renamedArc ->
+                                                    vault.SetArc renamedArc
+                                                    vault.RefreshHasUnsavedArcChangesFlag()
+                                                    return Ok()
+                                            })
                         })
             with e ->
                 return Error e
@@ -848,91 +964,71 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         match tryResolveArcRelativePath arcPath request.path with
                         | Error pathError -> return Error pathError
                         | Ok absolutePath ->
-                            vault.isBusyWriting <- true
+                            // The shared scope counts nesting, so a write that overlaps a
+                            // version control operation does not clear the busy flag under it.
+                            return!
+                                IPCHelper.withBusyWritingScope
+                                    vault
+                                    (fun () -> promise {
+                                        match request.fileType with
+                                        | FileContentType.FileContentTypeIsPlainTextVariant ->
+                                            let directoryPath = path.dirname absolutePath
+                                            do! ARCtrl.FileSystemHelper.createDirectoryAsync directoryPath
 
-                            try
-                                match request.fileType with
-                                | FileContentType.FileContentTypeIsPlainTextVariant ->
-                                    let directoryPath = path.dirname absolutePath
-                                    do! ARCtrl.FileSystemHelper.createDirectoryAsync directoryPath
-                                    do! ARCtrl.FileSystemHelper.writeFileTextAsync absolutePath request.content
-                                    do! refreshVaultFileTree vault
-                                    return Ok()
-                                | FileContentType.CLI ->
-                                    return Error(exn "Direct writing of CLI files is not supported.")
-                                | FileContentType.FileContentTypeIsISAFileVariant ->
-                                    return
-                                        Error(
-                                            exn
-                                                "Direct writing of ARC content files is not supported. Use saveArcFile for these file types to ensure ARC integrity."
-                                        )
-                                | _ ->
-                                    return Error(exn $"Unsupported file content type for writing: {request.fileType}")
-                            finally
-                                vault.isBusyWriting <- false
+                                            do! ARCtrl.FileSystemHelper.writeFileTextAsync absolutePath request.content
+
+                                            do! refreshVaultFileTree vault
+                                            return Ok()
+                                        | FileContentType.CLI ->
+                                            return Error(exn "Direct writing of CLI files is not supported.")
+                                        | FileContentType.FileContentTypeIsISAFileVariant ->
+                                            return
+                                                Error(
+                                                    exn
+                                                        "Direct writing of ARC content files is not supported. Use saveArcFile for these file types to ensure ARC integrity."
+                                                )
+                                        | _ ->
+                                            return
+                                                Error(
+                                                    exn
+                                                        $"Unsupported file content type for writing: {request.fileType}"
+                                                )
+                                    })
             with e ->
                 return Error e
         }
     openFile =
         fun (relativePath: string) -> promise {
-            let windowId = windowIdFromIpcEvent event
+            try
+                let windowId = windowIdFromIpcEvent event
 
-            match ARC_VAULTS.TryGetVault(windowId) with
-            | None -> return Error(exn $"The ARC for window id {windowId} should exist")
-            | Some vault when vault.arc.IsSome ->
-                let arcfileDTO = FileContentDTO.fromArcByPath relativePath vault.arc.Value
+                match ARC_VAULTS.TryGetVault(windowId) with
+                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+                | Some vault when vault.arc.IsSome ->
+                    let arcfileDTO = FileContentDTO.fromArcByPath relativePath vault.arc.Value
 
-                match arcfileDTO with
-                | Some dto -> return Ok dto
-                | _ ->
-                    // Fallback to text preview for unknown file types
-                    try
-                        let absolutePath = tryResolveArcRelativePath vault.path.Value relativePath
+                    match arcfileDTO with
+                    | Some dto -> return Ok dto
+                    | _ ->
+                        // Fallback to text preview for unknown file types
+                        try
+                            let absolutePath = tryResolveArcRelativePath vault.path.Value relativePath
 
-                        match absolutePath with
-                        | Error pathError -> return Error pathError
-                        | Ok path ->
-                            let! content = ARCtrl.FileSystemHelper.readFileTextAsync path
-                            let fileType = FileContentDTO.inferTextFileTypeFromPath relativePath
+                            match absolutePath with
+                            | Error pathError -> return Error pathError
+                            | Ok path ->
+                                let! content = ARCtrl.FileSystemHelper.readFileTextAsync path
+                                let fileType = FileContentDTO.inferTextFileTypeFromPath relativePath
 
-                            let dto = FileContentDTO.create fileType content relativePath
+                                let dto = FileContentDTO.create fileType content relativePath
 
-                            return Ok dto
-                    with e ->
-                        return Error(exn $"Could not read file {relativePath}: {e.Message}")
-            | _ -> return Error(arcNotOpenError ())
+                                return Ok dto
+                        with e ->
+                            return Error(exn $"Could not read file {relativePath}: {e.Message}")
+                | _ -> return Error(arcNotOpenError ())
+            with e ->
+                return Error e
         }
-    runGitLfs =
-        fun (request: GitLfsRequest) -> promise {
-            let windowId = windowIdFromIpcEvent event
-
-            match ARC_VAULTS.TryGetVault(windowId) with
-            | None -> return Error(exn $"The ARC for window id {windowId} should exist")
-            | Some vault ->
-                match vault.path with
-                | None -> return Error(arcNotOpenError ())
-                | Some arcPath ->
-                    match Main.Git.GitLfsService.validateTrackingRulesetRequest request.Command request.FilePath with
-                    | Error blockedReason -> return Error(exn blockedReason)
-                    | Ok() ->
-
-                        // Always enforce the active ARC root to avoid running against arbitrary repos.
-                        let enforcedRequest = { request with RepoPath = arcPath }
-                        let! result = GitLfs.runChannel vault.window enforcedRequest
-
-                        match result with
-                        | Error e ->
-                            Swate.Components.console.log ($"Error: {e.Message}")
-                            return Error e
-                        | Ok successResult ->
-                            match enforcedRequest.Command with
-                            | Track
-                            | Untrack -> do! refreshVaultFileTree vault
-                            | _ -> ()
-
-                            return Ok successResult
-        }
-    cancelGitLfs = fun (requestId: string) -> GitLfs.cancelChannel requestId
     resolveCloseRequest =
         fun (decision: IPCTypesHelper.SaveBeforeQuitDecision) -> promise {
             try

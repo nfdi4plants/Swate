@@ -62,6 +62,34 @@ type FileTree =
         let activeDialog, setActiveDialog = React.useState<FileTreeDialog option> None
         let isDialogBusy, setIsDialogBusy = React.useState false
 
+        let lfsActivityCtx = Renderer.Context.LfsActivityContext.useLfsActivityCtx ()
+        let lfsActivityByPath = lfsActivityCtx.activities
+        let lfsActivePaths = lfsActivityByPath |> Map.toList |> List.map fst
+        // The delete confirmation reads the paths through this ref, so it sees the actions that
+        // started after the modal opened.
+        let lfsActivePathsRef = React.useRef lfsActivePaths
+        lfsActivePathsRef.current <- lfsActivePaths
+
+        let runLfsActionWithActivity
+            (activity: string)
+            (runAction: string -> JS.Promise<Result<unit, string>>)
+            (relativePath: string)
+            : JS.Promise<Result<unit, string>> =
+            let entry =
+                fileStateCtx.state.FileTree
+                |> Array.tryFind (fun entry -> PathHelpers.pathsEqual entry.path relativePath)
+
+            lfsActivityCtx.run activity entry runAction relativePath
+
+        let runDownloadLfsFile relativePath =
+            runLfsActionWithActivity
+                "Downloading"
+                Renderer.Components.Helper.GitLfsHelper.runDownloadLfsFile
+                relativePath
+
+        let runFreeLocalLfsCopy relativePath =
+            runLfsActionWithActivity "Freeing" Renderer.Components.Helper.GitLfsHelper.runFreeLocalLfsCopy relativePath
+
         // The file watcher emits the initial tree too; only later tree updates should refresh open previews.
         let hasObservedFileTreeUpdateRef = React.useRef false
 
@@ -86,18 +114,24 @@ type FileTree =
             |]
         )
 
+        let treeEntries =
+            React.useMemo (
+                (fun () ->
+                    Renderer.Context.LfsActivityContext.LfsActivityState.withBusyEntries
+                        lfsActivityByPath
+                        fileStateCtx.state.FileTree
+                ),
+                [| box fileStateCtx.state.FileTree; box lfsActivityByPath |]
+            )
+
         let fileTree: FileTreeNode option =
             React.useMemo (
                 (fun () ->
-                    match fileStateCtx.state.FileTree with
+                    match treeEntries with
                     | [||] -> None
-                    | _ ->
-                        fileStateCtx.state.FileTree
-                        |> toFileTreeNode
-                        |> collapseSingleChildSameName
-                        |> Some
+                    | _ -> treeEntries |> toFileTreeNode |> collapseSingleChildSameName |> Some
                 ),
-                [| box fileStateCtx.state.FileTree |]
+                [| box treeEntries |]
             )
 
         let materializedState, setMaterializedState =
@@ -125,7 +159,19 @@ type FileTree =
         let fileItem =
             fileTree
             |> Option.map (
-                FileTreeMaterialization.toMaterializedFileItemTree Helper.createItem reconciledMaterializedState.Paths
+                FileTreeMaterialization.toMaterializedFileItemTree
+                    (fun node ->
+                        let item = Helper.createItem node
+
+                        {
+                            item with
+                                LfsActivity =
+                                    item.Path
+                                    |> Option.bind (fun path -> Map.tryFind path lfsActivityByPath)
+                                    |> Option.map _.Label
+                        }
+                    )
+                    reconciledMaterializedState.Paths
             )
 
         let applyPreviewResult itemName result =
@@ -322,6 +368,8 @@ type FileTree =
                     closeDeleteModal = closeDialog
                     setIsDeleting = setIsDialogBusy
                     enqueueError = errorModal.enqueue
+                    getLfsActivePaths = fun () -> lfsActivePathsRef.current
+                    deletePath = Api.ipcArcVaultApi.deletePath
                 }
 
         let createArcEntry kind (identifier: string) =
@@ -435,8 +483,17 @@ type FileTree =
                     "swt:fluent--note-add-24-regular"
                     (fun () -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesDraftPage))
                     item
-            yield! FileTreeContextMenu.renameContextMenuItems requestRenameItem item
+            yield! FileTreeContextMenu.renameContextMenuItems lfsActivePaths requestRenameItem item
         ]
+
+        let runToggleLfsMark (relativePath: string) (markAsLfs: bool) = promise {
+            let! result = Renderer.Components.Helper.GitLfsHelper.runToggleLfsMark relativePath markAsLfs
+            gitStateCtx.refresh ()
+
+            match result with
+            | Ok() -> return Ok()
+            | Error errorMessage -> return Error errorMessage
+        }
 
         let contextMenuConfig: ContextMenuConfig = {
             openItem = openPreview
@@ -455,9 +512,10 @@ type FileTree =
                 enqueueError = errorModal.enqueue
             }
             enqueueError = errorModal.enqueue
-            runToggleLfsMark = Renderer.Components.Helper.GitLfsHelper.runToggleLfsMark
-            runDownloadLfsFile = Renderer.Components.Helper.GitLfsHelper.runDownloadLfsFile
-            runFreeLocalLfsCopy = Renderer.Components.Helper.GitLfsHelper.runFreeLocalLfsCopy
+            runToggleLfsMark = runToggleLfsMark
+            runDownloadLfsFile = runDownloadLfsFile
+            runFreeLocalLfsCopy = runFreeLocalLfsCopy
+            lfsActivePaths = lfsActivePaths
         }
 
         let createContextMenuItems =
@@ -483,8 +541,8 @@ type FileTree =
             Renderer.Components.FileExplorerLfs.createLfsPillAction
                 errorModal.enqueue
                 arcScopeId
-                Renderer.Components.Helper.GitLfsHelper.runDownloadLfsFile
-                Renderer.Components.Helper.GitLfsHelper.runFreeLocalLfsCopy
+                runDownloadLfsFile
+                runFreeLocalLfsCopy
 
         let confirmRenameItem (newName: string) =
             if not isDialogBusy then
@@ -567,9 +625,10 @@ type FileTree =
                             getItemStatusAction = getItemStatusAction,
                             canDeleteItem =
                                 (fun (item: FileItem) ->
-                                    item.Path
-                                    |> Option.map PathHelpers.normalizeCanonicalRelativePath
-                                    |> Option.exists ArcEntityPathRules.isDeletePathAllowed
+                                    not (FileTreeContextMenu.isLockedByLfsActivity lfsActivePaths item)
+                                    && (item.Path
+                                        |> Option.map PathHelpers.normalizeCanonicalRelativePath
+                                        |> Option.exists ArcEntityPathRules.isDeletePathAllowed)
                                 ),
                             onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
