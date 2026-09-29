@@ -300,7 +300,9 @@ module ArcVaultExtensions =
 
                             let removedRelativePaths =
                                 removedDirectoryEvents
-                                |> List.map (fun event -> PathHelpers.normalizeCanonicalRelativePath event.RelativePath)
+                                |> List.map (fun event ->
+                                    PathHelpers.normalizeCanonicalRelativePath event.RelativePath
+                                )
 
                             let scopesToRemove =
                                 this.expandedDirectoryPaths
@@ -312,10 +314,13 @@ module ArcVaultExtensions =
                                 )
 
                             if not scopesToRemove.IsEmpty then
-                                this.expandedDirectoryPaths <- Set.difference this.expandedDirectoryPaths scopesToRemove
+                                this.expandedDirectoryPaths <-
+                                    Set.difference this.expandedDirectoryPaths scopesToRemove
 
                                 this.payloadWatcher
-                                |> Option.iter (fun watcher -> watcher.unwatch (scopesToRemove |> Set.toArray) |> ignore)
+                                |> Option.iter (fun watcher ->
+                                    watcher.unwatch (scopesToRemove |> Set.toArray) |> ignore
+                                )
 
                         for event in normalizedEvents do
                             try
@@ -396,26 +401,30 @@ module ArcVaultExtensions =
 
                     match! this.LoadWatcherSnapshot() with
                     | Error loadError ->
-                        if not (
-                            canPublishWatcherMergeSnapshot
-                                this.IsFileWatcherArcMergeEligible
-                                capturedWriteGeneration
-                                this.WriteGeneration
-                                capturedWatcherEpoch
-                                this.WatcherEpoch
-                        ) then
+                        if
+                            not (
+                                canPublishWatcherMergeSnapshot
+                                    this.IsFileWatcherArcMergeEligible
+                                    capturedWriteGeneration
+                                    this.WriteGeneration
+                                    capturedWatcherEpoch
+                                    this.WatcherEpoch
+                            )
+                        then
                             return WatcherMergeOutcome.Deferred
                         else
                             return WatcherMergeOutcome.Failed loadError
                     | Ok snapshot ->
-                        if not (
-                            canPublishWatcherMergeSnapshot
-                                this.IsFileWatcherArcMergeEligible
-                                capturedWriteGeneration
-                                this.WriteGeneration
-                                capturedWatcherEpoch
-                                this.WatcherEpoch
-                        ) then
+                        if
+                            not (
+                                canPublishWatcherMergeSnapshot
+                                    this.IsFileWatcherArcMergeEligible
+                                    capturedWriteGeneration
+                                    this.WriteGeneration
+                                    capturedWatcherEpoch
+                                    this.WatcherEpoch
+                            )
+                        then
                             return WatcherMergeOutcome.Deferred
                         else
                             match this.path with
@@ -538,7 +547,9 @@ module ArcVaultExtensions =
                                                     this.window.id
                                                     "Dropping a watcher batch after watcher state was cleared."
                                             else
-                                                match! this.TryApplyWatcherArcMergeIfEligible pendingArcMergeEvents with
+                                                match!
+                                                    this.TryApplyWatcherArcMergeIfEligible pendingArcMergeEvents
+                                                with
                                                 | (WatcherMergeOutcome.Applied | WatcherMergeOutcome.Failed _) as outcome ->
                                                     match outcome with
                                                     | WatcherMergeOutcome.Failed mergeError ->
@@ -562,7 +573,8 @@ module ArcVaultExtensions =
                                                         logWatcherDeferral deferralCount
                                                         let reachedDeferralLimit = this.HasReachedWatcherDeferralLimit
 
-                                                        this.fileWatcherPendingArcMergeEvents.AddRange pendingArcMergeEvents
+                                                        this.fileWatcherPendingArcMergeEvents.AddRange
+                                                            pendingArcMergeEvents
 
                                                         if reachedDeferralLimit then
                                                             do! this.ApplyWatcherFileTreeEvents pendingEvents
@@ -774,94 +786,88 @@ module ArcVaultExtensions =
                         | _ -> ()
                     | None -> ()
 
-        member private this.EnsurePayloadWatcher
-            (arcPath: string, targetScopes: Set<string>, ?usePolling: bool)
-            =
-            promise {
-                if this.payloadWatcher.IsNone && not targetScopes.IsEmpty then
-                    let watchedPaths =
-                        targetScopes
-                        |> Seq.map PathHelpers.normalizeCanonicalRelativePath
-                        |> Seq.toArray
+        member private this.EnsurePayloadWatcher(arcPath: string, targetScopes: Set<string>, ?usePolling: bool) = promise {
+            if this.payloadWatcher.IsNone && not targetScopes.IsEmpty then
+                let watchedPaths =
+                    targetScopes
+                    |> Seq.map PathHelpers.normalizeCanonicalRelativePath
+                    |> Seq.toArray
 
-                    let ignored
-                        : U4<string, ResizeArray<string>, string -> bool, System.Func<string, Filesystem.Stats, bool>> =
-                        !^(System.Func<string, Filesystem.Stats, bool>(fun path _ ->
-                            shouldIgnoreForPayloadWatcher arcPath this.payloadWatcherScopes.Contains path
-                        ))
+                let ignored
+                    : U4<string, ResizeArray<string>, string -> bool, System.Func<string, Filesystem.Stats, bool>> =
+                    !^(System.Func<string, Filesystem.Stats, bool>(fun path _ ->
+                        shouldIgnoreForPayloadWatcher arcPath this.payloadWatcherScopes.Contains path
+                    ))
 
-                    let watcher =
-                        // Payload scopes use one native, shallow watcher. Polling creates one poller per
-                        // direct file and is unbounded for large expanded directories.
-                        Chokidar.Chokidar.watch (
-                            watchedPaths,
-                            createWatcherOptions arcPath (Some(defaultArg usePolling false)) ignored (Some 0)
-                        )
-
-                    this.FileWatcherEventController
-                    |> Option.iter (fun (controller: string -> string -> unit) ->
-                        watcher.on (Chokidar.Events.All, controller) |> ignore
+                let watcher =
+                    // Payload scopes use one native, shallow watcher. Polling creates one poller per
+                    // direct file and is unbounded for large expanded directories.
+                    Chokidar.Chokidar.watch (
+                        watchedPaths,
+                        createWatcherOptions arcPath (Some(defaultArg usePolling false)) ignored (Some 0)
                     )
 
-                    this.payloadWatcher <- Some watcher
-                    this.payloadWatcherScopes <- targetScopes
+                this.FileWatcherEventController
+                |> Option.iter (fun (controller: string -> string -> unit) ->
+                    watcher.on (Chokidar.Events.All, controller) |> ignore
+                )
 
-                    let callbackEpoch = this.WatcherEpoch
+                this.payloadWatcher <- Some watcher
+                this.payloadWatcherScopes <- targetScopes
 
-                    watcher.on (
-                        Chokidar.Events.Error,
-                        fun (watcherError: obj) ->
-                            if
-                                callbackEpoch = this.WatcherEpoch
-                                && (this.payloadWatcher
-                                    |> Option.exists (fun current -> obj.ReferenceEquals(current, watcher)))
-                            then
-                                this.payloadWatcher <- None
-                                this.payloadWatcherScopes <- Set.empty
-                                swatelogfn this.window.id "ARC payload watcher failed: %O" watcherError
-                                watcher.close () |> Promise.catch (fun _ -> ()) |> Promise.start
-                    )
-                    |> ignore
+                let callbackEpoch = this.WatcherEpoch
+
+                watcher.on (
+                    Chokidar.Events.Error,
+                    fun (watcherError: obj) ->
+                        if
+                            callbackEpoch = this.WatcherEpoch
+                            && (this.payloadWatcher
+                                |> Option.exists (fun current -> obj.ReferenceEquals(current, watcher)))
+                        then
+                            this.payloadWatcher <- None
+                            this.payloadWatcherScopes <- Set.empty
+                            swatelogfn this.window.id "ARC payload watcher failed: %O" watcherError
+                            watcher.close () |> Promise.catch (fun _ -> ()) |> Promise.start
+                )
+                |> ignore
         }
 
-        member internal this.ReconcilePayloadWatcherScopes
-            (arcPath: string, ?usePolling: bool)
-            =
-            promise {
-                let targetScopes =
-                    this.expandedDirectoryPaths
-                    |> Set.filter (fun scope -> not (this.payloadWatcherScopeSuspensions.ContainsKey scope))
+        member internal this.ReconcilePayloadWatcherScopes(arcPath: string, ?usePolling: bool) = promise {
+            let targetScopes =
+                this.expandedDirectoryPaths
+                |> Set.filter (fun scope -> not (this.payloadWatcherScopeSuspensions.ContainsKey scope))
 
-                try
-                    match this.payloadWatcher with
-                    | Some watcher ->
-                        let removedScopes = Set.difference this.payloadWatcherScopes targetScopes
-                        let addedScopes = Set.difference targetScopes this.payloadWatcherScopes
+            try
+                match this.payloadWatcher with
+                | Some watcher ->
+                    let removedScopes = Set.difference this.payloadWatcherScopes targetScopes
+                    let addedScopes = Set.difference targetScopes this.payloadWatcherScopes
 
-                        if not removedScopes.IsEmpty then
-                            watcher.unwatch (removedScopes |> Set.toArray) |> ignore
+                    if not removedScopes.IsEmpty then
+                        watcher.unwatch (removedScopes |> Set.toArray) |> ignore
 
-                        if not addedScopes.IsEmpty then
-                            watcher.add (addedScopes |> Set.toArray) |> ignore
+                    if not addedScopes.IsEmpty then
+                        watcher.add (addedScopes |> Set.toArray) |> ignore
 
-                        this.payloadWatcherScopes <- targetScopes
-                    | None when not targetScopes.IsEmpty ->
-                        this.payloadWatcherScopes <- Set.empty
-                        do! this.EnsurePayloadWatcher(arcPath, targetScopes, ?usePolling = usePolling)
-                    | None -> ()
-                with watcherError ->
-                    let failedWatcher = this.payloadWatcher
-                    this.payloadWatcher <- None
+                    this.payloadWatcherScopes <- targetScopes
+                | None when not targetScopes.IsEmpty ->
                     this.payloadWatcherScopes <- Set.empty
+                    do! this.EnsurePayloadWatcher(arcPath, targetScopes, ?usePolling = usePolling)
+                | None -> ()
+            with watcherError ->
+                let failedWatcher = this.payloadWatcher
+                this.payloadWatcher <- None
+                this.payloadWatcherScopes <- Set.empty
 
-                    swatelogfn
-                        this.window.id
-                        "ARC payload watcher scope reconciliation failed; browsing remains available: %s"
-                        watcherError.Message
+                swatelogfn
+                    this.window.id
+                    "ARC payload watcher scope reconciliation failed; browsing remains available: %s"
+                    watcherError.Message
 
-                    failedWatcher
-                    |> Option.iter (fun watcher -> watcher.close () |> Promise.catch (fun _ -> ()) |> Promise.start)
-            }
+                failedWatcher
+                |> Option.iter (fun watcher -> watcher.close () |> Promise.catch (fun _ -> ()) |> Promise.start)
+        }
 
         member this.StartFileWatcher(?usePolling: bool) =
             if this.path.IsSome then
@@ -887,7 +893,8 @@ module ArcVaultExtensions =
 
                         let isCurrentWatcher () =
                             callbackEpoch = this.WatcherEpoch
-                            && (this.watcher |> Option.exists (fun current -> obj.ReferenceEquals(current, watcher)))
+                            && (this.watcher
+                                |> Option.exists (fun current -> obj.ReferenceEquals(current, watcher)))
 
                         watcher.on (
                             Chokidar.Events.Ready,
@@ -919,13 +926,19 @@ module ArcVaultExtensions =
                                 if isCurrentWatcher () then
                                     this.watcher <- None
                                     this.FileWatcherEventController <- None
-                                    swatelogfn this.window.id "ARC file watcher failed; live monitoring is disabled: %O" watcherError
+
+                                    swatelogfn
+                                        this.window.id
+                                        "ARC file watcher failed; live monitoring is disabled: %O"
+                                        watcherError
+
                                     watcher.close () |> Promise.catch (fun _ -> ()) |> Promise.start
                         )
                         |> ignore
                     with watcherError ->
                         this.watcher <- None
                         this.FileWatcherEventController <- None
+
                         swatelogfn
                             this.window.id
                             "ARC file watcher could not be started; the ARC remains open: %s"

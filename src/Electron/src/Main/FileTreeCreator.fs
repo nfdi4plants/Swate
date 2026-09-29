@@ -191,9 +191,7 @@ let removePathsAndDescendantsInPlace (targetPaths: seq<string>) (fileTree: Dicti
             shouldRemove
 
         let keysToRemove =
-            fileTree.Keys
-            |> Seq.filter isUnderRemovedDirectory
-            |> Seq.toArray
+            fileTree.Keys |> Seq.filter isUnderRemovedDirectory |> Seq.toArray
 
         keysToRemove |> Array.iter (fun path -> fileTree.Remove(path) |> ignore)
 
@@ -301,7 +299,10 @@ let scanImmediateFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]>
             let isDirectory = dirent.isDirectory ()
             let fullPath = join [| scanRoot; name |] |> PathHelpers.normalizeSeparators
 
-            if (isDirectory && shouldIgnoreDirName name) || (not isDirectory && shouldIgnorePath fullPath) then
+            if
+                (isDirectory && shouldIgnoreDirName name)
+                || (not isDirectory && shouldIgnorePath fullPath)
+            then
                 None
             else
                 Some(FileEntry.create (name, fullPath, isDirectory, None))
@@ -353,11 +354,7 @@ let reconcileImmediateFileEntries
     let normalizedDirectoryPath = PathHelpers.normalizePath directoryPath
 
     let isDirectChild (path: string) =
-        String.Equals(
-            PathHelpers.normalizePath (dirname path),
-            normalizedDirectoryPath,
-            StringComparison.Ordinal
-        )
+        String.Equals(PathHelpers.normalizePath (dirname path), normalizedDirectoryPath, StringComparison.Ordinal)
 
     let diskEntries =
         entries
@@ -371,7 +368,8 @@ let reconcileImmediateFileEntries
         |> Seq.toArray
 
     let removedChildren =
-        knownDirectChildren |> Array.filter (fun path -> not (diskEntries.ContainsKey path))
+        knownDirectChildren
+        |> Array.filter (fun path -> not (diskEntries.ContainsKey path))
 
     let mutable changed = not (Array.isEmpty removedChildren)
 

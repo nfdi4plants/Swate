@@ -922,9 +922,7 @@ Vitest.describe (
                         let mutable releaseQueuedMerge = ignore
 
                         let mergeQueueGate =
-                            JS.Constructors.Promise.Create(fun resolve _ ->
-                                releaseQueuedMerge <- fun () -> resolve ()
-                            )
+                            JS.Constructors.Promise.Create(fun resolve _ -> releaseQueuedMerge <- fun () -> resolve ())
 
                         let queuedMerge = vault.EnqueueArcMerge(fun () -> mergeQueueGate)
 
@@ -1119,9 +1117,7 @@ Vitest.describe (
                         let mutable releaseQueuedMerge = ignore
 
                         let mergeQueueGate =
-                            JS.Constructors.Promise.Create(fun resolve _ ->
-                                releaseQueuedMerge <- fun () -> resolve ()
-                            )
+                            JS.Constructors.Promise.Create(fun resolve _ -> releaseQueuedMerge <- fun () -> resolve ())
 
                         let queuedMerge = vault.EnqueueArcMerge(fun () -> mergeQueueGate)
 
@@ -1298,9 +1294,7 @@ Vitest.describe (
                         let mutable releaseQueuedMerge = ignore
 
                         let mergeQueueGate =
-                            JS.Constructors.Promise.Create(fun resolve _ ->
-                                releaseQueuedMerge <- fun () -> resolve ()
-                            )
+                            JS.Constructors.Promise.Create(fun resolve _ -> releaseQueuedMerge <- fun () -> resolve ())
 
                         let queuedMerge = vault.EnqueueArcMerge(fun () -> mergeQueueGate)
 

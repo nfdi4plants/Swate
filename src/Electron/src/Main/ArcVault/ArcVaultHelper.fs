@@ -575,7 +575,9 @@ let reconcileArcStructureScopeChanges
     (getCurrentFileTree: unit -> Dictionary<string, FileEntry>)
     =
     promise {
-        let normalizedScopePath = PathHelpers.normalizeCanonicalRelativePath relativeScopePath
+        let normalizedScopePath =
+            PathHelpers.normalizeCanonicalRelativePath relativeScopePath
+
         let! discoveredEvents = reconcileArcStructureScope arcPath normalizedScopePath
         let desired = Dictionary<string, string>()
 
@@ -598,10 +600,12 @@ let reconcileArcStructureScopeChanges
         let isStructuralEntry (entry: FileEntry) (relativePath: string) =
             match getNonEmptyPathParts relativePath with
             | [| zone |] ->
-                (entry.isDirectory && arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone))
+                (entry.isDirectory
+                 && arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone))
                 || (not entry.isDirectory && isArcModelReadContractPath relativePath)
             | [| zone; _ |] ->
-                entry.isDirectory && arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone)
+                entry.isDirectory
+                && arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone)
             | [| zone; _; _ |] ->
                 arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone)
                 && (entry.isDirectory || isArcModelReadContractPath relativePath)
@@ -631,7 +635,10 @@ let reconcileArcStructureScopeChanges
         for KeyValue(relativePath, entry) in known do
             let absolutePath = ArcPathHelper.combine arcPath relativePath
 
-            if not (desired.ContainsKey relativePath) && not (Filesystem.existsSync absolutePath) then
+            if
+                not (desired.ContainsKey relativePath)
+                && not (Filesystem.existsSync absolutePath)
+            then
                 changes.Add(
                     (if entry.isDirectory then
                          Chokidar.Events.UnlinkDir.ToString()

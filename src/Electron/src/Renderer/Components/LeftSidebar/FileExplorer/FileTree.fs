@@ -277,17 +277,10 @@ type FileTree =
 
         let reportExpansionError (error: exn) =
             errorModal.enqueue (
-                ErrorModalRequest.create (
-                    error.Message,
-                    title = "File Explorer update failed",
-                    ?scopeId = arcScopeId
-                )
+                ErrorModalRequest.create (error.Message, title = "File Explorer update failed", ?scopeId = arcScopeId)
             )
 
-        let visibleItems =
-            fileItem
-            |> Option.bind _.Children
-            |> Option.defaultValue []
+        let visibleItems = fileItem |> Option.bind _.Children |> Option.defaultValue []
 
         let reportActiveExpandedDirectories (expandedIds: Set<string>) =
             let activeDirectories =

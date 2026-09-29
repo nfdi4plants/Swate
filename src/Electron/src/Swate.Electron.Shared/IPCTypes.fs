@@ -32,9 +32,7 @@ type CreateArcOutcome =
     | Cancelled
     | CreatedButClosed of path: string
 
-type FileTreeDirectoryExpansionRequest = {
-    relativePaths: string[]
-}
+type FileTreeDirectoryExpansionRequest = { relativePaths: string[] }
 
 /// TEMPORARY DUCT-TAPE WORKAROUND: This IPC API only exists because template loading currently cannot run
 /// through ARCtrl on the Swate .NET server or directly in the renderer due to GitHub CORS.

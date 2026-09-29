@@ -815,7 +815,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             match classification with
                             | ArcEntityPathRules.DeletePathClassification.EntityFolderTarget _
                             | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.EntityFile _,
-                                                                                               _) ->
+                                                                                              _) ->
                                 match vault.arc with
                                 | None -> return Error(arcNotOpenError ())
                                 | Some arcLocal ->
@@ -863,10 +863,15 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                             vault.RefreshHasUnsavedArcChangesFlag()
 
                                                             let absoluteDataMapPath =
-                                                                Main.Bindings.Path.join [| arcPath; normalizedDataMapPath |]
+                                                                Main.Bindings.Path.join [|
+                                                                    arcPath
+                                                                    normalizedDataMapPath
+                                                                |]
 
                                                             vault.SetFileTree(
-                                                                removePathAndDescendants absoluteDataMapPath vault.fileTree
+                                                                removePathAndDescendants
+                                                                    absoluteDataMapPath
+                                                                    vault.fileTree
                                                             )
 
                                                             return Ok()
@@ -924,7 +929,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                     fun () -> promise {
                                         match ArcEntityPathRules.classifyRenameTarget request.relativePath with
                                         | ArcEntityPathRules.RenamePathClassification.GenericTarget _ ->
-                                            return! ArcFileSystemHelper.renameGenericFileSystemItemOnDisk arcPath request
+                                            return!
+                                                ArcFileSystemHelper.renameGenericFileSystemItemOnDisk arcPath request
                                         | _ ->
                                             match vault.arc with
                                             | None -> return Error(arcNotOpenError ())
@@ -934,7 +940,10 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                         vault
                                                         (fun () -> promise {
                                                             match!
-                                                                ArcRenameHelper.renameArcEntityAsync arcPath request arcLocal
+                                                                ArcRenameHelper.renameArcEntityAsync
+                                                                    arcPath
+                                                                    request
+                                                                    arcLocal
                                                             with
                                                             | Error renameError -> return Error renameError
                                                             | Ok renamedArc ->
@@ -958,7 +967,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             return!
                                 vault.WithPayloadScopesSuspended(
                                     [| request.sourceRelativePath; request.targetRelativePath |],
-                                    fun () -> ArcFileSystemHelper.moveGenericFileSystemItemOnDisk vault.path.Value request
+                                    fun () ->
+                                        ArcFileSystemHelper.moveGenericFileSystemItemOnDisk vault.path.Value request
                                 )
                         })
             with e ->

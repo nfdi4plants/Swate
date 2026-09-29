@@ -36,8 +36,7 @@ type ArcVault with
                         then
                             raise (exn "Expanded directories must be ARC-relative paths.")
 
-                        let normalizedRelativePath =
-                            PathHelpers.normalizeCanonicalRelativePath relativePath
+                        let normalizedRelativePath = PathHelpers.normalizeCanonicalRelativePath relativePath
 
                         let absolutePath =
                             ArcPathHelper.combine arcPath normalizedRelativePath
@@ -47,12 +46,11 @@ type ArcVault with
                         | None -> raise (exn "Expanded directories must stay inside the open ARC.")
                         | Some _ -> normalizedRelativePath
 
-                    let normalizedPaths = relativePaths |> Array.map normalizeRelativePath |> Set.ofArray
+                    let normalizedPaths =
+                        relativePaths |> Array.map normalizeRelativePath |> Set.ofArray
 
                     let requestedRefreshPaths =
-                        defaultArg refreshPaths [||]
-                        |> Array.map normalizeRelativePath
-                        |> Set.ofArray
+                        defaultArg refreshPaths [||] |> Array.map normalizeRelativePath |> Set.ofArray
 
                     let requestedAdded = Set.difference normalizedPaths this.expandedDirectoryPaths
                     let validAdded = ResizeArray<string>()
@@ -83,6 +81,7 @@ type ArcVault with
                         |> Set.union (validAdded |> Set.ofSeq)
 
                     let newlyExpandedScopes = Set.difference nextActivePaths this.expandedDirectoryPaths
+
                     let scopesToScan =
                         Set.union newlyExpandedScopes (Set.intersect requestedRefreshPaths nextActivePaths)
 
@@ -168,18 +167,16 @@ type ArcVault with
                     | false, _ -> this.payloadWatcherScopeSuspensions.[scope] <- 1
 
                 match this.path with
-                | Some arcPath ->
-                    do! this.ReconcilePayloadWatcherScopes arcPath
+                | Some arcPath -> do! this.ReconcilePayloadWatcherScopes arcPath
                 | None -> ()
 
-            let! outcome =
-                promise {
-                    try
-                        let! result = operation ()
-                        return Ok result
-                    with error ->
-                        return Error error
-                }
+            let! outcome = promise {
+                try
+                    let! result = operation ()
+                    return Ok result
+                with error ->
+                    return Error error
+            }
 
             let releasedScopes = ResizeArray<string>()
 
@@ -210,14 +207,11 @@ type ArcVault with
 
                 let unavailableReleasedScopes =
                     let releasedDesiredScopes =
-                        releasedScopes
-                        |> Seq.filter this.expandedDirectoryPaths.Contains
-                        |> Set.ofSeq
+                        releasedScopes |> Seq.filter this.expandedDirectoryPaths.Contains |> Set.ofSeq
 
                     Set.difference releasedDesiredScopes restorableScopes
 
-                this.expandedDirectoryPaths <-
-                    Set.difference this.expandedDirectoryPaths unavailableReleasedScopes
+                this.expandedDirectoryPaths <- Set.difference this.expandedDirectoryPaths unavailableReleasedScopes
 
                 try
                     do!
