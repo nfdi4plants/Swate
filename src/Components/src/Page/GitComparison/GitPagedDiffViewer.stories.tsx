@@ -408,7 +408,7 @@ export const PagedSourceInteractions: Story = {
     await waitFor(() => expect(root).toHaveTextContent("continued segment"));
 
     await scrollToEnd(scroll);
-    await expect(await canvas.findByTestId("git-paged-interactions-row-unaligned:tail:label")).toBeInTheDocument();
+    await expect(await canvas.findByTestId("git-paged-interactions-row-unaligned:tail:32:32:label")).toBeInTheDocument();
     await expect(root).toHaveTextContent("Previous unaligned line 1");
     await expect(root).toHaveTextContent("Current unaligned line 1");
   },
@@ -436,7 +436,7 @@ export const ContinueLoadsPagedSource: Story = {
 
     scroll.scrollTop = 42 * 28;
     await fireEvent.scroll(scroll, { target: { scrollTop: scroll.scrollTop } });
-    await expect(await canvas.findByTestId("git-paged-continue-row-unaligned:fake-mismatch:label")).toBeInTheDocument();
+    await expect(await canvas.findByTestId("git-paged-continue-row-unaligned:fake-mismatch:75:75:label")).toBeInTheDocument();
     await expect(root).toHaveTextContent("Current unaligned line 7");
 
     scroll.scrollTop = 0;
@@ -444,6 +444,54 @@ export const ContinueLoadsPagedSource: Story = {
     const endingRow = await canvas.findByTestId("git-paged-continue-row-row-40");
     await expect(endingRow).toHaveTextContent("CRLF");
     await expect(endingRow).toHaveTextContent("LF");
+  },
+};
+
+function makeSplitUnalignedParts() {
+  const fragment = (label: string, previousStart: number, previousCount: number, currentStart: number, currentCount: number) =>
+    PagedPart_UnalignedRegion(
+      "split-hunk",
+      Array.from({ length: previousCount }, (_, index) =>
+        makeLine(previousStart + index, `Previous ${label} line ${index + 1}`),
+      ),
+      Array.from({ length: currentCount }, (_, index) =>
+        makeLine(currentStart + index, `Current ${label} line ${index + 1}`),
+      ),
+      range(previousStart, previousCount),
+      range(currentStart, currentCount),
+    );
+
+  return [fragment("first", 0, 3, 0, 4), fragment("second", 3, 2, 4, 3)];
+}
+
+export const SplitUnalignedHunkRendersEveryFragment: Story = {
+  render: () => (
+    <div style={{ height: "40rem" }}>
+      <GitPagedDiffViewerComponent
+        parts={makeSplitUnalignedParts()}
+        status={PagedDiffStatus_Ready()}
+        progress={new PagedProgress(100, 100, true)}
+        hasMore={false}
+        outputComplete={true}
+        testIdPrefix="git-paged-split"
+      />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("git-paged-split-row-unaligned:split-hunk:0:0:label")).toBeInTheDocument();
+    await expect(canvas.getByTestId("git-paged-split-row-unaligned:split-hunk:3:4:label")).toBeInTheDocument();
+
+    const expectedLines = [
+      ...Array.from({ length: 3 }, (_, index) => `Previous first line ${index + 1}`),
+      ...Array.from({ length: 4 }, (_, index) => `Current first line ${index + 1}`),
+      ...Array.from({ length: 2 }, (_, index) => `Previous second line ${index + 1}`),
+      ...Array.from({ length: 3 }, (_, index) => `Current second line ${index + 1}`),
+    ];
+
+    for (const text of expectedLines) {
+      await expect(canvas.getAllByText(text, { exact: true })).toHaveLength(1);
+    }
   },
 };
 

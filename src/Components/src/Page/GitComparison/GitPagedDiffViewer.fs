@@ -83,16 +83,21 @@ module internal GitPagedDiffDisplay =
           |]
         | PagedPart.UnalignedRegion(hunkId, previous, current, previousRange, currentRange) ->
             let rowCount = max previous.Length current.Length
+            // A large hunk can be split into several unaligned fragments with the same hunk id.
+            // The range starts differ per fragment and come from the source, so the keys stay
+            // unique and survive rerenders and replays.
+            let fragmentKey =
+                $"unaligned:{hunkId}:{numberText previousRange.Start}:{numberText currentRange.Start}"
 
             [|
                 {
-                    Key = $"unaligned:{hunkId}:label"
+                    Key = $"{fragmentKey}:label"
                     Content = UnalignedLabel(hunkId, previousRange, currentRange)
                 }
 
                 for index in 0 .. rowCount - 1 do
                     {
-                        Key = $"unaligned:{hunkId}:{index}"
+                        Key = $"{fragmentKey}:{index}"
                         Content =
                             UnalignedLines(
                                 (if index < previous.Length then
@@ -739,6 +744,19 @@ type GitPagedDiffViewer =
 
         React.useEffect (
             (fun () ->
+                // A replayed page can be evicted again later. Forgetting pages that are no longer
+                // placeholders lets the viewer ask for them once more.
+                let evictedIds =
+                    rows
+                    |> Array.choose (fun row ->
+                        match row.Content with
+                        | GitPagedDiffDisplay.Evicted(pageId, _) -> Some pageId
+                        | _ -> None
+                    )
+                    |> Set.ofArray
+
+                requestedReplay.current <- HashSet<string>(requestedReplay.current |> Seq.filter evictedIds.Contains)
+
                 for item in virtualItems do
                     match rows.[item.Index].Content with
                     | GitPagedDiffDisplay.Evicted(pageId, _) ->
