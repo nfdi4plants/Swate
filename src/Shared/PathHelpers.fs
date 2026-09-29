@@ -62,7 +62,7 @@ module PathHelpers =
 
         if normalizeForComparison normalizedPath = normalizeForComparison normalizedSourcePath then
             Some normalizedTargetPath
-        elif isSameOrDescendantPathForFsComparison normalizedPath normalizedSourcePath then
+        elif isSameOrDescendantPath normalizedPath normalizedSourcePath then
             Some(normalizedTargetPath + normalizedPath.Substring(normalizedSourcePath.Length))
         else
             None
@@ -383,6 +383,15 @@ module ArcEntityPathRules =
         | DeletePathClassification.AddZoneDescendantTarget(_, normalizedRelativePath) ->
             isGenericFileSystemTargetAllowed normalizedRelativePath
         | _ -> false
+
+    /// The path that a delete of `relativePath` removes from disk. Deleting a canonical entity
+    /// workbook removes the whole entity folder, so the scope of the workbook is its parent folder.
+    let deleteScopePath (relativePath: string) =
+        match classifyDeleteTarget relativePath with
+        | DeletePathClassification.CanonicalFileTarget(CanonicalArcFileTarget.EntityFile _, normalizedRelativePath) ->
+            PathHelpers.tryGetParentPath normalizedRelativePath
+            |> Option.defaultValue normalizedRelativePath
+        | _ -> normalizeRelativePath relativePath
 
     let private canonicalEntityFilePath zone identifier =
         let zoneFolder = zoneFolderName zone

@@ -26,6 +26,20 @@ let private onlyChild (node: FileTreeNode) =
     node.children.Values |> Seq.exactlyOne
 
 Vitest.describe (
+    "FileIOHelper repository-relative paths",
+    fun () ->
+        Vitest.test (
+            "resolves case-only Windows root path differences",
+            fun () ->
+                Vitest.expect(tryGetRepoRelativePathOrRoot "C:/Repo/ARC" "c:\\repo\\arc").toEqual (Some "")
+
+                Vitest
+                    .expect(tryGetRepoRelativePath "C:/Repo/ARC" "c:\\repo\\arc\\studies\\S1")
+                    .toEqual (Some "studies/S1")
+        )
+)
+
+Vitest.describe (
     "FileIOHelper.collapseSingleChildSameNameDirectories",
     fun () ->
         Vitest.test (

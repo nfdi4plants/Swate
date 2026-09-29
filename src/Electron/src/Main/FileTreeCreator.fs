@@ -21,8 +21,10 @@ let private shouldIgnoreDirName (name: string) = name = ".git"
 let private shouldIgnorePath (path: string) =
     let normalizedPath = PathHelpers.normalizeSeparators path
     let tempXlsxPattern = """\.~\$.*\.xlsx$"""
+    let temporaryLfsBackupPattern = """\.vcs-lfs-backup-[0-9a-fA-F]{32}$"""
 
     System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
+    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
     || isLegacyDataMapPath normalizedPath
 
 let tryListLargeObjects (repoRoot: string) (openSession: bool) : Fable.Core.JS.Promise<Map<string, ObjectStateDto>> = promise {
@@ -187,22 +189,6 @@ let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
         let index = buildLargeObjectPathIndex largeObjectsByRelativePath
         return withFileEntryLargeObjectMetadata normalizedRepoRoot index entry
 }
-
-let getFileEntryWithLargeObjectSnapshot
-    (repoRoot: string)
-    (largeObjectsByRelativePath: Map<string, ObjectStateDto>)
-    (path: string)
-    =
-    promise {
-        let normalizedRepoRoot = normalizeRootPath repoRoot
-        let! entry = getFileEntry path
-
-        if entry.isDirectory then
-            return entry
-        else
-            let index = buildLargeObjectPathIndex largeObjectsByRelativePath
-            return withFileEntryLargeObjectMetadata normalizedRepoRoot index entry
-    }
 
 let private scanFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise {
     let scanRoot = normalizeRootPath path

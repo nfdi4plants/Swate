@@ -658,9 +658,7 @@ module ArcFileSystemHelper =
 
                     if
                         sourceIsDirectory
-                        && PathHelpers.isSameOrDescendantPathForFsComparison
-                            genericMovePlan.TargetPath
-                            genericMovePlan.SourcePath
+                        && PathHelpers.isSameOrDescendantPath genericMovePlan.TargetPath genericMovePlan.SourcePath
                     then
                         return Error(exn "Move target must not be inside the source path.")
                     else
@@ -678,9 +676,7 @@ module ArcFileSystemHelper =
                             | Error removeError -> return Error removeError
                             | Ok() -> return! moveToTargetAsync ()
                         | false, _ when
-                            PathHelpers.isSameOrDescendantPathForFsComparison
-                                genericMovePlan.TargetPath
-                                genericMovePlan.SourcePath
+                            PathHelpers.isSameOrDescendantPath genericMovePlan.TargetPath genericMovePlan.SourcePath
                             ->
                             return!
                                 moveFileIntoDescendantPathOnDisk

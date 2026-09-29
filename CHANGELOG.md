@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🐛 Fixed
 
--   Speed up large ARCs by avoiding repeated large-object metadata scans and limiting payload monitoring to folders currently expanded in the File Explorer #1340.
+-   Speed up large ARCs by reducing repeated large-object metadata work and limiting payload monitoring to folders currently expanded in the File Explorer #1340.
 -   The diff of a changed, downloaded Git LFS text file shows the changed lines instead of the pointer text, without downloading anything.
 -   Mark and Unmark Git LFS take effect on the next save, so the file's storage changes. Unmark is refused when the file's object is not local.
 -   Discarding a downloaded Git LFS file keeps it downloaded.

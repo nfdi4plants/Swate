@@ -28,6 +28,9 @@ type ContextMenuConfig = {
     runToggleLfsMark: string -> bool -> JS.Promise<Result<unit, string>>
     runDownloadLfsFile: string -> JS.Promise<Result<unit, string>>
     runFreeLocalLfsCopy: string -> JS.Promise<Result<unit, string>>
+    /// ARC-relative paths with a running Download or Free. Rename and Delete stay disabled on every
+    /// folder that contains one of them.
+    lfsActivePaths: string list
 }
 
 type ArcCreateDraft = { ArcFile: ArcFiles; Path: string }

@@ -82,6 +82,7 @@ type FileItem = {
     IsLFSPointer: bool option
     Checkout: string option
     Downloaded: bool option
+    LfsActivity: string option
     Size: int64 option
     SizeFormatted: string option
     ItemType: string
@@ -132,6 +133,7 @@ module FileTree =
         IsLFSPointer = None
         Checkout = None
         Downloaded = None
+        LfsActivity = None
         Size = None
         SizeFormatted = None
         ItemType = "node"
@@ -153,6 +155,7 @@ module FileTree =
         IsLFSPointer = None
         Checkout = None
         Downloaded = None
+        LfsActivity = None
         Size = None
         SizeFormatted = None
         ItemType = "node"
@@ -174,6 +177,7 @@ module FileTree =
         IsLFSPointer = None
         Checkout = None
         Downloaded = None
+        LfsActivity = None
         Size = None
         SizeFormatted = None
         ItemType = config.ItemType
@@ -234,6 +238,7 @@ module FileTree =
         IsLFSPointer = None
         Checkout = None
         Downloaded = None
+        LfsActivity = None
         Size = None
         SizeFormatted = None
         ItemType = "empty"

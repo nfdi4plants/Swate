@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Main
+open Main.ArcVaultTypes
 open Main.Bindings.Path
 open Main.VersionControl
 open Swate.Components.Composite.Authentication.Types
@@ -44,12 +45,6 @@ let private createObjectState path =
 
 let private enrichFileEntries (objects: (string * ObjectStateDto) list) (entries: FileEntry[]) =
     FileTreeCreator.withFileEntriesLfsMetadata "/repo" (Map.ofList objects) entries
-
-let private enrichFileEntriesWithIndex (objects: (string * ObjectStateDto) list) (entries: FileEntry[]) =
-    let index = objects |> Map.ofList |> FileTreeCreator.buildLargeObjectPathIndex
-
-    entries
-    |> Array.map (FileTreeCreator.withFileEntryLargeObjectMetadata "/repo" index)
 
 type private TempRepositoryContext = { RootPath: string; RepoPath: string }
 
@@ -304,29 +299,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "a reusable large-object index preserves exact, normalized, and ambiguous lookup behavior",
-            fun () ->
-                let exactObject = createObjectState "Data.csv"
-                let lowerCaseObject = createObjectState "data.csv"
-                let unicodeObject = createObjectState "Messung_\u00E4.csv"
-
-                let entries =
-                    enrichFileEntriesWithIndex [
-                        "Data.csv", exactObject
-                        "data.csv", lowerCaseObject
-                        "Messung_\u00E4.csv", unicodeObject
-                    ] [|
-                        createFileEntry "Data.csv" "/repo/Data.csv"
-                        createFileEntry "Messung_a\u0308.csv" "/repo/Messung_a\u0308.csv"
-                        createFileEntry "DaTa.csv" "/repo/DaTa.csv"
-                    |]
-
-                Vitest.expect(entries.[0].largeObject).toEqual (Some exactObject)
-                Vitest.expect(entries.[1].largeObject).toEqual (Some unicodeObject)
-                Vitest.expect(entries.[2].largeObject).toEqual (None)
-        )
-
-        Vitest.test (
             "getFileEntryWithLfsMetadata enriches a single staged LFS file",
             fileTreeCreatorTestOptions,
             fun () -> promise {
@@ -393,6 +365,47 @@ Vitest.describe (
                             |> Array.find (fun entry -> normalizeSlashes entry.path = normalizeSlashes plainFilePath)
 
                         Vitest.expect(plainEntry.largeObject).toEqual (None)
+                    })
+            }
+        )
+
+        Vitest.test (
+            "one watcher batch enriches every changed large object from its prepared snapshot",
+            fileTreeCreatorTestOptions,
+            fun () -> promise {
+                do!
+                    withTempRepository (fun context -> promise {
+                        let firstFilePath = join [| context.RepoPath; "first.psd" |]
+                        let secondFilePath = join [| context.RepoPath; "second.psd" |]
+
+                        let! _ = runGitAsync context.RepoPath [| "lfs"; "install"; "--local" |]
+                        let! _ = runGitAsync context.RepoPath [| "lfs"; "track"; "*.psd" |]
+                        do! writeUtf8FileAsync firstFilePath "First tracked content.\n"
+                        do! writeUtf8FileAsync secondFilePath "Second tracked content.\n"
+
+                        let! _ = runGitAsync context.RepoPath [| "add"; ".gitattributes"; "first.psd"; "second.psd" |]
+
+                        // Open the repository session used by watcher refreshes without seeding the vault tree.
+                        let! _ = FileTreeCreator.getFileTree context.RepoPath
+                        let vault = ArcVault(testWindow ())
+                        vault.path <- Some context.RepoPath
+
+                        let createChangeEvent relativePath absolutePath : ArcVaultFileSystemEvent = {
+                            EventName = "change"
+                            RelativePath = relativePath
+                            AbsolutePath = normalizeSlashes absolutePath
+                        }
+
+                        do!
+                            vault.ApplyWatcherFileTreeEvents [
+                                createChangeEvent "first.psd" firstFilePath
+                                createChangeEvent "second.psd" secondFilePath
+                            ]
+
+                        let firstEntry = vault.fileTree.[normalizeSlashes firstFilePath]
+                        let secondEntry = vault.fileTree.[normalizeSlashes secondFilePath]
+                        Vitest.expect(firstEntry.largeObject.IsSome).toBe (true)
+                        Vitest.expect(secondEntry.largeObject.IsSome).toBe (true)
                     })
             }
         )
