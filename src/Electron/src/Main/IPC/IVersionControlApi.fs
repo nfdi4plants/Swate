@@ -797,30 +797,6 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                         )
                 )
                 id
-    getWordDiff =
-        fun request ->
-            withSession
-                "getWordDiff"
-                event
-                request.OperationId
-                false
-                (withService
-                    _.TextDiff
-                    "text diffs"
-                    (fun service context -> withPath request.Path (fun path -> service.GetWordDiff path context)))
-                Mappings.contentView
-    getBaseContent =
-        fun request ->
-            withSession
-                "getBaseContent"
-                event
-                request.OperationId
-                false
-                (withService
-                    _.TextDiff
-                    "text diffs"
-                    (fun service context -> withPath request.Path (fun path -> service.GetBaseContent path context)))
-                Mappings.contentView
     refreshSynchronization =
         fun request ->
             withSession

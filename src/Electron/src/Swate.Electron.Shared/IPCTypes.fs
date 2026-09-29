@@ -113,8 +113,6 @@ type IVersionControlApi = {
     switchRef: SwitchRefRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceStatusDto>, exn>>
     createRevision: CreateRevisionRequestDto -> JS.Promise<Result<OperationResultDto<string>, exn>>
     restorePaths: RestorePathsRequestDto -> JS.Promise<Result<OperationResultDto<unit>, exn>>
-    getWordDiff: ObjectPathRequestDto -> JS.Promise<Result<OperationResultDto<ContentViewDto>, exn>>
-    getBaseContent: ObjectPathRequestDto -> JS.Promise<Result<OperationResultDto<ContentViewDto>, exn>>
     refreshSynchronization: OperationRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, exn>>
     synchronize: SynchronizeRequestDto -> JS.Promise<Result<OperationResultDto<SynchronizationStateDto>, exn>>
     resolveConflict:

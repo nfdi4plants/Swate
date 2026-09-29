@@ -563,7 +563,6 @@ type GitDependencies = {
     getStoragePolicySettings:
         OperationRequestDto -> JS.Promise<Result<OperationResultDto<StoragePolicySettingsDto>, string>>
     setStoragePolicySettings: StoragePolicySettingsRequestDto -> JS.Promise<Result<OperationResultDto<unit>, string>>
-    loadDiffPage: GitSidebarChange -> JS.Promise<Result<PageState, string>>
     loadConflictPage: ConflictSessionSummaryDto -> string -> string -> JS.Promise<Result<PageState, string>>
     initializeWorkspace: InitializeWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<string>, string>>
     bindWorkspace: BindWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceSessionInfoDto>, string>>
@@ -1217,172 +1216,34 @@ let private runInitRepositoryAsync (deps: GitDependencies) (arcPath: string) = p
     | Ok _ -> return Ok()
 }
 
-/// Builds the diff page from the provider's base content and word diff plus the
-/// current file. Exposed with its readers as parameters so the tests can drive it.
-module GitDiffPageLoader =
-
-    let private unsupportedPage (path: string) (reason: string option) =
-        Ok(PageState.GitUnsupportedPage { Path = path; Reason = reason })
-
-    let private lfsPointerVersionLine = "version https://git-lfs.github.com/spec/v1"
-
-    let private lfsPointerOidPattern =
-        System.Text.RegularExpressions.Regex("^oid sha256:[0-9a-f]{64}$")
-
-    let private lfsPointerSizePattern =
-        System.Text.RegularExpressions.Regex("^size [0-9]+$")
-
-    let private lfsPointerExtensionPattern =
-        // git-lfs checks only that an extension key starts with ext-<digit>-<word character>.
-        System.Text.RegularExpressions.Regex(@"^ext-[0-9]+-\w\S* .+$")
-
-    /// True when the text is a Git LFS pointer file: the version line first, then one oid line and
-    /// one size line, with optional `ext-` lines. The provider returns the pointer as the base
-    /// content when it does not read the previous version's object, for example because the object
-    /// is missing locally or exceeds the provider's base diff size limit.
-    let isLfsPointerText (text: string) =
-        // Git LFS never writes a pointer of 1024 bytes or more.
-        if isNull text || text.Length >= 1024 then
-            false
-        else
-            let lines = text.Replace("\r\n", "\n").TrimEnd('\n').Split('\n')
-
-            match List.ofArray lines with
-            | version :: rest when version = lfsPointerVersionLine ->
-                let oidLines = rest |> List.filter lfsPointerOidPattern.IsMatch
-                let sizeLines = rest |> List.filter lfsPointerSizePattern.IsMatch
-                let extensionLines = rest |> List.filter lfsPointerExtensionPattern.IsMatch
-
-                oidLines.Length = 1
-                && sizeLines.Length = 1
-                && oidLines.Length + sizeLines.Length + extensionLines.Length = rest.Length
-            | _ -> false
-
-    let private lfsPointerBaseReason (path: string) =
-        Some $"The previous version of the Git LFS file '{path}' cannot be shown here."
-
-    let private contentOf (result: Result<OperationResultDto<ContentViewDto>, string>) =
-        match result with
-        | Error message -> Error message
-        | Ok(OperationResultDto.Failed failure) when failure.Category = FailureCategoryDto.Unsupported ->
-            Ok(ContentViewDto.Unsupported(Some failure.Message))
-        | Ok(OperationResultDto.Failed failure) -> Error(failureMessage failure)
-        | Ok result ->
-            OperationResultDto.tryValue result
-            |> Option.defaultValue (ContentViewDto.Unsupported None)
-            |> Ok
-
-    /// An added file has no committed base and a deleted file has no current content.
-    /// Either side is shown as empty text. A change with neither side is an error.
-    let load
-        (getBaseContent: string -> JS.Promise<Result<OperationResultDto<ContentViewDto>, string>>)
-        (getWordDiff: string -> JS.Promise<Result<OperationResultDto<ContentViewDto>, string>>)
-        (readCurrentContent: string -> JS.Promise<Result<string, string>>)
-        (change: GitSidebarChange)
-        : JS.Promise<Result<PageState, string>> =
-        promise {
-            let requestedPath = change.Path
-            let isDeleted = change.IndexStatus = "D" || change.WorkingTreeStatus = "D"
-            let! baseContent = getBaseContent requestedPath
-
-            let baseView =
-                match baseContent with
-                | Ok(OperationResultDto.Failed failure) when failure.Code = VersionControlCodes.BaseContentNotFound ->
-                    Ok None
-                | other -> contentOf other |> Result.map Some
-
-            // A pointer as the base means the provider did not read the previous version's object.
-            // Comparing the pointer text with the current bytes would show a false diff, so the loader opens the unsupported page.
-            let baseUnsupportedReason =
-                match baseView with
-                | Ok(Some(ContentViewDto.Unsupported reason)) -> Some reason
-                | Ok(Some(ContentViewDto.Text text)) when isLfsPointerText text ->
-                    Some(lfsPointerBaseReason requestedPath)
-                | _ -> None
-
-            // A promise block does not stop at a `return` inside an `if` without `else`, so the
-            // comparison is a separate step that only runs when the base can be shown.
-            let loadComparison () = promise {
-                let! wordDiff = getWordDiff requestedPath
-
-                let! currentContent =
-                    if isDeleted then
-                        promise { return Ok None }
-                    else
-                        promise {
-                            let! content = readCurrentContent requestedPath
-                            return content |> Result.map Some
-                        }
-
-                return baseView, wordDiff, currentContent
-            }
-
-            match baseUnsupportedReason with
-            | Some reason -> return unsupportedPage requestedPath reason
-            | None ->
-                let! baseView, wordDiff, currentContent = loadComparison ()
-
-                match baseView, contentOf wordDiff with
-                | Error message, _
-                | _, Error message -> return Error message
-                | Ok(Some(ContentViewDto.Unsupported reason)), _
-                | _, Ok(ContentViewDto.Unsupported reason) -> return unsupportedPage requestedPath reason
-                | Ok previous, Ok(ContentViewDto.Text wordDiffText) ->
-                    let previousText =
-                        match previous with
-                        | Some(ContentViewDto.Text text) -> Some text
-                        | _ -> None
-
-                    match currentContent with
-                    | Error message ->
-                        return Error $"Could not read the current content of '{requestedPath}': {message}"
-                    | Ok None when previousText.IsNone ->
-                        return Error $"'{requestedPath}' has no content on either side of the diff."
-                    | Ok current ->
-                        return
-                            Ok(
-                                PageState.GitDiffPage {
-                                    Path = requestedPath
-                                    PreviousContent = previousText |> Option.defaultValue ""
-                                    CurrentContent = current |> Option.defaultValue ""
-                                    ChangeKind =
-                                        match previousText, current with
-                                        | None, Some _ -> Some Swate.Components.Page.GitDiffChangeKind.Added
-                                        | Some _, None -> Some Swate.Components.Page.GitDiffChangeKind.Deleted
-                                        | _ -> None
-                                    WordDiffText = wordDiffText
-                                }
-                            )
-        }
-
 let private loadPageAsync
     (deps: GitDependencies)
     (activeConflict: ConflictSessionSummaryDto option)
     (workspaceVersion: string option)
     (change: GitSidebarChange)
     =
-    promise {
-        let path = change.Path
+    if not change.IsConflicted then
+        promise { return Ok GitPageChange.NoChange }
+    else
+        promise {
+            let path = change.Path
 
-        let! result =
-            match change.IsConflicted, activeConflict, workspaceVersion with
-            | true, Some conflict, Some version -> deps.loadConflictPage conflict version path
-            | true, _, _ -> promise {
-                // The status says the path conflicts but the session is not in the model: reload it
-                // together with a fresh token, so the page carries the state the user reviews.
+            match activeConflict, workspaceVersion with
+            | Some conflict, Some version ->
+                let! page = deps.loadConflictPage conflict version path
+                return page |> Result.map GitPageChange.Set
+            | _ ->
                 let! status = toResult (deps.getStatus (request deps))
 
                 match status with
                 | Ok(outcome, _) ->
                     match outcome.Value.ActiveConflictSession with
-                    | Some conflict -> return! deps.loadConflictPage conflict outcome.Value.WorkspaceVersion path
-                    | None -> return! deps.loadDiffPage change
+                    | Some conflict ->
+                        let! page = deps.loadConflictPage conflict outcome.Value.WorkspaceVersion path
+                        return page |> Result.map GitPageChange.Set
+                    | None -> return Ok GitPageChange.NoChange
                 | Error failure -> return Error(failureMessage failure)
-              }
-            | false, _, _ -> deps.loadDiffPage change
-
-        return result |> Result.map GitPageChange.Set
-    }
+        }
 
 let private conflictSessionConfirmationDialog (overlappingPaths: string[]) : GitSidebarConfirmationDialog =
     let overlapping =

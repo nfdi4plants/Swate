@@ -12,16 +12,6 @@ type LeftSidebarPage =
     | FileExplorer
     | Git
 
-/// A text diff of one changed file: the committed base, the current file and the
-/// provider's word diff.
-type VersionControlDiffPage = {
-    Path: string
-    PreviousContent: string
-    CurrentContent: string
-    ChangeKind: Swate.Components.Page.GitDiffChangeKind option
-    WordDiffText: string
-}
-
 /// A conflicted file with the provider's combined preview. The handle and the
 /// workspace token are the ones the preview was taken with, so a confirmation is
 /// checked against exactly that state.
@@ -62,7 +52,6 @@ type PageState =
     | NotesDraftPage
     | NotesSearchPage
     | ProvenanceGroupingPage
-    | GitDiffPage of VersionControlDiffPage
     | GitMergeConflictPage of VersionControlConflictPage
     | GitFileChoiceConflictPage of VersionControlFileChoicePage
     | GitUnsupportedPage of GitUnsupportedPageData

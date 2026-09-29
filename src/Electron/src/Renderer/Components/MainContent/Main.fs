@@ -7,7 +7,6 @@ open Renderer.Components.MainContent.ArcFilePreviewTarget
 open Renderer.Components.MainContent.DataHubBrowserTarget
 open Renderer.Components.MainContent.EmptySelectionTarget
 open Renderer.Components.MainContent.ErrorViewTarget
-open Renderer.Components.MainContent.GitDiffTarget
 open Renderer.Components.MainContent.GitFileChoiceConflictTarget
 open Renderer.Components.MainContent.GitMergeConflictTarget
 open Renderer.Components.MainContent.GitUnsupportedTarget
@@ -114,7 +113,6 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                             [ LazyComponents.ProvenanceGroupingTarget() ],
                             fallback = LazyComponents.FullPageLoadingSpinner("Loading Table Editor...")
                         )
-                    | Some _, Some(PageState.GitDiffPage diffData) -> GitDiffTarget.Main diffData
                     | Some _, Some(PageState.GitMergeConflictPage mergeData) -> GitMergeConflictTarget.Main mergeData
                     | Some _, Some(PageState.GitFileChoiceConflictPage choiceData) ->
                         GitFileChoiceConflictTarget.Main choiceData

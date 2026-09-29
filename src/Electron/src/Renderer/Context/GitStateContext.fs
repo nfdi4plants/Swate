@@ -47,23 +47,6 @@ type GitStateController = {
 
 module private Helper =
 
-    let private pathRequest (path: string) : ObjectPathRequestDto = {
-        OperationId = Renderer.VersionControlApiClient.newOperationId ()
-        Path = path
-        RefreshTree = None
-    }
-
-    /// The current content comes from the vault file itself, the rest from the provider.
-    let loadDiffPage (change: GitSidebarChange) : JS.Promise<Result<PageState, string>> =
-        GitDiffPageLoader.load
-            (fun path -> Renderer.VersionControlApiClient.getBaseContent (pathRequest path))
-            (fun path -> Renderer.VersionControlApiClient.getWordDiff (pathRequest path))
-            (fun path -> promise {
-                let! file = Api.ipcArcVaultApi.openFile path
-                return file |> Result.map _.content |> Result.mapError _.Message
-            })
-            change
-
     /// The conflict page captures the handle and workspace token used to validate its resolution request.
     let loadConflictPage
         (conflict: ConflictSessionSummaryDto)
@@ -79,7 +62,6 @@ module private Helper =
         getRepositoryWebUrl = Renderer.VersionControlApiClient.getRepositoryWebUrl
         getStoragePolicySettings = Renderer.VersionControlApiClient.getStoragePolicySettings
         setStoragePolicySettings = Renderer.VersionControlApiClient.setStoragePolicySettings
-        loadDiffPage = loadDiffPage
         loadConflictPage = loadConflictPage
         initializeWorkspace = Renderer.VersionControlApiClient.initializeWorkspace
         bindWorkspace = Renderer.VersionControlApiClient.bindWorkspace

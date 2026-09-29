@@ -52,10 +52,6 @@ let createRevision (dto: CreateRevisionRequestDto) = call (fun () -> api.createR
 
 let restorePaths (dto: RestorePathsRequestDto) = call (fun () -> api.restorePaths dto)
 
-let getWordDiff (dto: ObjectPathRequestDto) = call (fun () -> api.getWordDiff dto)
-
-let getBaseContent (dto: ObjectPathRequestDto) = call (fun () -> api.getBaseContent dto)
-
 let refreshSynchronization (dto: OperationRequestDto) =
     call (fun () -> api.refreshSynchronization dto)
 

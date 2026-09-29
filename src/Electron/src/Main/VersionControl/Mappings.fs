@@ -138,11 +138,6 @@ let conflictPreview (preview: ConflictPreview) : ContentViewDto =
     | TextPreview content -> ContentViewDto.Text content
     | UnsupportedPreview reason -> ContentViewDto.Unsupported reason
 
-let contentView (view: ContentView) : ContentViewDto =
-    match view with
-    | TextContent content -> ContentViewDto.Text content
-    | UnsupportedContent reason -> ContentViewDto.Unsupported reason
-
 let conflictItem (item: ConflictItem) : ConflictItemDto = {
     Path = RepositoryPath.value item.Path
     Candidates =

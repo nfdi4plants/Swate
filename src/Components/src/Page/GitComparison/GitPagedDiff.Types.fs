@@ -3,6 +3,12 @@ module Swate.Components.Page.GitComparison.GitPagedDiffTypes
 open Fable.Core
 
 [<StringEnum; RequireQualifiedAccess>]
+type GitDiffChangeKind =
+    | Added
+    | Deleted
+    | Modified
+
+[<StringEnum; RequireQualifiedAccess>]
 type PagedDiffSide =
     | Previous
     | Current
