@@ -39,6 +39,7 @@ module Virtual =
     type Virtualizer<'A, 'B> =
         member this.getVirtualItems() : VirtualItem[] = jsNative
         member this.getVirtualIndexes() : int[] = jsNative
+        member this.getMeasurements() : VirtualItem[] = jsNative
         member this.getTotalSize() : int = jsNative
 
         [<ParamObject(1)>]
@@ -72,6 +73,7 @@ type Virtual =
             getScrollElement: unit -> option<Browser.Types.HTMLElement>,
             estimateSize: int -> int,
             // optional
+            ?getItemKey: int -> string,
             ?scrollMargin: float,
             ?scrollPaddingStart: float,
             ?scrollPaddingEnd: float,
