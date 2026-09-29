@@ -33,8 +33,7 @@ type CreateArcOutcome =
     | CreatedButClosed of path: string
 
 type FileTreeDirectoryExpansionRequest = {
-    relativePath: string
-    isExpanded: bool
+    relativePaths: string[]
 }
 
 /// TEMPORARY DUCT-TAPE WORKAROUND: This IPC API only exists because template loading currently cannot run
@@ -73,7 +72,7 @@ type IArcVaultsApi = {
     cancelImportExternalFiles: string -> JS.Promise<Result<unit, exn>>
     getActiveFileImport: unit -> JS.Promise<Result<ActiveFileImportState option, exn>>
     getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
-    /// Activates or deactivates shallow monitoring for an expanded File Explorer directory.
+    /// Replaces the authoritative set of actively expanded, visible File Explorer directories.
     setFileTreeDirectoryExpanded: FileTreeDirectoryExpansionRequest -> JS.Promise<Result<unit, exn>>
     pathExists: string -> JS.Promise<Result<bool, exn>>
     openFile: string -> JS.Promise<Result<FileContentDTO, exn>>

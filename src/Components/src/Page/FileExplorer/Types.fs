@@ -328,6 +328,20 @@ module ContextMenuItem =
 
 module FileExplorerLogic =
 
+    let rec collectActiveExpandedDirectories (expandedIds: Set<string>) (items: FileItem list) =
+        items
+        |> List.collect (fun item ->
+            if item.IsDirectory && expandedIds.Contains item.Id then
+                let visibleExpandedChildren =
+                    item.Children
+                    |> Option.map (collectActiveExpandedDirectories expandedIds)
+                    |> Option.defaultValue []
+
+                item :: visibleExpandedChildren
+            else
+                []
+        )
+
     let private expandedIdsFromPath includeSelectedItem itemId items =
         let pathItems =
             match FileTree.getPath itemId items [] with

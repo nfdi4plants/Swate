@@ -1,5 +1,6 @@
 module Renderer.Components.LeftSidebar.FileExplorer.FileTreeMaterialization
 
+open System
 open Swate.Components.Shared
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Electron.Shared.FileIOTypes
@@ -7,14 +8,30 @@ open Swate.Electron.Shared.FileIOTypes
 type MaterializedState = {
     ArcScopeId: string option
     Paths: Set<string>
+    ExpandedPaths: Set<string>
 }
 
-let empty = { ArcScopeId = None; Paths = Set.empty }
-
-let materialize path state = {
-    state with
-        Paths = state.Paths.Add(PathHelpers.normalizePath path)
+let empty = {
+    ArcScopeId = None
+    Paths = Set.empty
+    ExpandedPaths = Set.empty
 }
+
+let setExpandedPaths paths state =
+    let normalizedPaths = paths |> Set.map PathHelpers.normalizePath
+
+    {
+        state with
+            Paths = Set.union state.Paths normalizedPaths
+            ExpandedPaths = normalizedPaths
+    }
+
+let private isSameOrDescendantLogicalPath path ancestorPath =
+    let normalizedPath = PathHelpers.normalizePath path
+    let normalizedAncestorPath = PathHelpers.normalizePath ancestorPath
+
+    normalizedPath = normalizedAncestorPath
+    || normalizedPath.StartsWith(normalizedAncestorPath + "/", StringComparison.Ordinal)
 
 let rec private collectDirectoryPaths (node: FileTreeNode) (directoryPaths: Set<string>) =
     if node.isDirectory then
@@ -35,6 +52,7 @@ let reconcileMaterializedState
     | None -> {
         ArcScopeId = arcScopeId
         Paths = Set.empty
+        ExpandedPaths = Set.empty
       }
     | Some root ->
         let validDirectoryPaths = collectDirectoryPaths root Set.empty
@@ -43,7 +61,7 @@ let reconcileMaterializedState
             selectedTreeItemPath
             |> Option.map (fun selectedPath ->
                 validDirectoryPaths
-                |> Set.filter (fun directoryPath -> PathHelpers.isSameOrDescendantPath selectedPath directoryPath)
+                |> Set.filter (fun directoryPath -> isSameOrDescendantLogicalPath selectedPath directoryPath)
             )
             |> Option.defaultValue Set.empty
             |> fun paths ->
@@ -58,9 +76,18 @@ let reconcileMaterializedState
             else
                 Set.empty
 
+        let persistedExpandedPaths =
+            if current.ArcScopeId = arcScopeId then
+                Set.intersect current.ExpandedPaths validDirectoryPaths
+            else
+                Set.empty
+
+        let expandedPaths = Set.union persistedExpandedPaths requiredPaths
+
         {
             ArcScopeId = arcScopeId
-            Paths = Set.union persistedPaths requiredPaths
+            Paths = Set.union persistedPaths expandedPaths
+            ExpandedPaths = expandedPaths
         }
 
 let rec toMaterializedFileItemTree
@@ -80,8 +107,6 @@ let rec toMaterializedFileItemTree
                 |> Seq.map (toMaterializedFileItemTree createItem materializedDirectoryPaths)
                 |> List.ofSeq
                 |> Some
-            elif parent.children.Count = 0 then
-                Some []
             else
                 None
 

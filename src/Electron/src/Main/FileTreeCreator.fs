@@ -131,14 +131,68 @@ let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary
 
     rendererFileTree
 
-/// Removes a path and all descendants from a mutable file-tree snapshot.
-let removePathAndDescendantsInPlace (targetPath: string) (fileTree: Dictionary<string, FileEntry>) =
-    let normalizedTargetPath = PathHelpers.normalizePath targetPath
+/// Logical FileTree keys are case-sensitive even when the host filesystem is not.
+let isSameOrDescendantLogicalPath (path: string) (ancestorPath: string) =
+    let normalizedPath = PathHelpers.normalizePath path
+    let normalizedAncestorPath = PathHelpers.normalizePath ancestorPath
 
-    if not (String.IsNullOrWhiteSpace normalizedTargetPath) then
+    not (String.IsNullOrWhiteSpace normalizedAncestorPath)
+    && (normalizedPath = normalizedAncestorPath
+        || normalizedPath.StartsWith(normalizedAncestorPath + "/", StringComparison.Ordinal))
+
+let private minimizeLogicalDirectoryPrefixes (targetPaths: seq<string>) =
+    let normalizedTargets =
+        targetPaths
+        |> Seq.map PathHelpers.normalizePath
+        |> Seq.filter (String.IsNullOrWhiteSpace >> not)
+        |> Seq.distinct
+        |> Seq.toArray
+
+    let allTargets = HashSet<string>(normalizedTargets)
+
+    normalizedTargets
+    |> Array.filter (fun candidate ->
+        let mutable parent = PathHelpers.tryGetParentPath candidate
+        let mutable hasDeletedAncestor = false
+
+        while parent.IsSome && not hasDeletedAncestor do
+            let parentPath = parent.Value
+
+            if String.IsNullOrWhiteSpace parentPath then
+                parent <- None
+            elif allTargets.Contains parentPath then
+                hasDeletedAncestor <- true
+            else
+                parent <- PathHelpers.tryGetParentPath parentPath
+
+        not hasDeletedAncestor
+    )
+
+/// Removes several directory paths and their descendants with one FileTree scan.
+let removePathsAndDescendantsInPlace (targetPaths: seq<string>) (fileTree: Dictionary<string, FileEntry>) =
+    let prefixes = minimizeLogicalDirectoryPrefixes targetPaths
+
+    if not (Array.isEmpty prefixes) then
+        let prefixSet = HashSet<string>(prefixes)
+
+        let isUnderRemovedDirectory path =
+            let normalizedPath = PathHelpers.normalizePath path
+            let mutable candidate = Some normalizedPath
+            let mutable shouldRemove = false
+
+            while candidate.IsSome && not shouldRemove do
+                let candidatePath = candidate.Value
+
+                if prefixSet.Contains candidatePath then
+                    shouldRemove <- true
+                else
+                    candidate <- PathHelpers.tryGetParentPath candidatePath
+
+            shouldRemove
+
         let keysToRemove =
             fileTree.Keys
-            |> Seq.filter (fun path -> PathHelpers.isSameOrDescendantPath path normalizedTargetPath)
+            |> Seq.filter isUnderRemovedDirectory
             |> Seq.toArray
 
         keysToRemove |> Array.iter (fun path -> fileTree.Remove(path) |> ignore)
@@ -149,7 +203,7 @@ let removePathAndDescendants
     (fileTree: Dictionary<string, FileEntry>)
     : Dictionary<string, FileEntry> =
     let nextTree = Dictionary<string, FileEntry>(fileTree)
-    removePathAndDescendantsInPlace targetPath nextTree
+    removePathsAndDescendantsInPlace [ targetPath ] nextTree
     nextTree
 
 let upsertFileEntryInPlace (entry: FileEntry) (fileTree: Dictionary<string, FileEntry>) = fileTree.[entry.path] <- entry
@@ -234,6 +288,116 @@ let private scanFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> 
         return entries.ToArray()
 }
 
+/// Reads only the immediate children of a directory. Child directories are represented as entries
+/// and are not traversed.
+let scanImmediateFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise {
+    let scanRoot = normalizeRootPath path
+    let! dirents = readdirWithTypesAsync scanRoot (ReaddirOptions(withFileTypes = true))
+
+    return
+        dirents
+        |> Array.choose (fun dirent ->
+            let name = dirent.name
+            let isDirectory = dirent.isDirectory ()
+            let fullPath = join [| scanRoot; name |] |> PathHelpers.normalizeSeparators
+
+            if (isDirectory && shouldIgnoreDirName name) || (not isDirectory && shouldIgnorePath fullPath) then
+                None
+            else
+                Some(FileEntry.create (name, fullPath, isDirectory, None))
+        )
+}
+
+/// Enriches newly discovered direct files across one shallow reconciliation from at most one
+/// repository object snapshot. Existing entries retain their already-known metadata.
+let prepareImmediateFileEntryBatches
+    (repoRoot: string)
+    (entryBatches: FileEntry[][])
+    (fileTree: Dictionary<string, FileEntry>)
+    : Fable.Core.JS.Promise<FileEntry[][]> =
+    promise {
+        let requiresLargeObjectSnapshot =
+            entryBatches
+            |> Array.collect id
+            |> Array.exists (fun entry -> not entry.isDirectory && not (fileTree.ContainsKey entry.path))
+
+        let! largeObjectsByRelativePath =
+            if requiresLargeObjectSnapshot then
+                tryListLargeObjects (normalizeRootPath repoRoot) false
+            else
+                promise { return Map.empty }
+
+        let index = buildLargeObjectPathIndex largeObjectsByRelativePath
+
+        return
+            entryBatches
+            |> Array.map (fun entries ->
+                entries
+                |> Array.map (fun entry ->
+                    match fileTree.TryGetValue entry.path with
+                    | true, existing when existing.isDirectory = entry.isDirectory && existing.name = entry.name ->
+                        existing
+                    | _ when entry.isDirectory -> entry
+                    | _ -> withFileEntryLargeObjectMetadata repoRoot index entry
+                )
+            )
+    }
+
+/// Reconciles only a directory's direct children. Surviving child directories keep all already
+/// materialized descendants; removed child directories lose their known subtrees.
+let reconcileImmediateFileEntries
+    (directoryPath: string)
+    (entries: FileEntry[])
+    (fileTree: Dictionary<string, FileEntry>)
+    : Dictionary<string, FileEntry> * bool =
+    let normalizedDirectoryPath = PathHelpers.normalizePath directoryPath
+
+    let isDirectChild (path: string) =
+        String.Equals(
+            PathHelpers.normalizePath (dirname path),
+            normalizedDirectoryPath,
+            StringComparison.Ordinal
+        )
+
+    let diskEntries =
+        entries
+        |> Array.map (fun entry -> PathHelpers.normalizePath entry.path, entry)
+        |> Map.ofArray
+
+    let knownDirectChildren =
+        fileTree.Keys
+        |> Seq.filter isDirectChild
+        |> Seq.map PathHelpers.normalizePath
+        |> Seq.toArray
+
+    let removedChildren =
+        knownDirectChildren |> Array.filter (fun path -> not (diskEntries.ContainsKey path))
+
+    let mutable changed = not (Array.isEmpty removedChildren)
+
+    for KeyValue(path, entry) in diskEntries do
+        match fileTree.TryGetValue path with
+        | true, existing when existing = entry -> ()
+        | _ -> changed <- true
+
+    if not changed then
+        fileTree, false
+    else
+        let nextTree = Dictionary<string, FileEntry>(fileTree)
+        removePathsAndDescendantsInPlace removedChildren nextTree
+
+        for KeyValue(_, entry) in diskEntries do
+            match nextTree.TryGetValue entry.path with
+            | true, existing when existing.isDirectory && entry.isDirectory ->
+                // The directory entry itself can change without discarding its known descendants.
+                nextTree.[entry.path] <- entry
+            | true, existing when existing.isDirectory <> entry.isDirectory ->
+                removePathsAndDescendantsInPlace [ entry.path ] nextTree
+                nextTree.[entry.path] <- entry
+            | _ -> nextTree.[entry.path] <- entry
+
+        nextTree, true
+
 /// Finds all files and subfolders of the given filepath
 let getFileEntries (path: string) (openSession: bool) : Fable.Core.JS.Promise<FileEntry[]> = promise {
     let repoRoot = normalizeRootPath path
@@ -259,7 +423,7 @@ let refreshFileTreeSubtree
     promise {
         let! entries = getFileEntriesInSubtree repoRoot path
         let nextTree = Dictionary<string, FileEntry>(fileTree)
-        removePathAndDescendantsInPlace path nextTree
+        removePathsAndDescendantsInPlace [ path ] nextTree
         entries |> Array.iter (fun entry -> upsertFileEntryInPlace entry nextTree)
         return nextTree
     }

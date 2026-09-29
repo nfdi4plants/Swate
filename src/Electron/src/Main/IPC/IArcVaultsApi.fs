@@ -679,18 +679,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     withLoadedArcVault
                         event
                         (fun vault -> promise {
-                            if request.isExpanded then
-                                match! tryResolveExistingArcDirectoryPath vault.path.Value request.relativePath with
-                                | Error pathError -> return Error pathError
-                                | Ok _ ->
-                                    do! vault.SetFileTreeDirectoryExpanded(request.relativePath, true)
-                                    return Ok()
-                            else
-                                match tryResolveArcRelativePath vault.path.Value request.relativePath with
-                                | Error pathError -> return Error pathError
-                                | Ok _ ->
-                                    do! vault.SetFileTreeDirectoryExpanded(request.relativePath, false)
-                                    return Ok()
+                            do! vault.SetActiveFileTreeDirectories request.relativePaths
+                            return Ok()
                         })
             with e ->
                 return Error e
@@ -825,26 +815,30 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             match classification with
                             | ArcEntityPathRules.DeletePathClassification.EntityFolderTarget _
                             | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.EntityFile _,
-                                                                                              _) ->
+                                                                                               _) ->
                                 match vault.arc with
                                 | None -> return Error(arcNotOpenError ())
                                 | Some arcLocal ->
                                     return!
-                                        IPCHelper.withBusyWritingScope
-                                            vault
-                                            (fun () -> promise {
-                                                match!
-                                                    ArcDeleteHelper.deleteArcEntityAsync
-                                                        arcPath
-                                                        normalizedRelativePath
-                                                        arcLocal
-                                                with
-                                                | Error deleteError -> return Error deleteError
-                                                | Ok deletedArc ->
-                                                    vault.SetArc deletedArc
-                                                    vault.RefreshHasUnsavedArcChangesFlag()
-                                                    return Ok()
-                                            })
+                                        vault.WithPayloadScopesSuspended(
+                                            [| normalizedRelativePath |],
+                                            fun () ->
+                                                IPCHelper.withBusyWritingScope
+                                                    vault
+                                                    (fun () -> promise {
+                                                        match!
+                                                            ArcDeleteHelper.deleteArcEntityAsync
+                                                                arcPath
+                                                                normalizedRelativePath
+                                                                arcLocal
+                                                        with
+                                                        | Error deleteError -> return Error deleteError
+                                                        | Ok deletedArc ->
+                                                            vault.SetArc deletedArc
+                                                            vault.RefreshHasUnsavedArcChangesFlag()
+                                                            return Ok()
+                                                    })
+                                        )
                             | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile _,
                                                                                               normalizedDataMapPath) ->
                                 match vault.arc, DatamapParentInfo.tryFromPath normalizedDataMapPath with
@@ -857,23 +851,27 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                         )
                                 | Some arc, Some parentInfo ->
                                     return!
-                                        IPCHelper.withBusyWritingScope
-                                            vault
-                                            (fun () -> promise {
-                                                match! arc.TryDeleteDataMapAsync(arcPath, parentInfo) with
-                                                | Error deleteError -> return Error deleteError
-                                                | Ok() ->
-                                                    vault.RefreshHasUnsavedArcChangesFlag()
+                                        vault.WithPayloadScopesSuspended(
+                                            [| normalizedRelativePath |],
+                                            fun () ->
+                                                IPCHelper.withBusyWritingScope
+                                                    vault
+                                                    (fun () -> promise {
+                                                        match! arc.TryDeleteDataMapAsync(arcPath, parentInfo) with
+                                                        | Error deleteError -> return Error deleteError
+                                                        | Ok() ->
+                                                            vault.RefreshHasUnsavedArcChangesFlag()
 
-                                                    let absoluteDataMapPath =
-                                                        Main.Bindings.Path.join [| arcPath; normalizedDataMapPath |]
+                                                            let absoluteDataMapPath =
+                                                                Main.Bindings.Path.join [| arcPath; normalizedDataMapPath |]
 
-                                                    vault.SetFileTree(
-                                                        removePathAndDescendants absoluteDataMapPath vault.fileTree
-                                                    )
+                                                            vault.SetFileTree(
+                                                                removePathAndDescendants absoluteDataMapPath vault.fileTree
+                                                            )
 
-                                                    return Ok()
-                                            })
+                                                            return Ok()
+                                                    })
+                                        )
                             | ArcEntityPathRules.DeletePathClassification.GenericTarget normalizedGenericPath
                             | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget(_,
                                                                                                   normalizedGenericPath) ->
@@ -885,9 +883,13 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                         )
                                 else
                                     return!
-                                        ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk
-                                            arcPath
-                                            normalizedGenericPath
+                                        vault.WithPayloadScopesSuspended(
+                                            [| normalizedGenericPath |],
+                                            fun () ->
+                                                ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk
+                                                    arcPath
+                                                    normalizedGenericPath
+                                        )
                             | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.InvestigationFile,
                                                                                               _) ->
                                 return Error(exn "Deleting the investigation file is not supported.")
@@ -916,26 +918,32 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         (fun vault -> promise {
                             let arcPath = vault.path.Value
 
-                            match ArcEntityPathRules.classifyRenameTarget request.relativePath with
-                            | ArcEntityPathRules.RenamePathClassification.GenericTarget _ ->
-                                return! ArcFileSystemHelper.renameGenericFileSystemItemOnDisk arcPath request
-                            | _ ->
-                                match vault.arc with
-                                | None -> return Error(arcNotOpenError ())
-                                | Some arcLocal ->
-                                    return!
-                                        IPCHelper.withBusyWritingScope
-                                            vault
-                                            (fun () -> promise {
-                                                match!
-                                                    ArcRenameHelper.renameArcEntityAsync arcPath request arcLocal
-                                                with
-                                                | Error renameError -> return Error renameError
-                                                | Ok renamedArc ->
-                                                    vault.SetArc renamedArc
-                                                    vault.RefreshHasUnsavedArcChangesFlag()
-                                                    return Ok()
-                                            })
+                            return!
+                                vault.WithPayloadScopesSuspended(
+                                    [| request.relativePath |],
+                                    fun () -> promise {
+                                        match ArcEntityPathRules.classifyRenameTarget request.relativePath with
+                                        | ArcEntityPathRules.RenamePathClassification.GenericTarget _ ->
+                                            return! ArcFileSystemHelper.renameGenericFileSystemItemOnDisk arcPath request
+                                        | _ ->
+                                            match vault.arc with
+                                            | None -> return Error(arcNotOpenError ())
+                                            | Some arcLocal ->
+                                                return!
+                                                    IPCHelper.withBusyWritingScope
+                                                        vault
+                                                        (fun () -> promise {
+                                                            match!
+                                                                ArcRenameHelper.renameArcEntityAsync arcPath request arcLocal
+                                                            with
+                                                            | Error renameError -> return Error renameError
+                                                            | Ok renamedArc ->
+                                                                vault.SetArc renamedArc
+                                                                vault.RefreshHasUnsavedArcChangesFlag()
+                                                                return Ok()
+                                                        })
+                                    }
+                                )
                         })
             with e ->
                 return Error e
@@ -947,7 +955,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     withLoadedArcVault
                         event
                         (fun vault -> promise {
-                            return! ArcFileSystemHelper.moveGenericFileSystemItemOnDisk vault.path.Value request
+                            return!
+                                vault.WithPayloadScopesSuspended(
+                                    [| request.sourceRelativePath; request.targetRelativePath |],
+                                    fun () -> ArcFileSystemHelper.moveGenericFileSystemItemOnDisk vault.path.Value request
+                                )
                         })
             with e ->
                 return Error e

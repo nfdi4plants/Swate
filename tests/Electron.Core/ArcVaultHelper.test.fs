@@ -635,14 +635,6 @@ Vitest.describe (
                         diskArc.GetAssay("DiskAssay").Title <- Some "Changed on disk"
                         do! diskArc.UpdateAsync arcPath
 
-                        let mutable watcherMergeBarrierCalled = false
-
-                        vault.WatcherMergeBarrier <-
-                            Some(fun () ->
-                                watcherMergeBarrierCalled <- true
-                                promise { return () }
-                            )
-
                         let mutable releaseFirstMerge = ignore
 
                         let firstMergeGate =
@@ -669,14 +661,11 @@ Vitest.describe (
                         | WatcherMergeOutcome.Deferred -> ()
                         | _ -> return failwith "The watcher merge should defer while the write is busy."
 
-                        Vitest.expect(watcherMergeBarrierCalled).toBe (false)
                         Vitest.expect(vault.arc.Value.GetAssay("DiskAssay").Title).toEqual (Some "Old title")
 
                         releaseWrite ()
                         do! writeScope
                         do! Promise.sleep 600
-
-                        vault.WatcherMergeBarrier <- None
 
                         match! vault.TryApplyWatcherArcMergeIfEligible watcherEvents with
                         | WatcherMergeOutcome.Applied -> ()
@@ -687,45 +676,28 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "a write that starts and ends while the snapshot loads defers it even after suppression",
-            fun () ->
-                withTempArc
-                    (fun arc -> arc.AddAssay(ArcAssay("DiskAssay", title = "Old title")))
-                    (fun arcPath -> promise {
-                        let! loadedArc = TestHelpers.loadArcAsync arcPath
-                        let vault = ArcVault(TestHelpers.testWindow ())
-                        vault.path <- Some arcPath
-                        vault.SetArc loadedArc
+            "a snapshot captured before a completed write is stale even after suppression",
+            fun () -> promise {
+                let vault = ArcVault(TestHelpers.testWindow ())
+                let capturedWriteGeneration = vault.WriteGeneration
+                let capturedWatcherEpoch = vault.WatcherEpoch
 
-                        let! diskArc = TestHelpers.loadArcAsync arcPath
-                        diskArc.GetAssay("DiskAssay").Title <- Some "Changed on disk"
-                        do! diskArc.UpdateAsync arcPath
+                do! vault.WithBusyWritingScope(fun () -> promise { return () })
+                do! Promise.sleep 600
 
-                        vault.WatcherMergeBarrier <-
-                            Some(fun () -> promise {
-                                do! vault.WithBusyWritingScope(fun () -> promise { return () })
+                Vitest.expect(vault.IsFileWatcherArcMergeEligible).toBe (true)
 
-                                let mutable attempts = 0
-
-                                while not vault.IsFileWatcherArcMergeEligible && attempts < 200 do
-                                    do! Promise.sleep 20
-                                    attempts <- attempts + 1
-
-                                if not vault.IsFileWatcherArcMergeEligible then
-                                    return failwith "Watcher merge eligibility did not return after 200 polls."
-                            })
-
-                        match!
-                            vault.TryApplyWatcherArcMergeIfEligible [
-                                watcherEvent arcPath "change" "assays/DiskAssay/isa.assay.xlsx"
-                            ]
-                        with
-                        | WatcherMergeOutcome.Deferred -> ()
-                        | _ -> return failwith "The watcher merge should defer after the write generation changes."
-
-                        Vitest.expect(vault.arc.Value.GetAssay("DiskAssay").Title).toEqual (Some "Old title")
-                        Vitest.expect(vault.IsFileWatcherArcMergeEligible).toBe (true)
-                    })
+                Vitest
+                    .expect(
+                        canPublishWatcherMergeSnapshot
+                            vault.IsFileWatcherArcMergeEligible
+                            capturedWriteGeneration
+                            vault.WriteGeneration
+                            capturedWatcherEpoch
+                            vault.WatcherEpoch
+                    )
+                    .toBe (false)
+            }
         )
 
         Vitest.test (
@@ -937,7 +909,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "a snapshot loaded before a rename is not published",
+            "a watcher merge queued before a lifecycle reset is not published",
             fun () ->
                 withTempArc
                     (fun arc -> arc.AddAssay(ArcAssay("DiskAssay", title = "Old title")))
@@ -947,17 +919,25 @@ Vitest.describe (
                         vault.path <- Some arcPath
                         vault.SetArc loadedArc
 
-                        vault.WatcherMergeBarrier <-
-                            Some(fun () ->
-                                vault.ClearPendingFileWatcherState()
-                                promise { return () }
+                        let mutable releaseQueuedMerge = ignore
+
+                        let mergeQueueGate =
+                            JS.Constructors.Promise.Create(fun resolve _ ->
+                                releaseQueuedMerge <- fun () -> resolve ()
                             )
 
-                        match!
+                        let queuedMerge = vault.EnqueueArcMerge(fun () -> mergeQueueGate)
+
+                        let watcherMerge =
                             vault.TryApplyWatcherArcMergeIfEligible [
                                 watcherEvent arcPath "change" "assays/DiskAssay/isa.assay.xlsx"
                             ]
-                        with
+
+                        vault.ClearPendingFileWatcherState()
+                        releaseQueuedMerge ()
+                        do! queuedMerge
+
+                        match! watcherMerge with
                         | WatcherMergeOutcome.Deferred -> ()
                         | _ -> return failwith "The watcher merge should defer after the pending state reset."
 
@@ -1132,38 +1112,33 @@ Vitest.describe (
 
                         let assayPath = join [| arcPath; "assays/DiskAssay/isa.assay.xlsx" |]
                         let loadingCalls = ResizeArray<WatcherLoadingCall>()
-                        let mutable handleFileEvent: string -> string -> unit = fun _ _ -> ()
-                        let mutable barrierCallCount = 0
 
-                        handleFileEvent <-
+                        let handleFileEvent =
                             vault._FileEventController (recordingWatcherApiWithPendingState vault loadingCalls)
 
-                        vault.WatcherMergeBarrier <-
-                            Some(fun () -> promise {
-                                if barrierCallCount = 0 then
-                                    barrierCallCount <- barrierCallCount + 1
-                                    handleFileEvent "change" assayPath
-                                    let secondHandlerStartedAt = nowMs ()
-                                    do! vault.WithBusyWritingScope(fun () -> promise { return () })
+                        let mutable releaseQueuedMerge = ignore
 
-                                    let mutable attempts = 0
+                        let mergeQueueGate =
+                            JS.Constructors.Promise.Create(fun resolve _ ->
+                                releaseQueuedMerge <- fun () -> resolve ()
+                            )
 
-                                    while attempts < 150
-                                          && (not vault.IsFileWatcherArcMergeEligible
-                                              || nowMs () - secondHandlerStartedAt < 1100.) do
-                                        do! Promise.sleep 20
-                                        attempts <- attempts + 1
-
-                                    if
-                                        not vault.IsFileWatcherArcMergeEligible
-                                        || nowMs () - secondHandlerStartedAt < 1100.
-                                    then
-                                        return failwith "The overlapping reload did not pass the suppression window."
-                                else
-                                    ()
-                            })
+                        let queuedMerge = vault.EnqueueArcMerge(fun () -> mergeQueueGate)
 
                         handleFileEvent "change" assayPath
+
+                        do!
+                            waitUntil
+                                "first watcher batch claimed"
+                                (fun () ->
+                                    vault.fileWatcherReloadArcTimeout.IsNone
+                                    && vault.fileWatcherPendingEvents.Count = 0
+                                    && vault.fileWatcherPendingArcMergeEvents.Count = 0
+                                )
+
+                        handleFileEvent "change" assayPath
+                        releaseQueuedMerge ()
+                        do! queuedMerge
 
                         let mutable attempts = 0
 
@@ -1181,7 +1156,6 @@ Vitest.describe (
                                 not call.IsLoading && (call.PendingEvents > 0 || call.PendingArcMergeEvents > 0)
                             )
 
-                        Vitest.expect(barrierCallCount > 0).toBe (true)
                         Vitest.expect(loadingCalls.[loadingCalls.Count - 1].IsLoading).toBe (false)
                         Vitest.expect(falseWithPendingEvents).toBe (false)
                         Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (0)
@@ -1321,13 +1295,29 @@ Vitest.describe (
                         let handleFileEvent =
                             vault._FileEventController (recordingWatcherApi loadingChanges)
 
-                        vault.WatcherMergeBarrier <-
-                            Some(fun () ->
-                                vault.ClearPendingFileWatcherState()
-                                promise { return () }
+                        let mutable releaseQueuedMerge = ignore
+
+                        let mergeQueueGate =
+                            JS.Constructors.Promise.Create(fun resolve _ ->
+                                releaseQueuedMerge <- fun () -> resolve ()
                             )
 
+                        let queuedMerge = vault.EnqueueArcMerge(fun () -> mergeQueueGate)
+
                         handleFileEvent "change" (join [| arcPath; "assays/DiskAssay/isa.assay.xlsx" |])
+
+                        do!
+                            waitUntil
+                                "stale watcher batch claimed"
+                                (fun () ->
+                                    vault.fileWatcherReloadArcTimeout.IsNone
+                                    && vault.fileWatcherPendingEvents.Count = 0
+                                    && vault.fileWatcherPendingArcMergeEvents.Count = 0
+                                )
+
+                        vault.ClearPendingFileWatcherState()
+                        releaseQueuedMerge ()
+                        do! queuedMerge
 
                         let mutable attempts = 0
 
@@ -4496,7 +4486,7 @@ Vitest.describe (
                             do! vault.OpenARC arcPath
                             let! initialTree = Main.FileTreeCreator.getFileTree arcPath
                             do! vault.FinalizeArcInitialization initialTree
-                            do! vault.SetFileTreeDirectoryExpanded("studies/S1/dataset", true)
+                            do! vault.SetActiveFileTreeDirectories [| "studies/S1/dataset" |]
 
                             match! vault.RenameOpenArcRoot "renamed-expanded-watcher" with
                             | Error error -> failwith error.Message
@@ -4541,11 +4531,11 @@ Vitest.describe (
                             do! writeWatcherTextFileAsync lateFile "late"
                             Vitest.expect(vault.fileTree.ContainsKey lateFile).toBe (false)
 
-                            do! vault.SetFileTreeDirectoryExpanded("studies/S1/dataset", true)
+                            do! vault.SetActiveFileTreeDirectories [| "studies/S1/dataset" |]
                             Vitest.expect(vault.fileTree.ContainsKey lateFile).toBe (true)
                             Vitest.expect(vault.payloadWatcher.IsSome).toBe (true)
 
-                            do! vault.SetFileTreeDirectoryExpanded("studies/S1/dataset", false)
+                            do! vault.SetActiveFileTreeDirectories [||]
                             Vitest.expect(vault.expandedDirectoryPaths.IsEmpty).toBe (true)
                             Vitest.expect(vault.payloadWatcher.IsNone).toBe (true)
                             do! vault.StopFileWatcher()

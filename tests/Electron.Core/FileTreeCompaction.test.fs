@@ -263,7 +263,7 @@ Vitest.describe (
 
                 let updatedTree =
                     let nextTree = Dictionary<string, FileEntry>(tree)
-                    FileTreeCreator.removePathAndDescendantsInPlace "C:/arc/assays/A" nextTree
+                    FileTreeCreator.removePathsAndDescendantsInPlace [ "C:/arc/assays/A" ] nextTree
                     nextTree
 
                 Vitest.expect(updatedTree.ContainsKey("C:/arc/assays/A")).toBe (false)

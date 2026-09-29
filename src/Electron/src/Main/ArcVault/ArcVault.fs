@@ -81,12 +81,13 @@ type ArcVault(window: BrowserWindow) =
     member val payloadWatcher: Chokidar.IWatcher option = None with get, set
     /// Expanded payload directories stored as case-sensitive normalized relative paths.
     member val expandedDirectoryPaths: Set<string> = Set.empty with get, set
+    member val internal payloadWatcherScopes: Set<string> = Set.empty with get, set
+    member val internal payloadWatcherScopeSuspensions: Dictionary<string, int> = Dictionary() with get
     member val internal FileWatcherEventController: (string -> string -> unit) option = None with get, set
     member val fileWatcherReloadArcTimeout: int option = None with get, set
+    member val internal FileWatcherBatchProcessor: (int * obj) option = None with get, set
     member val fileWatcherPendingEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
     member val fileWatcherPendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
-    /// The barrier stays None outside tests. The watcher path awaits it between snapshot loading and the final eligibility check.
-    member val internal WatcherMergeBarrier: (unit -> Fable.Core.JS.Promise<unit>) option = None with get, set
     /// Imported paths awaiting their delayed Chokidar events. These events update the tree but must not re-merge the import.
     member val importedFileWatcherPaths: HashSet<string> = HashSet() with get
     member val private isBusyWritingValue: bool = false with get, set
@@ -283,6 +284,39 @@ module ArcVaultExtensions =
                         let nextFileTree = Dictionary<string, FileEntry>(this.fileTree)
                         let mutable hasFileTreeChanges = false
 
+                        let removedDirectoryEvents =
+                            normalizedEvents
+                            |> List.filter (fun event ->
+                                WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName
+                                && not (WatcherHelpers.existsSyncWithExactName event.AbsolutePath)
+                            )
+
+                        let removedDirectoryPaths = removedDirectoryEvents |> List.map _.AbsolutePath
+
+                        if not removedDirectoryPaths.IsEmpty then
+                            let beforeCount = nextFileTree.Count
+                            removePathsAndDescendantsInPlace removedDirectoryPaths nextFileTree
+                            hasFileTreeChanges <- nextFileTree.Count <> beforeCount
+
+                            let removedRelativePaths =
+                                removedDirectoryEvents
+                                |> List.map (fun event -> PathHelpers.normalizeCanonicalRelativePath event.RelativePath)
+
+                            let scopesToRemove =
+                                this.expandedDirectoryPaths
+                                |> Set.filter (fun expandedPath ->
+                                    removedRelativePaths
+                                    |> List.exists (fun removedPath ->
+                                        isSameOrDescendantLogicalPath expandedPath removedPath
+                                    )
+                                )
+
+                            if not scopesToRemove.IsEmpty then
+                                this.expandedDirectoryPaths <- Set.difference this.expandedDirectoryPaths scopesToRemove
+
+                                this.payloadWatcher
+                                |> Option.iter (fun watcher -> watcher.unwatch (scopesToRemove |> Set.toArray) |> ignore)
+
                         for event in normalizedEvents do
                             try
                                 if
@@ -294,21 +328,30 @@ module ArcVaultExtensions =
                                     let changedFile =
                                         withFileEntryLargeObjectMetadata arcPath largeObjectPathIndex changedFile
 
-                                    upsertFileEntryInPlace changedFile nextFileTree
-                                    hasFileTreeChanges <- true
+                                    match nextFileTree.TryGetValue changedFile.path with
+                                    | true, current when current = changedFile -> ()
+                                    | _ ->
+                                        upsertFileEntryInPlace changedFile nextFileTree
+                                        hasFileTreeChanges <- true
                                 elif WatcherHelpers.eventNameEquals Chokidar.Events.AddDir event.EventName then
                                     let! addedDirectory = getFileEntry event.AbsolutePath
-                                    upsertFileEntryInPlace addedDirectory nextFileTree
-                                    hasFileTreeChanges <- true
-                                elif
-                                    WatcherHelpers.eventNameEquals Chokidar.Events.Unlink event.EventName
-                                    || (WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName
-                                        && not (WatcherHelpers.existsSyncWithExactName event.AbsolutePath))
-                                then
-                                    // Normalization above already turned the unlink of an existing file into a change. Directory unlinks
-                                    // stay admitted, so they still need this check.
-                                    removePathAndDescendantsInPlace event.AbsolutePath nextFileTree
-                                    hasFileTreeChanges <- true
+
+                                    match nextFileTree.TryGetValue addedDirectory.path with
+                                    | true, current when current = addedDirectory -> ()
+                                    | _ ->
+                                        upsertFileEntryInPlace addedDirectory nextFileTree
+                                        hasFileTreeChanges <- true
+                                elif WatcherHelpers.eventNameEquals Chokidar.Events.Unlink event.EventName then
+                                    // A regular-file unlink is exact. Directory subtrees were removed once above.
+                                    let normalizedAbsolutePath = PathHelpers.normalizePath event.AbsolutePath
+                                    let removedExact = nextFileTree.Remove event.AbsolutePath
+
+                                    let removedNormalized =
+                                        normalizedAbsolutePath <> event.AbsolutePath
+                                        && nextFileTree.Remove normalizedAbsolutePath
+
+                                    if removedExact || removedNormalized then
+                                        hasFileTreeChanges <- true
                             with fileTreeError ->
                                 swatelogfn
                                     this.window.id
@@ -353,24 +396,26 @@ module ArcVaultExtensions =
 
                     match! this.LoadWatcherSnapshot() with
                     | Error loadError ->
-                        if
-                            not this.IsFileWatcherArcMergeEligible
-                            || capturedWriteGeneration <> this.WriteGeneration
-                            || capturedWatcherEpoch <> this.WatcherEpoch
-                        then
+                        if not (
+                            canPublishWatcherMergeSnapshot
+                                this.IsFileWatcherArcMergeEligible
+                                capturedWriteGeneration
+                                this.WriteGeneration
+                                capturedWatcherEpoch
+                                this.WatcherEpoch
+                        ) then
                             return WatcherMergeOutcome.Deferred
                         else
                             return WatcherMergeOutcome.Failed loadError
                     | Ok snapshot ->
-                        match this.WatcherMergeBarrier with
-                        | Some barrier -> do! barrier ()
-                        | None -> ()
-
-                        if
-                            not this.IsFileWatcherArcMergeEligible
-                            || capturedWriteGeneration <> this.WriteGeneration
-                            || capturedWatcherEpoch <> this.WatcherEpoch
-                        then
+                        if not (
+                            canPublishWatcherMergeSnapshot
+                                this.IsFileWatcherArcMergeEligible
+                                capturedWriteGeneration
+                                this.WriteGeneration
+                                capturedWatcherEpoch
+                                this.WatcherEpoch
+                        ) then
                             return WatcherMergeOutcome.Deferred
                         else
                             match this.path with
@@ -422,185 +467,153 @@ module ArcVaultExtensions =
                         "Watcher merge deferred three times in a row. The tree batch is published on this and every further deferral until a merge applies."
                 | _ -> ()
 
+            let hasPendingEvents () =
+                this.fileWatcherPendingEvents.Count > 0
+                || this.fileWatcherPendingArcMergeEvents.Count > 0
+
+            let hasCurrentBatchProcessor () =
+                this.FileWatcherBatchProcessor
+                |> Option.exists (fun (processorEpoch, _) -> processorEpoch = this.WatcherEpoch)
+
             let rec scheduleReload () =
-                let mutable ownTimeoutId = None
+                if this.fileWatcherReloadArcTimeout.IsNone && not (hasCurrentBatchProcessor ()) then
+                    let scheduledEpoch = this.WatcherEpoch
 
-                let finishReload () =
-                    if
-                        this.fileWatcherPendingEvents.Count > 0
-                        || this.fileWatcherPendingArcMergeEvents.Count > 0
-                    then
-                        if
-                            this.fileWatcherReloadArcTimeout.IsNone
-                            || this.fileWatcherReloadArcTimeout = ownTimeoutId
-                        then
-                            this.fileWatcherReloadArcTimeout <- None
-                            scheduleReload ()
-                        else
-                            ()
-                    else if
-                        this.fileWatcherReloadArcTimeout.IsNone
-                        || this.fileWatcherReloadArcTimeout = ownTimeoutId
-                    then
-                        this.fileWatcherReloadArcTimeout <- None
-                        sendMsgApi.IsLoadingChanges false
-                    else
-                        ()
+                    let timeoutId =
+                        Fable.Core.JS.setTimeout
+                            (fun () ->
+                                this.fileWatcherReloadArcTimeout <- None
 
-                let timeoutId =
-                    Fable.Core.JS.setTimeout
-                        (fun () ->
-                            promise {
-                                swatelogfn this.window.id "Scheduled ARC reload triggered by file watcher."
-                                let callbackEpoch = this.WatcherEpoch
+                                if scheduledEpoch = this.WatcherEpoch && not (hasCurrentBatchProcessor ()) then
+                                    let processorToken = obj ()
+                                    this.FileWatcherBatchProcessor <- Some(scheduledEpoch, processorToken)
 
-                                if this.isBusyWriting then
-                                    let hasPendingEvents =
-                                        this.fileWatcherPendingEvents.Count > 0
-                                        || this.fileWatcherPendingArcMergeEvents.Count > 0
+                                    let finishBatch () =
+                                        let ownsProcessor =
+                                            this.FileWatcherBatchProcessor
+                                            |> Option.exists (fun (processorEpoch, currentToken) ->
+                                                processorEpoch = scheduledEpoch
+                                                && obj.ReferenceEquals(currentToken, processorToken)
+                                            )
 
-                                    // A fire with nothing pending defers nothing, so it neither counts nor logs.
-                                    if hasPendingEvents then
-                                        let deferralCount = this.IncrementWatcherDeferralCount()
-                                        logWatcherDeferral deferralCount
+                                        if ownsProcessor then
+                                            this.FileWatcherBatchProcessor <- None
 
-                                        if this.HasReachedWatcherDeferralLimit then
-                                            let pendingEvents = this.fileWatcherPendingEvents |> Seq.toList
-                                            this.fileWatcherPendingEvents.Clear()
+                                            if hasPendingEvents () then
+                                                scheduleReload ()
+                                            elif this.fileWatcherReloadArcTimeout.IsNone then
+                                                sendMsgApi.IsLoadingChanges false
 
-                                            do! this.ApplyWatcherFileTreeEvents pendingEvents
+                                    promise {
+                                        swatelogfn this.window.id "Scheduled ARC reload triggered by file watcher."
+                                        let callbackEpoch = scheduledEpoch
 
-                                    if
-                                        this.fileWatcherPendingEvents.Count = 0
-                                        && this.fileWatcherPendingArcMergeEvents.Count = 0
-                                    then
-                                        // Nothing is left to retry, so the retry chain ends here and the loading
-                                        // flag goes off. The flag means that watcher changes are loading, so a
-                                        // false during a write is truthful, and the next admitted event turns it
-                                        // on again. The counter resets so the next batch starts its own count.
-                                        this.ResetWatcherDeferralCount()
-                                        finishReload ()
-                                    elif this.fileWatcherReloadArcTimeout = ownTimeoutId then
-                                        this.fileWatcherReloadArcTimeout <- None
-                                        scheduleReload ()
-                                    else
-                                        ()
-                                else
-                                    let pendingEvents = this.fileWatcherPendingEvents |> Seq.toList
-                                    let pendingArcMergeEvents = this.fileWatcherPendingArcMergeEvents |> Seq.toList
-                                    this.fileWatcherPendingEvents.Clear()
-                                    this.fileWatcherPendingArcMergeEvents.Clear()
-
-                                    if pendingArcMergeEvents.IsEmpty then
-                                        this.ResetWatcherDeferralCount()
-                                        do! this.ApplyWatcherFileTreeEvents pendingEvents
-                                        finishReload ()
-                                    else
-                                        match! this.TryApplyWatcherArcMergeIfEligible pendingArcMergeEvents with
-                                        | (WatcherMergeOutcome.Applied | WatcherMergeOutcome.Failed _) as outcome ->
-                                            match outcome with
-                                            | WatcherMergeOutcome.Failed mergeError ->
-                                                swatelogfn
-                                                    this.window.id
-                                                    "Unable to merge ARC after file watcher event: %s"
-                                                    mergeError.Message
-                                            | _ -> ()
-
-                                            this.ResetWatcherDeferralCount()
-
-                                            // FileTree updates are renderer-visible and can trigger an immediate openFile call.
-                                            // A successful merge means that call reads the same ARC state represented by the published tree.
-                                            // A batch snapshotted before a pending-state reset carries paths under the old root.
-                                            if callbackEpoch = this.WatcherEpoch then
-                                                do! this.ApplyWatcherFileTreeEvents pendingEvents
-
-                                            finishReload ()
-                                        | WatcherMergeOutcome.Deferred ->
-                                            if callbackEpoch <> this.WatcherEpoch then
-                                                swatelogfn
-                                                    this.window.id
-                                                    "Watcher merge deferred after watcher state was cleared. Dropping the stale batch."
-
-                                                finishReload ()
-                                            else
+                                        if this.isBusyWriting then
+                                            if hasPendingEvents () then
                                                 let deferralCount = this.IncrementWatcherDeferralCount()
-
                                                 logWatcherDeferral deferralCount
 
-                                                // Read once: an overlapping callback can reset the counter during the await below.
-                                                let reachedDeferralLimit = this.HasReachedWatcherDeferralLimit
+                                                if this.HasReachedWatcherDeferralLimit then
+                                                    let pendingEvents = this.fileWatcherPendingEvents |> Seq.toList
+                                                    this.fileWatcherPendingEvents.Clear()
 
-                                                if reachedDeferralLimit then
-                                                    // The limit latches during a write, so every later deferral publishes the
-                                                    // tree batch too. A file the tree shows before its entity is merged opens
-                                                    // through the disk fallback of openFile (raw file text) until the retained
-                                                    // ARC batch merges after the write. A tree that hides every external change
-                                                    // for the whole duration of a long write would be worse.
-                                                    // The ARC batch is restored first, so a rejected tree update cannot lose it.
-                                                    // Appending is enough because both consumers re-check the disk at apply time.
-                                                    this.fileWatcherPendingArcMergeEvents.AddRange
-                                                        pendingArcMergeEvents
+                                                    if callbackEpoch = this.WatcherEpoch then
+                                                        do! this.ApplyWatcherFileTreeEvents pendingEvents
+                                        else
+                                            let pendingEvents = this.fileWatcherPendingEvents |> Seq.toList
 
-                                                    do! this.ApplyWatcherFileTreeEvents pendingEvents
-                                                else
-                                                    ()
+                                            let pendingArcMergeEvents =
+                                                this.fileWatcherPendingArcMergeEvents |> Seq.toList
+
+                                            this.fileWatcherPendingEvents.Clear()
+                                            this.fileWatcherPendingArcMergeEvents.Clear()
+
+                                            if pendingArcMergeEvents.IsEmpty then
+                                                this.ResetWatcherDeferralCount()
 
                                                 if callbackEpoch = this.WatcherEpoch then
-                                                    if not reachedDeferralLimit then
-                                                        this.fileWatcherPendingArcMergeEvents.AddRange
-                                                            pendingArcMergeEvents
+                                                    do! this.ApplyWatcherFileTreeEvents pendingEvents
+                                            elif callbackEpoch <> this.WatcherEpoch then
+                                                swatelogfn
+                                                    this.window.id
+                                                    "Dropping a watcher batch after watcher state was cleared."
+                                            else
+                                                match! this.TryApplyWatcherArcMergeIfEligible pendingArcMergeEvents with
+                                                | (WatcherMergeOutcome.Applied | WatcherMergeOutcome.Failed _) as outcome ->
+                                                    match outcome with
+                                                    | WatcherMergeOutcome.Failed mergeError ->
+                                                        swatelogfn
+                                                            this.window.id
+                                                            "Unable to merge ARC after file watcher event: %s"
+                                                            mergeError.Message
+                                                    | _ -> ()
 
-                                                        this.fileWatcherPendingEvents.AddRange pendingEvents
-                                                    else
-                                                        ()
+                                                    this.ResetWatcherDeferralCount()
 
-                                                    if
-                                                        this.fileWatcherReloadArcTimeout.IsNone
-                                                        || this.fileWatcherReloadArcTimeout = ownTimeoutId
-                                                    then
-                                                        this.fileWatcherReloadArcTimeout <- None
-                                                        scheduleReload ()
+                                                    if callbackEpoch = this.WatcherEpoch then
+                                                        do! this.ApplyWatcherFileTreeEvents pendingEvents
+                                                | WatcherMergeOutcome.Deferred ->
+                                                    if callbackEpoch <> this.WatcherEpoch then
+                                                        swatelogfn
+                                                            this.window.id
+                                                            "Watcher merge deferred after watcher state was cleared. Dropping the stale batch."
                                                     else
-                                                        ()
-                                                else
-                                                    ()
-                            }
-                            |> Promise.catch (fun ex ->
-                                swatelogfn this.window.id "Scheduled ARC reload failed: %s" ex.Message
-                                finishReload ()
+                                                        let deferralCount = this.IncrementWatcherDeferralCount()
+                                                        logWatcherDeferral deferralCount
+                                                        let reachedDeferralLimit = this.HasReachedWatcherDeferralLimit
+
+                                                        this.fileWatcherPendingArcMergeEvents.AddRange pendingArcMergeEvents
+
+                                                        if reachedDeferralLimit then
+                                                            do! this.ApplyWatcherFileTreeEvents pendingEvents
+                                                        else
+                                                            this.fileWatcherPendingEvents.AddRange pendingEvents
+
+                                        finishBatch ()
+                                    }
+                                    |> Promise.catch (fun ex ->
+                                        swatelogfn this.window.id "Scheduled ARC reload failed: %s" ex.Message
+                                        finishBatch ()
+                                    )
+                                    |> Promise.start
+                                elif not (hasPendingEvents ()) && not (hasCurrentBatchProcessor ()) then
+                                    sendMsgApi.IsLoadingChanges false
                             )
-                            |> Promise.start
-                        )
-                        500
+                            500
 
-                ownTimeoutId <- Some timeoutId
-                this.fileWatcherReloadArcTimeout <- Some timeoutId
+                    this.fileWatcherReloadArcTimeout <- Some timeoutId
 
             fun (eventName: string) (path: string) ->
 
                 swatelogfn this.window.id "File change detected: %s on %s" eventName path
 
-                WatcherHelpers.queueFileWatcherEvent
-                    (fun event ->
-                        let isImportedPath =
-                            this.importedFileWatcherPaths.Remove(
-                                PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant())
-                            )
+                let wasIdle =
+                    not (hasPendingEvents ())
+                    && this.fileWatcherReloadArcTimeout.IsNone
+                    && not (hasCurrentBatchProcessor ())
 
-                        not isImportedPath
+                match this.path with
+                | Some rootPath ->
+                    let watcherEvent = WatcherHelpers.buildWatcherEvent rootPath eventName path
+
+                    // Imported-path acknowledgement is event bookkeeping, not part of the ARC-merge predicate.
+                    let isImportedPath =
+                        this.importedFileWatcherPaths.Remove(
+                            PathHelpers.normalizePath (watcherEvent.AbsolutePath.ToLowerInvariant())
+                        )
+
+                    this.fileWatcherPendingEvents.Add watcherEvent
+
+                    if
+                        WatcherHelpers.isArcMergeRelevant watcherEvent
+                        && not isImportedPath
                         && (this.activeFileImport.IsSome || this.IsFileWatcherArcMergeEligible)
-                    )
-                    this.path
-                    this.fileWatcherPendingEvents
-                    this.fileWatcherPendingArcMergeEvents
-                    eventName
-                    path
+                    then
+                        this.fileWatcherPendingArcMergeEvents.Add watcherEvent
+                | None -> ()
 
-                match this.fileWatcherReloadArcTimeout with
-                | Some timeoutId ->
-                    Fable.Core.JS.clearTimeout timeoutId
-                    this.fileWatcherReloadArcTimeout <- None
-                | None -> sendMsgApi.IsLoadingChanges true
+                if wasIdle && hasPendingEvents () then
+                    sendMsgApi.IsLoadingChanges true
 
                 scheduleReload ()
 
@@ -743,7 +756,9 @@ module ArcVaultExtensions =
                                             |> ignore
                                         )
 
-                                    let! structuralEvents = reconcileArcStructureScope arcPath relativePath
+                                    let! structuralEvents =
+                                        reconcileArcStructureScopeChanges arcPath relativePath (fun () -> this.fileTree)
+
                                     WatcherHelpers.attachArcStructureScopes this.watcher structuralEvents
 
                                     for syntheticEventName, syntheticPath in structuralEvents do
@@ -759,98 +774,164 @@ module ArcVaultExtensions =
                         | _ -> ()
                     | None -> ()
 
-        member private this.EnsurePayloadWatcher(arcPath: string, ?usePolling: bool) = promise {
-            if this.payloadWatcher.IsNone && not this.expandedDirectoryPaths.IsEmpty then
-                let watchedPaths =
+        member private this.EnsurePayloadWatcher
+            (arcPath: string, targetScopes: Set<string>, ?usePolling: bool)
+            =
+            promise {
+                if this.payloadWatcher.IsNone && not targetScopes.IsEmpty then
+                    let watchedPaths =
+                        targetScopes
+                        |> Seq.map PathHelpers.normalizeCanonicalRelativePath
+                        |> Seq.toArray
+
+                    let ignored
+                        : U4<string, ResizeArray<string>, string -> bool, System.Func<string, Filesystem.Stats, bool>> =
+                        !^(System.Func<string, Filesystem.Stats, bool>(fun path _ ->
+                            shouldIgnoreForPayloadWatcher arcPath this.payloadWatcherScopes.Contains path
+                        ))
+
+                    let watcher =
+                        // Payload scopes use one native, shallow watcher. Polling creates one poller per
+                        // direct file and is unbounded for large expanded directories.
+                        Chokidar.Chokidar.watch (
+                            watchedPaths,
+                            createWatcherOptions arcPath (Some(defaultArg usePolling false)) ignored (Some 0)
+                        )
+
+                    this.FileWatcherEventController
+                    |> Option.iter (fun (controller: string -> string -> unit) ->
+                        watcher.on (Chokidar.Events.All, controller) |> ignore
+                    )
+
+                    this.payloadWatcher <- Some watcher
+                    this.payloadWatcherScopes <- targetScopes
+
+                    let callbackEpoch = this.WatcherEpoch
+
+                    watcher.on (
+                        Chokidar.Events.Error,
+                        fun (watcherError: obj) ->
+                            if
+                                callbackEpoch = this.WatcherEpoch
+                                && (this.payloadWatcher
+                                    |> Option.exists (fun current -> obj.ReferenceEquals(current, watcher)))
+                            then
+                                this.payloadWatcher <- None
+                                this.payloadWatcherScopes <- Set.empty
+                                swatelogfn this.window.id "ARC payload watcher failed: %O" watcherError
+                                watcher.close () |> Promise.catch (fun _ -> ()) |> Promise.start
+                    )
+                    |> ignore
+        }
+
+        member internal this.ReconcilePayloadWatcherScopes
+            (arcPath: string, ?usePolling: bool)
+            =
+            promise {
+                let targetScopes =
                     this.expandedDirectoryPaths
-                    |> Seq.map PathHelpers.normalizeCanonicalRelativePath
-                    |> Seq.toArray
-
-                let ignored
-                    : U4<string, ResizeArray<string>, string -> bool, System.Func<string, Filesystem.Stats, bool>> =
-                    !^(System.Func<string, Filesystem.Stats, bool>(fun path _ ->
-                        shouldIgnoreForPayloadWatcher arcPath this.expandedDirectoryPaths.Contains path
-                    ))
-
-                let watcher =
-                    Chokidar.Chokidar.watch (watchedPaths, createWatcherOptions arcPath usePolling ignored (Some 0))
-
-                this.FileWatcherEventController
-                |> Option.iter (fun (controller: string -> string -> unit) ->
-                    watcher.on (Chokidar.Events.All, controller) |> ignore
-                )
-
-                this.payloadWatcher <- Some watcher
+                    |> Set.filter (fun scope -> not (this.payloadWatcherScopeSuspensions.ContainsKey scope))
 
                 try
-                    do! waitForFileWatcherReady watcher
-                with error ->
+                    match this.payloadWatcher with
+                    | Some watcher ->
+                        let removedScopes = Set.difference this.payloadWatcherScopes targetScopes
+                        let addedScopes = Set.difference targetScopes this.payloadWatcherScopes
+
+                        if not removedScopes.IsEmpty then
+                            watcher.unwatch (removedScopes |> Set.toArray) |> ignore
+
+                        if not addedScopes.IsEmpty then
+                            watcher.add (addedScopes |> Set.toArray) |> ignore
+
+                        this.payloadWatcherScopes <- targetScopes
+                    | None when not targetScopes.IsEmpty ->
+                        this.payloadWatcherScopes <- Set.empty
+                        do! this.EnsurePayloadWatcher(arcPath, targetScopes, ?usePolling = usePolling)
+                    | None -> ()
+                with watcherError ->
+                    let failedWatcher = this.payloadWatcher
                     this.payloadWatcher <- None
+                    this.payloadWatcherScopes <- Set.empty
 
-                    try
-                        do! watcher.close ()
-                    with _ ->
-                        ()
+                    swatelogfn
+                        this.window.id
+                        "ARC payload watcher scope reconciliation failed; browsing remains available: %s"
+                        watcherError.Message
 
-                    return raise error
-        }
-
-        member internal this.RestartPayloadWatcher(arcPath: string, ?usePolling: bool) = promise {
-            match this.payloadWatcher with
-            | Some watcher ->
-                this.payloadWatcher <- None
-
-                try
-                    do! watcher.close ()
-                with _ ->
-                    ()
-            | None -> ()
-
-            do! this.EnsurePayloadWatcher(arcPath, ?usePolling = usePolling)
-        }
+                    failedWatcher
+                    |> Option.iter (fun watcher -> watcher.close () |> Promise.catch (fun _ -> ()) |> Promise.start)
+            }
 
         member this.StartFileWatcher(?usePolling: bool) =
             if this.path.IsSome then
                 match this.watcher with
                 | Some _ -> ()
                 | None ->
-                    let watcher = createFileWatcher this.path.Value usePolling
+                    try
+                        let arcPath = this.path.Value
+                        let watcher = createFileWatcher arcPath usePolling
+                        let callbackEpoch = this.WatcherEpoch
 
-                    let sendWatcherMessage = WindowSend.sender<IArcFileWatcherApi> this.window
+                        let sendWatcherMessage = WindowSend.sender<IArcFileWatcherApi> this.window
 
-                    let sendMsgApi: IArcFileWatcherApi = {
-                        IsLoadingChanges =
-                            fun isLoading -> sendWatcherMessage (fun api -> api.IsLoadingChanges isLoading)
-                    }
+                        let sendMsgApi: IArcFileWatcherApi = {
+                            IsLoadingChanges =
+                                fun isLoading -> sendWatcherMessage (fun api -> api.IsLoadingChanges isLoading)
+                        }
 
-                    let controller = this.CreateFileWatcherEventController sendMsgApi
-                    watcher.on (Chokidar.Events.All, controller) |> ignore
-                    this.FileWatcherEventController <- Some controller
-                    this.watcher <- Some watcher
+                        let controller = this.CreateFileWatcherEventController sendMsgApi
+                        watcher.on (Chokidar.Events.All, controller) |> ignore
+                        this.FileWatcherEventController <- Some controller
+                        this.watcher <- Some watcher
+
+                        let isCurrentWatcher () =
+                            callbackEpoch = this.WatcherEpoch
+                            && (this.watcher |> Option.exists (fun current -> obj.ReferenceEquals(current, watcher)))
+
+                        watcher.on (
+                            Chokidar.Events.Ready,
+                            fun () ->
+                                promise {
+                                    if isCurrentWatcher () then
+                                        let! structuralEvents =
+                                            reconcileArcStructureScopeChanges arcPath "" (fun () -> this.fileTree)
+
+                                        if isCurrentWatcher () then
+                                            WatcherHelpers.attachArcStructureScopes this.watcher structuralEvents
+
+                                            for eventName, relativePath in structuralEvents do
+                                                controller eventName relativePath
+                                }
+                                |> Promise.catch (fun error ->
+                                    swatelogfn
+                                        this.window.id
+                                        "Unable to reconcile ARC structure after watcher readiness: %s"
+                                        error.Message
+                                )
+                                |> Promise.start
+                        )
+                        |> ignore
+
+                        watcher.on (
+                            Chokidar.Events.Error,
+                            fun (watcherError: obj) ->
+                                if isCurrentWatcher () then
+                                    this.watcher <- None
+                                    this.FileWatcherEventController <- None
+                                    swatelogfn this.window.id "ARC file watcher failed; live monitoring is disabled: %O" watcherError
+                                    watcher.close () |> Promise.catch (fun _ -> ()) |> Promise.start
+                        )
+                        |> ignore
+                    with watcherError ->
+                        this.watcher <- None
+                        this.FileWatcherEventController <- None
+                        swatelogfn
+                            this.window.id
+                            "ARC file watcher could not be started; the ARC remains open: %s"
+                            watcherError.Message
             else
                 swatefailfn this.window.id "No path set for StartFileWatcher."
-
-        member private this.StartFileWatcherAndWaitUntilReady(?usePolling: bool) = promise {
-            let wasStopped = this.watcher.IsNone
-            this.StartFileWatcher(?usePolling = usePolling)
-
-            if wasStopped then
-                try
-                    let watcher = this.watcher.Value
-                    do! waitForFileWatcherReady watcher
-
-                    let! structuralEvents = reconcileArcStructureScope this.path.Value ""
-                    WatcherHelpers.attachArcStructureScopes this.watcher structuralEvents
-
-                    match this.FileWatcherEventController with
-                    | Some controller ->
-                        for eventName, relativePath in structuralEvents do
-                            controller eventName relativePath
-                    | None -> ()
-                with error ->
-                    do! this.StopFileWatcher()
-                    return raise error
-        }
 
         member this.ClearPendingFileWatcherState() =
             this.IncrementWatcherEpoch()
@@ -862,27 +943,30 @@ module ArcVaultExtensions =
             this.importedFileWatcherPaths.Clear()
 
         member this.StopFileWatcher() = promise {
-            match this.watcher with
-            | None -> ()
-            | Some watcher ->
-                try
-                    do! watcher.close ()
-                with _ ->
-                    ()
-
+            let structureWatcher = this.watcher
+            let payloadWatcher = this.payloadWatcher
             this.watcher <- None
-
-            match this.payloadWatcher with
-            | None -> ()
-            | Some watcher ->
-                try
-                    do! watcher.close ()
-                with _ ->
-                    ()
-
             this.payloadWatcher <- None
+            this.payloadWatcherScopes <- Set.empty
+            this.payloadWatcherScopeSuspensions.Clear()
             this.FileWatcherEventController <- None
             this.ClearPendingFileWatcherState()
+
+            match structureWatcher with
+            | None -> ()
+            | Some watcher ->
+                try
+                    do! watcher.close ()
+                with _ ->
+                    ()
+
+            match payloadWatcher with
+            | None -> ()
+            | Some watcher ->
+                try
+                    do! watcher.close ()
+                with _ ->
+                    ()
         }
 
         member internal this.RestoreEmptyVaultAfterFailedInitialization() = promise {
@@ -919,7 +1003,7 @@ module ArcVaultExtensions =
             | false, None -> swatefailfn this.window.id "Unable to commit ARC initialization without a path."
             | false, Some normalizedPath ->
                 this.fileTree <- fileTree
-                do! this.StartFileWatcherAndWaitUntilReady()
+                this.StartFileWatcher()
                 this.isInitializingArc <- false
 
                 WindowSend.send<IPathChangeRendererApi> this.window (fun api -> api.pathChange (Some normalizedPath))
@@ -989,7 +1073,7 @@ module ArcVaultExtensions =
             | None -> return Error(arcNotOpenError ())
             | Some _ when this.isBusyWriting -> return Error(busyWritingError ())
             | Some currentPath ->
-                let hadWatcher = this.watcher.IsSome
+                let hadWatcher = this.watcher.IsSome || this.payloadWatcher.IsSome
                 let expandedDirectoryPaths = this.expandedDirectoryPaths
 
                 if hadWatcher then
@@ -1008,8 +1092,8 @@ module ArcVaultExtensions =
                 | Error renameError ->
                     if hadWatcher then
                         this.expandedDirectoryPaths <- expandedDirectoryPaths
-                        do! this.StartFileWatcherAndWaitUntilReady()
-                        do! this.RestartPayloadWatcher currentPath
+                        this.StartFileWatcher()
+                        do! this.ReconcilePayloadWatcherScopes currentPath
 
                     return Error renameError
                 | Ok renamedPath ->
@@ -1039,18 +1123,6 @@ module ArcVaultExtensions =
                                 renamedPath
                                 loadError.Message
 
-                    if hadWatcher then
-                        try
-                            this.expandedDirectoryPaths <- expandedDirectoryPaths
-                            do! this.StartFileWatcherAndWaitUntilReady()
-                            do! this.RestartPayloadWatcher renamedPath
-                        with watcherError ->
-                            swatelogfn
-                                this.window.id
-                                "ARC folder was renamed to '%s', but file watcher restart failed: %s"
-                                renamedPath
-                                watcherError.Message
-
                     try
                         let! fileTree = getFileTree renamedPath
                         this.SetFileTree fileTree
@@ -1060,6 +1132,18 @@ module ArcVaultExtensions =
                             "ARC folder was renamed to '%s', but file tree refresh failed: %s"
                             renamedPath
                             refreshError.Message
+
+                    if hadWatcher then
+                        try
+                            this.expandedDirectoryPaths <- expandedDirectoryPaths
+                            this.StartFileWatcher()
+                            do! this.ReconcilePayloadWatcherScopes renamedPath
+                        with watcherError ->
+                            swatelogfn
+                                this.window.id
+                                "ARC folder was renamed to '%s', but file watcher restart failed: %s"
+                                renamedPath
+                                watcherError.Message
 
                     try
                         WindowSend.send<IPathChangeRendererApi>

@@ -2,6 +2,7 @@ module Main.ArcVaultHelper
 
 
 open System
+open System.Collections.Generic
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
@@ -17,6 +18,17 @@ open Swate.Electron.Shared.RenamePathRules
 
 let arcNotOpenError () =
     exn "No ARC is open. Open an ARC and try again."
+
+let canPublishWatcherMergeSnapshot
+    isMergeEligible
+    capturedWriteGeneration
+    currentWriteGeneration
+    capturedWatcherEpoch
+    currentWatcherEpoch
+    =
+    isMergeEligible
+    && capturedWriteGeneration = currentWriteGeneration
+    && capturedWatcherEpoch = currentWatcherEpoch
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"
@@ -553,6 +565,82 @@ let reconcileArcStructureScope (arcPath: string) (relativeScopePath: string) =
         | [| zone; entity |] when arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone) ->
             return! reconcileEntity zone entity
         | _ -> return [||]
+    }
+
+/// Compares the bounded structural disk view with the installed FileTree snapshot. It reports only
+/// additions and removals, so watcher readiness does not replay unchanged metadata into ARC merging.
+let reconcileArcStructureScopeChanges
+    (arcPath: string)
+    (relativeScopePath: string)
+    (getCurrentFileTree: unit -> Dictionary<string, FileEntry>)
+    =
+    promise {
+        let normalizedScopePath = PathHelpers.normalizeCanonicalRelativePath relativeScopePath
+        let! discoveredEvents = reconcileArcStructureScope arcPath normalizedScopePath
+        let desired = Dictionary<string, string>()
+
+        for eventName, relativePath in discoveredEvents do
+            desired.[PathHelpers.normalizeCanonicalRelativePath relativePath] <- eventName
+
+        if String.IsNullOrWhiteSpace normalizedScopePath then
+            try
+                let! rootEntries =
+                    Filesystem.readdirWithTypesAsync arcPath (Filesystem.ReaddirOptions(withFileTypes = true))
+
+                for entry in rootEntries do
+                    let relativePath = PathHelpers.normalizeCanonicalRelativePath entry.name
+
+                    if entry.isFile () && isArcModelReadContractPath relativePath then
+                        desired.[relativePath] <- Chokidar.Events.Add.ToString()
+            with _ ->
+                ()
+
+        let isStructuralEntry (entry: FileEntry) (relativePath: string) =
+            match getNonEmptyPathParts relativePath with
+            | [| zone |] ->
+                (entry.isDirectory && arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone))
+                || (not entry.isDirectory && isArcModelReadContractPath relativePath)
+            | [| zone; _ |] ->
+                entry.isDirectory && arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone)
+            | [| zone; _; _ |] ->
+                arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone)
+                && (entry.isDirectory || isArcModelReadContractPath relativePath)
+            | _ -> false
+
+        let known = Dictionary<string, FileEntry>()
+
+        for entry in (getCurrentFileTree ()).Values do
+            match tryGetRepoRelativePath arcPath entry.path with
+            | Some relativePath ->
+                let relativePath = PathHelpers.normalizeCanonicalRelativePath relativePath
+
+                if
+                    isStructuralEntry entry relativePath
+                    && (String.IsNullOrWhiteSpace normalizedScopePath
+                        || isSameOrDescendantLogicalPath relativePath normalizedScopePath)
+                then
+                    known.[relativePath] <- entry
+            | None -> ()
+
+        let changes = ResizeArray<string * string>()
+
+        for KeyValue(relativePath, eventName) in desired do
+            if not (known.ContainsKey relativePath) then
+                changes.Add(eventName, relativePath)
+
+        for KeyValue(relativePath, entry) in known do
+            let absolutePath = ArcPathHelper.combine arcPath relativePath
+
+            if not (desired.ContainsKey relativePath) && not (Filesystem.existsSync absolutePath) then
+                changes.Add(
+                    (if entry.isDirectory then
+                         Chokidar.Events.UnlinkDir.ToString()
+                     else
+                         Chokidar.Events.Unlink.ToString()),
+                    relativePath
+                )
+
+        return changes.ToArray()
     }
 
 let createFileWatcher (path: string) (usePolling: bool option) =

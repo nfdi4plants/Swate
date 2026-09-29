@@ -34,17 +34,18 @@ Vitest.describe (
     "Electron file-tree materialization",
     fun () ->
         Vitest.test (
-            "materializing a directory normalizes its path and preserves its ARC scope",
+            "updating expanded paths materializes them and preserves the ARC scope",
             fun () ->
                 let state = {
                     empty with
                         ArcScopeId = Some "C:/arc"
                 }
 
-                let materialized = materialize "arc\\notes" state
+                let materialized = setExpandedPaths (Set.singleton "arc\\notes") state
 
                 Vitest.expect(materialized.ArcScopeId).toEqual (Some "C:/arc")
                 Vitest.expect(materialized.Paths |> Set.toList).toEqual ([ "arc/notes" ])
+                Vitest.expect(materialized.ExpandedPaths |> Set.toList).toEqual ([ "arc/notes" ])
         )
 
         Vitest.test (
@@ -87,12 +88,14 @@ Vitest.describe (
                 let current = {
                     ArcScopeId = Some "C:/arc"
                     Paths = Set.ofList [ "arc"; "arc/kept"; "arc/removed" ]
+                    ExpandedPaths = Set.ofList [ "arc/kept"; "arc/removed" ]
                 }
 
                 let reconciled =
                     reconcileMaterializedState (Some "C:/arc") (Some "arc/selected/selected.txt") (Some root) current
 
                 Vitest.expect(reconciled.Paths |> Set.toList).toEqual ([ "arc"; "arc/kept"; "arc/selected" ])
+                Vitest.expect(reconciled.ExpandedPaths |> Set.toList).toEqual ([ "arc"; "arc/kept"; "arc/selected" ])
         )
 
         Vitest.test (
@@ -106,6 +109,7 @@ Vitest.describe (
                 let current = {
                     ArcScopeId = Some "C:/old-arc"
                     Paths = Set.ofList [ "arc"; "arc/kept" ]
+                    ExpandedPaths = Set.ofList [ "arc"; "arc/kept" ]
                 }
 
                 let reconciled =
@@ -113,5 +117,6 @@ Vitest.describe (
 
                 Vitest.expect(reconciled.ArcScopeId).toEqual (Some "C:/new-arc")
                 Vitest.expect(reconciled.Paths |> Set.toList).toEqual ([ "arc" ])
+                Vitest.expect(reconciled.ExpandedPaths |> Set.toList).toEqual ([ "arc" ])
         )
 )
