@@ -26,6 +26,21 @@ let recoveryAction (action: RecoveryAction) : RecoveryActionDto = {
     Instructions = action.Instructions
 }
 
+let diffSide (side: DiffSide) : DiffSideDto =
+    match side with
+    | DiffSide.Previous -> DiffSideDto.Previous
+    | DiffSide.Current -> DiffSideDto.Current
+
+let diffSideFromDto (side: DiffSideDto) : DiffSide =
+    match side with
+    | DiffSideDto.Previous -> DiffSide.Previous
+    | DiffSideDto.Current -> DiffSide.Current
+
+let diffContentBlocked (detail: DiffContentBlocked) : DiffContentBlockedDto = {
+    Side = diffSide detail.Side
+    Evidence = detail.Evidence
+}
+
 let failure (failure: OperationFailure) : OperationFailureDto = {
     Category = failureCategory failure.Category
     Code = failure.Code
@@ -41,6 +56,7 @@ let failure (failure: OperationFailure) : OperationFailureDto = {
             Label = label
             Revision = RevisionId.value revision
         })
+    DiffDetail = failure.DiffDetail |> Option.map diffContentBlocked
 }
 
 let warning (warning: OperationWarning) : OperationWarningDto = {
@@ -263,3 +279,415 @@ let tryProviderRef (value: string) : Result<ProviderRef, OperationFailure> =
 let tryRevisionId (value: string) : Result<RevisionId, OperationFailure> =
     RevisionId.tryCreate value
     |> Result.mapError (OperationFailure.create Validation VersionControlCodes.InvalidRevision)
+
+// ---- Paged text diff
+
+/// The longest operation id or handle id a text diff request may carry.
+[<Literal>]
+let MaxTextDiffIdLength = 128
+
+/// The largest failure message, in UTF-8 bytes, a text diff reply carries.
+[<Literal>]
+let MaxTextDiffMessageBytes = 4096
+
+/// The longest DiffDetail evidence, in UTF-16 code units, a text diff reply carries.
+[<Literal>]
+let MaxDiffEvidenceLength = 256
+
+let private int64Text (value: int64) : string = string value
+
+let diffHandle (handle: DiffHandle) : DiffHandleDto = {
+    Id = handle.Id
+    Version = handle.Version
+}
+
+let lineRange (range: LineRange) : LineRangeDto = {
+    Start = int64Text range.Start
+    Count = int64Text range.Count
+}
+
+let lineEnding (ending: LineEnding) : LineEndingDto =
+    match ending with
+    | LineEnding.NoEnding -> LineEndingDto.NoEnding
+    | LineEnding.LF -> LineEndingDto.LF
+    | LineEnding.CRLF -> LineEndingDto.CRLF
+    | LineEnding.CR -> LineEndingDto.CR
+
+let highlight (highlight: Highlight) : HighlightDto = {
+    Start = highlight.Start
+    Length = highlight.Length
+    Kind =
+        match highlight.Kind with
+        | HighlightKind.UnchangedText -> HighlightKindDto.UnchangedText
+        | HighlightKind.ChangedText -> HighlightKindDto.ChangedText
+}
+
+let lineSlice (slice: LineSlice) : LineSliceDto = {
+    OffsetUtf16 = int64Text slice.OffsetUtf16
+    TotalUtf16 = slice.TotalUtf16 |> Option.map int64Text
+    Text = slice.Text
+    Highlights = slice.Highlights |> Array.map highlight
+}
+
+let diffLine (line: DiffLine) : DiffLineDto = {
+    Number = int64Text line.Number
+    Ending = lineEnding line.Ending
+    Slice = lineSlice line.Slice
+}
+
+let diffRowKind (kind: DiffRowKind) : DiffRowKindDto =
+    match kind with
+    | DiffRowKind.Context -> DiffRowKindDto.Context
+    | DiffRowKind.Added -> DiffRowKindDto.Added
+    | DiffRowKind.Removed -> DiffRowKindDto.Removed
+    | DiffRowKind.Replaced -> DiffRowKindDto.Replaced
+    | DiffRowKind.EndingChanged -> DiffRowKindDto.EndingChanged
+
+let diffRow (row: DiffRow) : DiffRowDto = {
+    Id = row.Id
+    Kind = diffRowKind row.Kind
+    Previous = row.Previous |> Option.map diffLine
+    Current = row.Current |> Option.map diffLine
+}
+
+let hunkBody (body: HunkBody) : HunkBodyDto =
+    match body with
+    | HunkBody.AlignedRows rows -> HunkBodyDto.AlignedRows(rows |> Array.map diffRow)
+    | HunkBody.UnalignedSides(previous, current) ->
+        HunkBodyDto.UnalignedSides(previous |> Array.map diffLine, current |> Array.map diffLine)
+
+let hunkFragment (fragment: HunkFragment) : HunkFragmentDto = {
+    HunkId = fragment.HunkId
+    PreviousRange = lineRange fragment.PreviousRange
+    CurrentRange = lineRange fragment.CurrentRange
+    StartsHunk = fragment.StartsHunk
+    EndsHunk = fragment.EndsHunk
+    Body = hunkBody fragment.Body
+}
+
+let equalGap (gap: EqualGap) : EqualGapDto = {
+    GapId = gap.GapId
+    PreviousRange = lineRange gap.PreviousRange
+    CurrentRange = lineRange gap.CurrentRange
+}
+
+let diffPart (part: DiffPart) : DiffPartDto =
+    match part with
+    | DiffPart.Hunk fragment -> DiffPartDto.Hunk(hunkFragment fragment)
+    | DiffPart.HiddenEqual gap -> DiffPartDto.HiddenEqual(equalGap gap)
+    | DiffPart.ExpandedContext(gapId, rows) -> DiffPartDto.ExpandedContext(gapId, rows |> Array.map diffRow)
+
+let scanProgress (progress: ScanProgress) : ScanProgressDto = {
+    ValidatedBytes = int64Text progress.ValidatedBytes
+    TotalBytes = int64Text progress.TotalBytes
+    ScanComplete = progress.ScanComplete
+}
+
+let snippetEnd (snippetEnd: SnippetEnd) : SnippetEndDto =
+    match snippetEnd with
+    | SnippetEnd.Truncated -> SnippetEndDto.Truncated
+    | SnippetEnd.MoreTextPending -> SnippetEndDto.MoreTextPending
+    | SnippetEnd.LineEnd -> SnippetEndDto.LineEnd
+    | SnippetEnd.EndOfFile -> SnippetEndDto.EndOfFile
+
+let pendingSide (side: PendingSide) : PendingSideDto =
+    match side with
+    | PendingSide.NoActiveLine -> PendingSideDto.NoActiveLine
+    | PendingSide.Snippet snippet ->
+        PendingSideDto.Snippet {
+            Line = int64Text snippet.Line
+            OffsetUtf16 = int64Text snippet.OffsetUtf16
+            Text = snippet.Text
+            End = snippetEnd snippet.End
+        }
+    | PendingSide.Exhausted lineCount -> PendingSideDto.Exhausted(int64Text lineCount)
+
+let pendingPreview (preview: PendingPreview) : PendingPreviewDto = {
+    Previous = pendingSide preview.Previous
+    Current = pendingSide preview.Current
+    Mismatch =
+        preview.Mismatch
+        |> Option.map (fun marker -> {
+            PreviousOffsetUtf16 = int64Text marker.PreviousOffsetUtf16
+            CurrentOffsetUtf16 = int64Text marker.CurrentOffsetUtf16
+        })
+}
+
+let diffPage (page: DiffPage) : DiffPageDto = {
+    PageId = page.PageId
+    NextCursor = page.NextCursor
+    Parts = page.Parts |> Array.map diffPart
+    Progress = scanProgress page.Progress
+    OutputComplete = page.OutputComplete
+    Pending = page.Pending |> Option.map pendingPreview
+}
+
+let diffSourceInfo (info: DiffSourceInfo) : DiffSourceInfoDto = {
+    Path = RepositoryPath.value info.Path
+    Revision = info.Revision |> Option.map RevisionId.value
+    IsAbsent = info.IsAbsent
+    ByteLength = int64Text info.ByteLength
+    LineCount = info.LineCount |> Option.map int64Text
+    Encoding = info.Encoding
+    EncodingWasChosen = info.EncodingWasChosen
+    HasBom = info.HasBom
+}
+
+let diffSourceInfoPair (previous: DiffSourceInfo, current: DiffSourceInfo) : DiffSourceInfoPairDto = {
+    Previous = diffSourceInfo previous
+    Current = diffSourceInfo current
+}
+
+let diffBlocker (blocker: DiffBlocker) : DiffBlockerDto =
+    match blocker with
+    | DiffBlocker.Binary(side, evidence) -> DiffBlockerDto.Binary(diffSide side, evidence)
+    | DiffBlocker.LocalContentUnavailable(side, objectId) ->
+        DiffBlockerDto.LocalContentUnavailable(diffSide side, objectId)
+    | DiffBlocker.EncodingRequired(side, token, candidates) ->
+        DiffBlockerDto.EncodingRequired(
+            diffSide side,
+            { PreparationTokenDto.Id = token.Id },
+            candidates
+            |> Array.map (fun candidate -> {
+                EncodingCandidateDto.Encoding = candidate.Encoding
+                Preview = candidate.Preview
+            })
+        )
+    | DiffBlocker.NotRegularFile side -> DiffBlockerDto.NotRegularFile(diffSide side)
+    | DiffBlocker.ProviderUnsupported -> DiffBlockerDto.ProviderUnsupported
+
+let resumablePage (resumable: Resumable<DiffPage>) : ResumablePageDto =
+    match resumable with
+    | Resumable.Ready page -> ResumablePageDto.Ready(diffPage page)
+    | Resumable.Scanning(progress, continuation, pending) ->
+        ResumablePageDto.Scanning(scanProgress progress, continuation, pending |> Option.map pendingPreview)
+
+let openDiffResult (result: OpenDiffResult) : OpenDiffResultDto =
+    match result with
+    | OpenDiffResult.NotDiffable blocker -> OpenDiffResultDto.NotDiffable(diffBlocker blocker)
+    | OpenDiffResult.Opened(handle, previous, current, first) ->
+        OpenDiffResultDto.Opened(
+            diffHandle handle,
+            diffSourceInfo previous,
+            diffSourceInfo current,
+            resumablePage first
+        )
+
+let resumableOpen (resumable: Resumable<OpenDiffResult>) : ResumableOpenDto =
+    match resumable with
+    | Resumable.Ready result -> ResumableOpenDto.Ready(openDiffResult result)
+    | Resumable.Scanning(progress, continuation, pending) ->
+        ResumableOpenDto.Scanning(scanProgress progress, continuation, pending |> Option.map pendingPreview)
+
+let resumableParts (resumable: Resumable<DiffPart[]>) : ResumablePartsDto =
+    match resumable with
+    | Resumable.Ready parts -> ResumablePartsDto.Ready(parts |> Array.map diffPart)
+    | Resumable.Scanning(progress, continuation, pending) ->
+        ResumablePartsDto.Scanning(scanProgress progress, continuation, pending |> Option.map pendingPreview)
+
+let resumableLine (resumable: Resumable<DiffLine>) : ResumableLineDto =
+    match resumable with
+    | Resumable.Ready line -> ResumableLineDto.Ready(diffLine line)
+    | Resumable.Scanning(progress, continuation, pending) ->
+        ResumableLineDto.Scanning(scanProgress progress, continuation, pending |> Option.map pendingPreview)
+
+// Fable cannot emit a lone surrogate literal, so these compare code values.
+let private isHighSurrogate (character: char) =
+    int character >= 0xD800 && int character <= 0xDBFF
+
+let private isLowSurrogate (character: char) =
+    int character >= 0xDC00 && int character <= 0xDFFF
+
+/// Cuts text to at most maxBytes of UTF-8 and never splits a surrogate pair.
+let truncateUtf8 (maxBytes: int) (text: string) : string =
+    if isNull text then
+        text
+    else
+        let mutable bytes = 0
+        let mutable index = 0
+        let mutable full = false
+
+        while not full && index < text.Length do
+            let character = text[index]
+
+            let units, size =
+                if
+                    isHighSurrogate character
+                    && index + 1 < text.Length
+                    && isLowSurrogate text[index + 1]
+                then
+                    2, 4
+                elif int character < 0x80 then
+                    1, 1
+                elif int character < 0x800 then
+                    1, 2
+                else
+                    1, 3
+
+            if bytes + size > maxBytes then
+                full <- true
+            else
+                bytes <- bytes + size
+                index <- index + units
+
+        if index = text.Length then
+            text
+        else
+            text.Substring(0, index)
+
+let private truncateUtf16 (maxUnits: int) (text: string) : string =
+    if isNull text || text.Length <= maxUnits then
+        text
+    elif isHighSurrogate text[maxUnits - 1] then
+        text.Substring(0, maxUnits - 1)
+    else
+        text.Substring(0, maxUnits)
+
+/// Bounds the variable text of a text diff failure before it crosses IPC. The other
+/// fields pass unchanged.
+let boundTextDiffFailure (failure: OperationFailureDto) : OperationFailureDto = {
+    failure with
+        Message = truncateUtf8 MaxTextDiffMessageBytes failure.Message
+        DiffDetail =
+            failure.DiffDetail
+            |> Option.map (fun detail -> {
+                detail with
+                    Evidence = truncateUtf16 MaxDiffEvidenceLength detail.Evidence
+            })
+}
+
+let boundTextDiffResult (result: OperationResultDto<'T>) : OperationResultDto<'T> =
+    match result with
+    | OperationResultDto.Succeeded _ -> result
+    | OperationResultDto.PartiallySucceeded(outcome, failure) ->
+        OperationResultDto.PartiallySucceeded(outcome, boundTextDiffFailure failure)
+    | OperationResultDto.Failed failure -> OperationResultDto.Failed(boundTextDiffFailure failure)
+
+/// Maps a text diff result and bounds its failure text for the IPC reply.
+let textDiffResult (mapValue: 'T -> 'U) (value: OperationResult<'T>) : OperationResultDto<'U> =
+    result mapValue value |> boundTextDiffResult
+
+let private invalidDiffRequest (message: string) : OperationFailure =
+    OperationFailure.create Validation VersionControlCodes.InvalidDiffRequest message
+
+/// Accepts an operation id or handle id of at most MaxTextDiffIdLength characters.
+let tryTextDiffId (name: string) (value: string) : Result<string, OperationFailure> =
+    if isNull value then
+        Error(invalidDiffRequest $"The {name} is missing.")
+    elif value.Length > MaxTextDiffIdLength then
+        Error(invalidDiffRequest $"The {name} is longer than {MaxTextDiffIdLength} characters.")
+    else
+        Ok value
+
+/// Parses a line number or offset the renderer sent as decimal text.
+let tryNonNegativeInt64 (name: string) (text: string) : Result<int64, OperationFailure> =
+    let isDecimal =
+        not (System.String.IsNullOrEmpty text)
+        && text |> Seq.forall (fun character -> character >= '0' && character <= '9')
+
+    if not isDecimal then
+        Error(invalidDiffRequest $"The {name} must be a non-negative decimal integer.")
+    else
+        match System.Int64.TryParse text with
+        | true, value -> Ok value
+        | _ -> Error(invalidDiffRequest $"The {name} is too large.")
+
+let private tryOptionalRepositoryPath (path: string option) : Result<RepositoryPath option, OperationFailure> =
+    match path with
+    | None -> Ok None
+    | Some text -> tryRepositoryPath text |> Result.map Some
+
+let tryOpenDiffRequest (request: OpenTextDiffRequestDto) : Result<OpenDiffRequest, OperationFailure> =
+    tryTextDiffId "operation id" request.OperationId
+    |> Result.bind (fun _ -> tryRepositoryPath request.Path)
+    |> Result.bind (fun path ->
+        tryOptionalRepositoryPath request.PreviousPath
+        |> Result.map (fun previousPath -> {
+            OpenDiffRequest.Path = path
+            PreviousPath = previousPath
+            Preparation =
+                request.PreparationTokenId
+                |> Option.map (fun tokenId -> { PreparationToken.Id = tokenId })
+            PreviousEncoding = request.PreviousEncoding
+            CurrentEncoding = request.CurrentEncoding
+            ContextLines = request.ContextLines
+            Continuation = request.Continuation
+        })
+    )
+
+let private tryHandleRequest
+    (operationId: string)
+    (handleId: string)
+    (handleVersion: string)
+    (build: DiffHandle -> Result<'T, OperationFailure>)
+    : Result<'T, OperationFailure> =
+    tryTextDiffId "operation id" operationId
+    |> Result.bind (fun _ -> tryTextDiffId "handle id" handleId)
+    |> Result.bind (fun id ->
+        build {
+            DiffHandle.Id = id
+            Version = handleVersion
+        }
+    )
+
+let tryDiffHandle (request: TextDiffHandleRequestDto) : Result<DiffHandle, OperationFailure> =
+    tryHandleRequest request.OperationId request.HandleId request.HandleVersion Ok
+
+let tryReadPageRequest (request: ReadTextDiffPageRequestDto) : Result<ReadPageRequest, OperationFailure> =
+    tryHandleRequest
+        request.OperationId
+        request.HandleId
+        request.HandleVersion
+        (fun handle ->
+            Ok {
+                ReadPageRequest.Handle = handle
+                Cursor = request.Cursor
+            }
+        )
+
+let tryReplayPageRequest (request: ReplayTextDiffPageRequestDto) : Result<ReplayPageRequest, OperationFailure> =
+    tryHandleRequest
+        request.OperationId
+        request.HandleId
+        request.HandleVersion
+        (fun handle ->
+            Ok {
+                ReplayPageRequest.Handle = handle
+                PageId = request.PageId
+            }
+        )
+
+let tryExpandRequest (request: ExpandTextDiffRequestDto) : Result<ExpandRequest, OperationFailure> =
+    tryHandleRequest
+        request.OperationId
+        request.HandleId
+        request.HandleVersion
+        (fun handle ->
+            Ok {
+                ExpandRequest.Handle = handle
+                GapId = request.GapId
+                FromStart = request.FromStart
+                Count = request.Count
+                Continuation = request.Continuation
+            }
+        )
+
+let tryReadLineRequest (request: ReadTextDiffLineRequestDto) : Result<ReadLineRequest, OperationFailure> =
+    tryHandleRequest
+        request.OperationId
+        request.HandleId
+        request.HandleVersion
+        (fun handle ->
+            tryNonNegativeInt64 "line" request.Line
+            |> Result.bind (fun line ->
+                tryNonNegativeInt64 "UTF-16 offset" request.OffsetUtf16
+                |> Result.map (fun offset -> {
+                    ReadLineRequest.Handle = handle
+                    Side = diffSideFromDto request.Side
+                    Line = line
+                    OffsetUtf16 = offset
+                    MaxUtf16 = request.MaxUtf16
+                    Continuation = request.Continuation
+                })
+            )
+        )

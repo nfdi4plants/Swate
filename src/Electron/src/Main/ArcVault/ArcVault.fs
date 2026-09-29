@@ -1198,6 +1198,9 @@ type ArcVaults() =
             vault.isCloseRequestPending <- false
             vault.isCloseApproved <- false
 
+            // Runs before the vault disposal, whose session close waits for these operations.
+            Main.VersionControl.TextDiffHandles.windowClosed id
+
             if this.Vaults.ContainsKey(id) then
                 this.DisposeVault(id)
         )

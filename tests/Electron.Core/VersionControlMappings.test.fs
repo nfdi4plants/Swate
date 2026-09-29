@@ -182,6 +182,7 @@ Vitest.describe (
                 }
             Details = [||]
             RevisionEvidence = [||]
+            DiffDetail = None
         }
 
         let outcome: OperationOutcomeDto<int> = {

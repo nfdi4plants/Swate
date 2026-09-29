@@ -1135,6 +1135,7 @@ let private transportFailure (message: string) : OperationFailureDto = {
     RecoveryAction = None
     Details = [||]
     RevisionEvidence = [||]
+    DiffDetail = None
 }
 
 /// Flattens the transport error and the structured result: Ok carries the outcome and

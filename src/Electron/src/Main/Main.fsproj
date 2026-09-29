@@ -41,6 +41,7 @@
     <Compile Include="VersionControl\Mappings.fs" />
     <Compile Include="VersionControl\VersionControlSettings.fs" />
     <Compile Include="VersionControl\WorkspaceSessionHost.fs" />
+    <Compile Include="VersionControl\TextDiffHandles.fs" />
     <Compile Include="FileTreeCreator.fs" />
     <Compile Include="ArcVault\Types.fs" />
     <Compile Include="ArcVault\ArcVaultHelper.fs" />

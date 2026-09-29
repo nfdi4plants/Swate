@@ -265,6 +265,50 @@ let private withService
     | Some service -> call service context
     | None -> async { return serviceUnavailable serviceName }
 
+let private operationWindowId (context: OperationContext) : int option =
+    WorkspaceSessionHost.get().TryGetOperationWindowId context.OperationId
+
+/// Runs one text diff call in the session of the calling window. An invalid request is
+/// answered before the operation is registered, and every failure of the reply is bounded.
+/// The calls are reads, so they use the tracked operation without the busy flag.
+let private withTextDiff
+    (operationName: string)
+    (event: IpcMainInvokeEvent)
+    (operationId: string)
+    (request: Result<'R, OperationFailure>)
+    (call: WorkspaceSessionHost.HostedSession -> TextDiffService -> 'R -> OperationContext -> Async<OperationResult<'T>>)
+    (mapValue: 'T -> 'U)
+    : JS.Promise<Result<OperationResultDto<'U>, exn>> =
+    promise {
+        match request with
+        | Error failure -> return Ok(Mappings.textDiffResult mapValue (Failed failure))
+        | Ok converted ->
+            let! result =
+                withSession
+                    operationName
+                    event
+                    operationId
+                    false
+                    (fun hosted context ->
+                        withService
+                            _.TextDiff
+                            "text diffs"
+                            (fun service serviceContext -> call hosted service converted serviceContext)
+                            hosted
+                            context
+                    )
+                    mapValue
+
+            return result |> Result.map Mappings.boundTextDiffResult
+    }
+
+let private withOwnedHandle
+    (handle: DiffHandle)
+    (context: OperationContext)
+    (call: unit -> Async<OperationResult<'T>>)
+    : Async<OperationResult<'T>> =
+    TextDiffHandles.withOwnedHandle (operationWindowId context) handle call
+
 let private withPath (path: string) (call: RepositoryPath -> Async<OperationResult<'T>>) : Async<OperationResult<'T>> =
     match Mappings.tryRepositoryPath path with
     | Ok repositoryPath -> call repositoryPath
@@ -1118,4 +1162,118 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                             | Failed failure -> Failed failure
                 })
                 Mappings.workspaceStatus
+    // Every handle an open returns is recorded with the window of the operation, so the
+    // window can only reach its own handles and its handles close with it. A handle that
+    // arrives after its window closed or reloaded is closed at once.
+    openTextDiff =
+        fun request ->
+            withTextDiff
+                "openTextDiff"
+                event
+                request.OperationId
+                (Mappings.tryOpenDiffRequest request)
+                (fun hosted service openRequest context -> async {
+                    let windowId = operationWindowId context
+                    let reloadCount = TextDiffHandles.reloadCount windowId
+                    let! opened = service.Open openRequest context
+
+                    match opened with
+                    | Succeeded outcome
+                    | PartiallySucceeded(outcome, _) ->
+                        match outcome.Value with
+                        | Resumable.Ready(OpenDiffResult.Opened(handle, _, _, _)) ->
+                            TextDiffHandles.recordOrClose
+                                windowId
+                                reloadCount
+                                hosted.Binding.WorkspaceRoot
+                                service
+                                handle
+                        | _ -> ()
+                    | Failed _ -> ()
+
+                    return opened
+                })
+                Mappings.resumableOpen
+    readTextDiffPage =
+        fun request ->
+            withTextDiff
+                "readTextDiffPage"
+                event
+                request.OperationId
+                (Mappings.tryReadPageRequest request)
+                (fun _ service pageRequest context ->
+                    withOwnedHandle pageRequest.Handle context (fun () -> service.ReadPage pageRequest context)
+                )
+                Mappings.resumablePage
+    replayTextDiffPage =
+        fun request ->
+            withTextDiff
+                "replayTextDiffPage"
+                event
+                request.OperationId
+                (Mappings.tryReplayPageRequest request)
+                (fun _ service replayRequest context ->
+                    withOwnedHandle replayRequest.Handle context (fun () -> service.ReplayPage replayRequest context)
+                )
+                Mappings.diffPage
+    expandTextDiff =
+        fun request ->
+            withTextDiff
+                "expandTextDiff"
+                event
+                request.OperationId
+                (Mappings.tryExpandRequest request)
+                (fun _ service expandRequest context ->
+                    withOwnedHandle expandRequest.Handle context (fun () -> service.Expand expandRequest context)
+                )
+                Mappings.resumableParts
+    readTextDiffLine =
+        fun request ->
+            withTextDiff
+                "readTextDiffLine"
+                event
+                request.OperationId
+                (Mappings.tryReadLineRequest request)
+                (fun _ service lineRequest context ->
+                    withOwnedHandle lineRequest.Handle context (fun () -> service.ReadLine lineRequest context)
+                )
+                Mappings.resumableLine
+    getTextDiffSourceInfo =
+        fun request ->
+            withTextDiff
+                "getTextDiffSourceInfo"
+                event
+                request.OperationId
+                (Mappings.tryDiffHandle request)
+                (fun _ service handle context ->
+                    withOwnedHandle
+                        handle
+                        context
+                        (fun () -> service.GetSourceInfo { SourceInfoRequest.Handle = handle } context)
+                )
+                Mappings.diffSourceInfoPair
+    // A failed close keeps the registry entry, so the window close retries it.
+    closeTextDiff =
+        fun request ->
+            withTextDiff
+                "closeTextDiff"
+                event
+                request.OperationId
+                (Mappings.tryDiffHandle request)
+                (fun _ service handle context ->
+                    withOwnedHandle
+                        handle
+                        context
+                        (fun () -> async {
+                            let! closed = service.Close handle context
+
+                            match closed with
+                            | Failed _ -> ()
+                            | Succeeded _
+                            | PartiallySucceeded _ -> TextDiffHandles.remove handle.Id
+
+                            return closed
+                        })
+                )
+                id
 }

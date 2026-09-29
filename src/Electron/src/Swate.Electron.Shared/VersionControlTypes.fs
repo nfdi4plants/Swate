@@ -6,6 +6,268 @@ module Swate.Electron.Shared.VersionControlTypes
 
 open Fable.Core
 
+// Paged text diff. Every int64 of the library travels as a decimal string, because
+// JSON has no integer above 2^53 and the renderer never computes with these values.
+// These types come first so that a field name they share with an older DTO, such as
+// Path or Preview, still resolves to the older DTO in code without a type annotation.
+
+/// One of the two sources of a text diff.
+[<StringEnum(CaseRules.None); RequireQualifiedAccess>]
+type DiffSideDto =
+    | Previous
+    | Current
+
+/// The side whose content turned out not to be text, with the evidence the library found.
+type DiffContentBlockedDto = { Side: DiffSideDto; Evidence: string }
+
+type DiffHandleDto = { Id: string; Version: string }
+
+/// A zero-based range of source lines.
+type LineRangeDto = { Start: string; Count: string }
+
+[<StringEnum(CaseRules.None); RequireQualifiedAccess>]
+type LineEndingDto =
+    | NoEnding
+    | LF
+    | CRLF
+    | CR
+
+[<StringEnum(CaseRules.None); RequireQualifiedAccess>]
+type HighlightKindDto =
+    | UnchangedText
+    | ChangedText
+
+/// A UTF-16 span inside the text of a line slice.
+type HighlightDto = {
+    Start: int
+    Length: int
+    Kind: HighlightKindDto
+}
+
+/// A UTF-16 slice of one line. TotalUtf16 stays None until the line length is known.
+type LineSliceDto = {
+    OffsetUtf16: string
+    TotalUtf16: string option
+    Text: string
+    Highlights: HighlightDto[]
+}
+
+type DiffLineDto = {
+    Number: string
+    Ending: LineEndingDto
+    Slice: LineSliceDto
+}
+
+[<StringEnum(CaseRules.None); RequireQualifiedAccess>]
+type DiffRowKindDto =
+    | Context
+    | Added
+    | Removed
+    | Replaced
+    | EndingChanged
+
+type DiffRowDto = {
+    Id: string
+    Kind: DiffRowKindDto
+    Previous: DiffLineDto option
+    Current: DiffLineDto option
+}
+
+[<RequireQualifiedAccess>]
+type HunkBodyDto =
+    | AlignedRows of rows: DiffRowDto[]
+    | UnalignedSides of previous: DiffLineDto[] * current: DiffLineDto[]
+
+type HunkFragmentDto = {
+    HunkId: string
+    PreviousRange: LineRangeDto
+    CurrentRange: LineRangeDto
+    StartsHunk: bool
+    EndsHunk: bool
+    Body: HunkBodyDto
+}
+
+/// A hidden range whose lines and endings are verified equal.
+type EqualGapDto = {
+    GapId: string
+    PreviousRange: LineRangeDto
+    CurrentRange: LineRangeDto
+}
+
+[<RequireQualifiedAccess>]
+type DiffPartDto =
+    | Hunk of fragment: HunkFragmentDto
+    | HiddenEqual of gap: EqualGapDto
+    | ExpandedContext of gapId: string * rows: DiffRowDto[]
+
+type ScanProgressDto = {
+    ValidatedBytes: string
+    TotalBytes: string
+    ScanComplete: bool
+}
+
+/// What follows the last character of a pending snippet.
+[<StringEnum(CaseRules.None); RequireQualifiedAccess>]
+type SnippetEndDto =
+    | Truncated
+    | MoreTextPending
+    | LineEnd
+    | EndOfFile
+
+type PendingSnippetDto = {
+    Line: string
+    OffsetUtf16: string
+    Text: string
+    End: SnippetEndDto
+}
+
+[<RequireQualifiedAccess>]
+type PendingSideDto =
+    | NoActiveLine
+    | Snippet of snippet: PendingSnippetDto
+    | Exhausted of lineCount: string
+
+type MismatchMarkerDto = {
+    PreviousOffsetUtf16: string
+    CurrentOffsetUtf16: string
+}
+
+/// Advisory text of the lines still being scanned. It never forms a diff row.
+type PendingPreviewDto = {
+    Previous: PendingSideDto
+    Current: PendingSideDto
+    Mismatch: MismatchMarkerDto option
+}
+
+type DiffPageDto = {
+    PageId: string
+    NextCursor: string option
+    Parts: DiffPartDto[]
+    Progress: ScanProgressDto
+    OutputComplete: bool
+    Pending: PendingPreviewDto option
+}
+
+type DiffSourceInfoDto = {
+    Path: string
+    Revision: string option
+    IsAbsent: bool
+    ByteLength: string
+    LineCount: string option
+    Encoding: string option
+    EncodingWasChosen: bool
+    HasBom: bool
+}
+
+/// The source infos of both sides of an opened diff.
+type DiffSourceInfoPairDto = {
+    Previous: DiffSourceInfoDto
+    Current: DiffSourceInfoDto
+}
+
+/// An encoding the user can pick, with at most 2 KiB of text decoded with it.
+type EncodingCandidateDto = { Encoding: string; Preview: string }
+
+type PreparationTokenDto = { Id: string }
+
+[<RequireQualifiedAccess>]
+type DiffBlockerDto =
+    | Binary of side: DiffSideDto * evidence: string
+    | LocalContentUnavailable of side: DiffSideDto * objectId: string option
+    | EncodingRequired of side: DiffSideDto * token: PreparationTokenDto * candidates: EncodingCandidateDto[]
+    | NotRegularFile of side: DiffSideDto
+    | ProviderUnsupported
+
+// A Scanning result carries no value yet. The renderer passes its continuation back with
+// the next request of the same kind. Each payload type has its own resumable DTO.
+
+[<RequireQualifiedAccess>]
+type ResumablePageDto =
+    | Ready of page: DiffPageDto
+    | Scanning of progress: ScanProgressDto * continuation: string * pending: PendingPreviewDto option
+
+[<RequireQualifiedAccess>]
+type OpenDiffResultDto =
+    | NotDiffable of blocker: DiffBlockerDto
+    | Opened of
+        handle: DiffHandleDto *
+        previous: DiffSourceInfoDto *
+        current: DiffSourceInfoDto *
+        first: ResumablePageDto
+
+[<RequireQualifiedAccess>]
+type ResumableOpenDto =
+    | Ready of result: OpenDiffResultDto
+    | Scanning of progress: ScanProgressDto * continuation: string * pending: PendingPreviewDto option
+
+[<RequireQualifiedAccess>]
+type ResumablePartsDto =
+    | Ready of parts: DiffPartDto[]
+    | Scanning of progress: ScanProgressDto * continuation: string * pending: PendingPreviewDto option
+
+[<RequireQualifiedAccess>]
+type ResumableLineDto =
+    | Ready of line: DiffLineDto
+    | Scanning of progress: ScanProgressDto * continuation: string * pending: PendingPreviewDto option
+
+/// Opens a diff of one path. PreparationTokenId and the encodings answer an earlier
+/// EncodingRequired blocker, and Continuation resumes an earlier Scanning result.
+type OpenTextDiffRequestDto = {
+    OperationId: string
+    Path: string
+    PreviousPath: string option
+    PreparationTokenId: string option
+    PreviousEncoding: string option
+    CurrentEncoding: string option
+    ContextLines: int
+    Continuation: string option
+}
+
+/// Cursor is a page's NextCursor or the continuation of a page Scanning result.
+type ReadTextDiffPageRequestDto = {
+    OperationId: string
+    HandleId: string
+    HandleVersion: string
+    Cursor: string
+}
+
+type ReplayTextDiffPageRequestDto = {
+    OperationId: string
+    HandleId: string
+    HandleVersion: string
+    PageId: string
+}
+
+/// The library clamps Count to 100 lines.
+type ExpandTextDiffRequestDto = {
+    OperationId: string
+    HandleId: string
+    HandleVersion: string
+    GapId: string
+    FromStart: bool
+    Count: int
+    Continuation: string option
+}
+
+/// Line and OffsetUtf16 are non-negative decimal integers. The library clamps MaxUtf16 to 8,192.
+type ReadTextDiffLineRequestDto = {
+    OperationId: string
+    HandleId: string
+    HandleVersion: string
+    Side: DiffSideDto
+    Line: string
+    OffsetUtf16: string
+    MaxUtf16: int
+    Continuation: string option
+}
+
+/// Names an open diff for getTextDiffSourceInfo and closeTextDiff.
+type TextDiffHandleRequestDto = {
+    OperationId: string
+    HandleId: string
+    HandleVersion: string
+}
+
 [<StringEnum(CaseRules.None)>]
 type FailureCategoryDto =
     | Validation
@@ -38,6 +300,8 @@ type OperationFailureDto = {
     RecoveryAction: RecoveryActionDto option
     Details: string[]
     RevisionEvidence: RevisionEvidenceDto[]
+    /// Set on a diff_content_not_text failure of a text diff call.
+    DiffDetail: DiffContentBlockedDto option
 }
 
 type OperationWarningDto = { Code: string; Message: string }
@@ -171,6 +435,10 @@ module VersionControlCodes =
 
     [<Literal>]
     let BindingNotPersisted = "binding_not_persisted"
+
+    /// A text diff request with an overlong id or a number that is negative or not a decimal integer.
+    [<Literal>]
+    let InvalidDiffRequest = "invalid_diff_request"
 
     /// The IPC call itself failed before a structured result existed.
     [<Literal>]

@@ -116,6 +116,7 @@ let private makeFailure category code message recovery paths : OperationFailureD
     RecoveryAction = recovery
     Details = [||]
     RevisionEvidence = [||]
+    DiffDetail = None
 }
 
 let private failed category code message : OperationResultDto<'T> =

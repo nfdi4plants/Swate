@@ -91,3 +91,21 @@ let getRepositoryWebUrl (dto: OperationRequestDto) =
     call (fun () -> api.getRepositoryWebUrl dto)
 
 let clearStaleLock (dto: OperationRequestDto) = call (fun () -> api.clearStaleLock dto)
+
+let openTextDiff (dto: OpenTextDiffRequestDto) = call (fun () -> api.openTextDiff dto)
+
+let readTextDiffPage (dto: ReadTextDiffPageRequestDto) =
+    call (fun () -> api.readTextDiffPage dto)
+
+let replayTextDiffPage (dto: ReplayTextDiffPageRequestDto) =
+    call (fun () -> api.replayTextDiffPage dto)
+
+let expandTextDiff (dto: ExpandTextDiffRequestDto) = call (fun () -> api.expandTextDiff dto)
+
+let readTextDiffLine (dto: ReadTextDiffLineRequestDto) =
+    call (fun () -> api.readTextDiffLine dto)
+
+let getTextDiffSourceInfo (dto: TextDiffHandleRequestDto) =
+    call (fun () -> api.getTextDiffSourceInfo dto)
+
+let closeTextDiff (dto: TextDiffHandleRequestDto) = call (fun () -> api.closeTextDiff dto)
