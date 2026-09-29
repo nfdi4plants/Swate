@@ -387,9 +387,14 @@ export const KeyboardRangeSelectionUsesTheOriginalAnchor: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.click(canvas.getByText("beta"));
-    await userEvent.keyboard("{ArrowDown}{ArrowDown}");
+    await userEvent.keyboard("{ArrowDown}");
+    await waitFor(() =>
+      expect(canvas.getByTestId("tree-node-gamma.txt")).toHaveFocus(),
+    );
+
+    await userEvent.keyboard("{ArrowDown}");
     const deltaNode = canvas.getByTestId("tree-node-delta");
-    await expect(deltaNode).toHaveFocus();
+    await waitFor(() => expect(deltaNode).toHaveFocus());
     fireEvent.keyDown(deltaNode, { key: " ", shiftKey: true });
 
     await expect(
