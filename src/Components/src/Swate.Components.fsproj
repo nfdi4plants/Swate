@@ -101,7 +101,7 @@
     <Compile Include="Api\SwateApi.fs" />
     <Compile Include="Api\GitLabApi.fs" />
     <Compile Include="Api\TIBApi.fs" />
-   
+
     <Compile Include="Primitive\Types.fs" />
     <Compile Include="Primitive\Icons.fs" />
     <Compile Include="Primitive\Buttons\Buttons.fs" />
@@ -134,10 +134,9 @@
     <Compile Include="Primitive\Navbar\Navbar.fs" />
 
     <Compile Include="Composite\Tree\Types.fs" />
-    <Compile Include="Composite\Tree\TreeHelper.fs" />
+    <Compile Include="Composite\Tree\Helper.fs" />
     <Compile Include="Composite\Tree\State.fs" />
     <Compile Include="Composite\Tree\Dom.fs" />
-    <Compile Include="Composite\Tree\Context.fs" />
     <Compile Include="Composite\Tree\TreeController.fs" />
     <Compile Include="Composite\Tree\Hooks.fs" />
     <Compile Include="Composite\Tree\TreeNode.fs" />

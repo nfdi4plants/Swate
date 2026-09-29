@@ -6,15 +6,15 @@ open Feliz
 open Swate.Components.Primitive.ContextMenu.Types
 
 /// Defines whether the tree stores one selected node or a set of selected nodes.
-[<StringEnum(CaseRules.LowerFirst)>]
+[<RequireQualifiedAccess; StringEnum(CaseRules.LowerFirst)>]
 type TreeSelectionMode =
     | Single
     | Multiple
 
 /// Describes the lifecycle state for children loaded through a TreeDataSource.
 /// StringEnum emits this value as a native JavaScript string rather than an object.
-[<StringEnum(CaseRules.LowerFirst)>]
-type TreeLazyLoadStatus =
+[<RequireQualifiedAccess; StringEnum(CaseRules.LowerFirst)>]
+type internal TreeLazyLoadStatus =
     | Idle
     | Loading
     | Loaded
@@ -95,8 +95,9 @@ type TreeRenderProps<'T>
     member val select = select with get, set
 
 /// A flattened tree row with depth and parent metadata for rendering and navigation.
-type TreeVisibleNode<'T> = {
+type internal TreeVisibleNode<'T> = {
     node: TreeItem<'T>
+    comparisonNode: TreeItem<'T>
     depth: int
     parentId: string option
     posInSet: int
@@ -104,18 +105,18 @@ type TreeVisibleNode<'T> = {
 }
 
 /// Cached load result for a node whose children are provided asynchronously.
-type TreeLoadState<'T> = {
-    Status: TreeLazyLoadStatus
-    Children: TreeItem<'T>[] option
-    Error: string option
-    RequestId: int option
+type internal TreeLoadState<'T> = {
+    status: TreeLazyLoadStatus
+    children: TreeItem<'T>[] option
+    error: string option
 }
 
 /// Lookup tables derived from the currently visible tree rows.
-type TreeRowLookup<'T> = {
-    Nodes: Map<string, TreeItem<'T>>
-    Parents: Map<string, string>
-    VisibleNodes: TreeVisibleNode<'T>[]
+type internal TreeRowLookup<'T> = {
+    nodes: Map<string, TreeItem<'T>>
+    parents: Map<string, string>
+    indices: Map<string, int>
+    visibleNodes: TreeVisibleNode<'T>[]
 }
 
 /// Datasource adapter for lazy trees.
@@ -135,41 +136,77 @@ type TreeStyleFn<'T> = TreeItem<'T> option -> string[] -> string[]
 /// Builds context-menu entries for a tree node target, or for the tree root when no node is targeted.
 type TreeContextMenuEvent<'T> = delegate of MouseEvent * TreeItem<'T> option -> ContextMenuItem[]
 
-/// Context value shared by tree-node presentation components.
-type TreeContextValue = {
-    SelectionDisabled: bool
-    IsNodeSelectable: obj -> bool
-    RenderNode: (obj -> ReactElement) option
-    Leading: (obj -> ReactElement) option
-    Trailing: (obj -> ReactElement) option
-    StyleFn: (obj option -> string[] -> string[]) option
-    Debug: bool
-}
-
 /// Internal React state container used by the tree hooks and controller.
-type TreeState<'T> = {
-    ExpandedIds: Set<string>
-    SetExpandedIds: (Set<string> -> Set<string>) -> unit
-    SelectedIds: Set<string>
-    SetSelectedIds: (Set<string> -> Set<string>) -> unit
-    ActiveId: string option
-    SetActiveId: string option -> unit
-    FocusedId: string option
-    SetFocusedId: string option -> unit
-    SelectionAnchorId: string option
-    SetSelectionAnchorId: string option -> unit
-    LoadedChildren: Map<string, TreeLoadState<'T>>
-    SetLoadedChildren: (Map<string, TreeLoadState<'T>> -> Map<string, TreeLoadState<'T>>) -> unit
+type internal TreeState<'T> = {
+    expandedIds: Set<string>
+    setExpandedIds: (Set<string> -> Set<string>) -> unit
+    selectedIds: string[]
+    setSelectedIds: (string[] -> string[]) -> unit
+    activeId: string option
+    setActiveId: string option -> unit
+    focusedId: string option
+    setFocusedId: string option -> unit
+    selectionAnchorId: string option
+    setSelectionAnchorId: string option -> unit
+    loadedChildren: Map<string, TreeLoadState<'T>>
+    setLoadedChildren: (Map<string, TreeLoadState<'T>> -> Map<string, TreeLoadState<'T>>) -> unit
 }
 
 /// Coordinates DOM focus, virtualized scrolling, and visible-row lookup for keyboard navigation.
-type TreeFocusController<'T> = {
-    Lookup: TreeRowLookup<'T>
-    SetActiveId: string option -> unit
-    SetFocusedId: string option -> unit
-    SetSelectionAnchorId: string option -> unit
-    ScrollToIndex: int -> unit
-    FocusDom: string -> unit
+type internal TreeFocusController<'T> = {
+    lookup: TreeRowLookup<'T>
+    setActiveId: string option -> unit
+    setFocusedId: string option -> unit
+    scrollToIndex: int -> unit
+    focusDom: string -> unit
+}
+
+/// Tracks the current request per cache entry so stale async results are ignored.
+type internal TreeLoadTracker = {
+    mutable nextRequestId: int
+    mutable activeRequestIds: Map<string, int>
+}
+
+/// Values required to load one datasource-backed cache entry.
+type internal TreeLoadController<'T> = {
+    dataSource: TreeDataSource<'T> option
+    trackerRef: IRefValue<TreeLoadTracker>
+    treeState: TreeState<'T>
+    onError: exn -> unit
+}
+
+/// Latest state and callbacks read by stable row event handlers.
+type internal TreeNodeActionState<'T> = {
+    items: TreeItem<'T>[]
+    dataSource: TreeDataSource<'T> option
+    isSelectionDisabled: bool
+    isNodeSelectable: TreeItem<'T> -> bool
+    lookup: TreeRowLookup<'T>
+    focusedId: string option
+    selectionMode: TreeSelectionMode
+    effectiveSelectedIds: string[]
+    scrollToIndex: int -> unit
+    setSelection: string[] -> unit
+    treeState: TreeState<'T>
+    onError: exn -> unit
+}
+
+/// Current consumer-provided node renderers read by memoized rows.
+type internal TreePresentation<'T> = {
+    renderNode: (TreeRenderProps<'T> -> ReactElement) option
+    leading: (TreeRenderProps<'T> -> ReactElement) option
+    trailing: (TreeRenderProps<'T> -> ReactElement) option
+}
+
+/// Values required to apply one user selection intent.
+type internal TreeSelectionController<'T> = {
+    selectionMode: TreeSelectionMode
+    isSelectionDisabled: bool
+    isNodeSelectable: TreeItem<'T> -> bool
+    lookup: TreeRowLookup<'T>
+    effectiveSelectedIds: string[]
+    setSelection: string[] -> unit
+    treeState: TreeState<'T>
 }
 
 /// Describes how a user interaction changes the current selection.
@@ -180,7 +217,7 @@ type internal TreeSelectionIntent =
 
 /// Event handlers produced for tree rows by the controller hook.
 type internal TreeNodeActions<'T> = {
-    ExpandNode: TreeItem<'T> -> unit
-    SelectNode: TreeItem<'T> -> TreeSelectionIntent -> unit
-    OnNodeKeyDown: TreeItem<'T> -> KeyboardEvent -> unit
+    expandNode: string -> unit
+    selectNode: string -> TreeSelectionIntent -> unit
+    onNodeKeyDown: string -> KeyboardEvent -> unit
 }

@@ -3,6 +3,8 @@ namespace Swate.Components
 open Feliz
 open ARCtrl
 open Fable.Core
+open Fable.Core.JsInterop
+open Browser.Types
 
 type style =
     static member resolveStyle(style: U2<string, string[]>) =
@@ -36,6 +38,27 @@ module Extensions =
 module Keys =
     let inline mkLocalStorageKey (file: string) (component': string) (function': string) : string =
         $"swate-{file}-{component'}-{function'}"
+
+[<RequireQualifiedAccess>]
+module BrowserEvent =
+
+    let tryGetTargetElement (event: Event) : Element option =
+        let target: obj = box event.target
+
+        if isNullOrUndefined target then
+            None
+        elif isNullOrUndefined target?closest then
+            let parentElement: obj = target?parentElement
+
+            if isNullOrUndefined parentElement then
+                None
+            else
+                Some(unbox<Element> parentElement)
+        else
+            Some(unbox<Element> target)
+
+    let tryGetClosest (selector: string) event =
+        tryGetTargetElement event |> Option.bind (fun target -> target.closest selector)
 
 
 [<RequireQualifiedAccess>]
@@ -77,15 +100,12 @@ module kbdEventCode =
     let home = "Home"
 
     [<Literal>]
-    let End = "End"
+    let ``end`` = "End"
 
     [<Literal>]
     let space = " "
 
     let key (key: string) = key.ToUpper() |> sprintf "Key%s"
-
-open Fable.Core
-open Fable.Core.JsInterop
 
 [<Fable.Core.Global>]
 type console =

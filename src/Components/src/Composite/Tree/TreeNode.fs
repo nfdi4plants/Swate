@@ -3,12 +3,11 @@ namespace Swate.Components.Composite.Tree
 open Browser.Types
 open Fable.Core
 open Feliz
-open Swate.Components.Composite.Tree.Context
 open Swate.Components.Composite.Tree.Dom
 open Swate.Components.Composite.Tree.Types
 
 [<Erase; Mangle(false)>]
-type TreeNode =
+type internal TreeNode =
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private Surface<'T>
@@ -22,10 +21,11 @@ type TreeNode =
             isLoading: bool,
             error: string option,
             canExpand: bool,
+            presentationRef: IRefValue<TreePresentation<'T>>,
             onToggle: unit -> unit,
             onSelect: MouseEvent -> unit
         ) =
-        let config = useTreeCtx ()
+        let presentation = presentationRef.current
         let nodeProps = TreeItem.props node
 
         let renderProps =
@@ -54,9 +54,12 @@ type TreeNode =
                         else
                             $"Expand {nodeProps.label}"
                     )
-                    prop.onClick (fun e ->
-                        e.preventDefault ()
-                        e.stopPropagation ()
+                    // Keep the treeitem as the DOM focus owner when its chevron is pressed.
+                    prop.onMouseDown (fun event -> event.preventDefault ())
+                    prop.onClick (fun event ->
+                        event.preventDefault ()
+                        event.stopPropagation ()
+                        focusTreeItemFromEvent event
                         onToggle ()
                     )
                     prop.children [
@@ -66,7 +69,7 @@ type TreeNode =
                             ]
                         else
                             Html.i [
-                                prop.className $"swt:iconify {TreeHelper.chevronIcon isExpanded} swt:size-4"
+                                prop.className $"swt:iconify {Helper.chevronIcon isExpanded} swt:size-4"
                             ]
                     ]
                 ]
@@ -77,8 +80,8 @@ type TreeNode =
                 ]
 
         let leadingContent =
-            match config.Leading with
-            | Some leading -> leading (box renderProps)
+            match presentation.leading with
+            | Some leading -> leading renderProps
             | None ->
                 match nodeProps.leading with
                 | Some leading -> leading
@@ -88,16 +91,16 @@ type TreeNode =
                     | None ->
                         Html.i [
                             prop.className [
-                                $"swt:iconify {TreeHelper.defaultIcon node} swt:size-4 swt:shrink-0"
+                                $"swt:iconify {Helper.defaultIcon node} swt:size-4 swt:shrink-0"
                             ]
                         ]
 
         let nodeContent =
-            match config.RenderNode with
+            match presentation.renderNode with
             | Some renderNode ->
                 Html.div [
                     prop.className "swt:min-w-0 swt:flex-1 swt:text-left"
-                    prop.children [ renderNode (box renderProps) ]
+                    prop.children [ renderNode renderProps ]
                 ]
             | None ->
                 Html.span [
@@ -116,12 +119,9 @@ type TreeNode =
             | None -> Html.none
 
         let trailingContent =
-            match config.Trailing with
-            | Some trailing -> trailing (box renderProps)
-            | None ->
-                match nodeProps.trailing with
-                | Some trailing -> trailing
-                | None -> Html.none
+            match presentation.trailing with
+            | Some trailing -> trailing renderProps
+            | None -> nodeProps.trailing |> Option.defaultValue Html.none
 
         React.Fragment [
             Html.div [
@@ -130,10 +130,6 @@ type TreeNode =
                     if TreeItem.isBranch node then
                         "swt:pl-4"
                 ]
-                prop.onClick (fun event ->
-                    if not (originatesFromInteractiveDescendant event) then
-                        onSelect event
-                )
                 prop.children [ leadingContent; nodeContent ]
             ]
 
@@ -144,9 +140,13 @@ type TreeNode =
         ]
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
-    static member Row<'T>
+    static member TreeNode<'T>
         (
-            row: TreeVisibleNode<'T>,
+            nodeId: string,
+            comparisonNode: TreeItem<'T>,
+            depth: int,
+            posInSet: int,
+            setSize: int,
             isExpanded: bool,
             isSelected: bool,
             isActive: bool,
@@ -154,17 +154,21 @@ type TreeNode =
             isFocused: bool,
             isLoading: bool,
             error: string option,
+            canSelect: bool,
             canExpand: bool,
+            className: string[],
+            debug: bool,
+            nodesRef: IRefValue<Map<string, TreeItem<'T>>>,
+            presentationRef: IRefValue<TreePresentation<'T>>,
             ?onToggle: unit -> unit,
             ?onSelect: MouseEvent -> unit,
             ?onFocus: unit -> unit,
             ?onKeyDown: KeyboardEvent -> unit
         ) =
-        let config = useTreeCtx ()
-        let node = row.node
+        let node =
+            nodesRef.current |> Map.tryFind nodeId |> Option.defaultValue comparisonNode
+
         let nodeProps = TreeItem.props node
-        let nodeId = nodeProps.id
-        let canSelect = not config.SelectionDisabled && config.IsNodeSelectable(box node)
         let onToggle = defaultArg onToggle ignore
         let onSelect = defaultArg onSelect ignore
         let onFocus = defaultArg onFocus ignore
@@ -177,28 +181,30 @@ type TreeNode =
                 prop.custom ("aria-selected", isSelected)
             if not canSelect && not canExpand then
                 prop.custom ("aria-disabled", true)
-            prop.custom ("aria-level", row.depth + 1)
-            prop.custom ("aria-posinset", row.posInSet)
-            prop.custom ("aria-setsize", row.setSize)
+            prop.custom ("aria-level", depth + 1)
+            prop.custom ("aria-posinset", posInSet)
+            prop.custom ("aria-setsize", setSize)
             if canExpand then
                 prop.custom ("aria-expanded", isExpanded)
             prop.custom ("data-tree-node-id", nodeId)
             prop.custom ("data-tree-node-kind", if TreeItem.isBranch node then "branch" else "leaf")
             prop.custom ("data-tree-active", isActive)
             prop.custom ("data-tree-focused", isFocused)
-            if config.Debug then
+            if debug then
                 prop.testId $"tree-node-{nodeId}"
-            prop.className (
-                TreeHelper.nodeContainerClasses row canSelect canExpand isSelected isActive isFocused config.StyleFn
-            )
-            prop.style [ style.paddingLeft (length.rem (float row.depth * 1.25)) ]
+            prop.className className
+            prop.style [ style.paddingLeft (length.rem (float depth * 1.25)) ]
             prop.title (nodeProps.tooltip |> Option.defaultValue nodeProps.label)
+            prop.onClick (fun event ->
+                if not (originatesFromInteractiveDescendant event) then
+                    onSelect event
+            )
             prop.onFocus (fun _ -> onFocus ())
             prop.onKeyDown onKeyDown
             prop.children [
                 TreeNode.Surface(
                     node,
-                    row.depth,
+                    depth,
                     isExpanded,
                     isSelected,
                     isActive,
@@ -206,6 +212,7 @@ type TreeNode =
                     isLoading,
                     error,
                     canExpand,
+                    presentationRef,
                     onToggle,
                     onSelect
                 )

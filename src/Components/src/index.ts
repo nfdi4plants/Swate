@@ -57,6 +57,20 @@ export { default as ThemeProvider } from './dist/Composite/ThemeSelector/ThemePr
 export { default as ThemeSelector } from './dist/Composite/ThemeSelector/ThemeSelector.fs';
 export { default as TutorialOverlay } from './dist/Composite/TutorialOverlay/TutorialOverlay.fs';
 
+import { Tree as GeneratedTree } from './dist/Composite/Tree/Tree.fs';
+import { bindTree } from './Composite/Tree/TreePublicApi';
+export const Tree = bindTree(GeneratedTree);
+export type {
+  TreeApi,
+  TreeContextMenuItem,
+  TreeDataSource,
+  TreeItem,
+  TreeItemProps,
+  TreeProps,
+  TreeRenderProps,
+  TreeSelectionMode,
+} from './Composite/Tree/TreePublicApi';
+
 export { Main as NoteSearch, SearchSuggestion } from './dist/Composite/Notes/NoteSearch/NoteSearch.fs';
 export { WidgetController, Entry as WidgetEntry } from './dist/Composite/Widgets/Widgets.fs';
 

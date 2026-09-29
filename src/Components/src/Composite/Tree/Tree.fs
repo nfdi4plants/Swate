@@ -1,9 +1,9 @@
 namespace Swate.Components.Composite.Tree
 
 open Fable.Core
+open Fable.Core.JsInterop
 open Feliz
 open Swate.Components
-open Swate.Components.Composite.Tree.Context
 open Swate.Components.Composite.Tree.Dom
 open Swate.Components.Composite.Tree.Hooks
 open Swate.Components.Composite.Tree.State
@@ -13,30 +13,59 @@ open Swate.Components.Composite.Tree.Types
 type Tree =
 
     [<ReactComponent>]
-    static member private Root<'T>
+    static member Tree<'T>
         (
             items: TreeItem<'T>[],
-            selectionMode: TreeSelectionMode,
-            selectedIds: string[] option,
-            defaultSelectedIds: string[] option,
-            defaultExpandedIds: string[] option,
-            onSelectionChange: (string[] -> unit) option,
-            dataSource: TreeDataSource<'T> option,
-            isSelectionDisabled: bool,
-            isNodeSelectable: TreeItem<'T> -> bool,
-            enableVirtualization: bool,
-            estimateNodeHeight: int,
-            onContextMenu: TreeContextMenuEvent<'T> option,
-            styleFn: TreeStyleFn<'T> option,
-            onError: exn -> unit,
-            apiRef: IRefValue<TreeApi option> option,
-            ariaLabel: string,
-            debug: bool
+            ?dataSource: TreeDataSource<'T>,
+            ?selectionMode: TreeSelectionMode,
+            ?selectedIds: string[],
+            ?defaultSelectedIds: string[],
+            ?defaultExpandedIds: string[],
+            ?onSelectionChange: string[] -> unit,
+            ?isSelectionDisabled: bool,
+            ?isNodeSelectable: TreeItem<'T> -> bool,
+            ?enableVirtualization: bool,
+            ?estimateNodeHeight: int,
+            ?onContextMenu: TreeContextMenuEvent<'T>,
+            ?renderNode: TreeRenderProps<'T> -> ReactElement,
+            ?leading: TreeRenderProps<'T> -> ReactElement,
+            ?trailing: TreeRenderProps<'T> -> ReactElement,
+            ?styleFn: TreeStyleFn<'T>,
+            ?onError: exn -> unit,
+            ?ref: IRefValue<TreeApi>,
+            ?ariaLabel: string,
+            ?debug: bool
         ) =
+        let selectionMode = defaultArg selectionMode TreeSelectionMode.Single
+        let isSelectionDisabled = defaultArg isSelectionDisabled false
+        let isNodeSelectable = defaultArg isNodeSelectable (fun _ -> true)
+        let enableVirtualization = defaultArg enableVirtualization false
+        let estimateNodeHeight = defaultArg estimateNodeHeight 34
+        let onError = defaultArg onError (fun error -> Browser.Dom.console.error error)
+        let ariaLabel = defaultArg ariaLabel "Tree"
+        let debug = defaultArg debug false
+
         let treeRef = React.useElementRef ()
         let scrollRef = React.useElementRef ()
-        let activeRequestIdsRef = React.useRef<Map<string, int>> Map.empty
-        let loadRequestIdRef = React.useRef 0
+
+        let loadTrackerRef =
+            React.useRef<TreeLoadTracker> {
+                nextRequestId = 0
+                activeRequestIds = Map.empty
+            }
+
+        let presentationRef =
+            React.useRef<TreePresentation<'T>> {
+                renderNode = renderNode
+                leading = leading
+                trailing = trailing
+            }
+
+        presentationRef.current <- {
+            renderNode = renderNode
+            leading = leading
+            trailing = trailing
+        }
 
         let treeState: TreeState<'T> =
             useTreeState selectionMode defaultExpandedIds defaultSelectedIds
@@ -44,63 +73,68 @@ type Tree =
         let effectiveSelectedIds, setSelection =
             useControlledSelection selectionMode selectedIds onSelectionChange treeState
 
-        let effectiveSelectedIdsRef = React.useRef effectiveSelectedIds
-        effectiveSelectedIdsRef.current <- effectiveSelectedIds
-
-        useTreeApi apiRef activeRequestIdsRef treeState.SetLoadedChildren treeState.SetExpandedIds
+        let effectiveItems = rootItems items treeState.loadedChildren
 
         let lookup =
             React.useMemo (
-                (fun () -> flattenVisible treeState.LoadedChildren treeState.ExpandedIds items),
+                (fun () -> flattenVisible treeState.loadedChildren treeState.expandedIds effectiveItems),
                 [|
-                    box treeState.LoadedChildren
-                    box treeState.ExpandedIds
-                    box items
+                    box treeState.loadedChildren
+                    box treeState.expandedIds
+                    box effectiveItems
                 |]
             )
 
-        let rows = lookup.VisibleNodes
-        let activeId = activeOrFirst treeState.ActiveId effectiveSelectedIds rows
-        let focusedId = visibleFocus treeState.FocusedId rows
-
+        let rows = lookup.visibleNodes
+        let nodesRef = React.useRef lookup.nodes
+        nodesRef.current <- lookup.nodes
+        let activeId = activeOrFirst treeState.activeId effectiveSelectedIds lookup
+        let focusedId = visibleFocus treeState.focusedId lookup
         let shouldUseVirtualization = enableVirtualization && rows.Length > 0
+
+        let pinnedFocusIndex =
+            focusedId |> Option.bind (fun nodeId -> lookup.indices |> Map.tryFind nodeId)
 
         let virtualizer =
             Virtual.useVirtualizer (
                 count = rows.Length,
                 getScrollElement = (fun () -> scrollRef.current),
                 estimateSize = (fun _ -> estimateNodeHeight),
-                overscan = 8
+                overscan = 8,
+                rangeExtractor =
+                    (fun range ->
+                        match pinnedFocusIndex with
+                        | Some index ->
+                            [|
+                                yield index
+                                yield! Virtual.defaultRangeExtractor range
+                            |]
+                            |> Array.distinct
+                            |> Array.sort
+                        | None -> Virtual.defaultRangeExtractor range
+                    )
             )
 
-        // the virtualizer only returns the rows that are currently visible in the viewport,
-        // so we need to keep track of which nodes are currently mounted in the DOM
         let virtualRows = virtualizer.getVirtualItems ()
 
-        // get the ids of the nodes that are currently mounted in the DOM, based on the virtual rows
         let mountedNodeIds =
             if shouldUseVirtualization then
                 virtualRows
-                |> Seq.choose (fun virtualRow ->
+                |> Array.choose (fun virtualRow ->
                     rows
                     |> Array.tryItem virtualRow.index
                     |> Option.map (fun row -> TreeItem.getId row.node)
                 )
-                |> Seq.toArray
             else
                 rows |> Array.map (fun row -> TreeItem.getId row.node)
 
-        // tab stop is the node that is currently focused,
-        // or if no node is focused, the active node, or if no node is active, the first mounted node
         let tabStopId =
             focusedId
             |> Option.filter (fun nodeId -> mountedNodeIds |> Array.contains nodeId)
-
             |> Option.orElseWith (fun () ->
                 activeId
                 |> Option.filter (fun nodeId -> mountedNodeIds |> Array.contains nodeId)
             )
-
             |> Option.orElseWith (fun () -> mountedNodeIds |> Array.tryHead)
 
         let scrollToIndex index =
@@ -112,65 +146,99 @@ type Tree =
                 )
 
         let actions =
-            useTreeNodeActions
-                treeRef
-                scrollToIndex
-                activeRequestIdsRef
-                loadRequestIdRef
-                treeState
-                lookup
-                (focusedId |> Option.orElse activeId)
-                selectionMode
-                effectiveSelectedIdsRef
-                setSelection
-                dataSource
-                isSelectionDisabled
-                isNodeSelectable
-                onError
+            useTreeNodeActions treeRef loadTrackerRef {
+                items = items
+                dataSource = dataSource
+                isSelectionDisabled = isSelectionDisabled
+                isNodeSelectable = isNodeSelectable
+                lookup = lookup
+                focusedId = focusedId |> Option.orElse activeId
+                selectionMode = selectionMode
+                effectiveSelectedIds = effectiveSelectedIds
+                scrollToIndex = scrollToIndex
+                setSelection = setSelection
+                treeState = treeState
+                onError = onError
+            }
+
+        React.useImperativeHandle (
+            !!ref,
+            (fun () ->
+                TreeApi(
+                    (fun nodeId ->
+                        let invalidatedIds = invalidatedSubtreeIds items treeState.loadedChildren nodeId
+
+                        if not invalidatedIds.IsEmpty then
+                            loadTrackerRef.current.activeRequestIds <-
+                                loadTrackerRef.current.activeRequestIds
+                                |> Map.filter (fun cacheKey _ -> not (invalidatedIds.Contains cacheKey))
+
+                            treeState.setLoadedChildren (removeCacheEntries invalidatedIds)
+
+                            treeState.setExpandedIds (removeDescendantExpansions nodeId invalidatedIds)
+                    ),
+                    (fun () ->
+                        loadTrackerRef.current.activeRequestIds <- Map.empty
+
+                        treeState.setExpandedIds (preserveExpansionAfterInvalidateAll items treeState.loadedChildren)
+
+                        treeState.setLoadedChildren (fun _ -> Map.empty)
+                    )
+                )
+            )
+        )
 
         let renderRow row =
             let nodeId = TreeItem.getId row.node
 
             let loadState =
-                treeState.LoadedChildren
+                treeState.loadedChildren
                 |> Map.tryFind nodeId
                 |> Option.defaultValue emptyLoadState
 
-            let isExpanded = treeState.ExpandedIds.Contains nodeId
-            let canExpandNode = TreeItem.isBranch row.node
+            let isExpanded = treeState.expandedIds.Contains nodeId
+            let canExpand = TreeItem.isBranch row.node
+            let canSelect = not isSelectionDisabled && isNodeSelectable row.node
+            let isSelected = effectiveSelectedIds |> Array.contains nodeId
+            let isActive = activeId = Some nodeId
+            let isFocused = focusedId = Some nodeId
 
-            TreeNode.Row(
-                row = row,
+            TreeNode.TreeNode(
+                nodeId = nodeId,
+                comparisonNode = row.comparisonNode,
+                depth = row.depth,
+                posInSet = row.posInSet,
+                setSize = row.setSize,
                 isExpanded = isExpanded,
-                isSelected = effectiveSelectedIds.Contains nodeId,
-                isActive = (activeId = Some nodeId),
-                isFocused = (focusedId = Some nodeId),
+                isSelected = isSelected,
+                isActive = isActive,
+                isFocused = isFocused,
                 isTabStop = (tabStopId = Some nodeId),
-                isLoading = (loadState.Status = TreeLazyLoadStatus.Loading),
-                error = loadState.Error,
-                canExpand = canExpandNode,
-                onToggle = (fun () -> actions.ExpandNode row.node),
+                isLoading = (loadState.status = TreeLazyLoadStatus.Loading),
+                error = loadState.error,
+                canSelect = canSelect,
+                canExpand = canExpand,
+                className = Helper.nodeContainerClasses row canSelect canExpand isSelected isActive isFocused styleFn,
+                debug = debug,
+                nodesRef = nodesRef,
+                presentationRef = presentationRef,
+                onToggle = (fun () -> actions.expandNode nodeId),
                 onSelect =
                     (fun event ->
                         event.preventDefault ()
                         event.stopPropagation ()
+                        (unbox<Browser.Types.HTMLElement> event.currentTarget).focus ()
 
-                        let intent =
-                            if event.shiftKey then
-                                TreeSelectionIntent.Range
-                            elif event.ctrlKey || event.metaKey then
-                                TreeSelectionIntent.Toggle
-                            else
-                                TreeSelectionIntent.Replace
-
-                        actions.SelectNode row.node intent
+                        actions.selectNode
+                            nodeId
+                            (TreeController.selectionIntent event.shiftKey event.ctrlKey event.metaKey)
                     ),
                 onFocus =
                     (fun () ->
-                        if treeState.FocusedId <> Some nodeId then
-                            treeState.SetFocusedId(Some nodeId)
+                        if treeState.focusedId <> Some nodeId then
+                            treeState.setFocusedId (Some nodeId)
                     ),
-                onKeyDown = actions.OnNodeKeyDown row.node
+                onKeyDown = actions.onNodeKeyDown nodeId
             )
 
         let treeContent =
@@ -225,7 +293,6 @@ type Tree =
                 Swate.Components.Primitive.ContextMenu.ContextMenu.ContextMenu(
                     (fun data ->
                         let event, target = unbox<Browser.Types.MouseEvent * TreeItem<'T> option> data
-
                         contextMenuItems.Invoke(event, target) |> Array.toList
                     ),
                     ref = treeRef,
@@ -233,7 +300,7 @@ type Tree =
                         (fun event ->
                             let target =
                                 tryGetNodeId event
-                                |> Option.bind (fun nodeId -> lookup.Nodes |> Map.tryFind nodeId)
+                                |> Option.bind (fun nodeId -> lookup.nodes |> Map.tryFind nodeId)
 
                             Some(box (event, target))
                         ),
@@ -249,11 +316,11 @@ type Tree =
             prop.custom ("data-tree-root", "true")
             prop.onBlur (fun event ->
                 if focusMovedOutsideTree event then
-                    treeState.SetFocusedId None
+                    treeState.setFocusedId None
             )
             if debug then
                 prop.testId "generic-tree"
-            prop.className (TreeHelper.rootClasses styleFn)
+            prop.className (Helper.rootClasses styleFn)
             prop.children [
                 treeContent
                 contextMenu
@@ -261,106 +328,7 @@ type Tree =
                     Html.div [
                         prop.testId "tree-selected-ids"
                         prop.className "swt:hidden"
-                        prop.text (effectiveSelectedIds |> Set.toArray |> String.concat ",")
+                        prop.text (effectiveSelectedIds |> String.concat ",")
                     ]
             ]
         ]
-
-    [<ReactComponent>]
-    static member Tree<'T>
-        (
-            items: TreeItem<'T>[],
-            ?dataSource: TreeDataSource<'T>,
-            ?selectionMode: TreeSelectionMode,
-            ?selectedIds: string[],
-            ?defaultSelectedIds: string[],
-            ?defaultExpandedIds: string[],
-            ?onSelectionChange: string[] -> unit,
-            ?isSelectionDisabled: bool,
-            ?isNodeSelectable: TreeItem<'T> -> bool,
-            ?enableVirtualization: bool,
-            ?estimateNodeHeight: int,
-            ?onContextMenu: TreeContextMenuEvent<'T>,
-            ?renderNode: TreeRenderProps<'T> -> ReactElement,
-            ?leading: TreeRenderProps<'T> -> ReactElement,
-            ?trailing: TreeRenderProps<'T> -> ReactElement,
-            ?styleFn: TreeStyleFn<'T>,
-            ?onError: exn -> unit,
-            ?apiRef: IRefValue<TreeApi option>,
-            ?ariaLabel: string,
-            ?debug: bool
-        ) =
-        let selectionMode = defaultArg selectionMode TreeSelectionMode.Single
-        let isSelectionDisabled = defaultArg isSelectionDisabled false
-
-        let isNodeSelectable =
-            React.useMemo ((fun () -> defaultArg isNodeSelectable (fun _ -> true)), [| box isNodeSelectable |])
-
-        let enableVirtualization = defaultArg enableVirtualization false
-        let estimateNodeHeight = defaultArg estimateNodeHeight 34
-
-        let styleFn = React.useMemo ((fun () -> styleFn), [| box styleFn |])
-
-        let onError =
-            React.useMemo (
-                (fun () -> defaultArg onError (fun error -> Browser.Dom.console.error error)),
-                [| box onError |]
-            )
-
-        let ariaLabel = defaultArg ariaLabel "Tree"
-        let debug = defaultArg debug false
-
-        let contextValue: TreeContextValue =
-            React.useMemo (
-                (fun () -> {
-                    SelectionDisabled = isSelectionDisabled
-                    IsNodeSelectable = fun node -> isNodeSelectable (unbox<TreeItem<'T>> node)
-                    RenderNode =
-                        renderNode
-                        |> Option.map (fun renderNode -> fun props -> renderNode (unbox<TreeRenderProps<'T>> props))
-                    Leading =
-                        leading
-                        |> Option.map (fun leading -> fun props -> leading (unbox<TreeRenderProps<'T>> props))
-                    Trailing =
-                        trailing
-                        |> Option.map (fun trailing -> fun props -> trailing (unbox<TreeRenderProps<'T>> props))
-                    StyleFn =
-                        styleFn
-                        |> Option.map (fun styleFn ->
-                            fun node classes -> styleFn (node |> Option.map unbox<TreeItem<'T>>) classes
-                        )
-                    Debug = debug
-                }),
-                [|
-                    box isSelectionDisabled
-                    box isNodeSelectable
-                    box renderNode
-                    box leading
-                    box trailing
-                    box styleFn
-                    box debug
-                |]
-            )
-
-        TreeCtx.Provider(
-            contextValue,
-            Tree.Root(
-                items,
-                selectionMode,
-                selectedIds,
-                defaultSelectedIds,
-                defaultExpandedIds,
-                onSelectionChange,
-                dataSource,
-                isSelectionDisabled,
-                isNodeSelectable,
-                enableVirtualization,
-                estimateNodeHeight,
-                onContextMenu,
-                styleFn,
-                onError,
-                apiRef,
-                ariaLabel,
-                debug
-            )
-        )

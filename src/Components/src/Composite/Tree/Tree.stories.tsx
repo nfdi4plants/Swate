@@ -8,36 +8,44 @@ import {
   waitFor,
   within,
 } from "storybook/test";
-import { Tree } from "./Tree.fs.js";
-import type { TreeApi, TreeItem$1 as TreeItem } from "./Types.fs.js";
+import { Tree as GeneratedTree } from "./Tree.fs.js";
+import {
+  bindTree,
+  type TreeApi,
+  type TreeDataSource,
+  type TreeItem,
+  type TreeProps,
+  type TreeRenderProps,
+  type TreeSelectionMode,
+} from "./TreePublicApi";
+
+const Tree = bindTree(GeneratedTree);
 
 type DemoPayload = {
   badge?: string;
 };
 
 type DemoNode = TreeItem<DemoPayload>;
-type DemoTreeProps = Parameters<typeof Tree<DemoPayload>>[0];
-type DemoDataSource = NonNullable<DemoTreeProps["dataSource"]>;
-type DemoRenderProps = Parameters<NonNullable<DemoTreeProps["renderNode"]>>[0];
-type DemoSelectionMode = NonNullable<DemoTreeProps["selectionMode"]>;
+type DemoTreeProps = TreeProps<DemoPayload>;
+type DemoDataSource = TreeDataSource<DemoPayload>;
+type DemoRenderProps = TreeRenderProps<DemoPayload>;
+type DemoSelectionMode = TreeSelectionMode;
 
 const branch = (
   id: string,
   label: string,
   children?: DemoNode[],
   payload?: DemoPayload,
-): DemoNode =>
-  ({
-    type: "branch",
-    props: { id, label, data: payload },
-    ...(children !== undefined ? { children } : {}),
-  }) as DemoNode;
+): DemoNode => ({
+  type: "branch",
+  props: { id, label, data: payload },
+  ...(children !== undefined ? { children } : {}),
+});
 
-const leaf = (id: string, label: string, payload?: DemoPayload): DemoNode =>
-  ({
-    type: "leaf",
-    props: { id, label, data: payload },
-  }) as DemoNode;
+const leaf = (id: string, label: string, payload?: DemoPayload): DemoNode => ({
+  type: "leaf",
+  props: { id, label, data: payload },
+});
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -53,16 +61,6 @@ const createDeferred = <T,>(): Deferred<T> => {
     reject = rejectPromise;
   });
   return { promise, resolve, reject };
-};
-
-const unwrapGeneratedOption = <T,>(
-  value: T | { value: T } | undefined,
-): T | undefined => {
-  if (value === undefined) return undefined;
-  if (typeof value === "object" && value !== null && "value" in value) {
-    return (value as { value: T }).value;
-  }
-  return value as T;
 };
 
 const expectLoadingIndicator = async (canvasElement: HTMLElement) => {
@@ -223,9 +221,6 @@ export const SelectingAFolderDoesNotToggleExpansion: Story = {
 
     await userEvent.click(studiesNode);
     await expect(studiesNode).toHaveAttribute("aria-expanded", "false");
-    await expect(studiesNode).toHaveAttribute("aria-selected", "false");
-
-    await userEvent.click(canvas.getByText("studies"));
     await expect(studiesNode).toHaveAttribute("aria-selected", "true");
     await expect(studiesNode).toHaveAttribute("aria-expanded", "false");
     expect(canvas.getByTestId("folder-selection").textContent).toBe(
@@ -240,12 +235,9 @@ export const SelectingAFolderDoesNotToggleExpansion: Story = {
     await expect(studiesNode).toHaveAttribute("aria-expanded", "true");
     await expect(canvas.getByText("Study 01")).toBeVisible();
 
-    await userEvent.click(studiesNode);
-    await expect(studiesNode).toHaveAttribute("aria-expanded", "true");
-    await expect(canvas.getByText("Study 01")).toBeVisible();
-
     await userEvent.click(canvas.getByText("studies"));
     await expect(studiesNode).toHaveAttribute("aria-expanded", "true");
+    await expect(canvas.getByText("Study 01")).toBeVisible();
   },
 };
 
@@ -285,6 +277,26 @@ export const EnterOpensAFolder: Story = {
     );
     await expect(canvas.queryByText("Study 01")).not.toBeInTheDocument();
     await expect(studiesNode).toHaveFocus();
+  },
+};
+
+export const ChevronKeepsTreeitemFocusForKeyboardNavigation: Story = {
+  render: () => <FolderSelectionTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const studiesNode = canvas.getByTestId("tree-node-arc/studies");
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Expand studies" }),
+    );
+    await expect(studiesNode).toHaveFocus();
+
+    await userEvent.keyboard("{ArrowDown}");
+    await waitFor(() =>
+      expect(
+        canvas.getByTestId("tree-node-arc/studies/study_01"),
+      ).toHaveFocus(),
+    );
   },
 };
 
@@ -346,8 +358,43 @@ export const ShiftSelectsUntilClickedNode: Story = {
       "false",
     );
     expect(canvas.getByTestId("select-until-selection").textContent).toBe(
-      JSON.stringify(["beta", "delta", "gamma.txt"]),
+      JSON.stringify(["beta", "gamma.txt", "delta"]),
     );
+  },
+};
+
+export const NavigationDoesNotReplaceTheRangeAnchor: Story = {
+  render: () => <SelectUntilTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByText("beta"));
+    await userEvent.keyboard("{ArrowDown}");
+    await waitFor(() =>
+      expect(canvas.getByTestId("tree-node-gamma.txt")).toHaveFocus(),
+    );
+
+    fireEvent.click(canvas.getByText("delta"), { shiftKey: true });
+    await expect(
+      canvas.getByTestId("select-until-selection"),
+    ).toHaveTextContent(JSON.stringify(["beta", "gamma.txt", "delta"]));
+  },
+};
+
+export const KeyboardRangeSelectionUsesTheOriginalAnchor: Story = {
+  render: () => <SelectUntilTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByText("beta"));
+    await userEvent.keyboard("{ArrowDown}{ArrowDown}");
+    const deltaNode = canvas.getByTestId("tree-node-delta");
+    await expect(deltaNode).toHaveFocus();
+    fireEvent.keyDown(deltaNode, { key: " ", shiftKey: true });
+
+    await expect(
+      canvas.getByTestId("select-until-selection"),
+    ).toHaveTextContent(JSON.stringify(["beta", "gamma.txt", "delta"]));
   },
 };
 
@@ -424,8 +471,8 @@ export const ControlClickAddsToMultipleSelection: Story = {
 
     expect(canvas.getByTestId("multi-selected").textContent).toBe(
       JSON.stringify([
-        "arc/assays/assay_01/isa.assay.xlsx",
         "arc/studies/study_01/isa.study.xlsx",
+        "arc/assays/assay_01/isa.assay.xlsx",
       ]),
     );
   },
@@ -636,6 +683,62 @@ export const UncontrolledMultiSelectionUsesLatestState: Story = {
   },
 };
 
+const UncontrolledSelectionModeTree = () => {
+  const [selectionMode, setSelectionMode] =
+    React.useState<TreeSelectionMode>("multiple");
+  const items = React.useMemo(
+    () => [leaf("alpha.txt", "alpha.txt"), leaf("beta.txt", "beta.txt")],
+    [],
+  );
+
+  return (
+    <div>
+      <Tree
+        items={items}
+        selectionMode={selectionMode}
+        defaultSelectedIds={["alpha.txt", "beta.txt"]}
+        debug
+      />
+      <button type="button" onClick={() => setSelectionMode("single")}>
+        Uncontrolled single
+      </button>
+      <button type="button" onClick={() => setSelectionMode("multiple")}>
+        Uncontrolled multiple
+      </button>
+    </div>
+  );
+};
+
+export const UncontrolledModeChangeCleansHiddenSelections: Story = {
+  render: () => <UncontrolledSelectionModeTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("tree-node-beta.txt")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Uncontrolled single" }),
+    );
+    await expect(canvas.getByTestId("tree-node-beta.txt")).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Uncontrolled multiple" }),
+    );
+    await expect(canvas.getByTestId("tree-node-beta.txt")).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
+    await expect(canvas.getByTestId("tree-selected-ids")).toHaveTextContent(
+      "alpha.txt",
+    );
+  },
+};
+
 const DisabledSelectionTree = () => {
   const [selected, setSelected] = React.useState<string[]>([]);
   const items = React.useMemo(
@@ -687,7 +790,7 @@ export const DisabledSelection: Story = {
 const LazyCacheTree = () => {
   const [loadCount, setLoadCount] = React.useState(0);
   const requestCountRef = React.useRef(0);
-  const apiRef = React.useRef<TreeApi | undefined>(undefined);
+  const apiRef = React.useRef<TreeApi | null>(null);
 
   const items = React.useMemo(
     () => [branch("arc/lazy-studies", "studies", undefined)],
@@ -714,7 +817,7 @@ const LazyCacheTree = () => {
 
   return (
     <div className="swt:w-96 swt:space-y-2">
-      <Tree items={items} dataSource={dataSource} apiRef={apiRef} debug />
+      <Tree items={items} dataSource={dataSource} ref={apiRef} debug />
       <button
         type="button"
         className="swt:btn swt:btn-sm"
@@ -761,20 +864,90 @@ export const InvalidateNodeClearsLoadedCache: Story = {
     await userEvent.click(
       canvas.getByRole("button", { name: "Invalidate studies cache" }),
     );
-    await expect(
-      canvas.getByRole("button", { name: "Expand studies" }),
-    ).toBeVisible();
-    await userEvent.click(
-      canvas.getByRole("button", { name: "Expand studies" }),
-    );
     await expect(await canvas.findByText("Study load 2")).toBeVisible();
     await expect(canvas.queryByText("Study load 1")).not.toBeInTheDocument();
     expect(canvas.getByTestId("load-count").textContent).toBe("Loads: 2");
   },
 };
 
+const NestedLazyInvalidationTree = () => {
+  const apiRef = React.useRef<TreeApi | null>(null);
+  const loadCountsRef = React.useRef({ parent: 0, child: 0 });
+  const [loadCounts, setLoadCounts] = React.useState({ parent: 0, child: 0 });
+  const items = React.useMemo(() => [branch("parent", "parent")], []);
+
+  const dataSource = React.useMemo<DemoDataSource>(
+    () => ({
+      getTreeItems: async (item) => {
+        if (item?.props.id === "parent") {
+          loadCountsRef.current.parent += 1;
+          setLoadCounts({ ...loadCountsRef.current });
+          return [branch("parent/child", "child")];
+        }
+
+        if (item?.props.id === "parent/child") {
+          loadCountsRef.current.child += 1;
+          setLoadCounts({ ...loadCountsRef.current });
+          return [leaf("parent/child/result.txt", "nested result")];
+        }
+
+        return [];
+      },
+    }),
+    [],
+  );
+
+  return (
+    <div className="swt:w-96 swt:space-y-2">
+      <Tree items={items} dataSource={dataSource} ref={apiRef} debug />
+      <button
+        type="button"
+        onClick={() => apiRef.current?.invalidateNode("parent")}
+      >
+        Invalidate parent subtree
+      </button>
+      <output data-testid="nested-load-counts">
+        Parent: {loadCounts.parent}; Child: {loadCounts.child}
+      </output>
+    </div>
+  );
+};
+
+export const InvalidateNodeClearsDescendantCacheAndExpansion: Story = {
+  render: () => <NestedLazyInvalidationTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Expand parent" }),
+    );
+    await userEvent.click(
+      await canvas.findByRole("button", { name: "Expand child" }),
+    );
+    await expect(await canvas.findByText("nested result")).toBeVisible();
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Invalidate parent subtree" }),
+    );
+
+    await expect(
+      await canvas.findByRole("button", { name: "Expand child" }),
+    ).toBeVisible();
+    await expect(canvas.queryByText("nested result")).not.toBeInTheDocument();
+    await expect(canvas.getByTestId("nested-load-counts")).toHaveTextContent(
+      "Parent: 2; Child: 1",
+    );
+
+    await userEvent.click(canvas.getByRole("button", { name: "Expand child" }));
+    await expect(await canvas.findByText("nested result")).toBeVisible();
+    await expect(canvas.getByTestId("nested-load-counts")).toHaveTextContent(
+      "Parent: 2; Child: 2",
+    );
+  },
+};
+
 const PendingRequestInvalidationTree = () => {
-  const apiRef = React.useRef<TreeApi | undefined>(undefined);
+  const apiRef = React.useRef<TreeApi | null>(null);
   const requestsRef = React.useRef<Deferred<DemoNode[]>[]>([]);
   const [requestCount, setRequestCount] = React.useState(0);
   const items = React.useMemo(
@@ -809,7 +982,7 @@ const PendingRequestInvalidationTree = () => {
 
   return (
     <div className="swt:w-96 swt:space-y-2">
-      <Tree items={items} dataSource={dataSource} apiRef={apiRef} debug />
+      <Tree items={items} dataSource={dataSource} ref={apiRef} debug />
       <button
         type="button"
         onClick={() => apiRef.current?.invalidateNode("arc/pending")}
@@ -840,14 +1013,8 @@ export const InvalidateNodeSupersedesPendingRequest: Story = {
     await userEvent.click(
       canvas.getByRole("button", { name: "Invalidate pending load" }),
     );
-    await expect(
-      canvas.getByRole("button", { name: "Expand pending" }),
-    ).toBeVisible();
-    await userEvent.click(
-      canvas.getByRole("button", { name: "Expand pending" }),
-    );
     await expectLoadingIndicator(canvasElement);
-    expect(canvas.getByTestId("pending-request-count").textContent).toBe(
+    await expect(canvas.getByTestId("pending-request-count")).toHaveTextContent(
       "Requests: 2",
     );
 
@@ -859,7 +1026,7 @@ export const InvalidateNodeSupersedesPendingRequest: Story = {
 };
 
 const StaleFailureTree = () => {
-  const apiRef = React.useRef<TreeApi | undefined>(undefined);
+  const apiRef = React.useRef<TreeApi | null>(null);
   const requestsRef = React.useRef<Deferred<DemoNode[]>[]>([]);
   const [requestCount, setRequestCount] = React.useState(0);
   const [requestSettlements, setRequestSettlements] = React.useState<string[]>(
@@ -904,7 +1071,7 @@ const StaleFailureTree = () => {
       <Tree
         items={items}
         dataSource={dataSource}
-        apiRef={apiRef}
+        ref={apiRef}
         onError={() => setErrorCount((count) => count + 1)}
         debug
       />
@@ -959,12 +1126,6 @@ export const StaleLazyFailureDoesNotCollapseNewerResult: Story = {
 
     await userEvent.click(
       canvas.getByRole("button", { name: "Invalidate pending request" }),
-    );
-    await expect(
-      canvas.getByRole("button", { name: "Expand concurrent" }),
-    ).toBeVisible();
-    await userEvent.click(
-      canvas.getByRole("button", { name: "Expand concurrent" }),
     );
     await expectLoadingIndicator(canvasElement);
     await expect(canvas.getByTestId("stale-request-count")).toHaveTextContent(
@@ -1098,6 +1259,69 @@ export const DataSourceLoadsChildrenForExpandedBranch: Story = {
   },
 };
 
+const RootDataSourceTree = () => {
+  const dataSource = React.useMemo<DemoDataSource>(
+    () => ({
+      getTreeItems: async (item) =>
+        item === undefined ? [leaf("root-file.txt", "root file")] : [],
+    }),
+    [],
+  );
+
+  return <Tree items={[]} dataSource={dataSource} debug />;
+};
+
+export const DataSourceCanLoadRootItems: Story = {
+  render: () => <RootDataSourceTree />,
+  play: async ({ canvasElement }) => {
+    await expect(
+      await within(canvasElement).findByText("root file"),
+    ).toBeVisible();
+  },
+};
+
+const ReplacedDataSourceTree = () => {
+  const [version, setVersion] = React.useState(1);
+  const items = React.useMemo(() => [branch("remote", "remote")], []);
+  const dataSource = React.useMemo<DemoDataSource>(
+    () => ({
+      getTreeItems: async (item) =>
+        item?.props.id === "remote"
+          ? [leaf(`remote/v${version}.txt`, `version ${version}`)]
+          : [],
+    }),
+    [version],
+  );
+
+  return (
+    <div>
+      <Tree
+        items={items}
+        dataSource={dataSource}
+        defaultExpandedIds={["remote"]}
+        debug
+      />
+      <button type="button" onClick={() => setVersion(2)}>
+        Replace datasource
+      </button>
+    </div>
+  );
+};
+
+export const ReplacingDataSourceClearsItsCache: Story = {
+  render: () => <ReplacedDataSourceTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("version 1")).toBeVisible();
+
+    await userEvent.click(
+      canvas.getByRole("button", { name: "Replace datasource" }),
+    );
+    await expect(await canvas.findByText("version 2")).toBeVisible();
+    await expect(canvas.queryByText("version 1")).not.toBeInTheDocument();
+  },
+};
+
 const EmptyFolderTree = () => {
   const [selected, setSelected] = React.useState<string[]>([]);
   const items = React.useMemo(
@@ -1146,7 +1370,7 @@ export const EmptyFolderRemainsSelectableAndExpandable: Story = {
 const DataSourceInvalidateAllTree = () => {
   const [loadCount, setLoadCount] = React.useState(0);
   const loadCountRef = React.useRef(0);
-  const apiRef = React.useRef<TreeApi | undefined>(undefined);
+  const apiRef = React.useRef<TreeApi | null>(null);
   const items = React.useMemo(
     () => [branch("arc/workflows", "workflows", undefined)],
     [],
@@ -1178,7 +1402,7 @@ const DataSourceInvalidateAllTree = () => {
 
   return (
     <div className="swt:w-96 swt:space-y-2">
-      <Tree items={items} dataSource={dataSource} apiRef={apiRef} debug />
+      <Tree items={items} dataSource={dataSource} ref={apiRef} debug />
       <button
         type="button"
         className="swt:btn swt:btn-sm"
@@ -1217,12 +1441,6 @@ export const DataSourceInvalidateAllCache: Story = {
 
     await userEvent.click(
       canvas.getByRole("button", { name: "Invalidate all datasource cache" }),
-    );
-    await expect(
-      canvas.getByRole("button", { name: "Expand workflows" }),
-    ).toBeVisible();
-    await userEvent.click(
-      canvas.getByRole("button", { name: "Expand workflows" }),
     );
     await expect(await canvas.findByText("Workflow 2")).toBeVisible();
     await expect(canvas.queryByText("Workflow 1")).not.toBeInTheDocument();
@@ -1402,6 +1620,22 @@ export const VirtualizationUnmountsOffscreenRows: Story = {
   },
 };
 
+export const VirtualizationKeepsTheFocusedRowMounted: Story = {
+  render: () => <VirtualizedTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const firstStudy = canvas.getByTestId("tree-node-arc/studies/study_01");
+
+    await userEvent.click(firstStudy);
+    await expect(firstStudy).toHaveFocus();
+    await scrollVirtualizedTreeToBottom(canvasElement);
+
+    await expect(
+      canvas.getByTestId("tree-node-arc/studies/study_01"),
+    ).toHaveFocus();
+  },
+};
+
 export const VirtualizationKeepsAMountedTabStop: Story = {
   render: () => <VirtualizedTree />,
   play: async ({ canvasElement }) => {
@@ -1451,7 +1685,7 @@ const ContextMenuTree = () => {
         items={baseItems}
         defaultExpandedIds={["arc", "arc/studies", "arc/studies/study_01"]}
         onContextMenu={(_event, nodeOption) => {
-          const node = unwrapGeneratedOption(nodeOption);
+          const node = nodeOption;
           return [
             {
               text: <span>Inspect {node?.props.label ?? "tree root"}</span>,
@@ -1575,7 +1809,7 @@ export const CustomTrailingRenderer: Story = {
       items={customItems}
       defaultExpandedIds={customExpandedIds}
       trailing={(props: DemoRenderProps) => {
-        const payload = unwrapGeneratedOption(props.node.props.data);
+        const payload = props.node.props.data;
         return payload?.badge ? (
           <span data-testid="custom-trailing">{payload.badge}</span>
         ) : null;
@@ -1632,7 +1866,7 @@ export const CustomBranchStyling: Story = {
     <Tree
       items={customItems}
       styleFn={(nodeOption, classes) => {
-        const node = unwrapGeneratedOption(nodeOption);
+        const node = nodeOption;
         return node?.type === "branch"
           ? [...classes, "swt:text-primary"]
           : classes;
@@ -1653,7 +1887,7 @@ export const CustomLeafStyling: Story = {
       items={customItems}
       defaultExpandedIds={customExpandedIds}
       styleFn={(nodeOption, classes) => {
-        const node = unwrapGeneratedOption(nodeOption);
+        const node = nodeOption;
         return node?.type === "leaf"
           ? [...classes, "swt:text-accent"]
           : classes;
@@ -1868,8 +2102,12 @@ const RenderCountNode = ({ node, reportRender }: RenderCountNodeProps) => {
 const SelectiveRenderingTree = () => {
   const [items, setItems] = React.useState<DemoNode[]>(() => [
     branch("workspace", "Workspace", [
-      leaf("workspace/alpha.txt", "alpha.txt"),
-      leaf("workspace/beta.txt", "beta.txt"),
+      branch("workspace/projects", "projects", [
+        branch("workspace/projects/project-a", "Project A", [
+          leaf("workspace/projects/project-a/alpha.txt", "alpha.txt"),
+          leaf("workspace/projects/project-a/beta.txt", "beta.txt"),
+        ]),
+      ]),
     ]),
     leaf("stable-one.txt", "stable-one.txt"),
     leaf("stable-two.txt", "stable-two.txt"),
@@ -1878,7 +2116,10 @@ const SelectiveRenderingTree = () => {
   const [renderCounts, setRenderCounts] = React.useState<
     Record<string, number>
   >({});
-  const expandedIds = React.useMemo(() => ["workspace"], []);
+  const expandedIds = React.useMemo(
+    () => ["workspace", "workspace/projects", "workspace/projects/project-a"],
+    [],
+  );
 
   const reportRender = React.useCallback((nodeId: string) => {
     setRenderCounts((current) => ({
@@ -1900,13 +2141,31 @@ const SelectiveRenderingTree = () => {
         node.type === "branch" && node.props.id === "workspace"
           ? ({
               ...node,
-              children: Array.from(node.children ?? []).map((child) =>
-                child.props.id === "workspace/beta.txt"
+              children: (node.children ?? []).map((projects) =>
+                projects.type === "branch"
                   ? ({
-                      ...child,
-                      props: { ...child.props, label: "beta-renamed.txt" },
+                      ...projects,
+                      children: (projects.children ?? []).map((project) =>
+                        project.type === "branch"
+                          ? ({
+                              ...project,
+                              children: (project.children ?? []).map((file) =>
+                                file.props.id ===
+                                "workspace/projects/project-a/beta.txt"
+                                  ? ({
+                                      ...file,
+                                      props: {
+                                        ...file.props,
+                                        label: "beta-renamed.txt",
+                                      },
+                                    } as DemoNode)
+                                  : file,
+                              ),
+                            } as DemoNode)
+                          : project,
+                      ),
                     } as DemoNode)
-                  : child,
+                  : projects,
               ),
             } as DemoNode)
           : node,
@@ -1920,10 +2179,27 @@ const SelectiveRenderingTree = () => {
         node.type === "branch" && node.props.id === "workspace"
           ? ({
               ...node,
-              children: [
-                ...(node.children ?? []),
-                leaf("workspace/gamma.txt", "gamma.txt"),
-              ],
+              children: (node.children ?? []).map((projects) =>
+                projects.type === "branch"
+                  ? ({
+                      ...projects,
+                      children: (projects.children ?? []).map((project) =>
+                        project.type === "branch"
+                          ? ({
+                              ...project,
+                              children: [
+                                ...(project.children ?? []),
+                                leaf(
+                                  "workspace/projects/project-a/gamma.txt",
+                                  "gamma.txt",
+                                ),
+                              ],
+                            } as DemoNode)
+                          : project,
+                      ),
+                    } as DemoNode)
+                  : projects,
+              ),
             } as DemoNode)
           : node,
       ),
@@ -1932,9 +2208,11 @@ const SelectiveRenderingTree = () => {
 
   const trackedNodeIds = [
     "workspace",
-    "workspace/alpha.txt",
-    "workspace/beta.txt",
-    "workspace/gamma.txt",
+    "workspace/projects",
+    "workspace/projects/project-a",
+    "workspace/projects/project-a/alpha.txt",
+    "workspace/projects/project-a/beta.txt",
+    "workspace/projects/project-a/gamma.txt",
     "stable-one.txt",
     "stable-two.txt",
   ];
@@ -1955,7 +2233,7 @@ const SelectiveRenderingTree = () => {
         <button
           type="button"
           className="swt:btn swt:btn-sm"
-          onClick={() => setSelected(["workspace/beta.txt"])}
+          onClick={() => setSelected(["workspace/projects/project-a/beta.txt"])}
         >
           Select beta
         </button>
@@ -1981,8 +2259,10 @@ const SelectiveRenderingTree = () => {
 
 const initiallyRenderedNodeIds = [
   "workspace",
-  "workspace/alpha.txt",
-  "workspace/beta.txt",
+  "workspace/projects",
+  "workspace/projects/project-a",
+  "workspace/projects/project-a/alpha.txt",
+  "workspace/projects/project-a/beta.txt",
   "stable-one.txt",
   "stable-two.txt",
 ];
@@ -2001,23 +2281,31 @@ export const SelectionRerendersOnlyAffectedRows: Story = {
     );
     const beforeSelection = {
       workspace: renderCount("workspace"),
-      alpha: renderCount("workspace/alpha.txt"),
-      beta: renderCount("workspace/beta.txt"),
+      projects: renderCount("workspace/projects"),
+      project: renderCount("workspace/projects/project-a"),
+      alpha: renderCount("workspace/projects/project-a/alpha.txt"),
+      beta: renderCount("workspace/projects/project-a/beta.txt"),
       stableOne: renderCount("stable-one.txt"),
       stableTwo: renderCount("stable-two.txt"),
     };
 
     await userEvent.click(canvas.getByRole("button", { name: "Select beta" }));
     await waitFor(() =>
-      expect(renderCount("workspace/beta.txt")).toBeGreaterThan(
-        beforeSelection.beta,
-      ),
+      expect(
+        renderCount("workspace/projects/project-a/beta.txt"),
+      ).toBeGreaterThan(beforeSelection.beta),
     );
     await expect(
-      canvas.getByTestId("tree-node-workspace/beta.txt"),
+      canvas.getByTestId("tree-node-workspace/projects/project-a/beta.txt"),
     ).toHaveAttribute("aria-selected", "true");
     expect(renderCount("workspace")).toBeGreaterThan(beforeSelection.workspace);
-    expect(renderCount("workspace/alpha.txt")).toBe(beforeSelection.alpha);
+    expect(renderCount("workspace/projects")).toBe(beforeSelection.projects);
+    expect(renderCount("workspace/projects/project-a")).toBe(
+      beforeSelection.project,
+    );
+    expect(renderCount("workspace/projects/project-a/alpha.txt")).toBe(
+      beforeSelection.alpha,
+    );
     expect(renderCount("stable-one.txt")).toBe(beforeSelection.stableOne);
     expect(renderCount("stable-two.txt")).toBe(beforeSelection.stableTwo);
   },
@@ -2037,40 +2325,60 @@ export const RenameAndAddRerenderOnlyAffectedRows: Story = {
     );
     const beforeRename = {
       workspace: renderCount("workspace"),
-      alpha: renderCount("workspace/alpha.txt"),
-      beta: renderCount("workspace/beta.txt"),
+      projects: renderCount("workspace/projects"),
+      project: renderCount("workspace/projects/project-a"),
+      alpha: renderCount("workspace/projects/project-a/alpha.txt"),
+      beta: renderCount("workspace/projects/project-a/beta.txt"),
       stableOne: renderCount("stable-one.txt"),
       stableTwo: renderCount("stable-two.txt"),
     };
 
     await userEvent.click(canvas.getByRole("button", { name: "Rename beta" }));
     await waitFor(() =>
-      expect(renderCount("workspace/beta.txt")).toBeGreaterThan(
-        beforeRename.beta,
-      ),
+      expect(
+        renderCount("workspace/projects/project-a/beta.txt"),
+      ).toBeGreaterThan(beforeRename.beta),
     );
     await expect(canvas.getByText("beta-renamed.txt")).toBeVisible();
-    expect(renderCount("workspace")).toBeGreaterThan(beforeRename.workspace);
-    expect(renderCount("workspace/alpha.txt")).toBe(beforeRename.alpha);
+    expect(renderCount("workspace/projects/project-a")).toBeGreaterThan(
+      beforeRename.project,
+    );
+    expect(renderCount("workspace")).toBe(beforeRename.workspace);
+    expect(renderCount("workspace/projects")).toBe(beforeRename.projects);
+    expect(renderCount("workspace/projects/project-a/alpha.txt")).toBe(
+      beforeRename.alpha,
+    );
     expect(renderCount("stable-one.txt")).toBe(beforeRename.stableOne);
     expect(renderCount("stable-two.txt")).toBe(beforeRename.stableTwo);
 
     const beforeAdd = {
       workspace: renderCount("workspace"),
-      alpha: renderCount("workspace/alpha.txt"),
-      beta: renderCount("workspace/beta.txt"),
+      projects: renderCount("workspace/projects"),
+      project: renderCount("workspace/projects/project-a"),
+      alpha: renderCount("workspace/projects/project-a/alpha.txt"),
+      beta: renderCount("workspace/projects/project-a/beta.txt"),
       stableOne: renderCount("stable-one.txt"),
       stableTwo: renderCount("stable-two.txt"),
     };
 
     await userEvent.click(canvas.getByRole("button", { name: "Add gamma" }));
     await waitFor(() =>
-      expect(renderCount("workspace/gamma.txt")).toBeGreaterThan(0),
+      expect(
+        renderCount("workspace/projects/project-a/gamma.txt"),
+      ).toBeGreaterThan(0),
     );
     await expect(canvas.getByText("gamma.txt")).toBeVisible();
-    expect(renderCount("workspace")).toBeGreaterThan(beforeAdd.workspace);
-    expect(renderCount("workspace/alpha.txt")).toBe(beforeAdd.alpha);
-    expect(renderCount("workspace/beta.txt")).toBe(beforeAdd.beta);
+    expect(renderCount("workspace/projects/project-a")).toBeGreaterThan(
+      beforeAdd.project,
+    );
+    expect(renderCount("workspace")).toBe(beforeAdd.workspace);
+    expect(renderCount("workspace/projects")).toBe(beforeAdd.projects);
+    expect(renderCount("workspace/projects/project-a/alpha.txt")).toBe(
+      beforeAdd.alpha,
+    );
+    expect(renderCount("workspace/projects/project-a/beta.txt")).toBe(
+      beforeAdd.beta,
+    );
     expect(renderCount("stable-one.txt")).toBe(beforeAdd.stableOne);
     expect(renderCount("stable-two.txt")).toBe(beforeAdd.stableTwo);
   },

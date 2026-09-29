@@ -1,4 +1,4 @@
-module Swate.Components.Composite.Tree.TreeHelper
+module internal Swate.Components.Composite.Tree.Helper
 
 open Swate.Components.Composite.Tree.Types
 
@@ -28,7 +28,7 @@ let nodeContainerClasses (row: TreeVisibleNode<'T>) canSelect canExpand isSelect
     |]
 
     styleFn
-    |> Option.map (fun styleFn -> styleFn (Some(box row.node)) baseClasses)
+    |> Option.map (fun fn -> fn (Some row.node) baseClasses)
     |> Option.defaultValue baseClasses
 
 let chevronIcon isExpanded =
