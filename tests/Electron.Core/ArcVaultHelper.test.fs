@@ -26,6 +26,9 @@ module Abort = Main.Bindings.Abort
 
 let private electronMock: obj = import "__electronMock" "electron"
 
+[<Emit("Object.keys($0)")>]
+let private objectKeys (_: obj) : string[] = jsNative
+
 let private resetElectronMock () = electronMock?reset () |> ignore
 
 let private setBrowserWindowFactory (factory: obj -> obj) =
@@ -3911,6 +3914,39 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "permanent watcher roots contain only the ARC root and existing structure zones",
+            fun () -> promise {
+                let! arcPath = TestHelpers.createTempDirectoryAsync "swate-structure-roots-"
+
+                try
+                    for zone in [| "studies"; "assays"; "workflows"; "runs" |] do
+                        do! mkdirWatcherDirectoryAsync (join [| arcPath; zone; "ExistingEntity" |])
+
+                    let actual =
+                        createArcStructureWatcherPaths arcPath
+                        |> Array.map PathHelpers.normalizePath
+                        |> Set.ofArray
+
+                    let expected =
+                        [|
+                            arcPath
+                            join [| arcPath; "studies" |]
+                            join [| arcPath; "assays" |]
+                            join [| arcPath; "workflows" |]
+                            join [| arcPath; "runs" |]
+                        |]
+                        |> Array.map PathHelpers.normalizePath
+                        |> Set.ofArray
+
+                    Vitest.expect((actual = expected)).toBe (true)
+                    do! TestHelpers.removeDirectoryAsync arcPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync arcPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
             "permanent watcher keeps ARC structure but prunes payload descendants",
             fun () ->
                 let directoryStats =
@@ -4536,13 +4572,18 @@ Vitest.describe (
                         let sourceStudyPath = join [| sourceArcPath; "studies"; "NewStudy" |]
                         let targetStudyPath = join [| arcPath; "studies"; "NewStudy" |]
                         let targetDatasetPath = join [| targetStudyPath; "dataset" |]
-                        let targetPayloadPath = join [| targetDatasetPath; "raw.bin" |]
+                        let targetPayloadDirectoryPath = join [| targetDatasetPath; "payload" |]
+                        let targetPayloadPath = join [| targetPayloadDirectoryPath; "raw.bin" |]
 
                         let targetMetadataPath =
                             join [| targetStudyPath; "isa.study.xlsx" |] |> PathHelpers.normalizePath
 
-                        do! mkdirWatcherDirectoryAsync (join [| sourceStudyPath; "dataset" |])
-                        do! writeWatcherTextFileAsync (join [| sourceStudyPath; "dataset"; "raw.bin" |]) "payload"
+                        do! mkdirWatcherDirectoryAsync (join [| sourceStudyPath; "dataset"; "payload" |])
+
+                        do!
+                            writeWatcherTextFileAsync
+                                (join [| sourceStudyPath; "dataset"; "payload"; "raw.bin" |])
+                                "payload"
 
                         let vault = ArcVault(TestHelpers.testWindow ())
 
@@ -4572,6 +4613,18 @@ Vitest.describe (
                             Vitest
                                 .expect(vault.fileTree.ContainsKey(PathHelpers.normalizePath targetPayloadPath))
                                 .toBe (false)
+
+                            let watchedPaths =
+                                vault.watcher.Value.getWatched ()
+                                |> box
+                                |> objectKeys
+                                |> Array.map PathHelpers.normalizePath
+
+                            let isWatched path =
+                                watchedPaths |> Array.contains (PathHelpers.normalizePath path)
+
+                            Vitest.expect(isWatched targetDatasetPath).toBe (false)
+                            Vitest.expect(isWatched targetPayloadDirectoryPath).toBe (false)
 
                             do! vault.StopFileWatcher()
                         with error ->

@@ -277,6 +277,8 @@ module ArcVaultExtensions =
                             else
                                 promise { return Map.empty }
 
+                        let largeObjectPathIndex = buildLargeObjectPathIndex largeObjectsByRelativePath
+
                         // A batch owns one object snapshot and one tree copy, regardless of event count.
                         let nextFileTree = Dictionary<string, FileEntry>(this.fileTree)
                         let mutable hasFileTreeChanges = false
@@ -290,8 +292,7 @@ module ArcVaultExtensions =
                                     let! changedFile = getFileEntry event.AbsolutePath
 
                                     let changedFile =
-                                        withFileEntriesLfsMetadata arcPath largeObjectsByRelativePath [| changedFile |]
-                                        |> Array.head
+                                        withFileEntryLargeObjectMetadata arcPath largeObjectPathIndex changedFile
 
                                     upsertFileEntryInPlace changedFile nextFileTree
                                     hasFileTreeChanges <- true
@@ -735,10 +736,12 @@ module ArcVaultExtensions =
                         | Some relativePath when isArcStructureWatchScopePath relativePath ->
                             promise {
                                 try
-                                    this.watcher
-                                    |> Option.iter (fun watcher ->
-                                        watcher.add (PathHelpers.normalizeCanonicalRelativePath relativePath) |> ignore
-                                    )
+                                    if isArcStructureWatcherScopePath relativePath then
+                                        this.watcher
+                                        |> Option.iter (fun watcher ->
+                                            watcher.add (PathHelpers.normalizeCanonicalRelativePath relativePath)
+                                            |> ignore
+                                        )
 
                                     let! structuralEvents = reconcileArcStructureScope arcPath relativePath
                                     WatcherHelpers.attachArcStructureScopes this.watcher structuralEvents

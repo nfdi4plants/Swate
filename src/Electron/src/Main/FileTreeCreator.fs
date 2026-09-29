@@ -67,30 +67,6 @@ let tryListLargeObjects (repoRoot: string) (openSession: bool) : Fable.Core.JS.P
         return Map.empty
 }
 
-let withFileEntryLargeObjectMetadata
-    (repoRoot: string)
-    (largeObjectsByRelativePath: Map<string, ObjectStateDto>)
-    (largeObjectsByComparisonKey: Map<string, ObjectStateDto>)
-    (entry: FileEntry)
-    : FileEntry =
-    if entry.isDirectory then
-        entry
-    else
-        match tryGetRepoRelativePath repoRoot entry.path with
-        | Some relativePath ->
-            let normalizedRelativePath = PathHelpers.normalizeSeparators relativePath
-
-            let largeObject =
-                match Map.tryFind normalizedRelativePath largeObjectsByRelativePath with
-                | Some largeObject -> Some largeObject
-                | None ->
-                    normalizedRelativePath
-                    |> PathHelpers.normalizeForUnicodeComparison
-                    |> fun comparisonKey -> Map.tryFind comparisonKey largeObjectsByComparisonKey
-
-            { entry with largeObject = largeObject }
-        | None -> { entry with largeObject = None }
-
 let private buildLargeObjectsByComparisonKey (largeObjectsByRelativePath: Map<string, ObjectStateDto>) =
     largeObjectsByRelativePath
     |> Map.toSeq
@@ -102,16 +78,43 @@ let private buildLargeObjectsByComparisonKey (largeObjectsByRelativePath: Map<st
     )
     |> Map.ofSeq
 
+type LargeObjectPathIndex = {
+    Exact: Map<string, ObjectStateDto>
+    Comparison: Map<string, ObjectStateDto>
+}
+
+let buildLargeObjectPathIndex (largeObjectsByRelativePath: Map<string, ObjectStateDto>) = {
+    Exact = largeObjectsByRelativePath
+    Comparison = buildLargeObjectsByComparisonKey largeObjectsByRelativePath
+}
+
+let withFileEntryLargeObjectMetadata (repoRoot: string) (index: LargeObjectPathIndex) (entry: FileEntry) : FileEntry =
+    if entry.isDirectory then
+        entry
+    else
+        match tryGetRepoRelativePath repoRoot entry.path with
+        | Some relativePath ->
+            let normalizedRelativePath = PathHelpers.normalizeSeparators relativePath
+
+            let largeObject =
+                match Map.tryFind normalizedRelativePath index.Exact with
+                | Some largeObject -> Some largeObject
+                | None ->
+                    normalizedRelativePath
+                    |> PathHelpers.normalizeForUnicodeComparison
+                    |> fun comparisonKey -> Map.tryFind comparisonKey index.Comparison
+
+            { entry with largeObject = largeObject }
+        | None -> { entry with largeObject = None }
+
 let withFileEntriesLfsMetadata
     (repoRoot: string)
     (largeObjectsByRelativePath: Map<string, ObjectStateDto>)
     (entries: FileEntry[])
     : FileEntry[] =
-    let largeObjectsByComparisonKey =
-        buildLargeObjectsByComparisonKey largeObjectsByRelativePath
+    let index = buildLargeObjectPathIndex largeObjectsByRelativePath
 
-    entries
-    |> Array.map (withFileEntryLargeObjectMetadata repoRoot largeObjectsByRelativePath largeObjectsByComparisonKey)
+    entries |> Array.map (withFileEntryLargeObjectMetadata repoRoot index)
 
 /// Build the renderer snapshot using ARC-relative dictionary keys and FileEntry paths.
 let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary<string, FileEntry> =
@@ -181,15 +184,8 @@ let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
     else
         let! largeObjectsByRelativePath = tryListLargeObjects normalizedRepoRoot true
 
-        let largeObjectsByComparisonKey =
-            buildLargeObjectsByComparisonKey largeObjectsByRelativePath
-
-        return
-            withFileEntryLargeObjectMetadata
-                normalizedRepoRoot
-                largeObjectsByRelativePath
-                largeObjectsByComparisonKey
-                entry
+        let index = buildLargeObjectPathIndex largeObjectsByRelativePath
+        return withFileEntryLargeObjectMetadata normalizedRepoRoot index entry
 }
 
 let getFileEntryWithLargeObjectSnapshot
@@ -204,15 +200,8 @@ let getFileEntryWithLargeObjectSnapshot
         if entry.isDirectory then
             return entry
         else
-            let largeObjectsByComparisonKey =
-                buildLargeObjectsByComparisonKey largeObjectsByRelativePath
-
-            return
-                withFileEntryLargeObjectMetadata
-                    normalizedRepoRoot
-                    largeObjectsByRelativePath
-                    largeObjectsByComparisonKey
-                    entry
+            let index = buildLargeObjectPathIndex largeObjectsByRelativePath
+            return withFileEntryLargeObjectMetadata normalizedRepoRoot index entry
     }
 
 let private scanFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise {

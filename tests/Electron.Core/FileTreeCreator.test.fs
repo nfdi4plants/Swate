@@ -45,6 +45,12 @@ let private createObjectState path =
 let private enrichFileEntries (objects: (string * ObjectStateDto) list) (entries: FileEntry[]) =
     FileTreeCreator.withFileEntriesLfsMetadata "/repo" (Map.ofList objects) entries
 
+let private enrichFileEntriesWithIndex (objects: (string * ObjectStateDto) list) (entries: FileEntry[]) =
+    let index = objects |> Map.ofList |> FileTreeCreator.buildLargeObjectPathIndex
+
+    entries
+    |> Array.map (FileTreeCreator.withFileEntryLargeObjectMetadata "/repo" index)
+
 type private TempRepositoryContext = { RootPath: string; RepoPath: string }
 
 let private createTempDirectoryAsync () : Fable.Core.JS.Promise<string> =
@@ -294,6 +300,29 @@ Vitest.describe (
 
                 Vitest.expect(entries.[0].largeObject).toEqual (Some lowerCaseObject)
                 Vitest.expect(entries.[1].largeObject).toEqual (Some upperCaseObject)
+                Vitest.expect(entries.[2].largeObject).toEqual (None)
+        )
+
+        Vitest.test (
+            "a reusable large-object index preserves exact, normalized, and ambiguous lookup behavior",
+            fun () ->
+                let exactObject = createObjectState "Data.csv"
+                let lowerCaseObject = createObjectState "data.csv"
+                let unicodeObject = createObjectState "Messung_\u00E4.csv"
+
+                let entries =
+                    enrichFileEntriesWithIndex [
+                        "Data.csv", exactObject
+                        "data.csv", lowerCaseObject
+                        "Messung_\u00E4.csv", unicodeObject
+                    ] [|
+                        createFileEntry "Data.csv" "/repo/Data.csv"
+                        createFileEntry "Messung_a\u0308.csv" "/repo/Messung_a\u0308.csv"
+                        createFileEntry "DaTa.csv" "/repo/DaTa.csv"
+                    |]
+
+                Vitest.expect(entries.[0].largeObject).toEqual (Some exactObject)
+                Vitest.expect(entries.[1].largeObject).toEqual (Some unicodeObject)
                 Vitest.expect(entries.[2].largeObject).toEqual (None)
         )
 
