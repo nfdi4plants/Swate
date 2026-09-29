@@ -1,57 +1,75 @@
-/// Owns ArcVault file-tree queries and expansion state, including the payload-watcher updates
-/// required when expanded directories change.
+/// Owns File Explorer expansion state and its bounded payload watcher.
 [<AutoOpen>]
 module Main.ArcVaultFileTree
 
 open System.Collections.Generic
 open ARCtrl
+open Fable.Core
 open Main
 open Main.ArcVault
-open Main.ArcVaultHelper
+open Main.Bindings.Filesystem
+open Main.Bindings.Path
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.IPCTypes
 
 type ArcVault with
 
-    member this.GetRendererFileTreeSnapshot() = promise {
-        match this.path with
-        | None -> return Dictionary<string, FileEntry>()
-        | Some arcPath ->
-            if this.fileTree.Count = 0 then
-                let! fileTree = getFileTree arcPath
-                this.fileTree <- fileTree
-
-            return toRendererFileTree arcPath this.fileTree.Values
-    }
-
-    /// Activates live monitoring for an expanded directory, or stops it when collapsed.
-    /// Expansion also replaces the potentially stale subtree before it is displayed.
+    /// Activates shallow live monitoring for an expanded directory, or removes it when collapsed.
+    /// Expansion refreshes the selected subtree before publishing it.
     member this.SetFileTreeDirectoryExpanded(relativePath: string, isExpanded: bool) =
-        this.fileTreeWorkQueue.EnqueueFileTreeWork(fun () -> promise {
-            match this.path with
-            | None -> return raise (arcNotOpenError ())
-            | Some arcPath ->
-                let relativePath = PathHelpers.normalizeCanonicalRelativePath relativePath
+        let capturedWatcherEpoch = this.WatcherEpoch
 
-                let absolutePath =
-                    ArcPathHelper.combine arcPath relativePath |> PathHelpers.normalizePath
+        let queuedUpdate =
+            this.FileTreeUpdateTail
+            |> Promise.bind (fun () -> promise {
+                match this.path with
+                | None -> return raise (ArcVaultHelper.arcNotOpenError ())
+                | Some _ when capturedWatcherEpoch <> this.WatcherEpoch -> ()
+                | Some arcPath ->
+                    if
+                        isAbsolute relativePath
+                        || PathHelpers.containsPathTraversalSegments relativePath
+                    then
+                        return raise (exn "The expanded directory must be an ARC-relative path.")
 
-                if isExpanded then
-                    if not (this.expandedDirectoryPaths.Contains relativePath) then
-                        this.expandedDirectoryPaths <- this.expandedDirectoryPaths.Add relativePath
+                    let normalizedRelativePath = PathHelpers.normalizeCanonicalRelativePath relativePath
 
-                        try
+                    let absolutePath =
+                        ArcPathHelper.combine arcPath normalizedRelativePath
+                        |> PathHelpers.normalizePath
+
+                    match tryGetRepoRelativePathOrRoot arcPath absolutePath with
+                    | None -> return raise (exn "The expanded directory must stay inside the open ARC.")
+                    | Some _ ->
+                        let! stats = statAsync absolutePath
+
+                        if not (stats.isDirectory ()) then
+                            return raise (exn $"Path '{relativePath}' is not a directory.")
+
+                        if isExpanded then
+                            let wasAdded = not (this.expandedDirectoryPaths.Contains normalizedRelativePath)
+
+                            if wasAdded then
+                                this.expandedDirectoryPaths <- this.expandedDirectoryPaths.Add normalizedRelativePath
+
+                                try
+                                    do! this.RestartPayloadWatcher arcPath
+                                with watcherError ->
+                                    this.expandedDirectoryPaths <-
+                                        this.expandedDirectoryPaths.Remove normalizedRelativePath
+
+                                    do! this.RestartPayloadWatcher arcPath
+                                    return raise watcherError
+
+                            let! refreshedFileTree = refreshFileTreeSubtree arcPath absolutePath this.fileTree
+
+                            if capturedWatcherEpoch = this.WatcherEpoch then
+                                this.SetFileTree refreshedFileTree
+                        elif this.expandedDirectoryPaths.Contains normalizedRelativePath then
+                            this.expandedDirectoryPaths <- this.expandedDirectoryPaths.Remove normalizedRelativePath
+
                             do! this.RestartPayloadWatcher arcPath
-                        with watcherError ->
-                            this.expandedDirectoryPaths <- this.expandedDirectoryPaths.Remove relativePath
-                            do! this.RestartPayloadWatcher arcPath
-                            return raise watcherError
+            })
 
-                    let! refreshedFileTree = refreshFileTreeSubtree arcPath absolutePath this.fileTree
-                    this.SetFileTree refreshedFileTree
-                elif this.expandedDirectoryPaths.Contains relativePath then
-                    this.expandedDirectoryPaths <- this.expandedDirectoryPaths.Remove relativePath
-                    do! this.RestartPayloadWatcher arcPath
-        })
+        this.FileTreeUpdateTail <- queuedUpdate |> Promise.catch (fun _ -> ())
+        queuedUpdate

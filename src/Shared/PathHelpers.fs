@@ -29,6 +29,11 @@ module PathHelpers =
         normalizeSeparators path
         |> fun normalized -> normalized.Trim().TrimEnd('/').ToLowerInvariant()
 
+    let normalizeForUnicodeComparison (path: string) =
+        normalizeSeparators path
+        |> fun normalized -> normalized.Normalize(System.Text.NormalizationForm.FormC)
+        |> fun normalized -> normalized.ToLowerInvariant()
+
     /// Produces a normalized, case-insensitive path suitable for filesystem comparisons.
     let normalizePathForFsComparison (path: string) =
         path |> normalizePath |> normalizeForComparison
@@ -39,7 +44,7 @@ module PathHelpers =
 
         String.IsNullOrWhiteSpace normalizedAncestorPath
         || normalizedPath = normalizedAncestorPath
-        || normalizedPath.StartsWith(normalizedAncestorPath + "/", StringComparison.Ordinal)
+        || normalizedPath.StartsWith(normalizedAncestorPath + "/", StringComparison.OrdinalIgnoreCase)
 
     let isSameOrDescendantPathForFsComparison (path: string) (ancestorPath: string) =
         let normalizedPath = normalizePathForFsComparison path

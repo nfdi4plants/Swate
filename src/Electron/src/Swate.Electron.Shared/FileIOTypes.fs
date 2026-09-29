@@ -2,22 +2,13 @@ module Swate.Electron.Shared.FileIOTypes
 
 open System.Collections.Generic
 open Fable.Core
-
-type GitLfsLsFileInfo = {
-    name: string
-    size: float
-    checkout: bool
-    downloaded: bool
-    ``oid_type``: string
-    oid: string
-    version: string
-}
+open Swate.Electron.Shared.VersionControlTypes
 
 type FileEntry = {
     name: string
     isDirectory: bool
     path: string
-    lfs: GitLfsLsFileInfo option
+    largeObject: ObjectStateDto option
 }
 
 [<AutoOpen>]
@@ -30,18 +21,21 @@ module FileEntryExtensions =
 
     type FileEntry with
 
-        static member create(name: string, path: string, isDirectory: bool, ?lfs: GitLfsLsFileInfo option) : FileEntry = {
-            name = name
-            path = path
-            isDirectory = isDirectory
-            lfs = defaultArg lfs None
-        }
+        static member create
+            (name: string, path: string, isDirectory: bool, ?largeObject: ObjectStateDto option)
+            : FileEntry =
+            {
+                name = name
+                path = path
+                isDirectory = isDirectory
+                largeObject = defaultArg largeObject None
+            }
 
 type FileTreeNode = {
     name: string
     isDirectory: bool
     path: string
-    lfs: GitLfsLsFileInfo option
+    largeObject: ObjectStateDto option
     children: Dictionary<string, FileTreeNode>
 } with
 
@@ -51,13 +45,13 @@ type FileTreeNode = {
             isDirectory: bool,
             path: string,
             children: Dictionary<string, FileTreeNode>,
-            ?lfs: GitLfsLsFileInfo option
+            ?largeObject: ObjectStateDto option
         ) =
         {
             name = name
             isDirectory = isDirectory
             path = path
-            lfs = defaultArg lfs None
+            largeObject = defaultArg largeObject None
             children = children
         }
 

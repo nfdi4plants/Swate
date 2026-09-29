@@ -1,429 +1,201 @@
-# Swate Git Functionality Guide
+# Swate version control guide
 
-This guide describes the current Git implementation used by Swate Electron. It is for developers who need to call, extend, test, or troubleshoot Git functionality in this repository.
+This guide describes how Swate Electron talks to a version control provider. It is for developers who call, extend, test or troubleshoot that functionality. Git is the provider Swate provisions today. The code paths above the Electron composition root are provider neutral, so a second provider (lakeFS is compiled in without a configured connection) needs no change in the IPC or the renderer.
 
 ## 1. Architecture
 
-Git functionality is implemented in the Electron Main process and exposed to Renderer through the typed IPC bridge.
+Version control operations run in the Electron main process through the VersionControlService NuGet package and reach the renderer through the typed IPC bridge.
 
-Primary files:
+- Library: the `VersionControlService` package (Abstractions, Git and lakeFS providers). Its `WorkspaceSession` record exposes the core service plus optional services (synchronization, text diff, conflict resolution, object materialization, storage policy, maintenance, repository browser).
+- Composition root: `src/Electron/src/Main/VersionControl/ProviderComposition.fs` builds the Git factory (credentials and commit identity from the DataHub accounts, see `DataHubStrategies.fs`) and the lakeFS factory, and `VersionControlRuntime.fs` holds the catalog, the binding store and the resolver. This folder is the only place that knows provider ids or provider types.
+- Session host: `src/Electron/src/Main/VersionControl/WorkspaceSessionHost.fs` keeps one open session per vault root, adopts unbound repositories on first open, persists the workspace binding, owns the registry of running operations for cancellation, and holds the per-session settings.
+- IPC handler: `src/Electron/src/Main/IPC/IVersionControlApi.fs` implements `IVersionControlApi` from `src/Electron/src/Swate.Electron.Shared/IPCTypes.fs` over the DTOs in `VersionControlTypes.fs`. `Mappings.fs` translates every library type to its DTO and validates paths, refs and revisions before a provider call.
+- Renderer client: `src/Electron/src/Renderer/VersionControlApiClient.fs` wraps the bridge, generates operation ids and maps `Result<'T, exn>` to `Result<'T, string>`.
+- Renderer workflow: `src/Electron/src/Renderer/Context/GitWorkflow.fs` is the Elmish state machine behind the Git sidebar, wired in `GitStateContext.fs`. Feature code reaches it through `GitWorkflow.GitDependencies`.
 
-- Shared IPC and DTO contracts: `src/Electron/src/Swate.Electron.Shared/IPCTypes.fs`, `src/Electron/src/Swate.Electron.Shared/GitTypes.fs`
-- Main IPC implementation: `src/Electron/src/Main/IPC/IGitApi.fs`
-- Main Git implementation: `src/Electron/src/Main/Git`
-- Renderer wrapper: `src/Electron/src/Renderer/GitApiClient.fs`
-- Renderer workflow/state machine: `src/Electron/src/Renderer/Context/GitWorkflow.fs`
-- Renderer wiring: `src/Electron/src/Renderer/Context/GitStateContext.fs`
+The DataHub specific pieces stay in Swate: the GitLab API client (`Main/Auth/GitLabApi.fs`), the account store, and the Git LFS ruleset in `src/Shared/GitLfsRules.fs`.
 
-Use `Renderer.GitApiClient` from Renderer code. It wraps the raw `IGitApi` bridge, supplies the Electron event placeholder required by the remoting library, and maps `Result<'T, exn>` to `Result<'T, string>`.
+## 2. Renderer API
 
-Do not call `Api.ipcGitApi` directly from feature code unless you are extending the wrapper itself.
-
-## 2. Current Renderer API
-
-`Renderer.GitApiClient` exposes:
+Every function of `Renderer.VersionControlApiClient` takes a request DTO that carries an `OperationId`. The renderer allocates the id with `VersionControlApiClient.newOperationId ()` before the call, so the cancel button knows the key before the main process has started the operation.
 
 ```fsharp
-getGitStatus: unit -> JS.Promise<Result<GitStatusDto, string>>
-getGitBranches: unit -> JS.Promise<Result<GitBranchRefDto[], string>>
-getGitLfsSettings: unit -> JS.Promise<Result<GitLfsSettingsDto, string>>
-getGitDiffViewData: string -> JS.Promise<Result<GitPageLoadResultDto<GitDiffViewDataDto>, string>>
-getGitMergeConflictViewData: string -> JS.Promise<Result<GitPageLoadResultDto<GitMergeConflictViewDataDto>, string>>
-installGitLfs: unit -> JS.Promise<Result<GitOperationResult, string>>
-previewGitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitPullPreflightResult, string>>
-gitFetch: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
-gitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
-gitPush: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
-gitCancelOperation: GitCancelOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
-gitInitRepository: string -> JS.Promise<Result<string, string>>
-gitAddRemote: GitRemoteConfigRequest -> JS.Promise<Result<GitOperationResult, string>>
-gitCloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, string>>
-createBranch: GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
-checkoutBranch: GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
-gitStagePaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, string>>
-gitUnstagePaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, string>>
-gitDiscardPaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, string>>
-gitCommit: GitCommitRequest -> JS.Promise<Result<GitOperationResult, string>>
-setGitLfsSettings: GitLfsSettingsDto -> JS.Promise<Result<GitOperationResult, string>>
-confirmGitMergeResolution: GitConfirmMergeResolutionRequest -> JS.Promise<Result<GitConfirmMergeResolutionResult, string>>
-gitLfsPrune: unit -> JS.Promise<Result<GitOperationResult, string>>
-gitLfsDedup: unit -> JS.Promise<Result<GitOperationResult, string>>
-gitLfsDownloadFile: GitLfsFileRequest -> JS.Promise<Result<GitOperationResult, string>>
-gitLfsFreeLocalCopy: GitLfsFileRequest -> JS.Promise<Result<GitOperationResult, string>>
+getSessionInfo: OperationRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceSessionInfoDto>, string>>
+cloneWorkspace: CloneWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<string>, string>>
+initializeWorkspace: InitializeWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<string>, string>>
+bindWorkspace: BindWorkspaceRequestDto -> JS.Promise<Result<OperationResultDto<WorkspaceSessionInfoDto>, string>>
+cancelOperation: OperationRequestDto -> JS.Promise<Result<bool, string>>
+checkDependencies: OperationRequestDto -> JS.Promise<Result<OperationResultDto<DependencyStatusDto[]>, string>>
+installDependency: InstallDependencyRequestDto -> JS.Promise<Result<OperationResultDto<DependencyStatusDto>, string>>
+getStatus, listRefs, createRef, preflightSwitchRef, switchRef
+createRevision, restorePaths
+getWordDiff, getBaseContent
+refreshSynchronization, synchronize
+resolveConflict, finalizeConflict, cancelConflict
+listObjects, materializeObject, dematerializeObject
+getStoragePolicySettings, setStoragePolicySettings, setPathStoragePolicy, pruneStorage, deduplicateStorage
+getRepositoryWebUrl, clearStaleLock
 ```
 
-Most app code should access these through `GitWorkflow.GitDependencies`, which is populated in `GitStateContext.fs`. That dependency layer maps diff and merge page-load DTOs to `PageState`.
+The main process sends two events to the renderer (`MainToRendererIpc.IVersionControlRendererApi`): `versionControlOperationStarted` with the operation id the renderer sent as soon as the operation is registered, and `versionControlProgress` with float `Completed` and `Total` counters plus a phase code.
 
-## 3. Result Shapes
+Do not call `Api.ipcVersionControlApi` from feature code. Go through the client, or through `GitWorkflow.GitDependencies` when the sidebar state has to follow.
 
-Most write and sync operations return `GitOperationResult`:
+## 3. Result shapes
+
+Every call returns `Result<OperationResultDto<'T>, string>`. The outer `Error` is a transport failure (the IPC call itself failed). The inner value has three shapes:
 
 ```fsharp
-type GitOperationResult = {
-    Success: bool
-    Message: string option
-    FailureKind: GitFailureKind option
-    WarningMessage: string option
-    WarningKind: GitFailureKind option
-    Path: string option
-}
+type OperationResultDto<'T> =
+    | Succeeded of OperationOutcomeDto<'T>
+    | PartiallySucceeded of OperationOutcomeDto<'T> * OperationFailureDto
+    | Failed of OperationFailureDto
 ```
 
-Use it as follows:
+`OperationOutcomeDto` carries the value, the effect (`Performed` or `NoOp` with a reason), warnings, affected paths and the resulting revision and workspace version. `OperationFailureDto` carries `Category`, `Code`, `Message`, `StateChanged`, `Retryable`, `AffectedPaths`, `RecoveryAction` (a code plus optional instructions), `Details` and `RevisionEvidence`.
 
-- `Ok op` and `op.Success = true`: operation completed.
-- `Ok op` and `op.Success = false`: Git operation failed; inspect `FailureKind` and `Message`.
-- `Ok op` with `WarningMessage = Some ...`: main operation completed, but follow-up work had a recoverable warning.
-- `Error message`: IPC or wrapper-level failure.
-- `Path`: normalized path returned by provisioning operations. `gitInitRepository` maps success directly to `Result<string, string>` in the renderer wrapper.
+Routing is structural. Code that decides what to do next keys on `Category`, `Code`, `RecoveryAction.Code`, `StateChanged` or `AffectedPaths`. Never classify a failure by its message text.
 
-Read operations return typed DTOs:
+Categories: `Validation`, `NotFound`, `Concurrency`, `Authentication`, `Authorization`, `DependencyMissing`, `Network`, `Timeout`, `Canceled`, `Conflict`, `Unsupported`, `ProviderError`.
 
-```fsharp
-type GitStatusDto = {
-    Current: string option
-    Tracking: string option
-    Ahead: int
-    Behind: int
-    IsClean: bool
-    Conflicted: string[]
-    IsMergeInProgress: bool
-    Files: GitFileStatusDto[]
-}
+Codes the renderer handles are literals in `VersionControlCodes` (`VersionControlTypes.fs`). Library codes include `identity_missing`, `publish_target_missing`, `target_unreachable`, `precondition_failed`, `conflicts_detected`, `conflict_session_active`, `operation_in_progress` (a rebase, cherry-pick, revert, bisect or unmerged paths block the workspace), `publish_rejected` (the remote refused the push, the message carries its reason), `inspection_timeout` (the state read after an applied update exceeded its deadline), `target_not_empty` and `operation_canceled`. The three codes in the middle reach the user through the generic error modal with the library's message. Swate host codes include `service_unavailable` (the provider has no such optional service), `session_unavailable`, `workspace_unmanaged`, `workspace_ambiguous`, `location_unsupported`, `lock_removal_refused`, `binding_not_persisted`, `transport_error` (the IPC call failed before a structured result existed) and `storage_policy_blocked` (the DataHub ruleset refused a manual storage policy change, see section 8). A threshold outside 1 to 100 MiB is refused with the library's `invalid_lfs_threshold`.
 
-type GitBranchRefDto = {
-    RefName: string
-    DisplayLabel: string
-    Kind: GitBranchRefKind
-    IsCurrent: bool
-    IsTracking: bool
-}
+Recovery codes (`VersionControlCodes.Recovery`) tell the renderer which dialog to open after a canceled or partial operation: `remove_index_lock`, `restore_workspace`, `refresh_workspace`, `inspect_workspace`, `abort_merge`, `retry_materialization`, `resolve_conflict_session`, `refresh_conflict_session`, `remove_clone_target`.
+When a failure that is not canceled reports a state change, the renderer refreshes the workspace before it shows the error. If that refresh fails too, the error names both failures and the sidebar keeps its old snapshot. A failed clone skips the refresh, because no workspace is open yet.
 
-type GitDiffSummaryDto = {
-    Changed: int
-    Insertions: int
-    Deletions: int
-}
-```
+Helpers on `OperationResultDto` (`tryValue`) cover the common checks.
 
-Failure kinds are `Unauthorized`, `Forbidden`, `Network`, `Timeout`, `Canceled`, `LfsInstallRequired`, and `Unknown`.
+## 4. Common calls
 
-## 4. Common Calls
-
-Refresh status, branches, and LFS settings:
+Refresh the sidebar state:
 
 ```fsharp
 promise {
-    let! statusResult = Renderer.GitApiClient.getGitStatus ()
-    let! branchResult = Renderer.GitApiClient.getGitBranches ()
-    let! lfsSettingsResult = Renderer.GitApiClient.getGitLfsSettings ()
+    let operationRequest () : OperationRequestDto = { OperationId = VersionControlApiClient.newOperationId () }
+    let! status = VersionControlApiClient.getStatus (operationRequest ())
+    let! refs = VersionControlApiClient.listRefs (operationRequest ())
+    let! settings = VersionControlApiClient.getStoragePolicySettings (operationRequest ())
 
-    match statusResult, branchResult, lfsSettingsResult with
-    | Ok status, Ok branches, Ok settings ->
-        Browser.Dom.console.log($"Branch: {status.Current}")
-        Browser.Dom.console.log($"Changes: {status.Files.Length}")
-        Browser.Dom.console.log($"Branches: {branches.Length}")
-        Browser.Dom.console.log($"LFS threshold: {settings.AutoTrackThresholdMb} MB")
-    | _ ->
-        Browser.Dom.console.warn("Could not refresh all Git state.")
+    match status, refs, settings with
+    | Ok(OperationResultDto.Succeeded status), Ok(OperationResultDto.Succeeded refs), Ok(OperationResultDto.Succeeded settings) ->
+        Browser.Dom.console.log ($"Ref: {status.Value.CurrentRef.Name}")
+        Browser.Dom.console.log ($"Changes: {status.Value.Changes.Length}")
+        Browser.Dom.console.log ($"Refs: {refs.Value.Length}")
+        Browser.Dom.console.log ($"Threshold: {settings.Value.AutoPolicyThresholdMb}")
+    | _ -> Browser.Dom.console.warn ("Could not refresh the version control state.")
 }
 ```
 
-Initialize an ARC folder as a repository:
+The status carries `WorkspaceVersion`, an opaque optimistic concurrency token. Mutations (`createRevision`, `restorePaths`, `synchronize`, `switchRef`) send it back as `ExpectedWorkspaceVersion`. A stale token fails with `precondition_failed` in the `Concurrency` category and `StateChanged = false`. The workflow then refreshes and runs the write once more for commits, saves, a push that carries no acceptance, branch creation, and settings. It never replays a discard, a restore of interrupted paths, a pull, an accepted synchronize, a branch switch, an abandoned merge, or merge finalization. These actions would act on content or a decision the user has not reviewed, and a branch switch must run its preflight again before it can be repeated. The workflow reports the stale state and refreshes instead.
 
-```fsharp
-promise {
-    let! result = Renderer.GitApiClient.gitInitRepository arcPath
+Primary save in the sidebar is `createRevision` with the exact selected paths, a refresh and one `synchronize` with `PublishLocalRevisions = true`. The library refreshes, updates when the online copy is ahead and publishes. A `synchronize` that answers `publish_target_missing`, as a failure or as the partial result after an applied update, creates the project on the DataHub through `IGitLabApi.createProject`, binds the workspace with `bindWorkspace` and synchronizes again. A `target_unreachable` failure never triggers provisioning.
 
-    match result with
-    | Ok normalizedPath -> Browser.Dom.console.log($"Initialized: {normalizedPath}")
-    | Error message -> Browser.Dom.console.error(message)
-}
-```
+## 5. Main process structure
 
-Clone a repository:
+`src/Electron/src/Main/VersionControl`:
 
-```fsharp
-let request: GitCloneRepositoryRequest = {
-    RemoteUrl = "https://git.nfdi4plants.org/group/project.git"
-    TargetPath = @"C:\ARCs\project"
-    Branch = None
-    DownloadLargeFiles = true
-}
+- `DataHubStrategies.fs`: the credential strategy (token of the account matching the target host, the active account when no host is known, `None` when nobody is signed in) and the identity strategy (commit name and email of that account). Strategies are cheap and side effect free.
+- `WorkspaceBindingStore.fs`: the persisted `WorkspaceBinding` per vault root in the app settings, with tolerant decoding.
+- `ProviderComposition.fs`: factories, catalog, provider ids, location parsing (`https://` and `ssh://` locations belong to Git, `lakefs://` to lakeFS), the stale lock paths, and `dataHubRevisionPolicy`, the DataHub ruleset as the library's revision policy handed to both factories.
+- `VersionControlRuntime.fs`: the process wide runtime (catalog, binding store, resolver).
+- `Mappings.fs`: library types to DTOs and back, plus path, ref and revision validation.
+- `WorkspaceSessionHost.fs`: sessions, the operation registry, and the per-session settings (threshold and download preference) pushed into the provider when a session opens.
+- `VersionControlSettings.fs`: the settings record, its defaults (1 MiB, no download) and the 1 to 100 MiB bound.
 
-promise {
-    let! result = Renderer.GitApiClient.gitCloneRepository request
+`src/Electron/src/Main/IPC/IVersionControlApi.fs` wraps every call: `withSession` registers the operation before the session is opened and sends the started event, `withMutatingSession` also marks the vault busy and refreshes the file tree when the result reports a change, `withService` returns `service_unavailable` when the provider has no such optional service.
 
-    match result with
-    | Ok op when op.Success -> Browser.Dom.console.log(op.Path)
-    | Ok op -> Browser.Dom.console.error(op.Message |> Option.defaultValue "Clone failed.")
-    | Error message -> Browser.Dom.console.error(message)
-}
-```
+## 6. Validation and security rules
 
-Commit selected files:
+Repository paths sent by the renderer are validated in `Mappings.tryRepositoryPath` before any provider call and must be repository relative. Empty values, absolute paths, traversal segments and null characters fail with a `Validation` failure naming the path.
 
-```fsharp
-promise {
-    let! stageResult =
-        Renderer.GitApiClient.gitStagePaths {
-            Pathspecs = [| "assays/a1/dataset.xlsx"; "README.md" |]
-        }
+Ref names and revisions are validated the same way. Provider refs are opaque: the sidebar works with names, and requests carry the ref the provider handed out in `listRefs`.
 
-    match stageResult with
-    | Ok op when op.Success ->
-        let! commitResult =
-            Renderer.GitApiClient.gitCommit {
-                Message = "Update assay metadata"
-            }
+Repository locations are parsed in `ProviderComposition.tryCreateLocation`. Only full `https://`, `ssh://` and `lakefs://` locations are accepted. The Git provider rejects `file://`, `ext::`, `fd::`, protocol overrides such as `-c protocol...`, and SCP style SSH URLs such as `git@git.nfdi4plants.org:group/project.git`. Use `ssh://git@git.nfdi4plants.org/group/project.git` instead.
 
-        match commitResult with
-        | Ok commit when commit.Success -> Browser.Dom.console.log(commit.Message)
-        | Ok commit -> Browser.Dom.console.error(commit.Message)
-        | Error message -> Browser.Dom.console.error(message)
-    | Ok op -> Browser.Dom.console.error(op.Message)
-    | Error message -> Browser.Dom.console.error(message)
-}
-```
+Credentials are injected per command by the library and are never persisted to repository config. Git runs with `GIT_TERMINAL_PROMPT=0`.
 
-Fetch, preview pull, pull, and push:
-
-```fsharp
-let remoteRequest: GitRemoteOperationRequest = {
-    Remote = None
-    Branch = None
-}
-
-promise {
-    let! preview = Renderer.GitApiClient.previewGitPull remoteRequest
-
-    match preview with
-    | Ok { Status = GitPullPreflightStatus.SafeToPull } ->
-        let! pull = Renderer.GitApiClient.gitPull remoteRequest
-        Browser.Dom.console.log(pull)
-    | Ok { Status = GitPullPreflightStatus.WouldRequireMergeResolution; Message = message } ->
-        Browser.Dom.console.warn(defaultArg message "Pull would require merge resolution.")
-    | Ok { Status = GitPullPreflightStatus.Indeterminate; Message = message } ->
-        Browser.Dom.console.warn(defaultArg message "Pull preview was inconclusive.")
-    | Error message ->
-        Browser.Dom.console.error(message)
-}
-```
-
-## 5. Main Git Services
-
-`GitService.fs` owns Git operations for the active ARC repository path:
-
-- Status and refs: `getStatus`, `getBranches`
-- Diff and page data: `getDiffSummary`, `getDiff`, `getWordDiff`, `getDiffViewData`, `getMergeConflictViewData`
-- Remote sync: `fetch`, `previewPull`, `pull`, `push`
-- Local writes: `stagePaths`, `unstagePaths`, `discardPaths`, `commit`, `createBranch`, `checkoutBranch`, `addRemote`
-- LFS settings: `getLfsSettings`, `setLfsSettings`
-- LFS file/storage actions: `downloadLfsFile`, `freeLocalLfsCopy`, `pruneLfsCache`, `dedupLfsStorage`
-- Merge resolution: `confirmMergeResolution`
-
-`GitProvisioningService.fs` owns path-driven operations that do not require an active ARC:
-
-- `initRepository`
-- `cloneRepository`
-
-`GitLfsService.fs` owns Git LFS command orchestration and push planning:
-
-- System install/probe: `installSystem`, `isSystemInstalled`
-- Tracking: `track`, `isTrackedByAttributes`
-- Storage helpers: `storagePruneArgs`, `storageDedupArgs`, `buildFetchRefetchArgs`, `buildPullIncludeArgs`, `buildCheckoutArgs`, `buildLsFilesJsonArgs`, `tryFindListingForPath`, `buildCheckoutArgs`, `buildLsFilesJsonArgs`, `tryFindListingForPath`, `downloadObjectFromListing`
-- Push support: `planOutboundPush`, `uploadObjects`, `collectPushDiagnostics`
-
-`GitAuthAdapter.fs` builds scoped auth config and redacts secrets. `GitTokenProvider.fs` is the process-wide token lookup hook installed by `AuthService`.
-
-## 6. Validation and Security Rules
-
-Branch-like names are validated by `GitService.ensureValidBranchLikeName`.
-
-Pathspecs are validated by `GitService.ensureValidPathspec` and must be ARC-relative. Empty values, absolute paths, traversal segments (`.` or `..`), and null characters are rejected.
-
-Remote names are validated by `GitService.validateRemoteName`; blank input defaults to `origin`.
-
-Remote URLs are validated by `GitService.ensureAllowedRemoteUrl`. Only full `https://` and `ssh://` URLs are accepted. These are rejected:
-
-- `file://`
-- `ext::`
-- `fd::`
-- protocol override attempts such as `-c protocol...`
-- SCP-style SSH URLs such as `git@git.nfdi4plants.org:group/project.git`
-
-Use `ssh://git@git.nfdi4plants.org/group/project.git` instead of SCP-style SSH.
-
-All simple-git instances are created through `GitInternals.createGit`, which applies `GIT_TERMINAL_PROMPT=0`. Credentials are injected per command through config entries or command environment and are not persisted to repository config.
+Keep validation in the main process even when the renderer already validates. Renderer validation is for UX, main process validation is the trust boundary.
 
 ## 7. Authentication
 
-`AuthService.fs` installs the active `GitTokenProvider` after sign-in. Git services extract the host from the remote URL and call `tryGetAccessToken host`.
+The Git factory receives a `GitCredentialStrategy` and a `GitIdentityStrategy` built over the DataHub accounts (`DataHubStrategies.fs`). A `RevisionIdentityRequest` names the target host and an optional connection profile. The account is selected by profile when one is present, otherwise by host with the active account preferred, otherwise the active account when no host is known. When no account matches, the strategy returns `None` and the library fails the operation with `identity_missing` or an `Authentication` failure. Tokens are read from `AuthService` at call time, so signing in or switching accounts needs no re-registration.
 
-Current behavior:
+## 8. Large objects and Git LFS
 
-- `fetch`, `previewPull`, `pull`, and `push` require a token for the selected remote host. If none is available, they fail with `Unauthorized`.
-- `cloneRepository` uses a token when one is available. If no token is available, clone runs unauthenticated.
-- Authenticated clone failures are returned as failures. There is no unauthenticated retry/fallback after an authenticated clone failure.
-- `initRepository`, local status/diff/stage/commit/branch operations, and `addRemote` do not need a token.
+The library exposes large objects through the object materialization and storage policy services. For Git that is Git LFS.
 
-Auth config is scoped through `GitAuthAdapter.buildAuthArgs` and `GitAuthAdapter.applyAuth`. Error messages and diagnostics must pass through `redactToken` or the shared failure path before crossing IPC.
+The threshold for automatic large-object storage and the preference to download large objects are settings of the Electron app, not of the repository. Every session starts from the defaults (1 MiB, no download). The main process keeps the current values in memory per open session and pushes them into the provider when the session opens, so for Git the library keys `versioncontrolservice.lfs.autotrackthresholdmb` and `versioncontrolservice.lfs.materializelargeobjects` in the local repository config only mirror the app values. The sidebar reads them through `getStoragePolicySettings` and changes them through `setStoragePolicySettings`. A change lasts for the open session and is gone when the ARC is opened again. The main process refuses a threshold below 1 MiB or above 100 MiB with `invalid_lfs_threshold`, the code the library uses for the same refusal. lakeFS has no storage policy service, so the values are held by the main process only and the download preference feeds the clone request. Repositories created by earlier Swate versions may still carry `swate.lfs.autotrackthresholdmb` and `swate.lfs.downloadlargefiles` in their local config. Swate does not read them any more.
 
-## 8. Git LFS
+Renderer state starts with `DownloadLargeFiles = false` until the settings are loaded.
 
-Swate uses Git LFS in four places:
+Manual marking follows the DataHub ruleset in `src/Shared/GitLfsRules.fs`:
 
-- Stage-time auto tracking for selected files larger than `swate.lfs.autotrackthresholdmb`.
-- Commit-time validation that oversized staged blobs are tracked by LFS.
-- Pull/clone hydration of LFS content when `swate.lfs.downloadlargefiles` is true.
-- Push-time explicit upload of outbound LFS objects before the git ref push.
+- `isa.*.xlsx` metadata files must never be tracked with Git LFS. They cannot be marked manually, and a save never turns them into pointers: the composition root hands every provider factory one `RevisionPolicyStrategy` built from the ruleset (`Inline` for metadata files, `LargeObject` for files below a `dataset` folder and for files above 25 MB, `Automatic` otherwise). The Git provider applies it inside its revision transaction and writes the attribute rules it needs. The lakeFS provider accepts the strategy and ignores it. A metadata file that still holds a Git LFS pointer is refused with `inline_content_not_materialized` and the recovery `retry_materialization` until it is downloaded.
+- Files below a `dataset` folder must stay tracked and cannot be unmarked.
+- Files larger than 25 MB must stay tracked and cannot be unmarked.
 
-Settings are stored in local repository config:
+The file tree context menu disables blocked toggles, `GitLfsHelper` checks the rules again before calling `setPathStoragePolicy`, and the main process reads the file size itself and rejects a blocked request with `storage_policy_blocked`.
 
-- `swate.lfs.autotrackthresholdmb`: integer, default `1`, maximum `100`.
-- `swate.lfs.downloadlargefiles`: boolean, default `true` in Main Git service.
+File actions of the explorer: "Download LFS file" calls `materializeObject`, "Free local LFS copy" calls `dematerializeObject`. Both need a clean file. "Clean LFS Cache" (`pruneStorage`) and "Reduce LFS Storage" (`deduplicateStorage`) need a clean working tree. Deduplication can fail on file systems without copy on write support, which is expected and shown to the user.
 
-Renderer state starts with `DownloadLargeFiles = false` until repository settings are loaded. Use `getGitLfsSettings` after opening an ARC to get the effective repository values.
+Clone and synchronize hydrate large objects when `MaterializeAllObjects` (clone) or the materialize setting (synchronize) is on. A cancel during hydration keeps the update and reports a partial result with `retry_materialization`. The sidebar keeps the pulled state and offers the download again.
 
-Manual LFS marking follows the DataHub tracking ruleset (`Swate.Components.Shared.GitLfsRules`):
+## 9. Refs and the update workflow
 
-- `isa.*.xlsx` metadata files must never be tracked with Git LFS. They cannot be marked manually and are exempt from stage-time auto tracking and commit-time size validation.
-- Files below a `dataset` folder must stay tracked with Git LFS and cannot be unmarked.
-- LFS files larger than 25 MB must stay tracked with Git LFS and cannot be unmarked.
+`listRefs` returns local and remote refs with their kind. Switching to a remote ref goes through `preflightSwitchRef` and `switchRef` with the opaque provider ref. An unsafe preflight ends the switch with an error that names the paths at risk, without a confirmation. A partial preflight is refused the same way. `createRef` creates and switches to a new local ref.
 
-The file tree context menu disables blocked toggle actions, and the Main process rejects blocked `Track`/`Untrack` requests as a second line of defense.
+`synchronize` takes `ExpectedWorkspaceVersion`, `ExpectedTargetRevision`, `AcceptUpdateRisks` and `PublishLocalRevisions`. The pull button sends `PublishLocalRevisions = false`, the push button and the save send `true`. When the update would open a conflict session, the library stops with `update_would_create_conflict_session` (category `Conflict`, the overlapping paths in `AffectedPaths` when there are any, the target revision the preview used as `observed_target` evidence, recovery `accept_update_risks`) and the sidebar opens the merge resolution confirmation. Confirming repeats the write with `AcceptUpdateRisks = true` and the observed target, and the library refuses with `precondition_failed` when the target moved in between, which the sidebar reports without replaying. When the update would change files with local changes, the library stops with `update_would_overwrite_local_changes` (category `Conflict`, the paths in `AffectedPaths`, recovery `resolve_local_changes`). Acceptance does not apply there. The sidebar names the paths and asks the user to save or discard those changes first. A `preview_indeterminate` failure is a retryable provider failure and a decision code without `observed_target` evidence cannot be acted on, so the sidebar reports both as errors. A conflict returns `PartiallySucceeded` with `conflicts_detected` as before. When the publish fails after an applied update and reports no state change, the result is `PartiallySucceeded` with recovery `retry_publish`, and the sidebar offers to publish now. `Publication` is `LocalOnly` when the updated workspace is ahead of or diverged from the target and `PublicationNotApplicable` after a fast-forward. A canceled update returns `Failed` with category `Canceled` and one of the recovery codes `remove_index_lock`, `restore_workspace`, `refresh_workspace`, `inspect_workspace` or `abort_merge`, and the sidebar opens the matching dialog.
 
-When Git LFS is required but unavailable, operations return `FailureKind = Some GitFailureKind.LfsInstallRequired` with a message suitable for the install prompt. The renderer workflow calls `installGitLfs` and retries the original operation after a successful install.
+## 10. Diff and conflict resolution
 
-Clone always sets `GIT_LFS_SKIP_SMUDGE=1` first. If `DownloadLargeFiles = true`, clone then persists the setting and runs `git lfs pull` to hydrate content.
+The diff page loads `getBaseContent`, `getWordDiff` and the current file content from the vault. The conflict page loads the combined preview of the conflicted item and carries the conflict handle and the workspace version the preview was taken with. Confirming calls `resolveConflict` with the resolved content, then `getStatus`, then `finalizeConflict` when no items remain. A stale handle fails with `refresh_conflict_session` and the page reloads. Abandoning calls `cancelConflict`.
 
-Pull applies `GIT_LFS_SKIP_SMUDGE` when large-file download is disabled. When enabled, it hydrates with `git lfs pull` after the git pull.
+## 11. Busy, progress and cancellation
 
-Push uses `GitLfsService.planOutboundPush` to detect outbound LFS pointer objects. If needed, `GitLfsService.uploadObjects` uploads exact object IDs before the git push; if exact upload is unsupported by the installed git-lfs, it falls back to refspec upload.
+Mutations run under the vault busy flag so the file watcher does not merge Swate's own writes: `bindWorkspace`, `createRef`, `switchRef`, `createRevision`, `restorePaths`, `synchronize`, `resolveConflict`, `finalizeConflict`, `cancelConflict`, `materializeObject`, `dematerializeObject`, `setStoragePolicySettings`, `setPathStoragePolicy`, `pruneStorage`, `deduplicateStorage` and `clearStaleLock`. Nested busy scopes are counted per window, and the flag drops when the outermost scope ends. Read calls, `refreshSynchronization`, the provisioning calls and the dependency calls do not take the flag.
 
-Additional LFS file/storage actions:
+Progress arrives through `versionControlProgress` with float `Completed` and `Total` counters. Clone reports progress to the window that requested it.
 
-- "Clean LFS Cache" requires a clean working tree, rejects repositories with custom `lfs.storage`, and runs `git lfs prune --verify-remote --verify-unreachable --when-unverified=halt` through the active ARC. This removes hidden local LFS cache objects only after Git LFS can verify the configured origin remote.
-- "Reduce LFS Storage" requires a clean working tree and runs `git lfs dedup`. It may fail on file systems without copy-on-write support or when Git LFS extensions are configured; this is expected and should be shown to users.
-- "Download LFS file" is available from LFS-tracked pointer files via the file context menu, the LFS size/status pill, and the Git LFS pointer preview page. It verifies the file is clean and listed by the same `git lfs ls-files` index used by the file tree, runs `git lfs pull --include=<path>`, runs `git lfs checkout <path>`, and verifies the file is hydrated without changing Git status.
-- "Free local LFS copy" is available from downloaded LFS-tracked files via the file context menu and the LFS size/status pill. It verifies the file is clean, confirms Git LFS can fetch it from the remote, then replaces the visible full file with the small LFS pointer.
+Every operation can be canceled with `cancelOperation` and the operation id from `versionControlOperationStarted`. The running-operation registry stores each operation id with its workspace root. Cancellation kills the underlying process. The library then restores a clean state where it can and reports what is left through the recovery code.
 
-## 9. Branches and Pull Workflow
+A stale `.git/index.lock` left by a killed process is removed by `clearStaleLock`, which refuses with `lock_removal_refused` while another operation runs in that workspace. After clearing, an open merge is abandoned through the normal path.
 
-`getGitBranches` returns local branches and remote branch refs. The renderer maps remote branch switches to:
+## 12. Extending the functionality
 
-```fsharp
-{
-    Name = derivedLocalBranchName
-    StartPoint = Some remoteRefName
-}
-```
+When adding an operation:
 
-`checkoutBranch` behavior:
+1. Add or reuse DTOs in `VersionControlTypes.fs`. No Git or lakeFS type may appear in a DTO.
+2. Add the function to `IVersionControlApi` in `IPCTypes.fs` with a request DTO that carries `OperationId`.
+3. Implement it in `src/Electron/src/Main/IPC/IVersionControlApi.fs` through `withSession` or `withMutatingSession`, and map through `Mappings.fs`.
+4. Add the wrapper in `Renderer/VersionControlApiClient.fs`.
+5. Wire it into `GitWorkflow.GitDependencies` when the sidebar state needs it.
+6. Add tests in `tests/Electron.Core` (mappings, session host or IPC over a real repository) and `tests/Electron.Renderer` (workflow).
+7. Update this guide.
 
-- `StartPoint = None`: switch to an existing local branch only.
-- `StartPoint = Some ref`: create/check out `Name` from the provided start point.
+Provider specific behavior belongs in the library or in the composition root. Do not branch on a provider id anywhere else.
 
-`createBranch` creates and switches to a new local branch. After branch creation or checkout, Main reconciles tracking against `origin/<branch>` when that remote branch exists.
+## 13. Requirements and troubleshooting
 
-`previewGitPull` fetches the remote and runs `git merge-tree --write-tree HEAD <upstream>` to classify the pull:
+The library requires Git 2.38 or newer and Git LFS 3.7 or newer. `checkDependencies` reports every component with `Installed`, `Compatible` and a remediation text. The sidebar shows the remediation when a component is missing or too old. Only the Git LFS configuration component can be installed through `installDependency`, which the sidebar offers when an operation fails with category `DependencyMissing`.
 
-- `SafeToPull`: renderer may continue directly.
-- `WouldRequireMergeResolution`: renderer should ask before opening merge resolution flow.
-- `Indeterminate`: renderer should ask because the preflight could not classify safely.
+`Authentication` or `Authorization` failures on synchronize:
 
-## 10. Diff and Merge Resolution
-
-The renderer loads diff pages through `getGitDiffViewData`. Main returns previous content, current content, and porcelain word-diff metadata. Explicitly unsupported binary-like extensions and likely binary buffers return `GitPageLoadResultDto.Unsupported`, which the IPC layer maps to an unsupported-content page instead of throwing.
-
-Merge conflict flow:
-
-1. `getGitStatus` exposes `Conflicted` and `IsMergeInProgress`.
-2. `getGitMergeConflictViewData path` loads the current conflicted file content.
-3. Renderer edits the resolved content.
-4. `confirmGitMergeResolution` checks that the file still matches the expected conflict content, writes the resolved content, stages the path, and optionally commits when no conflicts remain.
-
-The expected-content guard prevents overwriting a file that changed after the renderer opened it.
-
-## 11. IPC Busy and Progress Behavior
-
-`Main.IPC.IGitApi` maps `GitService.GitResult<'T>` to shared DTOs.
-
-Operations wrapped in `withBusyWriting`:
-
-- `gitPull`
-- `gitStagePaths`
-- `gitUnstagePaths`
-- `gitDiscardPaths`
-- `gitCommit`
-- `createBranch`
-- `checkoutBranch`
-- `confirmGitMergeResolution`
-- `gitLfsPrune`
-- `gitLfsDedup`
-- `gitLfsDownloadFile`
-- `gitLfsFreeLocalCopy`
-
-Operations not wrapped:
-
-- Read-only calls: `getGitStatus`, `getGitBranches`, `getGitLfsSettings`, diff view loaders, merge conflict view loader.
-- Remote metadata/sync calls without working tree writes: `gitFetch`, `gitPush`, `previewGitPull`.
-- Provisioning calls: `gitInitRepository`, `gitCloneRepository`.
-- System Git LFS install.
-
-Progress is sent through `IMainUpdateRendererApi.gitProgressUpdate`. Fetch, preview pull, pull, push, and clone can report progress. Clone only reports progress when Main can resolve a vault from the IPC window id; otherwise the clone still runs.
-
-Fetch, preview pull, pull, push, clone, and Git LFS transfers can be cancelled with `gitCancelOperation`. The request's `TargetPath` is `None` for operations on the active ARC; for clone it must carry the clone target path because no vault window exists yet. Cancellation kills the underlying git process, then restores a clean repository state: a cancelled pull aborts any half-applied merge or rebase, and a cancelled clone deletes the partially cloned target directory. Failures raised while the operation's cancellation scope has a pending cancel request report `GitFailureKind.Canceled` — with the shared `GitOperationCancelledMessage` for fetch, preview pull, pull, and push, and with a clone-specific message for cancelled ARC downloads; the renderer classifies cancellations by that structured kind (or by exact equality with `GitOperationCancelledMessage` on the string-only preview channel), never by matching substrings of git error text. Cancelling after the pull itself has completed (during Git LFS hydration) does not roll the pull back: it reports a successful pull with a `Canceled` warning, and the not-yet-downloaded large files stay as LFS pointers until the next update.
-
-## 12. Extending Git Functionality
-
-When adding a new Git operation:
-
-1. Add or reuse DTOs in `Swate.Electron.Shared.GitTypes`.
-2. Add the IPC function to `IGitApi` in `IPCTypes.fs`.
-3. Implement Main handling in `src/Electron/src/Main/IPC/IGitApi.fs`.
-4. Put Git command logic in the appropriate Main service:
-   - Active ARC repo operation: `GitService.fs`
-   - Init/clone/path provisioning: `GitProvisioningService.fs`
-   - Git LFS orchestration: `GitLfsService.fs`
-   - Low-level spawned git: `GitLfsAdapter.fs`
-5. Add a wrapper in `Renderer.GitApiClient.fs`.
-6. Wire it into `GitWorkflow.GitDependencies` if renderer workflow state needs it.
-7. Add or update tests in `tests/Electron.Core`.
-8. Update this guide if behavior or consumer usage changes.
-
-Keep validation in Main even if Renderer already validates input. Renderer validation is for UX; Main validation is the trust boundary.
-
-## 13. Troubleshooting
-
-`Unauthorized` on fetch, preview pull, pull, or push:
-
-- Confirm an account is signed in and `AuthService` has installed a token provider.
-- Confirm the provider returns a token for the remote host.
-- Confirm the remote URL is `https://` or full-form `ssh://`.
+- Confirm an account is signed in for the target host and its token is valid.
+- Confirm the remote URL is `https://` or full form `ssh://`.
 
 Clone fails although the repository is public:
 
-- If a token is available, clone runs authenticated and does not retry unauthenticated after failure.
-- Sign out or adjust the active account if you intentionally need unauthenticated clone behavior.
-- Check target path rules: target must be missing or an empty directory, not a symlink/junction.
+- When a token is available, clone runs authenticated and does not retry without it.
+- The target must be missing or an empty directory (`target_not_empty` otherwise).
 
-Git LFS install prompt appears:
+`workspace_unmanaged` after opening a folder:
 
-- The operation needs Git LFS but `git lfs` is not available.
-- Use `installGitLfs` through the renderer workflow; after success, retry the original operation.
+- The folder is not under version control. The sidebar offers to initialize a repository.
 
-Pathspec rejected:
+`workspace_ambiguous`:
 
-- Use ARC-relative paths with `/`.
-- Do not pass absolute paths, `.` or `..` segments, empty values, or null characters.
+- More than one provider claims the folder. Remove the state of the provider that is not wanted, or bind the workspace explicitly.
 
-Remote branch checkout fails:
+Path rejected:
 
-- For remote-only branches, call `checkoutBranch` with `StartPoint = Some "origin/branch"` and `Name = "branch"`.
-- Calling with `StartPoint = None` only works for existing local branches.
-
-Unsupported diff or merge content:
-
-- Binary files and explicitly unsupported extensions are intentionally routed to the unsupported-content page.
-- Text-based diff and merge views only support files Main can safely read as text.
+- Use repository relative paths with `/`. Do not pass absolute paths, `.` or `..` segments, empty values or null characters.

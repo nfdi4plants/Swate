@@ -298,7 +298,7 @@ let renameOpenArcRootDirectoryOnDisk arcPath newName : JS.Promise<Result<string,
                     return Error(mapArcRootRenameDiskError plan.SourcePath plan.TargetPath renameError)
 }
 
-let createWindow () = promise {
+let createWindow () =
     printfn "[Swate] Creating new window"
     let screenSize = screen.getPrimaryDisplay().workAreaSize
 
@@ -310,16 +310,11 @@ let createWindow () = promise {
             icon = (windowIconPath |> U2.Case2),
             width = int screenSize.width,
             height = int screenSize.height,
+            show = false,
             webPreferences = WebPreferences(preload = path.join (__dirname, "preload.fs.js"))
         )
 
     let window = BrowserWindow(mainWindowOptions)
-
-    if isNullOrUndefined MAIN_WINDOW_VITE_DEV_SERVER_URL then
-        do! window.loadFile (path.join (__dirname, $"../renderer/{MAIN_WINDOW_VITE_NAME}/index.html"))
-    else
-        window.webContents.openDevTools Enums.WebContents.OpenDevTools.Options.Mode.Right
-        do! window.loadURL MAIN_WINDOW_VITE_DEV_SERVER_URL
 
     // Prevent links from opening new Electron windows
     window.webContents.setWindowOpenHandler (fun details ->
@@ -336,7 +331,16 @@ let createWindow () = promise {
             Fable.Electron.Main.shell.openExternal url |> Promise.start
     )
 
-    return window
+    window
+
+let loadWindow (window: BrowserWindow) = promise {
+    if isNullOrUndefined MAIN_WINDOW_VITE_DEV_SERVER_URL then
+        do! window.loadFile (path.join (__dirname, $"../renderer/{MAIN_WINDOW_VITE_NAME}/index.html"))
+    else
+        window.webContents.openDevTools Enums.WebContents.OpenDevTools.Options.Mode.Right
+        do! window.loadURL MAIN_WINDOW_VITE_DEV_SERVER_URL
+
+    window.show ()
 }
 
 let shouldUsePollingByDefault (platform: string) =
@@ -371,6 +375,15 @@ let tryGetWatcherRelativePath arcPath path =
         ->
         Some(PathHelpers.normalizeCanonicalRelativePath path)
     | None -> None
+
+/// Logical watcher scope keys are case-sensitive even on case-insensitive filesystems.
+let isSameOrDescendantLogicalPath (path: string) (ancestorPath: string) =
+    let normalizedPath = PathHelpers.normalizePath path
+    let normalizedAncestorPath = PathHelpers.normalizePath ancestorPath
+
+    String.IsNullOrWhiteSpace normalizedAncestorPath
+    || normalizedPath = normalizedAncestorPath
+    || normalizedPath.StartsWith(normalizedAncestorPath + "/", StringComparison.Ordinal)
 
 /// Keeps the permanent watcher on ARC metadata and structural directories without traversing payload trees.
 let shouldIgnoreForArcStructureWatcher (arcPath: string) (path: string) (stats: Filesystem.Stats) =
@@ -416,7 +429,6 @@ let createWatcherOptions
     (ignored: U4<string, ResizeArray<string>, string -> bool, System.Func<string, Filesystem.Stats, bool>>)
     (depth: int option)
     =
-
     // Native Windows file events can keep handles that block app-initiated folder renames.
     let usePolling =
         defaultArg usePolling (shouldUsePollingByDefault (currentNodePlatform ()))
@@ -445,35 +457,23 @@ let createWatcherOptions
     watcherOptions
 
 let createArcStructureWatcherPaths (arcPath: string) =
-    let rootPath = "."
-
     let structuralPaths =
         arcStructureZones
-        |> Array.collect (fun zone ->
+        |> Array.choose (fun zone ->
             let absoluteZonePath = ArcPathHelper.combine arcPath zone
 
             if Filesystem.existsSync absoluteZonePath then
-                let entityPaths =
-                    Filesystem.readdirSync absoluteZonePath
-                    |> Array.choose (fun entry ->
-                        let relativePath = ArcPathHelper.combine zone entry
-                        let absolutePath = ArcPathHelper.combine arcPath relativePath
-
-                        try
-                            if Filesystem.statSync(absolutePath).isDirectory () then
-                                Some(PathHelpers.normalizeCanonicalRelativePath relativePath)
-                            else
-                                None
-                        with _ ->
-                            None
-                    )
-
-                Array.append [| zone |] entityPaths
+                Some(PathHelpers.normalizePath absoluteZonePath)
             else
-                [||]
+                None
         )
 
-    Array.append [| rootPath |] structuralPaths
+    Array.append [| PathHelpers.normalizePath arcPath |] structuralPaths
+
+let isArcStructureWatcherScopePath (relativePath: string) =
+    match getNonEmptyPathParts relativePath with
+    | [| zone |] -> arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone)
+    | _ -> false
 
 let isArcStructureWatchScopePath (relativePath: string) =
     match getNonEmptyPathParts relativePath with
@@ -481,9 +481,7 @@ let isArcStructureWatchScopePath (relativePath: string) =
     | [| zone; _ |] -> arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone)
     | _ -> false
 
-/// Shallowly discovers the watcher-equivalent events needed to reconcile a structural scope.
-/// Zone reconciliation visits only direct entity directories; entity reconciliation visits only
-/// their direct children, so payload directory contents are never enumerated.
+/// Shallowly discovers structure and canonical metadata without entering payload directory contents.
 let reconcileArcStructureScope (arcPath: string) (relativeScopePath: string) =
     let addEvent relativePath =
         Chokidar.Events.Add.ToString(), relativePath
@@ -523,10 +521,9 @@ let reconcileArcStructureScope (arcPath: string) (relativeScopePath: string) =
 
     let reconcileZone zone = promise {
         let! entries = readDirectory zone
-        let entityDirectories = entries |> Array.filter (fun entry -> entry.isDirectory ())
         let events = ResizeArray<string * string>()
 
-        for entity in entityDirectories do
+        for entity in entries |> Array.filter (fun entry -> entry.isDirectory ()) do
             let entityPath =
                 ArcPathHelper.combine zone entity.name
                 |> PathHelpers.normalizeCanonicalRelativePath
@@ -544,9 +541,7 @@ let reconcileArcStructureScope (arcPath: string) (relativeScopePath: string) =
             let events = ResizeArray<string * string>()
 
             for zone in arcStructureZones do
-                let absoluteZonePath = ArcPathHelper.combine arcPath zone
-
-                if Filesystem.existsSync absoluteZonePath then
+                if Filesystem.existsSync (ArcPathHelper.combine arcPath zone) then
                     events.Add(addDirectoryEvent zone)
                     let! zoneEvents = reconcileZone zone
                     events.AddRange zoneEvents
@@ -559,17 +554,12 @@ let reconcileArcStructureScope (arcPath: string) (relativeScopePath: string) =
     }
 
 let createFileWatcher (path: string) (usePolling: bool option) =
-    let ignoreFn = shouldIgnoreForArcStructureWatcher path
-
     let ignored: U4<string, ResizeArray<string>, string -> bool, System.Func<string, Filesystem.Stats, bool>> =
-        !^(System.Func<string, Filesystem.Stats, bool>(ignoreFn))
+        !^(System.Func<string, Filesystem.Stats, bool>(shouldIgnoreForArcStructureWatcher path))
 
-    let watcherOptions = createWatcherOptions path usePolling ignored (Some 0)
-
-    let watcher =
-        Chokidar.Chokidar.watch (createArcStructureWatcherPaths path, watcherOptions)
-
-    watcher
+    // Root depth 1 observes zone/entity changes; each explicit zone depth 1 observes only
+    // entity directories and their immediate metadata/payload-directory children.
+    Chokidar.Chokidar.watch (createArcStructureWatcherPaths path, createWatcherOptions path usePolling ignored (Some 1))
 
 let waitForFileWatcherReady (watcher: Chokidar.IWatcher) : Fable.Core.JS.Promise<unit> =
     Fable.Core.JS.Constructors.Promise.Create(fun resolve reject ->
@@ -607,12 +597,7 @@ let waitForFileWatcherReady (watcher: Chokidar.IWatcher) : Fable.Core.JS.Promise
         |> ignore
     )
 
-open Fable.Electron.Remoting.Main
-
 let sendArcHasUnsavedChangesUpdate (hasUnsavedChanges: bool) (window: BrowserWindow) =
-    let sendMsg =
-        Remoting.createIpc ()
-        |> Remoting.withWindow window
-        |> Remoting.buildProxySender<Swate.Electron.Shared.IPCTypes.MainToRendererIpc.IHasUnsavedArcChangesRendererApi>
-
-    sendMsg.arcUnsavedChangesUpdate hasUnsavedChanges
+    WindowSend.send<Swate.Electron.Shared.IPCTypes.MainToRendererIpc.IHasUnsavedArcChangesRendererApi>
+        window
+        (fun api -> api.arcUnsavedChangesUpdate hasUnsavedChanges)

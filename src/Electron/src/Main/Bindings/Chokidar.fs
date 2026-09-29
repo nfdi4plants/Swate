@@ -57,6 +57,7 @@ type IWatcher =
     abstract member on: eventName: Events * callback: (obj -> unit) -> IWatcher
     abstract member on: eventName: Events * callback: (string -> unit) -> IWatcher
     abstract member on: eventName: Events * callback: (string -> string -> unit) -> IWatcher
+    abstract member emit: eventName: Events * watchedEventName: string * path: string -> bool
     abstract member getWatched: unit -> IWatched
 
 

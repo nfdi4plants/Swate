@@ -358,6 +358,13 @@ function MetadataVariants() {
         testIdPrefix="git-diff-created"
       />
       <GitDiffViewerComponent
+        wordDiffText=""
+        previousContent=""
+        currentContent={"Fresh content\n"}
+        changeKind="added"
+        testIdPrefix="git-diff-created-empty"
+      />
+      <GitDiffViewerComponent
         wordDiffText={deletedFileWordDiffText}
         previousContent={"Remove obsolete content\n"}
         currentContent=""
@@ -389,5 +396,8 @@ export const MetadataEdgeCases: Story = {
 
     await expect(canvas.getByTestId("git-diff-renamed-previous-header")).toHaveTextContent(renamedPreviousPath);
     await expect(canvas.getByTestId("git-diff-renamed-current-header")).toHaveTextContent(renamedCurrentPath);
+    await expect(canvas.getByTestId("git-diff-created-root")).toHaveTextContent("Added");
+    await expect(canvas.getByTestId("git-diff-created-empty-root")).toHaveTextContent("Added");
+    await expect(canvas.getByTestId("git-diff-deleted-root")).toHaveTextContent("Deleted");
   },
 };

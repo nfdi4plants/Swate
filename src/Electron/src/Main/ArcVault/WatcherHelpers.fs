@@ -1,12 +1,10 @@
-/// Pure and reusable file-watcher event, path, and ARC-structure reconciliation helpers.
-/// Stateful watcher lifecycle and scheduling belong to ArcVault.
 module Main.WatcherHelpers
 
 open System
 open System.Collections.Generic
-open Fable.Core
 open Fable.Electron
 open Main.Bindings
+open Main.Bindings.Filesystem
 open Main.ArcMerge
 open Main.ARCtrlExtensions
 open Main.ArcVaultTypes
@@ -15,21 +13,13 @@ open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 
-type FileWatcherControllerContext = {
-    ArcPath: unit -> string option
-    Watcher: unit -> Chokidar.IWatcher option
-    ImportedPaths: HashSet<string>
-    IsActiveImport: unit -> bool
-    IsArcMergeEligible: unit -> bool
-    PendingEvents: ResizeArray<ArcVaultFileSystemEvent>
-    PendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent>
-    SchedulePendingEvents: unit -> unit
-    LogEvent: string -> string -> unit
-    LogReconciliationError: string -> exn -> unit
-}
-
 let eventNameEquals (expected: Chokidar.Events) (actual: string) =
     String.Equals(actual, expected.ToString(), StringComparison.OrdinalIgnoreCase)
+
+let existsSyncWithExactName (path: string) =
+    existsSync path
+    && (readdirSync (dirname path)
+        |> Array.exists (fun name -> String.Equals(name, basename path, StringComparison.Ordinal)))
 
 /// Builds an ARC-root-relative watcher event from the raw chokidar payload.
 let buildWatcherEvent (arcPath: string) (eventName: string) (path: string) =
@@ -62,7 +52,7 @@ let buildWatcherEvent (arcPath: string) (eventName: string) (path: string) =
         AbsolutePath = absolutePath
     }
 
-/// Retains only the final event for each case-sensitive normalized path while preserving final-event order.
+/// Retains the final event for each case-sensitive logical path and preserves final-event order.
 let coalesceEventsByPath (events: ArcVaultFileSystemEvent list) =
     events
     |> List.rev
@@ -84,6 +74,24 @@ let isArcMergeRelevant (event: ArcVaultFileSystemEvent) =
         |> not
     else
         false
+
+let attachArcStructureScopes (watcher: Chokidar.IWatcher option) (events: (string * string) array) =
+    match watcher with
+    | None -> ()
+    | Some watcher ->
+        events
+        |> Array.choose (fun (eventName, relativePath) ->
+            if
+                eventNameEquals Chokidar.Events.AddDir eventName
+                && ArcVaultHelper.isArcStructureWatcherScopePath relativePath
+            then
+                Some(PathHelpers.normalizeCanonicalRelativePath relativePath)
+            else
+                None
+        )
+        |> function
+            | [||] -> ()
+            | scopes -> watcher.add scopes |> ignore
 
 let createImportedFileWatcherEvents arcPath targetRelativePath sourceAbsolutePaths =
     let targetRelativePath =
@@ -121,78 +129,36 @@ let queueFileWatcherEvent
             pendingArcMergeEvents.Add watcherEvent
     | None -> ()
 
-let queueArcVaultFileWatcherEvent (context: FileWatcherControllerContext) eventName path =
-    queueFileWatcherEvent
-        (fun event ->
-            let importedPathKey =
-                PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant())
+/// An admitted unlink for a recreated file becomes a change. An add or change for a file that is
+/// missing at merge time is dropped, because the file is either mid-replacement (an add follows)
+/// or deleted (a real unlink follows), and converting it would remove an entity together with
+/// unsaved edits on it.
+/// An unlink-dir event stays admitted because toArcMergeEvents expands it to canonical files.
+/// TryApplyWatcherArcMergeIfEligible then checks each file against disk.
+let normalizeAgainstDisk (events: ArcVaultFileSystemEvent list) =
+    events
+    |> List.choose (fun event ->
+        if isAbsolute event.RelativePath then
+            Some event
+        elif
+            eventNameEquals Chokidar.Events.Unlink event.EventName
+            && existsSyncWithExactName event.AbsolutePath
+        then
+            Some {
+                event with
+                    EventName = Chokidar.Events.Change.ToString()
+            }
+        elif
+            (eventNameEquals Chokidar.Events.Add event.EventName
+             || eventNameEquals Chokidar.Events.Change event.EventName)
+            && not (existsSync event.AbsolutePath)
+        then
+            None
+        else
+            Some event
+    )
 
-            let isImportedPath = context.ImportedPaths.Remove importedPathKey
-
-            not isImportedPath && (context.IsActiveImport() || context.IsArcMergeEligible())
-        )
-        (context.ArcPath())
-        context.PendingEvents
-        context.PendingArcMergeEvents
-        eventName
-        path
-
-let attachArcStructureScopes (watcher: Chokidar.IWatcher option) (events: (string * string) array) =
-    match watcher with
-    | None -> ()
-    | Some watcher ->
-        events
-        |> Array.choose (fun (eventName, relativePath) ->
-            if
-                eventNameEquals Chokidar.Events.AddDir eventName
-                && ArcVaultHelper.isArcStructureWatchScopePath relativePath
-            then
-                Some(PathHelpers.normalizeCanonicalRelativePath relativePath)
-            else
-                None
-        )
-        |> function
-            | [||] -> ()
-            | scopes -> watcher.add scopes |> ignore
-
-let reconcileArcStructureScope (context: FileWatcherControllerContext) arcPath relativeScopePath = promise {
-    let! events = ArcVaultHelper.reconcileArcStructureScope arcPath relativeScopePath
-    attachArcStructureScopes (context.Watcher()) events
-
-    for eventName, relativePath in events do
-        queueArcVaultFileWatcherEvent context eventName relativePath
-
-    context.SchedulePendingEvents()
-}
-
-let fileEventController (context: FileWatcherControllerContext) =
-    fun (eventName: string) (path: string) ->
-        context.LogEvent eventName path
-
-        if eventNameEquals Chokidar.Events.AddDir eventName then
-            match context.ArcPath() with
-            | Some arcPath ->
-                match ArcVaultHelper.tryGetWatcherRelativePath arcPath path with
-                | Some relativePath when ArcVaultHelper.isArcStructureWatchScopePath relativePath ->
-                    promise {
-                        try
-                            context.Watcher()
-                            |> Option.iter (fun watcher ->
-                                watcher.add (PathHelpers.normalizeCanonicalRelativePath relativePath) |> ignore
-                            )
-
-                            do! reconcileArcStructureScope context arcPath relativePath
-                        with reconciliationError ->
-                            context.LogReconciliationError relativePath reconciliationError
-                    }
-                    |> Promise.start
-                | _ -> ()
-            | None -> ()
-
-        queueArcVaultFileWatcherEvent context eventName path
-        context.SchedulePendingEvents()
-
-/// Converts raw filesystem events into ARC merge events; unlink-dir events expand to possible canonical files.
+/// Converts raw filesystem events into ARC merge events. Unlink-dir events expand to possible canonical files.
 let toArcMergeEvents (events: ArcVaultFileSystemEvent list) =
     events
     |> List.filter isArcMergeRelevant

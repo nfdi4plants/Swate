@@ -1,9 +1,6 @@
 module Main.Bindings.Node
 
 open Fable.Core
-open Fable.Core.JsInterop
-
-let childProcessDynamic: obj = importAll "node:child_process"
 
 [<Emit("process.platform")>]
 let processPlatform () : string = jsNative

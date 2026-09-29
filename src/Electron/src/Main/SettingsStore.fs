@@ -42,11 +42,17 @@ let tryReadSettingsFile (fileName: string) =
     with _ ->
         None
 
-let writeSettingsFileAtomic (fileName: string) (content: string) =
+/// Writes through a temp file and rename. The result names the failure instead of
+/// hiding it, for callers that have to know whether the file was written.
+let tryWriteSettingsFileAtomic (fileName: string) (content: string) : Result<unit, string> =
     try
         let filePath = getSettingsFilePath fileName
         let tempPath = filePath + ".tmp"
         writeFileSync tempPath content TextEncoding.Utf8
         renameSync tempPath filePath
-    with _ ->
-        ()
+        Ok()
+    with error ->
+        Error $"Could not write settings file '{fileName}': {error.Message}"
+
+let writeSettingsFileAtomic (fileName: string) (content: string) =
+    tryWriteSettingsFileAtomic fileName content |> ignore
