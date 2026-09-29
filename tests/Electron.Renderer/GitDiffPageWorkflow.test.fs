@@ -980,6 +980,127 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "Expanding the remainder of one gap again and again collapses the oldest rows, which expand again with the same lines",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                let familyGap (index: int) =
+                    DiffPartDto.HiddenEqual {
+                        GapId = $"g{index}"
+                        PreviousRange = lineRange (string index) (string (1000 - index))
+                        CurrentRange = lineRange (string index) (string (1000 - index))
+                    }
+
+                let! state = openFirstPage fake (diffPage "p1" None [| hunk "h1"; familyGap 0 |])
+                let generation = (diffOf state).Generation
+                // Both sides carry the text, so each expansion adds a little over 2 MiB.
+                let bigText = String.replicate (1024 * 1024) "x"
+
+                // The library answers an already expanded gap with its recorded first result.
+                let recorded = Dictionary<string, ResumablePartsDto>()
+
+                fake.ExpandReply <-
+                    fun request ->
+                        let index = int (request.GapId.Replace("g", ""))
+
+                        if not (recorded.ContainsKey request.GapId) then
+                            let row: DiffRowDto = {
+                                Id = $"row-{index}"
+                                Kind = DiffRowKindDto.Context
+                                Previous = Some(textLine index bigText)
+                                Current = Some(textLine index bigText)
+                            }
+
+                            recorded.[request.GapId] <-
+                                ResumablePartsDto.Ready [|
+                                    DiffPartDto.ExpandedContext(request.GapId, [| row |])
+                                    familyGap (index + 1)
+                                |]
+
+                        succeeded recorded.[request.GapId]
+
+                let loadedBytes (page: GitDiffPageData) =
+                    page.Pages
+                    |> Array.filter (fun windowPage -> not windowPage.IsEvicted)
+                    |> Array.sumBy _.PayloadBytes
+
+                let newestChunkBytes (page: GitDiffPageData) =
+                    page.Pages.[0].ExpandedGaps |> List.last |> _.PayloadBytes
+
+                let expanded (page: GitDiffPageData) (gapId: string) =
+                    page.Pages.[0].Parts
+                    |> Array.pick (
+                        function
+                        | Paged.PagedPart.ExpandedRows(id, rows) when id = gapId -> Some rows
+                        | _ -> None
+                    )
+
+                let current = ref state
+
+                for gapId in [ "g0"; "g1"; "g2"; "g3"; "g4"; "g0" ] do
+                    let! next = run fake (diffMsg (GitDiffMsg.Expand(generation, gapId, true))) current.Value
+                    current.Value <- next
+                    let page = diffOf next
+
+                    Vitest
+                        .expect(loadedBytes page)
+                        .toBeLessThanOrEqual (GitDiffPageLoader.MaxLoadedBytes + newestChunkBytes page)
+
+                    if gapId = "g4" then
+                        Vitest
+                            .expect(pageParts page.Pages.[0])
+                            .toEqual (
+                                [|
+                                    "hunk:h1"
+                                    "gap:g0"
+                                    "gap:g1"
+                                    "expanded:g2:1"
+                                    "expanded:g3:1"
+                                    "expanded:g4:1"
+                                    "gap:g5"
+                                |]
+                            )
+
+                        Vitest
+                            .expect(
+                                page.Pages.[0].Parts
+                                |> Array.pick (
+                                    function
+                                    | Paged.PagedPart.HiddenGap("g0", previous, current) -> Some(previous, current)
+                                    | _ -> None
+                                )
+                            )
+                            .toEqual (
+                                ({ Start = 0.0; Count = 1.0 }: Paged.PagedRange),
+                                ({ Start = 0.0; Count = 1.0 }: Paged.PagedRange)
+                            )
+
+                let page = diffOf current.Value
+                let rows = expanded page "g0"
+
+                Vitest
+                    .expect(pageParts page.Pages.[0])
+                    .toEqual (
+                        [|
+                            "hunk:h1"
+                            "expanded:g0:1"
+                            "gap:g1"
+                            "gap:g2"
+                            "expanded:g3:1"
+                            "expanded:g4:1"
+                            "gap:g5"
+                        |]
+                    )
+
+                Vitest.expect(rows |> Array.map _.Id).toEqual ([| "row-0" |])
+
+                Vitest
+                    .expect(rows |> Array.map (fun row -> row.Current |> Option.map _.Number))
+                    .toEqual ([| Some 0.0 |])
+            }
+        )
+
+        Vitest.test (
             "No changes is shown only when the scan and the output are complete and no hunk exists",
             fun () -> promise {
                 let fake = FakeDiffClient()

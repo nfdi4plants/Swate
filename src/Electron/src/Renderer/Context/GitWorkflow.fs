@@ -1481,32 +1481,20 @@ module GitDiffPageLoader =
                 ExpandedGaps = []
         }
 
-    /// Puts the least recently expanded gap of the page back as one hidden gap with its original
-    /// id and ranges. Every part its expansions produced is dropped with it.
+    /// Puts the rows of the least recently expanded gap of the page back as a hidden gap with
+    /// that gap's id. Gaps the expansion returned stay where they are.
     let private collapseOldestGap (windowPage: GitDiffWindowPage) =
         match windowPage.ExpandedGaps with
         | [] -> windowPage
         | oldest :: rest ->
-            let producedBy part =
-                match part with
-                | Paged.PagedPart.ExpandedRows(gapId, _)
-                | Paged.PagedPart.HiddenGap(gapId, _, _) -> oldest.GapIds |> List.contains gapId
-                | _ -> false
-
-            let restored =
-                Paged.PagedPart.HiddenGap(oldest.GapId, oldest.Previous, oldest.Current)
-
             let parts =
-                match windowPage.Parts |> Array.tryFindIndex producedBy with
-                | None -> windowPage.Parts
-                | Some first ->
-                    windowPage.Parts
-                    |> Array.indexed
-                    |> Array.choose (fun (index, part) ->
-                        if index = first then Some restored
-                        elif producedBy part then None
-                        else Some part
-                    )
+                windowPage.Parts
+                |> Array.map (fun part ->
+                    match part with
+                    | Paged.PagedPart.ExpandedRows(gapId, _) when gapId = oldest.GapId ->
+                        Paged.PagedPart.HiddenGap(oldest.GapId, oldest.Previous, oldest.Current)
+                    | _ -> part
+                )
 
             {
                 windowPage with
@@ -1518,8 +1506,8 @@ module GitDiffPageLoader =
 
     /// Replaces the loaded pages farthest from the requested page by placeholders until the
     /// window holds at most MaxLoadedPages pages and MaxLoadedBytes. The requested page stays.
-    /// When the requested page alone still exceeds MaxLoadedBytes, its least recently expanded
-    /// gaps collapse. The most recent expansion stays, since the user just asked for it.
+    /// When the requested page alone still exceeds MaxLoadedBytes, the rows of its least recently
+    /// expanded gaps collapse. The newest expansion stays, since the user just asked for it.
     let evict (page: GitDiffPageData) : GitDiffPageData =
         let anchor = page.RequestedPageIndex
 
@@ -1673,63 +1661,80 @@ module GitDiffPageLoader =
         )
 
     /// Puts the expanded parts where the gap was. A gap on a page evicted in the meantime is left alone.
-    /// The expansion is recorded with the gap the page first showed, so it can be collapsed again.
+    /// Each expansion result is recorded on its own, so its rows can be collapsed again.
+    /// Expanding a gap whose rows were collapsed returns the library's recorded first result,
+    /// whose remaining gaps the page already shows or has expanded further. Those gaps are
+    /// dropped, so no line appears twice.
     let private replaceGap (gapId: string) (parts: DiffPartDto[]) (page: GitDiffPageData) =
         match pageIndexOfGap gapId page with
         | None -> page
         | Some index ->
             let windowPage = page.Pages.[index]
-            let mapped = parts |> Array.map Presentation.part
             let bytes = payloadBytes parts
+
+            let shownGapIds =
+                windowPage.Parts
+                |> Array.choose (
+                    function
+                    | Paged.PagedPart.HiddenGap(id, _, _)
+                    | Paged.PagedPart.ExpandedRows(id, _) when id <> gapId -> Some id
+                    | _ -> None
+                )
+                |> Set.ofArray
+
+            let mapped =
+                parts
+                |> Array.map Presentation.part
+                |> Array.filter (
+                    function
+                    | Paged.PagedPart.HiddenGap(id, _, _) -> not (shownGapIds.Contains id)
+                    | _ -> true
+                )
 
             let replaced =
                 windowPage.Parts
                 |> Array.collect (fun part -> if isGap gapId part then mapped else [| part |])
 
-            let producedGaps =
-                mapped
-                |> Array.choose (
+            let gapRanges =
+                windowPage.Parts
+                |> Array.pick (
                     function
-                    | Paged.PagedPart.HiddenGap(id, _, _) -> Some id
+                    | Paged.PagedPart.HiddenGap(id, previous, current) when id = gapId -> Some(previous, current)
                     | _ -> None
                 )
-                |> List.ofArray
 
-            let touched, others =
-                windowPage.ExpandedGaps
-                |> List.partition (fun expanded -> expanded.GapIds |> List.contains gapId)
+            let linesOf (pick: Paged.PagedRow -> Paged.PagedLine option) (fallback: Paged.PagedRange) rows =
+                match rows |> Array.choose pick with
+                | [||] -> { fallback with Count = 0.0 }
+                | lines ->
+                    ({
+                        Start = lines.[0].Number
+                        Count = float lines.Length
+                    }
+                    : Paged.PagedRange)
 
             let expandedGap =
-                match touched with
-                | expanded :: _ -> {
-                    expanded with
-                        GapIds = expanded.GapIds @ producedGaps
-                        PayloadBytes = expanded.PayloadBytes + bytes
-                  }
-                | [] ->
-                    let previous, current =
-                        windowPage.Parts
-                        |> Array.pick (
-                            function
-                            | Paged.PagedPart.HiddenGap(id, previous, current) when id = gapId ->
-                                Some(previous, current)
-                            | _ -> None
-                        )
-
-                    {
-                        GapId = gapId
-                        Previous = previous
-                        Current = current
-                        GapIds = gapId :: producedGaps
-                        PayloadBytes = bytes
-                    }
+                mapped
+                |> Array.tryPick (
+                    function
+                    | Paged.PagedPart.ExpandedRows(id, rows) when id = gapId ->
+                        Some {
+                            GapId = gapId
+                            Previous = linesOf _.Previous (fst gapRanges) rows
+                            Current = linesOf _.Current (snd gapRanges) rows
+                            PayloadBytes = bytes
+                        }
+                    | _ -> None
+                )
 
             let updated = {
                 windowPage with
                     Parts = replaced
                     RowCount = Presentation.rowCount replaced
                     PayloadBytes = windowPage.PayloadBytes + bytes
-                    ExpandedGaps = others @ [ expandedGap ]
+                    ExpandedGaps =
+                        (windowPage.ExpandedGaps |> List.filter (fun expanded -> expanded.GapId <> gapId))
+                        @ Option.toList expandedGap
             }
 
             {
@@ -1775,10 +1780,7 @@ module GitDiffPageLoader =
                                 ExpandedGaps =
                                     windowPage.ExpandedGaps
                                     |> List.map (fun expanded ->
-                                        if
-                                            mergedGapIds
-                                            |> Array.exists (fun gapId -> expanded.GapIds |> List.contains gapId)
-                                        then
+                                        if mergedGapIds |> Array.contains expanded.GapId then
                                             {
                                                 expanded with
                                                     PayloadBytes = expanded.PayloadBytes + bytes

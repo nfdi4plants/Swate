@@ -67,15 +67,15 @@ type GitDiffPageStatus =
     | Closed
     | Failed of message: string
 
-/// A gap of a page that was expanded. Collapsing puts the gap back with its original id and
-/// ranges, and expanding it again returns the result the library recorded.
+/// The rows one expansion of a gap returned. Collapsing puts a hidden gap with the expanded
+/// gap's id back in their place, covering exactly their lines. Expanding that id again returns
+/// the result the library recorded for it, so the same rows come back.
 type GitDiffExpandedGap = {
     GapId: string
+    /// Lines of the expanded rows on each side.
     Previous: PagedRange
     Current: PagedRange
-    /// The gap itself and every gap its expansions returned.
-    GapIds: string list
-    /// JSON length of the expansion results and of the line slices merged into their rows.
+    /// JSON length of the expansion result and of the line slices merged into its rows.
     PayloadBytes: float
 }
 
@@ -88,7 +88,7 @@ type GitDiffWindowPage = {
     /// JSON length of the DTOs this page was built from, including expanded context and line slices.
     PayloadBytes: float
     IsEvicted: bool
-    /// Expanded gaps of this page, the least recently expanded first.
+    /// One entry per expansion result on this page, the least recently expanded first.
     ExpandedGaps: GitDiffExpandedGap list
 }
 
