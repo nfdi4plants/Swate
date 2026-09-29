@@ -61,6 +61,7 @@ let Main (page: GitDiffPageData) =
                                     GitDiffMsg.LoadLineSlice(generation, Presentation.sideDto side, line, offsetUtf16)
                                 )
                             ),
+                        pendingLineSlices = Array.ofList page.PendingLineSlices,
                         requestReplay = (fun pageId -> send (GitDiffMsg.Replay(generation, pageId))),
                         chooseEncoding =
                             (fun side encoding ->

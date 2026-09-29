@@ -36,6 +36,7 @@ module internal GitPagedDiffDisplay =
         Progress: PagedProgress option
         RequestExpand: (string -> bool -> unit) option
         RequestLineSlice: (PagedDiffSide -> float -> float -> unit) option
+        PendingLineSlices: PagedLineSliceRequest[]
         RequestReplay: (string -> unit) option
         RequestNext: (unit -> unit) option
     }
@@ -47,6 +48,8 @@ module internal GitPagedDiffDisplay =
         ForceContext: bool
         Prefix: string
         RequestLineSlice: (PagedDiffSide -> float -> float -> unit) option
+        /// A slice of this line is still loading, so its control stays disabled.
+        SlicePending: bool
     }
 
     type AnchorCandidate = { Key: string; Start: int }
@@ -333,7 +336,7 @@ type GitPagedDiffViewer =
                                     prop.testId
                                         $"{props.Prefix}-line-more-{props.Side}-{GitPagedDiffDisplay.numberText line.Number}"
                                     prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:ml-2"
-                                    prop.disabled props.RequestLineSlice.IsNone
+                                    prop.disabled (props.SlicePending || props.RequestLineSlice.IsNone)
                                     prop.onClick (fun _ ->
                                         props.RequestLineSlice
                                         |> Option.iter (fun callback ->
@@ -451,6 +454,12 @@ type GitPagedDiffViewer =
                 ForceContext = forceContext
                 Prefix = props.Prefix
                 RequestLineSlice = props.RequestLineSlice
+                SlicePending =
+                    line
+                    |> Option.exists (fun shown ->
+                        props.PendingLineSlices
+                        |> Array.exists (fun request -> request.Side = side && request.Line = shown.Number)
+                    )
             }
 
         let content =
@@ -586,6 +595,7 @@ type GitPagedDiffViewer =
             status: PagedDiffStatus,
             requestExpand: (string -> bool -> unit) option,
             requestLineSlice: (PagedDiffSide -> float -> float -> unit) option,
+            pendingLineSlices: PagedLineSliceRequest[],
             requestReplay: (string -> unit) option,
             requestNext: (unit -> unit) option
         ) =
@@ -852,6 +862,7 @@ type GitPagedDiffViewer =
                                                 Progress = progress
                                                 RequestExpand = requestExpand
                                                 RequestLineSlice = requestLineSlice
+                                                PendingLineSlices = pendingLineSlices
                                                 RequestReplay = requestReplay
                                                 RequestNext = requestNext
                                             }
@@ -943,13 +954,34 @@ type GitPagedDiffViewer =
         (
             prefix: string,
             side: PagedDiffSide,
+            sideTitle: string,
             candidates: PagedEncodingCandidate[],
             chooseEncoding: (PagedDiffSide -> string -> unit) option
         ) =
+        let sideName =
+            match side with
+            | PagedDiffSide.Previous -> "previous"
+            | PagedDiffSide.Current -> "current"
+
         Html.div [
             prop.testId $"{prefix}-state-encoding-choice"
             prop.className "swt:flex swt:min-h-0 swt:flex-1 swt:flex-col swt:gap-3 swt:p-4"
             prop.children [
+                Html.div [
+                    prop.testId $"{prefix}-encoding-side"
+                    prop.custom ("data-side", sideName)
+                    prop.className "swt:flex swt:min-w-0 swt:flex-col swt:gap-0.5"
+                    prop.children [
+                        Html.span [
+                            prop.className "swt:text-sm swt:font-semibold"
+                            prop.text $"Choose the encoding of the {sideName} version"
+                        ]
+                        Html.span [
+                            prop.className "swt:truncate swt:text-xs swt:text-base-content/60"
+                            prop.text sideTitle
+                        ]
+                    ]
+                ]
                 for candidate in candidates do
                     Html.div [
                         prop.className
@@ -996,6 +1028,7 @@ type GitPagedDiffViewer =
             ?requestNext: unit -> unit,
             ?requestExpand: (string -> bool -> unit),
             ?requestLineSlice: (PagedDiffSide -> float -> float -> unit),
+            ?pendingLineSlices: PagedLineSliceRequest[],
             ?requestReplay: (string -> unit),
             ?chooseEncoding: (PagedDiffSide -> string -> unit),
             ?previousTitle: string,
@@ -1064,7 +1097,12 @@ type GitPagedDiffViewer =
             | PagedDiffStatus.Scanning ->
                 GitPagedDiffViewer.ProgressState(prefix, GitPagedDiffDisplay.statusName status, progress, pending)
             | PagedDiffStatus.EncodingChoice(side, candidates) ->
-                GitPagedDiffViewer.EncodingState(prefix, side, candidates, chooseEncoding)
+                let sideTitle =
+                    match side with
+                    | PagedDiffSide.Previous -> previousTitle
+                    | PagedDiffSide.Current -> currentTitle
+
+                GitPagedDiffViewer.EncodingState(prefix, side, sideTitle, candidates, chooseEncoding)
             | PagedDiffStatus.Blocked(side, reason) ->
                 let sideText =
                     side
@@ -1109,6 +1147,7 @@ type GitPagedDiffViewer =
                         status,
                         requestExpand,
                         requestLineSlice,
+                        defaultArg pendingLineSlices [||],
                         requestReplay,
                         requestNext
                     )

@@ -96,6 +96,13 @@ type PagedPending = {
 
 type PagedEncodingCandidate = { Encoding: string; Preview: string }
 
+/// A line slice the viewer asked for that has not been answered yet.
+type PagedLineSliceRequest = {
+    Side: PagedDiffSide
+    Line: float
+    OffsetUtf16: float
+}
+
 type PagedDiffStatus =
     | Opening
     | Scanning

@@ -170,28 +170,43 @@ let rowCount (parts: PagedPart[]) =
         | PagedPart.EvictedPage(_, count) -> count
     )
 
-/// A slice that starts where the displayed text ends continues it. Any other slice replaces it.
+/// Merges a slice by its position in the line. The displayed text stays, and only the part of
+/// the slice beyond the displayed end is appended. A slice that ends within the displayed text
+/// adds nothing, and a slice that starts after the displayed end is dropped, since appending it
+/// would leave a hole in the text.
 let mergeSlice (displayed: PagedLine) (slice: PagedLine) : PagedLine =
     let displayedEnd = displayed.OffsetUtf16 + float displayed.Text.Length
+    let sliceEnd = slice.OffsetUtf16 + float slice.Text.Length
 
-    if slice.OffsetUtf16 = displayedEnd then
-        let shift = displayed.Text.Length
+    if slice.OffsetUtf16 > displayedEnd || sliceEnd <= displayedEnd then
+        displayed
+    else
+        // Number of slice characters the displayed text already holds.
+        let covered = int (displayedEnd - slice.OffsetUtf16)
+        let shift = displayed.Text.Length - covered
+
+        let appended =
+            slice.Highlights
+            |> Array.choose (fun highlight ->
+                let start = max highlight.Start covered
+                let length = highlight.Start + highlight.Length - start
+
+                if length > 0 then
+                    Some {
+                        highlight with
+                            Start = start + shift
+                            Length = length
+                    }
+                else
+                    None
+            )
 
         {
             displayed with
-                Text = displayed.Text + slice.Text
+                Text = displayed.Text + slice.Text.Substring covered
                 TotalUtf16 = slice.TotalUtf16 |> Option.orElse displayed.TotalUtf16
-                Highlights =
-                    Array.append
-                        displayed.Highlights
-                        (slice.Highlights
-                         |> Array.map (fun highlight -> {
-                             highlight with
-                                 Start = highlight.Start + shift
-                         }))
+                Highlights = Array.append displayed.Highlights appended
         }
-    else
-        slice
 
 let private mergeInLine (lineNumber: float) (slice: PagedLine) (current: PagedLine option) =
     match current with

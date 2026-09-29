@@ -6,6 +6,7 @@ import {
   PagedEncodingCandidate,
   PagedHighlight,
   PagedLine,
+  PagedLineSliceRequest,
   PagedPending,
   PagedPendingSide_Exhausted,
   PagedPendingSide_NoActiveLine,
@@ -623,6 +624,7 @@ export const PendingEncodingAndStates: Story = {
     await expect(canvas.getByTestId("git-paged-pending-endings-pending-current")).toHaveTextContent("End of file");
 
     await expect(canvas.getByTestId("git-paged-encoding-state-encoding-choice")).toBeInTheDocument();
+    await expect(canvas.getByTestId("git-paged-encoding-encoding-side")).toHaveAttribute("data-side", "current");
     await fireEvent.click(canvas.getByTestId("git-paged-encoding-encoding-choice-utf-8"));
     await expect(onChooseEncoding).toHaveBeenCalledWith("current", "utf-8");
 
@@ -637,6 +639,10 @@ export const PendingEncodingAndStates: Story = {
 
 function ControlStates() {
   const parts = [PagedPart_HiddenGap("busy-gap", range(4, 12), range(4, 12))];
+  const sliceParts = [
+    PagedPart_HunkRows("slice-hunk", range(12, PAGE_LIMIT), range(12, PAGE_LIMIT), true, true, makeAlignedRows(12, PAGE_LIMIT)),
+  ];
+  const pendingSlice = new PagedLineSliceRequest("current", 15, `Current source line 16: first slice`.length);
   return (
     <div className="swt:flex swt:flex-col swt:gap-4">
       <div style={{ height: "20rem" }}>
@@ -644,6 +650,9 @@ function ControlStates() {
       </div>
       <div style={{ height: "20rem" }}>
         <GitPagedDiffViewerComponent parts={parts} status={PagedDiffStatus_LoadingNext()} progress={new PagedProgress(40, 100, false)} hasMore={true} outputComplete={false} requestNext={() => {}} testIdPrefix="git-paged-loading" />
+      </div>
+      <div style={{ height: "20rem" }}>
+        <GitPagedDiffViewerComponent parts={sliceParts} status={PagedDiffStatus_Ready()} progress={new PagedProgress(100, 100, true)} hasMore={false} outputComplete={true} requestLineSlice={() => {}} pendingLineSlices={[pendingSlice]} testIdPrefix="git-paged-slice" />
       </div>
     </div>
   );
@@ -658,6 +667,7 @@ export const ActiveRequestsDisableControls: Story = {
     await expect(canvas.getByTestId("git-paged-loading-continue-button")).toBeDisabled();
     await expect(canvas.getByTestId("git-paged-loading-continue")).toHaveTextContent("40%");
     await expect(canvas.getByTestId("git-paged-loading-continue")).toHaveTextContent("40 B");
+    await expect(canvas.getByTestId("git-paged-slice-line-more-current-15")).toBeDisabled();
   },
 };
 

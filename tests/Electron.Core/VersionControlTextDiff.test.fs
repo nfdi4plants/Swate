@@ -659,6 +659,60 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "details lines are cut to 256 characters and 4 KiB in total, warnings to 4 KiB each",
+            fun () ->
+                let details =
+                    Array.append
+                        [| String.replicate 300 "d" |]
+                        (Array.init 20 (fun index -> $"{index:D2}" + String.replicate 248 "x"))
+
+                let failure = {
+                    failureWith "not text" "evidence" with
+                        Details = details
+                }
+
+                let outcome =
+                    match OperationResult.succeeded () with
+                    | Succeeded outcome -> {
+                        outcome with
+                            Warnings = [|
+                                {
+                                    Code = "long_warning"
+                                    Message = String.replicate 5000 "w"
+                                }
+                            |]
+                      }
+                    | other -> failwith $"Expected a success, got {other}"
+
+                let mapped, mappedFailure =
+                    match Mappings.textDiffResult id (PartiallySucceeded(outcome, failure)) with
+                    | OperationResultDto.PartiallySucceeded(mapped, mappedFailure) -> mapped, mappedFailure
+                    | other -> failwith $"Expected a partial success, got {other}"
+
+                Vitest.expect(mappedFailure.Details.Length).toBe 16
+                Vitest.expect(mappedFailure.Details[0]).toBe (String.replicate 256 "d")
+
+                Vitest
+                    .expect(
+                        mappedFailure.Details
+                        |> Array.forall (fun line -> line.Length <= Mappings.MaxTextDiffDetailLength)
+                    )
+                    .toBe
+                    true
+
+                Vitest.expect(mappedFailure.Details |> Array.sumBy utf8Bytes).toBeLessThanOrEqual
+                    Mappings.MaxTextDiffDetailsBytes
+
+                Vitest.expect(mappedFailure.Details[1..]).toEqual details[1..15]
+
+                Vitest.expect(mapped.Warnings |> Array.map _.Message.Length).toEqual [|
+                    Mappings.MaxTextDiffWarningBytes
+                |]
+
+                Vitest.expect(mapped.Warnings |> Array.map _.Code).toEqual [| "long_warning" |]
+        )
+
+        Vitest.test (
             "operation ids and handle ids longer than 128 characters are rejected",
             fun () ->
                 let atLimit = String.replicate 128 "a"

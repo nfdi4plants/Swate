@@ -752,6 +752,234 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "An expansion during a running next page request neither repeats the request nor adds its page twice",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let! state = openFirstPage fake (diffPage "p1" (Some "cursor-1") [| hunk "h1"; gap "g1" |])
+                let generation = (diffOf state).Generation
+                fake.ReadReply <- fun _ -> succeeded (ResumablePageDto.Ready(diffPage "p2" None [| hunk "h2" |]))
+
+                fake.ExpandReply <-
+                    fun _ ->
+                        succeeded (
+                            ResumablePartsDto.Ready [|
+                                DiffPartDto.ExpandedContext("g1", [| changedRow "e1" |])
+                            |]
+                        )
+
+                let step msg state =
+                    update fake.Dependencies fake.SetPageState (diffMsg msg) state
+
+                let loading, loadCmd = step (GitDiffMsg.LoadNext generation) state
+                let expanding, expandCmd = step (GitDiffMsg.Expand(generation, "g1", true)) loading
+                let again, againCmd = step (GitDiffMsg.LoadNext generation) expanding
+
+                let! pageMessages = collectMessages loadCmd
+                let! expandMessages = collectMessages expandCmd
+                let! repeatedMessages = collectMessages againCmd
+                let current = ref again
+
+                // The page answer is delivered twice, as if the same cursor had been read twice.
+                for message in
+                    Array.concat [
+                        pageMessages
+                        repeatedMessages
+                        pageMessages
+                        expandMessages
+                    ] do
+                    let! next = run fake message current.Value
+                    current.Value <- next
+
+                let page = diffOf current.Value
+
+                Vitest.expect(fake.Reads.Count).toBe (1)
+                Vitest.expect(page.Pages |> Array.map _.PageId).toEqual ([| "p1"; "p2" |])
+                Vitest.expect(pageParts page.Pages.[0]).toEqual ([| "hunk:h1"; "expanded:g1:1" |])
+                Vitest.expect(page.NextRequest).toEqual (None)
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+            }
+        )
+
+        Vitest.test (
+            "A repeated line slice request is sent once, and an overlapping answer appends only the text beyond the displayed end",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                let sliceLine (offset: string) (text: string) (total: string option) highlights : DiffLineDto = {
+                    Number = "0"
+                    Ending = LineEndingDto.LF
+                    Slice = {
+                        OffsetUtf16 = offset
+                        TotalUtf16 = total
+                        Text = text
+                        Highlights = highlights
+                    }
+                }
+
+                let longRow = {
+                    changedRow "r1" with
+                        Current = Some(sliceLine "0" "abc" None [||])
+                }
+
+                let! state = openFirstPage fake (diffPage "p1" None [| hunkWith "h1" [| longRow |] |])
+                let generation = (diffOf state).Generation
+                fake.LineReply <- fun _ -> succeeded (ResumableLineDto.Ready(sliceLine "3" "def" None [||]))
+
+                let request =
+                    diffMsg (GitDiffMsg.LoadLineSlice(generation, DiffSideDto.Current, 0.0, 3.0))
+
+                let first, firstCmd = update fake.Dependencies fake.SetPageState request state
+                let second, secondCmd = update fake.Dependencies fake.SetPageState request first
+                let! messages = collectMessages (Cmd.batch [ firstCmd; secondCmd ])
+
+                Vitest.expect(fake.Lines.Count).toBe (1)
+                Vitest.expect((diffOf second).PendingLineSlices.Length).toBe (1)
+
+                let current = ref second
+
+                for message in messages do
+                    let! next = run fake message current.Value
+                    current.Value <- next
+
+                let answer line =
+                    diffMsg (
+                        GitDiffMsg.LineCompleted(
+                            generation,
+                            fake.Lines.[0],
+                            Ok(succeeded (ResumableLineDto.Ready line))
+                        )
+                    )
+
+                let overlapping =
+                    sliceLine "3" "defghi" (Some "9") [|
+                        {
+                            Start = 4
+                            Length = 2
+                            Kind = HighlightKindDto.ChangedText
+                        }
+                    |]
+
+                let! state = run fake (answer overlapping) current.Value
+                let! state = run fake (answer (sliceLine "0" "abc" (Some "9") [||])) state
+                let line = currentLine (diffOf state)
+
+                Vitest.expect(line.Text).toBe ("abcdefghi")
+                Vitest.expect(line.TotalUtf16).toEqual (Some 9.0)
+
+                Vitest
+                    .expect(
+                        line.Highlights
+                        |> Array.map (fun highlight -> highlight.Start, highlight.Length)
+                    )
+                    .toEqual ([| 7, 2 |])
+
+                Vitest.expect((diffOf state).PendingLineSlices).toEqual ([])
+            }
+        )
+
+        Vitest.test (
+            "A Scanning open answer that arrives after the user left the diff is abandoned once",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                fake.OpenReply <-
+                    fun request ->
+                        match request.Continuation with
+                        | None -> succeeded (ResumableOpenDto.Scanning(progress false, "open-continuation", None))
+                        | Some _ -> failedWith "operation_canceled" None
+
+                let opening, openCmd =
+                    update fake.Dependencies fake.SetPageState (select "a.txt") runningState
+
+                let! left = run fake (diffMsg (GitDiffMsg.PageStateObserved(Some(PageState.TextPage "notes")))) opening
+                let! lateMessages = collectMessages openCmd
+                let current = ref left
+
+                for message in lateMessages do
+                    let! next = run fake message current.Value
+                    current.Value <- next
+
+                let abandons =
+                    fake.Opens
+                    |> Seq.filter (fun request -> request.Continuation = Some "open-continuation")
+                    |> Seq.toArray
+
+                Vitest.expect(abandons.Length).toBe (1)
+
+                Vitest
+                    .expect(
+                        {
+                            abandons.[0] with
+                                OperationId = ""
+                                Continuation = None
+                        }
+                    )
+                    .toEqual ({ fake.Opens.[0] with OperationId = "" })
+
+                Vitest
+                    .expect(
+                        fake.Cancels
+                        |> Seq.filter (fun id -> id = abandons.[0].OperationId)
+                        |> Seq.length
+                    )
+                    .toBe (1)
+
+                Vitest.expect(current.Value.DiffPage).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "Expansions on one page stay within 8 MiB by collapsing the least recently expanded gap, which expands again",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let gaps = [| for index in 1..5 -> gap $"g{index}" |]
+                let! state = openFirstPage fake (diffPage "p1" None (Array.append [| hunk "h1" |] gaps))
+                let generation = (diffOf state).Generation
+                let bigText = String.replicate (2 * 1024 * 1024) "x"
+
+                fake.ExpandReply <-
+                    fun request ->
+                        let row = {
+                            changedRow $"{request.GapId}-row" with
+                                Current = Some(textLine 0 bigText)
+                        }
+
+                        succeeded (ResumablePartsDto.Ready [| DiffPartDto.ExpandedContext(request.GapId, [| row |]) |])
+
+                let loadedBytes (page: GitDiffPageData) =
+                    page.Pages
+                    |> Array.filter (fun windowPage -> not windowPage.IsEvicted)
+                    |> Array.sumBy _.PayloadBytes
+
+                let current = ref state
+
+                for gapId in [ "g1"; "g2"; "g3"; "g4"; "g5"; "g1" ] do
+                    let! next = run fake (diffMsg (GitDiffMsg.Expand(generation, gapId, true))) current.Value
+                    current.Value <- next
+                    Vitest.expect(loadedBytes (diffOf next)).toBeLessThanOrEqual (GitDiffPageLoader.MaxLoadedBytes)
+
+                let page = diffOf current.Value
+
+                Vitest
+                    .expect(fake.Expands |> Seq.map _.GapId |> Seq.toArray)
+                    .toEqual ([| "g1"; "g2"; "g3"; "g4"; "g5"; "g1" |])
+
+                Vitest
+                    .expect(pageParts page.Pages.[0])
+                    .toEqual (
+                        [|
+                            "hunk:h1"
+                            "expanded:g1:1"
+                            "gap:g2"
+                            "gap:g3"
+                            "expanded:g4:1"
+                            "expanded:g5:1"
+                        |]
+                    )
+            }
+        )
+
+        Vitest.test (
             "No changes is shown only when the scan and the output are complete and no hunk exists",
             fun () -> promise {
                 let fake = FakeDiffClient()

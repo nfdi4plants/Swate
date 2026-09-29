@@ -67,6 +67,18 @@ type GitDiffPageStatus =
     | Closed
     | Failed of message: string
 
+/// A gap of a page that was expanded. Collapsing puts the gap back with its original id and
+/// ranges, and expanding it again returns the result the library recorded.
+type GitDiffExpandedGap = {
+    GapId: string
+    Previous: PagedRange
+    Current: PagedRange
+    /// The gap itself and every gap its expansions returned.
+    GapIds: string list
+    /// JSON length of the expansion results and of the line slices merged into their rows.
+    PayloadBytes: float
+}
+
 /// One page of the loaded window. Parts are already mapped for the viewer, so a part keeps
 /// its identity across renders. An evicted page holds a single placeholder part.
 type GitDiffWindowPage = {
@@ -76,7 +88,12 @@ type GitDiffWindowPage = {
     /// JSON length of the DTOs this page was built from, including expanded context and line slices.
     PayloadBytes: float
     IsEvicted: bool
+    /// Expanded gaps of this page, the least recently expanded first.
+    ExpandedGaps: GitDiffExpandedGap list
 }
+
+/// The running request for the page after the last loaded one.
+type GitDiffNextRequest = { Cursor: string; OperationId: string }
 
 /// A paged text diff of one changed file. Generation is the page load request id of the
 /// selection that opened it, so responses for an older selection can be recognized.
@@ -91,6 +108,10 @@ type GitDiffPageData = {
     /// The page the user asked for last. Eviction drops the pages farthest from it.
     RequestedPageIndex: int
     NextCursor: string option
+    /// Set while a next page is loading, so the same cursor is not requested twice.
+    NextRequest: GitDiffNextRequest option
+    /// Line slices requested and not answered yet.
+    PendingLineSlices: PagedLineSliceRequest list
     Progress: ScanProgressDto option
     Pending: PendingPreviewDto option
     OutputComplete: bool

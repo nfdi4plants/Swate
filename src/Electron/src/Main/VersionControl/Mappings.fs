@@ -294,6 +294,18 @@ let MaxTextDiffMessageBytes = 4096
 [<Literal>]
 let MaxDiffEvidenceLength = 256
 
+/// The longest failure Details line, in UTF-16 code units, a text diff reply carries.
+[<Literal>]
+let MaxTextDiffDetailLength = 256
+
+/// The largest sum of failure Details lines, in UTF-8 bytes, a text diff reply carries.
+[<Literal>]
+let MaxTextDiffDetailsBytes = 4096
+
+/// The largest warning message, in UTF-8 bytes, a text diff reply carries.
+[<Literal>]
+let MaxTextDiffWarningBytes = 4096
+
 let private int64Text (value: int64) : string = string value
 
 let diffHandle (handle: DiffHandle) : DiffHandleDto = {
@@ -543,11 +555,69 @@ let private truncateUtf16 (maxUnits: int) (text: string) : string =
     else
         text.Substring(0, maxUnits)
 
+/// UTF-8 length of the text. A lone surrogate counts as the 3 bytes of its replacement character.
+let private utf8Length (text: string) =
+    if isNull text then
+        0
+    else
+        let mutable bytes = 0
+        let mutable index = 0
+
+        while index < text.Length do
+            let character = text[index]
+
+            if
+                isHighSurrogate character
+                && index + 1 < text.Length
+                && isLowSurrogate text[index + 1]
+            then
+                bytes <- bytes + 4
+                index <- index + 2
+            else
+                bytes <-
+                    bytes
+                    + (if int character < 0x80 then 1
+                       elif int character < 0x800 then 2
+                       else 3)
+
+                index <- index + 1
+
+        bytes
+
+/// Cuts every line to MaxTextDiffDetailLength and keeps lines while their UTF-8 sum stays
+/// within MaxTextDiffDetailsBytes. The first line that does not fit and all later lines are dropped.
+let private boundDetails (details: string[]) : string[] =
+    if isNull details then
+        details
+    else
+        let lines = details |> Array.map (truncateUtf16 MaxTextDiffDetailLength)
+
+        let sums =
+            lines |> Array.scan (fun total line -> total + utf8Length line) 0 |> Array.tail
+
+        let kept =
+            sums
+            |> Array.takeWhile (fun total -> total <= MaxTextDiffDetailsBytes)
+            |> Array.length
+
+        Array.truncate kept lines
+
+let private boundWarnings (warnings: OperationWarningDto[]) : OperationWarningDto[] =
+    if isNull warnings then
+        warnings
+    else
+        warnings
+        |> Array.map (fun warning -> {
+            warning with
+                Message = truncateUtf8 MaxTextDiffWarningBytes warning.Message
+        })
+
 /// Bounds the variable text of a text diff failure before it crosses IPC. The other
 /// fields pass unchanged.
 let boundTextDiffFailure (failure: OperationFailureDto) : OperationFailureDto = {
     failure with
         Message = truncateUtf8 MaxTextDiffMessageBytes failure.Message
+        Details = boundDetails failure.Details
         DiffDetail =
             failure.DiffDetail
             |> Option.map (fun detail -> {
@@ -557,10 +627,15 @@ let boundTextDiffFailure (failure: OperationFailureDto) : OperationFailureDto = 
 }
 
 let boundTextDiffResult (result: OperationResultDto<'T>) : OperationResultDto<'T> =
+    let boundOutcome (outcome: OperationOutcomeDto<'T>) = {
+        outcome with
+            Warnings = boundWarnings outcome.Warnings
+    }
+
     match result with
-    | OperationResultDto.Succeeded _ -> result
+    | OperationResultDto.Succeeded outcome -> OperationResultDto.Succeeded(boundOutcome outcome)
     | OperationResultDto.PartiallySucceeded(outcome, failure) ->
-        OperationResultDto.PartiallySucceeded(outcome, boundTextDiffFailure failure)
+        OperationResultDto.PartiallySucceeded(boundOutcome outcome, boundTextDiffFailure failure)
     | OperationResultDto.Failed failure -> OperationResultDto.Failed(boundTextDiffFailure failure)
 
 /// Maps a text diff result and bounds its failure text for the IPC reply.

@@ -1454,6 +1454,8 @@ module GitDiffPageLoader =
             Pages = [||]
             RequestedPageIndex = 0
             NextCursor = None
+            NextRequest = None
+            PendingLineSlices = []
             Progress = None
             Pending = None
             OutputComplete = false
@@ -1476,10 +1478,48 @@ module GitDiffPageLoader =
                 RowCount = rowCount
                 PayloadBytes = 0.0
                 IsEvicted = true
+                ExpandedGaps = []
         }
+
+    /// Puts the least recently expanded gap of the page back as one hidden gap with its original
+    /// id and ranges. Every part its expansions produced is dropped with it.
+    let private collapseOldestGap (windowPage: GitDiffWindowPage) =
+        match windowPage.ExpandedGaps with
+        | [] -> windowPage
+        | oldest :: rest ->
+            let producedBy part =
+                match part with
+                | Paged.PagedPart.ExpandedRows(gapId, _)
+                | Paged.PagedPart.HiddenGap(gapId, _, _) -> oldest.GapIds |> List.contains gapId
+                | _ -> false
+
+            let restored =
+                Paged.PagedPart.HiddenGap(oldest.GapId, oldest.Previous, oldest.Current)
+
+            let parts =
+                match windowPage.Parts |> Array.tryFindIndex producedBy with
+                | None -> windowPage.Parts
+                | Some first ->
+                    windowPage.Parts
+                    |> Array.indexed
+                    |> Array.choose (fun (index, part) ->
+                        if index = first then Some restored
+                        elif producedBy part then None
+                        else Some part
+                    )
+
+            {
+                windowPage with
+                    Parts = parts
+                    RowCount = Presentation.rowCount parts
+                    PayloadBytes = windowPage.PayloadBytes - oldest.PayloadBytes
+                    ExpandedGaps = rest
+            }
 
     /// Replaces the loaded pages farthest from the requested page by placeholders until the
     /// window holds at most MaxLoadedPages pages and MaxLoadedBytes. The requested page stays.
+    /// When the requested page alone still exceeds MaxLoadedBytes, its least recently expanded
+    /// gaps collapse. The most recent expansion stays, since the user just asked for it.
     let evict (page: GitDiffPageData) : GitDiffPageData =
         let anchor = page.RequestedPageIndex
 
@@ -1505,7 +1545,35 @@ module GitDiffPageLoader =
             else
                 pages
 
-        { page with Pages = loop page.Pages }
+        let pages = loop page.Pages
+
+        let otherBytes =
+            pages
+            |> Array.indexed
+            |> Array.sumBy (fun (index, windowPage) ->
+                if index = anchor || windowPage.IsEvicted then
+                    0.0
+                else
+                    windowPage.PayloadBytes
+            )
+
+        let rec collapse (windowPage: GitDiffWindowPage) =
+            if
+                not windowPage.IsEvicted
+                && otherBytes + windowPage.PayloadBytes > MaxLoadedBytes
+                && windowPage.ExpandedGaps.Length > 1
+            then
+                collapse (collapseOldestGap windowPage)
+            else
+                windowPage
+
+        let pages =
+            if anchor >= 0 && anchor < pages.Length then
+                pages |> Array.updateAt anchor (collapse pages.[anchor])
+            else
+                pages
+
+        { page with Pages = pages }
 
     let private windowPage (dto: DiffPageDto) : GitDiffWindowPage =
         let parts = dto.Parts |> Array.map Presentation.part
@@ -1516,12 +1584,15 @@ module GitDiffPageLoader =
             RowCount = Presentation.rowCount parts
             PayloadBytes = payloadBytes dto
             IsEvicted = false
+            ExpandedGaps = []
         }
 
+    /// Requests the page at the cursor, unless that cursor is already being read.
     let private readPage (deps: GitDependencies) (page: GitDiffPageData) (cursor: string) =
-        match page.Handle with
-        | None -> page, Cmd.none
-        | Some handle ->
+        match page.Handle, page.NextRequest with
+        | None, _ -> page, Cmd.none
+        | Some _, Some running when running.Cursor = cursor -> page, Cmd.none
+        | Some handle, _ ->
             let request: ReadTextDiffPageRequestDto = {
                 OperationId = deps.newOperationId ()
                 HandleId = handle.Id
@@ -1529,16 +1600,30 @@ module GitDiffPageLoader =
                 Cursor = cursor
             }
 
-            track request.OperationId page,
+            track request.OperationId {
+                page with
+                    NextRequest =
+                        Some {
+                            Cursor = cursor
+                            OperationId = request.OperationId
+                        }
+            },
             send
                 deps.textDiff.readTextDiffPage
                 request
                 (fun request result -> GitDiffMsg.PageCompleted(page.Generation, request, result))
 
-    /// A Ready page joins the window. A Scanning result keeps its continuation as the cursor
-    /// and asks for the page again with it.
+    /// A Ready page joins the window once. A page id that is already in the window is ignored.
+    /// A Scanning result keeps its continuation as the cursor and asks for the page again with it.
     let private applyResumablePage (deps: GitDependencies) (page: GitDiffPageData) (result: ResumablePageDto) =
         match result with
+        | ResumablePageDto.Ready dto when page.Pages |> Array.exists (fun windowPage -> windowPage.PageId = dto.PageId) ->
+            let status =
+                match page.Status with
+                | GitDiffPageStatus.LoadingNext when page.NextRequest.IsNone -> GitDiffPageStatus.Ready
+                | status -> status
+
+            { page with Status = status }, Cmd.none
         | ResumablePageDto.Ready dto ->
             let pages = Array.append page.Pages [| windowPage dto |]
 
@@ -1560,10 +1645,10 @@ module GitDiffPageLoader =
             Cmd.none
         | ResumablePageDto.Scanning(progress, continuation, pending) ->
             let status =
-                if page.Pages.Length = 0 then
-                    GitDiffPageStatus.Scanning
-                else
-                    GitDiffPageStatus.LoadingNext
+                match page.Status with
+                | _ when page.Pages.Length = 0 -> GitDiffPageStatus.Scanning
+                | GitDiffPageStatus.Expanding _ -> page.Status
+                | _ -> GitDiffPageStatus.LoadingNext
 
             readPage
                 deps
@@ -1588,22 +1673,63 @@ module GitDiffPageLoader =
         )
 
     /// Puts the expanded parts where the gap was. A gap on a page evicted in the meantime is left alone.
+    /// The expansion is recorded with the gap the page first showed, so it can be collapsed again.
     let private replaceGap (gapId: string) (parts: DiffPartDto[]) (page: GitDiffPageData) =
         match pageIndexOfGap gapId page with
         | None -> page
         | Some index ->
             let windowPage = page.Pages.[index]
             let mapped = parts |> Array.map Presentation.part
+            let bytes = payloadBytes parts
 
             let replaced =
                 windowPage.Parts
                 |> Array.collect (fun part -> if isGap gapId part then mapped else [| part |])
 
+            let producedGaps =
+                mapped
+                |> Array.choose (
+                    function
+                    | Paged.PagedPart.HiddenGap(id, _, _) -> Some id
+                    | _ -> None
+                )
+                |> List.ofArray
+
+            let touched, others =
+                windowPage.ExpandedGaps
+                |> List.partition (fun expanded -> expanded.GapIds |> List.contains gapId)
+
+            let expandedGap =
+                match touched with
+                | expanded :: _ -> {
+                    expanded with
+                        GapIds = expanded.GapIds @ producedGaps
+                        PayloadBytes = expanded.PayloadBytes + bytes
+                  }
+                | [] ->
+                    let previous, current =
+                        windowPage.Parts
+                        |> Array.pick (
+                            function
+                            | Paged.PagedPart.HiddenGap(id, previous, current) when id = gapId ->
+                                Some(previous, current)
+                            | _ -> None
+                        )
+
+                    {
+                        GapId = gapId
+                        Previous = previous
+                        Current = current
+                        GapIds = gapId :: producedGaps
+                        PayloadBytes = bytes
+                    }
+
             let updated = {
                 windowPage with
                     Parts = replaced
                     RowCount = Presentation.rowCount replaced
-                    PayloadBytes = windowPage.PayloadBytes + payloadBytes parts
+                    PayloadBytes = windowPage.PayloadBytes + bytes
+                    ExpandedGaps = others @ [ expandedGap ]
             }
 
             {
@@ -1632,11 +1758,34 @@ module GitDiffPageLoader =
                             | None -> part, false
                         )
 
+                    // Bytes merged into expanded rows leave the page with their gap when it collapses.
+                    let mergedGapIds =
+                        parts
+                        |> Array.choose (
+                            function
+                            | Paged.PagedPart.ExpandedRows(gapId, _), true -> Some gapId
+                            | _ -> None
+                        )
+
                     if parts |> Array.exists snd then
                         {
                             windowPage with
                                 Parts = parts |> Array.map fst
                                 PayloadBytes = windowPage.PayloadBytes + bytes
+                                ExpandedGaps =
+                                    windowPage.ExpandedGaps
+                                    |> List.map (fun expanded ->
+                                        if
+                                            mergedGapIds
+                                            |> Array.exists (fun gapId -> expanded.GapIds |> List.contains gapId)
+                                        then
+                                            {
+                                                expanded with
+                                                    PayloadBytes = expanded.PayloadBytes + bytes
+                                            }
+                                        else
+                                            expanded
+                                    )
                         },
                         true
                     else
@@ -1661,12 +1810,39 @@ module GitDiffPageLoader =
                 RequestedPageIndex = index
           }
 
-    let private closeArrivedHandleCmd
+    /// The library keeps the worker session of a Scanning Open until its continuation is used.
+    /// Reopening with the continuation and canceling that operation at once releases the session.
+    let private abandonOpenCmd
         (deps: GitDependencies)
+        (request: OpenTextDiffRequestDto)
+        (continuation: string)
+        : Cmd<Msg> =
+        [
+            fun _ ->
+                let operationId = deps.newOperationId ()
+
+                deps.textDiff.openTextDiff {
+                    request with
+                        OperationId = operationId
+                        Continuation = Some continuation
+                }
+                |> Promise.catch (fun error -> Error error.Message)
+                |> Promise.start
+
+                deps.cancelOperation { OperationId = operationId }
+                |> Promise.catch (fun error -> Error error.Message)
+                |> Promise.start
+        ]
+
+    /// Releases what an Open answer holds when its page was left or replaced.
+    let private releaseArrivedOpenCmd
+        (deps: GitDependencies)
+        (request: OpenTextDiffRequestDto)
         (result: Result<OperationResultDto<ResumableOpenDto>, string>)
         =
         match valueOf result with
         | Ok(ResumableOpenDto.Ready(OpenDiffResultDto.Opened(handle, _, _, _))) -> closeHandleCmd deps handle
+        | Ok(ResumableOpenDto.Scanning(_, continuation, _)) -> abandonOpenCmd deps request continuation
         | _ -> Cmd.none
 
     let private generationOf (msg: GitDiffMsg) =
@@ -1691,15 +1867,15 @@ module GitDiffPageLoader =
         match msg with
         | GitDiffMsg.PageStateObserved _ -> page, Cmd.none
         | GitDiffMsg.LoadNext _ ->
-            match page.Status, page.NextCursor with
-            | (GitDiffPageStatus.Ready | GitDiffPageStatus.Expanding _), Some cursor ->
-                readPage
-                    deps
-                    {
-                        page with
-                            Status = GitDiffPageStatus.LoadingNext
-                    }
-                    cursor
+            match page.Status, page.NextCursor, page.NextRequest with
+            | (GitDiffPageStatus.Ready | GitDiffPageStatus.Expanding _), Some cursor, None ->
+                // A running expansion keeps its status, so its gap controls stay disabled.
+                let status =
+                    match page.Status with
+                    | GitDiffPageStatus.Expanding _ -> page.Status
+                    | _ -> GitDiffPageStatus.LoadingNext
+
+                readPage deps { page with Status = status } cursor
             | _ -> page, Cmd.none
         | GitDiffMsg.Expand(_, gapId, fromStart) ->
             match handleRequest (), pageIndexOfGap gapId page with
@@ -1725,8 +1901,14 @@ module GitDiffPageLoader =
                     (fun request result -> GitDiffMsg.ExpandCompleted(page.Generation, request, result))
             | _ -> page, Cmd.none
         | GitDiffMsg.LoadLineSlice(_, side, line, offsetUtf16) ->
+            let slice: Paged.PagedLineSliceRequest = {
+                Side = Presentation.side side
+                Line = line
+                OffsetUtf16 = offsetUtf16
+            }
+
             match handleRequest () with
-            | Some handle ->
+            | Some handle when not (page.PendingLineSlices |> List.contains slice) ->
                 let request: ReadTextDiffLineRequestDto = {
                     OperationId = deps.newOperationId ()
                     HandleId = handle.Id
@@ -1738,12 +1920,15 @@ module GitDiffPageLoader =
                     Continuation = None
                 }
 
-                track request.OperationId page,
+                track request.OperationId {
+                    page with
+                        PendingLineSlices = slice :: page.PendingLineSlices
+                },
                 send
                     deps.textDiff.readTextDiffLine
                     request
                     (fun request result -> GitDiffMsg.LineCompleted(page.Generation, request, result))
-            | None -> page, Cmd.none
+            | _ -> page, Cmd.none
         | GitDiffMsg.Replay(_, pageId) ->
             let isEvicted =
                 page.Pages
@@ -1830,6 +2015,11 @@ module GitDiffPageLoader =
         | GitDiffMsg.PageCompleted(_, request, result) ->
             let page = finish request.OperationId page
 
+            let page =
+                match page.NextRequest with
+                | Some running when running.OperationId = request.OperationId -> { page with NextRequest = None }
+                | _ -> page
+
             if isSettled page.Status then
                 page, Cmd.none
             else
@@ -1868,7 +2058,11 @@ module GitDiffPageLoader =
                 | Ok(ResumablePartsDto.Ready parts) ->
                     let status =
                         match page.Status with
-                        | GitDiffPageStatus.Expanding gapId when gapId = request.GapId -> GitDiffPageStatus.Ready
+                        | GitDiffPageStatus.Expanding gapId when gapId = request.GapId ->
+                            if page.NextRequest.IsSome then
+                                GitDiffPageStatus.LoadingNext
+                            else
+                                GitDiffPageStatus.Ready
                         | status -> status
 
                     evict {
@@ -1879,11 +2073,23 @@ module GitDiffPageLoader =
         | GitDiffMsg.LineCompleted(_, request, result) ->
             let page = finish request.OperationId page
 
+            let answered () =
+                let slice: Paged.PagedLineSliceRequest = {
+                    Side = Presentation.side request.Side
+                    Line = Presentation.number request.Line
+                    OffsetUtf16 = Presentation.number request.OffsetUtf16
+                }
+
+                {
+                    page with
+                        PendingLineSlices = page.PendingLineSlices |> List.filter (fun pending -> pending <> slice)
+                }
+
             if isSettled page.Status then
-                page, Cmd.none
+                answered (), Cmd.none
             else
                 match valueOf result with
-                | Error status -> { page with Status = status }, Cmd.none
+                | Error status -> { answered () with Status = status }, Cmd.none
                 | Ok(ResumableLineDto.Scanning(progress, continuation, _)) ->
                     let next = {
                         request with
@@ -1896,7 +2102,7 @@ module GitDiffPageLoader =
                         deps.textDiff.readTextDiffLine
                         next
                         (fun request result -> GitDiffMsg.LineCompleted(page.Generation, request, result))
-                | Ok(ResumableLineDto.Ready lineDto) -> evict (mergeLine request.Side lineDto page), Cmd.none
+                | Ok(ResumableLineDto.Ready lineDto) -> evict (mergeLine request.Side lineDto (answered ())), Cmd.none
 
     /// Leaving the diff only drops the page here. The workflow's update closes the handle of
     /// any diff page that disappears or is replaced.
@@ -1913,7 +2119,7 @@ module GitDiffPageLoader =
             let next, cmd = updatePage deps msg page
 
             { model with DiffPage = Some next }, Cmd.batch [ publishCmd setPageState next; cmd ]
-        | GitDiffMsg.OpenCompleted(_, _, result), _ -> model, closeArrivedHandleCmd deps result
+        | GitDiffMsg.OpenCompleted(_, request, result), _ -> model, releaseArrivedOpenCmd deps request result
         | _ -> model, Cmd.none
 
 let private conflictSessionConfirmationDialog (overlappingPaths: string[]) : GitSidebarConfirmationDialog =
