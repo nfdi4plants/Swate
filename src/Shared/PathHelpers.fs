@@ -384,6 +384,15 @@ module ArcEntityPathRules =
             isGenericFileSystemTargetAllowed normalizedRelativePath
         | _ -> false
 
+    /// The path that a delete of `relativePath` removes from disk. Deleting a canonical entity
+    /// workbook removes the whole entity folder, so the scope of the workbook is its parent folder.
+    let deleteScopePath (relativePath: string) =
+        match classifyDeleteTarget relativePath with
+        | DeletePathClassification.CanonicalFileTarget(CanonicalArcFileTarget.EntityFile _, normalizedRelativePath) ->
+            PathHelpers.tryGetParentPath normalizedRelativePath
+            |> Option.defaultValue normalizedRelativePath
+        | _ -> normalizeRelativePath relativePath
+
     let private canonicalEntityFilePath zone identifier =
         let zoneFolder = zoneFolderName zone
         let entityFileName = zoneEntityFileName zone

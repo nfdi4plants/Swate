@@ -122,6 +122,16 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "ignores LFS backup paths while accepting regular files",
+            fun () ->
+                let guidSuffix = String.replicate 32 "a"
+                let backupPath = $"C:/arc/data.bin.vcs-lfs-backup-{guidSuffix}"
+
+                Vitest.expect(Main.ArcVaultHelper.isFileWatcherPathIgnored backupPath).toBe (true)
+                Vitest.expect(Main.ArcVaultHelper.isFileWatcherPathIgnored "C:/arc/data.bin").toBe (false)
+        )
+
+        Vitest.test (
             "checks whether relative files and directories exist",
             fun () ->
                 withAssayArc (fun arcPath -> promise {

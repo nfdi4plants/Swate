@@ -1224,6 +1224,43 @@ module GitDiffPageLoader =
     let private unsupportedPage (path: string) (reason: string option) =
         Ok(PageState.GitUnsupportedPage { Path = path; Reason = reason })
 
+    let private lfsPointerVersionLine = "version https://git-lfs.github.com/spec/v1"
+
+    let private lfsPointerOidPattern =
+        System.Text.RegularExpressions.Regex("^oid sha256:[0-9a-f]{64}$")
+
+    let private lfsPointerSizePattern =
+        System.Text.RegularExpressions.Regex("^size [0-9]+$")
+
+    let private lfsPointerExtensionPattern =
+        // git-lfs checks only that an extension key starts with ext-<digit>-<word character>.
+        System.Text.RegularExpressions.Regex(@"^ext-[0-9]+-\w\S* .+$")
+
+    /// True when the text is a Git LFS pointer file: the version line first, then one oid line and
+    /// one size line, with optional `ext-` lines. The provider returns the pointer as the base
+    /// content when it does not read the previous version's object, for example because the object
+    /// is missing locally or exceeds the provider's base diff size limit.
+    let isLfsPointerText (text: string) =
+        // Git LFS never writes a pointer of 1024 bytes or more.
+        if isNull text || text.Length >= 1024 then
+            false
+        else
+            let lines = text.Replace("\r\n", "\n").TrimEnd('\n').Split('\n')
+
+            match List.ofArray lines with
+            | version :: rest when version = lfsPointerVersionLine ->
+                let oidLines = rest |> List.filter lfsPointerOidPattern.IsMatch
+                let sizeLines = rest |> List.filter lfsPointerSizePattern.IsMatch
+                let extensionLines = rest |> List.filter lfsPointerExtensionPattern.IsMatch
+
+                oidLines.Length = 1
+                && sizeLines.Length = 1
+                && oidLines.Length + sizeLines.Length + extensionLines.Length = rest.Length
+            | _ -> false
+
+    let private lfsPointerBaseReason (path: string) =
+        Some $"The previous version of the Git LFS file '{path}' cannot be shown here."
+
     let private contentOf (result: Result<OperationResultDto<ContentViewDto>, string>) =
         match result with
         | Error message -> Error message
@@ -1247,16 +1284,6 @@ module GitDiffPageLoader =
             let requestedPath = change.Path
             let isDeleted = change.IndexStatus = "D" || change.WorkingTreeStatus = "D"
             let! baseContent = getBaseContent requestedPath
-            let! wordDiff = getWordDiff requestedPath
-
-            let! currentContent =
-                if isDeleted then
-                    promise { return Ok None }
-                else
-                    promise {
-                        let! content = readCurrentContent requestedPath
-                        return content |> Result.map Some
-                    }
 
             let baseView =
                 match baseContent with
@@ -1264,36 +1291,68 @@ module GitDiffPageLoader =
                     Ok None
                 | other -> contentOf other |> Result.map Some
 
-            match baseView, contentOf wordDiff with
-            | Error message, _
-            | _, Error message -> return Error message
-            | Ok(Some(ContentViewDto.Unsupported reason)), _
-            | _, Ok(ContentViewDto.Unsupported reason) -> return unsupportedPage requestedPath reason
-            | Ok previous, Ok(ContentViewDto.Text wordDiffText) ->
-                let previousText =
-                    match previous with
-                    | Some(ContentViewDto.Text text) -> Some text
-                    | _ -> None
+            // A pointer as the base means the provider did not read the previous version's object.
+            // Comparing the pointer text with the current bytes would show a false diff, so the loader opens the unsupported page.
+            let baseUnsupportedReason =
+                match baseView with
+                | Ok(Some(ContentViewDto.Unsupported reason)) -> Some reason
+                | Ok(Some(ContentViewDto.Text text)) when isLfsPointerText text ->
+                    Some(lfsPointerBaseReason requestedPath)
+                | _ -> None
 
-                match currentContent with
-                | Error message -> return Error $"Could not read the current content of '{requestedPath}': {message}"
-                | Ok None when previousText.IsNone ->
-                    return Error $"'{requestedPath}' has no content on either side of the diff."
-                | Ok current ->
-                    return
-                        Ok(
-                            PageState.GitDiffPage {
-                                Path = requestedPath
-                                PreviousContent = previousText |> Option.defaultValue ""
-                                CurrentContent = current |> Option.defaultValue ""
-                                ChangeKind =
-                                    match previousText, current with
-                                    | None, Some _ -> Some Swate.Components.Page.GitDiffChangeKind.Added
-                                    | Some _, None -> Some Swate.Components.Page.GitDiffChangeKind.Deleted
-                                    | _ -> None
-                                WordDiffText = wordDiffText
-                            }
-                        )
+            // A promise block does not stop at a `return` inside an `if` without `else`, so the
+            // comparison is a separate step that only runs when the base can be shown.
+            let loadComparison () = promise {
+                let! wordDiff = getWordDiff requestedPath
+
+                let! currentContent =
+                    if isDeleted then
+                        promise { return Ok None }
+                    else
+                        promise {
+                            let! content = readCurrentContent requestedPath
+                            return content |> Result.map Some
+                        }
+
+                return baseView, wordDiff, currentContent
+            }
+
+            match baseUnsupportedReason with
+            | Some reason -> return unsupportedPage requestedPath reason
+            | None ->
+                let! baseView, wordDiff, currentContent = loadComparison ()
+
+                match baseView, contentOf wordDiff with
+                | Error message, _
+                | _, Error message -> return Error message
+                | Ok(Some(ContentViewDto.Unsupported reason)), _
+                | _, Ok(ContentViewDto.Unsupported reason) -> return unsupportedPage requestedPath reason
+                | Ok previous, Ok(ContentViewDto.Text wordDiffText) ->
+                    let previousText =
+                        match previous with
+                        | Some(ContentViewDto.Text text) -> Some text
+                        | _ -> None
+
+                    match currentContent with
+                    | Error message ->
+                        return Error $"Could not read the current content of '{requestedPath}': {message}"
+                    | Ok None when previousText.IsNone ->
+                        return Error $"'{requestedPath}' has no content on either side of the diff."
+                    | Ok current ->
+                        return
+                            Ok(
+                                PageState.GitDiffPage {
+                                    Path = requestedPath
+                                    PreviousContent = previousText |> Option.defaultValue ""
+                                    CurrentContent = current |> Option.defaultValue ""
+                                    ChangeKind =
+                                        match previousText, current with
+                                        | None, Some _ -> Some Swate.Components.Page.GitDiffChangeKind.Added
+                                        | Some _, None -> Some Swate.Components.Page.GitDiffChangeKind.Deleted
+                                        | _ -> None
+                                    WordDiffText = wordDiffText
+                                }
+                            )
         }
 
 let private loadPageAsync

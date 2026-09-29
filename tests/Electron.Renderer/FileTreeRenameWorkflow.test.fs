@@ -112,7 +112,7 @@ Vitest.describe (
 )
 
 let private getRenameMenuItems (item: FileItem) =
-    FileTreeContextMenu.renameContextMenuItems (fun _ -> ()) item
+    FileTreeContextMenu.renameContextMenuItems [] (fun _ -> ()) item
 
 let private expectRenameMenuVisibility expectedCount item =
     let menuItems = getRenameMenuItems item
@@ -287,7 +287,7 @@ Vitest.describe (
                 let requestRenameItem =
                     RenameWorkflow.requestRenameItem (fun draft -> pendingRenameDraft <- draft) ignore
 
-                let menuItems = FileTreeContextMenu.renameContextMenuItems requestRenameItem item
+                let menuItems = FileTreeContextMenu.renameContextMenuItems [] requestRenameItem item
 
                 Vitest.expect(menuItems.Length).toBe (1)
                 menuItems.[0].OnClick()
@@ -334,7 +334,7 @@ Vitest.describe (
                     renderToBody (
                         Swate.Components.Page.FileExplorer.FileExplorer.FileExplorer(
                             initialItems = items,
-                            getItemActions = FileTreeContextMenu.renameContextMenuItems onRenameItem
+                            getItemActions = FileTreeContextMenu.renameContextMenuItems [] onRenameItem
                         )
                     )
 
