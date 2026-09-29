@@ -339,6 +339,14 @@ let private defaultDependencies: GitDependencies = {
     pruneStorage = fun _ -> unexpectedPromise "pruneStorage"
     deduplicateStorage = fun _ -> unexpectedPromise "deduplicateStorage"
     clearStaleLock = fun _ -> unexpectedPromise "clearStaleLock"
+    textDiff = {
+        openTextDiff = fun _ -> unexpectedPromise "openTextDiff"
+        readTextDiffPage = fun _ -> unexpectedPromise "readTextDiffPage"
+        replayTextDiffPage = fun _ -> unexpectedPromise "replayTextDiffPage"
+        expandTextDiff = fun _ -> unexpectedPromise "expandTextDiff"
+        readTextDiffLine = fun _ -> unexpectedPromise "readTextDiffLine"
+        closeTextDiff = fun _ -> unexpectedPromise "closeTextDiff"
+    }
     hasUsableAccount = fun () -> true
     delay = fun milliseconds -> Promise.sleep milliseconds
     newOperationId = fun () -> "op-1"

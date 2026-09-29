@@ -43,6 +43,8 @@ type GitStateController = {
     abandonMerge: unit -> unit
     pruneLfsCache: unit -> unit
     dedupLfsStorage: unit -> unit
+    /// Requests of the open diff page.
+    sendDiffMsg: GitDiffMsg -> unit
 }
 
 module private Helper =
@@ -90,6 +92,14 @@ module private Helper =
         pruneStorage = Renderer.VersionControlApiClient.pruneStorage
         deduplicateStorage = Renderer.VersionControlApiClient.deduplicateStorage
         clearStaleLock = Renderer.VersionControlApiClient.clearStaleLock
+        textDiff = {
+            openTextDiff = Renderer.VersionControlApiClient.openTextDiff
+            readTextDiffPage = Renderer.VersionControlApiClient.readTextDiffPage
+            replayTextDiffPage = Renderer.VersionControlApiClient.replayTextDiffPage
+            expandTextDiff = Renderer.VersionControlApiClient.expandTextDiff
+            readTextDiffLine = Renderer.VersionControlApiClient.readTextDiffLine
+            closeTextDiff = Renderer.VersionControlApiClient.closeTextDiff
+        }
         hasUsableAccount = hasUsableAccount
         delay = fun milliseconds -> Promise.sleep milliseconds
         newOperationId = Renderer.VersionControlApiClient.newOperationId
@@ -129,6 +139,7 @@ let GitStateCtx =
             abandonMerge = fun () -> ()
             pruneLfsCache = fun () -> ()
             dedupLfsStorage = fun () -> ()
+            sendDiffMsg = fun _ -> ()
         }
     )
 
@@ -235,6 +246,15 @@ let GitStateCtxProvider (children: ReactElement) =
 
     React.useEffect ((fun () -> dispatch (ArcPathChanged appStateCtx)), [| box appStateCtx |])
 
+    // Other parts of the app replace the page directly, so the workflow learns here that the
+    // user left the diff page and closes its handle.
+    React.useEffect (
+        (fun () -> dispatch (DiffPageMsg(GitDiffMsg.PageStateObserved pageStateCtx.state))),
+        [| box pageStateCtx.state |]
+    )
+
+    let sendDiffMsg (msg: GitDiffMsg) = dispatch (DiffPageMsg msg)
+
     let gitStateController: GitStateController =
         React.useMemo (
             (fun _ -> {
@@ -266,6 +286,7 @@ let GitStateCtxProvider (children: ReactElement) =
                 abandonMerge = abandonMerge
                 pruneLfsCache = pruneLfsCache
                 dedupLfsStorage = dedupLfsStorage
+                sendDiffMsg = sendDiffMsg
             }),
             [| box gitState |]
         )

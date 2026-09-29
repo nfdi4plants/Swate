@@ -6,6 +6,7 @@ open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.VersionControlTypes
 open Swate.Components.Page.ArcFileEditor.Types
+open Swate.Components.Page.GitComparison.GitPagedDiffTypes
 
 [<RequireQualifiedAccess>]
 type LeftSidebarPage =
@@ -42,6 +43,65 @@ type VersionControlFileChoicePage = {
 
 type GitUnsupportedPageData = { Path: string; Reason: string option }
 
+/// Why a text diff cannot be shown.
+[<RequireQualifiedAccess>]
+type GitDiffBlockReason =
+    | Binary of evidence: string
+    | LocalContentUnavailable of objectId: string option
+    | NotRegularFile
+    | ProviderUnsupported
+    /// A side failed strict decoding after the diff was opened.
+    | NotText of evidence: string
+
+[<RequireQualifiedAccess>]
+type GitDiffPageStatus =
+    | Opening
+    | Scanning
+    | EncodingChoice of side: DiffSideDto * token: PreparationTokenDto * candidates: EncodingCandidateDto[]
+    | Ready
+    | LoadingNext
+    | Expanding of gapId: string
+    | Blocked of side: DiffSideDto option * reason: GitDiffBlockReason
+    | SourceChanged
+    | WorkerFailed of message: string
+    | Closed
+    | Failed of message: string
+
+/// One page of the loaded window. Parts are already mapped for the viewer, so a part keeps
+/// its identity across renders. An evicted page holds a single placeholder part.
+type GitDiffWindowPage = {
+    PageId: string
+    Parts: PagedPart[]
+    RowCount: int
+    /// JSON length of the DTOs this page was built from, including expanded context and line slices.
+    PayloadBytes: float
+    IsEvicted: bool
+}
+
+/// A paged text diff of one changed file. Generation is the page load request id of the
+/// selection that opened it, so responses for an older selection can be recognized.
+type GitDiffPageData = {
+    Path: string
+    PreviousPath: string option
+    ChangeKind: GitDiffChangeKind option
+    Generation: int
+    Handle: DiffHandleDto option
+    SourceInfos: DiffSourceInfoPairDto option
+    Pages: GitDiffWindowPage[]
+    /// The page the user asked for last. Eviction drops the pages farthest from it.
+    RequestedPageIndex: int
+    NextCursor: string option
+    Progress: ScanProgressDto option
+    Pending: PendingPreviewDto option
+    OutputComplete: bool
+    Status: GitDiffPageStatus
+    /// Encodings the user picked, sent with every later open of this page.
+    PreviousEncoding: string option
+    CurrentEncoding: string option
+    /// Requests still running, canceled when the page closes.
+    RunningOperations: string list
+}
+
 [<RequireQualifiedAccess>]
 type PageState =
     | ArcFilePage of arcFile: ArcFiles * requestedView: ActiveView option
@@ -52,6 +112,7 @@ type PageState =
     | NotesDraftPage
     | NotesSearchPage
     | ProvenanceGroupingPage
+    | GitDiffPage of GitDiffPageData
     | GitMergeConflictPage of VersionControlConflictPage
     | GitFileChoiceConflictPage of VersionControlFileChoicePage
     | GitUnsupportedPage of GitUnsupportedPageData
