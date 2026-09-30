@@ -991,8 +991,7 @@ Vitest.describe (
 
                         let loadingChanges = ResizeArray<bool>()
 
-                        let handleFileEvent =
-                            vault.FileEventController (recordingWatcherApi loadingChanges)
+                        let handleFileEvent = vault.FileEventController(recordingWatcherApi loadingChanges)
 
                         let assayPath = join [| arcPath; "assays/DiskAssay/isa.assay.xlsx" |]
                         handleFileEvent "change" assayPath
@@ -1055,8 +1054,7 @@ Vitest.describe (
                         let queuedMerge = vault.EnqueueArcMerge(fun () -> mergeQueueGate)
                         let loadingChanges = ResizeArray<bool>()
 
-                        let handleFileEvent =
-                            vault.FileEventController (recordingWatcherApi loadingChanges)
+                        let handleFileEvent = vault.FileEventController(recordingWatcherApi loadingChanges)
 
                         let handlerLoadingCallCount = loadingChanges.Count
                         let assayPath = join [| arcPath; "assays/DiskAssay/isa.assay.xlsx" |]
@@ -1112,7 +1110,7 @@ Vitest.describe (
                         let loadingCalls = ResizeArray<WatcherLoadingCall>()
 
                         let handleFileEvent =
-                            vault.FileEventController (recordingWatcherApiWithPendingState vault loadingCalls)
+                            vault.FileEventController(recordingWatcherApiWithPendingState vault loadingCalls)
 
                         let mutable releaseQueuedMerge = ignore
 
@@ -1174,8 +1172,7 @@ Vitest.describe (
 
                         let loadingChanges = ResizeArray<bool>()
 
-                        let handleFileEvent =
-                            vault.FileEventController (recordingWatcherApi loadingChanges)
+                        let handleFileEvent = vault.FileEventController(recordingWatcherApi loadingChanges)
 
                         let mutable releaseWrite = ignore
 
@@ -1221,8 +1218,7 @@ Vitest.describe (
 
                         let loadingChanges = ResizeArray<bool>()
 
-                        let handleFileEvent =
-                            vault.FileEventController (recordingWatcherApi loadingChanges)
+                        let handleFileEvent = vault.FileEventController(recordingWatcherApi loadingChanges)
 
                         let assayPath = join [| arcPath; "assays/DiskAssay/isa.assay.xlsx" |]
                         handleFileEvent "change" assayPath
@@ -1288,8 +1284,7 @@ Vitest.describe (
 
                         let loadingChanges = ResizeArray<bool>()
 
-                        let handleFileEvent =
-                            vault.FileEventController (recordingWatcherApi loadingChanges)
+                        let handleFileEvent = vault.FileEventController(recordingWatcherApi loadingChanges)
 
                         let mutable releaseQueuedMerge = ignore
 
