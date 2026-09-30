@@ -1202,6 +1202,46 @@ Vitest.describe (
                         HandleVersion = "v1"
                     }
 
+                    let! replayFromB =
+                        apiB.replayTextDiffPage {
+                            OperationId = "replay-b"
+                            HandleId = "h-a"
+                            HandleVersion = "v1"
+                            PageId = "page"
+                        }
+
+                    let! expandFromB =
+                        apiB.expandTextDiff {
+                            OperationId = "expand-b"
+                            HandleId = "h-a"
+                            HandleVersion = "v1"
+                            GapId = "gap"
+                            FromStart = true
+                            Count = 5
+                            Continuation = None
+                        }
+
+                    let! lineFromB =
+                        apiB.readTextDiffLine {
+                            OperationId = "line-b"
+                            HandleId = "h-a"
+                            HandleVersion = "v1"
+                            Side = DiffSideDto.Previous
+                            Line = "1"
+                            OffsetUtf16 = "0"
+                            MaxUtf16 = 100
+                            Continuation = None
+                        }
+
+                    let! infoFromB = apiB.getTextDiffSourceInfo (handleRequest "info-b")
+
+                    // The service stub fails every one of these calls, so only the ownership check answers
+                    // with a closed session.
+                    Vitest.expect(failureCodeOf replayFromB).toBe TextDiffFailureCodes.SessionClosed
+                    Vitest.expect(failureCodeOf expandFromB).toBe TextDiffFailureCodes.SessionClosed
+                    Vitest.expect(failureCodeOf lineFromB).toBe TextDiffFailureCodes.SessionClosed
+                    Vitest.expect(failureCodeOf infoFromB).toBe TextDiffFailureCodes.SessionClosed
+
                     let! closeFromB = apiB.closeTextDiff (handleRequest "close-b")
                     Vitest.expect(failureCodeOf closeFromB).toBe TextDiffFailureCodes.SessionClosed
                     Vitest.expect(closes.Count).toBe 1

@@ -1867,6 +1867,24 @@ Vitest.describe (
                 Vitest.expect(replayed.Length).toBeLessThanOrEqual (12)
                 Vitest.expect(replayed |> Array.distinct).toEqual (replayed)
                 Vitest.expect((firstVisibleEvicted ()).IsNone).toBe (true)
+
+                // Once the requested page leaves the pages of the last replay request, they no
+                // longer hold the window above its page limit.
+                let loadedCount (page: GitDiffPageData) =
+                    page.Pages
+                    |> Array.filter (fun windowPage -> not windowPage.IsEvicted)
+                    |> Array.length
+
+                let settled = diffOf current.Value
+                Vitest.expect(loadedCount settled).toBe (12)
+
+                let movedAway =
+                    GitDiffPageLoader.evict {
+                        settled with
+                            RequestedPageIndex = settled.Pages.Length - 1
+                    }
+
+                Vitest.expect(loadedCount movedAway).toBeLessThanOrEqual (GitDiffPageLoader.MaxLoadedPages)
             }
         )
 )

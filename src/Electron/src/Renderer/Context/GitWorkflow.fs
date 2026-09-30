@@ -1554,12 +1554,20 @@ module GitDiffPageLoader =
 
     /// Replaces the loaded pages farthest from the requested page by placeholders until the
     /// window holds at most MaxLoadedPages pages and MaxLoadedBytes, measured as JSON length in
-    /// UTF-16 code units. The requested page and the pages the viewer showed at the last replay
-    /// request stay, even when they alone exceed the limits. When the requested page alone still
-    /// exceeds MaxLoadedBytes, the rows of its least recently expanded gaps collapse. The newest
-    /// expansion stays, since the user just asked for it.
+    /// UTF-16 code units. The requested page stays, and so do the pages the viewer showed at the
+    /// last replay request while the requested page is one of them, even when they alone exceed
+    /// the limits. When the requested page alone still exceeds MaxLoadedBytes, the rows of its
+    /// least recently expanded gaps collapse. The newest expansion stays, since the user just
+    /// asked for it.
     let evict (page: GitDiffPageData) : GitDiffPageData =
         let anchor = page.RequestedPageIndex
+
+        // Once the requested page moves away from the pages of the last replay request, those
+        // pages are no longer on screen.
+        let visiblePages =
+            match page.Pages |> Array.tryItem anchor with
+            | Some anchorPage when page.VisiblePages |> List.contains anchorPage.PageId -> page.VisiblePages
+            | _ -> []
 
         let rec loop (pages: GitDiffWindowPage[]) =
             let loaded =
@@ -1573,7 +1581,7 @@ module GitDiffPageLoader =
             let candidates =
                 loaded
                 |> Array.filter (fun (index, windowPage) ->
-                    index <> anchor && not (page.VisiblePages |> List.contains windowPage.PageId)
+                    index <> anchor && not (visiblePages |> List.contains windowPage.PageId)
                 )
 
             if
