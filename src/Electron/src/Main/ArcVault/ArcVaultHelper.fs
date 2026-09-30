@@ -439,14 +439,10 @@ let shouldIgnoreForPayloadWatcher (arcPath: string) (isExpanded: string -> bool)
 
 let createWatcherOptions
     (cwd: string)
-    (usePolling: bool option)
+    (usePolling: bool)
     (ignored: U4<string, ResizeArray<string>, string -> bool, System.Func<string, Filesystem.Stats, bool>>)
     (depth: int option)
     =
-    // Native Windows file events can keep handles that block app-initiated folder renames.
-    let usePolling =
-        defaultArg usePolling (shouldUsePollingByDefault (currentNodePlatform ()))
-
     let watcherOptions =
         if usePolling then
             Chokidar.WatchOptions(
@@ -656,6 +652,10 @@ let createFileWatcher (path: string) (usePolling: bool option) =
 
     // Root depth 1 observes zone/entity changes; each explicit zone depth 1 observes only
     // entity directories and their immediate metadata/payload-directory children.
+    // Native Windows file events can keep handles that block app-initiated folder renames.
+    let usePolling =
+        defaultArg usePolling (shouldUsePollingByDefault (currentNodePlatform ()))
+
     Chokidar.Chokidar.watch (createArcStructureWatcherPaths path, createWatcherOptions path usePolling ignored (Some 1))
 
 let sendArcHasUnsavedChangesUpdate (hasUnsavedChanges: bool) (window: BrowserWindow) =

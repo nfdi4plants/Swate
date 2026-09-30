@@ -817,7 +817,7 @@ module ArcVaultExtensions =
 
             baseController, realEventController
 
-        member private this.EnsurePayloadWatcher(arcPath: string, targetScopes: Set<string>, ?usePolling: bool) = promise {
+        member private this.EnsurePayloadWatcher(arcPath: string, targetScopes: Set<string>) = promise {
             if this.payloadWatcher.IsNone && not targetScopes.IsEmpty then
                 let watchedPaths =
                     targetScopes
@@ -833,10 +833,7 @@ module ArcVaultExtensions =
                 let watcher =
                     // Payload scopes use one native, shallow watcher. Polling creates one poller per
                     // direct file and is unbounded for large expanded directories.
-                    Chokidar.Chokidar.watch (
-                        watchedPaths,
-                        createWatcherOptions arcPath (Some(defaultArg usePolling false)) ignored (Some 0)
-                    )
+                    Chokidar.Chokidar.watch (watchedPaths, createWatcherOptions arcPath false ignored (Some 0))
 
                 this.FileWatcherEventController
                 |> Option.iter (fun (controller: string -> string -> unit) ->
@@ -864,7 +861,7 @@ module ArcVaultExtensions =
                 |> ignore
         }
 
-        member internal this.ReconcilePayloadWatcherScopes(arcPath: string, ?usePolling: bool) = promise {
+        member internal this.ReconcilePayloadWatcherScopes(arcPath: string) = promise {
             let targetScopes =
                 this.expandedDirectoryPaths
                 |> Set.filter (fun scope -> not (this.payloadWatcherScopeSuspensions.ContainsKey scope))
@@ -884,7 +881,7 @@ module ArcVaultExtensions =
                     this.payloadWatcherScopes <- targetScopes
                 | None when not targetScopes.IsEmpty ->
                     this.payloadWatcherScopes <- Set.empty
-                    do! this.EnsurePayloadWatcher(arcPath, targetScopes, ?usePolling = usePolling)
+                    do! this.EnsurePayloadWatcher(arcPath, targetScopes)
                 | None -> ()
             with watcherError ->
                 let failedWatcher = this.payloadWatcher

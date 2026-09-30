@@ -3976,8 +3976,8 @@ Vitest.describe (
                 let ignored: U4<string, ResizeArray<string>, string -> bool, System.Func<string, Stats, bool>> =
                     !^(System.Func<string, Stats, bool>(fun _ _ -> false))
 
-                let recursiveOptions = createWatcherOptions "C:/arc" (Some true) ignored None
-                let shallowOptions = createWatcherOptions "C:/arc" (Some true) ignored (Some 0)
+                let recursiveOptions = createWatcherOptions "C:/arc" true ignored None
+                let shallowOptions = createWatcherOptions "C:/arc" true ignored (Some 0)
 
                 Vitest.expect(recursiveOptions.depth).toEqual (None)
                 Vitest.expect(shallowOptions.depth).toEqual (Some 0)

@@ -73,22 +73,6 @@ let private writeUtf8FileAsync (path: string) (content: string) : Fable.Core.JS.
     return ()
 }
 
-let private createDirectoryAsync (path: string) : Fable.Core.JS.Promise<unit> = promise {
-    let! _ =
-        fsPromisesDynamic?mkdir (path, createObj [ "recursive" ==> true ])
-        |> unbox<Fable.Core.JS.Promise<obj>>
-
-    return ()
-}
-
-let private removePathAsync (path: string) : Fable.Core.JS.Promise<unit> = promise {
-    let! _ =
-        fsPromisesDynamic?rm (path, createObj [ "recursive" ==> true; "force" ==> true ])
-        |> unbox<Fable.Core.JS.Promise<obj>>
-
-    return ()
-}
-
 let private runGitAsync (repoPath: string) (args: string[]) : Fable.Core.JS.Promise<string> = promise {
     let! output =
         Fable.Core.JS.Constructors.Promise.Create(fun resolve reject ->

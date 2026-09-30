@@ -111,24 +111,6 @@ let createImportedFileWatcherEvents arcPath targetRelativePath sourceAbsolutePat
         buildWatcherEvent arcPath (Chokidar.Events.Add.ToString()) relativePath
     )
 
-/// Always queues a watcher event for the file tree, while ARC merge eligibility is controlled separately.
-let queueFileWatcherEvent
-    isArcMergeEligible
-    arcPath
-    (pendingEvents: ResizeArray<ArcVaultFileSystemEvent>)
-    (pendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent>)
-    eventName
-    changedPath
-    =
-    match arcPath with
-    | Some rootPath ->
-        let watcherEvent = buildWatcherEvent rootPath eventName changedPath
-        pendingEvents.Add watcherEvent
-
-        if isArcMergeRelevant watcherEvent && isArcMergeEligible watcherEvent then
-            pendingArcMergeEvents.Add watcherEvent
-    | None -> ()
-
 /// An admitted unlink for a recreated file becomes a change. An add or change for a file that is
 /// missing at merge time is dropped, because the file is either mid-replacement (an add follows)
 /// or deleted (a real unlink follows), and converting it would remove an entity together with
