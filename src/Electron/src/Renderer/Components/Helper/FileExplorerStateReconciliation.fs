@@ -108,3 +108,31 @@ let tryGetReloadableSelectedFilePath
         else
             None
     )
+
+let tryGetExternallyChangedSelectedFilePath
+    (changedPaths: string seq)
+    (fileTree: FileEntry[])
+    (selectionPath: string option)
+    (pageState: PageState option)
+    =
+    match pageState with
+    | Some pageState when reloadsWhenSelectedFileChanges pageState ->
+        selectionPath
+        |> Option.map PathHelpers.normalizePath
+        |> Option.filter (containsPath changedPaths)
+        |> Option.bind (fun selectedPath ->
+            tryGetReloadableSelectedFilePath fileTree (Some selectedPath) (Some pageState)
+        )
+    | _ -> None
+
+let tryGetMaterializedSelectedFilePath
+    (fileTree: FileEntry[])
+    (selectionPath: string option)
+    (pageState: PageState option)
+    =
+    match pageState with
+    | Some _ -> None
+    | None ->
+        tryFindSelectedFileEntry fileTree selectionPath
+        |> Option.filter isCheckedOutLfsFile
+        |> Option.map (fun entry -> PathHelpers.normalizePath entry.path)

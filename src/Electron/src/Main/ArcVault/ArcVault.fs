@@ -283,6 +283,7 @@ module ArcVaultExtensions =
                         // A batch owns one object snapshot and one tree copy, regardless of event count.
                         let nextFileTree = Dictionary<string, FileEntry>(this.fileTree)
                         let mutable hasFileTreeChanges = false
+                        let externallyChangedFilePaths = ResizeArray<string>()
 
                         let removedDirectoryEvents =
                             normalizedEvents
@@ -333,6 +334,24 @@ module ArcVaultExtensions =
                                     let changedFile =
                                         withFileEntryLargeObjectMetadata arcPath largeObjectPathIndex changedFile
 
+                                    let wasKnownFile =
+                                        match nextFileTree.TryGetValue changedFile.path with
+                                        | true, current -> not current.isDirectory
+                                        | false, _ -> false
+
+                                    if
+                                        not changedFile.isDirectory
+                                        && (WatcherHelpers.eventNameEquals Chokidar.Events.Change event.EventName
+                                            || (WatcherHelpers.eventNameEquals Chokidar.Events.Add event.EventName
+                                                && wasKnownFile))
+                                    then
+                                        match tryGetWatcherRelativePath arcPath changedFile.path with
+                                        | Some relativePath ->
+                                            externallyChangedFilePaths.Add(
+                                                PathHelpers.normalizeCanonicalRelativePath relativePath
+                                            )
+                                        | None -> ()
+
                                     match nextFileTree.TryGetValue changedFile.path with
                                     | true, current when current = changedFile -> ()
                                     | _ ->
@@ -365,8 +384,14 @@ module ArcVaultExtensions =
                                     event.RelativePath
                                     fileTreeError.Message
 
-                        if hasFileTreeChanges && capturedWatcherEpoch = this.WatcherEpoch then
-                            this.SetFileTree(nextFileTree)
+                        if capturedWatcherEpoch = this.WatcherEpoch then
+                            if hasFileTreeChanges then
+                                this.SetFileTree(nextFileTree)
+
+                            if externallyChangedFilePaths.Count > 0 then
+                                WindowSend.send<IFileTreeRendererApi>
+                                    this.window
+                                    (fun api -> api.externalFileContentsChanged (externallyChangedFilePaths.ToArray()))
                 })
 
             this.FileTreeUpdateTail <- queuedUpdate |> Promise.catch (fun _ -> ())

@@ -250,6 +250,12 @@ let Main () =
                                                     children =
                                                         React.Fragment [|
                                                             children
+                                                            Renderer
+                                                                .Components
+                                                                .LeftSidebar
+                                                                .FileExplorer
+                                                                .FileTree
+                                                                .ExternalFilePreviewRefresh()
                                                             CloseWindowController.CloseWindowController()
                                                         |],
                                                     navbar = Renderer.Components.Navbar.Main(),

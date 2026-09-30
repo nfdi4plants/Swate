@@ -84,6 +84,7 @@ Vitest.describe (
                 let observedFileTrees = ResizeArray<string[]>()
                 let mutable listenerRegistered = false
                 let mutable disposeCalled = false
+                let mutable externalContentDisposeCalled = false
                 let mutable snapshotLoadCalls = 0
                 let mutable importSubscriptionRegistered = false
                 let mutable importDisposeCalled = false
@@ -102,6 +103,10 @@ Vitest.describe (
                                 listenerRegistered <- true
 
                                 fun () -> disposeCalled <- true
+                            "externalFileContentsChanged"
+                            ==> fun (_listener: string[] -> unit) ->
+                                externalContentDisposeCalled <- false
+                                fun () -> externalContentDisposeCalled <- true
                         ])
 
                     setBridgeProperty
@@ -139,6 +144,7 @@ Vitest.describe (
                     do! waitForEffect (fun () -> disposeCalled)
 
                     Vitest.expect(disposeCalled).toBe (true)
+                    Vitest.expect(externalContentDisposeCalled).toBe (true)
                 finally
                     if not rootUnmounted then
                         root.unmount ()
@@ -157,6 +163,7 @@ Vitest.describe (
                 let mutable publishImportState = ignore
                 let mutable importListenerRegistered = false
                 let mutable fileTreeDisposeCalled = false
+                let mutable externalContentDisposeCalled = false
                 let mutable importDisposeCalled = false
                 let observedImports = ResizeArray<ActiveFileImportState option>()
                 let container = document.createElement ("div") :?> Browser.Types.HTMLDivElement
@@ -180,6 +187,10 @@ Vitest.describe (
                             ==> fun (_: Dictionary<string, FileEntry> -> unit) ->
                                 fileTreeDisposeCalled <- false
                                 fun () -> fileTreeDisposeCalled <- true
+                            "externalFileContentsChanged"
+                            ==> fun (_listener: string[] -> unit) ->
+                                externalContentDisposeCalled <- false
+                                fun () -> externalContentDisposeCalled <- true
                         ])
 
                     setBridgeProperty
@@ -210,6 +221,7 @@ Vitest.describe (
                     do! waitForEffect (fun () -> observedImports |> Seq.filter ((=) activeImport) |> Seq.length >= 2)
                 finally
                     root.unmount ()
+                    Vitest.expect(externalContentDisposeCalled).toBe (true)
                     container.remove ()
                     clearBridgeProperty fileTreeBridgeName
                     clearBridgeProperty importBridgeName
@@ -308,6 +320,54 @@ Vitest.describe (
                 Vitest
                     .expect(FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval None)
                     .toBe (false)
+        )
+
+        Vitest.test (
+            "external content changes reload the selected Markdown or text preview",
+            fun () ->
+                let selectedPath = "docs/readme.md"
+
+                let fileTree = [|
+                    FileEntry.create ("readme.md", selectedPath, false, None)
+                    FileEntry.create ("other.txt", "docs/other.txt", false, None)
+                |]
+
+                let markdownReload =
+                    FileExplorerStateReconciliation.tryGetExternallyChangedSelectedFilePath
+                        [ selectedPath ]
+                        fileTree
+                        (Some selectedPath)
+                        (Some(RendererPageState.MarkdownPage "before"))
+
+                let textReload =
+                    FileExplorerStateReconciliation.tryGetExternallyChangedSelectedFilePath
+                        [ selectedPath ]
+                        fileTree
+                        (Some selectedPath)
+                        (Some(RendererPageState.TextPage "before"))
+
+                Vitest.expect(markdownReload).toEqual (Some selectedPath)
+                Vitest.expect(textReload).toEqual (Some selectedPath)
+        )
+
+        Vitest.test (
+            "external content changes to an unrelated file do not reload the selected preview",
+            fun () ->
+                let selectedPath = "docs/readme.md"
+
+                let fileTree = [|
+                    FileEntry.create ("readme.md", selectedPath, false, None)
+                    FileEntry.create ("other.txt", "docs/other.txt", false, None)
+                |]
+
+                let reload =
+                    FileExplorerStateReconciliation.tryGetExternallyChangedSelectedFilePath
+                        [ "docs/other.txt" ]
+                        fileTree
+                        (Some selectedPath)
+                        (Some(RendererPageState.MarkdownPage "before"))
+
+                Vitest.expect(reload).toEqual (None)
         )
 
         Vitest.test (

@@ -9,14 +9,18 @@ open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Renderer
 
+type ExternalFileContentChange = { Revision: int; Paths: string[] }
+
 type FileState = {
     FileTree: FileEntry[]
     Selection: ArcSelection
+    ExternalFileContentChange: ExternalFileContentChange option
 } with
 
     static member init() : FileState = {
         FileTree = [||]
         Selection = ArcSelection.empty
+        ExternalFileContentChange = None
     }
 
 type FileStateController = {
@@ -66,6 +70,11 @@ let FileStateCtxProviderWithSnapshots
     (loadFileTreeSnapshot: FileTreeSnapshotLoader, fileImportApi: FileImportApi, children: ReactElement)
     =
     let selection, setSelectionState = React.useStateWithUpdater ArcSelection.empty
+
+    let externalFileContentChange, setExternalFileContentChange =
+        React.useState<ExternalFileContentChange option> None
+
+    let externalFileContentChangeRevision = React.useRef 0
     let isFilePickerOpenRef = React.useRef false
     let isCancellingFileImport, setIsCancellingFileImport = React.useState false
 
@@ -82,6 +91,20 @@ let FileStateCtxProviderWithSnapshots
                 fun setFileTree ->
                     Renderer.IpcReceiver.subscribeProxyReceiver<IFileTreeRendererApi> {
                         fileTreeUpdate = fileTreeFromDictionary >> setFileTree
+                        externalFileContentsChanged =
+                            fun paths ->
+                                let normalizedPaths = paths |> Array.map PathHelpers.normalizePath |> Array.distinct
+
+                                if normalizedPaths.Length > 0 then
+                                    externalFileContentChangeRevision.current <-
+                                        externalFileContentChangeRevision.current + 1
+
+                                    setExternalFileContentChange (
+                                        Some {
+                                            Revision = externalFileContentChangeRevision.current
+                                            Paths = normalizedPaths
+                                        }
+                                    )
                     }
             onError = fun ex -> console.error ("Failed to load file tree snapshot.", ex.Message)
             dependencies = [||]
@@ -92,8 +115,13 @@ let FileStateCtxProviderWithSnapshots
             (fun _ -> {
                 FileTree = fileTree.state
                 Selection = selection
+                ExternalFileContentChange = externalFileContentChange
             }),
-            [| box fileTree.state; box selection |]
+            [|
+                box fileTree.state
+                box selection
+                box externalFileContentChange
+            |]
         )
 
     let activeFileImport =

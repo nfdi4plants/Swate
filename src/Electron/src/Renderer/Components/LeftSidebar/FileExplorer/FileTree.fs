@@ -34,6 +34,47 @@ open FileTreeHelper
 type FileTree =
 
     [<ReactComponent>]
+    static member ExternalFilePreviewRefresh() =
+        let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+        let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
+
+        let reloadPreview path =
+            let applyReloadError details =
+                pageStateCtx.setState (
+                    Some(
+                        Renderer.Types.PageState.ErrorPage
+                            $"The preview could not be refreshed after the file changed externally. Select the file again. Details: {details}"
+                    )
+                )
+
+            promise {
+                match! openView path with
+                | Ok pageState -> pageStateCtx.setState (Some pageState)
+                | Error errorMessage -> applyReloadError errorMessage
+            }
+            |> Promise.catch (fun exn -> applyReloadError exn.Message)
+            |> Promise.start
+
+        React.useEffect (
+            (fun () ->
+                fileStateCtx.state.ExternalFileContentChange
+                |> Option.bind (fun change ->
+                    FileExplorerStateReconciliation.tryGetExternallyChangedSelectedFilePath
+                        change.Paths
+                        fileStateCtx.state.FileTree
+                        fileStateCtx.state.Selection.TreePath
+                        pageStateCtx.state
+                )
+                |> Option.iter reloadPreview
+            ),
+            [|
+                box (fileStateCtx.state.ExternalFileContentChange |> Option.map _.Revision)
+            |]
+        )
+
+        Html.none
+
+    [<ReactComponent>]
     static member private EmptyFileTreePlaceholder() =
         Html.div [
             prop.className "swt:p-4 swt:text-center swt:text-gray-500"
@@ -262,7 +303,7 @@ type FileTree =
                         pageStateCtx.setState None
                     | None ->
                         match
-                            FileExplorerStateReconciliation.tryGetReloadableSelectedFilePath
+                            FileExplorerStateReconciliation.tryGetMaterializedSelectedFilePath
                                 fileStateCtx.state.FileTree
                                 fileStateCtx.state.Selection.TreePath
                                 pageStateCtx.state

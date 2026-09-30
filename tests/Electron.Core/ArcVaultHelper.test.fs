@@ -909,6 +909,47 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "content-only watcher changes publish the changed path without a redundant file-tree update",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let windowState = createTestWindow (testWindowOptions 74)
+                        let vault = ArcVault(windowState.Window)
+                        vault.path <- Some arcPath
+
+                        let relativePath = "notes/external.md"
+                        let directoryPath = join [| arcPath; "notes" |]
+                        let absolutePath = join [| arcPath; relativePath |]
+                        do! mkdirWatcherDirectoryAsync directoryPath
+                        do! writeWatcherTextFileAsync absolutePath "before"
+
+                        let! existingEntry = Main.FileTreeCreator.getFileEntry absolutePath
+                        vault.fileTree.Add(existingEntry.path, existingEntry)
+
+                        do! writeWatcherTextFileAsync absolutePath "after"
+                        do! vault.ApplyWatcherFileTreeEvents [ watcherEvent arcPath "change" relativePath ]
+
+                        let contentChangeMessages =
+                            windowState.SentMessages
+                            |> Seq.filter (fun args ->
+                                args.Length > 0 && (string args.[0]).Contains("externalFileContentsChanged")
+                            )
+                            |> Seq.toArray
+
+                        let fileTreeMessages =
+                            windowState.SentMessages
+                            |> Seq.filter (fun args -> args.Length > 0 && (string args.[0]).Contains("fileTreeUpdate"))
+                            |> Seq.toArray
+
+                        Vitest.expect(contentChangeMessages.Length).toBe (1)
+                        Vitest.expect(JS.JSON.stringify (contentChangeMessages.[0])).toContain (relativePath)
+                        Vitest.expect(fileTreeMessages.Length).toBe (0)
+                        Vitest.expect(vault.fileTree.[existingEntry.path]).toEqual (existingEntry)
+                    })
+        )
+
+        Vitest.test (
             "a watcher merge queued before a lifecycle reset is not published",
             fun () ->
                 withTempArc
