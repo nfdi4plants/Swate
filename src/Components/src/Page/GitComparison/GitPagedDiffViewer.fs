@@ -22,7 +22,12 @@ module internal GitPagedDiffDisplay =
 
     type Row = { Key: string; Content: Content }
 
-    type VirtualRow = { Key: string; Index: int; Start: int }
+    type VirtualRow = {
+        Key: string
+        Index: int
+        Start: int
+        Size: int
+    }
 
     type RowProps = {
         Row: Row
@@ -30,13 +35,16 @@ module internal GitPagedDiffDisplay =
         Start: int
         MeasureElementRef: VirtualMeasureElementRef
         Prefix: string
-        ExpandingGap: string option
+        /// Gaps whose expansion is still running. Their controls stay disabled.
+        ExpandingGaps: string[]
         LoadingNext: bool
         HasMore: bool
         Progress: PagedProgress option
         RequestExpand: (string -> bool -> unit) option
         RequestLineSlice: (PagedDiffSide -> float -> float -> unit) option
         PendingLineSlices: PagedLineSliceRequest[]
+        /// Evicted pages whose replay is still running. Their controls stay disabled.
+        PendingReplays: string[]
         RequestReplay: (string -> unit) option
         RequestNext: (unit -> unit) option
     }
@@ -59,6 +67,11 @@ module internal GitPagedDiffDisplay =
         Candidates: AnchorCandidate[]
     }
 
+    /// Height of one diff row. A placeholder of an evicted page is as tall as its rows, so the
+    /// scroll position stays where it was when the page is evicted or replayed.
+    [<Literal>]
+    let RowHeightPx = 28
+
     let private rangeStart (range: PagedRange) =
         if range.Count = 0.0 then range.Start else range.Start + 1.0
 
@@ -66,7 +79,7 @@ module internal GitPagedDiffDisplay =
 
     let numberText value = sprintf "%.0f" value
 
-    let private hunkHeader previous current =
+    let hunkHeader previous current =
         $"@@ -{numberText (rangeStart previous)},{numberText previous.Count} +{numberText (rangeStart current)},{numberText current.Count} @@"
 
     let buildPartRows part =
@@ -199,12 +212,14 @@ module internal GitPagedDiffDisplay =
         else
             clamp 0 100 (int (Math.Round(progress.ValidatedBytes / progress.TotalBytes * 100.0)))
 
+    /// An evicted page with rows counts as content, since its rows come back when it is replayed.
     let hasChanges (parts: PagedPart[]) =
         parts
         |> Array.exists (
             function
             | PagedPart.HunkRows _
             | PagedPart.UnalignedRegion _ -> true
+            | PagedPart.EvictedPage(_, rowCount) -> rowCount > 0
             | _ -> false
         )
 
@@ -236,21 +251,55 @@ module internal GitPagedDiffDisplay =
         | PagedDiffStatus.EncodingChoice _ -> "encoding-choice"
         | PagedDiffStatus.Ready -> "ready"
         | PagedDiffStatus.LoadingNext -> "loading-next"
-        | PagedDiffStatus.Expanding _ -> "expanding"
+        | PagedDiffStatus.Reopening -> "reopening"
         | PagedDiffStatus.Blocked _ -> "blocked"
         | PagedDiffStatus.SourceChanged -> "source-changed"
         | PagedDiffStatus.WorkerFailed _ -> "worker-failed"
-        | PagedDiffStatus.Closed -> "closed"
         | PagedDiffStatus.Failed _ -> "failed"
+
+    let sideName side =
+        match side with
+        | PagedDiffSide.Previous -> "previous"
+        | PagedDiffSide.Current -> "current"
+
+    let kindName kind =
+        match kind with
+        | PagedRowKind.Context -> "context"
+        | PagedRowKind.Added -> "added"
+        | PagedRowKind.Removed -> "removed"
+        | PagedRowKind.Replaced -> "replaced"
+        | PagedRowKind.EndingChanged -> "ending-changed"
+
+    let endingName ending =
+        match ending with
+        | PagedLineEnding.NoEnding -> "none"
+        | PagedLineEnding.LF -> "lf"
+        | PagedLineEnding.CRLF -> "crlf"
+        | PagedLineEnding.CR -> "cr"
+
+    let snippetEndName snippetEnd =
+        match snippetEnd with
+        | PagedSnippetEnd.Truncated -> "truncated"
+        | PagedSnippetEnd.MoreTextPending -> "more-text-pending"
+        | PagedSnippetEnd.LineEnd -> "line-end"
+        | PagedSnippetEnd.EndOfFile -> "end-of-file"
 
 [<Erase; Mangle(false)>]
 type GitPagedDiffViewer =
 
     [<ReactComponent>]
     static member private LineContent(props: GitPagedDiffDisplay.LineProps) =
+        let kind =
+            if props.ForceContext then
+                PagedRowKind.Context
+            else
+                props.Kind
+
         match props.Line with
         | None ->
             Html.div [
+                prop.custom ("data-side", GitPagedDiffDisplay.sideName props.Side)
+                prop.custom ("data-kind", GitPagedDiffDisplay.kindName kind)
                 prop.className "swt:grid swt:grid-cols-[3.5rem_minmax(0,1fr)] swt:min-w-0"
             ]
         | Some line ->
@@ -278,6 +327,7 @@ type GitPagedDiffViewer =
                     segments.Add(
                         Html.span [
                             prop.key $"highlight-{index}"
+                            prop.custom ("data-highlight", (if highlight.Changed then "changed" else "unchanged"))
                             if highlight.Changed then
                                 prop.className (GitPagedDiffDisplay.changedSegmentClass props.Side)
                             prop.text (line.Text.Substring(startIndex, endIndex - startIndex))
@@ -297,7 +347,13 @@ type GitPagedDiffViewer =
             let lineStyle =
                 GitPagedDiffDisplay.rowKindClass props.Side props.Kind props.ForceContext
 
+            let lineNumber = GitPagedDiffDisplay.numberText line.Number
+            let side = GitPagedDiffDisplay.sideName props.Side
+
             Html.div [
+                prop.testId $"{props.Prefix}-line-{side}-{lineNumber}"
+                prop.custom ("data-side", side)
+                prop.custom ("data-kind", GitPagedDiffDisplay.kindName kind)
                 prop.className "swt:grid swt:grid-cols-[3.5rem_minmax(0,1fr)] swt:min-w-0"
                 prop.children [
                     Html.div [
@@ -307,35 +363,44 @@ type GitPagedDiffViewer =
                         ]
                         prop.text (GitPagedDiffDisplay.lineNumberText line.Number)
                     ]
+                    // The text wraps inside its column, and the controls sit after it outside the
+                    // text flow, so a long line neither covers the other column nor hides them.
                     Html.div [
+                        prop.testId $"{props.Prefix}-line-text-{side}-{lineNumber}"
                         prop.className [
-                            "swt:px-3 swt:py-1 swt:min-w-0 swt:font-mono swt:text-xs swt:leading-5"
+                            "swt:flex swt:min-w-0 swt:items-start swt:gap-2 swt:px-3 swt:py-1 swt:font-mono swt:text-xs swt:leading-5"
                             lineStyle
                         ]
-                        prop.style [ style.whitespace.pre; style.overflowWrap.anywhere ]
                         prop.children [
-                            if line.OffsetUtf16 > 0.0 then
-                                Html.span [
-                                    prop.className "swt:mr-1 swt:text-base-content/45"
-                                    prop.text "…"
-                                ]
+                            Html.span [
+                                prop.className "swt:min-w-0 swt:flex-1"
+                                prop.style [ style.whitespace.prewrap; style.overflowWrap.anywhere ]
+                                prop.children [
+                                    if line.OffsetUtf16 > 0.0 then
+                                        Html.span [
+                                            prop.className "swt:mr-1 swt:text-base-content/45"
+                                            prop.text "…"
+                                        ]
 
-                            if segments.Count = 0 then
-                                Html.span [ prop.text " " ]
-                            else
-                                React.Fragment(List.ofSeq segments)
+                                    if segments.Count = 0 then
+                                        Html.span [ prop.text " " ]
+                                    else
+                                        React.Fragment(List.ofSeq segments)
+                                ]
+                            ]
 
                             if props.Kind = PagedRowKind.EndingChanged && not props.ForceContext then
                                 Html.span [
-                                    prop.className "swt:badge swt:badge-outline swt:badge-xs swt:ml-2"
+                                    prop.testId $"{props.Prefix}-ending-{side}-{lineNumber}"
+                                    prop.custom ("data-ending", GitPagedDiffDisplay.endingName line.Ending)
+                                    prop.className "swt:badge swt:badge-outline swt:badge-xs swt:shrink-0"
                                     prop.text (GitPagedDiffDisplay.endingText line.Ending)
                                 ]
 
                             if hasMore then
                                 Html.button [
-                                    prop.testId
-                                        $"{props.Prefix}-line-more-{props.Side}-{GitPagedDiffDisplay.numberText line.Number}"
-                                    prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:ml-2"
+                                    prop.testId $"{props.Prefix}-line-more-{side}-{lineNumber}"
+                                    prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:shrink-0"
                                     prop.disabled (props.SlicePending || props.RequestLineSlice.IsNone)
                                     prop.onClick (fun _ ->
                                         props.RequestLineSlice
@@ -379,23 +444,38 @@ type GitPagedDiffViewer =
                             prop.className "swt:text-xs swt:text-base-content/55"
                             prop.text $"No further line, {GitPagedDiffDisplay.numberText lineCount} lines read"
                         ]
-                    | PagedPendingSide.Snippet(line, _, text, endState) ->
+                    | PagedPendingSide.Snippet(line, snippetOffset, text, endState) ->
+                        // The mismatch offset counts from the start of the line, and the snippet
+                        // can start further into the line.
                         let marker =
                             mismatchOffset
-                            |> Option.map (fun offset -> GitPagedDiffDisplay.clamp 0 text.Length offset)
+                            |> Option.map (fun offset ->
+                                GitPagedDiffDisplay.clamp 0 text.Length (offset - int snippetOffset)
+                            )
 
-                        let textWithMarker =
+                        let startsMidLine = snippetOffset > 0.0
+
+                        let textWithMarker = [
+                            if startsMidLine then
+                                Html.span [
+                                    prop.testId $"{prefix}-pending-leading-{sideTestId}"
+                                    prop.className "swt:text-base-content/45"
+                                    prop.text "…"
+                                ]
                             match marker with
-                            | Some offset -> [
+                            | Some offset ->
                                 Html.span [ prop.text (text.Substring(0, offset)) ]
+
                                 Html.span [
                                     prop.testId $"{prefix}-pending-mismatch-{sideTestId}"
+                                    prop.custom ("data-offset", offset)
                                     prop.className "swt:text-error swt:font-bold"
                                     prop.text "│"
                                 ]
+
                                 Html.span [ prop.text (text.Substring(offset)) ]
-                              ]
-                            | None -> [ Html.span [ prop.text text ] ]
+                            | None -> Html.span [ prop.text text ]
+                        ]
 
                         Html.div [
                             prop.className "swt:flex swt:min-w-0 swt:flex-col swt:gap-1"
@@ -405,11 +485,15 @@ type GitPagedDiffViewer =
                                     prop.text $"Line {GitPagedDiffDisplay.lineNumberText line}"
                                 ]
                                 Html.code [
+                                    prop.testId $"{prefix}-pending-snippet-{sideTestId}"
+                                    prop.custom ("data-starts-mid-line", (if startsMidLine then "true" else "false"))
                                     prop.className
                                         "swt:min-w-0 swt:whitespace-pre-wrap swt:break-all swt:font-mono swt:text-xs"
                                     prop.children textWithMarker
                                 ]
                                 Html.span [
+                                    prop.testId $"{prefix}-pending-end-{sideTestId}"
+                                    prop.custom ("data-end", GitPagedDiffDisplay.snippetEndName endState)
                                     prop.className "swt:text-[11px] swt:text-base-content/55"
                                     prop.text (
                                         match endState with
@@ -474,57 +558,77 @@ type GitPagedDiffViewer =
                     cell PagedDiffSide.Current row.Kind forceContext row.Current
                 ]
             | GitPagedDiffDisplay.Gap(gapId, previous, _) ->
-                let isExpanding = props.ExpandingGap = Some gapId
+                let isExpanding = props.ExpandingGaps |> Array.contains gapId
 
-                fullWidth "swt:justify-center swt:bg-base-200/45 swt:text-xs swt:text-base-content/65" [
+                // The control at the top of the gap sits below the previous hunk and reveals the
+                // first hidden lines. The control at the bottom sits above the next hunk and
+                // reveals the last hidden lines.
+                let expandButton (fromStart: bool) =
+                    let position, icon, label =
+                        if fromStart then
+                            "start", "swt:fluent--arrow-down-24-regular", "Show the first hidden lines"
+                        else
+                            "end", "swt:fluent--arrow-up-24-regular", "Show the last hidden lines"
+
                     Html.button [
-                        prop.testId $"{props.Prefix}-gap-expand-up-{gapId}"
-                        prop.className "swt:btn swt:btn-ghost swt:btn-xs"
-                        prop.disabled (isExpanding || props.RequestExpand.IsNone)
-                        prop.onClick (fun _ -> props.RequestExpand |> Option.iter (fun callback -> callback gapId true))
-                        prop.text "Expand up"
-                    ]
-                    Html.span [
-                        prop.className "swt:whitespace-nowrap"
-                        prop.text $"{GitPagedDiffDisplay.numberText previous.Count} hidden lines"
-                    ]
-                    Html.button [
-                        prop.testId $"{props.Prefix}-gap-expand-down-{gapId}"
-                        prop.className "swt:btn swt:btn-ghost swt:btn-xs"
+                        prop.testId $"{props.Prefix}-gap-expand-{position}-{gapId}"
+                        prop.custom ("data-from-start", (if fromStart then "true" else "false"))
+                        prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:gap-1"
+                        prop.title label
+                        prop.ariaLabel label
                         prop.disabled (isExpanding || props.RequestExpand.IsNone)
                         prop.onClick (fun _ ->
-                            props.RequestExpand |> Option.iter (fun callback -> callback gapId false)
+                            props.RequestExpand |> Option.iter (fun callback -> callback gapId fromStart)
                         )
-                        prop.text "Expand down"
+                        prop.children [
+                            Html.span [ prop.className [ "swt:iconify"; icon; "swt:size-4" ] ]
+                        ]
+                    ]
+
+                Html.div [
+                    prop.className
+                        "swt:col-span-2 swt:flex swt:flex-col swt:items-center swt:gap-0.5 swt:bg-base-200/45 swt:px-4 swt:py-1 swt:text-xs swt:text-base-content/65"
+                    prop.children [
+                        expandButton true
+                        Html.span [
+                            prop.className "swt:whitespace-nowrap"
+                            prop.text $"{GitPagedDiffDisplay.numberText previous.Count} hidden lines"
+                        ]
+                        expandButton false
                     ]
                 ]
-            | GitPagedDiffDisplay.UnalignedLabel(hunkId, previous, current) ->
+            | GitPagedDiffDisplay.UnalignedLabel(_, previous, current) ->
                 fullWidth
-                    "swt:border-y swt:border-base-content/10 swt:bg-warning/10 swt:text-xs swt:text-base-content/70"
+                    "swt:border-y swt:border-base-content/10 swt:bg-warning/10 swt:font-mono swt:text-xs swt:text-base-content/70"
                     [
                         Html.span [
-                            prop.className "swt:font-semibold"
-                            prop.text $"Unaligned region {hunkId}"
-                        ]
-                        Html.span [
-                            prop.text
-                                $"Previous {GitPagedDiffDisplay.numberText previous.Count}, current {GitPagedDiffDisplay.numberText current.Count}"
+                            prop.text (GitPagedDiffDisplay.hunkHeader previous current)
                         ]
                     ]
             | GitPagedDiffDisplay.UnalignedLines(previous, current) ->
                 React.Fragment [
-                    cell PagedDiffSide.Previous PagedRowKind.Context false previous
-                    cell PagedDiffSide.Current PagedRowKind.Context false current
+                    cell PagedDiffSide.Previous PagedRowKind.Removed false previous
+                    cell PagedDiffSide.Current PagedRowKind.Added false current
                 ]
             | GitPagedDiffDisplay.Evicted(pageId, rowCount) ->
-                fullWidth "swt:justify-center swt:bg-base-200/60 swt:text-xs swt:text-base-content/65" [
-                    Html.span [ prop.text $"{rowCount} rows unloaded" ]
-                    Html.button [
-                        prop.testId $"{props.Prefix}-evicted-{pageId}"
-                        prop.className "swt:btn swt:btn-ghost swt:btn-xs"
-                        prop.disabled props.RequestReplay.IsNone
-                        prop.onClick (fun _ -> props.RequestReplay |> Option.iter (fun callback -> callback pageId))
-                        prop.text "Reload rows"
+                let replaying = props.PendingReplays |> Array.contains pageId
+
+                Html.div [
+                    prop.className
+                        "swt:col-span-2 swt:flex swt:items-center swt:justify-center swt:gap-3 swt:px-4 swt:bg-base-200/60 swt:text-xs swt:text-base-content/65"
+                    prop.custom ("data-row-count", rowCount)
+                    prop.style [
+                        style.height (GitPagedDiffDisplay.RowHeightPx * max 1 rowCount)
+                    ]
+                    prop.children [
+                        Html.span [ prop.text $"{rowCount} rows unloaded" ]
+                        Html.button [
+                            prop.testId $"{props.Prefix}-evicted-{pageId}"
+                            prop.className "swt:btn swt:btn-ghost swt:btn-xs"
+                            prop.disabled (replaying || props.RequestReplay.IsNone)
+                            prop.onClick (fun _ -> props.RequestReplay |> Option.iter (fun callback -> callback pageId))
+                            prop.text "Reload rows"
+                        ]
                     ]
                 ]
             | GitPagedDiffDisplay.Continue pending ->
@@ -586,30 +690,35 @@ type GitPagedDiffViewer =
     static member private Grid
         (
             rows: GitPagedDiffDisplay.Row[],
+            rowParts: int[],
             previousTitle: string,
             currentTitle: string,
             prefix: string,
-            partsLength: int,
+            lastPart: obj,
             hasMore: bool,
             progress: PagedProgress option,
             status: PagedDiffStatus,
+            expandingGaps: string[],
             requestExpand: (string -> bool -> unit) option,
             requestLineSlice: (PagedDiffSide -> float -> float -> unit) option,
             pendingLineSlices: PagedLineSliceRequest[],
-            requestReplay: (string -> unit) option,
+            pendingReplays: string[],
+            requestReplay: (string -> int -> int -> unit) option,
             requestNext: (unit -> unit) option
         ) =
-        let rowEstimatePx = 28
+        let rowHeight = GitPagedDiffDisplay.RowHeightPx
         let headerScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
         let bodyScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
         let bodyContentRef: IRefValue<HTMLElement option> = React.useElementRef ()
         let contentMeasureRef, contentRect = React.useMeasure<Element> ()
         let previousLayout = React.useRef<GitPagedDiffDisplay.AnchorSnapshot option> None
 
-        let expandingGap =
-            match status with
-            | PagedDiffStatus.Expanding gapId -> Some gapId
-            | _ -> None
+        // While the diff reopens, the rows stay on screen and take no requests.
+        let interactive = status <> PagedDiffStatus.Reopening
+        let requestExpand = requestExpand |> Option.filter (fun _ -> interactive)
+        let requestLineSlice = requestLineSlice |> Option.filter (fun _ -> interactive)
+        let requestReplay = requestReplay |> Option.filter (fun _ -> interactive)
+        let requestNext = requestNext |> Option.filter (fun _ -> interactive)
 
         React.useEffect (
             (fun () ->
@@ -646,7 +755,12 @@ type GitPagedDiffViewer =
             Virtual.useVirtualizer (
                 count = rows.Length,
                 getScrollElement = (fun () -> bodyScrollRef.current),
-                estimateSize = (fun _ -> rowEstimatePx),
+                estimateSize =
+                    (fun index ->
+                        match rows.[index].Content with
+                        | GitPagedDiffDisplay.Evicted(_, rowCount) -> rowHeight * max 1 rowCount
+                        | _ -> rowHeight
+                    ),
                 getItemKey = (fun index -> rows.[index].Key),
                 overscan = 8,
                 gap = 0
@@ -667,7 +781,8 @@ type GitPagedDiffViewer =
                         ({
                             Key = rows.[index].Key
                             Index = index
-                            Start = index * rowEstimatePx
+                            Start = index * rowHeight
+                            Size = rowHeight
                         }
                         : GitPagedDiffDisplay.VirtualRow)
                     )
@@ -680,9 +795,33 @@ type GitPagedDiffViewer =
                         Key = item.key
                         Index = item.index
                         Start = item.start
+                        Size = item.size
                     }
                     : GitPagedDiffDisplay.VirtualRow)
                 )
+
+        // The rendered rows include the overscan. Replays only go to rows the user can see.
+        let viewportItems () =
+            match bodyScrollRef.current with
+            | Some element ->
+                let top = int element.scrollTop
+                let bottom = top + int element.clientHeight
+
+                virtualItems
+                |> Array.filter (fun item -> item.Start < bottom && item.Start + item.Size > top)
+            | None -> [||]
+
+        // The first and the last part with a row in the viewport, or -1 for both without one.
+        let visiblePartRange (items: GitPagedDiffDisplay.VirtualRow[]) =
+            let indices =
+                items
+                |> Array.map (fun item -> rowParts.[item.Index])
+                |> Array.filter (fun index -> index >= 0)
+
+            if indices.Length = 0 then
+                -1, -1
+            else
+                Array.min indices, Array.max indices
 
         let captureAnchor () : GitPagedDiffDisplay.AnchorSnapshot =
             let scrollTop =
@@ -727,7 +866,7 @@ type GitPagedDiffViewer =
                     match surviving, bodyScrollRef.current with
                     | Some anchor, Some scrollElement ->
                         let nextStart =
-                            rowVirtualizer.getMeasurements ()
+                            rowVirtualizer.measurementsCache
                             |> Array.tryFind (fun item -> item.key = anchor.Key)
                             |> Option.map (fun item -> item.start)
 
@@ -749,11 +888,26 @@ type GitPagedDiffViewer =
             |> Array.map (fun item -> rows.[item.Index].Key)
             |> String.concat "\u001f"
 
+        let viewportKeys =
+            viewportItems ()
+            |> Array.map (fun item -> rows.[item.Index].Key)
+            |> String.concat "\u001f"
+
+        let replaySignature = pendingReplays |> String.concat "\u001f"
         let requestedReplay = React.useRef (HashSet<string>())
-        let requestedNext = React.useRef (HashSet<int>())
+        let lastReplaySignature = React.useRef replaySignature
+        // Holds the last part at the time of the last next page request. It changes when a page
+        // is added or the last page is replaced. Evicting earlier pages leaves it alone.
+        let requestedNext = React.useRef<obj> (obj ())
 
         React.useEffect (
             (fun () ->
+                // A replay the loader dropped while another one ran is asked for again once the
+                // running replays change.
+                if lastReplaySignature.current <> replaySignature then
+                    lastReplaySignature.current <- replaySignature
+                    requestedReplay.current.Clear()
+
                 // A replayed page can be evicted again later. Forgetting pages that are no longer
                 // placeholders lets the viewer ask for them once more.
                 let evictedIds =
@@ -767,31 +921,63 @@ type GitPagedDiffViewer =
 
                 requestedReplay.current <- HashSet<string>(requestedReplay.current |> Seq.filter evictedIds.Contains)
 
-                for item in virtualItems do
-                    match rows.[item.Index].Content with
-                    | GitPagedDiffDisplay.Evicted(pageId, _) ->
-                        if requestReplay.IsSome && requestedReplay.current.Add pageId then
-                            requestReplay.Value pageId
-                    | GitPagedDiffDisplay.Continue _ ->
-                        let canRequest =
-                            match status with
-                            | PagedDiffStatus.LoadingNext -> false
-                            | _ -> true
+                // One replay at a time, for the first placeholder the user can see.
+                match requestReplay with
+                | Some callback when pendingReplays.Length = 0 ->
+                    let viewport = viewportItems ()
 
-                        if canRequest && requestNext.IsSome && requestedNext.current.Add partsLength then
-                            requestNext.Value()
-                    | _ -> ()
+                    viewport
+                    |> Array.tryPick (fun item ->
+                        match rows.[item.Index].Content with
+                        | GitPagedDiffDisplay.Evicted(pageId, _) when not (requestedReplay.current.Contains pageId) ->
+                            Some pageId
+                        | _ -> None
+                    )
+                    |> Option.iter (fun pageId ->
+                        requestedReplay.current.Add pageId |> ignore
+                        let first, last = visiblePartRange viewport
+                        callback pageId first last
+                    )
+                | _ -> ()
+
+                let continueRendered =
+                    virtualItems
+                    |> Array.exists (fun item ->
+                        match rows.[item.Index].Content with
+                        | GitPagedDiffDisplay.Continue _ -> true
+                        | _ -> false
+                    )
+
+                match requestNext with
+                | Some callback when
+                    continueRendered
+                    && status <> PagedDiffStatus.LoadingNext
+                    && not (Object.ReferenceEquals(requestedNext.current, lastPart))
+                    ->
+                    requestedNext.current <- lastPart
+                    callback ()
+                | _ -> ()
 
                 FsReact.createDisposable (fun () -> ())
             ),
             [|
                 box renderedKeys
+                box viewportKeys
                 box status
                 box requestReplay
                 box requestNext
-                box partsLength
+                box replaySignature
+                lastPart
             |]
         )
+
+        let replayVisible =
+            requestReplay
+            |> Option.map (fun callback ->
+                fun pageId ->
+                    let first, last = visiblePartRange (viewportItems ())
+                    callback pageId first last
+            )
 
         Html.div [
             prop.testId $"{prefix}-grid"
@@ -856,14 +1042,15 @@ type GitPagedDiffViewer =
                                                 Start = item.Start
                                                 MeasureElementRef = rowVirtualizer.measureElement
                                                 Prefix = prefix
-                                                ExpandingGap = expandingGap
+                                                ExpandingGaps = expandingGaps
                                                 LoadingNext = status = PagedDiffStatus.LoadingNext
                                                 HasMore = hasMore
                                                 Progress = progress
                                                 RequestExpand = requestExpand
                                                 RequestLineSlice = requestLineSlice
                                                 PendingLineSlices = pendingLineSlices
-                                                RequestReplay = requestReplay
+                                                PendingReplays = pendingReplays
+                                                RequestReplay = replayVisible
                                                 RequestNext = requestNext
                                             }
                                         ]
@@ -1016,6 +1203,25 @@ type GitPagedDiffViewer =
             ]
         ]
 
+    [<ReactComponent>]
+    static member private ReopeningBar(prefix: string, progress: PagedProgress option) =
+        let percentage =
+            progress
+            |> Option.map GitPagedDiffDisplay.progressPercentage
+            |> Option.defaultValue 0
+
+        Html.div [
+            prop.testId $"{prefix}-reopening"
+            prop.custom ("data-progress", percentage)
+            prop.className "swt:h-1 swt:w-full swt:shrink-0 swt:overflow-hidden swt:bg-base-300"
+            prop.children [
+                Html.div [
+                    prop.className "swt:h-full swt:bg-primary"
+                    prop.style [ style.width (length.percent percentage) ]
+                ]
+            ]
+        ]
+
     [<ReactComponent(true)>]
     static member Viewer
         (
@@ -1027,9 +1233,13 @@ type GitPagedDiffViewer =
             ?pending: PagedPending,
             ?requestNext: unit -> unit,
             ?requestExpand: (string -> bool -> unit),
+            ?expandingGaps: string[],
             ?requestLineSlice: (PagedDiffSide -> float -> float -> unit),
             ?pendingLineSlices: PagedLineSliceRequest[],
-            ?requestReplay: (string -> unit),
+            // Asks for the rows of an evicted page. The two numbers are the indices of the first
+            // and the last part with a row in the viewport, or -1 for both when no part is visible.
+            ?requestReplay: (string -> int -> int -> unit),
+            ?pendingReplays: string[],
             ?chooseEncoding: (PagedDiffSide -> string -> unit),
             ?previousTitle: string,
             ?currentTitle: string,
@@ -1041,13 +1251,13 @@ type GitPagedDiffViewer =
         let currentTitle = defaultArg currentTitle "Current version"
         let pending = pending
         let partRowCache = React.useRef<(obj * GitPagedDiffDisplay.Row[]) list> []
-        let requestedReplay = requestReplay
-        let requestedNext = requestNext
 
         let rows = ResizeArray<GitPagedDiffDisplay.Row>()
+        // The index of the part each row belongs to, -1 for rows outside the parts.
+        let rowParts = ResizeArray<int>()
         let nextCache = ResizeArray<obj * GitPagedDiffDisplay.Row[]>()
 
-        for part in parts do
+        for partIndex, part in parts |> Array.indexed do
             let identity = box part
 
             let cached =
@@ -1065,16 +1275,23 @@ type GitPagedDiffViewer =
             nextCache.Add(identity, partRows)
             rows.AddRange partRows
 
+            for _ in partRows do
+                rowParts.Add partIndex
+
         if hasMore then
             rows.Add {
                 Key = "continue"
                 Content = GitPagedDiffDisplay.Continue pending
             }
+
+            rowParts.Add -1
         elif pending.IsSome then
             rows.Add {
                 Key = "pending"
                 Content = GitPagedDiffDisplay.Continue pending
             }
+
+            rowParts.Add -1
 
         partRowCache.current <- List.ofSeq nextCache
 
@@ -1095,6 +1312,8 @@ type GitPagedDiffViewer =
             | PagedDiffStatus.Opening ->
                 GitPagedDiffViewer.ProgressState(prefix, GitPagedDiffDisplay.statusName status, progress, pending)
             | PagedDiffStatus.Scanning ->
+                GitPagedDiffViewer.ProgressState(prefix, GitPagedDiffDisplay.statusName status, progress, pending)
+            | PagedDiffStatus.Reopening when parts.Length = 0 ->
                 GitPagedDiffViewer.ProgressState(prefix, GitPagedDiffDisplay.statusName status, progress, pending)
             | PagedDiffStatus.EncodingChoice(side, candidates) ->
                 let sideTitle =
@@ -1122,13 +1341,12 @@ type GitPagedDiffViewer =
                 GitPagedDiffViewer.MessageState(prefix, "source-changed", "The source changed", None)
             | PagedDiffStatus.WorkerFailed message ->
                 GitPagedDiffViewer.MessageState(prefix, "worker-failed", "The diff worker failed", Some message)
-            | PagedDiffStatus.Closed -> GitPagedDiffViewer.MessageState(prefix, "closed", "The diff is closed", None)
             | PagedDiffStatus.Failed message ->
                 GitPagedDiffViewer.MessageState(prefix, "failed", "The diff could not be opened", Some message)
             | PagedDiffStatus.Ready
             | PagedDiffStatus.LoadingNext
-            | PagedDiffStatus.Expanding _ ->
-                if noChanges then
+            | PagedDiffStatus.Reopening ->
+                if noChanges && status <> PagedDiffStatus.Reopening then
                     Html.div [
                         prop.testId $"{prefix}-no-changes"
                         prop.className
@@ -1136,21 +1354,32 @@ type GitPagedDiffViewer =
                         prop.text "No changes"
                     ]
                 else
-                    GitPagedDiffViewer.Grid(
-                        rows.ToArray(),
-                        previousTitle,
-                        currentTitle,
-                        prefix,
-                        parts.Length,
-                        hasMore,
-                        progress,
-                        status,
-                        requestExpand,
-                        requestLineSlice,
-                        defaultArg pendingLineSlices [||],
-                        requestReplay,
-                        requestNext
-                    )
+                    // Both statuses render the same two children, so the grid keeps its scroll
+                    // position when a reopen starts or ends.
+                    React.Fragment [
+                        if status = PagedDiffStatus.Reopening then
+                            GitPagedDiffViewer.ReopeningBar(prefix, progress)
+                        else
+                            Html.none
+                        GitPagedDiffViewer.Grid(
+                            rows.ToArray(),
+                            rowParts.ToArray(),
+                            previousTitle,
+                            currentTitle,
+                            prefix,
+                            (parts |> Array.tryLast |> Option.map box |> Option.defaultValue null),
+                            hasMore,
+                            progress,
+                            status,
+                            defaultArg expandingGaps [||],
+                            requestExpand,
+                            requestLineSlice,
+                            defaultArg pendingLineSlices [||],
+                            defaultArg pendingReplays [||],
+                            requestReplay,
+                            requestNext
+                        )
+                    ]
 
         GitComparisonView.PanelShell
             (React.Fragment [

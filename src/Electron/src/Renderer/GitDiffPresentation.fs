@@ -144,12 +144,11 @@ let status (value: Renderer.Types.GitDiffPageStatus) : PagedDiffStatus =
         )
     | Renderer.Types.GitDiffPageStatus.Ready -> PagedDiffStatus.Ready
     | Renderer.Types.GitDiffPageStatus.LoadingNext -> PagedDiffStatus.LoadingNext
-    | Renderer.Types.GitDiffPageStatus.Expanding gapId -> PagedDiffStatus.Expanding gapId
+    | Renderer.Types.GitDiffPageStatus.Reopening _ -> PagedDiffStatus.Reopening
     | Renderer.Types.GitDiffPageStatus.Blocked(diffSide, reason) ->
         PagedDiffStatus.Blocked(diffSide |> Option.map side, blockReasonText reason)
     | Renderer.Types.GitDiffPageStatus.SourceChanged -> PagedDiffStatus.SourceChanged
     | Renderer.Types.GitDiffPageStatus.WorkerFailed message -> PagedDiffStatus.WorkerFailed message
-    | Renderer.Types.GitDiffPageStatus.Closed -> PagedDiffStatus.Closed
     | Renderer.Types.GitDiffPageStatus.Failed message -> PagedDiffStatus.Failed message
 
 /// The path of the side, with the short revision when the side comes from a commit.

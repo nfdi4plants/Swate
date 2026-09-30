@@ -39,7 +39,8 @@ module Virtual =
     type Virtualizer<'A, 'B> =
         member this.getVirtualItems() : VirtualItem[] = jsNative
         member this.getVirtualIndexes() : int[] = jsNative
-        member this.getMeasurements() : VirtualItem[] = jsNative
+        /// The measured items, current after each render.
+        member this.measurementsCache: VirtualItem[] = jsNative
         member this.getTotalSize() : int = jsNative
 
         [<ParamObject(1)>]

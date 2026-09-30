@@ -1,6 +1,8 @@
 module ElectronCore.VersionControlTextDiffTests
 
 open Fable.Core
+open Fable.Core.JsInterop
+open Main
 open Main.VersionControl
 open Swate.Electron.Shared.VersionControlTypes
 open VersionControlService.Abstractions
@@ -212,6 +214,173 @@ let private expectInvalid (result: Result<'T, OperationFailure>) =
     match result with
     | Error failure -> Vitest.expect(failure.Code).toBe VersionControlCodes.InvalidDiffRequest
     | Ok value -> failwith $"Expected a rejected request, got {value}"
+
+/// Fails with a message that names the awaited event when it does not happen in time.
+let private within (milliseconds: int) (description: string) (pending: JS.Promise<unit>) : JS.Promise<unit> =
+    Promise.race [
+        pending
+        promise {
+            do! Promise.sleep milliseconds
+            return failwith $"{description} did not happen within {milliseconds} ms."
+        }
+    ]
+
+let private unexpected (name: string) : Async<OperationResult<'T>> = async {
+    return failwith $"{name} was not expected."
+}
+
+/// A text diff service whose calls all fail the test. Each test replaces the calls it expects.
+let private unexpectedService: TextDiffService = {
+    Open = fun _ _ -> unexpected "Open"
+    ReadPage = fun _ _ -> unexpected "ReadPage"
+    ReplayPage = fun _ _ -> unexpected "ReplayPage"
+    Expand = fun _ _ -> unexpected "Expand"
+    ReadLine = fun _ _ -> unexpected "ReadLine"
+    GetSourceInfo = fun _ _ -> unexpected "GetSourceInfo"
+    Close = fun _ _ -> unexpected "Close"
+}
+
+/// A runtime with one provider that owns the workspace root and opens a core-only session
+/// carrying the given text diff service. Opening the session waits for the gate.
+let private textDiffRuntime
+    (workspaceRoot: string)
+    (sessionGate: JS.Promise<unit>)
+    (service: TextDiffService)
+    : VersionControlRuntime.VersionControlRuntime =
+    let providerId = ProviderId.tryCreate "git" |> Result.defaultWith failwith
+
+    let unsupported () = async { return Failed(OperationFailure.create Unsupported "operation_not_supported" "fake") }
+
+    let binding root : WorkspaceBinding = {
+        SchemaVersion = WorkspaceBinding.CurrentSchemaVersion
+        ProviderId = providerId
+        WorkspaceRoot = root
+        ProviderStateRef = None
+        Location = {
+            ProviderId = providerId
+            DisplayName = None
+            ProviderLocation = root
+            ConnectionProfileId = None
+        }
+        ConnectionProfileId = None
+    }
+
+    let core: CoreVersionControl = {
+        GetStatus = fun _ -> unsupported ()
+        ListRefs = fun _ -> unsupported ()
+        CreateRef = fun _ _ -> unsupported ()
+        PreflightSwitchRef = fun _ _ -> unsupported ()
+        SwitchRef = fun _ _ -> unsupported ()
+        CreateRevision = fun _ _ -> unsupported ()
+        RestorePaths = fun _ _ -> unsupported ()
+        GetDiffSummary = fun _ -> unsupported ()
+    }
+
+    let factory: ProviderFactory = {
+        Id = providerId
+        Probe =
+            fun path -> async {
+                let detected = WorkspaceBindingStore.rootsEqual CaseInsensitive path workspaceRoot
+
+                return
+                    if detected then
+                        Detected(workspaceRoot, 50, None)
+                    else
+                        NotDetected
+            }
+        VerifyLocation = fun _ _ -> unsupported ()
+        Initialize = fun _ _ -> unsupported ()
+        Clone = fun _ _ -> unsupported ()
+        Adopt = fun request _ -> async { return OperationResult.succeeded (binding request.WorkspaceRoot) }
+        Bind = fun _ _ -> unsupported ()
+        Open =
+            fun opened _ -> async {
+                do! Async.AwaitPromise sessionGate
+
+                let session =
+                    WorkspaceSession.createCoreOnly
+                        {
+                            ProviderId = opened.ProviderId
+                            WorkspaceRoot = opened.WorkspaceRoot
+                            Location = Some opened.Location
+                        }
+                        core
+
+                return OperationResult.succeeded { session with TextDiff = Some service }
+            }
+        CheckDependencies = fun _ -> async { return OperationResult.succeeded [||] }
+        InstallDependency = fun _ _ -> unsupported ()
+    }
+
+    {
+        Catalog = ProviderComposition.createCatalog [ factory ]
+        Bindings = TestHelpers.memoryBindings ()
+        PathCaseSensitivity = CaseInsensitive
+    }
+
+/// Registers a vault at the workspace root for each window and lets every window's web
+/// contents resolve to its window.
+let private registerWindows (workspaceRoot: string) (windowIds: int list) =
+    let windows =
+        windowIds
+        |> List.map (fun windowId ->
+            let window = TestHelpers.testWindow ()
+            window?id <- windowId
+            let vault = Main.ArcVault.ArcVault(window)
+            vault.path <- Some workspaceRoot
+            Main.ArcVault.ARC_VAULTS.Vaults.[windowId] <- vault
+            windowId, window
+        )
+
+    TestHelpers.electronMock?setBrowserWindowFromWebContents (fun (webContents: obj) ->
+        windows
+        |> List.tryFind (fun (windowId, _) -> windowId = unbox<int> webContents?id)
+        |> Option.map (snd >> box)
+        |> Option.defaultValue null
+    )
+    |> ignore
+
+let private sourceInfo (path: string) : DiffSourceInfo = {
+    Path = RepositoryPath.tryCreate path |> Result.defaultWith failwith
+    Revision = None
+    IsAbsent = false
+    ByteLength = 1L
+    LineCount = Some 1L
+    Encoding = Some "utf-8"
+    EncodingWasChosen = false
+    HasBom = false
+}
+
+let private openedDiff (handleId: string) (path: string) : OpenDiffResult =
+    OpenDiffResult.Opened(
+        { Id = handleId; Version = "v1" },
+        sourceInfo path,
+        sourceInfo path,
+        Resumable.Ready {
+            PageId = "page-1"
+            NextCursor = None
+            Parts = [||]
+            Progress = { progress with ScanComplete = true }
+            OutputComplete = true
+            Pending = None
+        }
+    )
+
+let private openRequest (operationId: string) (path: string) : OpenTextDiffRequestDto = {
+    OperationId = operationId
+    Path = path
+    PreviousPath = None
+    PreparationTokenId = None
+    PreviousEncoding = None
+    CurrentEncoding = None
+    ContextLines = 3
+    Continuation = None
+}
+
+let private failureCodeOf (result: Result<OperationResultDto<'T>, exn>) =
+    match result with
+    | Ok(OperationResultDto.Failed failure) -> failure.Code
+    | other -> failwith $"Expected a failed call, got {other}"
 
 Vitest.describe (
     "Text diff IPC payload size",
@@ -659,6 +828,15 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "evidence whose surrogate pair starts at unit 255 is cut before the pair",
+            fun () ->
+                let kept = String.replicate 255 "x"
+                let mapped = boundFailure (failureWith "not text" (kept + "\U0001F600"))
+
+                Vitest.expect(mapped.DiffDetail |> Option.map _.Evidence).toEqual (Some kept)
+        )
+
+        Vitest.test (
             "details lines are cut to 256 characters and 4 KiB in total, warnings to 4 KiB each",
             fun () ->
                 let details =
@@ -832,7 +1010,7 @@ Vitest.describe (
                         service
                         (handle "after-reload")
 
-                    do! bothClosed
+                    do! within 2000 "Closing both handles" bothClosed
 
                     Vitest.expect(closes |> Seq.sort |> Seq.toArray).toEqual [|
                         "before-reload", Some reloadedWindow
@@ -866,6 +1044,183 @@ Vitest.describe (
                     TextDiffHandles.isWindowAlive <- originalIsWindowAlive
                     TextDiffHandles.windowClosed reloadedWindow
                     WorkspaceSessionHost.resetForTests ()
+            }
+        )
+
+        Vitest.test (
+            "reloading and closing a window close its recorded handles as operations of that window",
+            fun () -> promise {
+                let! root = TestHelpers.createTempDirectoryAsync "swate-text-diff-window-close-"
+                let reloadedWindow = 5
+                let closedWindow = 7
+                let originalIsWindowAlive = TextDiffHandles.isWindowAlive
+                TextDiffHandles.isWindowAlive <- fun _ -> true
+                let closes = ResizeArray<string * int option>()
+                let allClosed, resolveAllClosed = TestHelpers.deferred ()
+
+                let service = {
+                    unexpectedService with
+                        Close =
+                            fun handle context -> async {
+                                closes.Add(
+                                    handle.Id,
+                                    WorkspaceSessionHost.get().TryGetOperationWindowId context.OperationId
+                                )
+
+                                if closes.Count = 3 then
+                                    resolveAllClosed ()
+
+                                return OperationResult.succeeded ()
+                            }
+                }
+
+                let host =
+                    WorkspaceSessionHost.WorkspaceSessionHost(textDiffRuntime root (Promise.lift ()) service)
+
+                WorkspaceSessionHost.initialize host
+
+                try
+                    let! opened =
+                        host.OpenSession(root, TestHelpers.detached "open-session")
+                        |> Async.StartAsPromise
+
+                    let hosted = TestHelpers.expectValue "session open" opened
+
+                    let record windowId handleId =
+                        TextDiffHandles.recordOrClose
+                            (Some windowId)
+                            (TextDiffHandles.reloadCount (Some windowId))
+                            hosted.Binding.WorkspaceRoot
+                            service
+                            { Id = handleId; Version = "v1" }
+
+                    record reloadedWindow "reloaded-1"
+                    record reloadedWindow "reloaded-2"
+                    record closedWindow "closed-1"
+
+                    Vitest.expect(closes.Count).toBe 0
+
+                    TextDiffHandles.windowReloaded reloadedWindow
+                    TextDiffHandles.windowClosed closedWindow
+                    do! within 2000 "Closing the three handles" allClosed
+
+                    Vitest.expect(closes |> Seq.sort |> Seq.toArray).toEqual [|
+                        "closed-1", Some closedWindow
+                        "reloaded-1", Some reloadedWindow
+                        "reloaded-2", Some reloadedWindow
+                    |]
+
+                    for handleId in [ "reloaded-1"; "reloaded-2"; "closed-1" ] do
+                        Vitest.expect(TextDiffHandles.isRecorded handleId).toBe false
+                finally
+                    TextDiffHandles.isWindowAlive <- originalIsWindowAlive
+                    TextDiffHandles.windowClosed reloadedWindow
+                    WorkspaceSessionHost.resetForTests ()
+
+                do! host.CloseAll() |> Async.StartAsPromise
+                do! TestHelpers.removeDirectoryAsync root
+            }
+        )
+
+        Vitest.test (
+            "the text diff IPC handlers keep a handle to the window that opened it",
+            fun () -> promise {
+                let! root = TestHelpers.createTempDirectoryAsync "swate-text-diff-ipc-owner-"
+                let windowA = 81
+                let windowB = 82
+                let originalIsWindowAlive = TextDiffHandles.isWindowAlive
+                TextDiffHandles.isWindowAlive <- fun _ -> true
+                let sessionGate, releaseSession = TestHelpers.deferred ()
+                let reloadClosed, resolveReloadClosed = TestHelpers.deferred ()
+                let closes = ResizeArray<string * int option>()
+                let reads = ResizeArray<string>()
+
+                let service = {
+                    unexpectedService with
+                        Open =
+                            fun request _ -> async {
+                                let path = RepositoryPath.value request.Path
+                                let handleId = if path = "reload.txt" then "h-reload" else "h-a"
+                                return OperationResult.succeeded (Resumable.Ready(openedDiff handleId path))
+                            }
+                        ReadPage =
+                            fun request _ -> async {
+                                reads.Add request.Handle.Id
+                                return! unexpected "ReadPage"
+                            }
+                        Close =
+                            fun handle context -> async {
+                                closes.Add(
+                                    handle.Id,
+                                    WorkspaceSessionHost.get().TryGetOperationWindowId context.OperationId
+                                )
+
+                                if handle.Id = "h-reload" then
+                                    resolveReloadClosed ()
+
+                                return OperationResult.succeeded ()
+                            }
+                }
+
+                let host =
+                    WorkspaceSessionHost.WorkspaceSessionHost(textDiffRuntime root sessionGate service)
+
+                WorkspaceSessionHost.initialize host
+                registerWindows root [ windowA; windowB ]
+                let apiA = Main.IPC.IVersionControlApi.api (TestHelpers.ipcEvent windowA)
+                let apiB = Main.IPC.IVersionControlApi.api (TestHelpers.ipcEvent windowB)
+
+                try
+                    // The window reloads while the session of the open is still opening.
+                    let reloadOpen = apiA.openTextDiff (openRequest "open-reload" "reload.txt")
+                    TextDiffHandles.windowReloaded windowA
+                    releaseSession ()
+                    let! _ = reloadOpen
+                    do! within 2000 "Closing the handle of the open that the reload outran" reloadClosed
+
+                    Vitest.expect(closes |> Seq.toArray).toEqual [| "h-reload", Some windowA |]
+                    Vitest.expect(TextDiffHandles.isRecorded "h-reload").toBe false
+
+                    let! opened = apiA.openTextDiff (openRequest "open-a" "a.txt")
+                    TestHelpers.expectDtoValue "open from window A" opened |> ignore
+                    Vitest.expect(TextDiffHandles.isRecorded "h-a").toBe true
+
+                    let! readFromB =
+                        apiB.readTextDiffPage {
+                            OperationId = "read-b"
+                            HandleId = "h-a"
+                            HandleVersion = "v1"
+                            Cursor = "cursor"
+                        }
+
+                    Vitest.expect(failureCodeOf readFromB).toBe TextDiffFailureCodes.SessionClosed
+                    Vitest.expect(reads.Count).toBe 0
+
+                    let handleRequest operationId : TextDiffHandleRequestDto = {
+                        OperationId = operationId
+                        HandleId = "h-a"
+                        HandleVersion = "v1"
+                    }
+
+                    let! closeFromB = apiB.closeTextDiff (handleRequest "close-b")
+                    Vitest.expect(failureCodeOf closeFromB).toBe TextDiffFailureCodes.SessionClosed
+                    Vitest.expect(closes.Count).toBe 1
+                    Vitest.expect(TextDiffHandles.isRecorded "h-a").toBe true
+
+                    let! closeFromA = apiA.closeTextDiff (handleRequest "close-a")
+                    TestHelpers.expectDtoValue "close from window A" closeFromA |> ignore
+                    Vitest.expect(closes |> Seq.last).toEqual ("h-a", Some windowA)
+                    Vitest.expect(TextDiffHandles.isRecorded "h-a").toBe false
+                finally
+                    TextDiffHandles.isWindowAlive <- originalIsWindowAlive
+                    TextDiffHandles.windowClosed windowA
+                    TextDiffHandles.windowClosed windowB
+                    Main.ArcVault.ARC_VAULTS.Vaults.Clear()
+                    TestHelpers.electronMock?reset () |> ignore
+                    WorkspaceSessionHost.resetForTests ()
+
+                do! host.CloseAll() |> Async.StartAsPromise
+                do! TestHelpers.removeDirectoryAsync root
             }
         )
 )

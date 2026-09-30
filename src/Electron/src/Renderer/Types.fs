@@ -60,11 +60,13 @@ type GitDiffPageStatus =
     | EncodingChoice of side: DiffSideDto * token: PreparationTokenDto * candidates: EncodingCandidateDto[]
     | Ready
     | LoadingNext
-    | Expanding of gapId: string
+    /// The diff opens again after its session ended. The pages the new session has read so far
+    /// replace the old pages at the same index. The old pages after them stay on screen until
+    /// the reopen reaches the page the user was viewing.
+    | Reopening of pagesRead: int
     | Blocked of side: DiffSideDto option * reason: GitDiffBlockReason
     | SourceChanged
     | WorkerFailed of message: string
-    | Closed
     | Failed of message: string
 
 /// The rows one expansion of a gap returned. Collapsing puts a hidden gap with the expanded
@@ -112,6 +114,12 @@ type GitDiffPageData = {
     NextRequest: GitDiffNextRequest option
     /// Line slices requested and not answered yet.
     PendingLineSlices: PagedLineSliceRequest list
+    /// Gaps whose expansion is running. A gap is expanded by one request at a time.
+    ExpandingGaps: string list
+    /// Evicted pages whose replay is running. At most one replay runs at a time.
+    PendingReplays: string list
+    /// Pages the viewer showed when it asked for the last replay. Eviction keeps them.
+    VisiblePages: string list
     Progress: ScanProgressDto option
     Pending: PendingPreviewDto option
     OutputComplete: bool

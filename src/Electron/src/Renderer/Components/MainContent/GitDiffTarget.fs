@@ -18,6 +18,25 @@ let Main (page: GitDiffPageData) =
     let parts =
         React.useMemo ((fun () -> page.Pages |> Array.collect _.Parts), [| box page.Pages |])
 
+    // The page of each part, so the part range the viewer reports maps back to page ids.
+    let partPages =
+        React.useMemo (
+            (fun () ->
+                page.Pages
+                |> Array.collect (fun windowPage -> windowPage.Parts |> Array.map (fun _ -> windowPage.PageId))
+            ),
+            [| box page.Pages |]
+        )
+
+    let visiblePages (firstPart: int) (lastPart: int) =
+        if firstPart < 0 || lastPart < firstPart then
+            []
+        else
+            [
+                for index in firstPart .. min lastPart (partPages.Length - 1) -> partPages.[index]
+            ]
+            |> List.distinct
+
     let previousTitle, currentTitle =
         match page.SourceInfos with
         | Some infos -> Presentation.sourceTitle infos.Previous, Presentation.sourceTitle infos.Current
@@ -55,6 +74,7 @@ let Main (page: GitDiffPageData) =
                         ?pending = (page.Pending |> Option.map Presentation.pending),
                         requestNext = (fun () -> send (GitDiffMsg.LoadNext generation)),
                         requestExpand = (fun gapId fromStart -> send (GitDiffMsg.Expand(generation, gapId, fromStart))),
+                        expandingGaps = Array.ofList page.ExpandingGaps,
                         requestLineSlice =
                             (fun side line offsetUtf16 ->
                                 send (
@@ -62,7 +82,11 @@ let Main (page: GitDiffPageData) =
                                 )
                             ),
                         pendingLineSlices = Array.ofList page.PendingLineSlices,
-                        requestReplay = (fun pageId -> send (GitDiffMsg.Replay(generation, pageId))),
+                        requestReplay =
+                            (fun pageId firstPart lastPart ->
+                                send (GitDiffMsg.Replay(generation, pageId, visiblePages firstPart lastPart))
+                            ),
+                        pendingReplays = Array.ofList page.PendingReplays,
                         chooseEncoding =
                             (fun side encoding ->
                                 send (GitDiffMsg.ChooseEncoding(generation, Presentation.sideDto side, encoding))

@@ -316,6 +316,7 @@ let private defaultDependencies: GitDependencies = {
     getStoragePolicySettings = fun _ -> unexpectedPromise "getStoragePolicySettings"
     setStoragePolicySettings = fun _ -> unexpectedPromise "setStoragePolicySettings"
     loadConflictPage = fun _ _ _ -> unexpectedPromise "loadConflictPage"
+    updatePageState = ignore
     initializeWorkspace = fun _ -> unexpectedPromise "initializeWorkspace"
     bindWorkspace = fun _ -> unexpectedPromise "bindWorkspace"
     createRemoteProject = fun _ -> unexpectedGitLab "createRemoteProject"

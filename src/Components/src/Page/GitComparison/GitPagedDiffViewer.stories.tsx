@@ -20,13 +20,12 @@ import {
   PagedPart_HunkRows,
   PagedPart_UnalignedRegion,
   PagedDiffStatus_Blocked,
-  PagedDiffStatus_Closed,
   PagedDiffStatus_EncodingChoice,
-  PagedDiffStatus_Expanding,
   PagedDiffStatus_Failed,
   PagedDiffStatus_LoadingNext,
   PagedDiffStatus_Opening,
   PagedDiffStatus_Ready,
+  PagedDiffStatus_Reopening,
   PagedDiffStatus_Scanning,
   PagedDiffStatus_SourceChanged,
   PagedDiffStatus_WorkerFailed,
@@ -171,6 +170,18 @@ function replaceHunkRows(
   });
 }
 
+// Appends the slice text after the displayed text, the way the app merges a line slice.
+function mergeSlice(line: PagedLine, sliceText: string) {
+  return makeLine(
+    line.Number,
+    line.Text + sliceText,
+    line.Ending,
+    line.OffsetUtf16,
+    line.OffsetUtf16 + line.Text.length + sliceText.length,
+    line.Highlights,
+  );
+}
+
 function InteractionHarness({
   onRequestExpand,
   onRequestLineSlice,
@@ -198,13 +209,11 @@ function InteractionHarness({
   const requestLineSlice = (side: "previous" | "current", number: number, offset: number) => {
     onRequestLineSlice?.(side, number, offset);
     if (side !== "current" || number !== 15) return;
-    const nextText = "continued segment";
     setParts((current) =>
       replaceHunkRows(current, (rows) =>
         rows.map((row) => {
-          if (row.Id !== "row-15") return row;
-          const nextLine = makeLine(number, nextText, "lF", offset, offset + nextText.length);
-          return new PagedRow(row.Id, row.Kind, row.Previous, nextLine);
+          if (row.Id !== "row-15" || !row.Current) return row;
+          return new PagedRow(row.Id, row.Kind, row.Previous, mergeSlice(row.Current, "continued segment"));
         }),
       ),
     );
@@ -229,7 +238,32 @@ function InteractionHarness({
   );
 }
 
-function FakePagedSource({ onRequestNext }: { onRequestNext?: () => void }) {
+// Collects every earlier page into one placeholder whenever a page is added, the way the app
+// evicts pages far from the end. The part count then stays the same while pages keep coming.
+function collapseOlderParts(parts: PagedPart_$union[], evictions: number) {
+  if (parts.length < 2) return parts;
+  const older = parts.slice(0, -1);
+  const rowCount = older.reduce((total, part) => {
+    if (part.tag === 0) return total + (part.fields[5] as PagedRow[]).length;
+    if (part.tag === 1) {
+      const [, previous, current] = part.fields as [string, PagedLine[], PagedLine[]];
+      return total + Math.max(previous.length, current.length);
+    }
+    if (part.tag === 4) return total + (part.fields[1] as number);
+    return total;
+  }, 0);
+  return [PagedPart_EvictedPage(`evicted-${evictions}`, rowCount), parts[parts.length - 1]];
+}
+
+function FakePagedSource({
+  onRequestNext,
+  evictOlderPages = false,
+  testIdPrefix,
+}: {
+  onRequestNext?: () => void;
+  evictOlderPages?: boolean;
+  testIdPrefix: string;
+}) {
   const [model, setModel] = React.useState(() => ({
     parts: [
       PagedPart_HiddenGap("lead-gap", range(0, 35), range(0, 35)),
@@ -238,6 +272,7 @@ function FakePagedSource({ onRequestNext }: { onRequestNext?: () => void }) {
     nextStart: 55,
     hasMore: true,
     outputComplete: false,
+    evictions: 0,
     progress: new PagedProgress(350, GENERATED_LINE_COUNT * 10, false),
   }));
 
@@ -266,11 +301,13 @@ function FakePagedSource({ onRequestNext }: { onRequestNext?: () => void }) {
       }
 
       const complete = nextStart >= GENERATED_LINE_COUNT;
+      const appended = [...current.parts, part];
       return {
-        parts: [...current.parts, part],
+        parts: evictOlderPages ? collapseOlderParts(appended, current.evictions + 1) : appended,
         nextStart,
         hasMore: !complete,
         outputComplete: complete,
+        evictions: current.evictions + 1,
         progress: new PagedProgress(nextStart * 10, GENERATED_LINE_COUNT * 10, complete),
       };
     });
@@ -287,7 +324,7 @@ function FakePagedSource({ onRequestNext }: { onRequestNext?: () => void }) {
         requestNext={requestNext}
         previousTitle="Generated previous text"
         currentTitle="Generated current text"
-        testIdPrefix="git-paged-continue"
+        testIdPrefix={testIdPrefix}
       />
     </div>
   );
@@ -300,12 +337,14 @@ function EvictedHarness({ onRequestReplay }: { onRequestReplay?: (pageId: string
     PagedPart_EvictedPage("old-page", PAGE_LIMIT),
     PagedPart_HunkRows("after-replay", range(60, 8), range(60, 8), true, true, makeAlignedRows(60, 8)),
   ]);
-  const replayCount = React.useRef(0);
+  const [pendingReplays, setPendingReplays] = React.useState<string[]>([]);
 
   const requestReplay = (pageId: string) => {
     onRequestReplay?.(pageId);
-    replayCount.current += 1;
-    if (replayCount.current < 2) return;
+    setPendingReplays([pageId]);
+  };
+
+  const completeReplay = () => {
     setParts((current) =>
       current.flatMap((part) =>
         part.tag === 4
@@ -313,10 +352,12 @@ function EvictedHarness({ onRequestReplay }: { onRequestReplay?: (pageId: string
           : [part],
       ),
     );
+    setPendingReplays([]);
   };
 
   return (
     <div style={{ height: "40rem" }}>
+      <button data-testid="git-paged-replay-complete" onClick={completeReplay}>Complete replay</button>
       <GitPagedDiffViewerComponent
         parts={parts}
         status={PagedDiffStatus_Ready()}
@@ -324,7 +365,88 @@ function EvictedHarness({ onRequestReplay }: { onRequestReplay?: (pageId: string
         hasMore={false}
         outputComplete={false}
         requestReplay={requestReplay}
+        pendingReplays={pendingReplays}
         testIdPrefix="git-paged-replay"
+      />
+    </div>
+  );
+}
+
+const VIEWPORT_PAGE_COUNT = 40;
+const VIEWPORT_PAGE_ROWS = 3;
+
+type ReplayRecord = { pageId: string; runningAtRequest: number };
+
+// Every page starts evicted. A replay answers after a short delay and reports itself as
+// running until then, like the loader does.
+function ViewportReplayHarness({ onReplay }: { onReplay: (record: ReplayRecord) => void }) {
+  const [parts, setParts] = React.useState<PagedPart_$union[]>(() =>
+    Array.from({ length: VIEWPORT_PAGE_COUNT }, (_, index) => PagedPart_EvictedPage(`page-${index}`, VIEWPORT_PAGE_ROWS)),
+  );
+  const [pendingReplays, setPendingReplays] = React.useState<string[]>([]);
+  const running = React.useRef<string[]>([]);
+
+  const requestReplay = (pageId: string) => {
+    onReplay({ pageId, runningAtRequest: running.current.length });
+    running.current = [...running.current, pageId];
+    setPendingReplays(running.current);
+
+    window.setTimeout(() => {
+      const index = Number(pageId.replace("page-", ""));
+      setParts((current) =>
+        current.map((part) =>
+          part.tag === 4 && part.fields[0] === pageId
+            ? PagedPart_HunkRows(
+                `hunk-${index}`,
+                range(index * VIEWPORT_PAGE_ROWS, VIEWPORT_PAGE_ROWS),
+                range(index * VIEWPORT_PAGE_ROWS, VIEWPORT_PAGE_ROWS),
+                false,
+                false,
+                makeAlignedRows(index * VIEWPORT_PAGE_ROWS, VIEWPORT_PAGE_ROWS, -1, -1),
+              )
+            : part,
+        ),
+      );
+      running.current = running.current.filter((id) => id !== pageId);
+      setPendingReplays(running.current);
+    }, 20);
+  };
+
+  return (
+    <div style={{ height: "40rem" }}>
+      <GitPagedDiffViewerComponent
+        parts={parts}
+        status={PagedDiffStatus_Ready()}
+        progress={new PagedProgress(100, 100, true)}
+        hasMore={false}
+        outputComplete={true}
+        requestReplay={requestReplay}
+        pendingReplays={pendingReplays}
+        testIdPrefix="git-paged-viewport"
+      />
+    </div>
+  );
+}
+
+function ReopenHarness() {
+  const [reopening, setReopening] = React.useState(false);
+  const parts = [
+    PagedPart_HunkRows("reopen-hunk", range(0, 60), range(0, 60), true, false, makeAlignedRows(0, 60, -1, -1)),
+    PagedPart_HiddenGap("reopen-gap", range(60, 30), range(60, 30)),
+  ];
+  return (
+    <div style={{ height: "32rem" }}>
+      <button data-testid="git-paged-reopen-toggle" onClick={() => setReopening((current) => !current)}>
+        Toggle reopen
+      </button>
+      <GitPagedDiffViewerComponent
+        parts={parts}
+        status={reopening ? PagedDiffStatus_Reopening() : PagedDiffStatus_Ready()}
+        progress={new PagedProgress(30, 100, false)}
+        hasMore={false}
+        outputComplete={false}
+        requestExpand={() => {}}
+        testIdPrefix="git-paged-reopen"
       />
     </div>
   );
@@ -345,11 +467,39 @@ async function scrollToEnd(element: HTMLElement) {
   await fireEvent.scroll(element, { target: { scrollTop: top } });
 }
 
+async function scrollTo(element: HTMLElement, top: number) {
+  element.scrollTop = top;
+  await fireEvent.scroll(element, { target: { scrollTop: top } });
+}
+
+const onRequestExpand = fn();
+const onRequestLineSlice = fn();
+const onRequestNext = fn();
+const onRequestNextAfterEvictions = fn();
+const onRequestReplay = fn();
+const onViewportReplay = fn();
+const onChooseEncoding = fn();
+const onAnchorExpand = fn();
+
 const meta = {
   title: "Page Components/GitComparison/GitPagedDiffViewer",
   component: GitPagedDiffViewerComponent,
   tags: ["autodocs"],
   parameters: { layout: "fullscreen" },
+  beforeEach: () => {
+    for (const mock of [
+      onRequestExpand,
+      onRequestLineSlice,
+      onRequestNext,
+      onRequestNextAfterEvictions,
+      onRequestReplay,
+      onViewportReplay,
+      onChooseEncoding,
+      onAnchorExpand,
+    ]) {
+      mock.mockClear();
+    }
+  },
   decorators: [
     (Story) => (
       <div className="swt:h-[80vh] swt:min-h-192 swt:bg-base-200 swt:p-6">
@@ -361,9 +511,6 @@ const meta = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
-
-const onRequestExpand = fn();
-const onRequestLineSlice = fn();
 
 export const PagedSourceInteractions: Story = {
   render: () => (
@@ -379,34 +526,50 @@ export const PagedSourceInteractions: Story = {
     await expect(firstGap).toHaveTextContent("12");
     await expect(root).toHaveTextContent("@@ -13,20 +13,20 @@");
 
-    await fireEvent.click(canvas.getByTestId("git-paged-interactions-gap-expand-up-focus-gap"));
-    await waitFor(() => expect(canvas.getByTestId("git-paged-interactions-gap-expand-down-focus-gap-right")).toBeEnabled());
+    // The control at the top of a gap reveals its first lines, the one at the bottom its last lines.
+    const startControl = canvas.getByTestId("git-paged-interactions-gap-expand-start-focus-gap");
+    const endControl = canvas.getByTestId("git-paged-interactions-gap-expand-end-focus-gap");
+    await expect(startControl).toHaveAttribute("data-from-start", "true");
+    await expect(endControl).toHaveAttribute("data-from-start", "false");
+    await expect(startControl.getBoundingClientRect().top).toBeLessThan(endControl.getBoundingClientRect().top);
+
+    await fireEvent.click(startControl);
+    await waitFor(() => expect(canvas.getByTestId("git-paged-interactions-gap-expand-end-focus-gap-right")).toBeEnabled());
     await expect(onRequestExpand).toHaveBeenNthCalledWith(1, "focus-gap", true);
 
-    await fireEvent.click(canvas.getByTestId("git-paged-interactions-gap-expand-down-focus-gap-right"));
-    await waitFor(() => expect(canvas.getByTestId("git-paged-interactions-gap-expand-up-focus-gap-right-left")).toBeEnabled());
+    await fireEvent.click(canvas.getByTestId("git-paged-interactions-gap-expand-end-focus-gap-right"));
+    await waitFor(() => expect(canvas.getByTestId("git-paged-interactions-gap-expand-start-focus-gap-right-left")).toBeEnabled());
     await expect(onRequestExpand).toHaveBeenNthCalledWith(2, "focus-gap-right", false);
 
-    await fireEvent.click(canvas.getByTestId("git-paged-interactions-gap-expand-up-focus-gap-right-left"));
-    await waitFor(() => expect(canvas.queryByTestId("git-paged-interactions-gap-expand-up-focus-gap-right-left")).toBeNull());
+    await fireEvent.click(canvas.getByTestId("git-paged-interactions-gap-expand-start-focus-gap-right-left"));
+    await waitFor(() => expect(canvas.queryByTestId("git-paged-interactions-gap-expand-start-focus-gap-right-left")).toBeNull());
     await expect(onRequestExpand).toHaveBeenNthCalledWith(3, "focus-gap-right-left", true);
 
     const scroll = scrollElementFor(canvasElement, "git-paged-interactions-grid");
-    scroll.scrollTop = 0;
-    await fireEvent.scroll(scroll, { target: { scrollTop: 0 } });
+    await scrollTo(scroll, 0);
 
     for (let number = 1; number <= 12; number += 1) {
       await expect(canvas.getAllByText(`Previous source line ${number}`, { exact: true })).toHaveLength(1);
       await expect(canvas.getAllByText(`Current source line ${number}`, { exact: true })).toHaveLength(1);
     }
 
-    const endingRow = canvas.getByTestId("git-paged-interactions-row-row-16");
-    await expect(endingRow).toHaveTextContent("CRLF");
-    await expect(endingRow).toHaveTextContent("LF");
+    await expect(canvas.getByTestId("git-paged-interactions-ending-previous-16")).toHaveAttribute("data-ending", "crlf");
+    await expect(canvas.getByTestId("git-paged-interactions-ending-current-16")).toHaveAttribute("data-ending", "lf");
+
+    const highlighted = canvas.getByTestId("git-paged-interactions-line-text-current-15");
+    const changedSegments = Array.from(highlighted.querySelectorAll('[data-highlight="changed"]'));
+    await expect(changedSegments.map((segment) => segment.textContent).join("")).toBe("Current");
+    const unchangedLine = canvas.getByTestId("git-paged-interactions-line-text-current-14");
+    await expect(unchangedLine.querySelectorAll('[data-highlight="changed"]')).toHaveLength(0);
 
     await fireEvent.click(canvas.getByTestId("git-paged-interactions-line-more-current-15"));
     await expect(onRequestLineSlice).toHaveBeenCalledWith("current", 15, `Current source line 16: first slice`.length);
-    await waitFor(() => expect(root).toHaveTextContent("continued segment"));
+    await waitFor(() =>
+      expect(canvas.getByTestId("git-paged-interactions-line-text-current-15")).toHaveTextContent(
+        "Current source line 16: first slicecontinued segment",
+      ),
+    );
+    await expect(canvas.queryByTestId("git-paged-interactions-line-more-current-15")).toBeNull();
 
     await scrollToEnd(scroll);
     await expect(await canvas.findByTestId("git-paged-interactions-row-unaligned:tail:32:32:label")).toBeInTheDocument();
@@ -415,10 +578,8 @@ export const PagedSourceInteractions: Story = {
   },
 };
 
-const onRequestNext = fn();
-
 export const ContinueLoadsPagedSource: Story = {
-  render: () => <FakePagedSource onRequestNext={onRequestNext} />,
+  render: () => <FakePagedSource onRequestNext={onRequestNext} testIdPrefix="git-paged-continue" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const scroll = scrollElementFor(canvasElement, "git-paged-continue-grid");
@@ -435,16 +596,34 @@ export const ContinueLoadsPagedSource: Story = {
     const root = canvas.getByTestId("git-paged-continue-root");
     await expect(root).toHaveTextContent("Current source line 120");
 
-    scroll.scrollTop = 42 * 28;
-    await fireEvent.scroll(scroll, { target: { scrollTop: scroll.scrollTop } });
+    await scrollTo(scroll, 42 * 28);
     await expect(await canvas.findByTestId("git-paged-continue-row-unaligned:fake-mismatch:75:75:label")).toBeInTheDocument();
     await expect(root).toHaveTextContent("Current unaligned line 7");
 
-    scroll.scrollTop = 0;
-    await fireEvent.scroll(scroll, { target: { scrollTop: 0 } });
-    const endingRow = await canvas.findByTestId("git-paged-continue-row-row-40");
-    await expect(endingRow).toHaveTextContent("CRLF");
-    await expect(endingRow).toHaveTextContent("LF");
+    await scrollTo(scroll, 0);
+    await expect(await canvas.findByTestId("git-paged-continue-ending-previous-40")).toHaveAttribute("data-ending", "crlf");
+    await expect(canvas.getByTestId("git-paged-continue-ending-current-40")).toHaveAttribute("data-ending", "lf");
+  },
+};
+
+export const ContinueKeepsLoadingAfterEvictions: Story = {
+  render: () => (
+    <FakePagedSource
+      onRequestNext={onRequestNextAfterEvictions}
+      evictOlderPages={true}
+      testIdPrefix="git-paged-evicting"
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-evicting-grid");
+
+    for (let expectedCall = 1; expectedCall <= 4; expectedCall += 1) {
+      await scrollToEnd(scroll);
+      await waitFor(() => expect(onRequestNextAfterEvictions.mock.calls.length).toBeGreaterThanOrEqual(expectedCall));
+    }
+    await expect(onRequestNextAfterEvictions).toHaveBeenCalledTimes(4);
+    await expect(canvas.queryByTestId("git-paged-evicting-row-continue")).toBeNull();
   },
 };
 
@@ -493,23 +672,124 @@ export const SplitUnalignedHunkRendersEveryFragment: Story = {
     for (const text of expectedLines) {
       await expect(canvas.getAllByText(text, { exact: true })).toHaveLength(1);
     }
+
+    // The previous lane lists removed lines and the current lane added lines.
+    await expect(canvas.getByTestId("git-paged-split-line-previous-0")).toHaveAttribute("data-kind", "removed");
+    await expect(canvas.getByTestId("git-paged-split-line-current-0")).toHaveAttribute("data-kind", "added");
+    await expect(canvas.getByTestId("git-paged-split-line-current-6")).toHaveAttribute("data-kind", "added");
   },
 };
 
-const onRequestReplay = fn();
+export const LongLineStaysInItsColumn: Story = {
+  render: () => (
+    <div style={{ height: "30rem" }}>
+      <GitPagedDiffViewerComponent
+        parts={[
+          PagedPart_HunkRows("long-hunk", range(0, 1), range(0, 1), true, true, [
+            new PagedRow(
+              "long-row",
+              "replaced",
+              makeLine(0, "short previous line"),
+              makeLine(0, "x".repeat(3000), "lF", 0, 10000),
+            ),
+          ]),
+        ]}
+        status={PagedDiffStatus_Ready()}
+        progress={new PagedProgress(100, 100, true)}
+        hasMore={false}
+        outputComplete={true}
+        requestLineSlice={() => {}}
+        testIdPrefix="git-paged-long"
+      />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const previousCell = canvas.getByTestId("git-paged-long-line-text-previous-0").getBoundingClientRect();
+    const currentText = canvas.getByTestId("git-paged-long-line-text-current-0");
+    const currentCell = currentText.getBoundingClientRect();
+    const loadMore = canvas.getByTestId("git-paged-long-line-more-current-0").getBoundingClientRect();
+
+    await expect(currentText.scrollWidth).toBeLessThanOrEqual(currentText.clientWidth + 1);
+    await expect(currentCell.left).toBeGreaterThanOrEqual(previousCell.right - 1);
+    await expect(loadMore.left).toBeGreaterThanOrEqual(currentCell.left - 1);
+    await expect(loadMore.right).toBeLessThanOrEqual(currentCell.right + 1);
+    await expect(loadMore.top).toBeGreaterThanOrEqual(currentCell.top - 1);
+    await expect(loadMore.bottom).toBeLessThanOrEqual(currentCell.bottom + 1);
+  },
+};
 
 export const EvictedPageReplaysWhenVisible: Story = {
   render: () => <EvictedHarness onRequestReplay={onRequestReplay} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const scroll = scrollElementFor(canvasElement, "git-paged-replay-grid");
+
     await scrollToEnd(scroll);
     await waitFor(() => expect(onRequestReplay).toHaveBeenCalledTimes(1));
+
+    // The placeholder is as tall as the rows it stands for.
+    const placeholder = canvas.getByTestId("git-paged-replay-row-evicted:old-page");
+    const rowHeight = canvas.getByTestId("git-paged-replay-row-row-60").getBoundingClientRect().height;
+    await expect(Math.abs(placeholder.getBoundingClientRect().height - PAGE_LIMIT * rowHeight)).toBeLessThan(1);
     await expect(onRequestReplay).toHaveBeenCalledWith("old-page");
-    await fireEvent.click(canvas.getByTestId("git-paged-replay-evicted-old-page"));
-    await expect(onRequestReplay).toHaveBeenCalledTimes(2);
-    await expect(canvas.getByTestId("git-paged-replay-row-row-40")).toBeInTheDocument();
-    await expect(canvas.queryByTestId("git-paged-replay-row-evicted:old-page")).toBeNull();
+    await waitFor(() => expect(canvas.getByTestId("git-paged-replay-evicted-old-page")).toBeDisabled());
+    await expect(onRequestReplay).toHaveBeenCalledTimes(1);
+
+    await fireEvent.click(canvas.getByTestId("git-paged-replay-complete"));
+    await waitFor(() => expect(canvas.queryByTestId("git-paged-replay-row-evicted:old-page")).toBeNull());
+    await expect(canvas.getByTestId("git-paged-replay-row-row-59")).toBeInTheDocument();
+    await expect(onRequestReplay).toHaveBeenCalledTimes(1);
+  },
+};
+
+export const ReplaysOnlyPagesInView: Story = {
+  render: () => <ViewportReplayHarness onReplay={onViewportReplay} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-viewport-grid");
+    const pageHeight = VIEWPORT_PAGE_ROWS * 28;
+    const pagesInView = Math.ceil(scroll.clientHeight / pageHeight);
+
+    await waitFor(() => expect(canvas.queryByTestId("git-paged-viewport-row-evicted:page-0")).toBeNull());
+    await waitFor(() => expect(canvas.queryByTestId(`git-paged-viewport-row-evicted:page-${pagesInView - 1}`)).toBeNull());
+    await new Promise((resolve) => window.setTimeout(resolve, 200));
+
+    const records = onViewportReplay.mock.calls.map(([record]) => record as ReplayRecord);
+    const pageIds = records.map((record) => record.pageId);
+
+    await expect(records.every((record) => record.runningAtRequest === 0)).toBe(true);
+    await expect(new Set(pageIds).size).toBe(pageIds.length);
+    await expect(pageIds.length).toBeLessThanOrEqual(pagesInView);
+    await expect(pageIds.every((pageId) => Number(pageId.replace("page-", "")) < pagesInView)).toBe(true);
+    await expect(canvas.getByTestId(`git-paged-viewport-row-evicted:page-${pagesInView + 2}`)).toBeInTheDocument();
+  },
+};
+
+export const ReopeningKeepsTheGridInPlace: Story = {
+  render: () => <ReopenHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const grid = canvas.getByTestId("git-paged-reopen-grid");
+    const scroll = scrollElementFor(canvasElement, "git-paged-reopen-grid");
+    await scrollTo(scroll, 20 * 28);
+    const scrollTop = scroll.scrollTop;
+    await expect(scrollTop).toBeGreaterThan(0);
+
+    await fireEvent.click(canvas.getByTestId("git-paged-reopen-toggle"));
+    await expect(await canvas.findByTestId("git-paged-reopen-reopening")).toHaveAttribute("data-progress", "30");
+    await expect(canvas.getByTestId("git-paged-reopen-grid")).toBe(grid);
+    await expect(scroll.scrollTop).toBe(scrollTop);
+
+    await scrollToEnd(scroll);
+    await expect(await canvas.findByTestId("git-paged-reopen-gap-expand-start-reopen-gap")).toBeDisabled();
+    await expect(canvas.getByTestId("git-paged-reopen-gap-expand-end-reopen-gap")).toBeDisabled();
+    await scrollTo(scroll, scrollTop);
+
+    await fireEvent.click(canvas.getByTestId("git-paged-reopen-toggle"));
+    await waitFor(() => expect(canvas.queryByTestId("git-paged-reopen-reopening")).toBeNull());
+    await expect(canvas.getByTestId("git-paged-reopen-grid")).toBe(grid);
+    await expect(scroll.scrollTop).toBe(scrollTop);
   },
 };
 
@@ -518,6 +798,12 @@ function PendingAndStateSamples({ onChooseEncoding }: { onChooseEncoding?: (side
     PagedPendingSide_Snippet(6, 0, "previous pending snippet", "moreTextPending"),
     PagedPendingSide_Snippet(6, 0, "current pending snippet", "truncated"),
     [3, 4],
+  );
+  // The snippets start 300 units into the line, and the mismatch offsets count from the line start.
+  const midLine = new PagedPending(
+    PagedPendingSide_Snippet(8, 300, "previous snippet from the middle", "moreTextPending"),
+    PagedPendingSide_Snippet(8, 300, "current snippet from the middle", "moreTextPending"),
+    [305, 307],
   );
   const exhausted = new PagedPending(
     PagedPendingSide_NoActiveLine(),
@@ -545,6 +831,17 @@ function PendingAndStateSamples({ onChooseEncoding }: { onChooseEncoding?: (side
           outputComplete={false}
           pending={mismatch}
           testIdPrefix="git-paged-pending-mismatch"
+        />
+      </div>
+      <div style={{ height: "20rem" }}>
+        <GitPagedDiffViewerComponent
+          parts={[]}
+          status={PagedDiffStatus_Scanning()}
+          progress={new PagedProgress(50, 100, false)}
+          hasMore={true}
+          outputComplete={false}
+          pending={midLine}
+          testIdPrefix="git-paged-pending-mid-line"
         />
       </div>
       <div style={{ height: "20rem" }}>
@@ -595,14 +892,9 @@ function PendingAndStateSamples({ onChooseEncoding }: { onChooseEncoding?: (side
       <div style={{ height: "16rem" }}>
         <GitPagedDiffViewerComponent parts={[]} status={PagedDiffStatus_Failed("open failed") } progress={undefined} hasMore={false} outputComplete={false} testIdPrefix="git-paged-failed" />
       </div>
-      <div style={{ height: "16rem" }}>
-        <GitPagedDiffViewerComponent parts={[]} status={PagedDiffStatus_Closed()} progress={undefined} hasMore={false} outputComplete={false} testIdPrefix="git-paged-closed" />
-      </div>
     </div>
   );
 }
-
-const onChooseEncoding = fn();
 
 export const PendingEncodingAndStates: Story = {
   render: () => <PendingAndStateSamples onChooseEncoding={onChooseEncoding} />,
@@ -614,14 +906,23 @@ export const PendingEncodingAndStates: Story = {
     await expect(pending).toHaveTextContent("7");
     await expect(canvas.getByTestId("git-paged-pending-mismatch-pending-previous")).toHaveTextContent("pending snippet");
     await expect(canvas.getByTestId("git-paged-pending-mismatch-pending-current")).toHaveTextContent("pending snippet");
-    await expect(canvas.getByTestId("git-paged-pending-mismatch-pending-mismatch-previous")).toBeInTheDocument();
-    await expect(canvas.getByTestId("git-paged-pending-mismatch-pending-mismatch-current")).toBeInTheDocument();
-    await expect(pending).toHaveTextContent("Still reading");
-    await expect(pending).toHaveTextContent("…");
+    await expect(canvas.getByTestId("git-paged-pending-mismatch-pending-mismatch-previous")).toHaveAttribute("data-offset", "3");
+    await expect(canvas.getByTestId("git-paged-pending-mismatch-pending-mismatch-current")).toHaveAttribute("data-offset", "4");
+    await expect(canvas.getByTestId("git-paged-pending-mismatch-pending-snippet-previous")).toHaveAttribute("data-starts-mid-line", "false");
+    await expect(canvas.queryByTestId("git-paged-pending-mismatch-pending-leading-previous")).toBeNull();
+    await expect(canvas.getByTestId("git-paged-pending-mismatch-pending-end-previous")).toHaveAttribute("data-end", "more-text-pending");
+    await expect(canvas.getByTestId("git-paged-pending-mismatch-pending-end-current")).toHaveAttribute("data-end", "truncated");
+
+    await expect(canvas.getByTestId("git-paged-pending-mid-line-pending-mismatch-previous")).toHaveAttribute("data-offset", "5");
+    await expect(canvas.getByTestId("git-paged-pending-mid-line-pending-mismatch-current")).toHaveAttribute("data-offset", "7");
+    await expect(canvas.getByTestId("git-paged-pending-mid-line-pending-snippet-previous")).toHaveAttribute("data-starts-mid-line", "true");
+    await expect(canvas.getByTestId("git-paged-pending-mid-line-pending-leading-previous")).toBeInTheDocument();
+    await expect(canvas.getByTestId("git-paged-pending-mid-line-pending-leading-current")).toBeInTheDocument();
+
     await expect(canvas.getByTestId("git-paged-pending-exhausted-pending-previous")).toBeInTheDocument();
     await expect(canvas.getByTestId("git-paged-pending-exhausted-pending-current")).toHaveTextContent("9");
-    await expect(canvas.getByTestId("git-paged-pending-endings-pending-previous")).toHaveTextContent("Line end");
-    await expect(canvas.getByTestId("git-paged-pending-endings-pending-current")).toHaveTextContent("End of file");
+    await expect(canvas.getByTestId("git-paged-pending-endings-pending-end-previous")).toHaveAttribute("data-end", "line-end");
+    await expect(canvas.getByTestId("git-paged-pending-endings-pending-end-current")).toHaveAttribute("data-end", "end-of-file");
 
     await expect(canvas.getByTestId("git-paged-encoding-state-encoding-choice")).toBeInTheDocument();
     await expect(canvas.getByTestId("git-paged-encoding-encoding-side")).toHaveAttribute("data-side", "current");
@@ -633,20 +934,24 @@ export const PendingEncodingAndStates: Story = {
     await expect(canvas.getByTestId("git-paged-source-changed-state-source-changed")).toBeInTheDocument();
     await expect(canvas.getByTestId("git-paged-worker-failed-state-worker-failed")).toHaveTextContent("worker exited");
     await expect(canvas.getByTestId("git-paged-failed-state-failed")).toHaveTextContent("open failed");
-    await expect(canvas.getByTestId("git-paged-closed-state-closed")).toBeInTheDocument();
   },
 };
 
 function ControlStates() {
-  const parts = [PagedPart_HiddenGap("busy-gap", range(4, 12), range(4, 12))];
+  const parts = [
+    PagedPart_HiddenGap("busy-gap", range(4, 12), range(4, 12)),
+    PagedPart_HunkRows("between-gaps", range(16, 2), range(16, 2), true, true, makeAlignedRows(16, 2, -1, -1)),
+    PagedPart_HiddenGap("second-busy-gap", range(18, 12), range(18, 12)),
+    PagedPart_HiddenGap("idle-gap", range(30, 12), range(30, 12)),
+  ];
   const sliceParts = [
     PagedPart_HunkRows("slice-hunk", range(12, PAGE_LIMIT), range(12, PAGE_LIMIT), true, true, makeAlignedRows(12, PAGE_LIMIT)),
   ];
   const pendingSlice = new PagedLineSliceRequest("current", 15, `Current source line 16: first slice`.length);
   return (
     <div className="swt:flex swt:flex-col swt:gap-4">
-      <div style={{ height: "20rem" }}>
-        <GitPagedDiffViewerComponent parts={parts} status={PagedDiffStatus_Expanding("busy-gap")} progress={undefined} hasMore={false} outputComplete={false} requestExpand={() => {}} testIdPrefix="git-paged-expanding" />
+      <div style={{ height: "24rem" }}>
+        <GitPagedDiffViewerComponent parts={parts} status={PagedDiffStatus_Ready()} progress={undefined} hasMore={false} outputComplete={false} requestExpand={() => {}} expandingGaps={["busy-gap", "second-busy-gap"]} testIdPrefix="git-paged-expanding" />
       </div>
       <div style={{ height: "20rem" }}>
         <GitPagedDiffViewerComponent parts={parts} status={PagedDiffStatus_LoadingNext()} progress={new PagedProgress(40, 100, false)} hasMore={true} outputComplete={false} requestNext={() => {}} testIdPrefix="git-paged-loading" />
@@ -662,8 +967,11 @@ export const ActiveRequestsDisableControls: Story = {
   render: () => <ControlStates />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByTestId("git-paged-expanding-gap-expand-up-busy-gap")).toBeDisabled();
-    await expect(canvas.getByTestId("git-paged-expanding-gap-expand-down-busy-gap")).toBeDisabled();
+    for (const gapId of ["busy-gap", "second-busy-gap"]) {
+      await expect(canvas.getByTestId(`git-paged-expanding-gap-expand-start-${gapId}`)).toBeDisabled();
+      await expect(canvas.getByTestId(`git-paged-expanding-gap-expand-end-${gapId}`)).toBeDisabled();
+    }
+    await expect(canvas.getByTestId("git-paged-expanding-gap-expand-start-idle-gap")).toBeEnabled();
     await expect(canvas.getByTestId("git-paged-loading-continue-button")).toBeDisabled();
     await expect(canvas.getByTestId("git-paged-loading-continue")).toHaveTextContent("40%");
     await expect(canvas.getByTestId("git-paged-loading-continue")).toHaveTextContent("40 B");
@@ -701,8 +1009,6 @@ export const EmptyDiffWaitsForCompletion: Story = {
     await expect(canvas.getByTestId("git-paged-empty-no-changes")).toBeInTheDocument();
   },
 };
-
-const onAnchorExpand = fn();
 
 function AnchorHarness() {
   const afterRows = makeAlignedRows(25, 10, -1, -1).map((row, index) =>
@@ -742,7 +1048,7 @@ export const ExpansionKeepsTheVisibleRowInPlace: Story = {
     await waitFor(() => expect(Math.abs(anchor.getBoundingClientRect().top - scroll.getBoundingClientRect().top)).toBeLessThan(2));
     const beforeTop = anchor.getBoundingClientRect().top;
 
-    await fireEvent.click(canvas.getByTestId("git-paged-anchor-gap-expand-down-anchor-gap"));
+    await fireEvent.click(canvas.getByTestId("git-paged-anchor-gap-expand-end-anchor-gap"));
     await expect(onAnchorExpand).toHaveBeenCalledWith("anchor-gap", false);
     await waitFor(() => {
       const updatedAnchor = canvas.getByTestId("git-paged-anchor-row-anchor-target");

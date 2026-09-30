@@ -109,9 +109,10 @@ type PagedDiffStatus =
     | EncodingChoice of side: PagedDiffSide * candidates: PagedEncodingCandidate[]
     | Ready
     | LoadingNext
-    | Expanding of gapId: string
+    /// The diff opens again after its session ended. The rows already shown stay on screen
+    /// and take no requests until the diff is ready again.
+    | Reopening
     | Blocked of side: PagedDiffSide option * reason: string
     | SourceChanged
     | WorkerFailed of message: string
-    | Closed
     | Failed of message: string

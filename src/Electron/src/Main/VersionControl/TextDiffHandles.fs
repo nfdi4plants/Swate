@@ -92,7 +92,7 @@ let private closeInBackground
     |> Promise.start
 
 /// Records the handle of a finished open. When the window closed or reloaded while the
-/// open ran, nobody can use the handle any more, so it is closed right away instead.
+/// open ran, nobody can use the handle any more, and this function closes it right away.
 let recordOrClose
     (windowId: int option)
     (reloadCountAtStart: int)

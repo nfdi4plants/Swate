@@ -1167,6 +1167,11 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     // arrives after its window closed or reloaded is closed at once.
     openTextDiff =
         fun request ->
+            // The count is read when the call arrives. A reload while the session opens then
+            // counts as a reload during the open.
+            let reloadCount =
+                TextDiffHandles.reloadCount (windowFromIpcEvent event |> Option.map _.id)
+
             withTextDiff
                 "openTextDiff"
                 event
@@ -1174,7 +1179,6 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 (Mappings.tryOpenDiffRequest request)
                 (fun hosted service openRequest context -> async {
                     let windowId = operationWindowId context
-                    let reloadCount = TextDiffHandles.reloadCount windowId
                     let! opened = service.Open openRequest context
 
                     match opened with
