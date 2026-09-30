@@ -93,7 +93,7 @@ type ThemeSelector =
                     | Theme.Finster -> AnimatedMoon
                     | Theme.Planti -> Planti
                     | Theme.Viola -> Viola
-                    | Theme.Auto -> 
+                    | Theme.Auto -> Browser
                     | Theme.Amaze -> Amaze
 
                 iconRef.current?innerHTML <- icon
