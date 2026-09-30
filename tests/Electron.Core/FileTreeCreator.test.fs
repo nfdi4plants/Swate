@@ -17,7 +17,6 @@ open ElectronCore.TestHelpers
 module FileTreeCreator = Main.FileTreeCreator
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
-let private osDynamic: obj = importAll "os"
 let private childProcessDynamic: obj = importAll "node:child_process"
 
 let private fileTreeCreatorTestOptions = TestOptions(timeout = 20000)
@@ -50,23 +49,6 @@ let private enrichFileEntries (objects: (string * ObjectStateDto) list) (entries
     FileTreeCreator.withFileEntriesLfsMetadata "/repo" (Map.ofList objects) entries
 
 type private TempRepositoryContext = { RootPath: string; RepoPath: string }
-
-let private createTempDirectoryAsync () : Fable.Core.JS.Promise<string> =
-    let prefix =
-        join [|
-            osDynamic?tmpdir () |> unbox<string>
-            "swate-electron-file-tree-"
-        |]
-
-    fsPromisesDynamic?mkdtemp (prefix) |> unbox<Fable.Core.JS.Promise<string>>
-
-let private removeDirectoryAsync (path: string) : Fable.Core.JS.Promise<unit> = promise {
-    let! _ =
-        fsPromisesDynamic?rm (path, createObj [ "recursive" ==> true; "force" ==> true ])
-        |> unbox<Fable.Core.JS.Promise<obj>>
-
-    return ()
-}
 
 let private writeUtf8FileAsync (path: string) (content: string) : Fable.Core.JS.Promise<unit> = promise {
     let! _ =
@@ -118,7 +100,7 @@ let private withTempRepository
     (testBody: TempRepositoryContext -> Fable.Core.JS.Promise<unit>)
     : Fable.Core.JS.Promise<unit> =
     promise {
-        let! rootPath = createTempDirectoryAsync ()
+        let! rootPath = createTempDirectoryAsync "swate-electron-file-tree-"
 
         try
             let repoPath = join [| rootPath; "repo" |]
@@ -321,7 +303,7 @@ Vitest.describe (
 
                         let! _ = runGitAsync context.RepoPath [| "add"; ".gitattributes"; "first.psd"; "second.psd" |]
 
-                        // Open the repository session used by watcher refreshes without seeding the vault tree.
+                        // Open the repository session used by watcher LFS lookups without seeding the vault tree.
                         let! _ = FileTreeCreator.getFileTree context.RepoPath
                         let vault = ArcVault(testWindow ())
                         vault.path <- Some context.RepoPath

@@ -16,6 +16,36 @@ open Vitest
 
 type private RendererPageState = Renderer.Types.PageState
 
+let mutable private externalPreviewOpenCalls = ResizeArray<string>()
+
+let mutable private externalPreviewOpenResult: Result<FileContentDTO, exn> =
+    Ok {|
+        fileType = FileContentType.Markdown
+        content = "after"
+        path = "docs/readme.md"
+    |}
+
+Vitest.vi.mock (
+    "./src/Electron/src/Renderer/Api.js",
+    box (fun () ->
+        createObj [
+            "ipcGitLabApi" ==> createObj []
+            "ipcVersionControlApi" ==> createObj []
+            "ipcArcVaultApi"
+            ==> createObj [
+                "openFile"
+                ==> fun (path: string) ->
+                    externalPreviewOpenCalls.Add path
+                    JS.Constructors.Promise.resolve externalPreviewOpenResult
+            ]
+            "ipcAuthApi" ==> createObj []
+            "ipcTemplateApi" ==> createObj []
+            "ipcValidationPackageApi" ==> createObj []
+        ]
+    )
+)
+|> ignore
+
 let private bridgeName typeName = $"FABLE_REMOTING_{typeName}"
 
 let private setBridgeProperty name value = window?(name) <- value
@@ -233,6 +263,77 @@ Vitest.describe (
     "File explorer state reconciliation",
     fun () ->
         Vitest.test (
+            "a targeted external content change reloads the selected Markdown preview",
+            fun () -> promise {
+                let selectedPath = "docs/readme.md"
+                externalPreviewOpenCalls.Clear()
+
+                externalPreviewOpenResult <-
+                    Ok {|
+                        fileType = FileContentType.Markdown
+                        content = "after"
+                        path = selectedPath
+                    |}
+
+                let fileStateController: FileStateController = {
+                    state = {
+                        FileTree = [|
+                            FileEntry.create ("readme.md", selectedPath, false, None)
+                        |]
+                        Selection = ArcSelection.forTreePath (Some selectedPath)
+                        ExternalFileContentChange =
+                            Some {
+                                Revision = 1
+                                Paths = [| selectedPath |]
+                            }
+                    }
+                    fileTreeIsLoading = false
+                    refreshFileTree = ignore
+                    setSelection = ignore
+                    updateSelection = ignore
+                    activeFileImport = None
+                    isCancellingFileImport = false
+                    importExternalFiles = fun _ -> JS.Constructors.Promise.resolve (Ok())
+                    cancelFileImport = fun () -> JS.Constructors.Promise.resolve (Ok())
+                }
+
+                let mutable renderedPageState = Some(RendererPageState.MarkdownPage "before")
+
+                let pageStateContext: Swate.Components.StateContext<RendererPageState option> = {
+                    state = renderedPageState
+                    setState = fun next -> renderedPageState <- next
+                }
+
+                let container = document.createElement ("div") :?> Browser.Types.HTMLDivElement
+                document.body.appendChild container |> ignore
+                let root = ReactDOM.createRoot container
+
+                try
+                    root.render (
+                        Renderer.Context.PageStateContext.PageStateCtx.Provider(
+                            pageStateContext,
+                            FileStateCtx.Provider(
+                                fileStateController,
+                                Renderer.Components.LeftSidebar.FileExplorer.FileTree.ExternalFilePreviewRefresh()
+                            )
+                        )
+                    )
+
+                    do!
+                        waitForEffect (fun () ->
+                            externalPreviewOpenCalls.Count = 1
+                            && renderedPageState = Some(RendererPageState.MarkdownPage "after")
+                        )
+
+                    Vitest.expect(externalPreviewOpenCalls.ToArray()).toEqual ([| selectedPath |])
+                    Vitest.expect(renderedPageState).toEqual (Some(RendererPageState.MarkdownPage "after"))
+                finally
+                    root.unmount ()
+                    container.remove ()
+            }
+        )
+
+        Vitest.test (
             "isSelectionMissing detects removed selections after file-tree updates",
             fun () ->
                 let remainingPaths = [| ""; "assays"; "assays/assay-a/isa.assay.xlsx" |]
@@ -323,7 +424,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "external content changes reload the selected Markdown or text preview",
+            "matching external content changes select Markdown and text previews for reload",
             fun () ->
                 let selectedPath = "docs/readme.md"
 
@@ -351,7 +452,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "external content changes to an unrelated file do not reload the selected preview",
+            "an unrelated external content change does not select the current preview for reload",
             fun () ->
                 let selectedPath = "docs/readme.md"
 

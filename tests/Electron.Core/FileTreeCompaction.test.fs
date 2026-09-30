@@ -33,11 +33,15 @@ let private createFileEntry path isDirectory largeObject = {
 }
 
 Vitest.describe (
-    "FileIOHelper repository-relative paths",
+    "FileIOHelper case-insensitive filesystem path comparison",
     fun () ->
         Vitest.test (
-            "resolves case-only Windows root path differences",
+            "repository-relative paths use the explicit filesystem-comparison normalization contract",
             fun () ->
+                Vitest
+                    .expect(PathHelpers.normalizePathForFsComparison "C:/Repo/ARC")
+                    .toBe (PathHelpers.normalizePathForFsComparison "c:\\repo\\arc")
+
                 Vitest.expect(tryGetRepoRelativePathOrRoot "C:/Repo/ARC" "c:\\repo\\arc").toEqual (Some "")
 
                 Vitest

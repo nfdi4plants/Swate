@@ -3959,7 +3959,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "file watcher polling defaults to Windows only",
+            "ARC structure watcher polling is enabled only for Windows platforms",
             fun () ->
                 Vitest.expect(shouldUsePollingByDefault "win32").toBe (true)
                 Vitest.expect(shouldUsePollingByDefault "WIN32").toBe (true)
@@ -3968,23 +3968,26 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "watcher options support explicit shallow scopes",
+            "structure and payload watcher options keep their polling and depth contracts separate",
             fun () ->
                 let ignored: Main.Bindings.Chokidar.IgnoredPattern =
                     !^(System.Func<string, Stats option, bool>(fun _ _ -> false))
 
-                let recursiveOptions = createWatcherOptions "C:/arc" true ignored None
-                let shallowOptions = createWatcherOptions "C:/arc" true ignored (Some 0)
+                let structureOptions = createWatcherOptions "C:/arc" true ignored (Some 1)
+                let payloadOptions = createWatcherOptions "C:/arc" false ignored (Some 0)
 
-                Vitest.expect(recursiveOptions.depth).toEqual (None)
-                Vitest.expect(shallowOptions.depth).toEqual (Some 0)
-                Vitest.expect(shallowOptions.usePolling).toEqual (Some true)
-                Vitest.expect(shallowOptions.interval).toEqual (Some 200)
-                Vitest.expect(shallowOptions.binaryInterval).toEqual (Some 400)
+                Vitest.expect(structureOptions.depth).toEqual (Some 1)
+                Vitest.expect(structureOptions.usePolling).toEqual (Some true)
+                Vitest.expect(structureOptions.interval).toEqual (Some 200)
+                Vitest.expect(structureOptions.binaryInterval).toEqual (Some 400)
+                Vitest.expect(payloadOptions.depth).toEqual (Some 0)
+                Vitest.expect(payloadOptions.usePolling).toEqual (None)
+                Vitest.expect(payloadOptions.interval).toEqual (None)
+                Vitest.expect(payloadOptions.binaryInterval).toEqual (None)
         )
 
         Vitest.test (
-            "permanent watcher roots contain only the ARC root and existing structure zones",
+            "ARC structure watcher roots contain only the ARC root and existing structure zones",
             fun () -> promise {
                 let! arcPath = TestHelpers.createTempDirectoryAsync "swate-structure-roots-"
 
@@ -4017,7 +4020,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "permanent watcher keeps ARC structure but prunes payload descendants",
+            "ARC structure watcher includes structure entries and prunes payload descendants",
             fun () ->
                 let directoryStats =
                     createObj [ "isDirectory" ==> (fun () -> true) ] |> unbox<Stats>
@@ -4047,7 +4050,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "permanent watcher safely ignores deep paths when chokidar omits stats",
+            "ARC structure watcher safely ignores deep paths when chokidar omits stats",
             fun () ->
                 Vitest
                     .expect(shouldIgnoreForArcStructureWatcher "C:/arc" "C:/arc/studies/S1/dataset/data.raw" None)
@@ -4543,7 +4546,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "RenameOpenArcRoot restores expanded-directory watchers under the renamed root",
+            "RenameOpenArcRoot preserves the active expanded-directory payload scope",
             TestOptions(timeout = 30000),
             fun () ->
                 TestHelpers.withTempArcWith
@@ -4564,8 +4567,6 @@ Vitest.describe (
                             match! vault.RenameOpenArcRoot "renamed-expanded-watcher" with
                             | Error error -> failwith error.Message
                             | Ok _ ->
-                                Vitest.expect(vault.watcher.IsSome).toBe (true)
-                                Vitest.expect(vault.payloadWatcher.IsSome).toBe (true)
                                 Vitest.expect(vault.expandedDirectoryPaths.Count).toBe (1)
 
                                 Vitest
@@ -4582,7 +4583,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "directory expansion refreshes its subtree and collapse removes active payload scopes",
+            "directory expansion materializes direct children and collapse removes the active payload scope",
             TestOptions(timeout = 30000),
             fun () ->
                 TestHelpers.withTempArcWith
@@ -4608,7 +4609,7 @@ Vitest.describe (
 
                             do! vault.SetActiveFileTreeDirectories [| "studies/S1/dataset" |]
                             Vitest.expect(vault.fileTree.ContainsKey lateFile).toBe (true)
-                            Vitest.expect(vault.payloadWatcher.IsSome).toBe (true)
+                            Vitest.expect(vault.payloadWatcherScopes.Contains "studies/S1/dataset").toBe (true)
 
                             do! vault.SetActiveFileTreeDirectories [||]
                             Vitest.expect(vault.expandedDirectoryPaths.IsEmpty).toBe (true)
