@@ -83,7 +83,7 @@ let attachArcStructureScopes (watcher: Chokidar.IWatcher option) (events: (strin
         |> Array.choose (fun (eventName, relativePath) ->
             if
                 eventNameEquals Chokidar.Events.AddDir eventName
-                && ArcVaultHelper.isArcStructureWatcherScopePath relativePath
+                && ArcVaultHelper.isArcStructureZoneScopePath relativePath
             then
                 Some(PathHelpers.normalizeCanonicalRelativePath relativePath)
             else

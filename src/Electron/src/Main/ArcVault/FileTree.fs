@@ -1,4 +1,4 @@
-/// Owns File Explorer expansion state and its bounded payload watcher.
+/// Reconciles expansion state, shallow directory materialization, and temporary payload-scope suspension.
 [<AutoOpen>]
 module Main.ArcVaultFileTree
 

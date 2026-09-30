@@ -784,10 +784,10 @@ module ArcVaultExtensions =
                         match this.path with
                         | Some arcPath ->
                             match tryGetWatcherRelativePath arcPath path with
-                            | Some relativePath when isArcStructureWatchScopePath relativePath ->
+                            | Some relativePath when isArcStructureZoneOrEntityScopePath relativePath ->
                                 promise {
                                     try
-                                        if isArcStructureWatcherScopePath relativePath then
+                                        if isArcStructureZoneScopePath relativePath then
                                             this.watcher
                                             |> Option.iter (fun watcher ->
                                                 watcher.add (PathHelpers.normalizeCanonicalRelativePath relativePath)
@@ -824,9 +824,8 @@ module ArcVaultExtensions =
                     |> Seq.map PathHelpers.normalizeCanonicalRelativePath
                     |> Seq.toArray
 
-                let ignored
-                    : U4<string, ResizeArray<string>, string -> bool, System.Func<string, Filesystem.Stats, bool>> =
-                    !^(System.Func<string, Filesystem.Stats, bool>(fun path _ ->
+                let ignored: Chokidar.IgnoredPattern =
+                    !^(System.Func<string, Filesystem.Stats option, bool>(fun path _ ->
                         shouldIgnoreForPayloadWatcher arcPath this.payloadWatcherScopes.Contains path
                     ))
 
@@ -897,14 +896,14 @@ module ArcVaultExtensions =
                 |> Option.iter (fun watcher -> watcher.close () |> Promise.catch (fun _ -> ()) |> Promise.start)
         }
 
-        member this.StartFileWatcher(?usePolling: bool) =
+        member this.StartFileWatcher() =
             if this.path.IsSome then
                 match this.watcher with
                 | Some _ -> ()
                 | None ->
                     try
                         let arcPath = this.path.Value
-                        let watcher = createFileWatcher arcPath usePolling
+                        let watcher = createFileWatcher arcPath
                         let callbackEpoch = this.WatcherEpoch
 
                         let sendWatcherMessage = WindowSend.sender<IArcFileWatcherApi> this.window

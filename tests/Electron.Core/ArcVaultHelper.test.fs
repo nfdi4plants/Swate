@@ -3973,8 +3973,8 @@ Vitest.describe (
         Vitest.test (
             "watcher options support explicit shallow scopes",
             fun () ->
-                let ignored: U4<string, ResizeArray<string>, string -> bool, System.Func<string, Stats, bool>> =
-                    !^(System.Func<string, Stats, bool>(fun _ _ -> false))
+                let ignored: Main.Bindings.Chokidar.IgnoredPattern =
+                    !^(System.Func<string, Stats option, bool>(fun _ _ -> false))
 
                 let recursiveOptions = createWatcherOptions "C:/arc" true ignored None
                 let shallowOptions = createWatcherOptions "C:/arc" true ignored (Some 0)
@@ -4028,15 +4028,24 @@ Vitest.describe (
                 let fileStats = createObj [ "isDirectory" ==> (fun () -> false) ] |> unbox<Stats>
 
                 Vitest
-                    .expect(shouldIgnoreForArcStructureWatcher "C:/arc" "C:/arc/studies/S1/isa.study.xlsx" fileStats)
+                    .expect(
+                        shouldIgnoreForArcStructureWatcher "C:/arc" "C:/arc/studies/S1/isa.study.xlsx" (Some fileStats)
+                    )
                     .toBe (false)
 
                 Vitest
-                    .expect(shouldIgnoreForArcStructureWatcher "C:/arc" "C:/arc/studies/S1/dataset" directoryStats)
+                    .expect(
+                        shouldIgnoreForArcStructureWatcher "C:/arc" "C:/arc/studies/S1/dataset" (Some directoryStats)
+                    )
                     .toBe (false)
 
                 Vitest
-                    .expect(shouldIgnoreForArcStructureWatcher "C:/arc" "C:/arc/studies/S1/dataset/data.raw" fileStats)
+                    .expect(
+                        shouldIgnoreForArcStructureWatcher
+                            "C:/arc"
+                            "C:/arc/studies/S1/dataset/data.raw"
+                            (Some fileStats)
+                    )
                     .toBe (true)
         )
 

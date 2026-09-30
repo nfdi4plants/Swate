@@ -380,6 +380,9 @@ let private arcStructureZones = [|
     ArcPathHelper.RunsFolderName
 |]
 
+let isArcStructureZone (pathSegment: string) =
+    arcStructureZones |> Array.exists (PathHelpers.pathsEqual pathSegment)
+
 let tryGetWatcherRelativePath arcPath path =
     match tryGetRepoRelativePathOrRoot arcPath path with
     | Some relativePath -> Some relativePath
@@ -400,7 +403,7 @@ let isSameOrDescendantLogicalPath (path: string) (ancestorPath: string) =
     || normalizedPath.StartsWith(normalizedAncestorPath + "/", StringComparison.Ordinal)
 
 /// Keeps the permanent watcher on ARC metadata and structural directories without traversing payload trees.
-let shouldIgnoreForArcStructureWatcher (arcPath: string) (path: string) (stats: Filesystem.Stats) =
+let shouldIgnoreForArcStructureWatcher (arcPath: string) (path: string) (stats: Filesystem.Stats option) =
     if isFileWatcherPathIgnored path then
         true
     else
@@ -408,17 +411,16 @@ let shouldIgnoreForArcStructureWatcher (arcPath: string) (path: string) (stats: 
         | None -> true
         | Some relativePath ->
             let segments = getNonEmptyPathParts relativePath
-            let statsAvailable = not (isNull (box stats))
-            let isDirectory = statsAvailable && stats.isDirectory ()
 
             match segments with
             | [||] -> false
             | [| _ |] -> false
-            | [| zone; _ |] when arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone) -> false
-            | [| zone; _; _ |] when arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone) ->
-                statsAvailable
-                && not isDirectory
-                && not (isArcModelReadContractPath relativePath)
+            | [| zone; _ |] when isArcStructureZone zone -> false
+            | [| zone; _; _ |] when isArcStructureZone zone ->
+                stats
+                |> Option.exists (fun stats ->
+                    not (stats.isDirectory ()) && not (isArcModelReadContractPath relativePath)
+                )
             | _ -> true
 
 /// Bounds payload monitoring to explicitly expanded directories and their immediate children.
@@ -437,12 +439,7 @@ let shouldIgnoreForPayloadWatcher (arcPath: string) (isExpanded: string -> bool)
                 let parentPath = PathHelpers.tryGetParentPath relativePath |> Option.defaultValue ""
                 not (isExpanded relativePath || isExpanded parentPath)
 
-let createWatcherOptions
-    (cwd: string)
-    (usePolling: bool)
-    (ignored: U4<string, ResizeArray<string>, string -> bool, System.Func<string, Filesystem.Stats, bool>>)
-    (depth: int option)
-    =
+let createWatcherOptions (cwd: string) (usePolling: bool) (ignored: Chokidar.IgnoredPattern) (depth: int option) =
     let watcherOptions =
         if usePolling then
             Chokidar.WatchOptions(
@@ -480,15 +477,15 @@ let createArcStructureWatcherPaths (arcPath: string) =
 
     Array.append [| PathHelpers.normalizePath arcPath |] structuralPaths
 
-let isArcStructureWatcherScopePath (relativePath: string) =
+let isArcStructureZoneScopePath (relativePath: string) =
     match getNonEmptyPathParts relativePath with
-    | [| zone |] -> arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone)
+    | [| zone |] -> isArcStructureZone zone
     | _ -> false
 
-let isArcStructureWatchScopePath (relativePath: string) =
+let isArcStructureZoneOrEntityScopePath (relativePath: string) =
     match getNonEmptyPathParts relativePath with
-    | [| zone |] -> arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone)
-    | [| zone; _ |] -> arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone)
+    | [| zone |] -> isArcStructureZone zone
+    | [| zone; _ |] -> isArcStructureZone zone
     | _ -> false
 
 /// Shallowly discovers structure and canonical metadata without entering payload directory contents.
@@ -557,9 +554,8 @@ let reconcileArcStructureScope (arcPath: string) (relativeScopePath: string) =
                     events.AddRange zoneEvents
 
             return events.ToArray()
-        | [| zone |] when arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone) -> return! reconcileZone zone
-        | [| zone; entity |] when arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone) ->
-            return! reconcileEntity zone entity
+        | [| zone |] when isArcStructureZone zone -> return! reconcileZone zone
+        | [| zone; entity |] when isArcStructureZone zone -> return! reconcileEntity zone entity
         | _ -> return [||]
     }
 
@@ -596,14 +592,11 @@ let reconcileArcStructureScopeChanges
         let isStructuralEntry (entry: FileEntry) (relativePath: string) =
             match getNonEmptyPathParts relativePath with
             | [| zone |] ->
-                (entry.isDirectory
-                 && arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone))
+                (entry.isDirectory && isArcStructureZone zone)
                 || (not entry.isDirectory && isArcModelReadContractPath relativePath)
-            | [| zone; _ |] ->
-                entry.isDirectory
-                && arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone)
+            | [| zone; _ |] -> entry.isDirectory && isArcStructureZone zone
             | [| zone; _; _ |] ->
-                arcStructureZones |> Array.exists (PathHelpers.pathsEqual zone)
+                isArcStructureZone zone
                 && (entry.isDirectory || isArcModelReadContractPath relativePath)
             | _ -> false
 
@@ -646,15 +639,14 @@ let reconcileArcStructureScopeChanges
         return changes.ToArray()
     }
 
-let createFileWatcher (path: string) (usePolling: bool option) =
-    let ignored: U4<string, ResizeArray<string>, string -> bool, System.Func<string, Filesystem.Stats, bool>> =
-        !^(System.Func<string, Filesystem.Stats, bool>(shouldIgnoreForArcStructureWatcher path))
+let createFileWatcher (path: string) =
+    let ignored: Chokidar.IgnoredPattern =
+        !^(System.Func<string, Filesystem.Stats option, bool>(shouldIgnoreForArcStructureWatcher path))
 
     // Root depth 1 observes zone/entity changes; each explicit zone depth 1 observes only
     // entity directories and their immediate metadata/payload-directory children.
     // Native Windows file events can keep handles that block app-initiated folder renames.
-    let usePolling =
-        defaultArg usePolling (shouldUsePollingByDefault (currentNodePlatform ()))
+    let usePolling = shouldUsePollingByDefault (currentNodePlatform ())
 
     Chokidar.Chokidar.watch (createArcStructureWatcherPaths path, createWatcherOptions path usePolling ignored (Some 1))
 

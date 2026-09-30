@@ -18,11 +18,13 @@ type Events =
     | Raw
     | All
 
+type IgnoredPattern = U4<string, ResizeArray<string>, string -> bool, System.Func<string, Stats option, bool>>
+
 [<Pojo>]
 type WatchOptions
     (
         ?persistent: bool,
-        ?ignored: U4<string, ResizeArray<string>, string -> bool, System.Func<string, Stats, bool>>,
+        ?ignored: IgnoredPattern,
         ?ignoreInitial: bool,
         ?followSimlinks: bool,
         ?cwd: string,
