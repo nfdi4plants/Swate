@@ -1,4 +1,4 @@
-module ElectronCore.FileTreeCompactionTests
+module ElectronCore.FileTreeMutationTests
 
 open System.Collections.Generic
 module FileTreeCreator = Main.FileTreeCreator

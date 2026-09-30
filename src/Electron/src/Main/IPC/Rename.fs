@@ -31,42 +31,22 @@ module ArcRenameHelper =
         | ArcFilesDiscriminate.Run -> arc.RenameRun(oldIdentifier, newIdentifier)
         | fileType -> failwith $"Renaming {fileType} is not supported."
 
-    let private remapArcFileSystemPaths sourcePath targetPath (arc: ARC) =
-        let remappedPaths =
-            arc.FileSystem.Tree.ToFilePaths()
-            |> Array.map (fun path ->
-                PathHelpers.tryRemapPathPrefix sourcePath targetPath path
-                |> Option.defaultWith (fun () -> PathHelpers.normalizeCanonicalRelativePath path)
-            )
-            |> Array.distinctBy PathHelpers.normalizeForComparison
-
-        arc.SetFilePaths(remappedPaths)
-
-    let private mergeRenamedEntityFromDisk
-        arcPath
-        sourcePath
-        targetPath
-        fileType
-        oldIdentifier
-        newIdentifier
-        (arcLocal: ARC)
-        =
-        promise {
-            match! ARC.LoadAsyncSwate arcPath with
-            | Error errors ->
-                return
-                    Error(
-                        exn
-                            $"Renamed ARC entity, but could not reload the ARC from disk: {PathHelpers.formatContractErrors errors}"
-                    )
-            | Ok persistedArc ->
-                baselineArcStaticHashes persistedArc
-                let renamedArc = copyArcPreservingStaticHashes arcLocal
-                applyInMemoryRename fileType oldIdentifier newIdentifier renamedArc
-                remapArcFileSystemPaths sourcePath targetPath renamedArc
-                syncArcStaticHashes persistedArc renamedArc
-                return Ok renamedArc
-        }
+    let private mergeRenamedEntityFromDisk arcPath fileType oldIdentifier newIdentifier (arcLocal: ARC) = promise {
+        match! ARC.LoadAsyncSwate arcPath with
+        | Error errors ->
+            return
+                Error(
+                    exn
+                        $"Renamed ARC entity, but could not reload the ARC from disk: {PathHelpers.formatContractErrors errors}"
+                )
+        | Ok persistedArc ->
+            baselineArcStaticHashes persistedArc
+            let renamedArc = copyArcPreservingStaticHashes arcLocal
+            applyInMemoryRename fileType oldIdentifier newIdentifier renamedArc
+            renamedArc.SetFilePaths(persistedArc.FileSystem.Tree.ToFilePaths())
+            syncArcStaticHashes persistedArc renamedArc
+            return Ok renamedArc
+    }
 
     let private renameResolvedArcEntityAsync
         (arcPath: string)
@@ -122,14 +102,7 @@ module ArcRenameHelper =
                                         )
                                 | Ok _ ->
                                     return!
-                                        mergeRenamedEntityFromDisk
-                                            arcPath
-                                            sourcePath
-                                            targetPath
-                                            fileType
-                                            oldIdentifier
-                                            newIdentifier
-                                            arcLocal
+                                        mergeRenamedEntityFromDisk arcPath fileType oldIdentifier newIdentifier arcLocal
             with renameError ->
                 let mappedError = mapRenameDiskError sourcePath targetPath renameError
 

@@ -16,7 +16,7 @@
     <Compile Include="ArcMerge\DataMapEvents.test.fs" />
     <Compile Include="ArcMerge\EdgeCases.test.fs" />
     <Compile Include="FileIOHelper.test.fs" />
-    <Compile Include="FileTreeCompaction.test.fs" />
+    <Compile Include="FileTreeMutation.test.fs" />
     <Compile Include="FileTreeCreator.test.fs" />
     <Compile Include="ArcFileMutationHelper.test.fs" />
     <Compile Include="ArcVaultHelper.test.fs" />

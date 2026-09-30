@@ -206,7 +206,11 @@ type FileExplorer =
                     if willExpand then
                         effectiveExpandedIds.Add item.Id
                     else
-                        effectiveExpandedIds.Remove item.Id
+                        let rec collectSubtreeIds current =
+                            current.Id
+                            :: (current.Children |> Option.defaultValue [] |> List.collect collectSubtreeIds)
+
+                        Set.difference effectiveExpandedIds (collectSubtreeIds item |> Set.ofList)
 
                 if expandedItemIds.IsNone then
                     dispatch (FileExplorerLogic.SetExpanded(item.Id, willExpand))

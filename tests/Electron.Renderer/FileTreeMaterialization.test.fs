@@ -1,10 +1,28 @@
 module ElectronRenderer.FileTreeMaterializationTests
 
 open System.Collections.Generic
+open Browser.Dom
+open Fable.Core.JsInterop
+open Feliz
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeMaterialization
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Electron.Shared.FileIOTypes
 open Vitest
+
+Vitest.vi.mock (
+    "./src/Electron/src/Renderer/Api.js",
+    box (fun () ->
+        createObj [
+            "ipcGitLabApi" ==> createObj []
+            "ipcVersionControlApi" ==> createObj []
+            "ipcArcVaultApi" ==> createObj []
+            "ipcAuthApi" ==> createObj []
+            "ipcTemplateApi" ==> createObj []
+            "ipcValidationPackageApi" ==> createObj []
+        ]
+    )
+)
+|> ignore
 
 let private fileNode (name: string) (path: string) =
     FileTreeNode.create (name, false, path, Dictionary())
@@ -29,6 +47,27 @@ let private toFileItemTree materializedDirectoryPaths node =
         )
         materializedDirectoryPaths
         node
+
+let private folderItem id children = {
+    FileTree.createFolder id (Some id) FileItemIcon.Folder with
+        Id = id
+        Children = Some children
+}
+
+let private fileItem id = {
+    FileTree.createFile id (Some id) FileItemIcon.Document with
+        Id = id
+}
+
+[<ReactComponent>]
+let private ExpansionCleanupProbe (report: string[] -> unit) =
+    Html.div [
+        prop.ref (
+            Renderer.Components.LeftSidebar.FileExplorer.FileTree.CreateClearActiveExpandedDirectoriesRef(fun () ->
+                report [||]
+            )
+        )
+    ]
 
 Vitest.describe (
     "Electron file-tree materialization",
@@ -118,5 +157,71 @@ Vitest.describe (
                 Vitest.expect(reconciled.ArcScopeId).toEqual (Some "C:/new-arc")
                 Vitest.expect(reconciled.Paths |> Set.toList).toEqual ([ "arc" ])
                 Vitest.expect(reconciled.ExpandedPaths |> Set.toList).toEqual ([ "arc" ])
+        )
+)
+
+Vitest.describe (
+    "active expanded directory reconciliation",
+    fun () ->
+        let child = folderItem "parent/child" []
+        let sibling = folderItem "sibling" []
+        let file = fileItem "file.txt"
+        let items = [ folderItem "parent" [ child; file ]; sibling ]
+
+        let activeIds expandedIds =
+            FileExplorerLogic.collectActiveExpandedDirectories expandedIds items
+            |> List.map _.Id
+            |> Set.ofList
+
+        Vitest.test (
+            "keeps expanded parents, children, and unrelated siblings active",
+            fun () ->
+                let active = activeIds (Set.ofList [ "parent"; "parent/child"; "sibling" ])
+
+                Vitest.expect(active |> Set.toList).toEqual ([ "parent"; "parent/child"; "sibling" ])
+        )
+
+        Vitest.test (
+            "does not report a stale expanded child below a collapsed parent",
+            fun () ->
+                let active = activeIds (Set.ofList [ "parent/child"; "sibling" ])
+
+                Vitest.expect(active |> Set.toList).toEqual ([ "sibling" ])
+        )
+
+        Vitest.test (
+            "never reports files as active expanded directories",
+            fun () ->
+                let active = activeIds (Set.ofList [ "parent"; "file.txt" ])
+
+                Vitest.expect(active.Contains "file.txt").toBe (false)
+                Vitest.expect(active |> Set.toList).toEqual ([ "parent" ])
+        )
+)
+
+Vitest.describe (
+    "file explorer expansion cleanup",
+    fun () ->
+        Vitest.test (
+            "unmount reports an empty active-directory request after an expanded scope",
+            fun () -> promise {
+                let requests = ResizeArray<string[]>()
+                let container = document.createElement "div"
+                document.body.appendChild container |> ignore
+                let root = ReactDOM.createRoot container
+
+                try
+                    requests.Add [| "studies/S1/dataset" |]
+                    root.render (ExpansionCleanupProbe requests.Add)
+                    Vitest.expect(requests.[0]).toEqual ([| "studies/S1/dataset" |])
+                    root.unmount ()
+
+                    while requests.Count < 2 do
+                        do! Promise.sleep 0
+
+                    Vitest.expect(requests.[requests.Count - 1]).toEqual ([||])
+                finally
+                    container.remove ()
+            }
         )
 )
