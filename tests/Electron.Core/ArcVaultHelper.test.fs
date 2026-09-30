@@ -61,6 +61,28 @@ let private mkdirWatcherDirectoryAsync (directoryPath: string) = promise {
 let private writeWatcherTextFileAsync (filePath: string) (content: string) =
     writeFileAsync filePath content TextEncoding.Utf8
 
+[<Emit("$0._readyEmitted === true")>]
+let private hasWatcherEmittedReady (_watcher: Main.Bindings.Chokidar.IWatcher) : bool = jsNative
+
+let private waitForObservedWatcherReady (watcher: Main.Bindings.Chokidar.IWatcher) =
+    if hasWatcherEmittedReady watcher then
+        JS.Constructors.Promise.resolve ()
+    else
+        JS.Constructors.Promise.Create(fun resolve _ ->
+            let mutable resolved = false
+
+            let resolveOnce () =
+                if not resolved then
+                    resolved <- true
+                    resolve ()
+
+            watcher.on (Main.Bindings.Chokidar.Events.Ready, resolveOnce) |> ignore
+
+            // Ready can fire between the first state check and listener registration.
+            if hasWatcherEmittedReady watcher then
+                resolveOnce ()
+        )
+
 let private recordingWatcherApi (loadingChanges: ResizeArray<bool>) : IArcFileWatcherApi = {
     IsLoadingChanges = fun isLoading -> loadingChanges.Add isLoading
 }
@@ -4665,14 +4687,7 @@ Vitest.describe (
                             do! vault.OpenARC arcPath
                             let! initialTree = Main.FileTreeCreator.getFileTree arcPath
                             do! vault.FinalizeArcInitialization initialTree
-
-                            let watcherReady =
-                                JS.Constructors.Promise.Create(fun resolve _ ->
-                                    let onReady: unit -> unit = fun () -> resolve ()
-                                    vault.watcher.Value.on (Main.Bindings.Chokidar.Events.Ready, onReady) |> ignore
-                                )
-
-                            do! watcherReady
+                            do! waitForObservedWatcherReady vault.watcher.Value
                             do! renameAsync sourceStudyPath targetStudyPath
 
                             do!
