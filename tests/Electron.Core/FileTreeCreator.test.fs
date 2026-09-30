@@ -358,45 +358,4 @@ Vitest.describe (
                     })
             }
         )
-
-        Vitest.test (
-            "refreshFileTreeSubtree replaces stale descendants and preserves unrelated large-object branches",
-            fileTreeCreatorTestOptions,
-            fun () -> promise {
-                do!
-                    withTempRepository (fun context -> promise {
-                        let refreshRoot = join [| context.RepoPath; "studies"; "S1"; "dataset" |]
-                        let staleDirectory = join [| refreshRoot; "stale" |]
-                        let staleFile = join [| staleDirectory; "old.txt" |]
-                        let unrelatedDirectory = join [| context.RepoPath; "assays"; "A1" |]
-                        let unrelatedFile = join [| unrelatedDirectory; "keep.txt" |]
-                        let newLargeObject = join [| refreshRoot; "new.psd" |]
-
-                        do! createDirectoryAsync staleDirectory
-                        do! createDirectoryAsync unrelatedDirectory
-                        do! writeUtf8FileAsync staleFile "stale"
-                        do! writeUtf8FileAsync unrelatedFile "keep"
-                        let! _ = runGitAsync context.RepoPath [| "lfs"; "install"; "--local" |]
-                        let! _ = runGitAsync context.RepoPath [| "lfs"; "track"; "*.psd" |]
-
-                        let! initialTree = FileTreeCreator.getFileTree context.RepoPath
-
-                        do! removePathAsync staleDirectory
-                        do! writeUtf8FileAsync newLargeObject "new tracked payload"
-
-                        let! _ =
-                            runGitAsync context.RepoPath [| "add"; ".gitattributes"; "studies/S1/dataset/new.psd" |]
-
-                        let! refreshedTree =
-                            FileTreeCreator.refreshFileTreeSubtree context.RepoPath refreshRoot initialTree
-
-                        Vitest.expect(initialTree.ContainsKey(normalizeSlashes staleFile)).toBe (true)
-                        Vitest.expect(refreshedTree.ContainsKey(normalizeSlashes staleFile)).toBe (false)
-                        Vitest.expect(refreshedTree.ContainsKey(normalizeSlashes staleDirectory)).toBe (false)
-                        Vitest.expect(refreshedTree.ContainsKey(normalizeSlashes newLargeObject)).toBe (true)
-                        Vitest.expect(refreshedTree.[normalizeSlashes newLargeObject].largeObject.IsSome).toBe (true)
-                        Vitest.expect(refreshedTree.ContainsKey(normalizeSlashes unrelatedFile)).toBe (true)
-                    })
-            }
-        )
 )

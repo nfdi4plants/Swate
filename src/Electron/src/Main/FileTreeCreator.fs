@@ -377,28 +377,6 @@ let getFileEntries (path: string) (openSession: bool) : Fable.Core.JS.Promise<Fi
     return withFileEntriesLfsMetadata repoRoot largeObjectsByRelativePath scannedEntries
 }
 
-/// Finds all files and subfolders below a path and enriches them from one repository object snapshot.
-let getFileEntriesInSubtree (repoRoot: string) (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise {
-    let normalizedRepoRoot = normalizeRootPath repoRoot
-    let! scannedEntries = scanFileEntries path
-    let! largeObjectsByRelativePath = tryListLargeObjects normalizedRepoRoot false
-    return withFileEntriesLfsMetadata normalizedRepoRoot largeObjectsByRelativePath scannedEntries
-}
-
-/// Replaces one subtree in a single copy of the current file-tree snapshot.
-let refreshFileTreeSubtree
-    (repoRoot: string)
-    (path: string)
-    (fileTree: Dictionary<string, FileEntry>)
-    : Fable.Core.JS.Promise<Dictionary<string, FileEntry>> =
-    promise {
-        let! entries = getFileEntriesInSubtree repoRoot path
-        let nextTree = Dictionary<string, FileEntry>(fileTree)
-        removePathsAndDescendantsInPlace [ path ] nextTree
-        entries |> Array.iter (fun entry -> upsertFileEntryInPlace entry nextTree)
-        return nextTree
-    }
-
 /// Scans a path and builds its keyed file tree.
 let getFileTree (path: string) : Fable.Core.JS.Promise<Dictionary<string, FileEntry>> = promise {
     let! fileEntries = getFileEntries path true
