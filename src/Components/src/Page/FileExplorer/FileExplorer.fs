@@ -203,17 +203,10 @@ type FileExplorer =
 
             if isExpanded <> willExpand then
                 let nextExpandedIds =
-                    if willExpand then
-                        effectiveExpandedIds.Add item.Id
-                    else
-                        let rec collectSubtreeIds current =
-                            current.Id
-                            :: (current.Children |> Option.defaultValue [] |> List.collect collectSubtreeIds)
-
-                        Set.difference effectiveExpandedIds (collectSubtreeIds item |> Set.ofList)
+                    FileExplorerLogic.nextExpandedIdsForItem effectiveExpandedIds item willExpand
 
                 if expandedItemIds.IsNone then
-                    dispatch (FileExplorerLogic.SetExpanded(item.Id, willExpand))
+                    dispatch (FileExplorerLogic.SetExpanded(item, willExpand))
 
                 onExpandedItemIdsChange |> Option.iter (fun notify -> notify nextExpandedIds)
                 onDirectoryExpansionChange |> Option.iter (fun fn -> fn item willExpand)

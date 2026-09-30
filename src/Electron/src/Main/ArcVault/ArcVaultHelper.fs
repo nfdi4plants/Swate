@@ -490,11 +490,6 @@ let isArcStructureZoneOrEntityScopePath (relativePath: string) =
 
 /// Shallowly discovers structure and canonical metadata without entering payload directory contents.
 let reconcileArcStructureScope (arcPath: string) (relativeScopePath: string) =
-    let addEvent relativePath =
-        Chokidar.Events.Add.ToString(), relativePath
-
-    let addDirectoryEvent relativePath =
-        Chokidar.Events.AddDir.ToString(), relativePath
 
     let readDirectory relativePath = promise {
         try
@@ -518,9 +513,9 @@ let reconcileArcStructureScope (arcPath: string) (relativeScopePath: string) =
                     |> PathHelpers.normalizeCanonicalRelativePath
 
                 if entry.isDirectory () then
-                    Some(addDirectoryEvent relativePath)
+                    Some(Chokidar.Events.AddDir.ToString(), relativePath)
                 elif entry.isFile () && isArcModelReadContractPath relativePath then
-                    Some(addEvent relativePath)
+                    Some(Chokidar.Events.Add.ToString(), relativePath)
                 else
                     None
             )
@@ -535,7 +530,7 @@ let reconcileArcStructureScope (arcPath: string) (relativeScopePath: string) =
                 ArcPathHelper.combine zone entity.name
                 |> PathHelpers.normalizeCanonicalRelativePath
 
-            events.Add(addDirectoryEvent entityPath)
+            events.Add(Chokidar.Events.AddDir.ToString(), entityPath)
             let! entityEvents = reconcileEntity zone entity.name
             events.AddRange entityEvents
 
@@ -549,7 +544,7 @@ let reconcileArcStructureScope (arcPath: string) (relativeScopePath: string) =
 
             for zone in arcStructureZones do
                 if Filesystem.existsSync (ArcPathHelper.combine arcPath zone) then
-                    events.Add(addDirectoryEvent zone)
+                    events.Add(Chokidar.Events.AddDir.ToString(), zone)
                     let! zoneEvents = reconcileZone zone
                     events.AddRange zoneEvents
 

@@ -33,11 +33,6 @@ open FileTreeHelper
 [<Erase; Mangle(false)>]
 type FileTree =
 
-    static member internal CreateClearActiveExpandedDirectoriesRef(clear: unit -> unit) =
-        fun (element: Browser.Types.Element) ->
-            if isNull element then
-                clear ()
-
     [<ReactComponent>]
     static member ExternalFilePreviewRefresh() =
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
@@ -363,7 +358,10 @@ type FileTree =
 
         let setFileTreeRootElement =
             React.useCallback (
-                FileTree.CreateClearActiveExpandedDirectoriesRef(fun () -> clearActiveExpandedDirectoriesRef.current ()),
+                (fun (element: Browser.Types.Element) ->
+                    if isNull element then
+                        clearActiveExpandedDirectoriesRef.current ()
+                ),
                 [||]
             )
 

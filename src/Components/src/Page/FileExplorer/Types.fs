@@ -328,6 +328,16 @@ module ContextMenuItem =
 
 module FileExplorerLogic =
 
+    let rec private collectSubtreeIds (item: FileItem) =
+        item.Id
+        :: (item.Children |> Option.defaultValue [] |> List.collect collectSubtreeIds)
+
+    let nextExpandedIdsForItem (currentExpandedIds: Set<string>) (item: FileItem) (willExpand: bool) =
+        if willExpand then
+            currentExpandedIds.Add item.Id
+        else
+            Set.difference currentExpandedIds (collectSubtreeIds item |> Set.ofList)
+
     let rec collectActiveExpandedDirectories (expandedIds: Set<string>) (items: FileItem list) =
         items
         |> List.collect (fun item ->
@@ -390,7 +400,7 @@ module FileExplorerLogic =
     }
 
     type Msg =
-        | SetExpanded of itemId: string * isExpanded: bool
+        | SetExpanded of item: FileItem * isExpanded: bool
         | SelectItem of string
         | UpdateItems of FileItem list * selectedItemId: string option option * includeSelectedItem: bool
 
@@ -403,14 +413,10 @@ module FileExplorerLogic =
 
     let update msg model =
         match msg with
-        | SetExpanded(itemId, isExpanded) ->
-            let expandedIds =
-                if isExpanded then
-                    model.ExpandedIds.Add itemId
-                else
-                    model.ExpandedIds.Remove itemId
-
-            { model with ExpandedIds = expandedIds }
+        | SetExpanded(item, isExpanded) -> {
+            model with
+                ExpandedIds = nextExpandedIdsForItem model.ExpandedIds item isExpanded
+          }
 
         | SelectItem itemId ->
             let path =

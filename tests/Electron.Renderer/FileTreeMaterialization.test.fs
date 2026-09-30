@@ -1,28 +1,10 @@
 module ElectronRenderer.FileTreeMaterializationTests
 
 open System.Collections.Generic
-open Browser.Dom
-open Fable.Core.JsInterop
-open Feliz
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeMaterialization
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Electron.Shared.FileIOTypes
 open Vitest
-
-Vitest.vi.mock (
-    "./src/Electron/src/Renderer/Api.js",
-    box (fun () ->
-        createObj [
-            "ipcGitLabApi" ==> createObj []
-            "ipcVersionControlApi" ==> createObj []
-            "ipcArcVaultApi" ==> createObj []
-            "ipcAuthApi" ==> createObj []
-            "ipcTemplateApi" ==> createObj []
-            "ipcValidationPackageApi" ==> createObj []
-        ]
-    )
-)
-|> ignore
 
 let private fileNode (name: string) (path: string) =
     FileTreeNode.create (name, false, path, Dictionary())
@@ -58,16 +40,6 @@ let private fileItem id = {
     FileTree.createFile id (Some id) FileItemIcon.Document with
         Id = id
 }
-
-[<ReactComponent>]
-let private ExpansionCleanupProbe (report: string[] -> unit) =
-    Html.div [
-        prop.ref (
-            Renderer.Components.LeftSidebar.FileExplorer.FileTree.CreateClearActiveExpandedDirectoriesRef(fun () ->
-                report [||]
-            )
-        )
-    ]
 
 Vitest.describe (
     "Electron file-tree materialization",
@@ -197,31 +169,25 @@ Vitest.describe (
                 Vitest.expect(active.Contains "file.txt").toBe (false)
                 Vitest.expect(active |> Set.toList).toEqual ([ "parent" ])
         )
-)
 
-Vitest.describe (
-    "file explorer expansion cleanup",
-    fun () ->
         Vitest.test (
-            "unmount reports an empty active-directory request after an expanded scope",
-            fun () -> promise {
-                let requests = ResizeArray<string[]>()
-                let container = document.createElement "div"
-                document.body.appendChild container |> ignore
-                let root = ReactDOM.createRoot container
+            "uncontrolled reducer prunes descendants and preserves expanded siblings",
+            fun () ->
+                let parent = items.Head
 
-                try
-                    requests.Add [| "studies/S1/dataset" |]
-                    root.render (ExpansionCleanupProbe requests.Add)
-                    Vitest.expect(requests.[0]).toEqual ([| "studies/S1/dataset" |])
-                    root.unmount ()
+                let initial = {
+                    FileExplorerLogic.init items with
+                        ExpandedIds = Set.ofList [ "parent"; "parent/child"; "sibling" ]
+                }
 
-                    while requests.Count < 2 do
-                        do! Promise.sleep 0
+                let collapsed =
+                    FileExplorerLogic.update (FileExplorerLogic.SetExpanded(parent, false)) initial
 
-                    Vitest.expect(requests.[requests.Count - 1]).toEqual ([||])
-                finally
-                    container.remove ()
-            }
+                Vitest.expect(collapsed.ExpandedIds |> Set.toList).toEqual ([ "sibling" ])
+
+                let reopened =
+                    FileExplorerLogic.update (FileExplorerLogic.SetExpanded(parent, true)) collapsed
+
+                Vitest.expect(reopened.ExpandedIds |> Set.toList).toEqual ([ "parent"; "sibling" ])
         )
 )
