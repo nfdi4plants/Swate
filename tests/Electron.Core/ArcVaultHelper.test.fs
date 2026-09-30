@@ -26,9 +26,6 @@ module Abort = Main.Bindings.Abort
 
 let private electronMock: obj = import "__electronMock" "electron"
 
-[<Emit("Object.keys($0)")>]
-let private objectKeys (_: obj) : string[] = jsNative
-
 let private resetElectronMock () = electronMock?reset () |> ignore
 
 let private setBrowserWindowFactory (factory: obj -> obj) =
@@ -4050,6 +4047,14 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "permanent watcher safely ignores deep paths when chokidar omits stats",
+            fun () ->
+                Vitest
+                    .expect(shouldIgnoreForArcStructureWatcher "C:/arc" "C:/arc/studies/S1/dataset/data.raw" None)
+                    .toBe (true)
+        )
+
+        Vitest.test (
             "payload watcher prunes descendants until their directory is explicitly expanded",
             fun () ->
                 let mutable expandedDirectories = Set.singleton "studies/S1"
@@ -4567,6 +4572,8 @@ Vitest.describe (
                                     .expect(vault.expandedDirectoryPaths |> Seq.exactlyOne)
                                     .toBe ("studies/S1/dataset")
 
+                                Vitest.expect(vault.payloadWatcherScopes.Contains "studies/S1/dataset").toBe (true)
+
                             do! vault.StopFileWatcher()
                         with error ->
                             do! vault.StopFileWatcher()
@@ -4614,7 +4621,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "a populated entity directory watcher event reconciles metadata without payload traversal",
+            "a real populated entity watcher event preserves lazy payload materialization",
             TestOptions(timeout = 30000),
             fun () ->
                 TestHelpers.withTempArcWith
@@ -4628,10 +4635,18 @@ Vitest.describe (
                         do! sourceArc.WriteAsync sourceArcPath
 
                         let sourceStudyPath = join [| sourceArcPath; "studies"; "NewStudy" |]
-                        let targetStudyPath = join [| arcPath; "studies"; "NewStudy" |]
-                        let targetDatasetPath = join [| targetStudyPath; "dataset" |]
-                        let targetPayloadDirectoryPath = join [| targetDatasetPath; "payload" |]
-                        let targetPayloadPath = join [| targetPayloadDirectoryPath; "raw.bin" |]
+
+                        let targetStudyPath =
+                            join [| arcPath; "studies"; "NewStudy" |] |> PathHelpers.normalizePath
+
+                        let targetDatasetPath =
+                            join [| targetStudyPath; "dataset" |] |> PathHelpers.normalizePath
+
+                        let targetPayloadDirectoryPath =
+                            join [| targetDatasetPath; "payload" |] |> PathHelpers.normalizePath
+
+                        let targetPayloadPath =
+                            join [| targetPayloadDirectoryPath; "raw.bin" |] |> PathHelpers.normalizePath
 
                         let targetMetadataPath =
                             join [| targetStudyPath; "isa.study.xlsx" |] |> PathHelpers.normalizePath
@@ -4649,40 +4664,45 @@ Vitest.describe (
                             do! vault.OpenARC arcPath
                             let! initialTree = Main.FileTreeCreator.getFileTree arcPath
                             do! vault.FinalizeArcInitialization initialTree
+
+                            let watcherReady =
+                                JS.Constructors.Promise.Create(fun resolve _ ->
+                                    let onReady: unit -> unit = fun () -> resolve ()
+                                    vault.watcher.Value.on (Main.Bindings.Chokidar.Events.Ready, onReady) |> ignore
+                                )
+
+                            do! watcherReady
                             do! renameAsync sourceStudyPath targetStudyPath
 
-                            vault.watcher.Value.emit (
-                                Main.Bindings.Chokidar.Events.All,
-                                Main.Bindings.Chokidar.Events.AddDir.ToString(),
-                                "studies/NewStudy"
-                            )
-                            |> ignore
-
-                            do! Promise.sleep 3000
+                            do!
+                                waitUntilWatcherState
+                                    "real entity watcher event reconciled structure and metadata"
+                                    (fun () ->
+                                        vault.arc.Value.ContainsStudy("NewStudy")
+                                        && vault.fileTree.ContainsKey targetStudyPath
+                                        && vault.fileTree.ContainsKey targetMetadataPath
+                                        && vault.fileTree.ContainsKey targetDatasetPath
+                                    )
 
                             Vitest.expect(vault.arc.Value.ContainsStudy("NewStudy")).toBe (true)
-
-                            Vitest
-                                .expect(vault.fileTree.ContainsKey(PathHelpers.normalizePath targetStudyPath))
-                                .toBe (true)
-
+                            Vitest.expect(vault.fileTree.ContainsKey targetStudyPath).toBe (true)
                             Vitest.expect(vault.fileTree.ContainsKey targetMetadataPath).toBe (true)
+                            Vitest.expect(vault.fileTree.ContainsKey targetDatasetPath).toBe (true)
+                            Vitest.expect(vault.fileTree.ContainsKey targetPayloadDirectoryPath).toBe (false)
+                            Vitest.expect(vault.fileTree.ContainsKey targetPayloadPath).toBe (false)
 
-                            Vitest
-                                .expect(vault.fileTree.ContainsKey(PathHelpers.normalizePath targetPayloadPath))
-                                .toBe (false)
+                            do! vault.SetActiveFileTreeDirectories [| "studies/NewStudy/dataset" |]
 
-                            let watchedPaths =
-                                vault.watcher.Value.getWatched ()
-                                |> box
-                                |> objectKeys
-                                |> Array.map PathHelpers.normalizePath
+                            Vitest.expect(vault.fileTree.ContainsKey targetPayloadDirectoryPath).toBe (true)
+                            Vitest.expect(vault.fileTree.ContainsKey targetPayloadPath).toBe (false)
 
-                            let isWatched path =
-                                watchedPaths |> Array.contains (PathHelpers.normalizePath path)
+                            do!
+                                vault.SetActiveFileTreeDirectories [|
+                                    "studies/NewStudy/dataset"
+                                    "studies/NewStudy/dataset/payload"
+                                |]
 
-                            Vitest.expect(isWatched targetDatasetPath).toBe (false)
-                            Vitest.expect(isWatched targetPayloadDirectoryPath).toBe (false)
+                            Vitest.expect(vault.fileTree.ContainsKey targetPayloadPath).toBe (true)
 
                             do! vault.StopFileWatcher()
                         with error ->

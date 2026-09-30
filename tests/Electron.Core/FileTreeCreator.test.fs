@@ -22,6 +22,9 @@ let private childProcessDynamic: obj = importAll "node:child_process"
 
 let private fileTreeCreatorTestOptions = TestOptions(timeout = 20000)
 
+[<Emit("$0.mock.calls.length")>]
+let private mockCallCount (mock: obj) : int = jsNative
+
 let private normalizeSlashes (path: string) = path.Replace("\\", "/")
 
 let private createFileEntry name path =
@@ -303,7 +306,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "one watcher batch enriches every changed large object from its prepared snapshot",
+            "watcher batches list large objects once for changes and not for deletes",
             fileTreeCreatorTestOptions,
             fun () -> promise {
                 do!
@@ -323,22 +326,63 @@ Vitest.describe (
                         let vault = ArcVault(testWindow ())
                         vault.path <- Some context.RepoPath
 
-                        let createChangeEvent relativePath absolutePath : ArcVaultFileSystemEvent = {
-                            EventName = "change"
+                        let hostedSession =
+                            WorkspaceSessionHost.get().TryGetSession context.RepoPath
+                            |> Option.defaultWith (fun () -> failwith "Expected an open repository session.")
+
+                        let materialization =
+                            hostedSession.Session.ObjectMaterialization
+                            |> Option.defaultWith (fun () -> failwith "Expected Git LFS object materialization.")
+
+                        let listObjectsSpy = Vitest.vi.spyOn (box materialization, "ListObjects")
+
+                        let createEvent eventName relativePath absolutePath : ArcVaultFileSystemEvent = {
+                            EventName = eventName
                             RelativePath = relativePath
                             AbsolutePath = normalizeSlashes absolutePath
                         }
 
-                        do!
-                            vault.ApplyWatcherFileTreeEvents [
-                                createChangeEvent "first.psd" firstFilePath
-                                createChangeEvent "second.psd" secondFilePath
-                            ]
+                        try
+                            do!
+                                vault.ApplyWatcherFileTreeEvents [
+                                    createEvent "change" "first.psd" firstFilePath
+                                    createEvent "change" "second.psd" secondFilePath
+                                ]
 
-                        let firstEntry = vault.fileTree.[normalizeSlashes firstFilePath]
-                        let secondEntry = vault.fileTree.[normalizeSlashes secondFilePath]
-                        Vitest.expect(firstEntry.largeObject.IsSome).toBe (true)
-                        Vitest.expect(secondEntry.largeObject.IsSome).toBe (true)
+                            let firstEntry = vault.fileTree.[normalizeSlashes firstFilePath]
+                            let secondEntry = vault.fileTree.[normalizeSlashes secondFilePath]
+
+                            Vitest
+                                .expect(
+                                    firstEntry.largeObject
+                                    |> Option.map (fun item -> item.Path, item.IsMaterialized)
+                                )
+                                .toEqual (Some("first.psd", true))
+
+                            Vitest
+                                .expect(
+                                    secondEntry.largeObject
+                                    |> Option.map (fun item -> item.Path, item.IsMaterialized)
+                                )
+                                .toEqual (Some("second.psd", true))
+
+                            Vitest.expect(mockCallCount listObjectsSpy).toBe (1)
+
+                            do! fsPromisesDynamic?unlink (firstFilePath) |> unbox<Fable.Core.JS.Promise<unit>>
+
+                            do! fsPromisesDynamic?unlink (secondFilePath) |> unbox<Fable.Core.JS.Promise<unit>>
+
+                            do!
+                                vault.ApplyWatcherFileTreeEvents [
+                                    createEvent "unlink" "first.psd" firstFilePath
+                                    createEvent "unlink" "second.psd" secondFilePath
+                                ]
+
+                            Vitest.expect(vault.fileTree.ContainsKey(normalizeSlashes firstFilePath)).toBe (false)
+                            Vitest.expect(vault.fileTree.ContainsKey(normalizeSlashes secondFilePath)).toBe (false)
+                            Vitest.expect(mockCallCount listObjectsSpy).toBe (1)
+                        finally
+                            Vitest.vi.restoreAllMocks ()
                     })
             }
         )
