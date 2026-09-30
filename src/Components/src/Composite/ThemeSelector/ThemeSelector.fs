@@ -56,9 +56,19 @@ module private ThemeSelectorHelper =
 
     [<Literal>]
     let Amaze =
-        """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+        """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
 	<rect width="24" height="24" fill="none" />
-	<path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+	<g stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+		<path d="M12 3.5C10.4 5.2 9.3 7.6 9.3 10.1c0 2.6 1 4.9 2.7 6.7c1.7-1.8 2.7-4.1 2.7-6.7c0-2.5-1.1-4.9-2.7-6.6Z" />
+		<path d="M8.3 5.8c-.6 1.8-.8 3.7-.6 5.3c.3 2 1.2 3.7 3.1 5.1c.4-1.8.1-3.8-.7-5.5c-.7-1.6-1.7-3.1-2.8-4.9Z" />
+		<path d="M15.7 5.8c.6 1.8.8 3.7.6 5.3c-.3 2-1.2 3.7-3.1 5.1c-.4-1.8-.1-3.8.7-5.5c.7-1.6 1.7-3.1 2.8-4.9Z" />
+		<path d="M5.5 8.2c0 2 .4 3.8 1.2 5.2c1 1.7 2.4 2.9 4.7 3.4c-.3-2-1.2-3.8-2.5-5.2c-1-1.1-2.1-2.1-3.4-3.4Z" />
+		<path d="M18.5 8.2c0 2-.4 3.8-1.2 5.2c-1 1.7-2.4 2.9-4.7 3.4c.3-2 1.2-3.8 2.5-5.2c1-1.1 2.1-2.1 3.4-3.4Z" />
+		<path d="M3.8 12.2c1 .9 2.1 1.7 3.2 2.2c1.3.6 2.8.9 4.5.7c-1-1.3-2.4-2.2-4-2.7c-1.2-.4-2.4-.4-3.7-.2Z" />
+		<path d="M20.2 12.2c-1 .9-2.1 1.7-3.2 2.2c-1.3.6-2.8.9-4.5.7c1-1.3 2.4-2.2 4-2.7c1.2-.4 2.4-.4 3.7-.2Z" />
+		<path d="M6.2 16.1c1.4-.9 3-1.3 4.6-1.3c1.7 0 3.1.4 4.8 1.3c-1.3 1.2-2.6 1.8-4.8 1.8c-2.1 0-3.4-.6-4.6-1.8Z" />
+		<path d="M8.8 19c.9-.7 1.9-1 3.2-1s2.3.3 3.2 1c-.8.8-1.8 1.3-3.2 1.3s-2.4-.5-3.2-1.3Z" />
+	</g>
 </svg>"""
 
     [<Literal>]
@@ -93,8 +103,8 @@ type ThemeSelector =
                     | Theme.Finster -> AnimatedMoon
                     | Theme.Planti -> Planti
                     | Theme.Viola -> Viola
-                    | Theme.Auto -> Browser
                     | Theme.Amaze -> Amaze
+                    | Theme.Auto -> Browser
 
                 iconRef.current?innerHTML <- icon
                 ()
@@ -114,8 +124,8 @@ type ThemeSelector =
                         ThemeSelector.SelectItem Theme.Finster
                         ThemeSelector.SelectItem Theme.Planti
                         ThemeSelector.SelectItem Theme.Viola
-                        ThemeSelector.SelectItem Theme.Auto
                         ThemeSelector.SelectItem Theme.Amaze
+                        ThemeSelector.SelectItem Theme.Auto
                     ]
                 ]
             ]

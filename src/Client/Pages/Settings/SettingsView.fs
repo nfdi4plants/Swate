@@ -118,8 +118,8 @@ type Settings =
                     | Theme.Finster -> animatedMoon
                     | Theme.Planti -> planti
                     | Theme.Viola -> viola
-                    | Theme.Auto -> browser
                     | Theme.Amaze -> amaze
+                    | Theme.Auto -> browser
 
                 iconRef.current?innerHTML <- icon
                 ()
@@ -145,7 +145,9 @@ type Settings =
                             mkOption Theme.Finster
                             mkOption Theme.Planti
                             mkOption Theme.Viola
+                            mkOption Theme.Amaze
                             mkOption Theme.Auto
+
                         ]
                     ]
                 ]
