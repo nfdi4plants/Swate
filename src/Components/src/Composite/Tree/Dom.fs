@@ -1,4 +1,4 @@
-module Swate.Components.Composite.Tree.Dom
+module internal Swate.Components.Composite.Tree.Dom
 
 open Browser.Types
 open Fable.Core
@@ -41,7 +41,11 @@ let originatesFromInteractiveDescendant (event: MouseEvent) =
     if obj.ReferenceEquals(event.target, event.currentTarget) then
         false
     else
-        BrowserEvent.tryGetClosest InteractiveElementSelector event |> Option.isSome
+        BrowserEvent.tryGetClosest InteractiveElementSelector event
+        |> Option.exists (fun interactive ->
+            let row = event.currentTarget :?> Element
+            not (obj.ReferenceEquals(interactive, row)) && row.contains interactive
+        )
 
 let focusMovedOutsideTree (event: FocusEvent) =
     let tree: HTMLElement = unbox event.currentTarget

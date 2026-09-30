@@ -103,7 +103,7 @@ module kbdEventCode =
     let ``end`` = "End"
 
     [<Literal>]
-    let space = " "
+    let space = "Space"
 
     let key (key: string) = key.ToUpper() |> sprintf "Key%s"
 

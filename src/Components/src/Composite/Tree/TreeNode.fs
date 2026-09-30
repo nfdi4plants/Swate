@@ -9,10 +9,10 @@ open Swate.Components.Composite.Tree.Types
 [<Erase; Mangle(false)>]
 type internal TreeNode =
 
-    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
+    [<ReactMemoComponent(AreEqualFn.FsEquals)>]
     static member private Surface<'T>
         (
-            node: TreeItem<'T>,
+            comparisonNode: TreeItem<'T>,
             depth: int,
             isExpanded: bool,
             isSelected: bool,
@@ -21,11 +21,16 @@ type internal TreeNode =
             isLoading: bool,
             error: string option,
             canExpand: bool,
-            presentationRef: IRefValue<TreePresentation<'T>>,
+            presentation: TreePresentation<'T>,
+            currentRef: IRefValue<TreeNodeActionState<'T>>,
             onToggle: unit -> unit,
-            onSelect: MouseEvent -> unit
+            onSelect: TreeSelectionEvent -> unit
         ) =
-        let presentation = presentationRef.current
+        let node =
+            currentRef.current.lookup.nodes
+            |> Map.tryFind (TreeItem.getId comparisonNode)
+            |> Option.defaultValue comparisonNode
+
         let nodeProps = TreeItem.props node
 
         let renderProps =
@@ -139,80 +144,78 @@ type internal TreeNode =
             ]
         ]
 
-    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
+    [<ReactMemoComponent(AreEqualFn.FsEquals)>]
     static member TreeNode<'T>
-        (
-            nodeId: string,
-            comparisonNode: TreeItem<'T>,
-            depth: int,
-            posInSet: int,
-            setSize: int,
-            isExpanded: bool,
-            isSelected: bool,
-            isActive: bool,
-            isTabStop: bool,
-            isFocused: bool,
-            isLoading: bool,
-            error: string option,
-            canSelect: bool,
-            canExpand: bool,
-            className: string[],
-            debug: bool,
-            nodesRef: IRefValue<Map<string, TreeItem<'T>>>,
-            presentationRef: IRefValue<TreePresentation<'T>>,
-            ?onToggle: unit -> unit,
-            ?onSelect: MouseEvent -> unit,
-            ?onFocus: unit -> unit,
-            ?onKeyDown: KeyboardEvent -> unit
-        ) =
+        (view: TreeNodeView<'T>, currentRef: IRefValue<TreeNodeActionState<'T>>, actions: TreeNodeActions<'T>)
+        =
+        let nodeId = TreeItem.getId view.comparisonNode
+
         let node =
-            nodesRef.current |> Map.tryFind nodeId |> Option.defaultValue comparisonNode
+            currentRef.current.lookup.nodes
+            |> Map.tryFind nodeId
+            |> Option.defaultValue view.comparisonNode
 
         let nodeProps = TreeItem.props node
-        let onToggle = defaultArg onToggle ignore
-        let onSelect = defaultArg onSelect ignore
-        let onFocus = defaultArg onFocus ignore
-        let onKeyDown = defaultArg onKeyDown ignore
+        let canExpand = TreeItem.isBranch node
+
+        let onToggle, onSelect =
+            React.useMemo (
+                (fun () ->
+                    (fun () -> actions.expandNode nodeId),
+                    (fun (event: TreeSelectionEvent) ->
+                        event.preventDefault ()
+                        event.stopPropagation ()
+                        focusNode currentRef.current.treeRef nodeId
+
+                        actions.selectNode
+                            nodeId
+                            (TreeController.selectionIntent event.shiftKey event.ctrlKey event.metaKey)
+                    )
+                ),
+                [| box nodeId; box actions |]
+            )
 
         Html.div [
             prop.role "treeitem"
-            prop.tabIndex (if isTabStop then 0 else -1)
-            if canSelect then
-                prop.custom ("aria-selected", isSelected)
-            if not canSelect && not canExpand then
-                prop.custom ("aria-disabled", true)
-            prop.custom ("aria-level", depth + 1)
-            prop.custom ("aria-posinset", posInSet)
-            prop.custom ("aria-setsize", setSize)
+            prop.tabIndex (if view.isTabStop then 0 else -1)
+            if view.canSelect then
+                prop.ariaSelected view.isSelected
+            if not view.canSelect && not canExpand then
+                prop.ariaDisabled true
+            prop.ariaLevel (view.depth + 1)
+            prop.ariaPosInSet view.posInSet
+            prop.ariaSetSize view.setSize
             if canExpand then
-                prop.custom ("aria-expanded", isExpanded)
+                prop.ariaExpanded view.isExpanded
             prop.custom ("data-tree-node-id", nodeId)
             prop.custom ("data-tree-node-kind", if TreeItem.isBranch node then "branch" else "leaf")
-            prop.custom ("data-tree-active", isActive)
-            prop.custom ("data-tree-focused", isFocused)
-            if debug then
-                prop.testId $"tree-node-{nodeId}"
-            prop.className className
-            prop.style [ style.paddingLeft (length.rem (float depth * 1.25)) ]
+            prop.custom ("data-tree-active", view.isActive)
+            prop.custom ("data-tree-focused", view.isFocused)
+            prop.className view.className
+            prop.style [ style.paddingLeft (length.rem (float view.depth * 1.25)) ]
             prop.title (nodeProps.tooltip |> Option.defaultValue nodeProps.label)
             prop.onClick (fun event ->
                 if not (originatesFromInteractiveDescendant event) then
-                    onSelect event
+                    onSelect (unbox event)
             )
-            prop.onFocus (fun _ -> onFocus ())
-            prop.onKeyDown onKeyDown
+            prop.onFocus (fun _ ->
+                if currentRef.current.treeState.focusedId <> Some nodeId then
+                    currentRef.current.treeState.setFocusedId (Some nodeId)
+            )
+            prop.onKeyDown (actions.onNodeKeyDown nodeId)
             prop.children [
                 TreeNode.Surface(
-                    node,
-                    depth,
-                    isExpanded,
-                    isSelected,
-                    isActive,
-                    isFocused,
-                    isLoading,
-                    error,
+                    view.comparisonNode,
+                    view.depth,
+                    view.isExpanded,
+                    view.isSelected,
+                    view.isActive,
+                    view.isFocused,
+                    view.isLoading,
+                    view.error,
                     canExpand,
-                    presentationRef,
+                    view.presentation,
+                    currentRef,
                     onToggle,
                     onSelect
                 )

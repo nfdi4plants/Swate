@@ -4,8 +4,11 @@ open Fable.Core
 open Feliz
 open Swate.Components.Composite.Tree.State
 open Swate.Components.Composite.Tree.Types
+open Swate.Components.Composite.Tree.Dom
 
-let private isLoadActive (controller: TreeLoadController<'T>) cacheKey =
+let private isLoadActive (controller: TreeNodeActionState<'T>) cacheKey =
+    // The ref guards synchronously before React commits; the cached status drives the spinner
+    // and prevents a committed Loading/Loaded entry from being requested again.
     hasActiveOrLoadedChildren cacheKey controller.treeState.loadedChildren
     || controller.trackerRef.current.activeRequestIds |> Map.containsKey cacheKey
 
@@ -24,7 +27,27 @@ let private markLoadFinished (trackerRef: IRefValue<TreeLoadTracker>) cacheKey r
     if isRequestCurrent trackerRef cacheKey requestId then
         trackerRef.current.activeRequestIds <- trackerRef.current.activeRequestIds |> Map.remove cacheKey
 
-let loadTreeItems (controller: TreeLoadController<'T>) target cacheKey = promise {
+#if FABLE_COMPILER
+[<Emit("$0 instanceof Error ? $0 : new Error(typeof $0 === 'string' && $0.length > 0 ? $0 : 'Failed to load tree items')")>]
+let private normalizeLoadError (error: obj) : exn = jsNative
+#else
+let private normalizeLoadError (error: obj) : exn =
+    match error with
+    | :? exn as exception' -> exception'
+    | :? string as message when message.Length > 0 -> System.Exception message
+    | _ -> System.Exception "Failed to load tree items"
+#endif
+
+let resetCache (current: TreeNodeActionState<'T>) =
+    current.trackerRef.current.activeRequestIds <- Map.empty
+
+    current.treeState.setExpandedIds (
+        preserveExpansionAfterInvalidateAll current.items current.treeState.loadedChildren current.defaultExpandedIds
+    )
+
+    current.treeState.setLoadedChildren (fun _ -> Map.empty)
+
+let loadTreeItems (controller: TreeNodeActionState<'T>) target cacheKey = promise {
     match controller.dataSource with
     | Some source when not (isLoadActive controller cacheKey) ->
         let requestId = nextRequestId controller.trackerRef
@@ -39,12 +62,13 @@ let loadTreeItems (controller: TreeLoadController<'T>) target cacheKey = promise
                     controller.treeState.setLoadedChildren (withLoaded cacheKey children)
             with ex ->
                 if isRequestCurrent controller.trackerRef cacheKey requestId then
-                    controller.treeState.setLoadedChildren (withLoadError cacheKey ex.Message)
+                    let error = normalizeLoadError (box ex)
+                    controller.treeState.setLoadedChildren (withLoadError cacheKey error.Message)
 
                     if cacheKey <> rootCacheKey then
                         controller.treeState.setExpandedIds (Set.remove cacheKey)
 
-                    controller.onError ex
+                    controller.onError error
         finally
             markLoadFinished controller.trackerRef cacheKey requestId
     | _ -> ()
@@ -59,14 +83,18 @@ let selectionIntent shiftKey ctrlKey metaKey =
     elif ctrlKey || metaKey then TreeSelectionIntent.Toggle
     else TreeSelectionIntent.Replace
 
-let selectNode (controller: TreeSelectionController<'T>) (node: TreeItem<'T>) intent =
+let selectNode (controller: TreeNodeActionState<'T>) (node: TreeItem<'T>) intent =
     let nodeId = TreeItem.getId node
     controller.treeState.setActiveId (Some nodeId)
 
     if not controller.isSelectionDisabled && controller.isNodeSelectable node then
+        let isVisible id =
+            controller.lookup.indices |> Map.containsKey id
+
         let anchorId =
             controller.treeState.selectionAnchorId
-            |> Option.orElseWith (fun () -> controller.effectiveSelectedIds |> Array.tryLast)
+            |> Option.filter (fun id -> controller.effectiveSelectedIds.Length > 0 && isVisible id)
+            |> Option.orElseWith (fun () -> controller.effectiveSelectedIds |> Array.rev |> Array.tryFind isVisible)
             |> Option.defaultValue nodeId
 
         let nextSelectedIds =
@@ -74,38 +102,42 @@ let selectNode (controller: TreeSelectionController<'T>) (node: TreeItem<'T>) in
             | TreeSelectionMode.Multiple, TreeSelectionIntent.Toggle ->
                 toggleSelection nodeId controller.effectiveSelectedIds
             | TreeSelectionMode.Multiple, TreeSelectionIntent.Range ->
-                rangeSelection anchorId nodeId controller.isNodeSelectable controller.lookup.visibleNodes
+                rangeSelection anchorId nodeId controller.isNodeSelectable controller.lookup
             | _ -> [| nodeId |]
 
         controller.setSelection nextSelectedIds
 
-        match intent, controller.treeState.selectionAnchorId with
-        | TreeSelectionIntent.Range, Some _ -> ()
-        | _ -> controller.treeState.setSelectionAnchorId (Some nodeId)
+        let nextAnchor =
+            if intent = TreeSelectionIntent.Range then
+                anchorId
+            else
+                nodeId
 
-let focusNode (focusController: TreeFocusController<'T>) index nodeId =
-    focusController.setActiveId (Some nodeId)
-    focusController.setFocusedId (Some nodeId)
+        controller.treeState.setSelectionAnchorId (Some nextAnchor)
+
+let focusNode (focusController: TreeNodeActionState<'T>) index nodeId =
+    focusController.treeState.setActiveId (Some nodeId)
+    focusController.treeState.setFocusedId (Some nodeId)
     focusController.scrollToIndex index
-    focusController.focusDom nodeId
+    focusNodeAfterRender focusController.treeRef nodeId
 
-let tryFocusById (focusController: TreeFocusController<'T>) nodeId =
+let tryFocusById (focusController: TreeNodeActionState<'T>) nodeId =
     focusController.lookup.indices
     |> Map.tryFind nodeId
     |> Option.iter (fun index -> focusNode focusController index nodeId)
 
-let focusByDelta (focusController: TreeFocusController<'T>) focusedId delta =
+let focusByDelta (focusController: TreeNodeActionState<'T>) focusedId delta =
     moveFocus delta focusedId focusController.lookup
     |> Option.iter (tryFocusById focusController)
 
-let focusLast (focusController: TreeFocusController<'T>) =
+let focusLast (focusController: TreeNodeActionState<'T>) =
     focusController.lookup.visibleNodes
     |> Array.tryLast
     |> Option.iter (fun row -> tryFocusById focusController (TreeItem.getId row.node))
 
-let collapseOrFocusParent (focusController: TreeFocusController<'T>) expandedIds setExpandedIds nodeId =
-    if expandedIds |> Set.contains nodeId then
-        setExpandedIds (Set.remove nodeId)
+let collapseOrFocusParent (focusController: TreeNodeActionState<'T>) nodeId =
+    if focusController.treeState.expandedIds |> Set.contains nodeId then
+        focusController.treeState.setExpandedIds (Set.remove nodeId)
     else
         focusController.lookup.parents
         |> Map.tryFind nodeId

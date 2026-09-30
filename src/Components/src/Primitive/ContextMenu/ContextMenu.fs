@@ -232,7 +232,7 @@ type ContextMenu =
                                                 let triggerEvent =
                                                     fun (e: Browser.Types.MouseEvent) ->
                                                         let data = {|
-                                                            buttonEvent = e
+                                                            buttonEvent = unbox<ContextMenuClickEvent> e
                                                             spawnData = spawnData
                                                         |}
 

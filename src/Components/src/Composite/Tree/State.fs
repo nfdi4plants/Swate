@@ -44,11 +44,14 @@ let withLoadError nodeId message loadedChildren =
         error = Some message
     }
 
-let rootItems items loadedChildren =
-    loadedChildren
-    |> Map.tryFind rootCacheKey
-    |> Option.bind _.children
-    |> Option.defaultValue items
+let rootItems (items: TreeItem<'T>[]) loadedChildren =
+    if items.Length > 0 then
+        items
+    else
+        loadedChildren
+        |> Map.tryFind rootCacheKey
+        |> Option.bind _.children
+        |> Option.defaultValue items
 
 /// <summary>
 /// Returns the effective direct children for the specified tree node.
@@ -117,6 +120,11 @@ let flattenVisible loadedChildren expandedIds items =
         nodes = nodeMap |> Seq.distinctBy fst |> Map.ofSeq
         parents = parentMap |> Seq.distinctBy fst |> Map.ofSeq
         indices = nodes |> Seq.mapi (fun index row -> TreeItem.getId row.node, index) |> Map.ofSeq
+        firstChildren =
+            nodes
+            |> Seq.choose (fun row -> row.parentId |> Option.map (fun parent -> parent, TreeItem.getId row.node))
+            |> Seq.distinctBy fst
+            |> Map.ofSeq
         visibleNodes = nodes.ToArray()
     }
 
@@ -132,16 +140,13 @@ let toggleSelection nodeId selectedIds =
     else
         Array.append selectedIds [| nodeId |]
 
-let rangeSelection anchorId targetId isNodeSelectable visibleNodes =
-    let tryIndex nodeId =
-        visibleNodes |> Array.tryFindIndex (fun row -> TreeItem.getId row.node = nodeId)
-
-    match tryIndex anchorId, tryIndex targetId with
+let rangeSelection anchorId targetId isNodeSelectable (lookup: TreeRowLookup<'T>) =
+    match Map.tryFind anchorId lookup.indices, Map.tryFind targetId lookup.indices with
     | Some anchorIndex, Some targetIndex ->
         let firstIndex = min anchorIndex targetIndex
         let lastIndex = max anchorIndex targetIndex
 
-        visibleNodes.[firstIndex..lastIndex]
+        lookup.visibleNodes.[firstIndex..lastIndex]
         |> Array.choose (fun row ->
             if isNodeSelectable row.node then
                 Some(TreeItem.getId row.node)
@@ -263,7 +268,7 @@ let private staticNodeIds items =
 
     collect Set.empty items
 
-let preserveExpansionAfterInvalidateAll items loadedChildren expandedIds =
+let preserveExpansionAfterInvalidateAll items loadedChildren defaultExpandedIds expandedIds =
     let staticIds = staticNodeIds items
 
     let loadedDescendantIds =
@@ -283,5 +288,15 @@ let preserveExpansionAfterInvalidateAll items loadedChildren expandedIds =
         |> Set.remove rootCacheKey
         |> Set.filter (fun nodeId -> loadedDescendantIds |> Set.contains nodeId |> not)
 
+    let lazyRootIds =
+        rootItems [||] loadedChildren |> Array.map TreeItem.getId |> Set.ofArray
+
+    let defaultIds = defaultExpandedIds |> Set.ofArray
+
     expandedIds
-    |> Set.filter (fun nodeId -> staticIds.Contains nodeId || reloadableRoots.Contains nodeId)
+    |> Set.filter (fun nodeId ->
+        staticIds.Contains nodeId
+        || reloadableRoots.Contains nodeId
+        || lazyRootIds.Contains nodeId
+        || defaultIds.Contains nodeId
+    )

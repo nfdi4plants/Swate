@@ -12,7 +12,7 @@ open Swate.Components.Composite.Tree.Types
 [<Erase; Mangle(false)>]
 type Tree =
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Tree<'T>
         (
             items: TreeItem<'T>[],
@@ -26,6 +26,7 @@ type Tree =
             ?isNodeSelectable: TreeItem<'T> -> bool,
             ?enableVirtualization: bool,
             ?estimateNodeHeight: int,
+            ?viewportClassName: string,
             ?onContextMenu: TreeContextMenuEvent<'T>,
             ?renderNode: TreeRenderProps<'T> -> ReactElement,
             ?leading: TreeRenderProps<'T> -> ReactElement,
@@ -33,8 +34,7 @@ type Tree =
             ?styleFn: TreeStyleFn<'T>,
             ?onError: exn -> unit,
             ?ref: IRefValue<TreeApi>,
-            ?ariaLabel: string,
-            ?debug: bool
+            ?ariaLabel: string
         ) =
         let selectionMode = defaultArg selectionMode TreeSelectionMode.Single
         let isSelectionDisabled = defaultArg isSelectionDisabled false
@@ -43,7 +43,6 @@ type Tree =
         let estimateNodeHeight = defaultArg estimateNodeHeight 34
         let onError = defaultArg onError (fun error -> Browser.Dom.console.error error)
         let ariaLabel = defaultArg ariaLabel "Tree"
-        let debug = defaultArg debug false
 
         let treeRef = React.useElementRef ()
         let scrollRef = React.useElementRef ()
@@ -54,14 +53,7 @@ type Tree =
                 activeRequestIds = Map.empty
             }
 
-        let presentationRef =
-            React.useRef<TreePresentation<'T>> {
-                renderNode = renderNode
-                leading = leading
-                trailing = trailing
-            }
-
-        presentationRef.current <- {
+        let presentation = {
             renderNode = renderNode
             leading = leading
             trailing = trailing
@@ -86,8 +78,6 @@ type Tree =
             )
 
         let rows = lookup.visibleNodes
-        let nodesRef = React.useRef lookup.nodes
-        nodesRef.current <- lookup.nodes
         let activeId = activeOrFirst treeState.activeId effectiveSelectedIds lookup
         let focusedId = visibleFocus treeState.focusedId lookup
         let shouldUseVirtualization = enableVirtualization && rows.Length > 0
@@ -101,41 +91,31 @@ type Tree =
                 getScrollElement = (fun () -> scrollRef.current),
                 estimateSize = (fun _ -> estimateNodeHeight),
                 overscan = 8,
-                rangeExtractor =
-                    (fun range ->
-                        match pinnedFocusIndex with
-                        | Some index ->
-                            [|
-                                yield index
-                                yield! Virtual.defaultRangeExtractor range
-                            |]
-                            |> Array.distinct
-                            |> Array.sort
-                        | None -> Virtual.defaultRangeExtractor range
-                    )
+                rangeExtractor = Virtual.pinnedRangeExtractor (pinnedFocusIndex |> Option.toArray)
             )
 
         let virtualRows = virtualizer.getVirtualItems ()
 
-        let mountedNodeIds =
+        let mountedIndices = virtualRows |> Array.map _.index |> Set.ofArray
+
+        let isMounted nodeId =
+            lookup.indices
+            |> Map.tryFind nodeId
+            |> Option.exists (fun index -> not shouldUseVirtualization || mountedIndices.Contains index)
+
+        let firstMounted =
             if shouldUseVirtualization then
                 virtualRows
-                |> Array.choose (fun virtualRow ->
-                    rows
-                    |> Array.tryItem virtualRow.index
-                    |> Option.map (fun row -> TreeItem.getId row.node)
-                )
+                |> Array.tryHead
+                |> Option.bind (fun row -> rows |> Array.tryItem row.index)
             else
-                rows |> Array.map (fun row -> TreeItem.getId row.node)
+                rows |> Array.tryHead
 
         let tabStopId =
             focusedId
-            |> Option.filter (fun nodeId -> mountedNodeIds |> Array.contains nodeId)
-            |> Option.orElseWith (fun () ->
-                activeId
-                |> Option.filter (fun nodeId -> mountedNodeIds |> Array.contains nodeId)
-            )
-            |> Option.orElseWith (fun () -> mountedNodeIds |> Array.tryHead)
+            |> Option.filter isMounted
+            |> Option.orElseWith (fun () -> activeId |> Option.filter isMounted)
+            |> Option.orElseWith (fun () -> firstMounted |> Option.map (fun row -> TreeItem.getId row.node))
 
         let scrollToIndex index =
             if shouldUseVirtualization then
@@ -145,9 +125,12 @@ type Tree =
                     behavior = Virtual.ScrollBehavior.Auto
                 )
 
-        let actions =
-            useTreeNodeActions treeRef loadTrackerRef {
+        let currentRef, actions =
+            useTreeNodeActions {
+                treeRef = treeRef
+                trackerRef = loadTrackerRef
                 items = items
+                defaultExpandedIds = defaultArg defaultExpandedIds [||]
                 dataSource = dataSource
                 isSelectionDisabled = isSelectionDisabled
                 isNodeSelectable = isNodeSelectable
@@ -161,31 +144,12 @@ type Tree =
                 onError = onError
             }
 
+        let onTreeFocus, onTreeBlur = useFocusRecovery currentRef
+
         React.useImperativeHandle (
             !!ref,
-            (fun () ->
-                TreeApi(
-                    (fun nodeId ->
-                        let invalidatedIds = invalidatedSubtreeIds items treeState.loadedChildren nodeId
-
-                        if not invalidatedIds.IsEmpty then
-                            loadTrackerRef.current.activeRequestIds <-
-                                loadTrackerRef.current.activeRequestIds
-                                |> Map.filter (fun cacheKey _ -> not (invalidatedIds.Contains cacheKey))
-
-                            treeState.setLoadedChildren (removeCacheEntries invalidatedIds)
-
-                            treeState.setExpandedIds (removeDescendantExpansions nodeId invalidatedIds)
-                    ),
-                    (fun () ->
-                        loadTrackerRef.current.activeRequestIds <- Map.empty
-
-                        treeState.setExpandedIds (preserveExpansionAfterInvalidateAll items treeState.loadedChildren)
-
-                        treeState.setLoadedChildren (fun _ -> Map.empty)
-                    )
-                )
-            )
+            (fun () -> TreeApi(actions.invalidateNode, actions.invalidateAll)),
+            [| box actions |]
         )
 
         let renderRow row =
@@ -204,48 +168,35 @@ type Tree =
             let isFocused = focusedId = Some nodeId
 
             TreeNode.TreeNode(
-                nodeId = nodeId,
-                comparisonNode = row.comparisonNode,
-                depth = row.depth,
-                posInSet = row.posInSet,
-                setSize = row.setSize,
-                isExpanded = isExpanded,
-                isSelected = isSelected,
-                isActive = isActive,
-                isFocused = isFocused,
-                isTabStop = (tabStopId = Some nodeId),
-                isLoading = (loadState.status = TreeLazyLoadStatus.Loading),
-                error = loadState.error,
-                canSelect = canSelect,
-                canExpand = canExpand,
-                className = Helper.nodeContainerClasses row canSelect canExpand isSelected isActive isFocused styleFn,
-                debug = debug,
-                nodesRef = nodesRef,
-                presentationRef = presentationRef,
-                onToggle = (fun () -> actions.expandNode nodeId),
-                onSelect =
-                    (fun event ->
-                        event.preventDefault ()
-                        event.stopPropagation ()
-                        (unbox<Browser.Types.HTMLElement> event.currentTarget).focus ()
-
-                        actions.selectNode
-                            nodeId
-                            (TreeController.selectionIntent event.shiftKey event.ctrlKey event.metaKey)
-                    ),
-                onFocus =
-                    (fun () ->
-                        if treeState.focusedId <> Some nodeId then
-                            treeState.setFocusedId (Some nodeId)
-                    ),
-                onKeyDown = actions.onNodeKeyDown nodeId
+                {
+                    comparisonNode = row.comparisonNode
+                    depth = row.depth
+                    posInSet = row.posInSet
+                    setSize = row.setSize
+                    isExpanded = isExpanded
+                    isSelected = isSelected
+                    isActive = isActive
+                    isFocused = isFocused
+                    isTabStop = (tabStopId = Some nodeId)
+                    isLoading = (loadState.status = TreeLazyLoadStatus.Loading)
+                    error = loadState.error
+                    canSelect = canSelect
+                    className =
+                        Helper.nodeContainerClasses row canSelect canExpand isSelected isActive isFocused styleFn
+                    presentation = presentation
+                },
+                currentRef,
+                actions
             )
 
         let treeContent =
             if shouldUseVirtualization then
                 Html.div [
                     prop.ref scrollRef
-                    prop.className "swt:max-h-96 swt:overflow-auto"
+                    prop.className [
+                        "swt:overflow-auto"
+                        defaultArg viewportClassName "swt:max-h-96"
+                    ]
                     prop.custom ("data-tree-virtualized", "true")
                     prop.children [
                         Html.div [
@@ -260,15 +211,12 @@ type Tree =
 
                                     Html.div [
                                         prop.key nodeId
-                                        prop.ref (fun element -> virtualizer.measureElement (Option.ofObj element))
-                                        prop.custom ("data-index", virtualRow.index)
-                                        prop.style [
-                                            style.position.absolute
-                                            style.top 0
-                                            style.left 0
-                                            style.width (length.percent 100)
-                                            style.custom ("transform", $"translateY({virtualRow.start}px)")
-                                        ]
+                                        yield!
+                                            Virtual.rowProps (
+                                                virtualRow.index,
+                                                virtualRow.start,
+                                                measureElement = virtualizer.measureElement
+                                            )
                                         prop.children [ renderRow row ]
                                     ]
                             ]
@@ -292,8 +240,8 @@ type Tree =
             | Some contextMenuItems ->
                 Swate.Components.Primitive.ContextMenu.ContextMenu.ContextMenu(
                     (fun data ->
-                        let event, target = unbox<Browser.Types.MouseEvent * TreeItem<'T> option> data
-                        contextMenuItems.Invoke(event, target) |> Array.toList
+                        let target = unbox<TreeContextMenuTarget<'T>> data
+                        contextMenuItems.Invoke(target.event, target.item) |> Array.toList
                     ),
                     ref = treeRef,
                     onSpawn =
@@ -302,33 +250,49 @@ type Tree =
                                 tryGetNodeId event
                                 |> Option.bind (fun nodeId -> lookup.nodes |> Map.tryFind nodeId)
 
-                            Some(box (event, target))
-                        ),
-                    debug = debug
+                            Some(box (TreeContextMenuTarget(event, target)))
+                        )
                 )
             | None -> Html.none
+
+        let rootLoadState =
+            if items.Length = 0 then
+                treeState.loadedChildren |> Map.tryFind rootCacheKey
+            else
+                None
 
         Html.div [
             prop.ref treeRef
             prop.role "tree"
+            prop.tabIndex -1
             prop.ariaLabel ariaLabel
-            prop.custom ("aria-multiselectable", (selectionMode = TreeSelectionMode.Multiple))
-            prop.custom ("data-tree-root", "true")
-            prop.onBlur (fun event ->
-                if focusMovedOutsideTree event then
-                    treeState.setFocusedId None
+            prop.ariaMultiSelectable (selectionMode.Equals TreeSelectionMode.Multiple)
+            prop.ariaBusy (
+                rootLoadState
+                |> Option.exists (fun state -> state.status = TreeLazyLoadStatus.Loading)
             )
-            if debug then
-                prop.testId "generic-tree"
+            prop.custom ("data-tree-root", "true")
+            prop.onFocus onTreeFocus
+            prop.onBlur onTreeBlur
             prop.className (Helper.rootClasses styleFn)
             prop.children [
                 treeContent
                 contextMenu
-                if debug then
+                match rootLoadState with
+                | Some state when state.status = TreeLazyLoadStatus.Loading ->
+                    Html.div [ prop.role "status"; prop.text "Loading tree…" ]
+                | Some state when state.status = TreeLazyLoadStatus.Error ->
                     Html.div [
-                        prop.testId "tree-selected-ids"
-                        prop.className "swt:hidden"
-                        prop.text (effectiveSelectedIds |> String.concat ",")
+                        prop.role "alert"
+                        prop.children [
+                            Html.span (defaultArg state.error "Failed to load tree items")
+                            Html.button [
+                                prop.type'.button
+                                prop.text "Retry tree loading"
+                                prop.onClick (fun _ -> actions.invalidateAll ())
+                            ]
+                        ]
                     ]
+                | _ -> ()
             ]
         ]

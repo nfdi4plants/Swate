@@ -57,12 +57,11 @@ export { default as ThemeProvider } from './dist/Composite/ThemeSelector/ThemePr
 export { default as ThemeSelector } from './dist/Composite/ThemeSelector/ThemeSelector.fs';
 export { default as TutorialOverlay } from './dist/Composite/TutorialOverlay/TutorialOverlay.fs';
 
-import { Tree as GeneratedTree } from './dist/Composite/Tree/Tree.fs';
-import { bindTree } from './Composite/Tree/TreePublicApi';
-export const Tree = bindTree(GeneratedTree);
+export { default as Tree } from './Composite/Tree/Tree.public';
 export type {
   TreeApi,
   TreeContextMenuItem,
+  TreeContextMenuTarget,
   TreeDataSource,
   TreeItem,
   TreeItemProps,
