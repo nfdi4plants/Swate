@@ -11,6 +11,12 @@ open Swate.Components.Page.GitComparison.GitPagedDiffTypes
 
 module internal GitPagedDiffDisplay =
 
+    /// Where a run of folded pages sits relative to the loaded pages.
+    type FoldSide =
+        | Earlier
+        | Later
+        | Between
+
     type Content =
         | HunkHeader of string
         | AlignedRow of PagedRow * bool
@@ -18,6 +24,8 @@ module internal GitPagedDiffDisplay =
         | UnalignedLabel of string * PagedRange * PagedRange
         | UnalignedLines of PagedLine option * PagedLine option
         | Evicted of string * int
+        /// Several evicted pages shown as one short placeholder. The page ids are in diff order.
+        | Folded of FoldSide * string[] * int
         | Continue of PagedPending option
 
     type Row = { Key: string; Content: Content }
@@ -42,6 +50,7 @@ module internal GitPagedDiffDisplay =
         Progress: PagedProgress option
         RequestExpand: (string -> bool -> unit) option
         RequestLineSlice: (PagedDiffSide -> float -> float -> unit) option
+        RequestLineBefore: (PagedDiffSide -> float -> float -> unit) option
         PendingLineSlices: PagedLineSliceRequest[]
         /// Evicted pages whose replay is still running. Their controls stay disabled.
         PendingReplays: string[]
@@ -56,7 +65,8 @@ module internal GitPagedDiffDisplay =
         ForceContext: bool
         Prefix: string
         RequestLineSlice: (PagedDiffSide -> float -> float -> unit) option
-        /// A slice of this line is still loading, so its control stays disabled.
+        RequestLineBefore: (PagedDiffSide -> float -> float -> unit) option
+        /// A slice of this line is still loading, so its controls stay disabled.
         SlicePending: bool
     }
 
@@ -71,6 +81,11 @@ module internal GitPagedDiffDisplay =
     /// scroll position stays where it was when the page is evicted or replayed.
     [<Literal>]
     let RowHeightPx = 28
+
+    /// Height of the placeholder that stands for a run of folded pages. It does not grow with the
+    /// rows it stands for, so the scroll height stays within what the browser can lay out.
+    [<Literal>]
+    let FoldedHeightPx = 56
 
     let private rangeStart (range: PagedRange) =
         if range.Count = 0.0 then range.Start else range.Start + 1.0
@@ -145,6 +160,90 @@ module internal GitPagedDiffDisplay =
                 Content = Evicted(pageId, rowCount)
             }
           |]
+
+    let private isEvictedPage part =
+        match part with
+        | PagedPart.EvictedPage _ -> true
+        | _ -> false
+
+    /// The runs of evicted pages that fold into one placeholder, as first part index, last part
+    /// index and side. The evicted pages before the first loaded part fold into one run, and so do
+    /// the pages after the last one. Between loaded parts, a run folds once it holds two or more
+    /// pages. A single evicted page there keeps its full-height placeholder, since the loaded rows
+    /// around it keep the scroll position meaningful. Without a loaded part nothing folds, since
+    /// there is no loaded window to fold around.
+    let foldRuns (parts: PagedPart[]) : (int * int * FoldSide)[] =
+        match
+            parts |> Array.tryFindIndex (isEvictedPage >> not), parts |> Array.tryFindIndexBack (isEvictedPage >> not)
+        with
+        | Some firstLoaded, Some lastLoaded ->
+            let runs = ResizeArray<int * int * FoldSide>()
+            let mutable index = 0
+
+            while index < parts.Length do
+                if isEvictedPage parts.[index] then
+                    let first = index
+
+                    while index + 1 < parts.Length && isEvictedPage parts.[index + 1] do
+                        index <- index + 1
+
+                    let side =
+                        if first < firstLoaded then Earlier
+                        elif first > lastLoaded then Later
+                        else Between
+
+                    if side <> Between || index > first then
+                        runs.Add(first, index, side)
+
+                index <- index + 1
+
+            runs.ToArray()
+        | _ -> [||]
+
+    let foldedRow (parts: PagedPart[]) (first: int) (last: int) (side: FoldSide) : Row =
+        let pages =
+            parts.[first..last]
+            |> Array.choose (
+                function
+                | PagedPart.EvictedPage(pageId, rowCount) -> Some(pageId, rowCount)
+                | _ -> None
+            )
+
+        let pageIds = pages |> Array.map fst
+
+        {
+            Key =
+                match side with
+                | Earlier -> "folded:earlier"
+                | Later -> "folded:later"
+                | Between -> $"folded:between:{pageIds.[0]}"
+            Content = Folded(side, pageIds, pages |> Array.sumBy snd)
+        }
+
+    /// The folded page next to the rows the user comes from, which replays first. Earlier pages
+    /// unfold from their last page, later pages from their first. A run between loaded pages
+    /// unfolds from its first page when the user sees the rows above it, and from its last page
+    /// when the user comes from below.
+    let nearestFoldedPage (side: FoldSide) (pageIds: string[]) (fromAbove: bool) =
+        match side with
+        | Earlier -> Array.last pageIds
+        | Later -> pageIds.[0]
+        | Between -> if fromAbove then pageIds.[0] else Array.last pageIds
+
+    let foldSideName side =
+        match side with
+        | Earlier -> "earlier"
+        | Later -> "later"
+        | Between -> "between"
+
+    /// Rows the scroll position is anchored to when the rows change. Folded placeholders and the
+    /// continue row come last, so the anchor stays on the diff rows the user looks at while
+    /// folded pages unfold around them.
+    let anchorPriority (content: Content) =
+        match content with
+        | Folded _ -> 1
+        | Continue _ -> 2
+        | _ -> 0
 
     let endingText ending =
         match ending with
@@ -363,15 +462,32 @@ type GitPagedDiffViewer =
                         ]
                         prop.text (GitPagedDiffDisplay.lineNumberText line.Number)
                     ]
-                    // The text wraps inside its column, and the controls sit after it outside the
+                    // The text wraps inside its column, and the controls sit beside it outside the
                     // text flow, so a long line neither covers the other column nor hides them.
                     Html.div [
                         prop.testId $"{props.Prefix}-line-text-{side}-{lineNumber}"
+                        prop.custom ("data-offset-utf16", GitPagedDiffDisplay.numberText line.OffsetUtf16)
                         prop.className [
                             "swt:flex swt:min-w-0 swt:items-start swt:gap-2 swt:px-3 swt:py-1 swt:font-mono swt:text-xs swt:leading-5"
                             lineStyle
                         ]
                         prop.children [
+                            // The page shows a slice around the change. This control loads the
+                            // text in front of the slice, so the start of a long line can be read.
+                            if line.OffsetUtf16 > 0.0 then
+                                Html.button [
+                                    prop.testId $"{props.Prefix}-line-before-{side}-{lineNumber}"
+                                    prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:shrink-0"
+                                    prop.disabled (props.SlicePending || props.RequestLineBefore.IsNone)
+                                    prop.onClick (fun _ ->
+                                        props.RequestLineBefore
+                                        |> Option.iter (fun callback ->
+                                            callback props.Side line.Number line.OffsetUtf16
+                                        )
+                                    )
+                                    prop.text "Load earlier"
+                                ]
+
                             Html.span [
                                 prop.className "swt:min-w-0 swt:flex-1"
                                 prop.style [ style.whitespace.prewrap; style.overflowWrap.anywhere ]
@@ -538,6 +654,7 @@ type GitPagedDiffViewer =
                 ForceContext = forceContext
                 Prefix = props.Prefix
                 RequestLineSlice = props.RequestLineSlice
+                RequestLineBefore = props.RequestLineBefore
                 SlicePending =
                     line
                     |> Option.exists (fun shown ->
@@ -631,6 +748,40 @@ type GitPagedDiffViewer =
                         ]
                     ]
                 ]
+            | GitPagedDiffDisplay.Folded(side, pageIds, rowCount) ->
+                let nextPage = GitPagedDiffDisplay.nearestFoldedPage side pageIds true
+
+                let replaying =
+                    props.PendingReplays
+                    |> Array.exists (fun pageId -> Array.contains pageId pageIds)
+
+                let label =
+                    match side with
+                    | GitPagedDiffDisplay.Earlier -> $"{rowCount} earlier rows"
+                    | GitPagedDiffDisplay.Later -> $"{rowCount} later rows"
+                    | GitPagedDiffDisplay.Between -> $"{rowCount} rows unloaded"
+
+                Html.div [
+                    prop.className
+                        "swt:col-span-2 swt:flex swt:items-center swt:justify-center swt:gap-3 swt:px-4 swt:bg-base-200/60 swt:text-xs swt:text-base-content/65"
+                    prop.custom ("data-folded-side", GitPagedDiffDisplay.foldSideName side)
+                    prop.custom ("data-page-count", pageIds.Length)
+                    prop.custom ("data-row-count", rowCount)
+                    prop.custom ("data-next-page", nextPage)
+                    prop.style [ style.height GitPagedDiffDisplay.FoldedHeightPx ]
+                    prop.children [
+                        Html.span [ prop.text label ]
+                        Html.button [
+                            prop.testId $"{props.Prefix}-folded-replay-{nextPage}"
+                            prop.className "swt:btn swt:btn-ghost swt:btn-xs"
+                            prop.disabled (replaying || props.RequestReplay.IsNone)
+                            prop.onClick (fun _ ->
+                                props.RequestReplay |> Option.iter (fun callback -> callback nextPage)
+                            )
+                            prop.text "Reload rows"
+                        ]
+                    ]
+                ]
             | GitPagedDiffDisplay.Continue pending ->
                 let busy = props.LoadingNext
 
@@ -701,6 +852,7 @@ type GitPagedDiffViewer =
             expandingGaps: string[],
             requestExpand: (string -> bool -> unit) option,
             requestLineSlice: (PagedDiffSide -> float -> float -> unit) option,
+            requestLineBefore: (PagedDiffSide -> float -> float -> unit) option,
             pendingLineSlices: PagedLineSliceRequest[],
             pendingReplays: string[],
             requestReplay: (string -> int -> int -> unit) option,
@@ -717,6 +869,7 @@ type GitPagedDiffViewer =
         let interactive = status <> PagedDiffStatus.Reopening
         let requestExpand = requestExpand |> Option.filter (fun _ -> interactive)
         let requestLineSlice = requestLineSlice |> Option.filter (fun _ -> interactive)
+        let requestLineBefore = requestLineBefore |> Option.filter (fun _ -> interactive)
         let requestReplay = requestReplay |> Option.filter (fun _ -> interactive)
         let requestNext = requestNext |> Option.filter (fun _ -> interactive)
 
@@ -759,6 +912,7 @@ type GitPagedDiffViewer =
                     (fun index ->
                         match rows.[index].Content with
                         | GitPagedDiffDisplay.Evicted(_, rowCount) -> rowHeight * max 1 rowCount
+                        | GitPagedDiffDisplay.Folded _ -> GitPagedDiffDisplay.FoldedHeightPx
                         | _ -> rowHeight
                     ),
                 getItemKey = (fun index -> rows.[index].Key),
@@ -838,8 +992,12 @@ type GitPagedDiffViewer =
 
             let candidates =
                 rowVirtualizer.getVirtualItems ()
-                |> Array.filter (fun item -> item.``end`` > visibleStart && item.start < visibleEnd)
-                |> Array.sortBy (fun item -> item.start)
+                |> Array.filter (fun item ->
+                    item.``end`` > visibleStart
+                    && item.start < visibleEnd
+                    && item.index < rows.Length
+                )
+                |> Array.sortBy (fun item -> GitPagedDiffDisplay.anchorPriority rows.[item.index].Content, item.start)
                 |> Array.map (fun item -> ({ Key = item.key; Start = item.start }: GitPagedDiffDisplay.AnchorCandidate))
 
             ({
@@ -912,25 +1070,40 @@ type GitPagedDiffViewer =
                 // placeholders lets the viewer ask for them once more.
                 let evictedIds =
                     rows
-                    |> Array.choose (fun row ->
+                    |> Array.collect (fun row ->
                         match row.Content with
-                        | GitPagedDiffDisplay.Evicted(pageId, _) -> Some pageId
-                        | _ -> None
+                        | GitPagedDiffDisplay.Evicted(pageId, _) -> [| pageId |]
+                        | GitPagedDiffDisplay.Folded(_, pageIds, _) -> pageIds
+                        | _ -> [||]
                     )
                     |> Set.ofArray
 
                 requestedReplay.current <- HashSet<string>(requestedReplay.current |> Seq.filter evictedIds.Contains)
 
-                // One replay at a time, for the first placeholder the user can see.
+                // One replay at a time, for the first placeholder the user can see. A folded
+                // placeholder replays the folded page next to the rows the user comes from.
                 match requestReplay with
                 | Some callback when pendingReplays.Length = 0 ->
                     let viewport = viewportItems ()
+
+                    let viewportMiddle =
+                        bodyScrollRef.current
+                        |> Option.map (fun element -> element.scrollTop + element.clientHeight / 2.0)
+                        |> Option.defaultValue 0.0
 
                     viewport
                     |> Array.tryPick (fun item ->
                         match rows.[item.Index].Content with
                         | GitPagedDiffDisplay.Evicted(pageId, _) when not (requestedReplay.current.Contains pageId) ->
                             Some pageId
+                        | GitPagedDiffDisplay.Folded(side, pageIds, _) ->
+                            let fromAbove = float item.Start + float item.Size / 2.0 > viewportMiddle
+                            let pageId = GitPagedDiffDisplay.nearestFoldedPage side pageIds fromAbove
+
+                            if requestedReplay.current.Contains pageId then
+                                None
+                            else
+                                Some pageId
                         | _ -> None
                     )
                     |> Option.iter (fun pageId ->
@@ -1029,6 +1202,7 @@ type GitPagedDiffViewer =
                     prop.children [
                         Html.div [
                             prop.ref bodyContentRef
+                            prop.testId $"{prefix}-content"
                             prop.className "swt:relative swt:w-full swt:min-w-232"
                             prop.style [ style.height (rowVirtualizer.getTotalSize ()) ]
                             prop.children [
@@ -1048,6 +1222,7 @@ type GitPagedDiffViewer =
                                                 Progress = progress
                                                 RequestExpand = requestExpand
                                                 RequestLineSlice = requestLineSlice
+                                                RequestLineBefore = requestLineBefore
                                                 PendingLineSlices = pendingLineSlices
                                                 PendingReplays = pendingReplays
                                                 RequestReplay = replayVisible
@@ -1235,6 +1410,9 @@ type GitPagedDiffViewer =
             ?requestExpand: (string -> bool -> unit),
             ?expandingGaps: string[],
             ?requestLineSlice: (PagedDiffSide -> float -> float -> unit),
+            // Asks for the text in front of a line slice. The numbers are the line number and the
+            // UTF-16 offset where the displayed text starts.
+            ?requestLineBefore: (PagedDiffSide -> float -> float -> unit),
             ?pendingLineSlices: PagedLineSliceRequest[],
             // Asks for the rows of an evicted page. The two numbers are the indices of the first
             // and the last part with a row in the viewport, or -1 for both when no part is visible.
@@ -1257,26 +1435,40 @@ type GitPagedDiffViewer =
         let rowParts = ResizeArray<int>()
         let nextCache = ResizeArray<obj * GitPagedDiffDisplay.Row[]>()
 
-        for partIndex, part in parts |> Array.indexed do
-            let identity = box part
+        // Evicted pages far from the loaded ones fold into one short placeholder, so the scroll
+        // height stays bounded however many pages the diff has.
+        let foldRuns = GitPagedDiffDisplay.foldRuns parts
+        let mutable partIndex = 0
 
-            let cached =
-                partRowCache.current
-                |> List.tryPick (fun (cachedIdentity, cachedRows) ->
-                    if Object.ReferenceEquals(identity, cachedIdentity) then
-                        Some cachedRows
-                    else
-                        None
-                )
+        while partIndex < parts.Length do
+            match foldRuns |> Array.tryFind (fun (first, _, _) -> first = partIndex) with
+            | Some(first, last, side) ->
+                rows.Add(GitPagedDiffDisplay.foldedRow parts first last side)
+                rowParts.Add -1
+                partIndex <- last + 1
+            | None ->
+                let part = parts.[partIndex]
+                let identity = box part
 
-            let partRows =
-                cached |> Option.defaultWith (fun () -> GitPagedDiffDisplay.buildPartRows part)
+                let cached =
+                    partRowCache.current
+                    |> List.tryPick (fun (cachedIdentity, cachedRows) ->
+                        if Object.ReferenceEquals(identity, cachedIdentity) then
+                            Some cachedRows
+                        else
+                            None
+                    )
 
-            nextCache.Add(identity, partRows)
-            rows.AddRange partRows
+                let partRows =
+                    cached |> Option.defaultWith (fun () -> GitPagedDiffDisplay.buildPartRows part)
 
-            for _ in partRows do
-                rowParts.Add partIndex
+                nextCache.Add(identity, partRows)
+                rows.AddRange partRows
+
+                for _ in partRows do
+                    rowParts.Add partIndex
+
+                partIndex <- partIndex + 1
 
         if hasMore then
             rows.Add {
@@ -1374,6 +1566,7 @@ type GitPagedDiffViewer =
                             defaultArg expandingGaps [||],
                             requestExpand,
                             requestLineSlice,
+                            requestLineBefore,
                             defaultArg pendingLineSlices [||],
                             defaultArg pendingReplays [||],
                             requestReplay,

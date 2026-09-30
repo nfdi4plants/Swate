@@ -1,5 +1,6 @@
 module Renderer.Components.MainContent.GitDiffTarget
 
+open Fable.Core
 open Feliz
 open Renderer.Types
 open Renderer.Context.GitWorkflow
@@ -7,12 +8,24 @@ open Swate.Components.Page.GitComparison
 
 module Presentation = Renderer.GitDiffPresentation
 
+/// Removes every User Timing measure of the page.
+[<Emit("performance.clearMeasures()")>]
+let private clearPerformanceMeasures () : unit = jsNative
+
 [<ReactComponent>]
 let Main (page: GitDiffPageData) =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
     let send = gitStateCtx.sendDiffMsg
     let generation = page.Generation
+
+    // The development build of React records a User Timing measure for every component render
+    // whose props changed, with the changed props copied into the measure. The browser keeps
+    // these measures until they are cleared, outside the JavaScript heap. With thousands of diff
+    // rows as props, each loaded page added megabytes that never came back. Clearing them when
+    // the pages change and when the diff closes keeps that memory bounded. The production build
+    // records no measures, and Swate reads none.
+    React.useEffect ((fun () -> FsReact.createDisposable clearPerformanceMeasures), [| box page.Pages |])
 
     // The viewer caches its rows per part object, so the parts are collected only when the pages change.
     let parts =
@@ -79,6 +92,17 @@ let Main (page: GitDiffPageData) =
                             (fun side line offsetUtf16 ->
                                 send (
                                     GitDiffMsg.LoadLineSlice(generation, Presentation.sideDto side, line, offsetUtf16)
+                                )
+                            ),
+                        requestLineBefore =
+                            (fun side line displayedStart ->
+                                send (
+                                    GitDiffMsg.LoadLineBefore(
+                                        generation,
+                                        Presentation.sideDto side,
+                                        line,
+                                        displayedStart
+                                    )
                                 )
                             ),
                         pendingLineSlices = Array.ofList page.PendingLineSlices,

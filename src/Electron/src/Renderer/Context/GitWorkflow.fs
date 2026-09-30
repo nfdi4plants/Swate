@@ -509,6 +509,8 @@ type GitDiffMsg =
     | LoadNext of generation: int
     | Expand of generation: int * gapId: string * fromStart: bool
     | LoadLineSlice of generation: int * side: DiffSideDto * line: float * offsetUtf16: float
+    /// Asks for the text in front of the displayed slice of a line, which starts at displayedStart.
+    | LoadLineBefore of generation: int * side: DiffSideDto * line: float * displayedStart: float
     /// Asks for the rows of an evicted page. The visible pages are the pages the viewer shows
     /// at that moment, and eviction keeps them.
     | Replay of generation: int * pageId: string * visiblePages: string list
@@ -1969,6 +1971,7 @@ module GitDiffPageLoader =
         | GitDiffMsg.LoadNext generation
         | GitDiffMsg.Expand(generation, _, _)
         | GitDiffMsg.LoadLineSlice(generation, _, _, _)
+        | GitDiffMsg.LoadLineBefore(generation, _, _, _)
         | GitDiffMsg.Replay(generation, _, _)
         | GitDiffMsg.ChooseEncoding(generation, _, _)
         | GitDiffMsg.OpenCompleted(generation, _, _)
@@ -1984,6 +1987,36 @@ module GitDiffPageLoader =
         let handleRequest () =
             page.Handle
             |> Option.filter (fun _ -> not (isSettled page.Status) && not (isReopening page.Status))
+
+        let readLineSlice (side: DiffSideDto) (line: float) (offsetUtf16: float) (maxUtf16: int) =
+            let slice: Paged.PagedLineSliceRequest = {
+                Side = Presentation.side side
+                Line = line
+                OffsetUtf16 = offsetUtf16
+            }
+
+            match handleRequest () with
+            | Some handle when not (page.PendingLineSlices |> List.contains slice) ->
+                let request: ReadTextDiffLineRequestDto = {
+                    OperationId = deps.newOperationId ()
+                    HandleId = handle.Id
+                    HandleVersion = handle.Version
+                    Side = side
+                    Line = Presentation.decimalText line
+                    OffsetUtf16 = Presentation.decimalText offsetUtf16
+                    MaxUtf16 = maxUtf16
+                    Continuation = None
+                }
+
+                track request.OperationId {
+                    page with
+                        PendingLineSlices = slice :: page.PendingLineSlices
+                },
+                send
+                    deps.textDiff.readTextDiffLine
+                    request
+                    (fun request result -> GitDiffMsg.LineCompleted(page.Generation, request, result))
+            | _ -> page, Cmd.none
 
         match msg with
         | GitDiffMsg.PageStateObserved _ -> page, Cmd.none
@@ -2024,35 +2057,12 @@ module GitDiffPageLoader =
                     request
                     (fun request result -> GitDiffMsg.ExpandCompleted(page.Generation, request, result))
             | _ -> page, Cmd.none
-        | GitDiffMsg.LoadLineSlice(_, side, line, offsetUtf16) ->
-            let slice: Paged.PagedLineSliceRequest = {
-                Side = Presentation.side side
-                Line = line
-                OffsetUtf16 = offsetUtf16
-            }
-
-            match handleRequest () with
-            | Some handle when not (page.PendingLineSlices |> List.contains slice) ->
-                let request: ReadTextDiffLineRequestDto = {
-                    OperationId = deps.newOperationId ()
-                    HandleId = handle.Id
-                    HandleVersion = handle.Version
-                    Side = side
-                    Line = Presentation.decimalText line
-                    OffsetUtf16 = Presentation.decimalText offsetUtf16
-                    MaxUtf16 = LineSliceUtf16
-                    Continuation = None
-                }
-
-                track request.OperationId {
-                    page with
-                        PendingLineSlices = slice :: page.PendingLineSlices
-                },
-                send
-                    deps.textDiff.readTextDiffLine
-                    request
-                    (fun request result -> GitDiffMsg.LineCompleted(page.Generation, request, result))
-            | _ -> page, Cmd.none
+        | GitDiffMsg.LoadLineSlice(_, side, line, offsetUtf16) -> readLineSlice side line offsetUtf16 LineSliceUtf16
+        | GitDiffMsg.LoadLineBefore(_, side, line, displayedStart) when displayedStart > 0.0 ->
+            // The request ends where the displayed text starts, so the answer goes in front of it.
+            let offsetUtf16 = max 0.0 (displayedStart - float LineSliceUtf16)
+            readLineSlice side line offsetUtf16 (int (displayedStart - offsetUtf16))
+        | GitDiffMsg.LoadLineBefore _ -> page, Cmd.none
         | GitDiffMsg.Replay(_, pageId, visiblePages) ->
             let isEvicted =
                 page.Pages

@@ -1,6 +1,7 @@
 module ElectronRenderer.GitDiffPageWorkflowTests
 
 open System.Collections.Generic
+open Browser.Dom
 open Elmish
 open Fable.Core
 open Fable.Core.JsInterop
@@ -339,6 +340,12 @@ let private noChangesShown (page: GitDiffPageData) =
         renderToStaticMarkup (Renderer.Components.MainContent.GitDiffTarget.Main page)
 
     markup.Contains("data-testid=\"renderer-git-diff-no-changes\"")
+
+/// The diff target rendered to static markup inside a detached element, so tests can query it.
+let private renderTarget (page: GitDiffPageData) =
+    let container = document.createElement "div"
+    container.innerHTML <- renderToStaticMarkup (Renderer.Components.MainContent.GitDiffTarget.Main page)
+    container
 
 Vitest.describe (
     "Git diff page workflow",
@@ -1885,6 +1892,161 @@ Vitest.describe (
                     }
 
                 Vitest.expect(loadedCount movedAway).toBeLessThanOrEqual (GitDiffPageLoader.MaxLoadedPages)
+            }
+        )
+
+        Vitest.test (
+            "A diff of 2,000 pages of 1,000 rows renders within a fixed height, with the unloaded pages folded into one placeholder",
+            TestOptions(timeout = 120000),
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let rowsPerPage = 1000
+                let pageCount = 2000
+
+                let pageDto (index: int) =
+                    let rows =
+                        Array.init
+                            rowsPerPage
+                            (fun row -> {
+                                changedRow $"p{index}-r{row}" with
+                                    Current = Some(textLine (index * rowsPerPage + row) "new")
+                            })
+
+                    diffPage $"p{index}" (Some $"cursor-{index}") [| hunkWith $"h{index}" rows |]
+
+                let! state = openFirstPage fake (pageDto 1)
+
+                fake.ReadReply <-
+                    fun request ->
+                        succeeded (ResumablePageDto.Ready(pageDto (int (request.Cursor.Replace("cursor-", "")) + 1)))
+
+                let current = ref state
+
+                for _ in 2..pageCount do
+                    let! next = run fake (diffMsg (GitDiffMsg.LoadNext (diffOf current.Value).Generation)) current.Value
+                    current.Value <- next
+
+                let page = diffOf current.Value
+                Vitest.expect(page.Pages.Length).toBe (pageCount)
+
+                let rendered = renderTarget page
+                let content = rendered.querySelector "[data-testid=\"renderer-git-diff-content\"]"
+
+                let height =
+                    System.Text.RegularExpressions.Regex
+                        .Match(content.getAttribute "style", @"height:\s*([\d.]+)px")
+                        .Groups.[1].Value
+                    |> float
+
+                Vitest.expect(height).toBeGreaterThan (0.0)
+
+                // The loaded window holds eight pages. Ten pages of rows at the row height is the bound.
+                Vitest.expect(height).toBeLessThan (float (10 * rowsPerPage * 28))
+
+                let folded = rendered.querySelector "[data-folded-side=\"earlier\"]"
+
+                Vitest
+                    .expect(folded.getAttribute "data-page-count")
+                    .toBe (string (pageCount - GitDiffPageLoader.MaxLoadedPages))
+
+                Vitest
+                    .expect(folded.getAttribute "data-row-count")
+                    .toBe (string ((pageCount - GitDiffPageLoader.MaxLoadedPages) * rowsPerPage))
+
+                Vitest
+                    .expect(folded.getAttribute "data-next-page")
+                    .toBe ($"p{pageCount - GitDiffPageLoader.MaxLoadedPages}")
+            }
+        )
+
+        Vitest.test (
+            "Loading the text before a line slice reads up to the displayed start and puts it in front with shifted highlights",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                let changed start length : HighlightDto = {
+                    Start = start
+                    Length = length
+                    Kind = HighlightKindDto.ChangedText
+                }
+
+                let slicedRow = {
+                    changedRow "r1" with
+                        Current =
+                            Some {
+                                textLine 0 "abc" with
+                                    Slice = {
+                                        OffsetUtf16 = "10000"
+                                        TotalUtf16 = Some "10003"
+                                        Text = "abc"
+                                        Highlights = [| changed 1 1 |]
+                                    }
+                            }
+                }
+
+                let! state = openFirstPage fake (diffPage "p1" None [| hunkWith "h1" [| slicedRow |] |])
+
+                // Every answer is as long as asked for, with a changed character at its start.
+                fake.LineReply <-
+                    fun request ->
+                        succeeded (
+                            ResumableLineDto.Ready {
+                                Number = request.Line
+                                Ending = LineEndingDto.LF
+                                Slice = {
+                                    OffsetUtf16 = request.OffsetUtf16
+                                    TotalUtf16 = Some "10003"
+                                    Text = String.replicate request.MaxUtf16 "x"
+                                    Highlights = [| changed 0 1 |]
+                                }
+                            }
+                        )
+
+                let lineText (page: GitDiffPageData) =
+                    (renderTarget page).querySelector "[data-testid=\"renderer-git-diff-line-text-current-0\"]"
+
+                let beforeControl (page: GitDiffPageData) =
+                    (renderTarget page).querySelector "[data-testid=\"renderer-git-diff-line-before-current-0\"]"
+
+                Vitest.expect((lineText (diffOf state)).getAttribute "data-offset-utf16").toBe ("10000")
+                Vitest.expect(isNull (beforeControl (diffOf state))).toBe (false)
+
+                let generation = (diffOf state).Generation
+
+                let! state =
+                    run fake (diffMsg (GitDiffMsg.LoadLineBefore(generation, DiffSideDto.Current, 0.0, 10000.0))) state
+
+                Vitest.expect(fake.Lines.[0].OffsetUtf16).toBe ("1808")
+                Vitest.expect(fake.Lines.[0].MaxUtf16).toBe (8192)
+
+                let line = currentLine (diffOf state)
+                Vitest.expect(line.OffsetUtf16).toBe (1808.0)
+                Vitest.expect(line.Text).toBe (String.replicate 8192 "x" + "abc")
+
+                Vitest
+                    .expect(
+                        line.Highlights
+                        |> Array.map (fun highlight -> highlight.Start, highlight.Length)
+                    )
+                    .toEqual ([| 0, 1; 8193, 1 |])
+
+                Vitest.expect((lineText (diffOf state)).getAttribute "data-offset-utf16").toBe ("1808")
+
+                let! state =
+                    run fake (diffMsg (GitDiffMsg.LoadLineBefore(generation, DiffSideDto.Current, 0.0, 1808.0))) state
+
+                Vitest.expect(fake.Lines.[1].OffsetUtf16).toBe ("0")
+                Vitest.expect(fake.Lines.[1].MaxUtf16).toBe (1808)
+
+                let line = currentLine (diffOf state)
+                Vitest.expect(line.Text.Length).toBe (10003)
+
+                Vitest
+                    .expect(line.Highlights |> Array.map (fun highlight -> highlight.Start))
+                    .toEqual ([| 0; 1808; 10001 |])
+
+                Vitest.expect((lineText (diffOf state)).getAttribute "data-offset-utf16").toBe ("0")
+                Vitest.expect(isNull (beforeControl (diffOf state))).toBe (true)
             }
         )
 )

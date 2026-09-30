@@ -169,11 +169,52 @@ let rowCount (parts: PagedPart[]) =
         | PagedPart.EvictedPage(_, count) -> count
     )
 
-/// Merges a slice by its position in the line. The displayed text stays, and only the part of
-/// the slice beyond the displayed end is appended. A slice that ends within the displayed text
-/// adds nothing, and a slice that starts after the displayed end is dropped, since appending it
-/// would leave a hole in the text.
+/// Puts the part of the slice before the displayed start in front of the displayed text. The
+/// highlights of the displayed text move by the length of the prepended text. A slice that
+/// starts at or after the displayed start adds nothing, and so does a slice that ends before it,
+/// since prepending it would leave a hole in the text.
+let private prependSlice (displayed: PagedLine) (slice: PagedLine) : PagedLine =
+    let sliceEnd = slice.OffsetUtf16 + float slice.Text.Length
+
+    if slice.OffsetUtf16 >= displayed.OffsetUtf16 || sliceEnd < displayed.OffsetUtf16 then
+        displayed
+    else
+        let prefixLength = int (displayed.OffsetUtf16 - slice.OffsetUtf16)
+
+        let prefixHighlights =
+            slice.Highlights
+            |> Array.choose (fun highlight ->
+                let length = min (highlight.Start + highlight.Length) prefixLength - highlight.Start
+
+                if length > 0 then
+                    Some { highlight with Length = length }
+                else
+                    None
+            )
+
+        let shifted =
+            displayed.Highlights
+            |> Array.map (fun highlight -> {
+                highlight with
+                    Start = highlight.Start + prefixLength
+            })
+
+        {
+            displayed with
+                OffsetUtf16 = slice.OffsetUtf16
+                Text = slice.Text.Substring(0, prefixLength) + displayed.Text
+                TotalUtf16 = slice.TotalUtf16 |> Option.orElse displayed.TotalUtf16
+                Highlights = Array.append prefixHighlights shifted
+        }
+
+/// Merges a slice by its position in the line. The displayed text stays. The part of the slice
+/// before the displayed start goes in front of it, and the part beyond the displayed end is
+/// appended. A slice that ends within the displayed text adds nothing at the end, and a slice
+/// that starts after the displayed end is dropped, since appending it would leave a hole in the
+/// text.
 let mergeSlice (displayed: PagedLine) (slice: PagedLine) : PagedLine =
+    let displayed = prependSlice displayed slice
+
     let displayedEnd = displayed.OffsetUtf16 + float displayed.Text.Length
     let sliceEnd = slice.OffsetUtf16 + float slice.Text.Length
 

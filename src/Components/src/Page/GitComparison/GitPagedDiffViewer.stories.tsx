@@ -428,6 +428,147 @@ function ViewportReplayHarness({ onReplay }: { onReplay: (record: ReplayRecord) 
   );
 }
 
+const FOLD_PAGE_COUNT = 2000;
+const FOLD_PAGE_ROWS = 1000;
+const FOLD_WINDOW = 8;
+
+function foldedPageRows(index: number) {
+  const start = (index - 1) * FOLD_PAGE_ROWS;
+  return Array.from({ length: FOLD_PAGE_ROWS }, (_, offset) =>
+    new PagedRow(`fold-${index}-${offset}`, "added", undefined, makeLine(start + offset, `Page ${index} row ${offset}`)),
+  );
+}
+
+// Keeps a window of eight loaded pages out of 2,000 pages of 1,000 rows, the way the app does.
+// Every other page is an evicted placeholder. A replay waits for the complete button, so the
+// story can look at the rows before and after it.
+function FoldedPagesHarness() {
+  const loadedParts = React.useRef(new Map<number, PagedPart_$union>());
+  const evictedParts = React.useRef(new Map<number, PagedPart_$union>());
+  const [model, setModel] = React.useState(() => ({
+    known: FOLD_PAGE_COUNT - 1,
+    loaded: Array.from({ length: FOLD_WINDOW }, (_, offset) => FOLD_PAGE_COUNT - FOLD_WINDOW + offset),
+  }));
+  const [pendingReplays, setPendingReplays] = React.useState<string[]>([]);
+
+  const load = (loaded: number[], index: number) => {
+    const next = [...loaded.filter((page) => page !== index), index];
+    while (next.length > FOLD_WINDOW) {
+      const farthest = next.reduce((far, page) => (Math.abs(page - index) > Math.abs(far - index) ? page : far));
+      next.splice(next.indexOf(farthest), 1);
+    }
+    return next;
+  };
+
+  const partFor = (index: number, loaded: boolean) => {
+    const cache = loaded ? loadedParts.current : evictedParts.current;
+    let part = cache.get(index);
+    if (!part) {
+      part = loaded
+        ? PagedPart_HunkRows(
+            `fold-hunk-${index}`,
+            range((index - 1) * FOLD_PAGE_ROWS, 0),
+            range((index - 1) * FOLD_PAGE_ROWS, FOLD_PAGE_ROWS),
+            false,
+            false,
+            foldedPageRows(index),
+          )
+        : PagedPart_EvictedPage(`page-${index}`, FOLD_PAGE_ROWS);
+      cache.set(index, part);
+    }
+    return part;
+  };
+
+  const parts = Array.from({ length: model.known }, (_, offset) => partFor(offset + 1, model.loaded.includes(offset + 1)));
+
+  const requestNext = () => {
+    onFoldedNext();
+    setModel((current) =>
+      current.known >= FOLD_PAGE_COUNT
+        ? current
+        : { known: current.known + 1, loaded: load(current.loaded, current.known + 1) },
+    );
+  };
+
+  const requestReplay = (pageId: string) => {
+    onFoldedReplay(pageId);
+    setPendingReplays([pageId]);
+  };
+
+  const completeReplay = () => {
+    const [pageId] = pendingReplays;
+    if (!pageId) return;
+    const index = Number(pageId.replace("page-", ""));
+    setModel((current) => ({ ...current, loaded: load(current.loaded, index) }));
+    setPendingReplays([]);
+  };
+
+  return (
+    <div style={{ height: "40rem" }}>
+      <button data-testid="git-paged-folded-complete" onClick={completeReplay}>Complete replay</button>
+      <GitPagedDiffViewerComponent
+        parts={parts}
+        status={PagedDiffStatus_Ready()}
+        progress={new PagedProgress(model.known, FOLD_PAGE_COUNT, model.known >= FOLD_PAGE_COUNT)}
+        hasMore={model.known < FOLD_PAGE_COUNT}
+        outputComplete={model.known >= FOLD_PAGE_COUNT}
+        requestNext={requestNext}
+        requestReplay={requestReplay}
+        pendingReplays={pendingReplays}
+        testIdPrefix="git-paged-folded"
+      />
+    </div>
+  );
+}
+
+const LINE_START_TEXT = `${"a".repeat(20000)}CHANGED${"b".repeat(5000)}`;
+const LINE_SLICE_START = 19872;
+
+// Shows a slice around the change of a long line and puts the requested text in front of it,
+// with the highlights moved by the length of that text, the way the app merges a slice.
+function LineStartHarness() {
+  const [line, setLine] = React.useState(() =>
+    makeLine(0, LINE_START_TEXT.slice(LINE_SLICE_START, 20500), "lF", LINE_SLICE_START, LINE_START_TEXT.length, [
+      new PagedHighlight(20000 - LINE_SLICE_START, 7, true),
+    ]),
+  );
+
+  const requestLineBefore = (side: string, number: number, start: number) => {
+    onRequestLineBefore(side, number, start);
+    setLine((current) => {
+      const offset = Math.max(0, start - 8192);
+      const prefix = LINE_START_TEXT.slice(offset, start);
+      return makeLine(
+        current.Number,
+        prefix + current.Text,
+        current.Ending,
+        offset,
+        current.TotalUtf16 ?? null,
+        current.Highlights.map((highlight) => new PagedHighlight(highlight.Start + prefix.length, highlight.Length, highlight.Changed)),
+      );
+    });
+  };
+
+  return (
+    <div style={{ height: "30rem" }}>
+      <GitPagedDiffViewerComponent
+        parts={[
+          PagedPart_HunkRows("line-start-hunk", range(0, 1), range(0, 1), true, true, [
+            new PagedRow("line-start-row", "replaced", makeLine(0, "short previous line"), line),
+          ]),
+        ]}
+        status={PagedDiffStatus_Ready()}
+        progress={new PagedProgress(100, 100, true)}
+        hasMore={false}
+        outputComplete={true}
+        requestLineSlice={() => {}}
+        requestLineBefore={requestLineBefore}
+        testIdPrefix="git-paged-line-start"
+      />
+    </div>
+  );
+}
+
 function ReopenHarness() {
   const [reopening, setReopening] = React.useState(false);
   const parts = [
@@ -480,6 +621,9 @@ const onRequestReplay = fn();
 const onViewportReplay = fn();
 const onChooseEncoding = fn();
 const onAnchorExpand = fn();
+const onFoldedReplay = fn();
+const onFoldedNext = fn();
+const onRequestLineBefore = fn();
 
 const meta = {
   title: "Page Components/GitComparison/GitPagedDiffViewer",
@@ -496,6 +640,9 @@ const meta = {
       onViewportReplay,
       onChooseEncoding,
       onAnchorExpand,
+      onFoldedReplay,
+      onFoldedNext,
+      onRequestLineBefore,
     ]) {
       mock.mockClear();
     }
@@ -616,10 +763,15 @@ export const ContinueKeepsLoadingAfterEvictions: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const scroll = scrollElementFor(canvasElement, "git-paged-evicting-grid");
 
+    // The evicted pages fold into a short placeholder, so the rows can fit without scrolling.
+    // The continue row then asks for the next page as soon as it is in view.
     for (let expectedCall = 1; expectedCall <= 4; expectedCall += 1) {
-      await scrollToEnd(scroll);
+      const grid = within(canvasElement).getByTestId("git-paged-evicting-grid");
+      const scroll = Array.from(grid.querySelectorAll<HTMLElement>("div")).find(
+        (element) => element.scrollHeight > element.clientHeight + 1,
+      );
+      if (scroll) await scrollToEnd(scroll);
       await waitFor(() => expect(onRequestNextAfterEvictions.mock.calls.length).toBeGreaterThanOrEqual(expectedCall));
     }
     await expect(onRequestNextAfterEvictions).toHaveBeenCalledTimes(4);
@@ -762,7 +914,9 @@ export const ReplaysOnlyPagesInView: Story = {
     await expect(new Set(pageIds).size).toBe(pageIds.length);
     await expect(pageIds.length).toBeLessThanOrEqual(pagesInView);
     await expect(pageIds.every((pageId) => Number(pageId.replace("page-", "")) < pagesInView)).toBe(true);
-    await expect(canvas.getByTestId(`git-paged-viewport-row-evicted:page-${pagesInView + 2}`)).toBeInTheDocument();
+    // The pages below the view stay unloaded, folded into one placeholder after the loaded rows.
+    const later = canvas.getByTestId("git-paged-viewport-row-folded:later").firstElementChild as HTMLElement;
+    await expect(later).toHaveAttribute("data-page-count", String(VIEWPORT_PAGE_COUNT - pageIds.length));
   },
 };
 
@@ -1054,5 +1208,78 @@ export const ExpansionKeepsTheVisibleRowInPlace: Story = {
       const updatedAnchor = canvas.getByTestId("git-paged-anchor-row-anchor-target");
       expect(Math.abs(updatedAnchor.getBoundingClientRect().top - beforeTop)).toBeLessThan(2);
     });
+  },
+};
+
+export const FoldedPagesKeepTheEndReachable: Story = {
+  render: () => <FoldedPagesHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-folded-grid");
+    const heightBound = 10 * FOLD_PAGE_ROWS * 28;
+    const earlier = () => canvas.getByTestId("git-paged-folded-row-folded:earlier").firstElementChild as HTMLElement;
+    const firstFolded = FOLD_PAGE_COUNT - 1 - FOLD_WINDOW;
+
+    await expect(scroll.scrollHeight).toBeLessThan(heightBound);
+    await expect(earlier()).toHaveAttribute("data-page-count", String(firstFolded));
+
+    // At the top, the folded page next to the loaded rows replays, nearest first, and the rows
+    // in view stay where they are.
+    for (let step = 0; step < 3; step += 1) {
+      const pageIndex = firstFolded - step;
+      await scrollTo(scroll, 0);
+      await waitFor(() => expect(onFoldedReplay).toHaveBeenCalledTimes(step + 1));
+      await expect(earlier()).toHaveAttribute("data-next-page", `page-${pageIndex}`);
+      const anchorTop = canvas.getByTestId(`git-paged-folded-row-fold-${pageIndex + 1}-0`).getBoundingClientRect().top;
+
+      await fireEvent.click(canvas.getByTestId("git-paged-folded-complete"));
+      await waitFor(() => expect(earlier()).toHaveAttribute("data-next-page", `page-${pageIndex - 1}`));
+      await waitFor(() =>
+        expect(
+          Math.abs(canvas.getByTestId(`git-paged-folded-row-fold-${pageIndex + 1}-0`).getBoundingClientRect().top - anchorTop),
+        ).toBeLessThan(2),
+      );
+      await expect(scroll.scrollHeight).toBeLessThan(heightBound);
+    }
+
+    await expect(onFoldedReplay.mock.calls.map(([pageId]) => pageId)).toEqual([
+      `page-${firstFolded}`,
+      `page-${firstFolded - 1}`,
+      `page-${firstFolded - 2}`,
+    ]);
+
+    // The continue row stays reachable at the end. Once it is in view it asks for the last page.
+    await scrollToEnd(scroll);
+    await waitFor(() => expect(onFoldedNext).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(canvas.queryByTestId("git-paged-folded-row-continue")).toBeNull());
+    await expect(scroll.scrollHeight).toBeLessThan(heightBound);
+  },
+};
+
+export const LoadEarlierShowsTheLineStart: Story = {
+  render: () => <LineStartHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const lineText = () => canvas.getByTestId("git-paged-line-start-line-text-current-0");
+    const changedText = () =>
+      Array.from(lineText().querySelectorAll('[data-highlight="changed"]'))
+        .map((segment) => segment.textContent)
+        .join("");
+
+    await expect(lineText()).toHaveAttribute("data-offset-utf16", String(LINE_SLICE_START));
+    await expect(changedText()).toBe("CHANGED");
+    await expect(canvas.queryByTestId("git-paged-line-start-line-before-previous-0")).toBeNull();
+
+    let start = LINE_SLICE_START;
+    while (start > 0) {
+      await fireEvent.click(canvas.getByTestId("git-paged-line-start-line-before-current-0"));
+      await expect(onRequestLineBefore).toHaveBeenLastCalledWith("current", 0, start);
+      start = Math.max(0, start - 8192);
+      await waitFor(() => expect(lineText()).toHaveAttribute("data-offset-utf16", String(start)));
+      await expect(changedText()).toBe("CHANGED");
+    }
+
+    await expect(onRequestLineBefore).toHaveBeenCalledTimes(3);
+    await expect(canvas.queryByTestId("git-paged-line-start-line-before-current-0")).toBeNull();
   },
 };
