@@ -46,12 +46,11 @@ let private createPool () : JS.Promise<TextDiffPool.TextDiffPool option> = promi
 
         return
             Some(
-                TextDiffPool.create {
-                    Factory = fun _ -> TextDiffTransport.WorkerThreadTransport.create (currentWorkerPath ())
-                    Supervisor = supervisor
-                    MaxWorkers = 2
-                    SessionsPerWorker = 4
-                }
+                TextDiffPool.create (
+                    TextDiffPool.TextDiffPoolOptions.create
+                        (fun _ -> TextDiffTransport.WorkerThreadTransport.create (currentWorkerPath ()))
+                        supervisor
+                )
             )
     with error ->
         logFailure "The text diff workers could not be set up." error
