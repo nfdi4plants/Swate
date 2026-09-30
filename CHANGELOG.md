@@ -39,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Merges Swate creates are titled "Merge online changes".
 -   The busy notice shows the operation and git's progress lines. The raw "Git output" log is removed.
 -   The tooltips of Update ARC from Online, Download Changes and Clean LFS Cache list the git commands that run now.
+-   The diff of a changed file opens page by page, so Swate compares files of any size. The comparison runs in background worker threads and keeps the window responsive. The page shows progress and a preview of the lines being read, loads more rows as you scroll, and shows hidden unchanged lines on request. Long lines load in pieces with "Load more", and changed words are highlighted. Binary and other non-text content is blocked with the reason. A file in an unknown encoding asks for the encoding of each version. After 15 minutes without use, the diff reopens by itself at the page you were reading.
+
+### 🔥 Removed
+
+-   The Components package no longer exports `GitDiffViewer`. `GitPagedDiffViewer` replaces it.
 
 ### 🐛 Fixed
 
