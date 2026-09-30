@@ -299,57 +299,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "getFileEntryWithLfsMetadata enriches a single staged LFS file",
-            fileTreeCreatorTestOptions,
-            fun () -> promise {
-                do!
-                    withTempRepository (fun context -> promise {
-                        let pointerFilePath = join [| context.RepoPath; "single-pointer.psd" |]
-
-                        let! _ = runGitAsync context.RepoPath [| "lfs"; "install"; "--local" |]
-                        let! _ = runGitAsync context.RepoPath [| "lfs"; "track"; "*.psd" |]
-                        do! writeUtf8FileAsync pointerFilePath "Single tracked content.\n"
-                        let! _ = runGitAsync context.RepoPath [| "add"; ".gitattributes"; "single-pointer.psd" |]
-                        ()
-
-                        let! enrichedEntry =
-                            FileTreeCreator.getFileEntryWithLfsMetadata context.RepoPath pointerFilePath
-
-                        Vitest.expect(enrichedEntry.largeObject.IsSome).toBe (true)
-                        let largeObject = enrichedEntry.largeObject |> Option.get
-
-                        Vitest.expect(largeObject.Path).toBe ("single-pointer.psd")
-                        Vitest.expect(largeObject.SizeBytes |> Option.get).toBeGreaterThan (0)
-                        Vitest.expect(largeObject.IsMaterialized).toBe (true)
-                        Vitest.expect(largeObject.IsLocallyAvailable).toBe (true)
-                        expectHexObjectId largeObject
-                    })
-            }
-        )
-
-        Vitest.test (
-            "files absent from large-object listing keep metadata None",
-            fileTreeCreatorTestOptions,
-            fun () -> promise {
-                do!
-                    withTempRepository (fun context -> promise {
-                        let untrackedLfsPath = join [| context.RepoPath; "untracked.psd" |]
-
-                        let! _ = runGitAsync context.RepoPath [| "lfs"; "install"; "--local" |]
-                        let! _ = runGitAsync context.RepoPath [| "lfs"; "track"; "*.psd" |]
-                        do! writeUtf8FileAsync untrackedLfsPath "Untracked file content.\n"
-                        let! _ = runGitAsync context.RepoPath [| "add"; ".gitattributes" |]
-                        ()
-
-                        let! enrichedEntry =
-                            FileTreeCreator.getFileEntryWithLfsMetadata context.RepoPath untrackedLfsPath
-
-                        Vitest.expect(enrichedEntry.largeObject).toEqual (None)
-                    })
-            }
-        )
-
-        Vitest.test (
             "no large objects keeps entries without metadata",
             fileTreeCreatorTestOptions,
             fun () -> promise {

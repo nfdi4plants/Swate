@@ -544,14 +544,16 @@ export const Default: Story = {
   }),
 };
 
-export const DirectoryArrowsReflectLoadability: StoryObj<typeof LazyLoadDirectoryFileExplorer> = {
+export const DirectoriesRemainRefreshable: StoryObj<typeof LazyLoadDirectoryFileExplorer> = {
   render: () => <LazyLoadDirectoryFileExplorer />,
 
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
     await canvas.findByText("Empty Folder");
-    await expect(canvas.queryByRole("button", { name: "Expand Empty Folder" })).toBeNull();
+    const emptyFolderToggle = await canvas.findByRole("button", { name: "Expand Empty Folder" });
+    await userEvent.click(emptyFolderToggle);
+    await expect(canvas.getByRole("button", { name: "Collapse Empty Folder" })).toBeInTheDocument();
 
     const lazyFolderToggle = await canvas.findByRole("button", { name: "Expand Lazy Folder" });
     await expect(canvas.queryByText("Lazy Child.txt")).toBeNull();

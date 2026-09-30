@@ -586,6 +586,19 @@ let rec private waitUntilWithin phase predicate remaining = promise {
 let private waitUntil phase predicate =
     waitUntilWithin phase predicate waitUntilAttemptLimit
 
+let rec private waitUntilWatcherStateWithin phase predicate remaining = promise {
+    if predicate () then
+        return ()
+    elif remaining <= 0 then
+        return failwithf "Timed out waiting for watcher state: %s." phase
+    else
+        do! Promise.sleep 20
+        return! waitUntilWatcherStateWithin phase predicate (remaining - 1)
+}
+
+let private waitUntilWatcherState phase predicate =
+    waitUntilWatcherStateWithin phase predicate 300
+
 let private withAsyncCleanup cleanup operation = promise {
     let! operationResult = operation () |> Promise.result
     let! cleanupResult = cleanup () |> Promise.result
@@ -1163,27 +1176,30 @@ Vitest.describe (
                         handleFileEvent "change" assayPath
 
                         do!
-                            waitUntil
+                            waitUntilWatcherState
                                 "first watcher batch claimed"
-                                (fun () ->
-                                    vault.fileWatcherReloadArcTimeout.IsNone
-                                    && vault.fileWatcherPendingEvents.Count = 0
-                                    && vault.fileWatcherPendingArcMergeEvents.Count = 0
-                                )
+                                (fun () -> vault.FileWatcherBatchProcessor.IsSome)
 
                         handleFileEvent "change" assayPath
+
+                        Vitest.expect(vault.FileWatcherBatchProcessor.IsSome).toBe (true)
+                        Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (1)
+                        Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (1)
+
                         releaseQueuedMerge ()
                         do! queuedMerge
 
-                        let mutable attempts = 0
-
-                        while attempts < 300
-                              && (loadingCalls.Count = 0 || loadingCalls.[loadingCalls.Count - 1].IsLoading) do
-                            do! Promise.sleep 20
-                            attempts <- attempts + 1
-
-                        if loadingCalls.Count = 0 then
-                            return failwith "The watcher controller did not report a loading state."
+                        do!
+                            waitUntilWatcherState
+                                "overlapping watcher batch completed"
+                                (fun () ->
+                                    loadingCalls.Count > 0
+                                    && not loadingCalls.[loadingCalls.Count - 1].IsLoading
+                                    && vault.FileWatcherBatchProcessor.IsNone
+                                    && vault.fileWatcherReloadArcTimeout.IsNone
+                                    && vault.fileWatcherPendingEvents.Count = 0
+                                    && vault.fileWatcherPendingArcMergeEvents.Count = 0
+                                )
 
                         let falseWithPendingEvents =
                             loadingCalls
@@ -1334,27 +1350,64 @@ Vitest.describe (
 
                         let queuedMerge = vault.EnqueueArcMerge(fun () -> mergeQueueGate)
 
-                        handleFileEvent "change" (join [| arcPath; "assays/DiskAssay/isa.assay.xlsx" |])
+                        let staleAssayPath = join [| arcPath; "assays/DiskAssay/isa.assay.xlsx" |]
+                        handleFileEvent "change" staleAssayPath
 
                         do!
-                            waitUntil
+                            waitUntilWatcherState
                                 "stale watcher batch claimed"
+                                (fun () -> vault.FileWatcherBatchProcessor.IsSome)
+
+                        let staleEpoch = vault.WatcherEpoch
+                        vault.ClearPendingFileWatcherState()
+
+                        Vitest.expect(vault.WatcherEpoch > staleEpoch).toBe (true)
+
+                        let freshFilePath = join [| arcPath; "fresh-after-reset.txt" |]
+                        do! writeWatcherTextFileAsync freshFilePath "fresh"
+
+                        let mutable releaseFreshTreeUpdate = ignore
+
+                        let freshTreeUpdateGate =
+                            JS.Constructors.Promise.Create(fun resolve _ ->
+                                releaseFreshTreeUpdate <- fun () -> resolve ()
+                            )
+
+                        vault.FileTreeUpdateTail <- freshTreeUpdateGate
+                        handleFileEvent "add" freshFilePath
+
+                        do!
+                            waitUntilWatcherState
+                                "fresh watcher batch claimed"
                                 (fun () ->
-                                    vault.fileWatcherReloadArcTimeout.IsNone
-                                    && vault.fileWatcherPendingEvents.Count = 0
-                                    && vault.fileWatcherPendingArcMergeEvents.Count = 0
+                                    vault.FileWatcherBatchProcessor
+                                    |> Option.exists (fun (processorEpoch, _) -> processorEpoch = vault.WatcherEpoch)
                                 )
 
-                        vault.ClearPendingFileWatcherState()
                         releaseQueuedMerge ()
                         do! queuedMerge
 
-                        let mutable attempts = 0
+                        Vitest
+                            .expect(
+                                vault.FileWatcherBatchProcessor
+                                |> Option.exists (fun (processorEpoch, _) -> processorEpoch = vault.WatcherEpoch)
+                            )
+                            .toBe (true)
 
-                        while attempts < 250
-                              && (loadingChanges.Count = 0 || loadingChanges.[loadingChanges.Count - 1]) do
-                            do! Promise.sleep 20
-                            attempts <- attempts + 1
+                        releaseFreshTreeUpdate ()
+
+                        let normalizedFreshFilePath = PathHelpers.normalizePath freshFilePath
+
+                        do!
+                            waitUntilWatcherState
+                                "fresh watcher batch completed"
+                                (fun () ->
+                                    vault.FileWatcherBatchProcessor.IsNone
+                                    && vault.fileWatcherReloadArcTimeout.IsNone
+                                    && vault.fileWatcherPendingEvents.Count = 0
+                                    && vault.fileWatcherPendingArcMergeEvents.Count = 0
+                                    && vault.fileTree.ContainsKey normalizedFreshFilePath
+                                )
 
                         Vitest.expect(loadingChanges.[loadingChanges.Count - 1]).toBe (false)
                         Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (0)
@@ -4016,30 +4069,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "waitForFileWatcherReady resolves from the native ready event",
-            fun () -> promise {
-                let mutable readyCallback: (unit -> unit) option = None
-
-                let watcher =
-                    createObj [
-                        "on"
-                        ==> (fun (eventName: obj) (callback: obj) ->
-                            if string eventName = "ready" then
-                                readyCallback <- Some(unbox callback)
-
-                            null
-                        )
-                    ]
-                    |> unbox<Main.Bindings.Chokidar.IWatcher>
-
-                let ready = waitForFileWatcherReady watcher
-                Vitest.expect(readyCallback.IsSome).toBe (true)
-                readyCallback.Value()
-                do! ready
-            }
-        )
-
-        Vitest.test (
             "structural reconciliation finds canonical metadata without entering payload directories",
             fun () -> promise {
                 let! arcPath = TestHelpers.createTempDirectoryAsync "swate-structure-reconcile-"
@@ -4537,7 +4566,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "directory expansion refreshes its subtree and collapse removes payload monitoring",
+            "directory expansion refreshes its subtree and collapse removes active payload scopes",
             TestOptions(timeout = 30000),
             fun () ->
                 TestHelpers.withTempArcWith
@@ -4567,7 +4596,7 @@ Vitest.describe (
 
                             do! vault.SetActiveFileTreeDirectories [||]
                             Vitest.expect(vault.expandedDirectoryPaths.IsEmpty).toBe (true)
-                            Vitest.expect(vault.payloadWatcher.IsNone).toBe (true)
+                            Vitest.expect(vault.payloadWatcherScopes.IsEmpty).toBe (true)
                             do! vault.StopFileWatcher()
                         with error ->
                             do! vault.StopFileWatcher()

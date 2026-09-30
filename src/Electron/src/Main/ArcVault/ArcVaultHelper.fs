@@ -658,42 +658,6 @@ let createFileWatcher (path: string) (usePolling: bool option) =
     // entity directories and their immediate metadata/payload-directory children.
     Chokidar.Chokidar.watch (createArcStructureWatcherPaths path, createWatcherOptions path usePolling ignored (Some 1))
 
-let waitForFileWatcherReady (watcher: Chokidar.IWatcher) : Fable.Core.JS.Promise<unit> =
-    Fable.Core.JS.Constructors.Promise.Create(fun resolve reject ->
-        let mutable settled = false
-
-        let timeoutId =
-            Fable.Core.JS.setTimeout
-                (fun () ->
-                    if not settled then
-                        settled <- true
-                        reject (exn "Timed out while waiting for the ARC file watcher to become ready.")
-                )
-                30000
-
-        let settle action =
-            if not settled then
-                settled <- true
-                Fable.Core.JS.clearTimeout timeoutId
-                action ()
-
-        watcher.on (Chokidar.Events.Ready, fun () -> settle (fun () -> resolve ()))
-        |> ignore
-
-        watcher.on (
-            Chokidar.Events.Error,
-            fun (watcherError: obj) ->
-                let message =
-                    try
-                        watcherError?message |> unbox<string>
-                    with _ ->
-                        string watcherError
-
-                settle (fun () -> reject (exn $"ARC file watcher failed to start: {message}"))
-        )
-        |> ignore
-    )
-
 let sendArcHasUnsavedChangesUpdate (hasUnsavedChanges: bool) (window: BrowserWindow) =
     WindowSend.send<Swate.Electron.Shared.IPCTypes.MainToRendererIpc.IHasUnsavedArcChangesRendererApi>
         window

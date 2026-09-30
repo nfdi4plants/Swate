@@ -229,19 +229,6 @@ let refreshFileTreeEntry
         return upsertFileEntry entry fileTree
     }
 
-let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
-    let normalizedRepoRoot = normalizeRootPath repoRoot
-    let! entry = getFileEntry path
-
-    if entry.isDirectory then
-        return entry
-    else
-        let! largeObjectsByRelativePath = tryListLargeObjects normalizedRepoRoot true
-
-        let index = buildLargeObjectPathIndex largeObjectsByRelativePath
-        return withFileEntryLargeObjectMetadata normalizedRepoRoot index entry
-}
-
 let private scanFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise {
     let scanRoot = normalizeRootPath path
 
