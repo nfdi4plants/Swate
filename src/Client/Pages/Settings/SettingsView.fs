@@ -105,6 +105,7 @@ type Settings =
     <circle cx="16" cy="16" r="4" fill="white"/>
     </g>
 </svg>"""
+
         React.useLayoutEffect (
             (fun () ->
                 let icon =
