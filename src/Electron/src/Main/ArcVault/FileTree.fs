@@ -109,11 +109,9 @@ type ArcVault with
                                 relativePath
                                 scanError.Message
 
-                    let! preparedBatches =
-                        shallowScans
-                        |> Seq.map snd
-                        |> Seq.toArray
-                        |> fun batches -> prepareImmediateFileEntryBatches arcPath batches this.fileTree
+                    let scannedEntryBatches = shallowScans |> Seq.map snd |> Seq.toArray
+
+                    let! largeObjectPathIndex = prepareImmediateFileEntryLargeObjectIndex arcPath scannedEntryBatches
 
                     if capturedWatcherEpoch = this.WatcherEpoch && this.path = Some arcPath then
                         // Read/copy the current tree only after every async disk/metadata operation.
@@ -122,7 +120,10 @@ type ArcVault with
 
                         for index in 0 .. shallowScans.Count - 1 do
                             let absolutePath, _ = shallowScans.[index]
-                            let entries = preparedBatches.[index]
+
+                            let entries =
+                                scannedEntryBatches.[index]
+                                |> Array.map (withFileEntryLargeObjectMetadata arcPath largeObjectPathIndex)
 
                             let reconciledTree, directoryChanged =
                                 reconcileImmediateFileEntries absolutePath entries nextTree

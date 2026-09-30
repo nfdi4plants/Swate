@@ -309,39 +309,25 @@ let scanImmediateFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]>
         )
 }
 
-/// Enriches newly discovered direct files across one shallow reconciliation from at most one
-/// repository object snapshot. Existing entries retain their already-known metadata.
-let prepareImmediateFileEntryBatches
+/// Builds one current large-object lookup for all direct files participating in a shallow
+/// reconciliation. Entries are enriched later, when the current FileTree is applied.
+let prepareImmediateFileEntryLargeObjectIndex
     (repoRoot: string)
     (entryBatches: FileEntry[][])
-    (fileTree: Dictionary<string, FileEntry>)
-    : Fable.Core.JS.Promise<FileEntry[][]> =
+    : Fable.Core.JS.Promise<LargeObjectPathIndex> =
     promise {
-        let requiresLargeObjectSnapshot =
+        let hasDirectFiles =
             entryBatches
             |> Array.collect id
-            |> Array.exists (fun entry -> not entry.isDirectory && not (fileTree.ContainsKey entry.path))
+            |> Array.exists (fun entry -> not entry.isDirectory)
 
         let! largeObjectsByRelativePath =
-            if requiresLargeObjectSnapshot then
+            if hasDirectFiles then
                 tryListLargeObjects (normalizeRootPath repoRoot) false
             else
                 promise { return Map.empty }
 
-        let index = buildLargeObjectPathIndex largeObjectsByRelativePath
-
-        return
-            entryBatches
-            |> Array.map (fun entries ->
-                entries
-                |> Array.map (fun entry ->
-                    match fileTree.TryGetValue entry.path with
-                    | true, existing when existing.isDirectory = entry.isDirectory && existing.name = entry.name ->
-                        existing
-                    | _ when entry.isDirectory -> entry
-                    | _ -> withFileEntryLargeObjectMetadata repoRoot index entry
-                )
-            )
+        return buildLargeObjectPathIndex largeObjectsByRelativePath
     }
 
 /// Reconciles only a directory's direct children. Surviving child directories keep all already

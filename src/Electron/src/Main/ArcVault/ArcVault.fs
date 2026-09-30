@@ -462,7 +462,7 @@ module ArcVaultExtensions =
                 swatelogfn this.window.id "Unable to merge ARC after file watcher event: %s" mergeError.Message
         }
 
-        member internal this._FileEventController(sendMsgApi: IArcFileWatcherApi) =
+        member internal this.FileEventController(sendMsgApi: IArcFileWatcherApi) =
             // A long write retries every 500 ms, so only the first deferral and the limit crossing are logged.
             let logWatcherDeferral deferralCount =
                 match deferralCount with
@@ -748,43 +748,49 @@ module ArcVaultExtensions =
                 swatefailfn this.window.id "No path set for StartFileWatcher."
         }
 
-        member private this.CreateFileWatcherEventController(sendMsgApi: IArcFileWatcherApi) =
-            let baseController = this._FileEventController sendMsgApi
+        member private this.CreateFileWatcherEventControllers(sendMsgApi: IArcFileWatcherApi) =
+            let baseController = this.FileEventController sendMsgApi
 
-            fun (eventName: string) (path: string) ->
-                baseController eventName path
+            let realEventController =
+                fun (eventName: string) (path: string) ->
+                    baseController eventName path
 
-                if WatcherHelpers.eventNameEquals Chokidar.Events.AddDir eventName then
-                    match this.path with
-                    | Some arcPath ->
-                        match tryGetWatcherRelativePath arcPath path with
-                        | Some relativePath when isArcStructureWatchScopePath relativePath ->
-                            promise {
-                                try
-                                    if isArcStructureWatcherScopePath relativePath then
-                                        this.watcher
-                                        |> Option.iter (fun watcher ->
-                                            watcher.add (PathHelpers.normalizeCanonicalRelativePath relativePath)
-                                            |> ignore
-                                        )
+                    if WatcherHelpers.eventNameEquals Chokidar.Events.AddDir eventName then
+                        match this.path with
+                        | Some arcPath ->
+                            match tryGetWatcherRelativePath arcPath path with
+                            | Some relativePath when isArcStructureWatchScopePath relativePath ->
+                                promise {
+                                    try
+                                        if isArcStructureWatcherScopePath relativePath then
+                                            this.watcher
+                                            |> Option.iter (fun watcher ->
+                                                watcher.add (PathHelpers.normalizeCanonicalRelativePath relativePath)
+                                                |> ignore
+                                            )
 
-                                    let! structuralEvents =
-                                        reconcileArcStructureScopeChanges arcPath relativePath (fun () -> this.fileTree)
+                                        let! structuralEvents =
+                                            reconcileArcStructureScopeChanges
+                                                arcPath
+                                                relativePath
+                                                (fun () -> this.fileTree)
 
-                                    WatcherHelpers.attachArcStructureScopes this.watcher structuralEvents
+                                        WatcherHelpers.attachArcStructureScopes this.watcher structuralEvents
 
-                                    for syntheticEventName, syntheticPath in structuralEvents do
-                                        baseController syntheticEventName syntheticPath
-                                with reconciliationError ->
-                                    swatelogfn
-                                        this.window.id
-                                        "Unable to reconcile ARC watcher scope '%s': %s"
-                                        relativePath
-                                        reconciliationError.Message
-                            }
-                            |> Promise.start
-                        | _ -> ()
-                    | None -> ()
+                                        for syntheticEventName, syntheticPath in structuralEvents do
+                                            baseController syntheticEventName syntheticPath
+                                    with reconciliationError ->
+                                        swatelogfn
+                                            this.window.id
+                                            "Unable to reconcile ARC watcher scope '%s': %s"
+                                            relativePath
+                                            reconciliationError.Message
+                                }
+                                |> Promise.start
+                            | _ -> ()
+                        | None -> ()
+
+            baseController, realEventController
 
         member private this.EnsurePayloadWatcher(arcPath: string, targetScopes: Set<string>, ?usePolling: bool) = promise {
             if this.payloadWatcher.IsNone && not targetScopes.IsEmpty then
@@ -886,9 +892,11 @@ module ArcVaultExtensions =
                                 fun isLoading -> sendWatcherMessage (fun api -> api.IsLoadingChanges isLoading)
                         }
 
-                        let controller = this.CreateFileWatcherEventController sendMsgApi
-                        watcher.on (Chokidar.Events.All, controller) |> ignore
-                        this.FileWatcherEventController <- Some controller
+                        let baseController, realEventController =
+                            this.CreateFileWatcherEventControllers sendMsgApi
+
+                        watcher.on (Chokidar.Events.All, realEventController) |> ignore
+                        this.FileWatcherEventController <- Some baseController
                         this.watcher <- Some watcher
 
                         let isCurrentWatcher () =
@@ -908,7 +916,7 @@ module ArcVaultExtensions =
                                             WatcherHelpers.attachArcStructureScopes this.watcher structuralEvents
 
                                             for eventName, relativePath in structuralEvents do
-                                                controller eventName relativePath
+                                                baseController eventName relativePath
                                 }
                                 |> Promise.catch (fun error ->
                                     swatelogfn
