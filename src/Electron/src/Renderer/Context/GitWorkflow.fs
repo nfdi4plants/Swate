@@ -111,6 +111,13 @@ type GitProvisionedRemote = {
 
 type GitErrorNotification = { Title: string; Message: string }
 
+/// The automatic reopen of a diff page whose worker session expired or whose preparation token
+/// went stale. After the open, pages are read forward until TargetPageIndex is loaded again.
+type GitDiffReopen = {
+    Generation: int
+    TargetPageIndex: int
+}
+
 type GitState = {
     Status: GitSidebarStatus
     ChangedFiles: GitSidebarChange[]
@@ -164,6 +171,8 @@ type GitState = {
     Services: ServiceAvailabilityDto option
     /// The open text diff page. The page state shows a copy, and responses apply to this one.
     DiffPage: GitDiffPageData option
+    /// Set while the diff page reopens by itself. A failure during that reopen settles the page.
+    DiffReopen: GitDiffReopen option
 } with
 
     static member Empty = {
@@ -218,6 +227,7 @@ type GitState = {
         ActiveConflict = None
         Services = None
         DiffPage = None
+        DiffReopen = None
     }
 
 type GitRefreshResult = {
@@ -1326,6 +1336,14 @@ module GitDiffPageLoader =
     [<Literal>]
     let DiffWorkerFailed = "diff_worker_failed"
 
+    /// The worker closed the session behind the handle after it sat idle.
+    [<Literal>]
+    let DiffSessionClosed = "diff_session_closed"
+
+    /// The preparation token of an encoding choice expired or no longer matches the sources.
+    [<Literal>]
+    let PreparationMismatch = "preparation_mismatch"
+
     let changeKindOf (change: GitSidebarChange) =
         match change.IndexStatus with
         | "A" -> Paged.GitDiffChangeKind.Added
@@ -2106,6 +2124,122 @@ module GitDiffPageLoader =
                         (fun request result -> GitDiffMsg.LineCompleted(page.Generation, request, result))
                 | Ok(ResumableLineDto.Ready lineDto) -> evict (mergeLine request.Side lineDto (answered ())), Cmd.none
 
+    let private failureCode (result: Result<OperationResultDto<'T>, string>) =
+        match result with
+        | Ok(OperationResultDto.Failed failure) -> Some failure.Code
+        | _ -> None
+
+    /// The operation id, the handle id, the handle version and the failure code of an answer
+    /// to a request that was sent on an open handle.
+    let private handleAnswerOf (msg: GitDiffMsg) =
+        match msg with
+        | GitDiffMsg.PageCompleted(_, request, result) ->
+            Some(request.OperationId, request.HandleId, request.HandleVersion, failureCode result)
+        | GitDiffMsg.ReplayCompleted(_, request, result) ->
+            Some(request.OperationId, request.HandleId, request.HandleVersion, failureCode result)
+        | GitDiffMsg.ExpandCompleted(_, request, result) ->
+            Some(request.OperationId, request.HandleId, request.HandleVersion, failureCode result)
+        | GitDiffMsg.LineCompleted(_, request, result) ->
+            Some(request.OperationId, request.HandleId, request.HandleVersion, failureCode result)
+        | _ -> None
+
+    /// Drops the window and opens the diff again with the chosen encodings and no preparation
+    /// token. Expanded gaps and line slices of the old session are gone, and the pages come
+    /// back as they are read again. The old handle is closed so the main process forgets it.
+    let private reopen (deps: GitDependencies) (page: GitDiffPageData) =
+        let next, openCmd =
+            openFresh
+                deps
+                {
+                    page with
+                        Handle = None
+                        Pages = [||]
+                        RequestedPageIndex = 0
+                        NextCursor = None
+                        NextRequest = None
+                        PendingLineSlices = []
+                        Progress = None
+                        Pending = None
+                        OutputComplete = false
+                        Status = GitDiffPageStatus.Opening
+                }
+                None
+
+        let closeOld =
+            match page.Handle with
+            | Some handle -> closeHandleCmd deps handle
+            | None -> Cmd.none
+
+        next, Cmd.batch [ openCmd; closeOld ]
+
+    /// Reads the next page while the reopened diff has not reached the target page. The reopen
+    /// ends once the target page is loaded, the diff has no further page, the page settles or
+    /// the library asks for an encoding.
+    let private continueReopen (deps: GitDependencies) (target: GitDiffReopen) (page: GitDiffPageData) =
+        match page.Status, page.NextCursor, page.NextRequest with
+        | (GitDiffPageStatus.Opening | GitDiffPageStatus.Scanning | GitDiffPageStatus.LoadingNext | GitDiffPageStatus.Expanding _),
+          _,
+          _
+        | _, _, Some _ -> page, Some target, Cmd.none
+        | GitDiffPageStatus.Ready, Some cursor, None when page.Pages.Length - 1 < target.TargetPageIndex ->
+            let next, cmd =
+                readPage
+                    deps
+                    {
+                        page with
+                            Status = GitDiffPageStatus.LoadingNext
+                    }
+                    cursor
+
+            next, Some target, cmd
+        | _ -> page, None, Cmd.none
+
+    /// Reopens the diff once when its worker session expired or the preparation token of an
+    /// encoding choice went stale. Any failure while that reopen runs settles the page.
+    let private updateWithReopen
+        (deps: GitDependencies)
+        (msg: GitDiffMsg)
+        (reopening: GitDiffReopen option)
+        (page: GitDiffPageData)
+        =
+        match msg, handleAnswerOf msg with
+        // The window of the old handle is gone, so its late answers change nothing.
+        | _, Some(operationId, handleId, handleVersion, _) when
+            page.Handle
+            |> Option.forall (fun handle -> handle.Id <> handleId || handle.Version <> handleVersion)
+            ->
+            finish operationId page, reopening, Cmd.none
+        | _, Some(operationId, _, _, Some DiffSessionClosed) when reopening.IsNone && not (isSettled page.Status) ->
+            let next, cmd = reopen deps (finish operationId page)
+
+            next,
+            Some {
+                Generation = page.Generation
+                TargetPageIndex = page.RequestedPageIndex
+            },
+            cmd
+        | GitDiffMsg.OpenCompleted(_, request, result), _ when
+            reopening.IsNone
+            && request.PreparationTokenId.IsSome
+            && failureCode result = Some PreparationMismatch
+            ->
+            let next, cmd = reopen deps (finish request.OperationId page)
+
+            next,
+            Some {
+                Generation = page.Generation
+                TargetPageIndex = 0
+            },
+            cmd
+        | _ ->
+            let next, cmd = updatePage deps msg page
+
+            match reopening with
+            | Some target ->
+                let next, reopening, readCmd = continueReopen deps target next
+                next, reopening, Cmd.batch [ cmd; readCmd ]
+            | None -> next, None, cmd
+
     /// Leaving the diff only drops the page here. The workflow's update closes the handle of
     /// any diff page that disappears or is replaced.
     let update
@@ -2118,9 +2252,18 @@ module GitDiffPageLoader =
         | GitDiffMsg.PageStateObserved(Some(PageState.GitDiffPage _)), _ -> model, Cmd.none
         | GitDiffMsg.PageStateObserved _, _ -> { model with DiffPage = None }, Cmd.none
         | _, Some page when generationOf msg = Some page.Generation ->
-            let next, cmd = updatePage deps msg page
+            let reopening =
+                model.DiffReopen
+                |> Option.filter (fun reopen -> reopen.Generation = page.Generation)
 
-            { model with DiffPage = Some next }, Cmd.batch [ publishCmd setPageState next; cmd ]
+            let next, reopening, cmd = updateWithReopen deps msg reopening page
+
+            {
+                model with
+                    DiffPage = Some next
+                    DiffReopen = reopening
+            },
+            Cmd.batch [ publishCmd setPageState next; cmd ]
         | GitDiffMsg.OpenCompleted(_, request, result), _ -> model, releaseArrivedOpenCmd deps request result
         | _ -> model, Cmd.none
 

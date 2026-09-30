@@ -284,6 +284,24 @@ let private openedWith first =
 let private openedPage page =
     openedWith (ResumablePageDto.Ready page)
 
+/// The worker hands out a new handle for every open, so a reopened diff has a handle of its own.
+let private handleOfOpen (openCount: int) : DiffHandleDto = {
+    Id = $"diff-{openCount}"
+    Version = "1"
+}
+
+let private openedOn (openHandle: DiffHandleDto) page =
+    succeeded (
+        ResumableOpenDto.Ready(
+            OpenDiffResultDto.Opened(openHandle, sourceInfo "a.txt", sourceInfo "a.txt", ResumablePageDto.Ready page)
+        )
+    )
+
+let private isFailed (status: GitDiffPageStatus) =
+    match status with
+    | GitDiffPageStatus.Failed _ -> true
+    | _ -> false
+
 let private describePart (part: Paged.PagedPart) =
     match part with
     | Paged.PagedPart.HunkRows(hunkId, _, _, _, _, _) -> $"hunk:{hunkId}"
@@ -1131,6 +1149,214 @@ Vitest.describe (
                     .toBe (false)
 
                 Vitest.expect(noChangesShown (withParts [| hunk "h1" |])).toBe (false)
+            }
+        )
+
+        Vitest.test (
+            "An expired session during a next page request reopens the diff and reads forward to the requested page",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                let pageDto index =
+                    diffPage $"p{index}" (Some $"cursor-{index}") [| hunk $"h{index}" |]
+
+                fake.OpenReply <- fun _ -> openedOn (handleOfOpen fake.Opens.Count) (pageDto 1)
+
+                fake.ReadReply <-
+                    fun request ->
+                        if request.HandleId = "diff-1" && request.Cursor = "cursor-2" then
+                            failedWith "diff_session_closed" None
+                        else
+                            let index = int (request.Cursor.Replace("cursor-", "")) + 1
+                            succeeded (ResumablePageDto.Ready(pageDto index))
+
+                let! state = run fake (select "a.txt") runningState
+                let generation = (diffOf state).Generation
+                let! state = run fake (diffMsg (GitDiffMsg.LoadNext generation)) state
+                Vitest.expect((diffOf state).RequestedPageIndex).toBe (1)
+
+                let! state = run fake (diffMsg (GitDiffMsg.LoadNext generation)) state
+                let page = diffOf state
+
+                Vitest.expect(fake.Opens.Count).toBe (2)
+
+                Vitest
+                    .expect({ fake.Opens.[1] with OperationId = "" })
+                    .toEqual ({ fake.Opens.[0] with OperationId = "" })
+
+                Vitest
+                    .expect(fake.Reads |> Seq.map (fun read -> read.HandleId, read.Cursor) |> Seq.toArray)
+                    .toEqual (
+                        [|
+                            "diff-1", "cursor-1"
+                            "diff-1", "cursor-2"
+                            "diff-2", "cursor-1"
+                        |]
+                    )
+
+                Vitest.expect(page.Handle).toEqual (Some(handleOfOpen 2))
+                Vitest.expect(page.Pages |> Array.map _.PageId).toEqual ([| "p1"; "p2" |])
+                Vitest.expect(page.RequestedPageIndex).toBe (1)
+                Vitest.expect(page.NextCursor).toEqual (Some "cursor-2")
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+                Vitest.expect(state.DiffReopen).toEqual (None)
+                Vitest.expect(fake.Closes |> Seq.map _.HandleId |> Seq.toArray).toEqual ([| "diff-1" |])
+            }
+        )
+
+        Vitest.test (
+            "An expired session during an expansion reopens the diff with the gap collapsed",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let first = diffPage "p1" None [| hunk "h1"; gap "g1" |]
+                fake.OpenReply <- fun _ -> openedOn (handleOfOpen fake.Opens.Count) first
+                fake.ExpandReply <- fun _ -> failedWith "diff_session_closed" None
+
+                let! state = run fake (select "a.txt") runningState
+                let! state = run fake (diffMsg (GitDiffMsg.Expand((diffOf state).Generation, "g1", true))) state
+                let page = diffOf state
+
+                Vitest.expect(fake.Expands.Count).toBe (1)
+                Vitest.expect(fake.Opens.Count).toBe (2)
+                Vitest.expect(fake.Opens.[1].PreparationTokenId).toEqual (None)
+                Vitest.expect(page.Handle).toEqual (Some(handleOfOpen 2))
+                Vitest.expect(page.Pages |> Array.map pageParts).toEqual ([| [| "hunk:h1"; "gap:g1" |] |])
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+            }
+        )
+
+        Vitest.test (
+            "A stale preparation token after an encoding pick reopens with the chosen encoding and no token",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let token: PreparationTokenDto = { Id = "token-1" }
+
+                let candidates: EncodingCandidateDto[] = [|
+                    {
+                        Encoding = "windows-1252"
+                        Preview = "a"
+                    }
+                |]
+
+                fake.OpenReply <-
+                    fun request ->
+                        match request.PreviousEncoding, request.PreparationTokenId with
+                        | None, _ ->
+                            succeeded (
+                                ResumableOpenDto.Ready(
+                                    OpenDiffResultDto.NotDiffable(
+                                        DiffBlockerDto.EncodingRequired(DiffSideDto.Previous, token, candidates)
+                                    )
+                                )
+                            )
+                        | Some _, Some _ -> failedWith "preparation_mismatch" None
+                        | Some _, None -> openedPage (diffPage "p1" None [| hunk "h1" |])
+
+                let! state = run fake (select "a.txt") runningState
+                let generation = (diffOf state).Generation
+
+                let! state =
+                    run
+                        fake
+                        (diffMsg (GitDiffMsg.ChooseEncoding(generation, DiffSideDto.Previous, "windows-1252")))
+                        state
+
+                Vitest.expect(fake.Opens.Count).toBe (3)
+                Vitest.expect(fake.Opens.[1].PreparationTokenId).toEqual (Some token.Id)
+                Vitest.expect(fake.Opens.[2].PreparationTokenId).toEqual (None)
+                Vitest.expect(fake.Opens.[2].PreviousEncoding).toEqual (Some "windows-1252")
+                Vitest.expect(fake.Opens.[2].Continuation).toEqual (None)
+                Vitest.expect((diffOf state).Status).toEqual (GitDiffPageStatus.Ready)
+                Vitest.expect((diffOf state).Handle).toEqual (Some handle)
+            }
+        )
+
+        Vitest.test (
+            "A reopen whose session closes again settles the page as failed without reopening a second time",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                let pageDto index =
+                    diffPage $"p{index}" (Some $"cursor-{index}") [| hunk $"h{index}" |]
+
+                fake.OpenReply <- fun _ -> openedOn (handleOfOpen fake.Opens.Count) (pageDto 1)
+
+                fake.ReadReply <-
+                    fun request ->
+                        match request.HandleId, request.Cursor with
+                        | "diff-1", "cursor-1" -> succeeded (ResumablePageDto.Ready(pageDto 2))
+                        | _ -> failedWith "diff_session_closed" None
+
+                let! state = run fake (select "a.txt") runningState
+                let generation = (diffOf state).Generation
+                let! state = run fake (diffMsg (GitDiffMsg.LoadNext generation)) state
+                let! state = run fake (diffMsg (GitDiffMsg.LoadNext generation)) state
+                let page = diffOf state
+
+                Vitest.expect(fake.Opens.Count).toBe (2)
+
+                Vitest
+                    .expect(fake.Reads |> Seq.map (fun read -> read.HandleId, read.Cursor) |> Seq.toArray)
+                    .toEqual (
+                        [|
+                            "diff-1", "cursor-1"
+                            "diff-1", "cursor-2"
+                            "diff-2", "cursor-1"
+                        |]
+                    )
+
+                Vitest.expect(isFailed page.Status).toBe (true)
+                Vitest.expect(state.DiffReopen).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "Leaving the diff while it reopens cancels the reopen and closes the handle it returns",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let first = diffPage "p1" None [| hunk "h1"; gap "g1" |]
+                fake.OpenReply <- fun _ -> openedOn (handleOfOpen fake.Opens.Count) first
+                fake.ExpandReply <- fun _ -> failedWith "diff_session_closed" None
+
+                let! state = run fake (select "a.txt") runningState
+
+                let expanding, expandCmd =
+                    update
+                        fake.Dependencies
+                        fake.SetPageState
+                        (diffMsg (GitDiffMsg.Expand((diffOf state).Generation, "g1", true)))
+                        state
+
+                let! expandMessages = collectMessages expandCmd
+                let reopeningRef = ref expanding
+                let reopenCmds = ResizeArray<Cmd<Msg>>()
+
+                // The commands of the expansion answer hold the reopen and stay unrun until the user left.
+                for message in expandMessages do
+                    let next, cmd =
+                        update fake.Dependencies fake.SetPageState message reopeningRef.Value
+
+                    reopeningRef.Value <- next
+                    reopenCmds.Add cmd
+
+                let reopening = reopeningRef.Value
+                let reopenId = (diffOf reopening).RunningOperations |> List.head
+                Vitest.expect(reopening.DiffReopen.IsSome).toBe (true)
+
+                let! left =
+                    run fake (diffMsg (GitDiffMsg.PageStateObserved(Some(PageState.TextPage "notes")))) reopening
+
+                let! lateMessages = collectMessages (Cmd.batch (List.ofSeq reopenCmds))
+                let current = ref left
+
+                for message in lateMessages do
+                    let! next = run fake message current.Value
+                    current.Value <- next
+
+                Vitest.expect(fake.Opens.[1].OperationId).toBe (reopenId)
+                Vitest.expect(fake.Cancels.Contains reopenId).toBe (true)
+                Vitest.expect(fake.Closes |> Seq.map _.HandleId |> Seq.toArray).toEqual ([| "diff-1"; "diff-2" |])
+                Vitest.expect(current.Value.DiffPage).toEqual (None)
             }
         )
 )
