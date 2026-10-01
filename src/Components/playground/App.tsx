@@ -227,7 +227,7 @@ function ValidationPackageBrowserFixtureContainer() {
 
 const App = () => {
     return (
-        <ValidationPackageBrowserFixtureContainer />
+        <DataHubBrowserContainer />
     );
 };
 

@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Merges Swate creates are titled "Merge online changes".
 -   The busy notice shows the operation and git's progress lines. The raw "Git output" log is removed.
 -   The tooltips of Update ARC from Online, Download Changes and Clean LFS Cache list the git commands that run now.
+-   Replace git file status icons with shorthand letters (A, M, D, R, N, C) to reduce confusion with "+" icon. #1199 (by @Freymaurer)
 
 ### 🐛 Fixed
 
@@ -57,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Closing a window during an operation no longer crashes the main process with "Object has been destroyed". Every message to a window checks that the window still exists.
 -   The file watcher no longer overwrites the in-memory ARC in the middle of one of Swate's own writes.
 -   A Git operation that fails after it already changed the workspace refreshes the sidebar before it shows the error.
+-   Added fallback support for broken repository image links in datahub browser. #1180 (by @Freymaurer)
 -   Show a native error message instead of crashing or silently failing when a selected folder is not a valid ARC.
 
 ## 2.3.1 - 2026-09-16

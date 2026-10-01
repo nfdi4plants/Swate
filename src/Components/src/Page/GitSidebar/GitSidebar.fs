@@ -23,7 +23,7 @@ module private GitSidebarInternal =
 
     type ChangePresentation = {
         Label: string
-        IconClassName: string
+        Shorthand: string
         ToneClassName: string
     }
 
@@ -58,36 +58,36 @@ module private GitSidebarInternal =
         else
             GitChangeKind.Modified
 
-    let changePresentation (change: GitSidebarChange) =
+    let changePresentation (change: GitSidebarChange) : ChangePresentation =
         match classifyChange change with
         | GitChangeKind.Added -> {
             Label = "Added"
-            IconClassName = "swt:fluent--add-24-regular"
+            Shorthand = "A"
             ToneClassName = "swt:text-success"
           }
         | GitChangeKind.Modified -> {
             Label = "Modified"
-            IconClassName = "swt:fluent--edit-24-regular"
+            Shorthand = "M"
             ToneClassName = "swt:text-warning"
           }
         | GitChangeKind.Deleted -> {
             Label = "Deleted"
-            IconClassName = "swt:fluent--delete-24-regular"
+            Shorthand = "D"
             ToneClassName = "swt:text-error"
           }
         | GitChangeKind.Renamed -> {
             Label = "Renamed"
-            IconClassName = "swt:fluent--arrow-swap-24-regular"
+            Shorthand = "R"
             ToneClassName = "swt:text-info"
           }
         | GitChangeKind.Untracked -> {
-            Label = "Untracked"
-            IconClassName = "swt:fluent--add-24-regular"
+            Label = "New (Untracked)"
+            Shorthand = "N"
             ToneClassName = "swt:text-success"
           }
         | GitChangeKind.Conflict -> {
             Label = "Conflict"
-            IconClassName = "swt:fluent--warning-24-regular"
+            Shorthand = "C"
             ToneClassName = "swt:text-error"
           }
 
@@ -1140,10 +1140,10 @@ type GitSidebar =
         Html.span [
             prop.testId $"GitSidebarChangeStatusIcon-{index}"
             prop.className [
-                "swt:iconify swt:size-4 swt:shrink-0"
-                presentation.IconClassName
+                "swt:shrink-0 swt:text-center"
                 presentation.ToneClassName
             ]
+            prop.text presentation.Shorthand
             prop.title tooltipText
             prop.ariaLabel tooltipText
             prop.onMouseDown stopRowActivation
