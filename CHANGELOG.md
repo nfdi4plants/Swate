@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Closing a window during an operation no longer crashes the main process with "Object has been destroyed". Every message to a window checks that the window still exists.
 -   The file watcher no longer overwrites the in-memory ARC in the middle of one of Swate's own writes.
 -   A Git operation that fails after it already changed the workspace refreshes the sidebar before it shows the error.
+-   Added fallback support for broken repository image links in datahub browser. #1180 (by @Freymaurer)
 
 ## 2.3.1 - 2026-09-16
 
