@@ -1163,9 +1163,9 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                             | Failed failure -> Failed failure
                 })
                 Mappings.workspaceStatus
-    // Every handle an open returns is recorded with the window of the operation, so the
-    // window can only reach its own handles and its handles close with it. A handle that
-    // arrives after its window closed is closed at once.
+    // Every handle an open returns is recorded with the window of the operation, so its
+    // handles close with the window. The library keeps each window to its own handles. A
+    // handle that arrives after its window closed is closed at once.
     openTextDiff =
         fun request ->
             withTextDiff

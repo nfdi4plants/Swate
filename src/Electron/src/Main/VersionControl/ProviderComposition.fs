@@ -53,6 +53,17 @@ let dataHubRevisionPolicy: RevisionPolicyStrategy = {
                 RevisionPathPolicy.Automatic
 }
 
+/// The text diff options of the pooled Git factory. `windowOwnerOf` names the window that started
+/// an operation, and the pool keeps each window's diff handles apart.
+let textDiffOptions
+    (pool: VersionControlService.Git.TextDiff.TextDiffPool.TextDiffPool)
+    (windowOwnerOf: OperationContext -> string)
+    : VersionControlService.Git.TextDiff.GitTextDiffService.GitTextDiffOptions =
+    {
+        Pool = pool
+        WindowOwnerOf = windowOwnerOf
+    }
+
 /// The Git factory whose sessions diff text in the shared worker pool. The pool is set up
 /// asynchronously, so Open waits for it and builds the pooled factory once. When the pool
 /// cannot be set up, sessions open without it. A diff Open then fails with
@@ -83,13 +94,7 @@ let createGitFactory
         match pooled with
         | Some factory -> factory
         | None ->
-            let factory =
-                factoryWith (
-                    Some {
-                        Pool = pool
-                        WindowOwnerOf = windowOwnerOf
-                    }
-                )
+            let factory = factoryWith (Some(textDiffOptions pool windowOwnerOf))
 
             pooled <- Some factory
             factory

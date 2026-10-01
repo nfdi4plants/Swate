@@ -1584,15 +1584,15 @@ type GitPagedDiffViewer =
         let previousTitle = defaultArg previousTitle "Previous version"
         let currentTitle = defaultArg currentTitle "Current version"
         let pending = pending
-        // The rows depend only on the parts and on what follows them, so they are built once for
-        // each change of those. The key of the last row of the last part stands in for the next
-        // page when the caller names none.
-        let rows, rowParts, lastRowKey =
+        // The rows of the parts are built once for each change of the parts array. The key of the
+        // last row of the last part stands in for the next page when the caller names none.
+        let partRowsOnly, partRowParts, lastRowKey =
             React.useMemo (
                 (fun () ->
                     let rows = ResizeArray<GitPagedDiffDisplay.Row>()
                     // The index of the part each row belongs to, -1 for rows outside the parts.
                     let rowParts = ResizeArray<int>()
+                    let mutable lastRowKey = None
 
                     // Evicted pages far from the loaded ones fold into one short placeholder, so
                     // the scroll height stays bounded however many pages the diff has.
@@ -1602,8 +1602,10 @@ type GitPagedDiffViewer =
                     while partIndex < parts.Length do
                         match foldRuns |> Array.tryFind (fun (first, _, _) -> first = partIndex) with
                         | Some(first, last, side) ->
-                            rows.Add(GitPagedDiffDisplay.foldedRow parts first last side)
+                            let folded = GitPagedDiffDisplay.foldedRow parts first last side
+                            rows.Add folded
                             rowParts.Add -1
+                            lastRowKey <- Some folded.Key
                             partIndex <- last + 1
                         | None ->
                             let partRows = GitPagedDiffDisplay.buildPartRows parts.[partIndex]
@@ -1612,33 +1614,35 @@ type GitPagedDiffViewer =
                             for _ in partRows do
                                 rowParts.Add partIndex
 
+                            lastRowKey <- partRows |> Array.tryLast |> Option.map _.Key
                             partIndex <- partIndex + 1
-
-                    if hasMore then
-                        rows.Add {
-                            Key = "continue"
-                            Content = GitPagedDiffDisplay.Continue pending
-                        }
-
-                        rowParts.Add -1
-                    elif pending.IsSome then
-                        rows.Add {
-                            Key = "pending"
-                            Content = GitPagedDiffDisplay.Continue pending
-                        }
-
-                        rowParts.Add -1
-
-                    let lastRowKey =
-                        parts
-                        |> Array.tryLast
-                        |> Option.bind (GitPagedDiffDisplay.buildPartRows >> Array.tryLast)
-                        |> Option.map _.Key
 
                     rows.ToArray(), rowParts.ToArray(), lastRowKey
                 ),
-                [| box parts; box hasMore; box pending |]
+                [| box parts |]
             )
+
+        // The row after the parts shows the pending request, so it follows the pending record
+        // on each render while the rows of the parts stay as they are.
+        let rows, rowParts =
+            if hasMore then
+                Array.append partRowsOnly [|
+                    {
+                        Key = "continue"
+                        Content = GitPagedDiffDisplay.Continue pending
+                    }
+                |],
+                Array.append partRowParts [| -1 |]
+            elif pending.IsSome then
+                Array.append partRowsOnly [|
+                    {
+                        Key = "pending"
+                        Content = GitPagedDiffDisplay.Continue pending
+                    }
+                |],
+                Array.append partRowParts [| -1 |]
+            else
+                partRowsOnly, partRowParts
 
         let noChanges =
             progress |> Option.exists (fun value -> value.ScanComplete)

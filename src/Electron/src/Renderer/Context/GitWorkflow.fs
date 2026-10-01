@@ -1536,7 +1536,7 @@ module GitDiffPageLoader =
             NextRequest = None
             PendingLineSlices = []
             ExpandingGaps = []
-            PendingReplays = None
+            PendingReplay = None
             VisiblePages = []
             KeepRequestedPage = false
             FailedGaps = []
@@ -2221,7 +2221,7 @@ module GitDiffPageLoader =
             // One replay at a time. Each answer evicts other pages, and replays running side by
             // side would evict each other's pages.
             match handleRequest (), page.Pages |> Array.tryFindIndex (fun windowPage -> windowPage.PageId = pageId) with
-            | Some handle, Some index when isEvicted && page.PendingReplays.IsNone ->
+            | Some handle, Some index when isEvicted && page.PendingReplay.IsNone ->
                 let request: ReplayTextDiffPageRequestDto = {
                     OperationId = deps.newOperationId ()
                     HandleId = handle.Id
@@ -2235,7 +2235,7 @@ module GitDiffPageLoader =
                 // the pages on screen.
                 track request.OperationId {
                     page with
-                        PendingReplays = Some pageId
+                        PendingReplay = Some pageId
                         RequestedPageIndex = index
                         VisiblePages = pageId :: visiblePages |> List.distinct
                         KeepRequestedPage = page.KeepRequestedPage || page.NextRequest.IsSome
@@ -2331,7 +2331,7 @@ module GitDiffPageLoader =
         | GitDiffMsg.ReplayCompleted(_, request, result) ->
             let page = {
                 finish request.OperationId page with
-                    PendingReplays = page.PendingReplays |> Option.filter (fun pageId -> pageId <> request.PageId)
+                    PendingReplay = page.PendingReplay |> Option.filter (fun pageId -> pageId <> request.PageId)
             }
 
             if isSettled page.Status then
@@ -2482,7 +2482,7 @@ module GitDiffPageLoader =
                         NextRequest = None
                         PendingLineSlices = []
                         ExpandingGaps = []
-                        PendingReplays = None
+                        PendingReplay = None
                         VisiblePages = []
                         KeepRequestedPage = false
                         FailedGaps = []

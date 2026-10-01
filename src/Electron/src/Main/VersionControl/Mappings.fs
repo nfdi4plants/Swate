@@ -504,12 +504,9 @@ let resumableLine (resumable: Resumable<DiffLine>) : ResumableLineDto =
     | Resumable.Scanning(progress, continuation, pending) ->
         ResumableLineDto.Scanning(scanProgress progress, continuation, pending |> Option.map pendingPreview)
 
-// Fable cannot emit a lone surrogate literal, so these compare code values.
+// Fable cannot emit a lone surrogate literal, so this compares code values.
 let private isHighSurrogate (character: char) =
     int character >= 0xD800 && int character <= 0xDBFF
-
-let private isLowSurrogate (character: char) =
-    int character >= 0xDC00 && int character <= 0xDFFF
 
 /// Cuts text to at most maxBytes of UTF-8 and never splits a surrogate pair.
 let truncateUtf8 (maxBytes: int) (text: string) : string =
@@ -616,9 +613,12 @@ let private tryBounded (name: string) (maxLength: int) (value: string) : Result<
 let private tryTextDiffId (name: string) : string -> Result<string, OperationFailure> =
     tryBounded name MaxTextDiffIdLength
 
-/// Any other token is opaque to Swate, so only its presence is checked.
-let private tryPresent (name: string) : string -> Result<string, OperationFailure> =
-    tryBounded name System.Int32.MaxValue
+/// Swate checks only that the token is present, since the token is opaque here.
+let private tryPresent (name: string) (value: string) : Result<string, OperationFailure> =
+    if isNull value then
+        Error(invalidDiffRequest $"The {name} is missing.")
+    else
+        Ok value
 
 let private tryOptionalToken (name: string) (value: string option) : Result<string option, OperationFailure> =
     match value with

@@ -33,7 +33,8 @@ let Main (page: GitDiffPageData) =
     // records no measures, and Swate reads none.
     React.useEffect ((fun () -> FsReact.createDisposable clearPerformanceMeasures), [| box page.Pages |])
 
-    // The viewer builds its rows again when the parts array changes, so the parts are collected only when the pages change.
+    // The viewer rebuilds its rows when the parts array changes and only re-renders the trailing row otherwise.
+    // The parts are collected only when the pages change.
     let parts =
         React.useMemo ((fun () -> page.Pages |> Array.collect _.Parts), [| box page.Pages |])
 
@@ -116,7 +117,7 @@ let Main (page: GitDiffPageData) =
                             (fun pageId firstPart lastPart ->
                                 send (GitDiffMsg.Replay(generation, pageId, visiblePages firstPart lastPart))
                             ),
-                        pendingReplays = Option.toArray page.PendingReplays,
+                        pendingReplays = Option.toArray page.PendingReplay,
                         chooseEncoding =
                             (fun side encoding ->
                                 send (GitDiffMsg.ChooseEncoding(generation, Presentation.sideDto side, encoding))

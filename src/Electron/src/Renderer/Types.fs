@@ -132,8 +132,8 @@ type GitDiffPageData = {
     PendingLineSlices: PagedLineSliceRequest list
     /// Gaps whose expansion is running. A gap is expanded by one request at a time.
     ExpandingGaps: string list
-    /// Evicted pages whose replay is running. At most one replay runs at a time.
-    PendingReplays: string option
+    /// The evicted page whose replay is running.
+    PendingReplay: string option
     /// Pages the viewer showed when it asked for the last replay. Eviction keeps them.
     VisiblePages: string list
     /// Set when a replay or an expansion was asked for while the next page was loading. That
