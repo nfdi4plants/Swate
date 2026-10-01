@@ -1605,7 +1605,13 @@ type GitPagedDiffViewer =
                             let folded = GitPagedDiffDisplay.foldedRow parts first last side
                             rows.Add folded
                             rowParts.Add -1
-                            lastRowKey <- Some folded.Key
+                            // The folded row's key stays the same while the run grows, so the key of the
+                            // run's last page stands in for it.
+                            lastRowKey <-
+                                GitPagedDiffDisplay.buildPartRows parts.[last]
+                                |> Array.tryLast
+                                |> Option.map _.Key
+
                             partIndex <- last + 1
                         | None ->
                             let partRows = GitPagedDiffDisplay.buildPartRows parts.[partIndex]

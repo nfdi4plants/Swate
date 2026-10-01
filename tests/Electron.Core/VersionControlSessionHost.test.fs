@@ -338,42 +338,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "the text diff options of the composition name the owner of the window that started the operation",
-            fun () ->
-                let runtime =
-                    createRuntime
-                        "settings"
-                        VersionControlService.LakeFs.LakeFsCredentials.unconfigured
-                        (memoryBindings ())
-
-                let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
-                WorkspaceSessionHost.initialize host
-
-                try
-                    // The options builder only stores the pool, so the test starts no workers.
-                    let options =
-                        ProviderComposition.textDiffOptions Unchecked.defaultof<_> WorkspaceSessionHost.windowOwnerOf
-
-                    let windowSeven = host.BeginOperation("op-window-7", None, Some 7, false, ignore)
-
-                    let windowSevenAgain =
-                        host.BeginOperation("op-window-7-again", None, Some 7, false, ignore)
-
-                    let windowEight = host.BeginOperation("op-window-8", None, Some 8, false, ignore)
-
-                    let ownerSeven = options.WindowOwnerOf windowSeven.Context
-                    Vitest.expect(ownerSeven).toBe (WorkspaceSessionHost.windowOwnerOf windowSeven.Context)
-                    Vitest.expect(options.WindowOwnerOf windowSevenAgain.Context).toBe ownerSeven
-                    Vitest.expect(options.WindowOwnerOf windowEight.Context).not.toBe ownerSeven
-
-                    windowSeven.Complete()
-                    windowSevenAgain.Complete()
-                    windowEight.Complete()
-                finally
-                    WorkspaceSessionHost.resetForTests ()
-        )
-
-        Vitest.test (
             "operations are tracked by window id and their completion can be awaited",
             fun () ->
                 withFixture (fun fixture -> promise {

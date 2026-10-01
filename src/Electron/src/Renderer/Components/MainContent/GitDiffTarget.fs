@@ -33,7 +33,7 @@ let Main (page: GitDiffPageData) =
     // records no measures, and Swate reads none.
     React.useEffect ((fun () -> FsReact.createDisposable clearPerformanceMeasures), [| box page.Pages |])
 
-    // The viewer rebuilds its rows when the parts array changes and only re-renders the trailing row otherwise.
+    // The viewer rebuilds the rows of the parts only when the parts array changes.
     // The parts are collected only when the pages change.
     let parts =
         React.useMemo ((fun () -> page.Pages |> Array.collect _.Parts), [| box page.Pages |])
