@@ -82,6 +82,73 @@ let private createDirectoryAsync (path: string) : Fable.Core.JS.Promise<unit> = 
     return ()
 }
 
+let private removeFileAsync (path: string) : Fable.Core.JS.Promise<unit> = promise {
+    let! _ =
+        fsPromisesDynamic?rm (path, createObj [ "force" ==> true ])
+        |> unbox<Fable.Core.JS.Promise<obj>>
+
+    return ()
+}
+
+let private runInBatches count batchSize (operation: int -> Fable.Core.JS.Promise<unit>) = promise {
+    let mutable offset = 0
+
+    while offset < count do
+        let lastIndex = min (offset + batchSize - 1) (count - 1)
+
+        let operations = [| offset..lastIndex |] |> Array.map operation
+
+        let! _ = Fable.Core.JS.Constructors.Promise.all operations
+        offset <- lastIndex + 1
+}
+
+[<Emit("performance.now()")>]
+let private performanceNow () : float = jsNative
+
+[<Emit("console.log($0)")>]
+let private logPerformanceMeasurement (_message: string) : unit = jsNative
+
+[<Emit("$0.toFixed(2)")>]
+let private formatDuration (_value: float) : string = jsNative
+
+let private measurePromise (operation: unit -> Fable.Core.JS.Promise<'T>) = promise {
+    let startedAt = performanceNow ()
+    let! result = operation ()
+    return result, performanceNow () - startedAt
+}
+
+let private median (values: float[]) =
+    let sorted = Array.sort values
+    let middle = sorted.Length / 2
+
+    if sorted.Length % 2 = 0 then
+        (sorted.[middle - 1] + sorted.[middle]) / 2.0
+    else
+        sorted.[middle]
+
+let private percentile95 (values: float[]) =
+    let sorted = Array.sort values
+
+    let index =
+        int (Math.Ceiling(0.95 * float sorted.Length)) - 1
+        |> max 0
+        |> min (sorted.Length - 1)
+
+    sorted.[index]
+
+type private ReconciliationMeasurement = {
+    ChildCount: int
+    Scenario: string
+    Durations: float[]
+}
+
+let private formatMeasurement measurement =
+    let medianDuration = median measurement.Durations
+    let p95Duration = percentile95 measurement.Durations
+    let maximumDuration = Array.max measurement.Durations
+
+    $"{measurement.ChildCount} children | {measurement.Scenario}: median {formatDuration medianDuration} ms, p95 {formatDuration p95Duration} ms, max {formatDuration maximumDuration} ms"
+
 let private directoryEntry name path =
     FileEntry.create (name, path, true, None)
 
@@ -448,7 +515,7 @@ Vitest.describe (
                         Array.init
                             1000
                             (fun index ->
-                                let name = $"file{index + 1:D4}.txt"
+                                let name = $"file{index + 1}.txt"
                                 let path = join [| datasetPath; name |] |> PathHelpers.normalizePath
                                 tree.[path] <- createFileEntry name path
                                 path
@@ -490,6 +557,279 @@ Vitest.describe (
                 with error ->
                     do! removeDirectoryAsync tempPath
                     return raise error
+            }
+        )
+)
+
+Vitest.describe (
+    "FileTreeCreator initial and shallow loading contract",
+    fun () ->
+        Vitest.test (
+            "initial loading is recursive while later reconciliation remains shallow",
+            fun () -> promise {
+                let! tempPath = createTempDirectoryAsync ()
+
+                try
+                    let arcPath = PathHelpers.normalizePath tempPath
+
+                    let resourcesPath =
+                        join [| arcPath; "studies"; "S1"; "resources" |] |> PathHelpers.normalizePath
+
+                    let level1Path = join [| resourcesPath; "level1" |] |> PathHelpers.normalizePath
+                    let level2Path = join [| level1Path; "level2" |] |> PathHelpers.normalizePath
+                    let level3Path = join [| level2Path; "level3" |] |> PathHelpers.normalizePath
+                    let deepFilePath = join [| level3Path; "deep.txt" |] |> PathHelpers.normalizePath
+
+                    do! createDirectoryAsync level3Path
+                    do! writeUtf8FileAsync deepFilePath "deep"
+
+                    let! initialEntries = FileTreeCreator.getFileEntries arcPath false
+
+                    let initialPaths =
+                        initialEntries
+                        |> Array.map (fun entry -> PathHelpers.normalizePath entry.path)
+                        |> Set.ofArray
+
+                    Vitest.expect(initialPaths.Contains resourcesPath).toBe (true)
+                    Vitest.expect(initialPaths.Contains level1Path).toBe (true)
+                    Vitest.expect(initialPaths.Contains level2Path).toBe (true)
+                    Vitest.expect(initialPaths.Contains level3Path).toBe (true)
+                    Vitest.expect(initialPaths.Contains deepFilePath).toBe (true)
+
+                    let shallowTree = Dictionary<string, FileEntry>()
+                    shallowTree.[arcPath] <- directoryEntry (basename arcPath) arcPath
+                    shallowTree.[resourcesPath] <- directoryEntry "resources" resourcesPath
+
+                    let! shallowRefresh =
+                        FileTreeCreator.reconcileFileTreeDirectory arcPath "studies/S1/resources" shallowTree
+
+                    let refreshedTree = shallowRefresh |> Option.get
+                    Vitest.expect(refreshedTree.ContainsKey level1Path).toBe (true)
+                    Vitest.expect(refreshedTree.ContainsKey level2Path).toBe (false)
+                    Vitest.expect(refreshedTree.ContainsKey level3Path).toBe (false)
+                    Vitest.expect(refreshedTree.ContainsKey deepFilePath).toBe (false)
+                    do! removeDirectoryAsync tempPath
+                with error ->
+                    do! removeDirectoryAsync tempPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "shallow discovery ignores descendants below its direct directory layer",
+            TestOptions(timeout = 120000),
+            fun () -> promise {
+                let! tempPath = createTempDirectoryAsync ()
+
+                try
+                    let arcPath = PathHelpers.normalizePath tempPath
+                    let datasetPath = join [| arcPath; "dataset" |] |> PathHelpers.normalizePath
+                    let directDirectoryCount = 100
+
+                    do! createDirectoryAsync datasetPath
+
+                    do!
+                        runInBatches
+                            directDirectoryCount
+                            50
+                            (fun index -> promise {
+                                let directDirectoryName = $"folder{index + 1}"
+
+                                let deepestDirectoryPath =
+                                    join [| datasetPath; directDirectoryName; "level1"; "level2" |]
+                                    |> PathHelpers.normalizePath
+
+                                do! createDirectoryAsync deepestDirectoryPath
+
+                                do! writeUtf8FileAsync (join [| deepestDirectoryPath; "payload.bin" |]) "payload"
+                            })
+
+                    let createUnmaterializedTree () =
+                        let tree = Dictionary<string, FileEntry>()
+                        tree.[arcPath] <- directoryEntry (basename arcPath) arcPath
+                        tree.[datasetPath] <- directoryEntry "dataset" datasetPath
+                        tree
+
+                    let! _ = FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset" (createUnmaterializedTree ())
+
+                    let! measuredRefresh, duration =
+                        measurePromise (fun () ->
+                            FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset" (createUnmaterializedTree ())
+                        )
+
+                    let refreshedTree = measuredRefresh |> Option.get
+
+                    for index in 0 .. directDirectoryCount - 1 do
+                        let directDirectoryName = $"folder{index + 1}"
+
+                        let directDirectoryPath =
+                            join [| datasetPath; directDirectoryName |] |> PathHelpers.normalizePath
+
+                        let level1Path =
+                            join [| directDirectoryPath; "level1" |] |> PathHelpers.normalizePath
+
+                        Vitest.expect(refreshedTree.ContainsKey directDirectoryPath).toBe (true)
+                        Vitest.expect(refreshedTree.ContainsKey level1Path).toBe (false)
+
+                    logPerformanceMeasurement (
+                        $"{directDirectoryCount} deep directory children | shallow discovery: {formatDuration duration} ms"
+                    )
+
+                    do! removeDirectoryAsync tempPath
+                with error ->
+                    do! removeDirectoryAsync tempPath
+                    return raise error
+            }
+        )
+)
+
+Vitest.describe (
+    "FileTreeCreator shallow reconciliation performance diagnostics",
+    fun () ->
+        Vitest.test (
+            "reports discovery, unchanged, incremental, and bulk-removal scaling",
+            TestOptions(timeout = 600000),
+            fun () -> promise {
+                let measurements = ResizeArray<ReconciliationMeasurement>()
+                let childCounts = [| 100; 1000; 7000 |]
+
+                for childCount in childCounts do
+                    let! tempPath = createTempDirectoryAsync ()
+
+                    try
+                        let arcPath = PathHelpers.normalizePath tempPath
+                        let datasetPath = join [| arcPath; "dataset" |] |> PathHelpers.normalizePath
+
+                        let filePath index =
+                            join [| datasetPath; $"file{index + 1}.txt" |] |> PathHelpers.normalizePath
+
+                        let createFiles () =
+                            runInBatches childCount 250 (fun index -> writeUtf8FileAsync (filePath index) "payload")
+
+                        let createUnmaterializedTree () =
+                            let tree = Dictionary<string, FileEntry>()
+                            tree.[arcPath] <- directoryEntry (basename arcPath) arcPath
+                            tree.[datasetPath] <- directoryEntry "dataset" datasetPath
+                            tree
+
+                        do! createDirectoryAsync datasetPath
+                        do! createFiles ()
+
+                        let! _ =
+                            FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset" (createUnmaterializedTree ())
+
+                        let discoveryDurations = ResizeArray<float>()
+                        let mutable materializedTree = Dictionary<string, FileEntry>()
+
+                        for _ in 1..3 do
+                            let! discoveryResult, duration =
+                                measurePromise (fun () ->
+                                    FileTreeCreator.reconcileFileTreeDirectory
+                                        arcPath
+                                        "dataset"
+                                        (createUnmaterializedTree ())
+                                )
+
+                            let discoveredTree = discoveryResult |> Option.get
+                            Vitest.expect(discoveredTree.Count).toBe (childCount + 2)
+                            Vitest.expect(discoveredTree.ContainsKey(filePath 0)).toBe (true)
+                            Vitest.expect(discoveredTree.ContainsKey(filePath (childCount - 1))).toBe (true)
+                            materializedTree <- discoveredTree
+                            discoveryDurations.Add duration
+
+                        measurements.Add {
+                            ChildCount = childCount
+                            Scenario = "first discovery"
+                            Durations = discoveryDurations.ToArray()
+                        }
+
+                        let! unchangedWarmup =
+                            FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset" materializedTree
+
+                        Vitest.expect(unchangedWarmup.IsNone).toBe (true)
+                        let unchangedDurations = ResizeArray<float>()
+
+                        for _ in 1..5 do
+                            let! unchangedResult, duration =
+                                measurePromise (fun () ->
+                                    FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset" materializedTree
+                                )
+
+                            Vitest.expect(unchangedResult.IsNone).toBe (true)
+                            unchangedDurations.Add duration
+
+                        measurements.Add {
+                            ChildCount = childCount
+                            Scenario = "unchanged refresh"
+                            Durations = unchangedDurations.ToArray()
+                        }
+
+                        let addedWarmupPath = join [| datasetPath; "added-warmup.txt" |]
+                        do! writeUtf8FileAsync addedWarmupPath "added"
+
+                        let! addedWarmup = FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset" materializedTree
+
+                        Vitest.expect(addedWarmup.IsSome).toBe (true)
+                        do! removeFileAsync addedWarmupPath
+                        let incrementalDurations = ResizeArray<float>()
+
+                        for sampleIndex in 1..3 do
+                            let addedPath =
+                                join [| datasetPath; $"added-{sampleIndex}.txt" |] |> PathHelpers.normalizePath
+
+                            do! writeUtf8FileAsync addedPath "added"
+
+                            let! incrementalResult, duration =
+                                measurePromise (fun () ->
+                                    FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset" materializedTree
+                                )
+
+                            let incrementalTree = incrementalResult |> Option.get
+                            Vitest.expect(incrementalTree.Count).toBe (childCount + 3)
+                            Vitest.expect(incrementalTree.ContainsKey addedPath).toBe (true)
+                            incrementalDurations.Add duration
+                            do! removeFileAsync addedPath
+
+                        measurements.Add {
+                            ChildCount = childCount
+                            Scenario = "one added file"
+                            Durations = incrementalDurations.ToArray()
+                        }
+
+                        let bulkRemovalDurations = ResizeArray<float>()
+
+                        for sampleIndex in 1..2 do
+                            if sampleIndex > 1 then
+                                do! createFiles ()
+
+                            do! removeDirectoryAsync datasetPath
+                            do! createDirectoryAsync datasetPath
+
+                            let! removalResult, duration =
+                                measurePromise (fun () ->
+                                    FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset" materializedTree
+                                )
+
+                            let removedTree = removalResult |> Option.get
+                            Vitest.expect(removedTree.Count).toBe (2)
+                            Vitest.expect(removedTree.ContainsKey(filePath 0)).toBe (false)
+                            Vitest.expect(removedTree.ContainsKey(filePath (childCount - 1))).toBe (false)
+                            bulkRemovalDurations.Add duration
+
+                        measurements.Add {
+                            ChildCount = childCount
+                            Scenario = "bulk removal"
+                            Durations = bulkRemovalDurations.ToArray()
+                        }
+
+                        do! removeDirectoryAsync tempPath
+                    with error ->
+                        do! removeDirectoryAsync tempPath
+                        return raise error
+
+                logPerformanceMeasurement "Shallow FileTree reconciliation performance"
+
+                measurements |> Seq.iter (formatMeasurement >> logPerformanceMeasurement)
             }
         )
 )
