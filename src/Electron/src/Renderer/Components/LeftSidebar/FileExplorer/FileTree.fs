@@ -294,7 +294,19 @@ type FileTree =
         let handleExpansionChange (item: FileItem) (willExpand: bool) =
             if willExpand then
                 match item.Path with
-                | Some path -> setMaterializedState (fun _ -> materialize path reconciledMaterializedState)
+                | Some path ->
+                    setMaterializedState (fun _ -> materialize path reconciledMaterializedState)
+
+                    promise {
+                        match! Api.ipcArcVaultApi.refreshFileTreeDirectory path with
+                        | Ok() -> ()
+                        | Error refreshError ->
+                            console.error ($"Could not refresh File Explorer directory '{path}'.", refreshError)
+                    }
+                    |> Promise.catch (fun refreshError ->
+                        console.error ($"Could not refresh File Explorer directory '{path}'.", refreshError)
+                    )
+                    |> Promise.start
                 | None -> ()
 
         let openDialog dialog =

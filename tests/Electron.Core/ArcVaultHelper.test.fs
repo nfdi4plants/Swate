@@ -25,6 +25,12 @@ module Abort = Main.Bindings.Abort
 
 let private electronMock: obj = import "__electronMock" "electron"
 
+let private chokidarPackage: obj =
+    importDefault "../../src/node_modules/chokidar/package.json"
+
+[<Emit("Object.entries($0).flatMap(([dir, names]) => names.map(name => `${dir}/${name}`))")>]
+let private flattenWatchedPaths (_watched: Main.Bindings.Chokidar.IWatched) : string[] = jsNative
+
 let private resetElectronMock () = electronMock?reset () |> ignore
 
 let private setBrowserWindowFactory (factory: obj -> obj) =
@@ -581,6 +587,16 @@ let rec private waitUntilWithin phase predicate remaining = promise {
 
 let private waitUntil phase predicate =
     waitUntilWithin phase predicate waitUntilAttemptLimit
+
+let rec private waitForWatcherCondition phase predicate remaining = promise {
+    if predicate () then
+        return ()
+    elif remaining <= 0 then
+        return failwithf "Timed out waiting for structural watcher condition: %s." phase
+    else
+        do! Promise.sleep 50
+        return! waitForWatcherCondition phase predicate (remaining - 1)
+}
 
 let private withAsyncCleanup cleanup operation = promise {
     let! operationResult = operation () |> Promise.result
@@ -4715,6 +4731,341 @@ Vitest.describe (
             fun () ->
                 let error = ArcLoadCancelledException 42
                 Vitest.expect(error.Message).toContain ("window 42")
+        )
+
+        Vitest.test (
+            "structural watcher admits ARC structure and prunes deep payload paths with or without stats",
+            fun () ->
+                let arcPath = "C:/arc"
+
+                let stats isDirectory =
+                    { new Stats with
+                        member _.isDirectory() = isDirectory
+                        member _.isFile() = not isDirectory
+                        member _.isSymbolicLink() = false
+                        member _.size = 0.0
+                    }
+
+                let directoryStats = Some(stats true)
+                let fileStats = Some(stats false)
+
+                let structuralCases = [
+                    arcPath, directoryStats
+                    $"{arcPath}/{ARCtrl.ArcPathHelper.InvestigationFileName}", fileStats
+                    $"{arcPath}/{ARCtrl.ArcPathHelper.StudiesFolderName}", directoryStats
+                    $"{arcPath}/{ARCtrl.ArcPathHelper.StudiesFolderName}/S1", directoryStats
+                    $"{arcPath}/{ARCtrl.ArcPathHelper.StudiesFolderName}/S1/{ARCtrl.ArcPathHelper.StudyFileName}",
+                    fileStats
+                    $"{arcPath}/{ARCtrl.ArcPathHelper.AssaysFolderName}/A1/{ARCtrl.ArcPathHelper.AssayDatasetFolderName}",
+                    directoryStats
+                ]
+
+                structuralCases
+                |> List.iter (fun (path, pathStats) ->
+                    Vitest.expect(isStructuralFileWatcherPath arcPath path pathStats).toBe (true)
+                    Vitest.expect(isStructuralFileWatcherPath arcPath path None).toBe (true)
+                )
+
+                let deepPayloadPath =
+                    $"{arcPath}/{ARCtrl.ArcPathHelper.AssaysFolderName}/A1/{ARCtrl.ArcPathHelper.AssayDatasetFolderName}/raw.bin"
+
+                Vitest.expect(isStructuralFileWatcherPath arcPath deepPayloadPath fileStats).toBe (false)
+                Vitest.expect(isStructuralFileWatcherPath arcPath deepPayloadPath None).toBe (false)
+                Vitest.expect(isStructuralFileWatcherPath arcPath "assays/A1/dataset/raw.bin" None).toBe (false)
+        )
+
+        Vitest.test (
+            "generic IPC filesystem mutations reconcile affected parent directories without watcher events",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-bounded-mutation-refresh-"
+                    "Bounded Mutation Refresh"
+                    ignore
+                    (fun arcPath -> promise {
+                        let windowId = 91340
+                        let vault = TestHelpers.registerVault windowId arcPath
+                        vault.SetArc(ARC("Bounded Mutation Refresh"))
+                        let! rootEntry = Main.FileTreeCreator.getFileEntry arcPath
+                        vault.fileTree <- createFileEntryTree [| rootEntry |]
+                        let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId windowId)
+
+                        let absolute relativePath =
+                            join [| arcPath; relativePath |] |> PathHelpers.normalizePath
+
+                        try
+                            match!
+                                api.createFileSystemItem {
+                                    parentPath = ""
+                                    name = "docs"
+                                    kind = FileSystemItemKind.Folder
+                                }
+                            with
+                            | Error error -> return raise error
+                            | Ok _ -> ()
+
+                            Vitest.expect(vault.fileTree.ContainsKey(absolute "docs")).toBe (true)
+
+                            match!
+                                api.createFileSystemItem {
+                                    parentPath = "docs"
+                                    name = "note.txt"
+                                    kind = FileSystemItemKind.File
+                                }
+                            with
+                            | Error error -> return raise error
+                            | Ok _ -> ()
+
+                            Vitest.expect(vault.fileTree.ContainsKey(absolute "docs/note.txt")).toBe (true)
+
+                            match!
+                                api.renamePath {
+                                    relativePath = "docs/note.txt"
+                                    newName = "renamed.txt"
+                                }
+                            with
+                            | Error error -> return raise error
+                            | Ok() -> ()
+
+                            Vitest.expect(vault.fileTree.ContainsKey(absolute "docs/note.txt")).toBe (false)
+                            Vitest.expect(vault.fileTree.ContainsKey(absolute "docs/renamed.txt")).toBe (true)
+
+                            match!
+                                api.createFileSystemItem {
+                                    parentPath = ""
+                                    name = "archive"
+                                    kind = FileSystemItemKind.Folder
+                                }
+                            with
+                            | Error error -> return raise error
+                            | Ok _ -> ()
+
+                            match!
+                                api.movePath {
+                                    sourceRelativePath = "docs/renamed.txt"
+                                    targetRelativePath = "archive/moved.txt"
+                                    overwrite = false
+                                }
+                            with
+                            | Error error -> return raise error
+                            | Ok() -> ()
+
+                            Vitest.expect(vault.fileTree.ContainsKey(absolute "docs/renamed.txt")).toBe (false)
+                            Vitest.expect(vault.fileTree.ContainsKey(absolute "archive/moved.txt")).toBe (true)
+
+                            match! api.deletePath "archive/moved.txt" with
+                            | Error error -> return raise error
+                            | Ok() -> ()
+
+                            Vitest.expect(vault.fileTree.ContainsKey(absolute "archive/moved.txt")).toBe (false)
+                            ARC_VAULTS.Vaults.Remove(windowId) |> ignore
+                        with error ->
+                            ARC_VAULTS.Vaults.Remove(windowId) |> ignore
+                            return raise error
+                    })
+        )
+
+        Vitest.test (
+            "real Chokidar 5 watcher observes structure without watching deep payload inventory",
+            TestOptions(timeout = 30000),
+            fun () -> promise {
+                let version: string = chokidarPackage?version
+                Vitest.expect(version.StartsWith("5.")).toBe (true)
+
+                let! arcPath = TestHelpers.createTempDirectoryAsync "swate-structural-watcher-"
+                let studiesPath = join [| arcPath; ARCtrl.ArcPathHelper.StudiesFolderName |]
+                let studyPath = join [| studiesPath; "S1" |]
+
+                let datasetPath =
+                    join [|
+                        studyPath
+                        ARCtrl.ArcPathHelper.StudiesResourcesFolderName
+                    |]
+
+                let deepPayloadPath = join [| datasetPath; "raw.bin" |]
+
+                let investigationPath =
+                    join [| arcPath; ARCtrl.ArcPathHelper.InvestigationFileName |]
+
+                let studyMetadataPath = join [| studyPath; ARCtrl.ArcPathHelper.StudyFileName |]
+
+                do! mkdirWatcherDirectoryAsync datasetPath
+                do! writeWatcherTextFileAsync investigationPath "initial"
+                do! writeWatcherTextFileAsync studyMetadataPath "initial"
+                do! writeWatcherTextFileAsync deepPayloadPath "initial"
+
+                let watcher = createFileWatcher arcPath (Some true)
+                let mutable isReady = false
+                let events = ResizeArray<string * string>()
+
+                watcher.on (
+                    Main.Bindings.Chokidar.Events.All,
+                    fun eventName path -> events.Add(eventName, PathHelpers.normalizeSeparators path)
+                )
+                |> ignore
+
+                watcher.on (Main.Bindings.Chokidar.Events.Ready, fun _ -> isReady <- true)
+                |> ignore
+
+                try
+                    do! waitForWatcherCondition "ready" (fun () -> isReady) 300
+
+                    let watchedPaths =
+                        watcher.getWatched ()
+                        |> flattenWatchedPaths
+                        |> Array.map PathHelpers.normalizeSeparators
+
+                    Vitest.expect(watchedPaths |> Array.exists (fun path -> path.EndsWith("raw.bin"))).toBe (false)
+
+                    events.Clear()
+                    do! writeWatcherTextFileAsync investigationPath "changed"
+
+                    do!
+                        waitForWatcherCondition
+                            "root metadata change"
+                            (fun () ->
+                                events
+                                |> Seq.exists (fun (_, path) ->
+                                    path.EndsWith(ARCtrl.ArcPathHelper.InvestigationFileName)
+                                )
+                            )
+                            300
+
+                    events.Clear()
+                    let addedEntityPath = join [| studiesPath; "S2" |]
+                    do! mkdirWatcherDirectoryAsync addedEntityPath
+
+                    do!
+                        waitForWatcherCondition
+                            "new entity directory"
+                            (fun () ->
+                                events
+                                |> Seq.exists (fun (eventName, path) ->
+                                    eventName = "addDir" && path.EndsWith("studies/S2")
+                                )
+                            )
+                            300
+
+                    events.Clear()
+                    do! writeWatcherTextFileAsync deepPayloadPath "changed"
+                    let markerEntityPath = join [| studiesPath; "S3" |]
+                    do! mkdirWatcherDirectoryAsync markerEntityPath
+
+                    do!
+                        waitForWatcherCondition
+                            "post-payload structural marker"
+                            (fun () ->
+                                events
+                                |> Seq.exists (fun (eventName, path) ->
+                                    eventName = "addDir" && path.EndsWith("studies/S3")
+                                )
+                            )
+                            300
+
+                    Vitest
+                        .expect(events |> Seq.exists (fun (_, path) -> path.EndsWith("resources/raw.bin")))
+                        .toBe (false)
+
+                    do! watcher.close ()
+                    do! TestHelpers.removeDirectoryAsync arcPath
+                with error ->
+                    do! watcher.close ()
+                    do! TestHelpers.removeDirectoryAsync arcPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "external deep payload changes appear only after explicit shallow refresh",
+            TestOptions(timeout = 30000),
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-external-payload-refresh-"
+                    "External Payload Refresh"
+                    (fun arc -> arc.AddStudy(ArcStudy("S1")))
+                    (fun arcPath -> promise {
+                        let version: string = chokidarPackage?version
+                        Vitest.expect(version.StartsWith("5.")).toBe (true)
+
+                        let relativeDatasetPath = "studies/S1/dataset"
+                        let datasetPath = join [| arcPath; relativeDatasetPath |]
+                        let existingPath = join [| datasetPath; "existing.txt" |]
+                        let newPath = join [| datasetPath; "new.txt" |]
+                        let nestedPath = join [| datasetPath; "nested" |]
+                        let hiddenPath = join [| nestedPath; "hidden.txt" |]
+
+                        let markerPath = join [| arcPath; ARCtrl.ArcPathHelper.StudiesFolderName; "S2" |]
+
+                        let treeContains (vault: ArcVault) path =
+                            vault.fileTree.ContainsKey(PathHelpers.normalizePath path)
+
+                        do! mkdirWatcherDirectoryAsync datasetPath
+                        do! writeWatcherTextFileAsync existingPath "existing"
+
+                        let! loadedArc = TestHelpers.loadArcAsync arcPath
+                        let! initialFileTree = Main.FileTreeCreator.getFileTree arcPath
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+                        vault.SetArc loadedArc
+                        vault.fileTree <- initialFileTree
+                        vault.StartFileWatcher(usePolling = true)
+
+                        let watcher = vault.watcher.Value
+                        let events = ResizeArray<string * string>()
+                        let mutable isReady = false
+
+                        watcher.on (
+                            Main.Bindings.Chokidar.Events.All,
+                            fun eventName path -> events.Add(eventName, PathHelpers.normalizeSeparators path)
+                        )
+                        |> ignore
+
+                        watcher.on (Main.Bindings.Chokidar.Events.Ready, fun _ -> isReady <- true)
+                        |> ignore
+
+                        do!
+                            withAsyncCleanup
+                                (fun () -> vault.StopFileWatcher())
+                                (fun () -> promise {
+                                    do! waitForWatcherCondition "ready" (fun () -> isReady) 300
+                                    Vitest.expect(treeContains vault existingPath).toBe (true)
+
+                                    events.Clear()
+                                    do! writeWatcherTextFileAsync newPath "new"
+                                    do! mkdirWatcherDirectoryAsync nestedPath
+                                    do! writeWatcherTextFileAsync hiddenPath "hidden"
+
+                                    // This admitted structural event is a bounded completion marker. Once its
+                                    // FileTree update is visible, any earlier watcher event has also been processed.
+                                    do! mkdirWatcherDirectoryAsync markerPath
+
+                                    do!
+                                        waitForWatcherCondition
+                                            "post-payload structural marker FileTree update"
+                                            (fun () -> treeContains vault markerPath)
+                                            300
+
+                                    let emittedPayloadPath (suffix: string) =
+                                        events |> Seq.exists (fun (_, path) -> path.EndsWith(suffix))
+
+                                    Vitest.expect(emittedPayloadPath "studies/S1/dataset/new.txt").toBe (false)
+                                    Vitest.expect(emittedPayloadPath "studies/S1/dataset/nested").toBe (false)
+
+                                    Vitest
+                                        .expect(emittedPayloadPath "studies/S1/dataset/nested/hidden.txt")
+                                        .toBe (false)
+
+                                    Vitest.expect(treeContains vault newPath).toBe (false)
+                                    Vitest.expect(treeContains vault nestedPath).toBe (false)
+                                    Vitest.expect(treeContains vault hiddenPath).toBe (false)
+
+                                    do! vault.RefreshFileTreeDirectory relativeDatasetPath
+
+                                    Vitest.expect(treeContains vault existingPath).toBe (true)
+                                    Vitest.expect(treeContains vault newPath).toBe (true)
+                                    Vitest.expect(treeContains vault nestedPath).toBe (true)
+                                    Vitest.expect(treeContains vault hiddenPath).toBe (false)
+                                })
+                    })
         )
 
 )

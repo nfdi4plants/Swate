@@ -1,11 +1,13 @@
 module ElectronCore.FileTreeCreatorTests
 
 open System
+open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
 open Main
 open Main.Bindings.Path
 open Main.VersionControl
+open Swate.Components.Shared
 open Swate.Components.Composite.Authentication.Types
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.VersionControlTypes
@@ -71,6 +73,17 @@ let private writeUtf8FileAsync (path: string) (content: string) : Fable.Core.JS.
 
     return ()
 }
+
+let private createDirectoryAsync (path: string) : Fable.Core.JS.Promise<unit> = promise {
+    let! _ =
+        fsPromisesDynamic?mkdir (path, createObj [ "recursive" ==> true ])
+        |> unbox<Fable.Core.JS.Promise<obj>>
+
+    return ()
+}
+
+let private directoryEntry name path =
+    FileEntry.create (name, path, true, None)
 
 let private runGitAsync (repoPath: string) (args: string[]) : Fable.Core.JS.Promise<string> = promise {
     let! output =
@@ -349,6 +362,57 @@ Vitest.describe (
 
                         Vitest.expect(plainEntry.largeObject).toEqual (None)
                     })
+            }
+        )
+)
+
+Vitest.describe (
+    "FileTreeCreator shallow directory reconciliation",
+    fun () ->
+        Vitest.test (
+            "discovers one level at a time, preserves surviving descendants, and skips unchanged snapshots",
+            fun () -> promise {
+                let! arcPath = createTempDirectoryAsync ()
+
+                try
+                    let datasetPath = join [| arcPath; "dataset" |] |> PathHelpers.normalizePath
+                    let payloadPath = join [| datasetPath; "payload" |] |> PathHelpers.normalizePath
+                    let rawPath = join [| payloadPath; "raw.bin" |] |> PathHelpers.normalizePath
+                    do! createDirectoryAsync payloadPath
+                    do! writeUtf8FileAsync rawPath "raw"
+
+                    let initialTree = Dictionary<string, FileEntry>()
+                    initialTree.[arcPath] <- directoryEntry (basename arcPath) arcPath
+                    initialTree.[datasetPath] <- directoryEntry "dataset" datasetPath
+
+                    let! datasetRefresh = FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset" initialTree
+
+                    let datasetTree = datasetRefresh |> Option.get
+                    Vitest.expect(datasetTree.ContainsKey payloadPath).toBe (true)
+                    Vitest.expect(datasetTree.ContainsKey rawPath).toBe (false)
+
+                    let! payloadRefresh =
+                        FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset/payload" datasetTree
+
+                    let payloadTree = payloadRefresh |> Option.get
+                    Vitest.expect(payloadTree.ContainsKey rawPath).toBe (true)
+
+                    let! unchanged = FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset" payloadTree
+
+                    Vitest.expect(unchanged.IsNone).toBe (true)
+                    Vitest.expect(payloadTree.ContainsKey rawPath).toBe (true)
+
+                    do! removeDirectoryAsync payloadPath
+
+                    let! removed = FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset" payloadTree
+
+                    let removedTree = removed |> Option.get
+                    Vitest.expect(removedTree.ContainsKey payloadPath).toBe (false)
+                    Vitest.expect(removedTree.ContainsKey rawPath).toBe (false)
+                    do! removeDirectoryAsync arcPath
+                with error ->
+                    do! removeDirectoryAsync arcPath
+                    return raise error
             }
         )
 )

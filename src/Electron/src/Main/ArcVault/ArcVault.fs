@@ -672,6 +672,22 @@ module ArcVaultExtensions =
 
             WindowSend.send<IFileTreeRendererApi> this.window (fun api -> api.fileTreeUpdate rendererFileTree)
 
+        /// Refreshes one directory without recursively scanning it and serializes the update with watcher tree work.
+        member this.RefreshFileTreeDirectory(relativeDirectoryPath: string) =
+            let queuedUpdate =
+                this.FileTreeUpdateTail
+                |> Promise.bind (fun () -> promise {
+                    match this.path with
+                    | None -> return raise (arcNotOpenError ())
+                    | Some arcPath ->
+                        match! reconcileFileTreeDirectory arcPath relativeDirectoryPath this.fileTree with
+                        | None -> ()
+                        | Some nextFileTree -> this.SetFileTree nextFileTree
+                })
+
+            this.FileTreeUpdateTail <- queuedUpdate |> Promise.catch (fun _ -> ())
+            queuedUpdate
+
         member this.GetRendererFileTreeSnapshot() = promise {
             match this.path with
             | None -> return Dictionary<string, FileEntry>()

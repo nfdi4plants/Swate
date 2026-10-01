@@ -464,6 +464,24 @@ module ArcEntityPathRules =
                     else
                         RenamePathClassification.GenericTarget normalizedRelativePath
 
+    /// True for paths owned by the permanent bounded ARC structural watcher.
+    /// A missing directory hint is treated conservatively only for known structural path shapes.
+    let isStructuralWatcherPath (relativePath: string) (isDirectory: bool option) =
+        let normalizedRelativePath = normalizeRelativePath relativePath
+        let segments = normalizedRelativePath |> splitPathSegments
+
+        match classifyRenameTarget normalizedRelativePath with
+        | RenamePathClassification.RootTarget -> true
+        | RenamePathClassification.InvestigationFileTarget _ -> isDirectory <> Some true
+        | RenamePathClassification.AddZoneRootTarget _
+        | RenamePathClassification.EntityFolderTarget _ -> isDirectory <> Some false
+        | RenamePathClassification.CanonicalEntityFileTarget _
+        | RenamePathClassification.CanonicalDataMapFileTarget _ -> isDirectory <> Some true
+        | _ ->
+            match classifyStructuralArcPath segments with
+            | StructuralArcPath.ProtectedEntityChildFolder -> isDirectory <> Some false
+            | _ -> false
+
     let isRenamePathAllowed (relativePath: string) =
         match classifyRenameTarget relativePath with
         | RenamePathClassification.EntityFolderTarget _ -> true

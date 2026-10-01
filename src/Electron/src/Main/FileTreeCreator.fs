@@ -174,6 +174,141 @@ let refreshFileTreeEntry
         return upsertFileEntry entry fileTree
     }
 
+let private isSameOrDescendantLogicalPath path ancestorPath =
+    let normalizedPath = PathHelpers.normalizePath path
+    let normalizedAncestorPath = PathHelpers.normalizePath ancestorPath
+
+    normalizedPath = normalizedAncestorPath
+    || normalizedPath.StartsWith(normalizedAncestorPath + "/", StringComparison.Ordinal)
+
+/// Reconciles only the immediate children of one ARC-relative directory.
+/// Returns None when the current snapshot already matches disk.
+let reconcileFileTreeDirectory
+    (arcPath: string)
+    (relativeDirectoryPath: string)
+    (fileTree: Dictionary<string, FileEntry>)
+    : Fable.Core.JS.Promise<Dictionary<string, FileEntry> option> =
+    promise {
+        let normalizedArcPath = normalizeRootPath arcPath
+
+        let normalizedRelativePath =
+            PathHelpers.normalizeCanonicalRelativePath relativeDirectoryPath
+
+        let absoluteDirectoryPath =
+            resolve [| normalizedArcPath; normalizedRelativePath |]
+            |> PathHelpers.normalizePath
+
+        let resolvedRelativePath =
+            tryGetRepoRelativePathOrRoot normalizedArcPath absoluteDirectoryPath
+
+        if
+            PathHelpers.containsPathTraversalSegments normalizedRelativePath
+            || isAbsolute normalizedRelativePath
+            || resolvedRelativePath <> Some normalizedRelativePath
+        then
+            return raise (exn $"Directory '{relativeDirectoryPath}' is outside the open ARC.")
+        else
+            let! directoryStats = statAsync absoluteDirectoryPath
+
+            if not (directoryStats.isDirectory ()) then
+                return raise (exn $"Path '{relativeDirectoryPath}' is not a directory.")
+            else
+                let! dirents = readdirWithTypesAsync absoluteDirectoryPath (ReaddirOptions(withFileTypes = true))
+
+                let diskChildren =
+                    dirents
+                    |> Array.filter (fun dirent ->
+                        not (shouldIgnoreDirName dirent.name)
+                        && not (shouldIgnorePath (join [| absoluteDirectoryPath; dirent.name |]))
+                    )
+                    |> Array.map (fun dirent ->
+                        let childPath =
+                            join [| absoluteDirectoryPath; dirent.name |] |> PathHelpers.normalizePath
+
+                        childPath, FileEntry.create (dirent.name, childPath, dirent.isDirectory (), None)
+                    )
+                    |> Map.ofArray
+
+                let knownDirectChildren =
+                    fileTree
+                    |> Seq.choose (fun pair ->
+                        let path = PathHelpers.normalizePath pair.Key
+
+                        if PathHelpers.tryGetParentPath path = Some absoluteDirectoryPath then
+                            Some(path, pair.Value)
+                        else
+                            None
+                    )
+                    |> Map.ofSeq
+
+                let hasRemovedChildren =
+                    knownDirectChildren
+                    |> Map.exists (fun path _ -> not (Map.containsKey path diskChildren))
+
+                let hasAddedOrChangedChildren =
+                    diskChildren
+                    |> Map.exists (fun path diskEntry ->
+                        match Map.tryFind path knownDirectChildren with
+                        | None -> true
+                        | Some knownEntry ->
+                            let reconciledEntry =
+                                if diskEntry.isDirectory then
+                                    diskEntry
+                                else
+                                    {
+                                        diskEntry with
+                                            largeObject = knownEntry.largeObject
+                                    }
+
+                            knownEntry.name <> reconciledEntry.name
+                            || knownEntry.path <> reconciledEntry.path
+                            || knownEntry.isDirectory <> reconciledEntry.isDirectory
+                            || knownEntry.largeObject <> reconciledEntry.largeObject
+                    )
+
+                if not hasRemovedChildren && not hasAddedOrChangedChildren then
+                    return None
+                else
+                    let nextTree = Dictionary<string, FileEntry>(fileTree)
+
+                    knownDirectChildren
+                    |> Map.iter (fun childPath _ ->
+                        match Map.tryFind childPath diskChildren with
+                        | None ->
+                            let descendantKeys =
+                                nextTree.Keys
+                                |> Seq.filter (fun path -> isSameOrDescendantLogicalPath path childPath)
+                                |> Seq.toArray
+
+                            descendantKeys |> Array.iter (fun path -> nextTree.Remove(path) |> ignore)
+                        | Some diskEntry ->
+                            match nextTree.TryGetValue childPath with
+                            | true, knownEntry when knownEntry.isDirectory && not diskEntry.isDirectory ->
+                                let descendantKeys =
+                                    nextTree.Keys
+                                    |> Seq.filter (fun path -> isSameOrDescendantLogicalPath path childPath)
+                                    |> Seq.toArray
+
+                                descendantKeys |> Array.iter (fun path -> nextTree.Remove(path) |> ignore)
+                            | _ -> ()
+                    )
+
+                    diskChildren
+                    |> Map.iter (fun childPath diskEntry ->
+                        let nextEntry =
+                            match Map.tryFind childPath knownDirectChildren with
+                            | Some knownEntry when not diskEntry.isDirectory -> {
+                                diskEntry with
+                                    largeObject = knownEntry.largeObject
+                              }
+                            | _ -> diskEntry
+
+                        nextTree.[childPath] <- nextEntry
+                    )
+
+                    return Some nextTree
+    }
+
 let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
     let normalizedRepoRoot = normalizeRootPath repoRoot
     let! entry = getFileEntry path

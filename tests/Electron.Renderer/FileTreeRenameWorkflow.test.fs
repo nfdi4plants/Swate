@@ -358,6 +358,41 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "an unmaterialized empty directory can request refresh on expansion and still collapse locally",
+            fun () -> promise {
+                let item = createFolderItem "payload" "studies/S1/dataset/payload"
+                let expansionChanges = ResizeArray<bool>()
+
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.Page.FileExplorer.FileExplorer.FileExplorer(
+                            initialItems = [ item ],
+                            onDirectoryExpansionChange =
+                                (fun expandedItem willExpand ->
+                                    Vitest.expect(expandedItem.Path).toEqual (item.Path)
+                                    expansionChanges.Add willExpand
+                                )
+                        )
+                    )
+
+                try
+                    let expandButton = container.querySelector "button[aria-label='Expand payload']"
+                    Vitest.expect(expandButton).not.toBeNull ()
+                    (expandButton :?> HTMLElement).click ()
+                    do! Promise.sleep 0
+
+                    let collapseButton = container.querySelector "button[aria-label='Collapse payload']"
+                    Vitest.expect(collapseButton).not.toBeNull ()
+                    (collapseButton :?> HTMLElement).click ()
+                    do! Promise.sleep 0
+
+                    Vitest.expect(expansionChanges.ToArray()).toEqual ([| true; false |])
+                finally
+                    cleanup ()
+            }
+        )
+
+        Vitest.test (
             "confirmRenameItem dispatches renamePath, remaps active selection, and refreshes git status",
             fun () -> promise {
                 let renameDraft =
