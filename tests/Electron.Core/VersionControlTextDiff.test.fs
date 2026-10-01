@@ -183,6 +183,7 @@ let private failureWith (message: string) (evidence: string) : OperationFailure 
             Some {
                 Side = DiffSide.Current
                 Evidence = evidence
+                InvalidSequenceOffset = None
             }
 }
 
