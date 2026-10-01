@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   The cancel button also covers the upload step of a save. Canceling it keeps the saved-locally notice and opens no error dialog.
 -   The main process logs the start and end of every version control operation with its result.
 -   Added a new colour scheme for Swate and ARCitectGX (@paulineHans GitHub)
+-   Added guidance for generating and using GitLab Personal Access Tokens. #1267 (by @Freymaurer)
 
 ### 🔄 Changed
 
