@@ -56,6 +56,14 @@ export default mergeConfig(
             include: ['src/**/*.test.ts', 'src/**/*.test.fs.ts'],
           },
         },
+        {
+          extends: true,
+          test: {
+            name: 'rtl',
+            environment: 'jsdom',
+            include: ['src/**/*.test.rtl.fs.ts'],
+          },
+        },
       ],
     },
   }),
