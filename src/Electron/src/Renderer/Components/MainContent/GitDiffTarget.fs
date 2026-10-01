@@ -124,7 +124,8 @@ let Main (page: GitDiffPageData) =
                         ?nextPageKey = page.NextCursor,
                         failedGaps = Array.ofList page.FailedGaps,
                         failedLineSlices = Array.ofList page.FailedLineSlices,
-                        failedReplays = Array.ofList page.FailedReplays
+                        failedReplays = Array.ofList page.FailedReplays,
+                        ?scrollTarget = page.ScrollTarget
                     )
                 ]
             ]

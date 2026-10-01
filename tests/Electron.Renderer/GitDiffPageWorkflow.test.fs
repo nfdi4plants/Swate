@@ -2552,6 +2552,32 @@ Vitest.describe (
                 Vitest.expect(page.Pages.[45].PageId).toBe ("diff-2-p46")
                 Vitest.expect(page.Pages.[45].IsEvicted).toBe (false)
                 Vitest.expect(pageParts page.Pages.[45]).toEqual ([| "hunk:diff-2-h46" |])
+
+                // Once the reopen lands, only pages that can share a window with the landing page
+                // stay loaded, and the viewer is asked to scroll to the target line.
+                Vitest
+                    .expect(
+                        page.Pages
+                        |> Array.indexed
+                        |> Array.filter (fun (index, windowPage) ->
+                            not windowPage.IsEvicted && abs (index - 45) >= GitDiffPageLoader.MaxLoadedPages
+                        )
+                        |> Array.map fst
+                    )
+                    .toEqual ([||])
+
+                Vitest
+                    .expect(page.ScrollTarget)
+                    .toEqual (
+                        Some(
+                            {
+                                Side = Paged.PagedDiffSide.Previous
+                                Line = 90.0
+                                Token = 1
+                            }
+                            : Paged.PagedScrollTarget
+                        )
+                    )
             }
         )
 

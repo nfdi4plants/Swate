@@ -14,6 +14,7 @@ import {
   PagedProgress,
   PagedRange,
   PagedRow,
+  PagedScrollTarget,
   PagedPart_EvictedPage,
   PagedPart_ExpandedRows,
   PagedPart_HiddenGap,
@@ -664,6 +665,51 @@ function ReopenHarness() {
         outputComplete={false}
         requestExpand={() => {}}
         testIdPrefix="git-paged-reopen"
+      />
+    </div>
+  );
+}
+
+const TARGET_PAGE_ROWS = 40;
+
+function targetPage(index: number) {
+  return PagedPart_HunkRows(
+    `target-hunk-${index}`,
+    range(index * TARGET_PAGE_ROWS, TARGET_PAGE_ROWS),
+    range(index * TARGET_PAGE_ROWS, TARGET_PAGE_ROWS),
+    false,
+    false,
+    makeAlignedRows(index * TARGET_PAGE_ROWS, TARGET_PAGE_ROWS, -1, -1),
+  );
+}
+
+// Starts with four loaded pages. Landing swaps them for placeholders and one loaded page further
+// down with a scroll target on one of its lines, the way a reopen lands. No row key survives.
+function ScrollTargetHarness() {
+  const [landed, setLanded] = React.useState(false);
+  const parts = React.useMemo(
+    () =>
+      landed
+        ? [
+            ...Array.from({ length: 5 }, (_, index) => PagedPart_EvictedPage(`target-page-${index}`, TARGET_PAGE_ROWS)),
+            targetPage(5),
+          ]
+        : Array.from({ length: 4 }, (_, index) => targetPage(index)),
+    [landed],
+  );
+  return (
+    <div style={{ height: "32rem" }}>
+      <button data-testid="git-paged-target-land" onClick={() => setLanded(true)}>
+        Land
+      </button>
+      <GitPagedDiffViewerComponent
+        parts={parts}
+        status={PagedDiffStatus_Ready()}
+        progress={new PagedProgress(100, 100, true)}
+        hasMore={false}
+        outputComplete={true}
+        scrollTarget={landed ? new PagedScrollTarget("previous", 5 * TARGET_PAGE_ROWS + 30, 1) : undefined}
+        testIdPrefix="git-paged-target"
       />
     </div>
   );
@@ -1378,5 +1424,28 @@ export const LoadEarlierShowsTheLineStart: Story = {
 
     await expect(onRequestLineBefore).toHaveBeenCalledTimes(3);
     await expect(canvas.queryByTestId("git-paged-line-start-line-before-current-0")).toBeNull();
+  },
+};
+
+export const ScrollTargetShowsTheTargetRow: Story = {
+  render: () => <ScrollTargetHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-target-grid");
+    await scrollTo(scroll, 10 * 28);
+
+    await fireEvent.click(canvas.getByTestId("git-paged-target-land"));
+    const targetKey = `row-${5 * TARGET_PAGE_ROWS + 30}`;
+    await waitFor(() => {
+      const view = scroll.getBoundingClientRect();
+      const row = canvas.getByTestId(`git-paged-target-row-${targetKey}`).getBoundingClientRect();
+      expect(row.top).toBeGreaterThanOrEqual(view.top - 1);
+      expect(row.bottom).toBeLessThanOrEqual(view.bottom + 1);
+    });
+
+    // The target applies once. Scrolling away afterwards stays where the user went.
+    await scrollTo(scroll, 0);
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
+    await expect(scroll.scrollTop).toBe(0);
   },
 };

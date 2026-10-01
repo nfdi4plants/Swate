@@ -1549,6 +1549,7 @@ module GitDiffPageLoader =
             PreviousEncoding = None
             CurrentEncoding = None
             RunningOperations = []
+            ScrollTarget = None
         }
 
         openFresh deps page None
@@ -2516,7 +2517,9 @@ module GitDiffPageLoader =
     /// on the first page read that reaches the target line, or once the diff has no further
     /// page, the page settles or the library asks for an encoding. The requested page is then
     /// the page that reached the target, and the old pages after the last page read go away,
-    /// since the next page read from the new session takes their place.
+    /// since the next page read from the new session takes their place. Pages too far from the
+    /// requested page to share a window with it are evicted, and the viewer scrolls to the
+    /// target line, or to the first line of the requested page when the diff ended before it.
     let private continueReopen (deps: GitDependencies) (target: GitDiffReopen) (page: GitDiffPageData) =
         match page.Status with
         | GitDiffPageStatus.Reopening _ when page.Handle.IsNone || page.NextRequest.IsSome ->
@@ -2533,12 +2536,43 @@ module GitDiffPageLoader =
                 let next, cmd = readPage deps page cursor
                 next, Some target, cmd
             | _ ->
+                let requested = landing |> Option.defaultValue (max 0 (pagesRead - 1))
+
+                // The old neighbors of the requested page stayed loaded while the reopen read
+                // forward. Left in place, they would hold the window away from the requested page.
+                let pages =
+                    page.Pages
+                    |> Array.truncate pagesRead
+                    |> Array.mapi (fun index windowPage ->
+                        if abs (index - requested) >= MaxLoadedPages && not windowPage.IsEvicted then
+                            evictedCopy windowPage
+                        else
+                            windowPage
+                    )
+
+                let scrollLine =
+                    (if landing.IsSome then target.TargetLine else None)
+                    |> Option.orElse (pages |> Array.tryItem requested |> Option.bind _.Span.First)
+
                 let finished =
                     evict {
                         page with
-                            Pages = page.Pages |> Array.truncate pagesRead
-                            RequestedPageIndex = landing |> Option.defaultValue (max 0 (pagesRead - 1))
+                            Pages = pages
+                            RequestedPageIndex = requested
                             Status = GitDiffPageStatus.Ready
+                            ScrollTarget =
+                                scrollLine
+                                |> Option.map (fun line ->
+                                    ({
+                                        Side = Presentation.side line.Side
+                                        Line = line.Number
+                                        Token =
+                                            page.ScrollTarget
+                                            |> Option.map (fun previous -> previous.Token + 1)
+                                            |> Option.defaultValue 1
+                                    }
+                                    : Paged.PagedScrollTarget)
+                                )
                     }
 
                 finished, None, Cmd.none

@@ -263,6 +263,28 @@ module internal GitPagedDiffDisplay =
         | Continue _ -> 2
         | _ -> 0
 
+    /// The first row that shows the line or a later line of the side. A hidden gap counts with
+    /// the lines it covers.
+    let rowIndexOfLine (side: PagedDiffSide) (line: float) (rows: Row[]) =
+        let reaches (value: PagedLine option) =
+            value |> Option.exists (fun value -> value.Number >= line)
+
+        let onSide (previous: 'T) (current: 'T) =
+            match side with
+            | PagedDiffSide.Previous -> previous
+            | PagedDiffSide.Current -> current
+
+        rows
+        |> Array.tryFindIndex (fun row ->
+            match row.Content with
+            | AlignedRow(aligned, _) -> reaches (onSide aligned.Previous aligned.Current)
+            | UnalignedLines(previous, current) -> reaches (onSide previous current)
+            | Gap(_, previous, current) ->
+                let range = onSide previous current
+                range.Count > 0.0 && range.Start + range.Count - 1.0 >= line
+            | _ -> false
+        )
+
     let endingText ending =
         match ending with
         | PagedLineEnding.NoEnding -> "No ending"
@@ -907,7 +929,8 @@ type GitPagedDiffViewer =
             requestNext: (unit -> unit) option,
             failedGaps: string[],
             failedLineSlices: PagedLineSliceRequest[],
-            failedReplays: string[]
+            failedReplays: string[],
+            scrollTarget: PagedScrollTarget option
         ) =
         let rowHeight = GitPagedDiffDisplay.RowHeightPx
         let headerScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
@@ -915,6 +938,7 @@ type GitPagedDiffViewer =
         let bodyContentRef: IRefValue<HTMLElement option> = React.useElementRef ()
         let contentMeasureRef, contentRect = React.useMeasure<Element> ()
         let previousLayout = React.useRef<GitPagedDiffDisplay.AnchorSnapshot option> None
+        let appliedScrollToken = React.useRef<int option> None
         // Changed after the scroll position was restored, so the rows render for the new position
         // before the browser paints.
         let layoutVersion, setLayoutVersion = React.useState 0
@@ -1125,9 +1149,28 @@ type GitPagedDiffViewer =
                     | None -> ()
                 | _ -> ()
 
+                // A scroll target moves the view once, as soon as a row shows its line. It wins
+                // over the row kept in place above.
+                match scrollTarget, bodyScrollRef.current with
+                | Some target, Some scrollElement when appliedScrollToken.current <> Some target.Token ->
+                    match GitPagedDiffDisplay.rowIndexOfLine target.Side target.Line rows with
+                    | Some index ->
+                        appliedScrollToken.current <- Some target.Token
+                        rowVirtualizer.getTotalSize () |> ignore
+                        scrollElement.scrollTop <- float rowVirtualizer.measurementsCache.[index].start
+
+                        if abs (rowVirtualizer.scrollOffset - scrollElement.scrollTop) >= 1.0 then
+                            rowVirtualizer.scrollOffset <- scrollElement.scrollTop
+                            setLayoutVersion (layoutVersion + 1)
+                    | None -> ()
+                | _ -> ()
+
                 previousLayout.current <- Some(captureAnchor ())
             ),
-            [| box rowsSignature |]
+            [|
+                box rowsSignature
+                box (scrollTarget |> Option.map _.Token)
+            |]
         )
 
         let renderedKeys =
@@ -1538,7 +1581,9 @@ type GitPagedDiffViewer =
             // the failure, and a failed page is not replayed again until the user asks.
             ?failedGaps: string[],
             ?failedLineSlices: PagedLineSliceRequest[],
-            ?failedReplays: string[]
+            ?failedReplays: string[],
+            // A source line to scroll to once a row shows it. The viewer scrolls once per token.
+            ?scrollTarget: PagedScrollTarget
         ) =
         let prefix = defaultArg testIdPrefix "git-paged-diff"
         let previousTitle = defaultArg previousTitle "Previous version"
@@ -1691,7 +1736,8 @@ type GitPagedDiffViewer =
                             requestNext,
                             defaultArg failedGaps [||],
                             defaultArg failedLineSlices [||],
-                            defaultArg failedReplays [||]
+                            defaultArg failedReplays [||],
+                            scrollTarget
                         )
                     ]
 

@@ -103,6 +103,14 @@ type PagedLineSliceRequest = {
     OffsetUtf16: float
 }
 
+/// A source line the viewer scrolls to once a row shows it or a later line of the same side.
+/// The viewer scrolls once per token, so a new token asks for the scroll again.
+type PagedScrollTarget = {
+    Side: PagedDiffSide
+    Line: float
+    Token: int
+}
+
 type PagedDiffStatus =
     | Opening
     | Scanning

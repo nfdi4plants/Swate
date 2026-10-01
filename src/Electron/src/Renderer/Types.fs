@@ -154,6 +154,9 @@ type GitDiffPageData = {
     CurrentEncoding: string option
     /// Requests still running, canceled when the page closes.
     RunningOperations: string list
+    /// The line the viewer scrolls to when a reopen lands. No row of the old session is left
+    /// after a reopen, so the scroll position cannot follow a row there.
+    ScrollTarget: PagedScrollTarget option
 }
 
 [<RequireQualifiedAccess>]
