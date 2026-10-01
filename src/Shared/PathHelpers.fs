@@ -468,7 +468,6 @@ module ArcEntityPathRules =
     /// A missing directory hint is treated conservatively only for known structural path shapes.
     let isStructuralWatcherPath (relativePath: string) (isDirectory: bool option) =
         let normalizedRelativePath = normalizeRelativePath relativePath
-        let segments = normalizedRelativePath |> splitPathSegments
 
         match classifyRenameTarget normalizedRelativePath with
         | RenamePathClassification.RootTarget -> true
@@ -477,10 +476,7 @@ module ArcEntityPathRules =
         | RenamePathClassification.EntityFolderTarget _ -> isDirectory <> Some false
         | RenamePathClassification.CanonicalEntityFileTarget _
         | RenamePathClassification.CanonicalDataMapFileTarget _ -> isDirectory <> Some true
-        | _ ->
-            match classifyStructuralArcPath segments with
-            | StructuralArcPath.ProtectedEntityChildFolder -> isDirectory <> Some false
-            | _ -> false
+        | _ -> false
 
     let isRenamePathAllowed (relativePath: string) =
         match classifyRenameTarget relativePath with

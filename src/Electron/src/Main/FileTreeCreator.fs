@@ -16,6 +16,63 @@ open VersionControlService.Abstractions
 let normalizeRootPath (path: string) =
     resolve [| path |] |> PathHelpers.normalizePath
 
+/// Maintains the normalized parent -> direct-child relation for the main-process FileTree.
+type FileTreeDirectChildrenIndex() =
+    let childrenByParent = Dictionary<string, HashSet<string>>()
+
+    let addChildPath (path: string) =
+        let normalizedPath = PathHelpers.normalizePath path
+
+        match PathHelpers.tryGetParentPath normalizedPath with
+        | None -> ()
+        | Some parentPath ->
+            match childrenByParent.TryGetValue parentPath with
+            | true, childPaths -> childPaths.Add normalizedPath |> ignore
+            | false, _ ->
+                let childPaths = HashSet<string>()
+                childPaths.Add normalizedPath |> ignore
+                childrenByParent.[parentPath] <- childPaths
+
+    let removePath (path: string) =
+        let normalizedPath = PathHelpers.normalizePath path
+
+        match PathHelpers.tryGetParentPath normalizedPath with
+        | Some parentPath ->
+            match childrenByParent.TryGetValue parentPath with
+            | true, childPaths ->
+                childPaths.Remove normalizedPath |> ignore
+
+                if childPaths.Count = 0 then
+                    childrenByParent.Remove parentPath |> ignore
+            | false, _ -> ()
+        | None -> ()
+
+        childrenByParent.Remove normalizedPath |> ignore
+
+    member _.Rebuild(fileTree: Dictionary<string, FileEntry>) =
+        childrenByParent.Clear()
+        fileTree.Keys |> Seq.iter addChildPath
+
+    member _.GetKnownDirectChildren
+        (directoryPath: string, fileTree: Dictionary<string, FileEntry>)
+        : Map<string, FileEntry> =
+        let normalizedDirectoryPath = PathHelpers.normalizePath directoryPath
+
+        match childrenByParent.TryGetValue normalizedDirectoryPath with
+        | false, _ -> Map.empty
+        | true, childPaths ->
+            childPaths
+            |> Seq.choose (fun childPath ->
+                match fileTree.TryGetValue childPath with
+                | true, entry -> Some(childPath, entry)
+                | false, _ -> None
+            )
+            |> Map.ofSeq
+
+    member _.ApplyChanges(removedPaths: seq<string>, upsertedEntries: seq<FileEntry>) =
+        removedPaths |> Seq.iter removePath
+        upsertedEntries |> Seq.iter (fun entry -> addChildPath entry.path)
+
 let private shouldIgnoreDirName (name: string) = name = ".git"
 
 let private shouldIgnorePath (path: string) =
@@ -215,6 +272,7 @@ let reconcileFileTreeDirectory
     (arcPath: string)
     (relativeDirectoryPath: string)
     (fileTree: Dictionary<string, FileEntry>)
+    (directChildrenIndex: FileTreeDirectChildrenIndex)
     : Fable.Core.JS.Promise<Dictionary<string, FileEntry> option> =
     promise {
         let normalizedArcPath = normalizeRootPath arcPath
@@ -258,16 +316,7 @@ let reconcileFileTreeDirectory
                     |> Map.ofArray
 
                 let knownDirectChildren =
-                    fileTree
-                    |> Seq.choose (fun pair ->
-                        let path = PathHelpers.normalizePath pair.Key
-
-                        if PathHelpers.tryGetParentPath path = Some absoluteDirectoryPath then
-                            Some(path, pair.Value)
-                        else
-                            None
-                    )
-                    |> Map.ofSeq
+                    directChildrenIndex.GetKnownDirectChildren(absoluteDirectoryPath, fileTree)
 
                 let hasRemovedChildren =
                     knownDirectChildren
@@ -312,13 +361,14 @@ let reconcileFileTreeDirectory
                         | Some _ -> ()
                     )
 
-                    missingFilePaths |> Seq.iter (fun path -> nextTree.Remove(path) |> ignore)
+                    let subtreeRemovalKeys =
+                        collectDirectChildSubtreeRemovalKeys
+                            absoluteDirectoryPath
+                            directChildDirectoryRemovalRoots
+                            nextTree.Keys
 
-                    collectDirectChildSubtreeRemovalKeys
-                        absoluteDirectoryPath
-                        directChildDirectoryRemovalRoots
-                        nextTree.Keys
-                    |> Array.iter (fun path -> nextTree.Remove(path) |> ignore)
+                    let removedPaths = Array.append (missingFilePaths.ToArray()) subtreeRemovalKeys
+                    removedPaths |> Array.iter (fun path -> nextTree.Remove(path) |> ignore)
 
                     diskChildren
                     |> Map.iter (fun childPath diskEntry ->
@@ -332,6 +382,8 @@ let reconcileFileTreeDirectory
 
                         nextTree.[childPath] <- nextEntry
                     )
+
+                    directChildrenIndex.ApplyChanges(removedPaths, diskChildren.Values)
 
                     return Some nextTree
     }

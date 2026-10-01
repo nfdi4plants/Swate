@@ -31,6 +31,15 @@ let private chokidarPackage: obj =
 [<Emit("Object.entries($0).flatMap(([dir, names]) => names.map(name => `${dir}/${name}`))")>]
 let private flattenWatchedPaths (_watched: Main.Bindings.Chokidar.IWatched) : string[] = jsNative
 
+[<Emit("Object.keys($0)")>]
+let private watchedDirectories (_watched: Main.Bindings.Chokidar.IWatched) : string[] = jsNative
+
+[<Emit("performance.now()")>]
+let private performanceNow () : float = jsNative
+
+[<Emit("console.log($0)")>]
+let private logDiagnostic (_message: string) : unit = jsNative
+
 let private resetElectronMock () = electronMock?reset () |> ignore
 
 let private setBrowserWindowFactory (factory: obj -> obj) =
@@ -65,6 +74,22 @@ let private mkdirWatcherDirectoryAsync (directoryPath: string) = promise {
 
 let private writeWatcherTextFileAsync (filePath: string) (content: string) =
     writeFileAsync filePath content TextEncoding.Utf8
+
+let private createWatcherFilesInBatches directoryPath count = promise {
+    let mutable offset = 0
+
+    while offset < count do
+        let lastIndex = min (offset + 249) (count - 1)
+
+        let writes =
+            [| offset..lastIndex |]
+            |> Array.map (fun index ->
+                writeWatcherTextFileAsync (join [| directoryPath; $"file{index + 1}.txt" |]) "payload"
+            )
+
+        let! _ = JS.Constructors.Promise.all writes
+        offset <- lastIndex + 1
+}
 
 let private recordingWatcherApi (loadingChanges: ResizeArray<bool>) : IArcFileWatcherApi = {
     IsLoadingChanges = fun isLoading -> loadingChanges.Add isLoading
@@ -422,10 +447,12 @@ type private TestWindowState = {
     RejectLoad: exn -> unit
     Destroy: unit -> unit
     TriggerClose: unit -> unit
+    TriggerFocusEvent: unit -> unit
     IsDestroyed: unit -> bool
     WasShown: unit -> bool
     CloseHandlerAttached: unit -> bool
     ClosedHandlerAttached: unit -> bool
+    FocusHandlerAttached: unit -> bool
     LifecycleWasAttachedWhenLoadStarted: unit -> bool
     PreventedCloseCount: unit -> int
     SendsAfterDestroy: unit -> int
@@ -449,6 +476,7 @@ let private createTestWindow options =
     let mutable shown = false
     let mutable closeHandler: (obj -> unit) option = None
     let mutable closedHandler: (unit -> unit) option = None
+    let mutable focusHandler: (unit -> unit) option = None
     let mutable lifecycleWasAttachedWhenLoadStarted = false
     let mutable preventedCloseCount = 0
     let mutable sendsAfterDestroy = 0
@@ -499,6 +527,8 @@ let private createTestWindow options =
             closeHandler <- Some(unbox handler)
         elif eventName = "closed" then
             closedHandler <- Some(unbox handler)
+        elif eventName = "focus" then
+            focusHandler <- Some(unbox handler)
 
     let onEventJs: obj =
         emitJsExpr onEvent "((eventName, handler) => $0(eventName, handler))"
@@ -562,10 +592,12 @@ let private createTestWindow options =
         RejectLoad = fun error -> rejectControlledLoad.Value(error)
         Destroy = fun () -> destroyed <- true
         TriggerClose = triggerClose
+        TriggerFocusEvent = fun () -> focusHandler.Value()
         IsDestroyed = fun () -> destroyed
         WasShown = fun () -> shown
         CloseHandlerAttached = fun () -> closeHandler.IsSome
         ClosedHandlerAttached = fun () -> closedHandler.IsSome
+        FocusHandlerAttached = fun () -> focusHandler.IsSome
         LifecycleWasAttachedWhenLoadStarted = fun () -> lifecycleWasAttachedWhenLoadStarted
         PreventedCloseCount = fun () -> preventedCloseCount
         SendsAfterDestroy = fun () -> sendsAfterDestroy
@@ -2264,7 +2296,10 @@ Vitest.describe (
 
                             loadingVault
                             |> Option.exists (fun vault ->
-                                vault.path.IsSome && vault.arc.IsNone && vault.watcher.IsNone
+                                vault.path.IsSome
+                                && vault.arc.IsNone
+                                && vault.watcher.IsSome
+                                && vault.fileWatcherReady
                             )
 
                         let windowState = createTestWindow (testWindowOptions targetWindowId)
@@ -2516,7 +2551,10 @@ Vitest.describe (
 
                             loadingVault
                             |> Option.exists (fun vault ->
-                                vault.path.IsSome && vault.arc.IsNone && vault.watcher.IsNone
+                                vault.path.IsSome
+                                && vault.arc.IsNone
+                                && vault.watcher.IsSome
+                                && vault.fileWatcherReady
                             )
 
                         let targetWindowState = createTestWindow (testWindowOptions targetWindowId)
@@ -2594,7 +2632,7 @@ Vitest.describe (
                         let mutable targetWasRegistered = false
                         let mutable pathWasAssigned = false
                         let mutable arcWasLoaded = false
-                        let mutable watcherWasAbsent = false
+                        let mutable watcherWasReady = false
                         let mutable fileTreeWasEmpty = false
 
                         let isArcStartedBeforeFileTreePublication () =
@@ -2605,12 +2643,12 @@ Vitest.describe (
                                 targetWasRegistered <- true
                                 pathWasAssigned <- vault.path = Some expectedPath
                                 arcWasLoaded <- vault.arc.IsSome
-                                watcherWasAbsent <- vault.watcher.IsNone
+                                watcherWasReady <- vault.watcher.IsSome && vault.fileWatcherReady
                                 fileTreeWasEmpty <- vault.fileTree.Count = 0
 
                                 pathWasAssigned
                                 && arcWasLoaded
-                                && watcherWasAbsent
+                                && watcherWasReady
                                 && fileTreeWasEmpty
                                 && vault.isInitializingArc
                             | None -> false
@@ -2663,7 +2701,7 @@ Vitest.describe (
                             Vitest.expect(targetWindowState.WasShown()).toBe (true)
                             Vitest.expect(pathWasAssigned).toBe (true)
                             Vitest.expect(arcWasLoaded).toBe (true)
-                            Vitest.expect(watcherWasAbsent).toBe (true)
+                            Vitest.expect(watcherWasReady).toBe (true)
                             Vitest.expect(fileTreeWasEmpty).toBe (true)
                             Vitest.expect(startupWasCompleteWhenClosed).toBe (true)
                             Vitest.expect(targetWindowState.IsDestroyed()).toBe (true)
@@ -2704,7 +2742,7 @@ Vitest.describe (
                         let mutable vaultExistedWhenClosed = false
                         let mutable pathWasAssignedWhenClosed = false
                         let mutable arcWasNoneWhenClosed = false
-                        let mutable watcherWasAbsentWhenClosed = false
+                        let mutable watcherWasReadyWhenClosed = false
 
                         let isArcOpening () =
                             loadingVault <- ARC_VAULTS.TryGetVault(windowId)
@@ -2715,13 +2753,13 @@ Vitest.describe (
                                 pathWasAssignedWhenClosed <- vault.path = Some(PathHelpers.normalizePath arcPath)
 
                                 arcWasNoneWhenClosed <- vault.arc.IsNone
-                                watcherWasAbsentWhenClosed <- vault.watcher.IsNone
+                                watcherWasReadyWhenClosed <- vault.watcher.IsSome && vault.fileWatcherReady
                             | None -> ()
 
                             vaultExistedWhenClosed
                             && pathWasAssignedWhenClosed
                             && arcWasNoneWhenClosed
-                            && watcherWasAbsentWhenClosed
+                            && watcherWasReadyWhenClosed
 
                         let windowState = createTestWindow (testWindowOptions windowId)
                         let mutable arcWasOpeningWhenClosed = false
@@ -2764,7 +2802,7 @@ Vitest.describe (
                                 Vitest.expect(vaultExistedWhenClosed).toBe (true)
                                 Vitest.expect(pathWasAssignedWhenClosed).toBe (true)
                                 Vitest.expect(arcWasNoneWhenClosed).toBe (true)
-                                Vitest.expect(watcherWasAbsentWhenClosed).toBe (true)
+                                Vitest.expect(watcherWasReadyWhenClosed).toBe (true)
                                 Vitest.expect(windowState.IsDestroyed()).toBe (true)
                                 Vitest.expect(vault.watcher.IsNone).toBe (true)
                                 Vitest.expect(ARC_VAULTS.Vaults.ContainsKey(windowId)).toBe (false)
@@ -2791,7 +2829,7 @@ Vitest.describe (
                         let mutable currentVault: ArcVault option = None
                         let mutable pathWasAssigned = false
                         let mutable arcWasLoaded = false
-                        let mutable watcherWasAbsent = false
+                        let mutable watcherWasReady = false
                         let mutable fileTreeWasEmpty = false
 
                         let isArcStartedBeforeFileTreePublication () =
@@ -2801,12 +2839,12 @@ Vitest.describe (
                             | Some vault ->
                                 pathWasAssigned <- vault.path = Some expectedPath
                                 arcWasLoaded <- vault.arc.IsSome
-                                watcherWasAbsent <- vault.watcher.IsNone
+                                watcherWasReady <- vault.watcher.IsSome && vault.fileWatcherReady
                                 fileTreeWasEmpty <- vault.fileTree.Count = 0
 
                                 pathWasAssigned
                                 && arcWasLoaded
-                                && watcherWasAbsent
+                                && watcherWasReady
                                 && fileTreeWasEmpty
                                 && vault.isInitializingArc
                             | None -> false
@@ -2855,7 +2893,7 @@ Vitest.describe (
                             Vitest.expect(createdWindowCount).toBe (0)
                             Vitest.expect(pathWasAssigned).toBe (true)
                             Vitest.expect(arcWasLoaded).toBe (true)
-                            Vitest.expect(watcherWasAbsent).toBe (true)
+                            Vitest.expect(watcherWasReady).toBe (true)
                             Vitest.expect(fileTreeWasEmpty).toBe (true)
                             Vitest.expect(startupWasCompleteWhenClosed).toBe (true)
                             Vitest.expect(windowState.IsDestroyed()).toBe (true)
@@ -3410,7 +3448,7 @@ Vitest.describe (
                 let mutable targetWasRegistered = false
                 let mutable targetPathWasAssigned = false
                 let mutable creationReachedPostWriteLoad = false
-                let mutable watcherWasAbsent = false
+                let mutable watcherWasReady = false
                 let mutable vaultWasEmptyWhenShown = false
 
                 let isArcLoadingAfterWrite () =
@@ -3421,12 +3459,12 @@ Vitest.describe (
                         targetWasRegistered <- true
                         targetPathWasAssigned <- vault.path = Some expectedPath
                         creationReachedPostWriteLoad <- vault.arc.IsSome
-                        watcherWasAbsent <- vault.watcher.IsNone
+                        watcherWasReady <- vault.watcher.IsSome && vault.fileWatcherReady
 
                         targetWasRegistered
                         && targetPathWasAssigned
                         && creationReachedPostWriteLoad
-                        && watcherWasAbsent
+                        && watcherWasReady
                         && vault.isInitializingArc
                         && not vault.isBusyWriting
                         && vault.hasUnsavedArcChanges
@@ -3549,7 +3587,7 @@ Vitest.describe (
                 let mutable targetWasRegistered = false
                 let mutable pathWasAssigned = false
                 let mutable arcWasLoaded = false
-                let mutable watcherWasAbsent = false
+                let mutable watcherWasReady = false
                 let mutable fileTreeWasEmpty = false
                 let mutable vaultWasEmptyWhenShown = false
 
@@ -3561,12 +3599,12 @@ Vitest.describe (
                         targetWasRegistered <- true
                         pathWasAssigned <- vault.path = Some expectedPath
                         arcWasLoaded <- vault.arc.IsSome
-                        watcherWasAbsent <- vault.watcher.IsNone
+                        watcherWasReady <- vault.watcher.IsSome && vault.fileWatcherReady
                         fileTreeWasEmpty <- vault.fileTree.Count = 0
 
                         pathWasAssigned
                         && arcWasLoaded
-                        && watcherWasAbsent
+                        && watcherWasReady
                         && fileTreeWasEmpty
                         && vault.isInitializingArc
                         && not vault.hasUnsavedArcChanges
@@ -3636,7 +3674,7 @@ Vitest.describe (
                     Vitest.expect(vaultWasEmptyWhenShown).toBe (true)
                     Vitest.expect(pathWasAssigned).toBe (true)
                     Vitest.expect(arcWasLoaded).toBe (true)
-                    Vitest.expect(watcherWasAbsent).toBe (true)
+                    Vitest.expect(watcherWasReady).toBe (true)
                     Vitest.expect(fileTreeWasEmpty).toBe (true)
                     Vitest.expect(startupWasCompleteWhenClosed).toBe (true)
                     Vitest.expect(targetWindowState.IsDestroyed()).toBe (true)
@@ -4713,6 +4751,66 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "structural events after watcher readiness are buffered until initialization snapshots are installed",
+            TestOptions(timeout = 30000),
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-startup-watcher-buffer-"
+                    "Startup Watcher Buffer"
+                    (fun arc -> arc.AddStudy(ArcStudy("S1")))
+                    (fun arcPath -> promise {
+                        let windowId = 91341
+                        let windowState = createTestWindow (testWindowOptions windowId)
+                        let vault = ArcVault(windowState.Window)
+                        let vaults = ArcVaults()
+                        vaults.Vaults.Add(windowId, vault)
+                        vaults.OnCloseWindow(windowState.Window, vault, windowId)
+
+                        let addedStudyPath =
+                            join [| arcPath; ARCtrl.ArcPathHelper.StudiesFolderName; "S2" |]
+                            |> PathHelpers.normalizePath
+
+                        let mutable pendingBeforeMutation = -1
+                        let mutable pendingArcMergesBeforeMutation = -1
+
+                        vault.InitialFileTreeSnapshotBarrier <-
+                            Some(fun () -> promise {
+                                pendingBeforeMutation <- vault.fileWatcherPendingEvents.Count
+                                pendingArcMergesBeforeMutation <- vault.fileWatcherPendingArcMergeEvents.Count
+                                do! mkdirWatcherDirectoryAsync addedStudyPath
+
+                                do!
+                                    waitForWatcherCondition
+                                        "startup structural event buffering"
+                                        (fun () -> vault.fileWatcherPendingEvents.Count > 0)
+                                        300
+                            })
+
+                        try
+                            do! vaults.OpenARCInVault(windowId, arcPath)
+
+                            Vitest.expect(pendingBeforeMutation).toBe (0)
+                            Vitest.expect(pendingArcMergesBeforeMutation).toBe (0)
+
+                            do!
+                                waitForWatcherCondition
+                                    "buffered startup event FileTree application"
+                                    (fun () -> vault.fileTree.ContainsKey addedStudyPath)
+                                    300
+
+                            Vitest.expect(vault.fileTree.ContainsKey addedStudyPath).toBe (true)
+                            Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (0)
+                            Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (0)
+                            do! vault.StopFileWatcher()
+                            vaults.Vaults.Remove(windowId) |> ignore
+                        with error ->
+                            do! vault.StopFileWatcher()
+                            vaults.Vaults.Remove(windowId) |> ignore
+                            return raise error
+                    })
+        )
+
+        Vitest.test (
             "ClearArc resets the dirty state and window title",
             fun () ->
                 let vault = ArcVault(TestHelpers.testWindow ())
@@ -4756,14 +4854,25 @@ Vitest.describe (
                     $"{arcPath}/{ARCtrl.ArcPathHelper.StudiesFolderName}/S1", directoryStats
                     $"{arcPath}/{ARCtrl.ArcPathHelper.StudiesFolderName}/S1/{ARCtrl.ArcPathHelper.StudyFileName}",
                     fileStats
-                    $"{arcPath}/{ARCtrl.ArcPathHelper.AssaysFolderName}/A1/{ARCtrl.ArcPathHelper.AssayDatasetFolderName}",
-                    directoryStats
                 ]
 
                 structuralCases
                 |> List.iter (fun (path, pathStats) ->
                     Vitest.expect(isStructuralFileWatcherPath arcPath path pathStats).toBe (true)
                     Vitest.expect(isStructuralFileWatcherPath arcPath path None).toBe (true)
+                )
+
+                let payloadBoundaryCases = [
+                    $"{arcPath}/{ARCtrl.ArcPathHelper.AssaysFolderName}/A1/{ARCtrl.ArcPathHelper.AssayDatasetFolderName}"
+                    $"{arcPath}/{ARCtrl.ArcPathHelper.AssaysFolderName}/A1/{ARCtrl.ArcPathHelper.AssayProtocolsFolderName}"
+                    $"{arcPath}/{ARCtrl.ArcPathHelper.StudiesFolderName}/S1/{ARCtrl.ArcPathHelper.StudiesResourcesFolderName}"
+                    $"{arcPath}/{ARCtrl.ArcPathHelper.StudiesFolderName}/S1/{ARCtrl.ArcPathHelper.StudiesProtocolsFolderName}"
+                ]
+
+                payloadBoundaryCases
+                |> List.iter (fun path ->
+                    Vitest.expect(isStructuralFileWatcherPath arcPath path directoryStats).toBe (false)
+                    Vitest.expect(isStructuralFileWatcherPath arcPath path None).toBe (false)
                 )
 
                 let deepPayloadPath =
@@ -4865,8 +4974,79 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "window focus shallow-refreshes external ARC root payload changes",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-root-focus-refresh-"
+                    "Root Focus Refresh"
+                    ignore
+                    (fun arcPath -> promise {
+                        let existingPath = join [| arcPath; "existing.txt" |] |> PathHelpers.normalizePath
+                        let deletedPath = join [| arcPath; "delete-me.txt" |] |> PathHelpers.normalizePath
+
+                        let renameSourcePath =
+                            join [| arcPath; "rename-me.txt" |] |> PathHelpers.normalizePath
+
+                        let renamedPath = join [| arcPath; "renamed.txt" |] |> PathHelpers.normalizePath
+                        let newRootPath = join [| arcPath; "new-root.txt" |] |> PathHelpers.normalizePath
+
+                        let externalFolderPath =
+                            join [| arcPath; "external-folder" |] |> PathHelpers.normalizePath
+
+                        let nestedFolderPath =
+                            join [| externalFolderPath; "nested" |] |> PathHelpers.normalizePath
+
+                        let deepPath = join [| nestedFolderPath; "deep.txt" |] |> PathHelpers.normalizePath
+
+                        do! writeWatcherTextFileAsync existingPath "existing"
+                        do! writeWatcherTextFileAsync deletedPath "delete"
+                        do! writeWatcherTextFileAsync renameSourcePath "rename"
+
+                        let! initialTree = Main.FileTreeCreator.getFileTree arcPath
+                        let windowId = 91342
+                        let windowState = createTestWindow (testWindowOptions windowId)
+                        let vault = ArcVault(windowState.Window)
+                        let vaults = ArcVaults()
+                        vault.path <- Some arcPath
+                        vault.fileTree <- initialTree
+                        vaults.OnCloseWindow(windowState.Window, vault, windowId)
+
+                        Vitest.expect(windowState.FocusHandlerAttached()).toBe (true)
+
+                        do! writeWatcherTextFileAsync newRootPath "new"
+                        do! mkdirWatcherDirectoryAsync nestedFolderPath
+                        do! writeWatcherTextFileAsync deepPath "deep"
+                        do! rmAsync deletedPath (RmOptions(force = true))
+                        do! renameAsync renameSourcePath renamedPath
+
+                        windowState.TriggerFocusEvent()
+
+                        do!
+                            waitForWatcherCondition
+                                "ARC root focus refresh"
+                                (fun () ->
+                                    vault.fileTree.ContainsKey newRootPath
+                                    && vault.fileTree.ContainsKey externalFolderPath
+                                    && vault.fileTree.ContainsKey renamedPath
+                                    && not (vault.fileTree.ContainsKey deletedPath)
+                                    && not (vault.fileTree.ContainsKey renameSourcePath)
+                                )
+                                300
+
+                        Vitest.expect(vault.fileTree.ContainsKey existingPath).toBe (true)
+                        Vitest.expect(vault.fileTree.ContainsKey newRootPath).toBe (true)
+                        Vitest.expect(vault.fileTree.ContainsKey externalFolderPath).toBe (true)
+                        Vitest.expect(vault.fileTree.ContainsKey renamedPath).toBe (true)
+                        Vitest.expect(vault.fileTree.ContainsKey deletedPath).toBe (false)
+                        Vitest.expect(vault.fileTree.ContainsKey renameSourcePath).toBe (false)
+                        Vitest.expect(vault.fileTree.ContainsKey nestedFolderPath).toBe (false)
+                        Vitest.expect(vault.fileTree.ContainsKey deepPath).toBe (false)
+                    })
+        )
+
+        Vitest.test (
             "real Chokidar 5 watcher observes structure without watching deep payload inventory",
-            TestOptions(timeout = 30000),
+            TestOptions(timeout = 120000),
             fun () -> promise {
                 let version: string = chokidarPackage?version
                 Vitest.expect(version.StartsWith("5.")).toBe (true)
@@ -4874,25 +5054,24 @@ Vitest.describe (
                 let! arcPath = TestHelpers.createTempDirectoryAsync "swate-structural-watcher-"
                 let studiesPath = join [| arcPath; ARCtrl.ArcPathHelper.StudiesFolderName |]
                 let studyPath = join [| studiesPath; "S1" |]
-
-                let datasetPath =
-                    join [|
-                        studyPath
-                        ARCtrl.ArcPathHelper.StudiesResourcesFolderName
-                    |]
-
-                let deepPayloadPath = join [| datasetPath; "raw.bin" |]
+                let assaysPath = join [| arcPath; ARCtrl.ArcPathHelper.AssaysFolderName |]
+                let assayPath = join [| assaysPath; "A1" |]
+                let datasetPath = join [| assayPath; ARCtrl.ArcPathHelper.AssayDatasetFolderName |]
 
                 let investigationPath =
                     join [| arcPath; ARCtrl.ArcPathHelper.InvestigationFileName |]
 
                 let studyMetadataPath = join [| studyPath; ARCtrl.ArcPathHelper.StudyFileName |]
+                let assayMetadataPath = join [| assayPath; ARCtrl.ArcPathHelper.AssayFileName |]
 
+                do! mkdirWatcherDirectoryAsync studyPath
                 do! mkdirWatcherDirectoryAsync datasetPath
                 do! writeWatcherTextFileAsync investigationPath "initial"
                 do! writeWatcherTextFileAsync studyMetadataPath "initial"
-                do! writeWatcherTextFileAsync deepPayloadPath "initial"
+                do! writeWatcherTextFileAsync assayMetadataPath "initial"
+                do! createWatcherFilesInBatches datasetPath 7000
 
+                let readyStartedAt = performanceNow ()
                 let watcher = createFileWatcher arcPath (Some true)
                 let mutable isReady = false
                 let events = ResizeArray<string * string>()
@@ -4903,30 +5082,55 @@ Vitest.describe (
                 )
                 |> ignore
 
-                watcher.on (Main.Bindings.Chokidar.Events.Ready, fun _ -> isReady <- true)
-                |> ignore
+                watcher.onReady (fun () -> isReady <- true) |> ignore
 
                 try
                     do! waitForWatcherCondition "ready" (fun () -> isReady) 300
+                    let readyDuration = performanceNow () - readyStartedAt
+
+                    let watched = watcher.getWatched ()
 
                     let watchedPaths =
-                        watcher.getWatched ()
-                        |> flattenWatchedPaths
-                        |> Array.map PathHelpers.normalizeSeparators
+                        watched |> flattenWatchedPaths |> Array.map PathHelpers.normalizeSeparators
 
-                    Vitest.expect(watchedPaths |> Array.exists (fun path -> path.EndsWith("raw.bin"))).toBe (false)
+                    let watchedDirectoryPaths =
+                        watched |> watchedDirectories |> Array.map PathHelpers.normalizeSeparators
+
+                    Vitest
+                        .expect(watchedDirectoryPaths |> Array.exists (fun path -> path.EndsWith("assays")))
+                        .toBe (true)
+
+                    Vitest
+                        .expect(watchedDirectoryPaths |> Array.exists (fun path -> path.EndsWith("assays/A1")))
+                        .toBe (true)
+
+                    Vitest
+                        .expect(
+                            watchedDirectoryPaths
+                            |> Array.exists (fun path -> path.EndsWith("assays/A1/dataset"))
+                        )
+                        .toBe (false)
+
+                    Vitest
+                        .expect(
+                            watchedPaths
+                            |> Array.exists (fun path -> path.Contains("assays/A1/dataset/file"))
+                        )
+                        .toBe (false)
+
+                    logDiagnostic (
+                        $"Structural watcher ready with 7,000 ignored payload files: {readyDuration} ms; watched directories: {watchedDirectoryPaths.Length}; watched entries: {watchedPaths.Length}"
+                    )
 
                     events.Clear()
-                    do! writeWatcherTextFileAsync investigationPath "changed"
+                    do! writeWatcherTextFileAsync assayMetadataPath "changed"
 
                     do!
                         waitForWatcherCondition
-                            "root metadata change"
+                            "canonical assay metadata change"
                             (fun () ->
                                 events
-                                |> Seq.exists (fun (_, path) ->
-                                    path.EndsWith(ARCtrl.ArcPathHelper.InvestigationFileName)
-                                )
+                                |> Seq.exists (fun (_, path) -> path.EndsWith(ARCtrl.ArcPathHelper.AssayFileName))
                             )
                             300
 

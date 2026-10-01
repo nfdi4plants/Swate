@@ -62,6 +62,8 @@ type ArcVault(window: BrowserWindow) =
     let mutable writeGeneration = 0
     let mutable watcherDeferralCount = 0
     let mutable watcherEpoch = 0
+    let mutable fileTreeValue = Dictionary<string, FileEntry>()
+    let fileTreeDirectChildrenIndex = FileTreeDirectChildrenIndex()
 
     let mutable fileTreeUpdateTail: Fable.Core.JS.Promise<unit> =
         JS.Constructors.Promise.resolve ()
@@ -76,8 +78,20 @@ type ArcVault(window: BrowserWindow) =
     //I am not sure if performance of calculating changes or precision should be more important. Lets see in the future. Maybe you can add this comment as /// comment on this member?
     /// Dirty marker for unsaved in-memory ARC mutations.
     member val hasUnsavedArcChanges: bool = false with get, private set
-    member val fileTree: Dictionary<string, FileEntry> = Dictionary<string, FileEntry>() with get, set
+
+    member _.fileTree
+        with get () = fileTreeValue
+        and set value =
+            fileTreeValue <- value
+            fileTreeDirectChildrenIndex.Rebuild value
+
+    member internal _.FileTreeDirectChildrenIndex = fileTreeDirectChildrenIndex
+
+    /// Installs a tree produced by shallow reconciliation, whose index delta was applied by the reconciler.
+    member internal _.InstallReconciledFileTree(value: Dictionary<string, FileEntry>) = fileTreeValue <- value
     member val watcher: Chokidar.IWatcher option = None with get, set
+    member val internal fileWatcherReady = false with get, set
+    member val internal flushBufferedFileWatcherEvents: (unit -> unit) option = None with get, set
     member val fileWatcherReloadArcTimeout: int option = None with get, set
     member val fileWatcherPendingEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
     member val fileWatcherPendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
@@ -91,6 +105,11 @@ type ArcVault(window: BrowserWindow) =
     member val isWaitingForImportCleanup = false with get, set
     /// True only while an ARC is being opened or initially created in this vault.
     member val isInitializingArc = false with get, set
+
+    /// Test synchronization point after the initial FileTree snapshot is built but before it is installed.
+    member val internal InitialFileTreeSnapshotBarrier: (unit -> Fable.Core.JS.Promise<unit>) option =
+        None with get, set
+
     member val isWaitingForOperationsOnClose = false with get, set
     member val isOperationCloseApproved = false with get, set
 
@@ -548,6 +567,17 @@ module ArcVaultExtensions =
                 ownTimeoutId <- Some timeoutId
                 this.fileWatcherReloadArcTimeout <- Some timeoutId
 
+            let flushBufferedEvents () =
+                if
+                    (this.fileWatcherPendingEvents.Count > 0
+                     || this.fileWatcherPendingArcMergeEvents.Count > 0)
+                    && this.fileWatcherReloadArcTimeout.IsNone
+                then
+                    sendMsgApi.IsLoadingChanges true
+                    scheduleReload ()
+
+            this.flushBufferedFileWatcherEvents <- Some flushBufferedEvents
+
             fun (eventName: string) (path: string) ->
 
                 swatelogfn this.window.id "File change detected: %s on %s" eventName path
@@ -560,7 +590,9 @@ module ArcVaultExtensions =
                             )
 
                         not isImportedPath
-                        && (this.activeFileImport.IsSome || this.IsFileWatcherArcMergeEligible)
+                        && (this.isInitializingArc
+                            || this.activeFileImport.IsSome
+                            || this.IsFileWatcherArcMergeEligible)
                     )
                     this.path
                     this.fileWatcherPendingEvents
@@ -568,13 +600,14 @@ module ArcVaultExtensions =
                     eventName
                     path
 
-                match this.fileWatcherReloadArcTimeout with
-                | Some timeoutId ->
-                    Fable.Core.JS.clearTimeout timeoutId
-                    this.fileWatcherReloadArcTimeout <- None
-                | None -> sendMsgApi.IsLoadingChanges true
+                if not this.isInitializingArc then
+                    match this.fileWatcherReloadArcTimeout with
+                    | Some timeoutId ->
+                        Fable.Core.JS.clearTimeout timeoutId
+                        this.fileWatcherReloadArcTimeout <- None
+                    | None -> sendMsgApi.IsLoadingChanges true
 
-                scheduleReload ()
+                    scheduleReload ()
 
         /// Applies an ARC content DTO to the in-memory ARC and marks the vault dirty.
         member this.UpdateArcByFileContentDTO(request: FileContentDTO) : Result<unit, exn> =
@@ -662,15 +695,21 @@ module ArcVaultExtensions =
             | _ -> return Error(arcNotOpenError ())
         }
 
-        member this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
-            this.fileTree <- fileTree
-
+        member private this.PublishFileTree() =
             let rendererFileTree =
                 match this.path with
-                | Some arcPath -> toRendererFileTree arcPath fileTree.Values
+                | Some arcPath -> toRendererFileTree arcPath this.fileTree.Values
                 | None -> Dictionary<string, FileEntry>()
 
             WindowSend.send<IFileTreeRendererApi> this.window (fun api -> api.fileTreeUpdate rendererFileTree)
+
+        member this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
+            this.fileTree <- fileTree
+            this.PublishFileTree()
+
+        member internal this.SetReconciledFileTree(fileTree: Dictionary<string, FileEntry>) =
+            this.InstallReconciledFileTree fileTree
+            this.PublishFileTree()
 
         /// Refreshes one directory without recursively scanning it and serializes the update with watcher tree work.
         member this.RefreshFileTreeDirectory(relativeDirectoryPath: string) =
@@ -680,9 +719,15 @@ module ArcVaultExtensions =
                     match this.path with
                     | None -> return raise (arcNotOpenError ())
                     | Some arcPath ->
-                        match! reconcileFileTreeDirectory arcPath relativeDirectoryPath this.fileTree with
+                        match!
+                            reconcileFileTreeDirectory
+                                arcPath
+                                relativeDirectoryPath
+                                this.fileTree
+                                this.FileTreeDirectChildrenIndex
+                        with
                         | None -> ()
-                        | Some nextFileTree -> this.SetFileTree nextFileTree
+                        | Some nextFileTree -> this.SetReconciledFileTree nextFileTree
                 })
 
             this.FileTreeUpdateTail <- queuedUpdate |> Promise.catch (fun _ -> ())
@@ -711,10 +756,10 @@ module ArcVaultExtensions =
                 swatefailfn this.window.id "No path set for StartFileWatcher."
         }
 
-        member this.StartFileWatcher(?usePolling: bool) =
+        member private this.EnsureFileWatcher(?usePolling: bool) =
             if this.path.IsSome then
                 match this.watcher with
-                | Some _ -> ()
+                | Some watcher -> watcher
                 | None ->
                     let watcher = createFileWatcher this.path.Value usePolling
 
@@ -726,9 +771,69 @@ module ArcVaultExtensions =
                     }
 
                     watcher.on (Chokidar.Events.All, this._FileEventController sendMsgApi) |> ignore
+                    watcher.onReady (fun () -> this.fileWatcherReady <- true) |> ignore
+
+                    watcher.onError (fun error ->
+                        swatelogfn this.window.id "Structural file watcher error: %s" (string error)
+                    )
+                    |> ignore
+
                     this.watcher <- Some watcher
+                    watcher
             else
                 swatefailfn this.window.id "No path set for StartFileWatcher."
+
+        member this.StartFileWatcher(?usePolling: bool) =
+            this.EnsureFileWatcher(?usePolling = usePolling) |> ignore
+
+        /// Starts the structural watcher before initialization snapshots and waits for its public initial ready signal.
+        /// Watcher errors and readiness timeouts degrade to snapshot-only startup instead of rejecting a readable ARC.
+        member internal this.PrepareFileWatcherForInitialization(?usePolling: bool) = promise {
+            try
+                let watcher = this.EnsureFileWatcher(?usePolling = usePolling)
+
+                if not this.fileWatcherReady then
+                    do!
+                        JS.Constructors.Promise.Create(fun resolve _ ->
+                            let mutable settled = false
+                            let mutable timeoutId: int option = None
+
+                            let finish () =
+                                if not settled then
+                                    settled <- true
+                                    timeoutId |> Option.iter JS.clearTimeout
+                                    resolve ()
+
+                            timeoutId <-
+                                JS.setTimeout
+                                    (fun () ->
+                                        swatelogfn
+                                            this.window.id
+                                            "Structural watcher readiness timed out; continuing with snapshot initialization."
+
+                                        finish ()
+                                    )
+                                    10000
+                                |> Some
+
+                            watcher.onReady finish |> ignore
+
+                            watcher.onError (fun error ->
+                                swatelogfn
+                                    this.window.id
+                                    "Structural watcher readiness degraded after an error: %s"
+                                    (string error)
+
+                                finish ()
+                            )
+                            |> ignore
+                        )
+            with watcherError ->
+                swatelogfn
+                    this.window.id
+                    "Unable to start the structural watcher; continuing with snapshot initialization: %s"
+                    watcherError.Message
+        }
 
         member this.ClearPendingFileWatcherState() =
             this.IncrementWatcherEpoch()
@@ -749,6 +854,8 @@ module ArcVaultExtensions =
                     ()
 
             this.watcher <- None
+            this.fileWatcherReady <- false
+            this.flushBufferedFileWatcherEvents <- None
             this.ClearPendingFileWatcherState()
         }
 
@@ -759,7 +866,7 @@ module ArcVaultExtensions =
 
             this.isInitializingArc <- false
             this.path <- None
-            this.fileTree.Clear()
+            this.fileTree <- Dictionary<string, FileEntry>()
 
             try
                 this.ClearArc()
@@ -774,8 +881,7 @@ module ArcVaultExtensions =
                         swatelogfn this.window.id "Failed to reset ARC dirty state in renderer: %s" error.Message
         }
 
-        /// Loads the ARC during initialization. The watcher is activated only after the initial
-        /// file-tree snapshot has been installed, so an older scan cannot overwrite watcher updates.
+        /// Loads the authoritative ARC snapshot after the bounded structural watcher is ready.
         member this.Startup() = promise { do! this.LoadArc() }
 
         /// Finalizes a prepared ARC after every asynchronous initialization step succeeded.
@@ -784,13 +890,16 @@ module ArcVaultExtensions =
             | true, _ -> raise (ArcLoadCancelledException this.window.id)
             | false, None -> swatefailfn this.window.id "Unable to commit ARC initialization without a path."
             | false, Some normalizedPath ->
-                this.fileTree <- fileTree
-                this.StartFileWatcher()
                 this.isInitializingArc <- false
+
+                // Install the authoritative snapshot before publishing any initialized state.
+                // Keep the renderer's established path-before-tree message order.
+                this.fileTree <- fileTree
 
                 WindowSend.send<IPathChangeRendererApi> this.window (fun api -> api.pathChange (Some normalizedPath))
 
-                this.SetFileTree fileTree
+                this.PublishFileTree()
+                this.flushBufferedFileWatcherEvents |> Option.iter (fun flush -> flush ())
 
         member this.OpenARC(path: string) = promise {
             match this.path with
@@ -803,6 +912,7 @@ module ArcVaultExtensions =
                 this.path <- Some normalizedPath
 
                 try
+                    do! this.PrepareFileWatcherForInitialization()
                     do! this.Startup()
                 with error ->
                     do! this.RestoreEmptyVaultAfterFailedInitialization()
@@ -834,6 +944,7 @@ module ArcVaultExtensions =
                         })
 
                     try
+                        do! this.PrepareFileWatcherForInitialization()
                         do! this.Startup()
                     with ArcLoadCancelledException targetWindowId ->
                         return raise (ArcCreatedButClosedException targetWindowId)
@@ -861,8 +972,8 @@ module ArcVaultExtensions =
                 else
                     this.ClearPendingFileWatcherState()
 
+                // A write can start while the watcher stops.
                 let! renameResult =
-                    // A write can start while the watcher stops.
                     if this.isBusyWriting then
                         promise { return Error(busyWritingError ()) }
                     else
@@ -1056,6 +1167,15 @@ type ArcVaults() =
     }
 
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
+        window.onFocus (fun () ->
+            if vault.path.IsSome && not vault.isInitializingArc && not (window.isDestroyed ()) then
+                vault.RefreshFileTreeDirectory ""
+                |> Promise.catch (fun refreshError ->
+                    swatelogfn id "Unable to refresh the ARC root after window focus: %s" refreshError.Message
+                )
+                |> Promise.start
+        )
+
         window.onClose (fun closeEvent ->
             let operationCloseApproved = vault.isOperationCloseApproved
             vault.isOperationCloseApproved <- false
@@ -1360,7 +1480,13 @@ type ArcVaults() =
         this.EnsureVaultIsStillActive(windowId, expectedVault)
 
         match fileTreeResult with
-        | Ok fileTree -> return fileTree
+        | Ok fileTree ->
+            match expectedVault.InitialFileTreeSnapshotBarrier with
+            | Some barrier -> do! barrier ()
+            | None -> ()
+
+            this.EnsureVaultIsStillActive(windowId, expectedVault)
+            return fileTree
         | Error error -> return raise error
     }
 

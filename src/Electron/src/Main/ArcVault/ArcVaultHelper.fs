@@ -349,22 +349,22 @@ let shouldUsePollingByDefault (platform: string) =
 let private currentNodePlatform () : string =
     emitJsExpr () "process.platform" |> unbox<string>
 
-let isFileWatcherPathIgnored (path: string) =
-    let normalizedPath = PathHelpers.normalizeSeparators path
+/// Keeps the permanent watcher on ARC structure only. The optional Stats value mirrors Chokidar's
+/// callback: it is absent during some discovery passes, so path shape must remain the primary guard.
+let isStructuralFileWatcherPath (arcPath: string) (candidatePath: string) (stats: Filesystem.Stats option) =
+    let normalizedCandidatePath = PathHelpers.normalizeSeparators candidatePath
     let tempXlsxPattern = """\.~\$.*\.xlsx$"""
     let temporaryImportPattern = """(^|/)\.swate-import-[0-9a-fA-F]{32}(/|$)"""
     let temporaryLfsBackupPattern = """\.vcs-lfs-backup-[0-9a-fA-F]{32}$"""
 
-    System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
-    || isGitMetadataPath normalizedPath
-    || isLegacyDataMapPath normalizedPath
-    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryImportPattern)
-    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
+    let isIgnored =
+        System.Text.RegularExpressions.Regex.IsMatch(normalizedCandidatePath, tempXlsxPattern)
+        || isGitMetadataPath normalizedCandidatePath
+        || isLegacyDataMapPath normalizedCandidatePath
+        || System.Text.RegularExpressions.Regex.IsMatch(normalizedCandidatePath, temporaryImportPattern)
+        || System.Text.RegularExpressions.Regex.IsMatch(normalizedCandidatePath, temporaryLfsBackupPattern)
 
-/// Keeps the permanent watcher on ARC structure only. The optional Stats value mirrors Chokidar's
-/// callback: it is absent during some discovery passes, so path shape must remain the primary guard.
-let isStructuralFileWatcherPath (arcPath: string) (candidatePath: string) (stats: Filesystem.Stats option) =
-    if isFileWatcherPathIgnored candidatePath then
+    if isIgnored then
         false
     else
         let absoluteCandidatePath =
