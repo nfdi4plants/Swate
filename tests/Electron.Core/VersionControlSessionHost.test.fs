@@ -284,11 +284,11 @@ Vitest.describe (
                     Vitest.expect(fixture.Host.IsIdle otherRoot).toBe false
                     Vitest.expect(fixture.Host.RunningOperationIds fixture.RepoRoot).toEqual [| "op-1" |]
                     Vitest.expect(fixture.Host.RunningOperationIds otherRoot).toEqual [| "op-other-root" |]
-                    Vitest.expect(fixture.Host.Cancel "op-other-root").toBe true
+                    Vitest.expect(fixture.Host.Cancel("op-other-root", None)).toBe true
                     Vitest.expect(otherWorkspaceOperation.Context.Cancellation.IsCancellationRequested()).toBe true
                     Vitest.expect(tracked.Context.Cancellation.IsCancellationRequested()).toBe false
                     otherWorkspaceOperation.Complete()
-                    Vitest.expect(fixture.Host.Cancel "op-1").toBe true
+                    Vitest.expect(fixture.Host.Cancel("op-1", None)).toBe true
                     Vitest.expect(tracked.Context.Cancellation.IsCancellationRequested()).toBe true
 
                     tracked.Context.ReportProgress {
@@ -303,7 +303,7 @@ Vitest.describe (
 
                     tracked.Complete()
                     Vitest.expect(fixture.Host.IsIdle fixture.RepoRoot).toBe true
-                    Vitest.expect(fixture.Host.Cancel "op-1").toBe false
+                    Vitest.expect(fixture.Host.Cancel("op-1", None)).toBe false
                 })
         )
 
@@ -417,7 +417,7 @@ Vitest.describe (
                             ignore
                         )
 
-                    fixture.Host.Cancel "op-cancel" |> ignore
+                    fixture.Host.Cancel("op-cancel", None) |> ignore
 
                     let synchronization =
                         hosted.Session.Synchronization

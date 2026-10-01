@@ -90,6 +90,7 @@ let private storagePolicySettingsDto (settings: VersionControlSettings) : Storag
 }
 
 /// Registers and announces one operation before any await, and turns exceptions into failures.
+/// An operation id that a running operation already has is answered with a failure and runs nothing.
 let private runTracked
     (host: WorkspaceSessionHost.WorkspaceSessionHost)
     (bridge: RendererBridge)
@@ -101,39 +102,44 @@ let private runTracked
     (operation: OperationContext -> Async<OperationResult<'T>>)
     : JS.Promise<OperationResult<'T>> =
     promise {
-        let tracked =
-            host.BeginOperation(
+        match
+            host.TryBeginOperation(
                 operationId,
                 workspaceRoot,
                 windowId,
                 mutating,
                 fun progress -> bridge.Progress(Mappings.progress operationId progress)
             )
+        with
+        | Error failure ->
+            let result: OperationResult<'T> = Failed failure
+            logOperationFinished operationName operationId result 0L
+            return result
+        | Ok tracked ->
+            let startedAt = System.DateTime.UtcNow
 
-        let startedAt = System.DateTime.UtcNow
+            if mutating then
+                logOperationStarted operationName operationId
 
-        if mutating then
-            logOperationStarted operationName operationId
-
-        let! result = promise {
-            try
+            let! result = promise {
                 try
-                    bridge.Started { OperationId = operationId }
-                    return! operation tracked.Context |> Async.StartAsPromise
-                with error ->
-                    return Failed(unexpectedFailure error)
-            finally
-                tracked.Complete()
-        }
+                    try
+                        bridge.Started { OperationId = operationId }
+                        return! operation tracked.Context |> Async.StartAsPromise
+                    with error ->
+                        return Failed(unexpectedFailure error)
+                finally
+                    tracked.Complete()
+            }
 
-        let durationMilliseconds =
-            int64 (System.DateTime.UtcNow.Subtract(startedAt).TotalMilliseconds)
+            let durationMilliseconds =
+                int64 (System.DateTime.UtcNow.Subtract(startedAt).TotalMilliseconds)
 
-        match mutating, result with
-        | false, Succeeded _ -> ()
-        | _ -> logOperationFinished operationName operationId result durationMilliseconds
+            match mutating, result with
+            | false, Succeeded _ -> ()
+            | _ -> logOperationFinished operationName operationId result durationMilliseconds
 
-        return result
+            return result
     }
 
 /// Opens the vault session of the calling window and runs the operation in it. The
@@ -265,9 +271,6 @@ let private withService
     | Some service -> call service context
     | None -> async { return serviceUnavailable serviceName }
 
-let private operationWindowId (context: OperationContext) : int option =
-    WorkspaceSessionHost.get().TryGetOperationWindowId context.OperationId
-
 /// Runs one text diff call in the session of the calling window. An invalid request is
 /// answered before the operation is registered, and every failure of the reply is bounded.
 /// The calls are reads, so they use the tracked operation without the busy flag.
@@ -302,12 +305,17 @@ let private withTextDiff
             return result |> Result.map Mappings.boundTextDiffResult
     }
 
+/// The window of the IPC call. Handle ownership uses it, since it comes from Electron and
+/// not from an id the renderer sent.
+let private callingWindowId (event: IpcMainInvokeEvent) : int option =
+    windowFromIpcEvent event |> Option.map _.id
+
 let private withOwnedHandle
+    (event: IpcMainInvokeEvent)
     (handle: DiffHandle)
-    (context: OperationContext)
     (call: unit -> Async<OperationResult<'T>>)
     : Async<OperationResult<'T>> =
-    TextDiffHandles.withOwnedHandle (operationWindowId context) handle call
+    TextDiffHandles.withOwnedHandle (callingWindowId event) handle call
 
 let private withPath (path: string) (call: RepositoryPath -> Async<OperationResult<'T>>) : Async<OperationResult<'T>> =
     match Mappings.tryRepositoryPath path with
@@ -620,7 +628,8 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             logOperationStarted operationName key.OperationId
 
             let host = WorkspaceSessionHost.get ()
-            let canceled = host.Cancel key.OperationId
+            // A window cancels only the operations it started.
+            let canceled = host.Cancel(key.OperationId, callingWindowId event)
 
             let durationMilliseconds =
                 int64 (System.DateTime.UtcNow.Subtract(startedAt).TotalMilliseconds)
@@ -1178,7 +1187,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 request.OperationId
                 (Mappings.tryOpenDiffRequest request)
                 (fun hosted service openRequest context -> async {
-                    let windowId = operationWindowId context
+                    let windowId = callingWindowId event
                     let! opened = service.Open openRequest context
 
                     match opened with
@@ -1206,7 +1215,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 request.OperationId
                 (Mappings.tryReadPageRequest request)
                 (fun _ service pageRequest context ->
-                    withOwnedHandle pageRequest.Handle context (fun () -> service.ReadPage pageRequest context)
+                    withOwnedHandle event pageRequest.Handle (fun () -> service.ReadPage pageRequest context)
                 )
                 Mappings.resumablePage
     replayTextDiffPage =
@@ -1217,7 +1226,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 request.OperationId
                 (Mappings.tryReplayPageRequest request)
                 (fun _ service replayRequest context ->
-                    withOwnedHandle replayRequest.Handle context (fun () -> service.ReplayPage replayRequest context)
+                    withOwnedHandle event replayRequest.Handle (fun () -> service.ReplayPage replayRequest context)
                 )
                 Mappings.diffPage
     expandTextDiff =
@@ -1228,7 +1237,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 request.OperationId
                 (Mappings.tryExpandRequest request)
                 (fun _ service expandRequest context ->
-                    withOwnedHandle expandRequest.Handle context (fun () -> service.Expand expandRequest context)
+                    withOwnedHandle event expandRequest.Handle (fun () -> service.Expand expandRequest context)
                 )
                 Mappings.resumableParts
     readTextDiffLine =
@@ -1239,7 +1248,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 request.OperationId
                 (Mappings.tryReadLineRequest request)
                 (fun _ service lineRequest context ->
-                    withOwnedHandle lineRequest.Handle context (fun () -> service.ReadLine lineRequest context)
+                    withOwnedHandle event lineRequest.Handle (fun () -> service.ReadLine lineRequest context)
                 )
                 Mappings.resumableLine
     getTextDiffSourceInfo =
@@ -1251,8 +1260,8 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 (Mappings.tryDiffHandle request)
                 (fun _ service handle context ->
                     withOwnedHandle
+                        event
                         handle
-                        context
                         (fun () -> service.GetSourceInfo { SourceInfoRequest.Handle = handle } context)
                 )
                 Mappings.diffSourceInfoPair
@@ -1266,8 +1275,8 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 (Mappings.tryDiffHandle request)
                 (fun _ service handle context ->
                     withOwnedHandle
+                        event
                         handle
-                        context
                         (fun () -> async {
                             let! closed = service.Close handle context
 

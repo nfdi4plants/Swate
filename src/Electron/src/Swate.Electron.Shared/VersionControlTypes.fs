@@ -417,6 +417,10 @@ module VersionControlCodes =
     [<Literal>]
     let LockRemovalRefused = "lock_removal_refused"
 
+    /// A call named an operation id that a running operation already has.
+    [<Literal>]
+    let OperationIdInUse = "operation_id_in_use"
+
     /// The library's code for a held index lock.
     [<Literal>]
     let IndexLocked = "index_locked"

@@ -57,7 +57,9 @@ type GitDiffBlockReason =
 type GitDiffPageStatus =
     | Opening
     | Scanning
-    | EncodingChoice of side: DiffSideDto * token: PreparationTokenDto * candidates: EncodingCandidateDto[]
+    /// The library needs the encoding of one side. Open asks with a preparation token before the
+    /// first page. A side that turns out not to be UTF-8 while the diff is read asks without one.
+    | EncodingChoice of side: DiffSideDto * token: PreparationTokenDto option * candidates: EncodingCandidateDto[]
     | Ready
     | LoadingNext
     /// The diff opens again after its session ended. The pages the new session has read so far
@@ -81,6 +83,18 @@ type GitDiffExpandedGap = {
     PayloadBytes: float
 }
 
+/// A line number of one source. Line numbers start at 0.
+type GitDiffLinePosition = { Side: DiffSideDto; Number: float }
+
+/// The source lines a page covers. Pages of two sessions of one diff can start at different
+/// lines, so a reopen finds the place the user was reading by these lines.
+type GitDiffPageSpan = {
+    /// The first line the page shows, on the previous side when its first row has one.
+    First: GitDiffLinePosition option
+    LastPrevious: float option
+    LastCurrent: float option
+}
+
 /// One page of the loaded window. Parts are already mapped for the viewer, so a part keeps
 /// its identity across renders. An evicted page holds a single placeholder part.
 type GitDiffWindowPage = {
@@ -92,6 +106,8 @@ type GitDiffWindowPage = {
     IsEvicted: bool
     /// One entry per expansion result on this page, the least recently expanded first.
     ExpandedGaps: GitDiffExpandedGap list
+    /// The lines of the page as it arrived, kept when the page is evicted.
+    Span: GitDiffPageSpan
 }
 
 /// The running request for the page after the last loaded one.
@@ -120,6 +136,15 @@ type GitDiffPageData = {
     PendingReplays: string list
     /// Pages the viewer showed when it asked for the last replay. Eviction keeps them.
     VisiblePages: string list
+    /// Set when a replay or an expansion was asked for while the next page was loading. That
+    /// page then joins the window without becoming the requested page, so the page the user
+    /// went back to stays loaded.
+    KeepRequestedPage: bool
+    /// Gaps, line slices and evicted pages whose last request failed. The viewer marks their
+    /// controls, and the next request of the same control clears the mark.
+    FailedGaps: string list
+    FailedLineSlices: PagedLineSliceRequest list
+    FailedReplays: string list
     Progress: ScanProgressDto option
     Pending: PendingPreviewDto option
     OutputComplete: bool

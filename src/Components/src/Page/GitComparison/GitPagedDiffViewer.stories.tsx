@@ -521,6 +521,82 @@ function FoldedPagesHarness() {
   );
 }
 
+const SHIFT_PAGE_ROWS = 30;
+const SHIFT_SHORT_PAGE_ROWS = 5;
+
+function shiftPageRows(index: number, count: number) {
+  return Array.from({ length: count }, (_, offset) =>
+    new PagedRow(
+      `shift-${index}-${offset}`,
+      "added",
+      undefined,
+      makeLine(index * SHIFT_PAGE_ROWS + offset, `Page ${index} row ${offset}`),
+    ),
+  );
+}
+
+// Starts with six pages, the first two folded. A next page waits for the complete button. It
+// adds a short page and folds the two earliest loaded pages, so the rows above the view
+// shrink more than the rows below grow, the way the app evicts pages near the end of a diff.
+function FoldOnLoadHarness() {
+  const [model, setModel] = React.useState({ known: 6, loaded: [3, 4, 5, 6] });
+  const [nextPending, setNextPending] = React.useState(false);
+
+  const rowCount = (index: number) => (index === 7 ? SHIFT_SHORT_PAGE_ROWS : SHIFT_PAGE_ROWS);
+
+  const parts = Array.from({ length: model.known }, (_, offset) => {
+    const index = offset + 1;
+    return model.loaded.includes(index)
+      ? PagedPart_HunkRows(
+          `shift-hunk-${index}`,
+          range(index * SHIFT_PAGE_ROWS, 0),
+          range(index * SHIFT_PAGE_ROWS, rowCount(index)),
+          false,
+          false,
+          shiftPageRows(index, rowCount(index)),
+        )
+      : PagedPart_EvictedPage(`page-${index}`, rowCount(index));
+  });
+
+  const requestNext = () => {
+    onShiftNext();
+    setNextPending(true);
+  };
+
+  const completeNext = () => {
+    setModel({ known: 7, loaded: [5, 6, 7] });
+    setNextPending(false);
+  };
+
+  return (
+    <div style={{ height: "40rem" }}>
+      <button data-testid="git-paged-shift-complete" onClick={completeNext}>Complete next page</button>
+      <GitPagedDiffViewerComponent
+        parts={parts}
+        status={nextPending ? PagedDiffStatus_LoadingNext() : PagedDiffStatus_Ready()}
+        progress={new PagedProgress(model.known, 10, false)}
+        hasMore={true}
+        outputComplete={false}
+        nextPageKey={`cursor-${model.known}`}
+        requestNext={requestNext}
+        testIdPrefix="git-paged-shift"
+      />
+    </div>
+  );
+}
+
+// The first diff row in the viewport and its distance from the top of the viewport.
+function firstVisibleRow(scroll: HTMLElement) {
+  const top = scroll.getBoundingClientRect().top;
+  const rows = Array.from(scroll.querySelectorAll<HTMLElement>("[data-paged-diff-key]"))
+    .filter((row) => /^shift-\d+-\d+$/.test(row.dataset.pagedDiffKey ?? ""))
+    .filter((row) => row.getBoundingClientRect().bottom > top + 1)
+    .sort((left, right) => left.getBoundingClientRect().top - right.getBoundingClientRect().top);
+  const row = rows[0];
+  if (!row) throw new Error("No diff row is in view");
+  return { key: row.dataset.pagedDiffKey, offset: row.getBoundingClientRect().top - top };
+}
+
 const LINE_START_TEXT = `${"a".repeat(20000)}CHANGED${"b".repeat(5000)}`;
 const LINE_SLICE_START = 19872;
 
@@ -624,6 +700,7 @@ const onAnchorExpand = fn();
 const onFoldedReplay = fn();
 const onFoldedNext = fn();
 const onRequestLineBefore = fn();
+const onShiftNext = fn();
 
 const meta = {
   title: "Page Components/GitComparison/GitPagedDiffViewer",
@@ -643,6 +720,7 @@ const meta = {
       onFoldedReplay,
       onFoldedNext,
       onRequestLineBefore,
+      onShiftNext,
     ]) {
       mock.mockClear();
     }
@@ -1233,7 +1311,8 @@ export const FoldedPagesKeepTheEndReachable: Story = {
       const anchorTop = canvas.getByTestId(`git-paged-folded-row-fold-${pageIndex + 1}-0`).getBoundingClientRect().top;
 
       await fireEvent.click(canvas.getByTestId("git-paged-folded-complete"));
-      await waitFor(() => expect(earlier()).toHaveAttribute("data-next-page", `page-${pageIndex - 1}`));
+      // The replayed page lands above the rows in view, so its last row is rendered just above them.
+      await waitFor(() => expect(canvas.getByTestId(`git-paged-folded-row-fold-${pageIndex}-${FOLD_PAGE_ROWS - 1}`)).toBeInTheDocument());
       await waitFor(() =>
         expect(
           Math.abs(canvas.getByTestId(`git-paged-folded-row-fold-${pageIndex + 1}-0`).getBoundingClientRect().top - anchorTop),
@@ -1253,6 +1332,24 @@ export const FoldedPagesKeepTheEndReachable: Story = {
     await waitFor(() => expect(onFoldedNext).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(canvas.queryByTestId("git-paged-folded-row-continue")).toBeNull());
     await expect(scroll.scrollHeight).toBeLessThan(heightBound);
+  },
+};
+
+export const LoadingNearTheEndKeepsTheFirstVisibleRow: Story = {
+  render: () => <FoldOnLoadHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-shift-grid");
+
+    await scrollToEnd(scroll);
+    await waitFor(() => expect(onShiftNext).toHaveBeenCalledTimes(1));
+    const before = firstVisibleRow(scroll);
+
+    await fireEvent.click(canvas.getByTestId("git-paged-shift-complete"));
+    await waitFor(() => expect(canvas.getByTestId("git-paged-shift-row-shift-7-0")).toBeInTheDocument());
+    await expect(canvas.queryByTestId("git-paged-shift-row-shift-4-0")).toBeNull();
+    await expect(firstVisibleRow(scroll).key).toBe(before.key);
+    await expect(Math.abs(firstVisibleRow(scroll).offset - before.offset)).toBeLessThan(2);
   },
 };
 

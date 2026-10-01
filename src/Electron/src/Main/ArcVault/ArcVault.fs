@@ -849,8 +849,8 @@ module ArcVaultExtensions =
                 else
                     this.ClearPendingFileWatcherState()
 
+                // A write can start while the watcher stops.
                 let! renameResult =
-                    // A write can start while the watcher stops.
                     if this.isBusyWriting then
                         promise { return Error(busyWritingError ()) }
                     else
@@ -1057,7 +1057,7 @@ type ArcVaults() =
 
                     currentHost.RunningOperationIdsForWindow id
                     |> Array.filter (fun operationId -> not (Set.contains operationId mutationIds))
-                    |> Array.iter (fun operationId -> currentHost.Cancel operationId |> ignore)
+                    |> Array.iter (fun operationId -> currentHost.Cancel(operationId, Some id) |> ignore)
                 )
 
             if not vault.isCloseApproved then
@@ -1137,7 +1137,9 @@ type ArcVaults() =
                                         let operationIds = currentHost.RunningOperationIdsForWindow id
 
                                         operationIds
-                                        |> Array.iter (fun operationId -> currentHost.Cancel operationId |> ignore)
+                                        |> Array.iter (fun operationId ->
+                                            currentHost.Cancel(operationId, Some id) |> ignore
+                                        )
 
                                         let waitForOperations = promise {
                                             do! currentHost.WhenOperationsComplete operationIds

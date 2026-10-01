@@ -55,9 +55,10 @@ let dataHubRevisionPolicy: RevisionPolicyStrategy = {
 
 /// The Git factory whose sessions diff text in the shared worker pool. The pool is set up
 /// asynchronously, so Open waits for it and builds the pooled factory once. When the pool
-/// cannot be set up, sessions open without it and their diff calls fail with
-/// diff_worker_failed. `windowOwnerOf` names the window that started an operation, and
-/// the pool keeps each window's diff handles apart.
+/// cannot be set up, sessions open without it. A diff Open then fails with
+/// diff_worker_failed, and calls on a handle answer diff_session_closed. `windowOwnerOf`
+/// names the window that started an operation, and the pool keeps each window's diff
+/// handles apart.
 let createGitFactory
     (source: DataHubStrategies.DataHubAccountSource)
     (windowOwnerOf: OperationContext -> string)

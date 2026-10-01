@@ -123,14 +123,14 @@ let private maximumPreview: PendingPreview = {
         }
 }
 
-/// A partial page at the fragment limit, with every line text grown until the worker
-/// message reaches its byte limit.
+/// A partial page of 600 rows in hunk fragments of 32 rows, with every line text grown until
+/// the worker message reaches its byte limit.
 let private pageWith (textLength: int) : DiffPage =
     let rows =
         Array.init
             PageRows
             (fun index -> {
-                Id = $"row-{index:D6}"
+                Id = "row-" + (string index).PadLeft(6, '0')
                 Kind = DiffRowKind.Replaced
                 Previous = Some(line (largeNumber + int64 index) (expensiveText textLength) 1)
                 Current = Some(line (largeNumber + int64 index) (expensiveText textLength) 1)
@@ -144,7 +144,7 @@ let private pageWith (textLength: int) : DiffPage =
             |> Array.chunkBySize 32
             |> Array.mapi (fun index chunk ->
                 DiffPart.Hunk {
-                    HunkId = $"hunk-{index:D6}"
+                    HunkId = "hunk-" + (string index).PadLeft(6, '0')
                     PreviousRange = range
                     CurrentRange = range
                     StartsHunk = true
@@ -164,7 +164,7 @@ let private expansionWith (textLength: int) : DiffPart[] = [|
         Array.init
             100
             (fun index -> {
-                Id = $"row-{index:D6}"
+                Id = "row-" + (string index).PadLeft(6, '0')
                 Kind = DiffRowKind.Context
                 Previous = Some(line (largeNumber + int64 index) (expensiveText textLength) 0)
                 Current = Some(line (largeNumber + int64 index) (expensiveText textLength) 0)
@@ -837,16 +837,20 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "details lines are cut to 256 characters and 4 KiB in total, warnings to 4 KiB each",
+            "details lines and affected paths are cut to 256 characters and 4 KiB in total, warnings to 4 KiB each",
             fun () ->
-                let details =
+                let lines (first: string) =
                     Array.append
-                        [| String.replicate 300 "d" |]
-                        (Array.init 20 (fun index -> $"{index:D2}" + String.replicate 248 "x"))
+                        [| String.replicate 300 first |]
+                        (Array.init 20 (fun index -> (string index).PadLeft(2, '0') + String.replicate 248 "x"))
+
+                let details = lines "d"
+                let paths = lines "p"
 
                 let failure = {
                     failureWith "not text" "evidence" with
                         Details = details
+                        AffectedPaths = paths
                 }
 
                 let outcome =
@@ -862,32 +866,169 @@ Vitest.describe (
                       }
                     | other -> failwith $"Expected a success, got {other}"
 
-                let mapped, mappedFailure =
-                    match Mappings.textDiffResult id (PartiallySucceeded(outcome, failure)) with
-                    | OperationResultDto.PartiallySucceeded(mapped, mappedFailure) -> mapped, mappedFailure
-                    | other -> failwith $"Expected a partial success, got {other}"
+                let mappedFailure = boundFailure failure
 
-                Vitest.expect(mappedFailure.Details.Length).toBe 16
-                Vitest.expect(mappedFailure.Details[0]).toBe (String.replicate 256 "d")
+                let mapped =
+                    match Mappings.textDiffResult id (Succeeded outcome) with
+                    | OperationResultDto.Succeeded mapped -> mapped
+                    | other -> failwith $"Expected a success, got {other}"
 
-                Vitest
-                    .expect(
-                        mappedFailure.Details
-                        |> Array.forall (fun line -> line.Length <= Mappings.MaxTextDiffDetailLength)
-                    )
-                    .toBe
-                    true
+                for bounded, original in
+                    [
+                        mappedFailure.Details, details
+                        mappedFailure.AffectedPaths, paths
+                    ] do
+                    Vitest.expect(bounded.Length).toBe 16
+                    Vitest.expect(bounded[0]).toBe (original[0].Substring(0, 256))
 
-                Vitest.expect(mappedFailure.Details |> Array.sumBy utf8Bytes).toBeLessThanOrEqual
-                    Mappings.MaxTextDiffDetailsBytes
+                    Vitest
+                        .expect(
+                            bounded
+                            |> Array.forall (fun line -> line.Length <= Mappings.MaxTextDiffDetailLength)
+                        )
+                        .toBe
+                        true
 
-                Vitest.expect(mappedFailure.Details[1..]).toEqual details[1..15]
+                    Vitest.expect(bounded |> Array.sumBy utf8Bytes).toBeLessThanOrEqual Mappings.MaxTextDiffDetailsBytes
+                    Vitest.expect(bounded[1..]).toEqual original[1..15]
 
                 Vitest.expect(mapped.Warnings |> Array.map _.Message.Length).toEqual [|
                     Mappings.MaxTextDiffWarningBytes
                 |]
 
                 Vitest.expect(mapped.Warnings |> Array.map _.Code).toEqual [| "long_warning" |]
+        )
+
+        Vitest.test (
+            "a partly successful page reply at the worker limit with long warnings and failure text stays within the limit plus 8 KiB",
+            fun () ->
+                let sizeOf textLength =
+                    workerBytes (TextDiffProtocol.ResultPayload.ReadPage(Resumable.Ready(pageWith textLength)))
+
+                let page = pageWith (fillTo PageLimitBytes sizeOf)
+
+                let outcome =
+                    match OperationResult.succeeded (Resumable.Ready page) with
+                    | Succeeded outcome -> {
+                        outcome with
+                            Warnings =
+                                Array.init
+                                    20
+                                    (fun index -> {
+                                        Code = $"warning_{index}"
+                                        Message = expensiveText 4096
+                                    })
+                      }
+                    | other -> failwith $"Expected a success, got {other}"
+
+                let failure = {
+                    failureWith (expensiveText 4096) (expensiveText 256) with
+                        Details = Array.replicate 20 (expensiveText 256)
+                        AffectedPaths = Array.replicate 20 (expensiveText 256)
+                }
+
+                let payload: Result<OperationResultDto<ResumablePageDto>, exn> =
+                    Ok(Mappings.textDiffResult Mappings.resumablePage (PartiallySucceeded(outcome, failure)))
+
+                Vitest.expect(ipcPayloadBytes payload).toBeLessThanOrEqual (PageLimitBytes + IpcMarginBytes)
+
+                match payload with
+                | Ok(OperationResultDto.PartiallySucceeded(mapped, mappedFailure)) ->
+                    Vitest.expect(mapped.Value).toEqual (Mappings.resumablePage (Resumable.Ready page))
+                    Vitest.expect(mappedFailure.Code).toBe TextDiffFailureCodes.ContentNotText
+                | other -> failwith $"Expected a partial success, got {other}"
+        )
+
+        Vitest.test (
+            "handle versions, cursors, page ids, gap ids, continuations, preparation tokens and encoding names longer than 256 characters are rejected",
+            fun () ->
+                let atLimit = String.replicate 256 "t"
+                let overLimit = String.replicate 257 "t"
+
+                let readPage version cursor : ReadTextDiffPageRequestDto = {
+                    OperationId = "op"
+                    HandleId = "handle"
+                    HandleVersion = version
+                    Cursor = cursor
+                }
+
+                let replay pageId : ReplayTextDiffPageRequestDto = {
+                    OperationId = "op"
+                    HandleId = "handle"
+                    HandleVersion = "v1"
+                    PageId = pageId
+                }
+
+                let expand gapId continuation : ExpandTextDiffRequestDto = {
+                    OperationId = "op"
+                    HandleId = "handle"
+                    HandleVersion = "v1"
+                    GapId = gapId
+                    FromStart = true
+                    Count = 100
+                    Continuation = continuation
+                }
+
+                let opening = openRequest "op" "data/a.txt"
+
+                match Mappings.tryReadPageRequest (readPage atLimit atLimit) with
+                | Ok request ->
+                    Vitest.expect(request.Handle.Version).toBe atLimit
+                    Vitest.expect(request.Cursor).toBe atLimit
+                | Error failure -> failwith failure.Message
+
+                match Mappings.tryExpandRequest (expand atLimit (Some atLimit)) with
+                | Ok request -> Vitest.expect(request.Continuation).toEqual (Some atLimit)
+                | Error failure -> failwith failure.Message
+
+                expectInvalid (Mappings.tryReadPageRequest (readPage overLimit "cursor"))
+                expectInvalid (Mappings.tryReadPageRequest (readPage "v1" overLimit))
+                expectInvalid (Mappings.tryReplayPageRequest (replay overLimit))
+                expectInvalid (Mappings.tryExpandRequest (expand overLimit None))
+                expectInvalid (Mappings.tryExpandRequest (expand "gap" (Some overLimit)))
+
+                expectInvalid (
+                    Mappings.tryReadLineRequest {
+                        lineRequest "op" "handle" "0" "0" with
+                            Continuation = Some overLimit
+                    }
+                )
+
+                expectInvalid (
+                    Mappings.tryDiffHandle {
+                        OperationId = "op"
+                        HandleId = "handle"
+                        HandleVersion = overLimit
+                    }
+                )
+
+                expectInvalid (
+                    Mappings.tryOpenDiffRequest {
+                        opening with
+                            PreparationTokenId = Some overLimit
+                    }
+                )
+
+                expectInvalid (
+                    Mappings.tryOpenDiffRequest {
+                        opening with
+                            PreviousEncoding = Some overLimit
+                    }
+                )
+
+                expectInvalid (
+                    Mappings.tryOpenDiffRequest {
+                        opening with
+                            CurrentEncoding = Some overLimit
+                    }
+                )
+
+                expectInvalid (
+                    Mappings.tryOpenDiffRequest {
+                        opening with
+                            Continuation = Some overLimit
+                    }
+                )
         )
 
         Vitest.test (
@@ -1251,6 +1392,64 @@ Vitest.describe (
                     TestHelpers.expectDtoValue "close from window A" closeFromA |> ignore
                     Vitest.expect(closes |> Seq.last).toEqual ("h-a", Some windowA)
                     Vitest.expect(TextDiffHandles.isRecorded "h-a").toBe false
+                finally
+                    TextDiffHandles.isWindowAlive <- originalIsWindowAlive
+                    TextDiffHandles.windowClosed windowA
+                    TextDiffHandles.windowClosed windowB
+                    Main.ArcVault.ARC_VAULTS.Vaults.Clear()
+                    TestHelpers.electronMock?reset () |> ignore
+                    WorkspaceSessionHost.resetForTests ()
+
+                do! host.CloseAll() |> Async.StartAsPromise
+                do! TestHelpers.removeDirectoryAsync root
+            }
+        )
+
+        Vitest.test (
+            "an operation id in use is refused, and a window cancels only its own operations",
+            fun () -> promise {
+                let! root = TestHelpers.createTempDirectoryAsync "swate-text-diff-operation-ids-"
+                let windowA = 91
+                let windowB = 92
+                let originalIsWindowAlive = TextDiffHandles.isWindowAlive
+                TextDiffHandles.isWindowAlive <- fun _ -> true
+                let sessionGate, releaseSession = TestHelpers.deferred ()
+
+                let service = {
+                    unexpectedService with
+                        Open =
+                            fun request _ -> async {
+                                let path = RepositoryPath.value request.Path
+                                return OperationResult.succeeded (Resumable.Ready(openedDiff "h-ids" path))
+                            }
+                        Close = fun _ _ -> async { return OperationResult.succeeded () }
+                }
+
+                let host =
+                    WorkspaceSessionHost.WorkspaceSessionHost(textDiffRuntime root sessionGate service)
+
+                WorkspaceSessionHost.initialize host
+                registerWindows root [ windowA; windowB ]
+                let apiA = Main.IPC.IVersionControlApi.api (TestHelpers.ipcEvent windowA)
+                let apiB = Main.IPC.IVersionControlApi.api (TestHelpers.ipcEvent windowB)
+
+                try
+                    // The open of window A waits for its session, so its operation stays registered.
+                    let openFromA = apiA.openTextDiff (openRequest "shared-id" "a.txt")
+                    let! openFromB = apiB.openTextDiff (openRequest "shared-id" "b.txt")
+
+                    Vitest.expect(failureCodeOf openFromB).toBe VersionControlCodes.OperationIdInUse
+                    Vitest.expect(host.TryGetOperationWindowId "shared-id").toEqual (Some windowA)
+
+                    let! canceledByB = apiB.cancelOperation { OperationId = "shared-id" }
+                    Vitest.expect(canceledByB).toEqual (Ok false)
+
+                    let! canceledByA = apiA.cancelOperation { OperationId = "shared-id" }
+                    Vitest.expect(canceledByA).toEqual (Ok true)
+
+                    releaseSession ()
+                    let! _ = openFromA
+                    Vitest.expect(host.TryGetOperationWindowId "shared-id").toEqual None
                 finally
                     TextDiffHandles.isWindowAlive <- originalIsWindowAlive
                     TextDiffHandles.windowClosed windowA

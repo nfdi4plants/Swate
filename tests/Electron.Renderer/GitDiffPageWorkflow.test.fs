@@ -272,6 +272,18 @@ let private hunkWith id (rows: DiffRowDto[]) =
 let private hunk id =
     hunkWith id [| changedRow $"{id}-row" |]
 
+/// A changed row that shows the line on both sides.
+let private rowAt (id: string) (line: int) : DiffRowDto = {
+    Id = id
+    Kind = DiffRowKindDto.Replaced
+    Previous = Some(textLine line "old")
+    Current = Some(textLine line "new")
+}
+
+/// A hunk whose row shows the line on both sides, so pages read in order cover growing lines.
+let private hunkAt id (line: int) =
+    hunkWith id [| rowAt $"{id}-row" line |]
+
 let private gap id =
     DiffPartDto.HiddenEqual {
         GapId = id
@@ -460,7 +472,7 @@ Vitest.describe (
 
                 Vitest
                     .expect((diffOf state).Status)
-                    .toEqual (GitDiffPageStatus.EncodingChoice(DiffSideDto.Previous, token, previousCandidates))
+                    .toEqual (GitDiffPageStatus.EncodingChoice(DiffSideDto.Previous, Some token, previousCandidates))
 
                 let! state =
                     run
@@ -474,7 +486,7 @@ Vitest.describe (
 
                 Vitest
                     .expect((diffOf state).Status)
-                    .toEqual (GitDiffPageStatus.EncodingChoice(DiffSideDto.Current, token, currentCandidates))
+                    .toEqual (GitDiffPageStatus.EncodingChoice(DiffSideDto.Current, Some token, currentCandidates))
 
                 let! state =
                     run fake (diffMsg (GitDiffMsg.ChooseEncoding(generation, DiffSideDto.Current, "latin1"))) state
@@ -790,7 +802,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "Changed sources, a failed worker and content that is not text get their own statuses",
+            "Changed sources, a failed worker, content that is not text and a session without a diff service get their own statuses",
             fun () -> promise {
                 let detail: DiffContentBlockedDto = {
                     Side = DiffSideDto.Current
@@ -802,6 +814,8 @@ Vitest.describe (
                     failedWith "diff_worker_failed" None, GitDiffPageStatus.WorkerFailed "diff_worker_failed"
                     failedWith "diff_content_not_text" (Some detail),
                     GitDiffPageStatus.Blocked(Some DiffSideDto.Current, GitDiffBlockReason.NotText "invalid utf-8")
+                    failedWith "service_unavailable" None,
+                    GitDiffPageStatus.Blocked(None, GitDiffBlockReason.ProviderUnsupported)
                     failedWith "git_failure" None, GitDiffPageStatus.Failed "git_failure"
                 ]
 
@@ -1215,7 +1229,7 @@ Vitest.describe (
                 let fake = FakeDiffClient()
 
                 let pageDto index =
-                    diffPage $"p{index}" (Some $"cursor-{index}") [| hunk $"h{index}" |]
+                    diffPage $"p{index}" (Some $"cursor-{index}") [| hunkAt $"h{index}" (index * 10) |]
 
                 fake.OpenReply <- fun _ -> openedOn (handleOfOpen fake.Opens.Count) (pageDto 1)
 
@@ -1334,7 +1348,7 @@ Vitest.describe (
                 let fake = FakeDiffClient()
 
                 let pageDto index =
-                    diffPage $"p{index}" (Some $"cursor-{index}") [| hunk $"h{index}" |]
+                    diffPage $"p{index}" (Some $"cursor-{index}") [| hunkAt $"h{index}" (index * 10) |]
 
                 fake.OpenReply <- fun _ -> openedOn (handleOfOpen fake.Opens.Count) (pageDto 1)
 
@@ -1424,7 +1438,7 @@ Vitest.describe (
 
                 let pageDto index =
                     diffPage $"p{index}" (if index < 10 then Some $"cursor-{index}" else None) [|
-                        hunk $"h{index}"
+                        hunkAt $"h{index}" (index * 10)
                         gap $"g{index}"
                     |]
 
@@ -2016,37 +2030,454 @@ Vitest.describe (
                 let! state =
                     run fake (diffMsg (GitDiffMsg.LoadLineBefore(generation, DiffSideDto.Current, 0.0, 10000.0))) state
 
-                Vitest.expect(fake.Lines.[0].OffsetUtf16).toBe ("1808")
+                // The request overlaps the displayed text by one unit.
+                Vitest.expect(fake.Lines.[0].OffsetUtf16).toBe ("1809")
                 Vitest.expect(fake.Lines.[0].MaxUtf16).toBe (8192)
 
                 let line = currentLine (diffOf state)
-                Vitest.expect(line.OffsetUtf16).toBe (1808.0)
-                Vitest.expect(line.Text).toBe (String.replicate 8192 "x" + "abc")
+                Vitest.expect(line.OffsetUtf16).toBe (1809.0)
+                Vitest.expect(line.Text).toBe (String.replicate 8191 "x" + "abc")
 
                 Vitest
                     .expect(
                         line.Highlights
                         |> Array.map (fun highlight -> highlight.Start, highlight.Length)
                     )
-                    .toEqual ([| 0, 1; 8193, 1 |])
+                    .toEqual ([| 0, 1; 8192, 1 |])
 
-                Vitest.expect((lineText (diffOf state)).getAttribute "data-offset-utf16").toBe ("1808")
+                Vitest.expect((lineText (diffOf state)).getAttribute "data-offset-utf16").toBe ("1809")
 
                 let! state =
-                    run fake (diffMsg (GitDiffMsg.LoadLineBefore(generation, DiffSideDto.Current, 0.0, 1808.0))) state
+                    run fake (diffMsg (GitDiffMsg.LoadLineBefore(generation, DiffSideDto.Current, 0.0, 1809.0))) state
 
                 Vitest.expect(fake.Lines.[1].OffsetUtf16).toBe ("0")
-                Vitest.expect(fake.Lines.[1].MaxUtf16).toBe (1808)
+                Vitest.expect(fake.Lines.[1].MaxUtf16).toBe (1810)
 
                 let line = currentLine (diffOf state)
                 Vitest.expect(line.Text.Length).toBe (10003)
 
                 Vitest
                     .expect(line.Highlights |> Array.map (fun highlight -> highlight.Start))
-                    .toEqual ([| 0; 1808; 10001 |])
+                    .toEqual ([| 0; 1809; 10001 |])
 
                 Vitest.expect((lineText (diffOf state)).getAttribute "data-offset-utf16").toBe ("0")
                 Vitest.expect(isNull (beforeControl (diffOf state))).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "Loading the text before a slice reaches the line start when a request boundary falls inside a surrogate pair",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                // One emoji takes the units 1807 and 1808, so a request from 1808 would split it.
+                // The displayed slice starts with another emoji at 10000, so a request that ends
+                // one unit after the displayed start splits that one.
+                let lineText =
+                    String.replicate 1807 "a"
+                    + "\U0001F600"
+                    + String.replicate 8191 "b"
+                    + "\U0001F600"
+                    + String.replicate 1998 "c"
+
+                let isLowSurrogate (index: int) =
+                    index > 0
+                    && index < lineText.Length
+                    && System.Char.IsLowSurrogate lineText.[index]
+
+                let slice (offset: int) (text: string) : DiffLineDto = {
+                    Number = "0"
+                    Ending = LineEndingDto.LF
+                    Slice = {
+                        OffsetUtf16 = string offset
+                        TotalUtf16 = Some(string lineText.Length)
+                        Text = text
+                        Highlights = [||]
+                    }
+                }
+
+                let slicedRow = {
+                    changedRow "r1" with
+                        Current = Some(slice 10000 (lineText.Substring 10000))
+                }
+
+                let! state = openFirstPage fake (diffPage "p1" None [| hunkWith "h1" [| slicedRow |] |])
+
+                // Like the library, a start inside a surrogate pair moves back by one unit with
+                // the same length, and an end inside a pair moves back as well.
+                fake.LineReply <-
+                    fun request ->
+                        let requested = int request.OffsetUtf16
+
+                        let start =
+                            if isLowSurrogate requested then
+                                requested - 1
+                            else
+                                requested
+
+                        let fullEnd = min lineText.Length (start + request.MaxUtf16)
+                        let sliceEnd = if isLowSurrogate fullEnd then fullEnd - 1 else fullEnd
+                        succeeded (ResumableLineDto.Ready(slice start (lineText.Substring(start, sliceEnd - start))))
+
+                let generation = (diffOf state).Generation
+                let current = ref state
+                let requests = ref 0
+
+                while (currentLine (diffOf current.Value)).OffsetUtf16 > 0.0 && requests.Value < 5 do
+                    let displayedStart = (currentLine (diffOf current.Value)).OffsetUtf16
+
+                    let! next =
+                        run
+                            fake
+                            (diffMsg (GitDiffMsg.LoadLineBefore(generation, DiffSideDto.Current, 0.0, displayedStart)))
+                            current.Value
+
+                    current.Value <- next
+                    requests.Value <- requests.Value + 1
+
+                let line = currentLine (diffOf current.Value)
+                Vitest.expect(line.OffsetUtf16).toBe (0.0)
+                Vitest.expect(line.Text).toBe (lineText)
+                Vitest.expect(requests.Value).toBe (2)
+            }
+        )
+
+        Vitest.test (
+            "A side that turns out not to be UTF-8 asks for its encoding without a token, and the choice reopens the diff with it",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                let detail: DiffContentBlockedDto = {
+                    Side = DiffSideDto.Current
+                    Evidence = "byte 0x93 at 120"
+                }
+
+                fake.OpenReply <-
+                    fun _ -> openedOn (handleOfOpen fake.Opens.Count) (diffPage "p1" (Some "cursor-1") [| hunk "h1" |])
+
+                fake.ReadReply <-
+                    fun request ->
+                        if request.HandleId = "diff-1" then
+                            failedWith "diff_encoding_mismatch" (Some detail)
+                        else
+                            succeeded (ResumablePageDto.Ready(diffPage "p2" None [| hunk "h2" |]))
+
+                let! state = run fake (select "a.txt") runningState
+                let generation = (diffOf state).Generation
+                let! state = run fake (diffMsg (GitDiffMsg.LoadNext generation)) state
+
+                let candidates: EncodingCandidateDto[] = [|
+                    { Encoding = "utf-8"; Preview = "" }
+                    {
+                        Encoding = "windows-1252"
+                        Preview = ""
+                    }
+                |]
+
+                Vitest
+                    .expect((diffOf state).Status)
+                    .toEqual (GitDiffPageStatus.EncodingChoice(DiffSideDto.Current, None, candidates))
+
+                let! state =
+                    run
+                        fake
+                        (diffMsg (GitDiffMsg.ChooseEncoding(generation, DiffSideDto.Current, "windows-1252")))
+                        state
+
+                let page = diffOf state
+                Vitest.expect(fake.Opens.Count).toBe (2)
+                Vitest.expect(fake.Opens.[1].CurrentEncoding).toEqual (Some "windows-1252")
+                Vitest.expect(fake.Opens.[1].PreviousEncoding).toEqual (None)
+                Vitest.expect(fake.Opens.[1].PreparationTokenId).toEqual (None)
+                Vitest.expect(page.Handle).toEqual (Some(handleOfOpen 2))
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+                Vitest.expect(fake.Closes |> Seq.map _.HandleId |> Seq.toArray).toEqual ([| "diff-1" |])
+            }
+        )
+
+        Vitest.test (
+            "A next page that lands after the user went back and replayed an earlier page keeps that page loaded",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                let pageDto index =
+                    diffPage $"p{index}" (Some $"cursor-{index}") [| hunk $"h{index}" |]
+
+                let! state = openFirstPage fake (pageDto 1)
+                let generation = (diffOf state).Generation
+
+                fake.ReadReply <-
+                    fun request ->
+                        succeeded (ResumablePageDto.Ready(pageDto (int (request.Cursor.Replace("cursor-", "")) + 1)))
+
+                fake.ReplayReply <- fun request -> succeeded (pageDto (int (request.PageId.Replace("p", ""))))
+                let current = ref state
+
+                for _ in 2..9 do
+                    let! next = run fake (diffMsg (GitDiffMsg.LoadNext generation)) current.Value
+                    current.Value <- next
+
+                Vitest.expect((diffOf current.Value).Pages.[0].IsEvicted).toBe (true)
+
+                // The next page is asked for, and its answer waits while the user scrolls back up
+                // and the first page is replayed.
+                let loading, loadCmd =
+                    update fake.Dependencies fake.SetPageState (diffMsg (GitDiffMsg.LoadNext generation)) current.Value
+
+                let! heldPage = collectMessages loadCmd
+                let! replayed = run fake (diffMsg (GitDiffMsg.Replay(generation, "p1", [ "p1"; "p2" ]))) loading
+                Vitest.expect((diffOf replayed).Pages.[0].IsEvicted).toBe (false)
+                current.Value <- replayed
+
+                for message in heldPage do
+                    let! next = run fake message current.Value
+                    current.Value <- next
+
+                let page = diffOf current.Value
+                Vitest.expect(page.Pages |> Array.map _.PageId).toEqual ([| for index in 1..10 -> $"p{index}" |])
+                Vitest.expect(page.Pages.[0].IsEvicted).toBe (false)
+                Vitest.expect(page.Pages.[1].IsEvicted).toBe (false)
+                Vitest.expect(page.RequestedPageIndex).toBe (0)
+                Vitest.expect(page.NextCursor).toEqual (Some "cursor-10")
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+            }
+        )
+
+        Vitest.test (
+            "With small pages in a tall viewport, the reads and replays of the viewer stay bounded and settle",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let total = 40
+
+                let pageDto index =
+                    diffPage $"p{index}" (if index < total then Some $"cursor-{index}" else None) [| hunk $"h{index}" |]
+
+                let! state = openFirstPage fake (pageDto 1)
+                let generation = (diffOf state).Generation
+
+                fake.ReadReply <-
+                    fun request ->
+                        succeeded (ResumablePageDto.Ready(pageDto (int (request.Cursor.Replace("cursor-", "")) + 1)))
+
+                fake.ReplayReply <- fun request -> succeeded (pageDto (int (request.PageId.Replace("p", ""))))
+
+                // Every row is in view. The viewer replays the first placeholder from the top,
+                // the folded page next to the loaded rows first, and the continue row asks once
+                // for each next page.
+                let firstPlaceholder (page: GitDiffPageData) =
+                    let loaded =
+                        page.Pages
+                        |> Array.indexed
+                        |> Array.filter (fun (_, windowPage) -> not windowPage.IsEvicted)
+                        |> Array.map fst
+
+                    if loaded.Length = 0 then
+                        None
+                    else
+                        let first = Array.head loaded
+                        let last = Array.last loaded
+
+                        let between =
+                            page.Pages
+                            |> Array.indexed
+                            |> Array.tryFind (fun (index, windowPage) ->
+                                windowPage.IsEvicted && index > first && index < last
+                            )
+
+                        match between with
+                        | _ when first > 0 -> Some page.Pages.[first - 1].PageId
+                        | Some(_, windowPage) -> Some windowPage.PageId
+                        | None when last < page.Pages.Length - 1 -> Some page.Pages.[last + 1].PageId
+                        | None -> None
+
+                let current = ref state
+                let requestedNext = ref None
+                let settled = ref false
+                let steps = ref 0
+
+                while not settled.Value && steps.Value < 400 do
+                    let page = diffOf current.Value
+
+                    let visible =
+                        page.Pages
+                        |> Array.filter (fun windowPage -> not windowPage.IsEvicted)
+                        |> Array.map _.PageId
+                        |> List.ofArray
+
+                    let replay = firstPlaceholder page
+                    let wantsNext = page.NextCursor.IsSome && page.NextCursor <> requestedNext.Value
+
+                    if replay.IsNone && not wantsNext then
+                        settled.Value <- true
+                    else
+                        match replay with
+                        | Some pageId ->
+                            let! next =
+                                run fake (diffMsg (GitDiffMsg.Replay(generation, pageId, visible))) current.Value
+
+                            current.Value <- next
+                        | None -> ()
+
+                        if wantsNext then
+                            requestedNext.Value <- page.NextCursor
+                            let! next = run fake (diffMsg (GitDiffMsg.LoadNext generation)) current.Value
+                            current.Value <- next
+
+                    steps.Value <- steps.Value + 1
+
+                Vitest.expect(settled.Value).toBe (true)
+                Vitest.expect(fake.Reads.Count).toBe (total - 1)
+                Vitest.expect(fake.Replays.Count).toBeLessThanOrEqual (2 * total)
+            }
+        )
+
+        Vitest.test (
+            "A reopen reads forward to the page with the first line the user was reading when page boundaries differ",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                // The first session reads pages of ten lines, the second one pages of five lines.
+                let pageOf (handleId: string) (index: int) =
+                    let size = if handleId = "diff-1" then 10 else 5
+                    let first = (index - 1) * size
+
+                    diffPage $"{handleId}-p{index}" (Some $"cursor-{index}") [|
+                        hunkWith $"{handleId}-h{index}" [|
+                            for line in first .. first + size - 1 -> rowAt $"{handleId}-r{line}" line
+                        |]
+                    |]
+
+                fake.OpenReply <-
+                    fun _ ->
+                        let openHandle = handleOfOpen fake.Opens.Count
+                        openedOn openHandle (pageOf openHandle.Id 1)
+
+                fake.ReadReply <-
+                    fun request ->
+                        if request.HandleId = "diff-1" && request.Cursor = "cursor-3" then
+                            failedWith "diff_session_closed" None
+                        else
+                            let index = int (request.Cursor.Replace("cursor-", "")) + 1
+                            succeeded (ResumablePageDto.Ready(pageOf request.HandleId index))
+
+                let! state = run fake (select "a.txt") runningState
+                let generation = (diffOf state).Generation
+                let current = ref state
+
+                // The third page shows the lines 20 to 29. Reading the fourth page finds the session closed.
+                for _ in 1..3 do
+                    let! next = run fake (diffMsg (GitDiffMsg.LoadNext generation)) current.Value
+                    current.Value <- next
+
+                let page = diffOf current.Value
+
+                Vitest
+                    .expect(
+                        fake.Reads
+                        |> Seq.filter (fun read -> read.HandleId = "diff-2")
+                        |> Seq.map _.Cursor
+                        |> Seq.toArray
+                    )
+                    .toEqual ([| "cursor-1"; "cursor-2"; "cursor-3"; "cursor-4" |])
+
+                Vitest.expect(page.Pages |> Array.map _.PageId).toEqual ([| for index in 1..5 -> $"diff-2-p{index}" |])
+
+                // The fifth page of the new session starts with line 20.
+                Vitest.expect(page.RequestedPageIndex).toBe (4)
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+                Vitest.expect(current.Value.DiffReopen).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A failed expansion, line slice or replay marks its control and keeps the rows, and changed sources still end the diff",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                let longRow = {
+                    changedRow "long" with
+                        Current =
+                            Some {
+                                textLine 0 "abc" with
+                                    Slice = {
+                                        OffsetUtf16 = "0"
+                                        TotalUtf16 = Some "9"
+                                        Text = "abc"
+                                        Highlights = [||]
+                                    }
+                            }
+                }
+
+                let pageDto index =
+                    diffPage $"p{index}" (Some $"cursor-{index}") [|
+                        hunkWith $"h{index}" [| { longRow with Id = $"long-{index}" } |]
+                        gap $"g{index}"
+                    |]
+
+                let! state = openFirstPage fake (pageDto 1)
+                let generation = (diffOf state).Generation
+
+                fake.ExpandReply <-
+                    fun request ->
+                        if request.GapId = "g9" then
+                            failedWith "source_changed" None
+                        else
+                            failedWith "git_failure" None
+
+                fake.LineReply <- fun _ -> failedWith "git_failure" None
+                fake.ReplayReply <- fun _ -> failedWith "git_failure" None
+
+                let! state = run fake (diffMsg (GitDiffMsg.Expand(generation, "g1", true))) state
+
+                let! state =
+                    run fake (diffMsg (GitDiffMsg.LoadLineSlice(generation, DiffSideDto.Current, 0.0, 3.0))) state
+
+                let page = diffOf state
+
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+                Vitest.expect(pageParts page.Pages.[0]).toEqual ([| "hunk:h1"; "gap:g1" |])
+                Vitest.expect(page.FailedGaps).toEqual ([ "g1" ])
+
+                Vitest
+                    .expect(page.FailedLineSlices |> List.map (fun slice -> slice.Side, slice.Line))
+                    .toEqual ([ Paged.PagedDiffSide.Current, 0.0 ])
+
+                let rendered = renderTarget page
+
+                Vitest
+                    .expect(
+                        (rendered.querySelector "[data-testid=\"renderer-git-diff-gap-expand-start-g1\"]").getAttribute
+                            "data-failed"
+                    )
+                    .toBe ("true")
+
+                Vitest
+                    .expect(
+                        (rendered.querySelector "[data-testid=\"renderer-git-diff-line-more-current-0\"]").getAttribute
+                            "data-failed"
+                    )
+                    .toBe ("true")
+
+                fake.ReadReply <-
+                    fun request ->
+                        succeeded (ResumablePageDto.Ready(pageDto (int (request.Cursor.Replace("cursor-", "")) + 1)))
+
+                let current = ref state
+
+                for _ in 2..9 do
+                    let! next = run fake (diffMsg (GitDiffMsg.LoadNext generation)) current.Value
+                    current.Value <- next
+
+                Vitest.expect((diffOf current.Value).Pages.[0].IsEvicted).toBe (true)
+
+                let! state = run fake (diffMsg (GitDiffMsg.Replay(generation, "p1", []))) current.Value
+                let page = diffOf state
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+                Vitest.expect(page.FailedReplays).toEqual ([ "p1" ])
+                Vitest.expect(page.Pages.[0].IsEvicted).toBe (true)
+
+                let! state = run fake (diffMsg (GitDiffMsg.Expand(generation, "g9", true))) state
+                Vitest.expect((diffOf state).Status).toEqual (GitDiffPageStatus.SourceChanged)
             }
         )
 )

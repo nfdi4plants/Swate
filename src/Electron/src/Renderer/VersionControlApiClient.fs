@@ -105,7 +105,4 @@ let expandTextDiff (dto: ExpandTextDiffRequestDto) = call (fun () -> api.expandT
 let readTextDiffLine (dto: ReadTextDiffLineRequestDto) =
     call (fun () -> api.readTextDiffLine dto)
 
-let getTextDiffSourceInfo (dto: TextDiffHandleRequestDto) =
-    call (fun () -> api.getTextDiffSourceInfo dto)
-
 let closeTextDiff (dto: TextDiffHandleRequestDto) = call (fun () -> api.closeTextDiff dto)

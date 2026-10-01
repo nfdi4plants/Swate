@@ -55,8 +55,17 @@ module Virtual =
         [<ParamObject(1)>]
         member this.scrollToOffset(offset: int, ?align: AlignOption, ?behavior: ScrollBehavior) : unit = jsNative
 
+        /// The item at the offset, measured with the current sizes. None while there is no item.
+        member this.getVirtualItemForOffset(offset: float) : VirtualItem option = jsNative
+
         member this.scrollRect: {| height: int; width: int |} = jsNative
-        member this.scrollOffset: int = jsNative
+
+        /// The scroll offset the virtualizer lays rows out for. It follows the scroll events of
+        /// the scroll element.
+        member this.scrollOffset
+            with get (): float = jsNative
+            and set (_: float) = jsNative
+
         member this.measureElement: VirtualMeasureElementRef = jsNative
 
 [<Erase>]

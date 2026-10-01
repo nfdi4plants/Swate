@@ -118,7 +118,13 @@ let Main (page: GitDiffPageData) =
                         previousTitle = previousTitle,
                         currentTitle = currentTitle,
                         ?changeKind = page.ChangeKind,
-                        testIdPrefix = "renderer-git-diff"
+                        testIdPrefix = "renderer-git-diff",
+                        // Evicting or replaying the last page changes the last part but not the
+                        // cursor, so the cursor keeps the continue row from reading again.
+                        ?nextPageKey = page.NextCursor,
+                        failedGaps = Array.ofList page.FailedGaps,
+                        failedLineSlices = Array.ofList page.FailedLineSlices,
+                        failedReplays = Array.ofList page.FailedReplays
                     )
                 ]
             ]

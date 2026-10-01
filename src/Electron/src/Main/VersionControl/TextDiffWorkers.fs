@@ -39,7 +39,9 @@ let private createPool () : JS.Promise<TextDiffPool.TextDiffPool option> = promi
     try
         let! supervisor =
             TextDiffSupervisor.create {
-                TempRoot = app.getPath Enums.App.GetPath.Name.Temp
+                // The supervisor keeps its text-diff folder of spools and scratch files in the user's
+                // app data, because the temp folder is shared by all users on Linux.
+                TempRoot = app.getPath Enums.App.GetPath.Name.UserData
                 GitExecutable = None
                 OnEvent = None
             }

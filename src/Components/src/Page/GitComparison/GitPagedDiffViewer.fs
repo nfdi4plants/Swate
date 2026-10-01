@@ -56,6 +56,11 @@ module internal GitPagedDiffDisplay =
         PendingReplays: string[]
         RequestReplay: (string -> unit) option
         RequestNext: (unit -> unit) option
+        /// Gaps, line slices and evicted pages whose last request failed. Their controls show
+        /// the failure and stay enabled, so the user can ask again.
+        FailedGaps: string[]
+        FailedLineSlices: PagedLineSliceRequest[]
+        FailedReplays: string[]
     }
 
     type LineProps = {
@@ -68,14 +73,27 @@ module internal GitPagedDiffDisplay =
         RequestLineBefore: (PagedDiffSide -> float -> float -> unit) option
         /// A slice of this line is still loading, so its controls stay disabled.
         SlicePending: bool
+        /// The last slice request of this line failed.
+        SliceFailed: bool
     }
 
-    type AnchorCandidate = { Key: string; Start: int }
+    /// A row the scroll position can follow, with its distance from the top of the viewport.
+    type AnchorCandidate = { Key: string; Offset: float }
 
     type AnchorSnapshot = {
         Keys: string[]
         Candidates: AnchorCandidate[]
     }
+
+    /// Rows the virtualizer renders above and below the viewport.
+    [<Literal>]
+    let OverscanRows = 8
+
+    let failedAttribute (failed: bool) =
+        prop.custom ("data-failed", (if failed then "true" else "false"))
+
+    /// The class of a control whose last request failed.
+    let failedClass (failed: bool) = if failed then "swt:text-error" else ""
 
     /// Height of one diff row. A placeholder of an evicted page is as tall as its rows, so the
     /// scroll position stays where it was when the page is evicted or replayed.
@@ -477,7 +495,11 @@ type GitPagedDiffViewer =
                             if line.OffsetUtf16 > 0.0 then
                                 Html.button [
                                     prop.testId $"{props.Prefix}-line-before-{side}-{lineNumber}"
-                                    prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:shrink-0"
+                                    GitPagedDiffDisplay.failedAttribute props.SliceFailed
+                                    prop.className [
+                                        "swt:btn swt:btn-ghost swt:btn-xs swt:shrink-0"
+                                        GitPagedDiffDisplay.failedClass props.SliceFailed
+                                    ]
                                     prop.disabled (props.SlicePending || props.RequestLineBefore.IsNone)
                                     prop.onClick (fun _ ->
                                         props.RequestLineBefore
@@ -516,7 +538,11 @@ type GitPagedDiffViewer =
                             if hasMore then
                                 Html.button [
                                     prop.testId $"{props.Prefix}-line-more-{side}-{lineNumber}"
-                                    prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:shrink-0"
+                                    GitPagedDiffDisplay.failedAttribute props.SliceFailed
+                                    prop.className [
+                                        "swt:btn swt:btn-ghost swt:btn-xs swt:shrink-0"
+                                        GitPagedDiffDisplay.failedClass props.SliceFailed
+                                    ]
                                     prop.disabled (props.SlicePending || props.RequestLineSlice.IsNone)
                                     prop.onClick (fun _ ->
                                         props.RequestLineSlice
@@ -661,6 +687,12 @@ type GitPagedDiffViewer =
                         props.PendingLineSlices
                         |> Array.exists (fun request -> request.Side = side && request.Line = shown.Number)
                     )
+                SliceFailed =
+                    line
+                    |> Option.exists (fun shown ->
+                        props.FailedLineSlices
+                        |> Array.exists (fun request -> request.Side = side && request.Line = shown.Number)
+                    )
             }
 
         let content =
@@ -676,6 +708,7 @@ type GitPagedDiffViewer =
                 ]
             | GitPagedDiffDisplay.Gap(gapId, previous, _) ->
                 let isExpanding = props.ExpandingGaps |> Array.contains gapId
+                let failed = props.FailedGaps |> Array.contains gapId
 
                 // The control at the top of the gap sits below the previous hunk and reveals the
                 // first hidden lines. The control at the bottom sits above the next hunk and
@@ -690,7 +723,11 @@ type GitPagedDiffViewer =
                     Html.button [
                         prop.testId $"{props.Prefix}-gap-expand-{position}-{gapId}"
                         prop.custom ("data-from-start", (if fromStart then "true" else "false"))
-                        prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:gap-1"
+                        GitPagedDiffDisplay.failedAttribute failed
+                        prop.className [
+                            "swt:btn swt:btn-ghost swt:btn-xs swt:gap-1"
+                            GitPagedDiffDisplay.failedClass failed
+                        ]
                         prop.title label
                         prop.ariaLabel label
                         prop.disabled (isExpanding || props.RequestExpand.IsNone)
@@ -729,6 +766,7 @@ type GitPagedDiffViewer =
                 ]
             | GitPagedDiffDisplay.Evicted(pageId, rowCount) ->
                 let replaying = props.PendingReplays |> Array.contains pageId
+                let failed = props.FailedReplays |> Array.contains pageId
 
                 Html.div [
                     prop.className
@@ -741,7 +779,11 @@ type GitPagedDiffViewer =
                         Html.span [ prop.text $"{rowCount} rows unloaded" ]
                         Html.button [
                             prop.testId $"{props.Prefix}-evicted-{pageId}"
-                            prop.className "swt:btn swt:btn-ghost swt:btn-xs"
+                            GitPagedDiffDisplay.failedAttribute failed
+                            prop.className [
+                                "swt:btn swt:btn-ghost swt:btn-xs"
+                                GitPagedDiffDisplay.failedClass failed
+                            ]
                             prop.disabled (replaying || props.RequestReplay.IsNone)
                             prop.onClick (fun _ -> props.RequestReplay |> Option.iter (fun callback -> callback pageId))
                             prop.text "Reload rows"
@@ -754,6 +796,8 @@ type GitPagedDiffViewer =
                 let replaying =
                     props.PendingReplays
                     |> Array.exists (fun pageId -> Array.contains pageId pageIds)
+
+                let failed = props.FailedReplays |> Array.contains nextPage
 
                 let label =
                     match side with
@@ -773,7 +817,11 @@ type GitPagedDiffViewer =
                         Html.span [ prop.text label ]
                         Html.button [
                             prop.testId $"{props.Prefix}-folded-replay-{nextPage}"
-                            prop.className "swt:btn swt:btn-ghost swt:btn-xs"
+                            GitPagedDiffDisplay.failedAttribute failed
+                            prop.className [
+                                "swt:btn swt:btn-ghost swt:btn-xs"
+                                GitPagedDiffDisplay.failedClass failed
+                            ]
                             prop.disabled (replaying || props.RequestReplay.IsNone)
                             prop.onClick (fun _ ->
                                 props.RequestReplay |> Option.iter (fun callback -> callback nextPage)
@@ -845,7 +893,7 @@ type GitPagedDiffViewer =
             previousTitle: string,
             currentTitle: string,
             prefix: string,
-            lastPart: obj,
+            nextKey: obj,
             hasMore: bool,
             progress: PagedProgress option,
             status: PagedDiffStatus,
@@ -856,7 +904,10 @@ type GitPagedDiffViewer =
             pendingLineSlices: PagedLineSliceRequest[],
             pendingReplays: string[],
             requestReplay: (string -> int -> int -> unit) option,
-            requestNext: (unit -> unit) option
+            requestNext: (unit -> unit) option,
+            failedGaps: string[],
+            failedLineSlices: PagedLineSliceRequest[],
+            failedReplays: string[]
         ) =
         let rowHeight = GitPagedDiffDisplay.RowHeightPx
         let headerScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
@@ -864,6 +915,9 @@ type GitPagedDiffViewer =
         let bodyContentRef: IRefValue<HTMLElement option> = React.useElementRef ()
         let contentMeasureRef, contentRect = React.useMeasure<Element> ()
         let previousLayout = React.useRef<GitPagedDiffDisplay.AnchorSnapshot option> None
+        // Changed after the scroll position was restored, so the rows render for the new position
+        // before the browser paints.
+        let layoutVersion, setLayoutVersion = React.useState 0
 
         // While the diff reopens, the rows stay on screen and take no requests.
         let interactive = status <> PagedDiffStatus.Reopening
@@ -916,7 +970,7 @@ type GitPagedDiffViewer =
                         | _ -> rowHeight
                     ),
                 getItemKey = (fun index -> rows.[index].Key),
-                overscan = 8,
+                overscan = GitPagedDiffDisplay.OverscanRows,
                 gap = 0
             )
 
@@ -977,28 +1031,52 @@ type GitPagedDiffViewer =
             else
                 Array.min indices, Array.max indices
 
+        // The rows in the viewport, taken from the scroll element and the measured row sizes. The
+        // rendered rows can still belong to an earlier scroll position, because the virtualizer
+        // learns of a scroll only from the scroll event.
+        let rowsInViewport () : Virtual.VirtualItem[] =
+            match bodyScrollRef.current with
+            | Some element when rows.Length > 0 ->
+                let top = element.scrollTop
+                let bottom = top + element.clientHeight
+
+                // Looking up the first row also brings the measurements up to date with the sizes
+                // measured since the last render.
+                match rowVirtualizer.getVirtualItemForOffset top with
+                | Some first ->
+                    let measurements = rowVirtualizer.measurementsCache
+                    let last = (min rows.Length measurements.Length) - 1
+                    let found = ResizeArray<Virtual.VirtualItem>()
+                    let mutable index = first.index
+
+                    while index <= last && float measurements.[index].start < bottom do
+                        let item = measurements.[index]
+
+                        if float item.``end`` > top then
+                            found.Add item
+
+                        index <- index + 1
+
+                    found.ToArray()
+                | None -> [||]
+            | _ -> [||]
+
         let captureAnchor () : GitPagedDiffDisplay.AnchorSnapshot =
-            let scrollTop =
+            let top =
                 bodyScrollRef.current
                 |> Option.map (fun element -> element.scrollTop)
                 |> Option.defaultValue 0.0
 
-            let visibleStart = int scrollTop
-
-            let visibleEnd =
-                bodyScrollRef.current
-                |> Option.map (fun element -> int (scrollTop + element.clientHeight))
-                |> Option.defaultValue visibleStart
-
             let candidates =
-                rowVirtualizer.getVirtualItems ()
-                |> Array.filter (fun item ->
-                    item.``end`` > visibleStart
-                    && item.start < visibleEnd
-                    && item.index < rows.Length
-                )
+                rowsInViewport ()
                 |> Array.sortBy (fun item -> GitPagedDiffDisplay.anchorPriority rows.[item.index].Content, item.start)
-                |> Array.map (fun item -> ({ Key = item.key; Start = item.start }: GitPagedDiffDisplay.AnchorCandidate))
+                |> Array.map (fun item ->
+                    ({
+                        Key = item.key
+                        Offset = float item.start - top
+                    }
+                    : GitPagedDiffDisplay.AnchorCandidate)
+                )
 
             ({
                 Keys = rows |> Array.map (fun row -> row.Key)
@@ -1008,32 +1086,43 @@ type GitPagedDiffViewer =
 
         let rowsSignature = rows |> Array.map (fun row -> row.Key) |> String.concat "\u001f"
 
+        // When rows are added, folded or replayed, the first row that was in view and is still
+        // there keeps its distance from the top of the viewport. The distance comes from the
+        // snapshot, since the browser lowers the scroll top on its own when the rows above shrink.
         React.useLayoutEffect (
             (fun () ->
-                match previousLayout.current with
-                | Some previous when previous.Keys <> (rows |> Array.map (fun row -> row.Key)) ->
-                    let surviving =
+                let keys = rows |> Array.map (fun row -> row.Key)
+
+                match previousLayout.current, bodyScrollRef.current with
+                | Some previous, Some scrollElement when previous.Keys <> keys ->
+                    let indexOfKey = Dictionary<string, int>()
+                    keys |> Array.iteri (fun index key -> indexOfKey.[key] <- index)
+
+                    let anchor =
                         previous.Candidates
                         |> Array.tryPick (fun candidate ->
-                            if rows |> Array.exists (fun row -> row.Key = candidate.Key) then
-                                Some candidate
-                            else
-                                None
+                            match indexOfKey.TryGetValue candidate.Key with
+                            | true, index -> Some(candidate, index)
+                            | _ -> None
                         )
 
-                    match surviving, bodyScrollRef.current with
-                    | Some anchor, Some scrollElement ->
-                        let nextStart =
-                            rowVirtualizer.measurementsCache
-                            |> Array.tryFind (fun item -> item.key = anchor.Key)
-                            |> Option.map (fun item -> item.start)
+                    match anchor with
+                    | Some(candidate, index) ->
+                        // Asking for the total size brings the measurements up to date with the
+                        // rows measured in this commit.
+                        rowVirtualizer.getTotalSize () |> ignore
+                        let target = float rowVirtualizer.measurementsCache.[index].start - candidate.Offset
 
-                        nextStart
-                        |> Option.iter (fun start ->
-                            let previousScrollTop = scrollElement.scrollTop
-                            scrollElement.scrollTop <- previousScrollTop + float (start - anchor.Start)
-                        )
-                    | _ -> ()
+                        if abs (scrollElement.scrollTop - target) >= 1.0 then
+                            scrollElement.scrollTop <- target
+
+                        // Until the scroll event arrives, the virtualizer would lay rows out for
+                        // the old position and correct size changes against it, which moves the
+                        // view back.
+                        if abs (rowVirtualizer.scrollOffset - scrollElement.scrollTop) >= 1.0 then
+                            rowVirtualizer.scrollOffset <- scrollElement.scrollTop
+                            setLayoutVersion (layoutVersion + 1)
+                    | None -> ()
                 | _ -> ()
 
                 previousLayout.current <- Some(captureAnchor ())
@@ -1054,8 +1143,8 @@ type GitPagedDiffViewer =
         let replaySignature = pendingReplays |> String.concat "\u001f"
         let requestedReplay = React.useRef (HashSet<string>())
         let lastReplaySignature = React.useRef replaySignature
-        // Holds the last part at the time of the last next page request. It changes when a page
-        // is added or the last page is replaced. Evicting earlier pages leaves it alone.
+        // Holds the key of the next page at the time of the last next page request, so the
+        // continue row asks once for each next page.
         let requestedNext = React.useRef<obj> (obj ())
 
         React.useEffect (
@@ -1091,19 +1180,20 @@ type GitPagedDiffViewer =
                         |> Option.map (fun element -> element.scrollTop + element.clientHeight / 2.0)
                         |> Option.defaultValue 0.0
 
+                    // A page whose replay failed waits for the user to ask again.
+                    let mayReplay pageId =
+                        not (requestedReplay.current.Contains pageId)
+                        && not (failedReplays |> Array.contains pageId)
+
                     viewport
                     |> Array.tryPick (fun item ->
                         match rows.[item.Index].Content with
-                        | GitPagedDiffDisplay.Evicted(pageId, _) when not (requestedReplay.current.Contains pageId) ->
-                            Some pageId
+                        | GitPagedDiffDisplay.Evicted(pageId, _) when mayReplay pageId -> Some pageId
                         | GitPagedDiffDisplay.Folded(side, pageIds, _) ->
                             let fromAbove = float item.Start + float item.Size / 2.0 > viewportMiddle
                             let pageId = GitPagedDiffDisplay.nearestFoldedPage side pageIds fromAbove
 
-                            if requestedReplay.current.Contains pageId then
-                                None
-                            else
-                                Some pageId
+                            if mayReplay pageId then Some pageId else None
                         | _ -> None
                     )
                     |> Option.iter (fun pageId ->
@@ -1113,21 +1203,33 @@ type GitPagedDiffViewer =
                     )
                 | _ -> ()
 
-                let continueRendered =
-                    virtualItems
-                    |> Array.exists (fun item ->
-                        match rows.[item.Index].Content with
-                        | GitPagedDiffDisplay.Continue _ -> true
+                // The continue row asks for the next page once it is within the rendered rows
+                // around the viewport. Its position comes from the scroll element, since the
+                // rendered rows can still belong to the position before a restore.
+                let continueNear =
+                    match bodyScrollRef.current with
+                    | Some element when rows.Length > 0 ->
+                        let measurements = rowVirtualizer.measurementsCache
+                        let lastIndex = rows.Length - 1
+
+                        match rows.[lastIndex].Content with
+                        | GitPagedDiffDisplay.Continue _ when measurements.Length = rows.Length ->
+                            let renderedBottom =
+                                element.scrollTop
+                                + element.clientHeight
+                                + float (GitPagedDiffDisplay.OverscanRows * rowHeight)
+
+                            float measurements.[lastIndex].start < renderedBottom
                         | _ -> false
-                    )
+                    | _ -> false
 
                 match requestNext with
                 | Some callback when
-                    continueRendered
+                    continueNear
                     && status <> PagedDiffStatus.LoadingNext
-                    && not (Object.ReferenceEquals(requestedNext.current, lastPart))
+                    && not (Object.ReferenceEquals(requestedNext.current, nextKey))
                     ->
-                    requestedNext.current <- lastPart
+                    requestedNext.current <- nextKey
                     callback ()
                 | _ -> ()
 
@@ -1140,7 +1242,7 @@ type GitPagedDiffViewer =
                 box requestReplay
                 box requestNext
                 box replaySignature
-                lastPart
+                nextKey
             |]
         )
 
@@ -1227,6 +1329,9 @@ type GitPagedDiffViewer =
                                                 PendingReplays = pendingReplays
                                                 RequestReplay = replayVisible
                                                 RequestNext = requestNext
+                                                FailedGaps = failedGaps
+                                                FailedLineSlices = failedLineSlices
+                                                FailedReplays = failedReplays
                                             }
                                         ]
                                     )
@@ -1368,11 +1473,14 @@ type GitPagedDiffViewer =
                                     ]
                                 ]
                             ]
-                            Html.pre [
-                                prop.className
-                                    "swt:max-h-48 swt:overflow-auto swt:whitespace-pre-wrap swt:break-all swt:rounded-box swt:bg-base-200/60 swt:p-2 swt:font-mono swt:text-xs"
-                                prop.text candidate.Preview
-                            ]
+                            // A side that turned out not to be UTF-8 while the diff was read comes
+                            // with candidates that have no preview.
+                            if candidate.Preview <> "" then
+                                Html.pre [
+                                    prop.className
+                                        "swt:max-h-48 swt:overflow-auto swt:whitespace-pre-wrap swt:break-all swt:rounded-box swt:bg-base-200/60 swt:p-2 swt:font-mono swt:text-xs"
+                                    prop.text candidate.Preview
+                                ]
                         ]
                     ]
             ]
@@ -1422,7 +1530,15 @@ type GitPagedDiffViewer =
             ?previousTitle: string,
             ?currentTitle: string,
             ?changeKind: GitDiffChangeKind,
-            ?testIdPrefix: string
+            ?testIdPrefix: string,
+            // Names the next page, such as its cursor. The continue row asks once for each key.
+            // Without a key it asks again whenever the last part changes.
+            ?nextPageKey: string,
+            // Gaps, line slices and evicted pages whose last request failed. Their controls show
+            // the failure, and a failed page is not replayed again until the user asks.
+            ?failedGaps: string[],
+            ?failedLineSlices: PagedLineSliceRequest[],
+            ?failedReplays: string[]
         ) =
         let prefix = defaultArg testIdPrefix "git-paged-diff"
         let previousTitle = defaultArg previousTitle "Previous version"
@@ -1559,7 +1675,9 @@ type GitPagedDiffViewer =
                             previousTitle,
                             currentTitle,
                             prefix,
-                            (parts |> Array.tryLast |> Option.map box |> Option.defaultValue null),
+                            (match nextPageKey with
+                             | Some key -> box key
+                             | None -> parts |> Array.tryLast |> Option.map box |> Option.defaultValue null),
                             hasMore,
                             progress,
                             status,
@@ -1570,7 +1688,10 @@ type GitPagedDiffViewer =
                             defaultArg pendingLineSlices [||],
                             defaultArg pendingReplays [||],
                             requestReplay,
-                            requestNext
+                            requestNext,
+                            defaultArg failedGaps [||],
+                            defaultArg failedLineSlices [||],
+                            defaultArg failedReplays [||]
                         )
                     ]
 

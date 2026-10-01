@@ -280,11 +280,14 @@ let tryRevisionId (value: string) : Result<RevisionId, OperationFailure> =
     RevisionId.tryCreate value
     |> Result.mapError (OperationFailure.create Validation VersionControlCodes.InvalidRevision)
 
-// ---- Paged text diff
-
 /// The longest operation id or handle id a text diff request may carry.
 [<Literal>]
 let MaxTextDiffIdLength = 128
+
+/// The longest handle version, cursor, page id, gap id, continuation, preparation token or
+/// encoding name a text diff request may carry.
+[<Literal>]
+let MaxTextDiffTokenLength = 256
 
 /// The largest failure message, in UTF-8 bytes, a text diff reply carries.
 [<Literal>]
@@ -305,6 +308,12 @@ let MaxTextDiffDetailsBytes = 4096
 /// The largest warning message, in UTF-8 bytes, a text diff reply carries.
 [<Literal>]
 let MaxTextDiffWarningBytes = 4096
+
+/// The largest JSON size, in UTF-8 bytes, of the warnings and the failure that a partly
+/// successful text diff reply carries next to its value. A page fills the reply up to its own
+/// limit, so these have to fit into the margin above it.
+[<Literal>]
+let MaxTextDiffPartialExtrasBytes = 4096
 
 let private int64Text (value: int64) : string = string value
 
@@ -585,12 +594,13 @@ let private utf8Length (text: string) =
         bytes
 
 /// Cuts every line to MaxTextDiffDetailLength and keeps lines while their UTF-8 sum stays
-/// within MaxTextDiffDetailsBytes. The first line that does not fit and all later lines are dropped.
-let private boundDetails (details: string[]) : string[] =
-    if isNull details then
-        details
+/// within MaxTextDiffDetailsBytes. The first line that does not fit and all later lines are
+/// dropped. Failure details and affected paths are bounded this way.
+let private boundLines (lines: string[]) : string[] =
+    if isNull lines then
+        lines
     else
-        let lines = details |> Array.map (truncateUtf16 MaxTextDiffDetailLength)
+        let lines = lines |> Array.map (truncateUtf16 MaxTextDiffDetailLength)
 
         let sums =
             lines |> Array.scan (fun total line -> total + utf8Length line) 0 |> Array.tail
@@ -617,7 +627,8 @@ let private boundWarnings (warnings: OperationWarningDto[]) : OperationWarningDt
 let boundTextDiffFailure (failure: OperationFailureDto) : OperationFailureDto = {
     failure with
         Message = truncateUtf8 MaxTextDiffMessageBytes failure.Message
-        Details = boundDetails failure.Details
+        Details = boundLines failure.Details
+        AffectedPaths = boundLines failure.AffectedPaths
         DiffDetail =
             failure.DiffDetail
             |> Option.map (fun detail -> {
@@ -626,16 +637,80 @@ let boundTextDiffFailure (failure: OperationFailureDto) : OperationFailureDto = 
             })
 }
 
-let boundTextDiffResult (result: OperationResultDto<'T>) : OperationResultDto<'T> =
-    let boundOutcome (outcome: OperationOutcomeDto<'T>) = {
-        outcome with
-            Warnings = boundWarnings outcome.Warnings
-    }
+/// UTF-8 bytes of the JSON of the value. JSON escapes count with their full length.
+let private jsonBytes (value: obj) : int =
+    utf8Length (Fable.Core.JS.JSON.stringify value)
 
+let private dropLast (values: 'T[]) =
+    Array.truncate (max 0 (values.Length - 1)) values
+
+/// Shrinks the warnings and the failure of a partly successful reply until their JSON fits
+/// into MaxTextDiffPartialExtrasBytes. Warnings go first, from the last one, then affected
+/// paths, then details lines, and the failure message is cut last.
+let private fitPartialExtras
+    (warnings: OperationWarningDto[])
+    (failure: OperationFailureDto)
+    : OperationWarningDto[] * OperationFailureDto =
+    let fits (warnings: OperationWarningDto[]) (failure: OperationFailureDto) =
+        jsonBytes (box warnings) + jsonBytes (box failure)
+        <= MaxTextDiffPartialExtrasBytes
+
+    let rec shrink (warnings: OperationWarningDto[]) (failure: OperationFailureDto) =
+        if fits warnings failure then
+            warnings, failure
+        elif not (isNull warnings) && warnings.Length > 0 then
+            shrink (dropLast warnings) failure
+        elif not (isNull failure.AffectedPaths) && failure.AffectedPaths.Length > 0 then
+            shrink warnings {
+                failure with
+                    AffectedPaths = dropLast failure.AffectedPaths
+            }
+        elif not (isNull failure.Details) && failure.Details.Length > 0 then
+            shrink warnings {
+                failure with
+                    Details = dropLast failure.Details
+            }
+        elif isNull failure.Message || failure.Message.Length = 0 then
+            warnings, failure
+        else
+            // The longest prefix of the message that fits, found by halving the step.
+            let withMessage length = {
+                failure with
+                    Message =
+                        if length = 0 then
+                            ""
+                        else
+                            truncateUtf16 length failure.Message
+            }
+
+            let mutable length = 0
+            let mutable step = failure.Message.Length
+
+            while step > 0 do
+                if
+                    length + step <= failure.Message.Length
+                    && fits warnings (withMessage (length + step))
+                then
+                    length <- length + step
+
+                step <- step / 2
+
+            warnings, withMessage length
+
+    shrink warnings failure
+
+let boundTextDiffResult (result: OperationResultDto<'T>) : OperationResultDto<'T> =
     match result with
-    | OperationResultDto.Succeeded outcome -> OperationResultDto.Succeeded(boundOutcome outcome)
+    | OperationResultDto.Succeeded outcome ->
+        OperationResultDto.Succeeded {
+            outcome with
+                Warnings = boundWarnings outcome.Warnings
+        }
     | OperationResultDto.PartiallySucceeded(outcome, failure) ->
-        OperationResultDto.PartiallySucceeded(boundOutcome outcome, boundTextDiffFailure failure)
+        let warnings, failure =
+            fitPartialExtras (boundWarnings outcome.Warnings) (boundTextDiffFailure failure)
+
+        OperationResultDto.PartiallySucceeded({ outcome with Warnings = warnings }, failure)
     | OperationResultDto.Failed failure -> OperationResultDto.Failed(boundTextDiffFailure failure)
 
 /// Maps a text diff result and bounds its failure text for the IPC reply.
@@ -653,6 +728,21 @@ let tryTextDiffId (name: string) (value: string) : Result<string, OperationFailu
         Error(invalidDiffRequest $"The {name} is longer than {MaxTextDiffIdLength} characters.")
     else
         Ok value
+
+/// Accepts a handle version, cursor, page id, gap id, continuation, preparation token or
+/// encoding name of at most MaxTextDiffTokenLength characters.
+let private tryTextDiffToken (name: string) (value: string) : Result<string, OperationFailure> =
+    if isNull value then
+        Error(invalidDiffRequest $"The {name} is missing.")
+    elif value.Length > MaxTextDiffTokenLength then
+        Error(invalidDiffRequest $"The {name} is longer than {MaxTextDiffTokenLength} characters.")
+    else
+        Ok value
+
+let private tryOptionalToken (name: string) (value: string option) : Result<string option, OperationFailure> =
+    match value with
+    | None -> Ok None
+    | Some text -> tryTextDiffToken name text |> Result.map Some
 
 /// Parses a line number or offset the renderer sent as decimal text.
 let tryNonNegativeInt64 (name: string) (text: string) : Result<int64, OperationFailure> =
@@ -674,6 +764,10 @@ let private tryOptionalRepositoryPath (path: string option) : Result<RepositoryP
 
 let tryOpenDiffRequest (request: OpenTextDiffRequestDto) : Result<OpenDiffRequest, OperationFailure> =
     tryTextDiffId "operation id" request.OperationId
+    |> Result.bind (fun _ -> tryOptionalToken "preparation token" request.PreparationTokenId)
+    |> Result.bind (fun _ -> tryOptionalToken "previous encoding" request.PreviousEncoding)
+    |> Result.bind (fun _ -> tryOptionalToken "current encoding" request.CurrentEncoding)
+    |> Result.bind (fun _ -> tryOptionalToken "continuation" request.Continuation)
     |> Result.bind (fun _ -> tryRepositoryPath request.Path)
     |> Result.bind (fun path ->
         tryOptionalRepositoryPath request.PreviousPath
@@ -697,6 +791,7 @@ let private tryHandleRequest
     (build: DiffHandle -> Result<'T, OperationFailure>)
     : Result<'T, OperationFailure> =
     tryTextDiffId "operation id" operationId
+    |> Result.bind (fun _ -> tryTextDiffToken "handle version" handleVersion)
     |> Result.bind (fun _ -> tryTextDiffId "handle id" handleId)
     |> Result.bind (fun id ->
         build {
@@ -714,10 +809,11 @@ let tryReadPageRequest (request: ReadTextDiffPageRequestDto) : Result<ReadPageRe
         request.HandleId
         request.HandleVersion
         (fun handle ->
-            Ok {
+            tryTextDiffToken "cursor" request.Cursor
+            |> Result.map (fun cursor -> {
                 ReadPageRequest.Handle = handle
-                Cursor = request.Cursor
-            }
+                Cursor = cursor
+            })
         )
 
 let tryReplayPageRequest (request: ReplayTextDiffPageRequestDto) : Result<ReplayPageRequest, OperationFailure> =
@@ -726,10 +822,11 @@ let tryReplayPageRequest (request: ReplayTextDiffPageRequestDto) : Result<Replay
         request.HandleId
         request.HandleVersion
         (fun handle ->
-            Ok {
+            tryTextDiffToken "page id" request.PageId
+            |> Result.map (fun pageId -> {
                 ReplayPageRequest.Handle = handle
-                PageId = request.PageId
-            }
+                PageId = pageId
+            })
         )
 
 let tryExpandRequest (request: ExpandTextDiffRequestDto) : Result<ExpandRequest, OperationFailure> =
@@ -738,13 +835,17 @@ let tryExpandRequest (request: ExpandTextDiffRequestDto) : Result<ExpandRequest,
         request.HandleId
         request.HandleVersion
         (fun handle ->
-            Ok {
-                ExpandRequest.Handle = handle
-                GapId = request.GapId
-                FromStart = request.FromStart
-                Count = request.Count
-                Continuation = request.Continuation
-            }
+            tryTextDiffToken "gap id" request.GapId
+            |> Result.bind (fun gapId ->
+                tryOptionalToken "continuation" request.Continuation
+                |> Result.map (fun continuation -> {
+                    ExpandRequest.Handle = handle
+                    GapId = gapId
+                    FromStart = request.FromStart
+                    Count = request.Count
+                    Continuation = continuation
+                })
+            )
         )
 
 let tryReadLineRequest (request: ReadTextDiffLineRequestDto) : Result<ReadLineRequest, OperationFailure> =
@@ -756,13 +857,16 @@ let tryReadLineRequest (request: ReadTextDiffLineRequestDto) : Result<ReadLineRe
             tryNonNegativeInt64 "line" request.Line
             |> Result.bind (fun line ->
                 tryNonNegativeInt64 "UTF-16 offset" request.OffsetUtf16
-                |> Result.map (fun offset -> {
-                    ReadLineRequest.Handle = handle
-                    Side = diffSideFromDto request.Side
-                    Line = line
-                    OffsetUtf16 = offset
-                    MaxUtf16 = request.MaxUtf16
-                    Continuation = request.Continuation
-                })
+                |> Result.bind (fun offset ->
+                    tryOptionalToken "continuation" request.Continuation
+                    |> Result.map (fun continuation -> {
+                        ReadLineRequest.Handle = handle
+                        Side = diffSideFromDto request.Side
+                        Line = line
+                        OffsetUtf16 = offset
+                        MaxUtf16 = request.MaxUtf16
+                        Continuation = continuation
+                    })
+                )
             )
         )
