@@ -68,6 +68,8 @@ type DataHubBrowser =
             ?extraButtons: ExploreProjectDto -> ButtonInfo[]
         ) =
 
+        let imageFailed, setImageFailed = React.useState (false)
+
         let visibility = project.visibility |> Option.defaultValue "public"
 
         let visibilityLabel, visibilityIcon =
@@ -114,13 +116,20 @@ type DataHubBrowser =
                             prop.className "swt:w-16 swt:h-16 swt:rounded"
                             prop.children [
                                 match project.avatar_url with
-                                | Some avatarUrl when not (System.String.IsNullOrWhiteSpace avatarUrl) ->
-                                    Html.img [ prop.src avatarUrl; prop.alt project.name ]
+                                | Some avatarUrl when
+                                    not imageFailed && not (System.String.IsNullOrWhiteSpace avatarUrl)
+                                    ->
+                                    Html.img [
+                                        prop.src avatarUrl
+                                        prop.alt project.name
+                                        prop.onError (fun (_: Browser.Types.Event) -> setImageFailed true)
+                                    ]
                                 | _ ->
                                     Html.div [
                                         prop.className
                                             "swt:w-full swt:h-full swt:rounded swt:bg-base-300 swt:flex swt:items-center swt:justify-center swt:text-xl swt:font-semibold"
                                         prop.text avatarInitial
+                                        prop.ariaLabel avatarInitial
                                     ]
                             ]
                         ]
