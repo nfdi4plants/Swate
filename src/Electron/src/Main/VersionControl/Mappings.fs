@@ -5,6 +5,7 @@ module Main.VersionControl.Mappings
 
 open Swate.Electron.Shared.VersionControlTypes
 open VersionControlService.Abstractions
+open Main.Bindings.Node
 
 let failureCategory (category: FailureCategory) : FailureCategoryDto =
     match category with
@@ -280,14 +281,11 @@ let tryRevisionId (value: string) : Result<RevisionId, OperationFailure> =
     RevisionId.tryCreate value
     |> Result.mapError (OperationFailure.create Validation VersionControlCodes.InvalidRevision)
 
-/// The longest operation id or handle id a text diff request may carry.
+/// The longest operation id or handle id a text diff request may carry. Every other token
+/// (cursors, page ids, gap ids, continuations, preparation tokens, handle versions and
+/// encoding names) is opaque to Swate, and the worker rejects an overlong one.
 [<Literal>]
 let MaxTextDiffIdLength = 128
-
-/// The longest handle version, cursor, page id, gap id, continuation, preparation token or
-/// encoding name a text diff request may carry.
-[<Literal>]
-let MaxTextDiffTokenLength = 256
 
 /// The largest failure message, in UTF-8 bytes, a text diff reply carries.
 [<Literal>]
@@ -308,12 +306,6 @@ let MaxTextDiffDetailsBytes = 4096
 /// The largest warning message, in UTF-8 bytes, a text diff reply carries.
 [<Literal>]
 let MaxTextDiffWarningBytes = 4096
-
-/// The largest JSON size, in UTF-8 bytes, of the warnings and the failure that a partly
-/// successful text diff reply carries next to its value. A page fills the reply up to its own
-/// limit, so these have to fit into the margin above it.
-[<Literal>]
-let MaxTextDiffPartialExtrasBytes = 4096
 
 let private int64Text (value: int64) : string = string value
 
@@ -521,40 +513,10 @@ let private isLowSurrogate (character: char) =
 
 /// Cuts text to at most maxBytes of UTF-8 and never splits a surrogate pair.
 let truncateUtf8 (maxBytes: int) (text: string) : string =
-    if isNull text then
+    if isNull text || utf8ByteLength text <= maxBytes then
         text
     else
-        let mutable bytes = 0
-        let mutable index = 0
-        let mutable full = false
-
-        while not full && index < text.Length do
-            let character = text[index]
-
-            let units, size =
-                if
-                    isHighSurrogate character
-                    && index + 1 < text.Length
-                    && isLowSurrogate text[index + 1]
-                then
-                    2, 4
-                elif int character < 0x80 then
-                    1, 1
-                elif int character < 0x800 then
-                    1, 2
-                else
-                    1, 3
-
-            if bytes + size > maxBytes then
-                full <- true
-            else
-                bytes <- bytes + size
-                index <- index + units
-
-        if index = text.Length then
-            text
-        else
-            text.Substring(0, index)
+        text.Substring(0, utf8PrefixUnits text maxBytes)
 
 let private truncateUtf16 (maxUnits: int) (text: string) : string =
     if isNull text || text.Length <= maxUnits then
@@ -563,35 +525,6 @@ let private truncateUtf16 (maxUnits: int) (text: string) : string =
         text.Substring(0, maxUnits - 1)
     else
         text.Substring(0, maxUnits)
-
-/// UTF-8 length of the text. A lone surrogate counts as the 3 bytes of its replacement character.
-let private utf8Length (text: string) =
-    if isNull text then
-        0
-    else
-        let mutable bytes = 0
-        let mutable index = 0
-
-        while index < text.Length do
-            let character = text[index]
-
-            if
-                isHighSurrogate character
-                && index + 1 < text.Length
-                && isLowSurrogate text[index + 1]
-            then
-                bytes <- bytes + 4
-                index <- index + 2
-            else
-                bytes <-
-                    bytes
-                    + (if int character < 0x80 then 1
-                       elif int character < 0x800 then 2
-                       else 3)
-
-                index <- index + 1
-
-        bytes
 
 /// Cuts every line to MaxTextDiffDetailLength and keeps lines while their UTF-8 sum stays
 /// within MaxTextDiffDetailsBytes. The first line that does not fit and all later lines are
@@ -603,7 +536,9 @@ let private boundLines (lines: string[]) : string[] =
         let lines = lines |> Array.map (truncateUtf16 MaxTextDiffDetailLength)
 
         let sums =
-            lines |> Array.scan (fun total line -> total + utf8Length line) 0 |> Array.tail
+            lines
+            |> Array.scan (fun total line -> total + utf8ByteLength line) 0
+            |> Array.tail
 
         let kept =
             sums
@@ -612,11 +547,13 @@ let private boundLines (lines: string[]) : string[] =
 
         Array.truncate kept lines
 
+/// Keeps the first warning and cuts its message, so the warnings add a fixed size to a reply.
 let private boundWarnings (warnings: OperationWarningDto[]) : OperationWarningDto[] =
     if isNull warnings then
         warnings
     else
         warnings
+        |> Array.truncate 1
         |> Array.map (fun warning -> {
             warning with
                 Message = truncateUtf8 MaxTextDiffWarningBytes warning.Message
@@ -637,68 +574,6 @@ let boundTextDiffFailure (failure: OperationFailureDto) : OperationFailureDto = 
             })
 }
 
-/// UTF-8 bytes of the JSON of the value. JSON escapes count with their full length.
-let private jsonBytes (value: obj) : int =
-    utf8Length (Fable.Core.JS.JSON.stringify value)
-
-let private dropLast (values: 'T[]) =
-    Array.truncate (max 0 (values.Length - 1)) values
-
-/// Shrinks the warnings and the failure of a partly successful reply until their JSON fits
-/// into MaxTextDiffPartialExtrasBytes. Warnings go first, from the last one, then affected
-/// paths, then details lines, and the failure message is cut last.
-let private fitPartialExtras
-    (warnings: OperationWarningDto[])
-    (failure: OperationFailureDto)
-    : OperationWarningDto[] * OperationFailureDto =
-    let fits (warnings: OperationWarningDto[]) (failure: OperationFailureDto) =
-        jsonBytes (box warnings) + jsonBytes (box failure)
-        <= MaxTextDiffPartialExtrasBytes
-
-    let rec shrink (warnings: OperationWarningDto[]) (failure: OperationFailureDto) =
-        if fits warnings failure then
-            warnings, failure
-        elif not (isNull warnings) && warnings.Length > 0 then
-            shrink (dropLast warnings) failure
-        elif not (isNull failure.AffectedPaths) && failure.AffectedPaths.Length > 0 then
-            shrink warnings {
-                failure with
-                    AffectedPaths = dropLast failure.AffectedPaths
-            }
-        elif not (isNull failure.Details) && failure.Details.Length > 0 then
-            shrink warnings {
-                failure with
-                    Details = dropLast failure.Details
-            }
-        elif isNull failure.Message || failure.Message.Length = 0 then
-            warnings, failure
-        else
-            // The longest prefix of the message that fits, found by halving the step.
-            let withMessage length = {
-                failure with
-                    Message =
-                        if length = 0 then
-                            ""
-                        else
-                            truncateUtf16 length failure.Message
-            }
-
-            let mutable length = 0
-            let mutable step = failure.Message.Length
-
-            while step > 0 do
-                if
-                    length + step <= failure.Message.Length
-                    && fits warnings (withMessage (length + step))
-                then
-                    length <- length + step
-
-                step <- step / 2
-
-            warnings, withMessage length
-
-    shrink warnings failure
-
 let boundTextDiffResult (result: OperationResultDto<'T>) : OperationResultDto<'T> =
     match result with
     | OperationResultDto.Succeeded outcome ->
@@ -707,10 +582,18 @@ let boundTextDiffResult (result: OperationResultDto<'T>) : OperationResultDto<'T
                 Warnings = boundWarnings outcome.Warnings
         }
     | OperationResultDto.PartiallySucceeded(outcome, failure) ->
-        let warnings, failure =
-            fitPartialExtras (boundWarnings outcome.Warnings) (boundTextDiffFailure failure)
-
-        OperationResultDto.PartiallySucceeded({ outcome with Warnings = warnings }, failure)
+        // A page fills the reply up to its limit, so the failure next to it carries no lists.
+        OperationResultDto.PartiallySucceeded(
+            {
+                outcome with
+                    Warnings = boundWarnings outcome.Warnings
+            },
+            {
+                boundTextDiffFailure failure with
+                    Details = [||]
+                    AffectedPaths = [||]
+            }
+        )
     | OperationResultDto.Failed failure -> OperationResultDto.Failed(boundTextDiffFailure failure)
 
 /// Maps a text diff result and bounds its failure text for the IPC reply.
@@ -720,29 +603,27 @@ let textDiffResult (mapValue: 'T -> 'U) (value: OperationResult<'T>) : Operation
 let private invalidDiffRequest (message: string) : OperationFailure =
     OperationFailure.create Validation VersionControlCodes.InvalidDiffRequest message
 
-/// Accepts an operation id or handle id of at most MaxTextDiffIdLength characters.
-let tryTextDiffId (name: string) (value: string) : Result<string, OperationFailure> =
+/// Accepts a present value of at most maxLength characters.
+let private tryBounded (name: string) (maxLength: int) (value: string) : Result<string, OperationFailure> =
     if isNull value then
         Error(invalidDiffRequest $"The {name} is missing.")
-    elif value.Length > MaxTextDiffIdLength then
-        Error(invalidDiffRequest $"The {name} is longer than {MaxTextDiffIdLength} characters.")
+    elif value.Length > maxLength then
+        Error(invalidDiffRequest $"The {name} is longer than {maxLength} characters.")
     else
         Ok value
 
-/// Accepts a handle version, cursor, page id, gap id, continuation, preparation token or
-/// encoding name of at most MaxTextDiffTokenLength characters.
-let private tryTextDiffToken (name: string) (value: string) : Result<string, OperationFailure> =
-    if isNull value then
-        Error(invalidDiffRequest $"The {name} is missing.")
-    elif value.Length > MaxTextDiffTokenLength then
-        Error(invalidDiffRequest $"The {name} is longer than {MaxTextDiffTokenLength} characters.")
-    else
-        Ok value
+/// An operation id or handle id is at most MaxTextDiffIdLength characters.
+let private tryTextDiffId (name: string) : string -> Result<string, OperationFailure> =
+    tryBounded name MaxTextDiffIdLength
+
+/// Any other token is opaque to Swate, so only its presence is checked.
+let private tryPresent (name: string) : string -> Result<string, OperationFailure> =
+    tryBounded name System.Int32.MaxValue
 
 let private tryOptionalToken (name: string) (value: string option) : Result<string option, OperationFailure> =
     match value with
     | None -> Ok None
-    | Some text -> tryTextDiffToken name text |> Result.map Some
+    | Some text -> tryPresent name text |> Result.map Some
 
 /// Parses a line number or offset the renderer sent as decimal text.
 let tryNonNegativeInt64 (name: string) (text: string) : Result<int64, OperationFailure> =
@@ -791,7 +672,7 @@ let private tryHandleRequest
     (build: DiffHandle -> Result<'T, OperationFailure>)
     : Result<'T, OperationFailure> =
     tryTextDiffId "operation id" operationId
-    |> Result.bind (fun _ -> tryTextDiffToken "handle version" handleVersion)
+    |> Result.bind (fun _ -> tryPresent "handle version" handleVersion)
     |> Result.bind (fun _ -> tryTextDiffId "handle id" handleId)
     |> Result.bind (fun id ->
         build {
@@ -809,7 +690,7 @@ let tryReadPageRequest (request: ReadTextDiffPageRequestDto) : Result<ReadPageRe
         request.HandleId
         request.HandleVersion
         (fun handle ->
-            tryTextDiffToken "cursor" request.Cursor
+            tryPresent "cursor" request.Cursor
             |> Result.map (fun cursor -> {
                 ReadPageRequest.Handle = handle
                 Cursor = cursor
@@ -822,7 +703,7 @@ let tryReplayPageRequest (request: ReplayTextDiffPageRequestDto) : Result<Replay
         request.HandleId
         request.HandleVersion
         (fun handle ->
-            tryTextDiffToken "page id" request.PageId
+            tryPresent "page id" request.PageId
             |> Result.map (fun pageId -> {
                 ReplayPageRequest.Handle = handle
                 PageId = pageId
@@ -835,7 +716,7 @@ let tryExpandRequest (request: ExpandTextDiffRequestDto) : Result<ExpandRequest,
         request.HandleId
         request.HandleVersion
         (fun handle ->
-            tryTextDiffToken "gap id" request.GapId
+            tryPresent "gap id" request.GapId
             |> Result.bind (fun gapId ->
                 tryOptionalToken "continuation" request.Continuation
                 |> Result.map (fun continuation -> {

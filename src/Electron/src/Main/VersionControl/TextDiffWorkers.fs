@@ -1,7 +1,7 @@
-/// The app-wide text diff worker pool. Creating the supervisor is asynchronous (it resolves
-/// the Git executable and prepares its temp folder), so the first caller starts the setup
-/// and every later caller shares the same promise. A failed setup is logged and retried by
-/// the next caller.
+/// The app-wide text diff worker pool. Creating the supervisor is asynchronous (it prepares
+/// its temp folder), so the first caller starts the setup and every later caller shares the
+/// same promise. A failed setup is logged and retried by the next caller. The supervisor
+/// starts Git by name unless its GitExecutable option names an explicit executable.
 module Main.VersionControl.TextDiffWorkers
 
 open Fable.Core

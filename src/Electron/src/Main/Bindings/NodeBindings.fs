@@ -19,3 +19,11 @@ let bufferSubarray (buffer: obj) (startIndex: int) (endIndex: int) : obj = jsNat
 
 [<Emit("$0.toString('utf8')")>]
 let bufferToUtf8String (buffer: obj) : string = jsNative
+
+[<Emit("Buffer.byteLength($0, 'utf8')")>]
+let utf8ByteLength (text: string) : int = jsNative
+
+/// The number of UTF-16 units of the text that encode into at most maxBytes of UTF-8.
+/// TextEncoder.encodeInto never writes half a character, so a surrogate pair stays whole.
+[<Emit("new TextEncoder().encodeInto($0, new Uint8Array($1)).read")>]
+let utf8PrefixUnits (text: string) (maxBytes: int) : int = jsNative

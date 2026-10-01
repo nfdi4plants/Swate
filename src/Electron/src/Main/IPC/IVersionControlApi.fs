@@ -305,17 +305,9 @@ let private withTextDiff
             return result |> Result.map Mappings.boundTextDiffResult
     }
 
-/// The window of the IPC call. Handle ownership uses it, since it comes from Electron and
-/// not from an id the renderer sent.
+/// The window of the IPC call. Electron supplies it, so the renderer cannot choose it.
 let private callingWindowId (event: IpcMainInvokeEvent) : int option =
     windowFromIpcEvent event |> Option.map _.id
-
-let private withOwnedHandle
-    (event: IpcMainInvokeEvent)
-    (handle: DiffHandle)
-    (call: unit -> Async<OperationResult<'T>>)
-    : Async<OperationResult<'T>> =
-    TextDiffHandles.withOwnedHandle (callingWindowId event) handle call
 
 let private withPath (path: string) (call: RepositoryPath -> Async<OperationResult<'T>>) : Async<OperationResult<'T>> =
     match Mappings.tryRepositoryPath path with
@@ -1173,14 +1165,9 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 Mappings.workspaceStatus
     // Every handle an open returns is recorded with the window of the operation, so the
     // window can only reach its own handles and its handles close with it. A handle that
-    // arrives after its window closed or reloaded is closed at once.
+    // arrives after its window closed is closed at once.
     openTextDiff =
         fun request ->
-            // The count is read when the call arrives. A reload while the session opens then
-            // counts as a reload during the open.
-            let reloadCount =
-                TextDiffHandles.reloadCount (windowFromIpcEvent event |> Option.map _.id)
-
             withTextDiff
                 "openTextDiff"
                 event
@@ -1195,12 +1182,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     | PartiallySucceeded(outcome, _) ->
                         match outcome.Value with
                         | Resumable.Ready(OpenDiffResult.Opened(handle, _, _, _)) ->
-                            TextDiffHandles.recordOrClose
-                                windowId
-                                reloadCount
-                                hosted.Binding.WorkspaceRoot
-                                service
-                                handle
+                            TextDiffHandles.recordOrClose windowId hosted.Binding.WorkspaceRoot service handle
                         | _ -> ()
                     | Failed _ -> ()
 
@@ -1214,9 +1196,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 event
                 request.OperationId
                 (Mappings.tryReadPageRequest request)
-                (fun _ service pageRequest context ->
-                    withOwnedHandle event pageRequest.Handle (fun () -> service.ReadPage pageRequest context)
-                )
+                (fun _ service pageRequest context -> service.ReadPage pageRequest context)
                 Mappings.resumablePage
     replayTextDiffPage =
         fun request ->
@@ -1225,9 +1205,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 event
                 request.OperationId
                 (Mappings.tryReplayPageRequest request)
-                (fun _ service replayRequest context ->
-                    withOwnedHandle event replayRequest.Handle (fun () -> service.ReplayPage replayRequest context)
-                )
+                (fun _ service replayRequest context -> service.ReplayPage replayRequest context)
                 Mappings.diffPage
     expandTextDiff =
         fun request ->
@@ -1236,9 +1214,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 event
                 request.OperationId
                 (Mappings.tryExpandRequest request)
-                (fun _ service expandRequest context ->
-                    withOwnedHandle event expandRequest.Handle (fun () -> service.Expand expandRequest context)
-                )
+                (fun _ service expandRequest context -> service.Expand expandRequest context)
                 Mappings.resumableParts
     readTextDiffLine =
         fun request ->
@@ -1247,9 +1223,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 event
                 request.OperationId
                 (Mappings.tryReadLineRequest request)
-                (fun _ service lineRequest context ->
-                    withOwnedHandle event lineRequest.Handle (fun () -> service.ReadLine lineRequest context)
-                )
+                (fun _ service lineRequest context -> service.ReadLine lineRequest context)
                 Mappings.resumableLine
     getTextDiffSourceInfo =
         fun request ->
@@ -1258,12 +1232,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 event
                 request.OperationId
                 (Mappings.tryDiffHandle request)
-                (fun _ service handle context ->
-                    withOwnedHandle
-                        event
-                        handle
-                        (fun () -> service.GetSourceInfo { SourceInfoRequest.Handle = handle } context)
-                )
+                (fun _ service handle context -> service.GetSourceInfo { SourceInfoRequest.Handle = handle } context)
                 Mappings.diffSourceInfoPair
     // A failed close keeps the registry entry, so the window close retries it.
     closeTextDiff =
@@ -1273,20 +1242,15 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 event
                 request.OperationId
                 (Mappings.tryDiffHandle request)
-                (fun _ service handle context ->
-                    withOwnedHandle
-                        event
-                        handle
-                        (fun () -> async {
-                            let! closed = service.Close handle context
+                (fun _ service handle context -> async {
+                    let! closed = service.Close handle context
 
-                            match closed with
-                            | Failed _ -> ()
-                            | Succeeded _
-                            | PartiallySucceeded _ -> TextDiffHandles.remove handle.Id
+                    match closed with
+                    | Failed _ -> ()
+                    | Succeeded _
+                    | PartiallySucceeded _ -> TextDiffHandles.remove handle.Id
 
-                            return closed
-                        })
-                )
+                    return closed
+                })
                 id
 }

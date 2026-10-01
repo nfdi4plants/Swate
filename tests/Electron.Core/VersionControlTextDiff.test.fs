@@ -838,7 +838,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "details lines and affected paths are cut to 256 characters and 4 KiB in total, warnings to 4 KiB each",
+            "details lines and affected paths are cut to 256 characters and 4 KiB in total, and only the first warning is kept, cut to 4 KiB",
             fun () ->
                 let lines (first: string) =
                     Array.append
@@ -862,6 +862,10 @@ Vitest.describe (
                                 {
                                     Code = "long_warning"
                                     Message = String.replicate 5000 "w"
+                                }
+                                {
+                                    Code = "second_warning"
+                                    Message = "dropped"
                                 }
                             |]
                       }
@@ -901,7 +905,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "a partly successful page reply at the worker limit with long warnings and failure text stays within the limit plus 8 KiB",
+            "a partly successful page reply at the worker limit keeps one warning and a failure without lists, within the limit plus their bounded text",
             fun () ->
                 let sizeOf textLength =
                     workerBytes (TextDiffProtocol.ResultPayload.ReadPage(Resumable.Ready(pageWith textLength)))
@@ -931,20 +935,33 @@ Vitest.describe (
                 let payload: Result<OperationResultDto<ResumablePageDto>, exn> =
                     Ok(Mappings.textDiffResult Mappings.resumablePage (PartiallySucceeded(outcome, failure)))
 
-                Vitest.expect(ipcPayloadBytes payload).toBeLessThanOrEqual (PageLimitBytes + IpcMarginBytes)
+                // One warning, the failure message and the evidence, each at its bound, with every
+                // unit escaped to six bytes in JSON, plus a margin for the object keys.
+                let extrasBytes =
+                    6
+                    * (Mappings.MaxTextDiffWarningBytes
+                       + Mappings.MaxTextDiffMessageBytes
+                       + Mappings.MaxDiffEvidenceLength)
+                    + IpcMarginBytes
+
+                Vitest.expect(ipcPayloadBytes payload).toBeLessThanOrEqual (PageLimitBytes + extrasBytes)
 
                 match payload with
                 | Ok(OperationResultDto.PartiallySucceeded(mapped, mappedFailure)) ->
                     Vitest.expect(mapped.Value).toEqual (Mappings.resumablePage (Resumable.Ready page))
+                    Vitest.expect(mapped.Warnings |> Array.map _.Code).toEqual [| "warning_0" |]
+                    Vitest.expect(mappedFailure.Message.Length).toBeLessThanOrEqual Mappings.MaxTextDiffMessageBytes
+                    Vitest.expect(mappedFailure.Details).toEqual [||]
+                    Vitest.expect(mappedFailure.AffectedPaths).toEqual [||]
                     Vitest.expect(mappedFailure.Code).toBe TextDiffFailureCodes.ContentNotText
                 | other -> failwith $"Expected a partial success, got {other}"
         )
 
         Vitest.test (
-            "handle versions, cursors, page ids, gap ids, continuations, preparation tokens and encoding names longer than 256 characters are rejected",
+            "handle versions, cursors, page ids, gap ids, continuations, preparation tokens and encoding names have no length limit, and a missing one is rejected",
             fun () ->
-                let atLimit = String.replicate 256 "t"
-                let overLimit = String.replicate 257 "t"
+                let long = String.replicate 10_000 "t"
+                let missing = Unchecked.defaultof<string>
 
                 let readPage version cursor : ReadTextDiffPageRequestDto = {
                     OperationId = "op"
@@ -972,62 +989,46 @@ Vitest.describe (
 
                 let opening = openRequest "op" "data/a.txt"
 
-                match Mappings.tryReadPageRequest (readPage atLimit atLimit) with
+                match Mappings.tryReadPageRequest (readPage long long) with
                 | Ok request ->
-                    Vitest.expect(request.Handle.Version).toBe atLimit
-                    Vitest.expect(request.Cursor).toBe atLimit
+                    Vitest.expect(request.Handle.Version).toBe long
+                    Vitest.expect(request.Cursor).toBe long
                 | Error failure -> failwith failure.Message
 
-                match Mappings.tryExpandRequest (expand atLimit (Some atLimit)) with
-                | Ok request -> Vitest.expect(request.Continuation).toEqual (Some atLimit)
+                match Mappings.tryExpandRequest (expand long (Some long)) with
+                | Ok request -> Vitest.expect(request.Continuation).toEqual (Some long)
                 | Error failure -> failwith failure.Message
 
-                expectInvalid (Mappings.tryReadPageRequest (readPage overLimit "cursor"))
-                expectInvalid (Mappings.tryReadPageRequest (readPage "v1" overLimit))
-                expectInvalid (Mappings.tryReplayPageRequest (replay overLimit))
-                expectInvalid (Mappings.tryExpandRequest (expand overLimit None))
-                expectInvalid (Mappings.tryExpandRequest (expand "gap" (Some overLimit)))
+                match Mappings.tryReplayPageRequest (replay long) with
+                | Ok request -> Vitest.expect(request.PageId).toBe long
+                | Error failure -> failwith failure.Message
 
-                expectInvalid (
-                    Mappings.tryReadLineRequest {
-                        lineRequest "op" "handle" "0" "0" with
-                            Continuation = Some overLimit
+                match
+                    Mappings.tryOpenDiffRequest {
+                        opening with
+                            PreparationTokenId = Some long
+                            PreviousEncoding = Some long
+                            CurrentEncoding = Some long
+                            Continuation = Some long
                     }
-                )
+                with
+                | Ok request ->
+                    Vitest.expect(request.Preparation).toEqual (Some { PreparationToken.Id = long })
+                    Vitest.expect(request.PreviousEncoding).toEqual (Some long)
+                    Vitest.expect(request.CurrentEncoding).toEqual (Some long)
+                    Vitest.expect(request.Continuation).toEqual (Some long)
+                | Error failure -> failwith failure.Message
+
+                expectInvalid (Mappings.tryReadPageRequest (readPage missing "cursor"))
+                expectInvalid (Mappings.tryReadPageRequest (readPage "v1" missing))
+                expectInvalid (Mappings.tryReplayPageRequest (replay missing))
+                expectInvalid (Mappings.tryExpandRequest (expand missing None))
 
                 expectInvalid (
                     Mappings.tryDiffHandle {
                         OperationId = "op"
                         HandleId = "handle"
-                        HandleVersion = overLimit
-                    }
-                )
-
-                expectInvalid (
-                    Mappings.tryOpenDiffRequest {
-                        opening with
-                            PreparationTokenId = Some overLimit
-                    }
-                )
-
-                expectInvalid (
-                    Mappings.tryOpenDiffRequest {
-                        opening with
-                            PreviousEncoding = Some overLimit
-                    }
-                )
-
-                expectInvalid (
-                    Mappings.tryOpenDiffRequest {
-                        opening with
-                            CurrentEncoding = Some overLimit
-                    }
-                )
-
-                expectInvalid (
-                    Mappings.tryOpenDiffRequest {
-                        opening with
-                            Continuation = Some overLimit
+                        HandleVersion = missing
                     }
                 )
         )
@@ -1087,7 +1088,7 @@ Vitest.describe (
     "Text diff handle registry",
     fun () ->
         Vitest.test (
-            "a handle arriving after its window closed or reloaded is closed at once, and other windows cannot use a recorded one",
+            "a handle arriving after its window closed is closed at once, and one arriving after a reload is recorded under the same window",
             fun () -> promise {
                 let host =
                     WorkspaceSessionHost.WorkspaceSessionHost(
@@ -1104,7 +1105,7 @@ Vitest.describe (
                 TextDiffHandles.isWindowAlive <- fun windowId -> windowId <> closedWindow
 
                 let closes = ResizeArray<string * int option>()
-                let bothClosed, resolveBothClosed = TestHelpers.deferred ()
+                let closed, resolveClosed = TestHelpers.deferred ()
 
                 let unexpected (name: string) : Async<OperationResult<'T>> = async {
                     return failwith $"{name} was not expected."
@@ -1123,8 +1124,7 @@ Vitest.describe (
                         fun handle context -> async {
                             closes.Add(handle.Id, host.TryGetOperationWindowId context.OperationId)
 
-                            if closes.Count = 2 then
-                                resolveBothClosed ()
+                            resolveClosed ()
 
                             return OperationResult.succeeded ()
                         }
@@ -1133,55 +1133,15 @@ Vitest.describe (
                 let handle (id: string) : DiffHandle = { Id = id; Version = "v1" }
 
                 try
-                    TextDiffHandles.recordOrClose (Some closedWindow) 0 "workspace" service (handle "closed-window")
-
-                    let countBeforeReload = TextDiffHandles.reloadCount (Some reloadedWindow)
+                    TextDiffHandles.recordOrClose (Some closedWindow) "workspace" service (handle "closed-window")
                     TextDiffHandles.windowReloaded reloadedWindow
+                    TextDiffHandles.recordOrClose (Some reloadedWindow) "workspace" service (handle "after-reload")
 
-                    TextDiffHandles.recordOrClose
-                        (Some reloadedWindow)
-                        countBeforeReload
-                        "workspace"
-                        service
-                        (handle "before-reload")
+                    do! within 2000 "Closing the handle of the closed window" closed
 
-                    TextDiffHandles.recordOrClose
-                        (Some reloadedWindow)
-                        (TextDiffHandles.reloadCount (Some reloadedWindow))
-                        "workspace"
-                        service
-                        (handle "after-reload")
-
-                    do! within 2000 "Closing both handles" bothClosed
-
-                    Vitest.expect(closes |> Seq.sort |> Seq.toArray).toEqual [|
-                        "before-reload", Some reloadedWindow
-                        "closed-window", Some closedWindow
-                    |]
-
+                    Vitest.expect(closes |> Seq.toArray).toEqual [| "closed-window", Some closedWindow |]
                     Vitest.expect(TextDiffHandles.isRecorded "closed-window").toBe false
-                    Vitest.expect(TextDiffHandles.isRecorded "before-reload").toBe false
                     Vitest.expect(TextDiffHandles.isRecorded "after-reload").toBe true
-
-                    let! fromOtherWindow =
-                        TextDiffHandles.withOwnedHandle
-                            (Some 6)
-                            (handle "after-reload")
-                            (fun () -> unexpected "the call")
-                        |> Async.StartAsPromise
-
-                    match fromOtherWindow with
-                    | Failed failure -> Vitest.expect(failure.Code).toBe TextDiffFailureCodes.SessionClosed
-                    | other -> failwith $"Expected a rejected handle, got {other}"
-
-                    let! fromOwnWindow =
-                        TextDiffHandles.withOwnedHandle
-                            (Some reloadedWindow)
-                            (handle "after-reload")
-                            (fun () -> async { return OperationResult.succeeded "read" })
-                        |> Async.StartAsPromise
-
-                    Vitest.expect(TestHelpers.expectValue "own window call" fromOwnWindow).toBe "read"
                 finally
                     TextDiffHandles.isWindowAlive <- originalIsWindowAlive
                     TextDiffHandles.windowClosed reloadedWindow
@@ -1229,12 +1189,10 @@ Vitest.describe (
                     let hosted = TestHelpers.expectValue "session open" opened
 
                     let record windowId handleId =
-                        TextDiffHandles.recordOrClose
-                            (Some windowId)
-                            (TextDiffHandles.reloadCount (Some windowId))
-                            hosted.Binding.WorkspaceRoot
-                            service
-                            { Id = handleId; Version = "v1" }
+                        TextDiffHandles.recordOrClose (Some windowId) hosted.Binding.WorkspaceRoot service {
+                            Id = handleId
+                            Version = "v1"
+                        }
 
                     record reloadedWindow "reloaded-1"
                     record reloadedWindow "reloaded-2"
@@ -1265,7 +1223,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "the text diff IPC handlers keep a handle to the window that opened it",
+            "the text diff IPC handlers run every call as an operation of the calling window, and the service answers another window's handle like a closed one",
             fun () -> promise {
                 let! root = TestHelpers.createTempDirectoryAsync "swate-text-diff-ipc-owner-"
                 let windowA = 81
@@ -1273,32 +1231,64 @@ Vitest.describe (
                 let originalIsWindowAlive = TextDiffHandles.isWindowAlive
                 TextDiffHandles.isWindowAlive <- fun _ -> true
                 let sessionGate, releaseSession = TestHelpers.deferred ()
-                let reloadClosed, resolveReloadClosed = TestHelpers.deferred ()
                 let closes = ResizeArray<string * int option>()
                 let reads = ResizeArray<string>()
+
+                // The stub keeps the contract the library documents on TextDiffService. A handle
+                // belongs to the owner of the operation that opened it, other owners get
+                // diff_session_closed, and Close of another owner's handle changes nothing.
+                let owners = System.Collections.Generic.Dictionary<string, string>()
+
+                let ownedBy (handle: DiffHandle) (context: OperationContext) =
+                    match owners.TryGetValue handle.Id with
+                    | true, owner -> owner = WorkspaceSessionHost.windowOwnerOf context
+                    | _ -> false
+
+                let closedSession () : OperationResult<'T> =
+                    Failed(
+                        OperationFailure.create
+                            Validation
+                            TextDiffFailureCodes.SessionClosed
+                            "The diff session is closed."
+                    )
+
+                let owned (handle: DiffHandle) (context: OperationContext) (call: unit -> Async<OperationResult<'T>>) =
+                    if ownedBy handle context then
+                        call ()
+                    else
+                        async { return closedSession () }
 
                 let service = {
                     unexpectedService with
                         Open =
-                            fun request _ -> async {
+                            fun request context -> async {
                                 let path = RepositoryPath.value request.Path
                                 let handleId = if path = "reload.txt" then "h-reload" else "h-a"
+                                owners[handleId] <- WorkspaceSessionHost.windowOwnerOf context
                                 return OperationResult.succeeded (Resumable.Ready(openedDiff handleId path))
                             }
                         ReadPage =
-                            fun request _ -> async {
-                                reads.Add request.Handle.Id
-                                return! unexpected "ReadPage"
-                            }
+                            fun request context ->
+                                owned
+                                    request.Handle
+                                    context
+                                    (fun () -> async {
+                                        reads.Add request.Handle.Id
+                                        return! unexpected "ReadPage"
+                                    })
+                        ReplayPage =
+                            fun request context -> owned request.Handle context (fun () -> unexpected "ReplayPage")
+                        Expand = fun request context -> owned request.Handle context (fun () -> unexpected "Expand")
+                        ReadLine = fun request context -> owned request.Handle context (fun () -> unexpected "ReadLine")
+                        GetSourceInfo =
+                            fun request context -> owned request.Handle context (fun () -> unexpected "GetSourceInfo")
                         Close =
                             fun handle context -> async {
-                                closes.Add(
-                                    handle.Id,
-                                    WorkspaceSessionHost.get().TryGetOperationWindowId context.OperationId
-                                )
-
-                                if handle.Id = "h-reload" then
-                                    resolveReloadClosed ()
+                                if ownedBy handle context then
+                                    closes.Add(
+                                        handle.Id,
+                                        WorkspaceSessionHost.get().TryGetOperationWindowId context.OperationId
+                                    )
 
                                 return OperationResult.succeeded ()
                             }
@@ -1318,10 +1308,10 @@ Vitest.describe (
                     TextDiffHandles.windowReloaded windowA
                     releaseSession ()
                     let! _ = reloadOpen
-                    do! within 2000 "Closing the handle of the open that the reload outran" reloadClosed
 
-                    Vitest.expect(closes |> Seq.toArray).toEqual [| "h-reload", Some windowA |]
-                    Vitest.expect(TextDiffHandles.isRecorded "h-reload").toBe false
+                    // The handle that arrives after the reload is recorded under the same window.
+                    Vitest.expect(closes.Count).toBe 0
+                    Vitest.expect(TextDiffHandles.isRecorded "h-reload").toBe true
 
                     let! opened = apiA.openTextDiff (openRequest "open-a" "a.txt")
                     TestHelpers.expectDtoValue "open from window A" opened |> ignore
@@ -1377,21 +1367,18 @@ Vitest.describe (
 
                     let! infoFromB = apiB.getTextDiffSourceInfo (handleRequest "info-b")
 
-                    // The service stub fails every one of these calls, so only the ownership check answers
-                    // with a closed session.
                     Vitest.expect(failureCodeOf replayFromB).toBe TextDiffFailureCodes.SessionClosed
                     Vitest.expect(failureCodeOf expandFromB).toBe TextDiffFailureCodes.SessionClosed
                     Vitest.expect(failureCodeOf lineFromB).toBe TextDiffFailureCodes.SessionClosed
                     Vitest.expect(failureCodeOf infoFromB).toBe TextDiffFailureCodes.SessionClosed
 
                     let! closeFromB = apiB.closeTextDiff (handleRequest "close-b")
-                    Vitest.expect(failureCodeOf closeFromB).toBe TextDiffFailureCodes.SessionClosed
-                    Vitest.expect(closes.Count).toBe 1
-                    Vitest.expect(TextDiffHandles.isRecorded "h-a").toBe true
+                    TestHelpers.expectDtoValue "close from window B" closeFromB |> ignore
+                    Vitest.expect(closes.Count).toBe 0
 
                     let! closeFromA = apiA.closeTextDiff (handleRequest "close-a")
                     TestHelpers.expectDtoValue "close from window A" closeFromA |> ignore
-                    Vitest.expect(closes |> Seq.last).toEqual ("h-a", Some windowA)
+                    Vitest.expect(closes |> Seq.toArray).toEqual [| "h-a", Some windowA |]
                     Vitest.expect(TextDiffHandles.isRecorded "h-a").toBe false
                 finally
                     TextDiffHandles.isWindowAlive <- originalIsWindowAlive
