@@ -174,12 +174,40 @@ let refreshFileTreeEntry
         return upsertFileEntry entry fileTree
     }
 
-let private isSameOrDescendantLogicalPath path ancestorPath =
-    let normalizedPath = PathHelpers.normalizePath path
-    let normalizedAncestorPath = PathHelpers.normalizePath ancestorPath
+/// Finds entries below any collected direct-child directory root in one pass over the FileTree paths.
+let internal collectDirectChildSubtreeRemovalKeys
+    (directoryPath: string)
+    (directChildDirectoryRoots: HashSet<string>)
+    (fileTreePaths: seq<string>)
+    =
+    if directChildDirectoryRoots.Count = 0 then
+        [||]
+    else
+        let directoryPrefix = PathHelpers.normalizePath directoryPath + "/"
 
-    normalizedPath = normalizedAncestorPath
-    || normalizedPath.StartsWith(normalizedAncestorPath + "/", StringComparison.Ordinal)
+        fileTreePaths
+        |> Seq.choose (fun originalPath ->
+            let path = PathHelpers.normalizePath originalPath
+
+            if directChildDirectoryRoots.Contains path then
+                Some originalPath
+            elif path.StartsWith(directoryPrefix, StringComparison.Ordinal) then
+                let relativePath = path.Substring(directoryPrefix.Length)
+                let separatorIndex = relativePath.IndexOf('/')
+
+                if separatorIndex > 0 then
+                    let directChildPath = directoryPrefix + relativePath.Substring(0, separatorIndex)
+
+                    if directChildDirectoryRoots.Contains directChildPath then
+                        Some originalPath
+                    else
+                        None
+                else
+                    None
+            else
+                None
+        )
+        |> Seq.toArray
 
 /// Reconciles only the immediate children of one ARC-relative directory.
 /// Returns None when the current snapshot already matches disk.
@@ -270,28 +298,27 @@ let reconcileFileTreeDirectory
                     return None
                 else
                     let nextTree = Dictionary<string, FileEntry>(fileTree)
+                    let missingFilePaths = ResizeArray<string>()
+
+                    let directChildDirectoryRemovalRoots = HashSet<string>()
 
                     knownDirectChildren
-                    |> Map.iter (fun childPath _ ->
+                    |> Map.iter (fun childPath knownEntry ->
                         match Map.tryFind childPath diskChildren with
-                        | None ->
-                            let descendantKeys =
-                                nextTree.Keys
-                                |> Seq.filter (fun path -> isSameOrDescendantLogicalPath path childPath)
-                                |> Seq.toArray
-
-                            descendantKeys |> Array.iter (fun path -> nextTree.Remove(path) |> ignore)
-                        | Some diskEntry ->
-                            match nextTree.TryGetValue childPath with
-                            | true, knownEntry when knownEntry.isDirectory && not diskEntry.isDirectory ->
-                                let descendantKeys =
-                                    nextTree.Keys
-                                    |> Seq.filter (fun path -> isSameOrDescendantLogicalPath path childPath)
-                                    |> Seq.toArray
-
-                                descendantKeys |> Array.iter (fun path -> nextTree.Remove(path) |> ignore)
-                            | _ -> ()
+                        | None when knownEntry.isDirectory -> directChildDirectoryRemovalRoots.Add childPath |> ignore
+                        | None -> missingFilePaths.Add childPath
+                        | Some diskEntry when knownEntry.isDirectory && not diskEntry.isDirectory ->
+                            directChildDirectoryRemovalRoots.Add childPath |> ignore
+                        | Some _ -> ()
                     )
+
+                    missingFilePaths |> Seq.iter (fun path -> nextTree.Remove(path) |> ignore)
+
+                    collectDirectChildSubtreeRemovalKeys
+                        absoluteDirectoryPath
+                        directChildDirectoryRemovalRoots
+                        nextTree.Keys
+                    |> Array.iter (fun path -> nextTree.Remove(path) |> ignore)
 
                     diskChildren
                     |> Map.iter (fun childPath diskEntry ->

@@ -415,4 +415,81 @@ Vitest.describe (
                     return raise error
             }
         )
+
+        Vitest.test (
+            "bulk child removal uses one subtree pass and preserves surviving directory descendants",
+            fun () -> promise {
+                let! tempPath = createTempDirectoryAsync ()
+
+                try
+                    let arcPath = PathHelpers.normalizePath tempPath
+                    let datasetPath = join [| arcPath; "dataset" |] |> PathHelpers.normalizePath
+                    let keepPath = join [| datasetPath; "keep" |] |> PathHelpers.normalizePath
+                    let nestedPath = join [| keepPath; "nested.txt" |] |> PathHelpers.normalizePath
+
+                    let removedDirectoryPath =
+                        join [| datasetPath; "removed" |] |> PathHelpers.normalizePath
+
+                    let removedNestedPath =
+                        join [| removedDirectoryPath; "old.txt" |] |> PathHelpers.normalizePath
+
+                    do! createDirectoryAsync keepPath
+                    do! writeUtf8FileAsync nestedPath "keep"
+
+                    let tree = Dictionary<string, FileEntry>()
+                    tree.[arcPath] <- directoryEntry (basename arcPath) arcPath
+                    tree.[datasetPath] <- directoryEntry "dataset" datasetPath
+                    tree.[keepPath] <- directoryEntry "keep" keepPath
+                    tree.[nestedPath] <- createFileEntry "nested.txt" nestedPath
+                    tree.[removedDirectoryPath] <- directoryEntry "removed" removedDirectoryPath
+                    tree.[removedNestedPath] <- createFileEntry "old.txt" removedNestedPath
+
+                    let removedFilePaths =
+                        Array.init
+                            1000
+                            (fun index ->
+                                let name = $"file{index + 1:D4}.txt"
+                                let path = join [| datasetPath; name |] |> PathHelpers.normalizePath
+                                tree.[path] <- createFileEntry name path
+                                path
+                            )
+
+                    let removalRoots = HashSet<string>()
+                    removalRoots.Add removedDirectoryPath |> ignore
+                    let mutable subtreePassCount = 0
+                    let mutable visitedPathCount = 0
+
+                    let countedPaths = seq {
+                        subtreePassCount <- subtreePassCount + 1
+
+                        for path in tree.Keys do
+                            visitedPathCount <- visitedPathCount + 1
+                            yield path
+                    }
+
+                    let subtreeRemovalKeys =
+                        FileTreeCreator.collectDirectChildSubtreeRemovalKeys datasetPath removalRoots countedPaths
+
+                    Vitest.expect(subtreePassCount).toBe (1)
+                    Vitest.expect(visitedPathCount).toBe (tree.Count)
+                    Vitest.expect(subtreeRemovalKeys).toContain (removedDirectoryPath)
+                    Vitest.expect(subtreeRemovalKeys).toContain (removedNestedPath)
+                    Vitest.expect(subtreeRemovalKeys).not.toContain (keepPath)
+                    Vitest.expect(subtreeRemovalKeys).not.toContain (nestedPath)
+
+                    let! reconciled = FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset" tree
+                    let reconciledTree = reconciled |> Option.get
+
+                    Vitest.expect(removedFilePaths |> Array.forall (reconciledTree.ContainsKey >> not)).toBe (true)
+
+                    Vitest.expect(reconciledTree.ContainsKey removedDirectoryPath).toBe (false)
+                    Vitest.expect(reconciledTree.ContainsKey removedNestedPath).toBe (false)
+                    Vitest.expect(reconciledTree.ContainsKey keepPath).toBe (true)
+                    Vitest.expect(reconciledTree.ContainsKey nestedPath).toBe (true)
+                    do! removeDirectoryAsync tempPath
+                with error ->
+                    do! removeDirectoryAsync tempPath
+                    return raise error
+            }
+        )
 )

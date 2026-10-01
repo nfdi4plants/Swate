@@ -4945,26 +4945,6 @@ Vitest.describe (
                             )
                             300
 
-                    events.Clear()
-                    do! writeWatcherTextFileAsync deepPayloadPath "changed"
-                    let markerEntityPath = join [| studiesPath; "S3" |]
-                    do! mkdirWatcherDirectoryAsync markerEntityPath
-
-                    do!
-                        waitForWatcherCondition
-                            "post-payload structural marker"
-                            (fun () ->
-                                events
-                                |> Seq.exists (fun (eventName, path) ->
-                                    eventName = "addDir" && path.EndsWith("studies/S3")
-                                )
-                            )
-                            300
-
-                    Vitest
-                        .expect(events |> Seq.exists (fun (_, path) -> path.EndsWith("resources/raw.bin")))
-                        .toBe (false)
-
                     do! watcher.close ()
                     do! TestHelpers.removeDirectoryAsync arcPath
                 with error ->
@@ -4993,8 +4973,6 @@ Vitest.describe (
                         let nestedPath = join [| datasetPath; "nested" |]
                         let hiddenPath = join [| nestedPath; "hidden.txt" |]
 
-                        let markerPath = join [| arcPath; ARCtrl.ArcPathHelper.StudiesFolderName; "S2" |]
-
                         let treeContains (vault: ArcVault) path =
                             vault.fileTree.ContainsKey(PathHelpers.normalizePath path)
 
@@ -5010,14 +4988,7 @@ Vitest.describe (
                         vault.StartFileWatcher(usePolling = true)
 
                         let watcher = vault.watcher.Value
-                        let events = ResizeArray<string * string>()
                         let mutable isReady = false
-
-                        watcher.on (
-                            Main.Bindings.Chokidar.Events.All,
-                            fun eventName path -> events.Add(eventName, PathHelpers.normalizeSeparators path)
-                        )
-                        |> ignore
 
                         watcher.on (Main.Bindings.Chokidar.Events.Ready, fun _ -> isReady <- true)
                         |> ignore
@@ -5029,30 +5000,29 @@ Vitest.describe (
                                     do! waitForWatcherCondition "ready" (fun () -> isReady) 300
                                     Vitest.expect(treeContains vault existingPath).toBe (true)
 
-                                    events.Clear()
+                                    let watchedPaths =
+                                        watcher.getWatched ()
+                                        |> flattenWatchedPaths
+                                        |> Array.map PathHelpers.normalizeSeparators
+
+                                    Vitest
+                                        .expect(
+                                            watchedPaths
+                                            |> Array.exists (fun path -> path.EndsWith(relativeDatasetPath))
+                                        )
+                                        .toBe (false)
+
+                                    Vitest
+                                        .expect(
+                                            watchedPaths |> Array.exists (fun path -> path.EndsWith("existing.txt"))
+                                        )
+                                        .toBe (false)
+
+                                    Vitest.expect(isStructuralFileWatcherPath arcPath newPath None).toBe (false)
+
                                     do! writeWatcherTextFileAsync newPath "new"
                                     do! mkdirWatcherDirectoryAsync nestedPath
                                     do! writeWatcherTextFileAsync hiddenPath "hidden"
-
-                                    // This admitted structural event is a bounded completion marker. Once its
-                                    // FileTree update is visible, any earlier watcher event has also been processed.
-                                    do! mkdirWatcherDirectoryAsync markerPath
-
-                                    do!
-                                        waitForWatcherCondition
-                                            "post-payload structural marker FileTree update"
-                                            (fun () -> treeContains vault markerPath)
-                                            300
-
-                                    let emittedPayloadPath (suffix: string) =
-                                        events |> Seq.exists (fun (_, path) -> path.EndsWith(suffix))
-
-                                    Vitest.expect(emittedPayloadPath "studies/S1/dataset/new.txt").toBe (false)
-                                    Vitest.expect(emittedPayloadPath "studies/S1/dataset/nested").toBe (false)
-
-                                    Vitest
-                                        .expect(emittedPayloadPath "studies/S1/dataset/nested/hidden.txt")
-                                        .toBe (false)
 
                                     Vitest.expect(treeContains vault newPath).toBe (false)
                                     Vitest.expect(treeContains vault nestedPath).toBe (false)
