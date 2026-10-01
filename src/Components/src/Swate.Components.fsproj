@@ -36,6 +36,7 @@
     <PackageReference Include="Feliz.UseElmish" />
     <PackageReference Include="Fable.Browser.Dom" />
     <PackageReference Include="Vitest" />
+    <PackageReference Include="Vitest.ReactTestingLibrary" />
   </ItemGroup>
 
   <ItemGroup>
@@ -308,7 +309,9 @@
     <Compile Include="Page\DataHubBrowser\Types.fs" />
     <Compile Include="Page\DataHubBrowser\MockData.fs" />
     <Compile Include="Page\DataHubBrowser\Model.fs" />
+    <Compile Include="Page\DataHubBrowser\sub\RepoListRow.fs" />
     <Compile Include="Page\DataHubBrowser\DataHubBrowser.fs" />
+    <Compile Include="Page\DataHubBrowser\sub\RepoListRow.test.rtl.fs" />
     <Compile Include="Page\ValidationPackageBrowser\Types.fs" />
     <Compile Include="Page\ValidationPackageBrowser\Helper.fs" />
     <Compile Include="Page\ValidationPackageBrowser\Helper.test.fs" />
