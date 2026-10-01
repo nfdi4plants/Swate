@@ -303,31 +303,30 @@ module internal GitPagedDiffDisplay =
         | PagedRowKind.EndingChanged, PagedDiffSide.Current -> true
         | _ -> false
 
-    let rowKindClass side kind forceContext =
-        if forceContext || kind = PagedRowKind.Context then
+    /// The class of a line or its number, picked from the theme of the side when the row changes it.
+    let private changedOrContextClass
+        side
+        kind
+        forceContext
+        (pick: GitTextComparisonRendering.Rendering.ComparisonSideStyle -> string)
+        =
+        if forceContext || kind = PagedRowKind.Context || not (changedSide side kind) then
             "swt:text-base-content/45 swt:bg-base-100"
-        elif changedSide side kind then
+        else
             let theme = GitTextComparisonRendering.Rendering.DiffTheme
 
-            if side = PagedDiffSide.Previous then
-                theme.LeftChanged.ChangedLineClass
-            else
-                theme.RightChanged.ChangedLineClass
-        else
-            "swt:text-base-content/45 swt:bg-base-100"
+            pick (
+                if side = PagedDiffSide.Previous then
+                    theme.LeftChanged
+                else
+                    theme.RightChanged
+            )
+
+    let rowKindClass side kind forceContext =
+        changedOrContextClass side kind forceContext _.ChangedLineClass
 
     let lineNumberClass side kind forceContext =
-        if forceContext || kind = PagedRowKind.Context then
-            "swt:text-base-content/45 swt:bg-base-100"
-        elif changedSide side kind then
-            let theme = GitTextComparisonRendering.Rendering.DiffTheme
-
-            if side = PagedDiffSide.Previous then
-                theme.LeftChanged.ChangedLineNumberClass
-            else
-                theme.RightChanged.ChangedLineNumberClass
-        else
-            "swt:text-base-content/45 swt:bg-base-100"
+        changedOrContextClass side kind forceContext _.ChangedLineNumberClass
 
     let changedSegmentClass side =
         let theme = GitTextComparisonRendering.Rendering.DiffTheme
@@ -717,6 +716,42 @@ type GitPagedDiffViewer =
                     )
             }
 
+        /// The placeholder of unloaded rows with its button, which replays the page it names.
+        let replayPlaceholder
+            (buttonTestId: string)
+            (nextPage: string)
+            (pageIds: string[])
+            (height: int)
+            (label: string)
+            (attributes: IReactProperty list)
+            =
+            let replaying =
+                props.PendingReplays
+                |> Array.exists (fun pageId -> Array.contains pageId pageIds)
+
+            let failed = props.FailedReplays |> Array.contains nextPage
+
+            Html.div [
+                prop.className
+                    "swt:col-span-2 swt:flex swt:items-center swt:justify-center swt:gap-3 swt:px-4 swt:bg-base-200/60 swt:text-xs swt:text-base-content/65"
+                yield! attributes
+                prop.style [ style.height height ]
+                prop.children [
+                    Html.span [ prop.text label ]
+                    Html.button [
+                        prop.testId buttonTestId
+                        GitPagedDiffDisplay.failedAttribute failed
+                        prop.className [
+                            "swt:btn swt:btn-ghost swt:btn-xs"
+                            GitPagedDiffDisplay.failedClass failed
+                        ]
+                        prop.disabled (replaying || props.RequestReplay.IsNone)
+                        prop.onClick (fun _ -> props.RequestReplay |> Option.iter (fun callback -> callback nextPage))
+                        prop.text "Reload rows"
+                    ]
+                ]
+            ]
+
         let content =
             match props.Row.Content with
             | GitPagedDiffDisplay.HunkHeader header ->
@@ -787,39 +822,15 @@ type GitPagedDiffViewer =
                     cell PagedDiffSide.Current PagedRowKind.Added false current
                 ]
             | GitPagedDiffDisplay.Evicted(pageId, rowCount) ->
-                let replaying = props.PendingReplays |> Array.contains pageId
-                let failed = props.FailedReplays |> Array.contains pageId
-
-                Html.div [
-                    prop.className
-                        "swt:col-span-2 swt:flex swt:items-center swt:justify-center swt:gap-3 swt:px-4 swt:bg-base-200/60 swt:text-xs swt:text-base-content/65"
-                    prop.custom ("data-row-count", rowCount)
-                    prop.style [
-                        style.height (GitPagedDiffDisplay.RowHeightPx * max 1 rowCount)
-                    ]
-                    prop.children [
-                        Html.span [ prop.text $"{rowCount} rows unloaded" ]
-                        Html.button [
-                            prop.testId $"{props.Prefix}-evicted-{pageId}"
-                            GitPagedDiffDisplay.failedAttribute failed
-                            prop.className [
-                                "swt:btn swt:btn-ghost swt:btn-xs"
-                                GitPagedDiffDisplay.failedClass failed
-                            ]
-                            prop.disabled (replaying || props.RequestReplay.IsNone)
-                            prop.onClick (fun _ -> props.RequestReplay |> Option.iter (fun callback -> callback pageId))
-                            prop.text "Reload rows"
-                        ]
-                    ]
-                ]
+                replayPlaceholder
+                    $"{props.Prefix}-evicted-{pageId}"
+                    pageId
+                    [| pageId |]
+                    (GitPagedDiffDisplay.RowHeightPx * max 1 rowCount)
+                    $"{rowCount} rows unloaded"
+                    [ prop.custom ("data-row-count", rowCount) ]
             | GitPagedDiffDisplay.Folded(side, pageIds, rowCount) ->
                 let nextPage = GitPagedDiffDisplay.nearestFoldedPage side pageIds true
-
-                let replaying =
-                    props.PendingReplays
-                    |> Array.exists (fun pageId -> Array.contains pageId pageIds)
-
-                let failed = props.FailedReplays |> Array.contains nextPage
 
                 let label =
                     match side with
@@ -827,31 +838,18 @@ type GitPagedDiffViewer =
                     | GitPagedDiffDisplay.Later -> $"{rowCount} later rows"
                     | GitPagedDiffDisplay.Between -> $"{rowCount} rows unloaded"
 
-                Html.div [
-                    prop.className
-                        "swt:col-span-2 swt:flex swt:items-center swt:justify-center swt:gap-3 swt:px-4 swt:bg-base-200/60 swt:text-xs swt:text-base-content/65"
-                    prop.custom ("data-folded-side", GitPagedDiffDisplay.foldSideName side)
-                    prop.custom ("data-page-count", pageIds.Length)
-                    prop.custom ("data-row-count", rowCount)
-                    prop.custom ("data-next-page", nextPage)
-                    prop.style [ style.height GitPagedDiffDisplay.FoldedHeightPx ]
-                    prop.children [
-                        Html.span [ prop.text label ]
-                        Html.button [
-                            prop.testId $"{props.Prefix}-folded-replay-{nextPage}"
-                            GitPagedDiffDisplay.failedAttribute failed
-                            prop.className [
-                                "swt:btn swt:btn-ghost swt:btn-xs"
-                                GitPagedDiffDisplay.failedClass failed
-                            ]
-                            prop.disabled (replaying || props.RequestReplay.IsNone)
-                            prop.onClick (fun _ ->
-                                props.RequestReplay |> Option.iter (fun callback -> callback nextPage)
-                            )
-                            prop.text "Reload rows"
-                        ]
+                replayPlaceholder
+                    $"{props.Prefix}-folded-replay-{nextPage}"
+                    nextPage
+                    pageIds
+                    GitPagedDiffDisplay.FoldedHeightPx
+                    label
+                    [
+                        prop.custom ("data-folded-side", GitPagedDiffDisplay.foldSideName side)
+                        prop.custom ("data-page-count", pageIds.Length)
+                        prop.custom ("data-row-count", rowCount)
+                        prop.custom ("data-next-page", nextPage)
                     ]
-                ]
             | GitPagedDiffDisplay.Continue pending ->
                 let busy = props.LoadingNext
 
@@ -915,7 +913,7 @@ type GitPagedDiffViewer =
             previousTitle: string,
             currentTitle: string,
             prefix: string,
-            nextKey: obj,
+            nextKey: string option,
             hasMore: bool,
             progress: PagedProgress option,
             status: PagedDiffStatus,
@@ -1188,7 +1186,7 @@ type GitPagedDiffViewer =
         let lastReplaySignature = React.useRef replaySignature
         // Holds the key of the next page at the time of the last next page request, so the
         // continue row asks once for each next page.
-        let requestedNext = React.useRef<obj> (obj ())
+        let requestedNext = React.useRef<string option option> None
 
         React.useEffect (
             (fun () ->
@@ -1270,9 +1268,9 @@ type GitPagedDiffViewer =
                 | Some callback when
                     continueNear
                     && status <> PagedDiffStatus.LoadingNext
-                    && not (Object.ReferenceEquals(requestedNext.current, nextKey))
+                    && requestedNext.current <> Some nextKey
                     ->
-                    requestedNext.current <- nextKey
+                    requestedNext.current <- Some nextKey
                     callback ()
                 | _ -> ()
 
@@ -1285,7 +1283,7 @@ type GitPagedDiffViewer =
                 box requestReplay
                 box requestNext
                 box replaySignature
-                nextKey
+                box nextKey
             |]
         )
 
@@ -1468,10 +1466,7 @@ type GitPagedDiffViewer =
             candidates: PagedEncodingCandidate[],
             chooseEncoding: (PagedDiffSide -> string -> unit) option
         ) =
-        let sideName =
-            match side with
-            | PagedDiffSide.Previous -> "previous"
-            | PagedDiffSide.Current -> "current"
+        let sideName = GitPagedDiffDisplay.sideName side
 
         Html.div [
             prop.testId $"{prefix}-state-encoding-choice"
@@ -1575,7 +1570,7 @@ type GitPagedDiffViewer =
             ?changeKind: GitDiffChangeKind,
             ?testIdPrefix: string,
             // Names the next page, such as its cursor. The continue row asks once for each key.
-            // Without a key it asks again whenever the last part changes.
+            // Without a key it asks again whenever the key of the last row of the last part changes.
             ?nextPageKey: string,
             // Gaps, line slices and evicted pages whose last request failed. Their controls show
             // the failure, and a failed page is not replayed again until the user asks.
@@ -1589,64 +1584,61 @@ type GitPagedDiffViewer =
         let previousTitle = defaultArg previousTitle "Previous version"
         let currentTitle = defaultArg currentTitle "Current version"
         let pending = pending
-        let partRowCache = React.useRef<(obj * GitPagedDiffDisplay.Row[]) list> []
+        // The rows depend only on the parts and on what follows them, so they are built once for
+        // each change of those. The key of the last row of the last part stands in for the next
+        // page when the caller names none.
+        let rows, rowParts, lastRowKey =
+            React.useMemo (
+                (fun () ->
+                    let rows = ResizeArray<GitPagedDiffDisplay.Row>()
+                    // The index of the part each row belongs to, -1 for rows outside the parts.
+                    let rowParts = ResizeArray<int>()
 
-        let rows = ResizeArray<GitPagedDiffDisplay.Row>()
-        // The index of the part each row belongs to, -1 for rows outside the parts.
-        let rowParts = ResizeArray<int>()
-        let nextCache = ResizeArray<obj * GitPagedDiffDisplay.Row[]>()
+                    // Evicted pages far from the loaded ones fold into one short placeholder, so
+                    // the scroll height stays bounded however many pages the diff has.
+                    let foldRuns = GitPagedDiffDisplay.foldRuns parts
+                    let mutable partIndex = 0
 
-        // Evicted pages far from the loaded ones fold into one short placeholder, so the scroll
-        // height stays bounded however many pages the diff has.
-        let foldRuns = GitPagedDiffDisplay.foldRuns parts
-        let mutable partIndex = 0
+                    while partIndex < parts.Length do
+                        match foldRuns |> Array.tryFind (fun (first, _, _) -> first = partIndex) with
+                        | Some(first, last, side) ->
+                            rows.Add(GitPagedDiffDisplay.foldedRow parts first last side)
+                            rowParts.Add -1
+                            partIndex <- last + 1
+                        | None ->
+                            let partRows = GitPagedDiffDisplay.buildPartRows parts.[partIndex]
+                            rows.AddRange partRows
 
-        while partIndex < parts.Length do
-            match foldRuns |> Array.tryFind (fun (first, _, _) -> first = partIndex) with
-            | Some(first, last, side) ->
-                rows.Add(GitPagedDiffDisplay.foldedRow parts first last side)
-                rowParts.Add -1
-                partIndex <- last + 1
-            | None ->
-                let part = parts.[partIndex]
-                let identity = box part
+                            for _ in partRows do
+                                rowParts.Add partIndex
 
-                let cached =
-                    partRowCache.current
-                    |> List.tryPick (fun (cachedIdentity, cachedRows) ->
-                        if Object.ReferenceEquals(identity, cachedIdentity) then
-                            Some cachedRows
-                        else
-                            None
-                    )
+                            partIndex <- partIndex + 1
 
-                let partRows =
-                    cached |> Option.defaultWith (fun () -> GitPagedDiffDisplay.buildPartRows part)
+                    if hasMore then
+                        rows.Add {
+                            Key = "continue"
+                            Content = GitPagedDiffDisplay.Continue pending
+                        }
 
-                nextCache.Add(identity, partRows)
-                rows.AddRange partRows
+                        rowParts.Add -1
+                    elif pending.IsSome then
+                        rows.Add {
+                            Key = "pending"
+                            Content = GitPagedDiffDisplay.Continue pending
+                        }
 
-                for _ in partRows do
-                    rowParts.Add partIndex
+                        rowParts.Add -1
 
-                partIndex <- partIndex + 1
+                    let lastRowKey =
+                        parts
+                        |> Array.tryLast
+                        |> Option.bind (GitPagedDiffDisplay.buildPartRows >> Array.tryLast)
+                        |> Option.map _.Key
 
-        if hasMore then
-            rows.Add {
-                Key = "continue"
-                Content = GitPagedDiffDisplay.Continue pending
-            }
-
-            rowParts.Add -1
-        elif pending.IsSome then
-            rows.Add {
-                Key = "pending"
-                Content = GitPagedDiffDisplay.Continue pending
-            }
-
-            rowParts.Add -1
-
-        partRowCache.current <- List.ofSeq nextCache
+                    rows.ToArray(), rowParts.ToArray(), lastRowKey
+                ),
+                [| box parts; box hasMore; box pending |]
+            )
 
         let noChanges =
             progress |> Option.exists (fun value -> value.ScanComplete)
@@ -1715,14 +1707,12 @@ type GitPagedDiffViewer =
                         else
                             Html.none
                         GitPagedDiffViewer.Grid(
-                            rows.ToArray(),
-                            rowParts.ToArray(),
+                            rows,
+                            rowParts,
                             previousTitle,
                             currentTitle,
                             prefix,
-                            (match nextPageKey with
-                             | Some key -> box key
-                             | None -> parts |> Array.tryLast |> Option.map box |> Option.defaultValue null),
+                            nextPageKey |> Option.orElse lastRowKey,
                             hasMore,
                             progress,
                             status,

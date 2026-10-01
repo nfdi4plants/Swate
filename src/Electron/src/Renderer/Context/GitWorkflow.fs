@@ -1536,7 +1536,7 @@ module GitDiffPageLoader =
             NextRequest = None
             PendingLineSlices = []
             ExpandingGaps = []
-            PendingReplays = []
+            PendingReplays = None
             VisiblePages = []
             KeepRequestedPage = false
             FailedGaps = []
@@ -1675,6 +1675,24 @@ module GitDiffPageLoader =
 
     let private position (side: DiffSideDto) (number: float) : GitDiffLinePosition = { Side = side; Number = number }
 
+    /// The lines a part shows on one side. A gap and an evicted page show none.
+    let private linesOnSide (side: Paged.PagedDiffSide) (part: Paged.PagedPart) : Paged.PagedLine[] =
+        match part with
+        | Paged.PagedPart.HunkRows(_, _, _, _, _, rows)
+        | Paged.PagedPart.ExpandedRows(_, rows) ->
+            rows
+            |> Array.choose (fun row ->
+                match side with
+                | Paged.PagedDiffSide.Previous -> row.Previous
+                | Paged.PagedDiffSide.Current -> row.Current
+            )
+        | Paged.PagedPart.UnalignedRegion(_, previous, current, _, _) ->
+            match side with
+            | Paged.PagedDiffSide.Previous -> previous
+            | Paged.PagedDiffSide.Current -> current
+        | Paged.PagedPart.HiddenGap _
+        | Paged.PagedPart.EvictedPage _ -> [||]
+
     /// The first line of the parts and the last line number on each side. A hidden gap covers
     /// the lines of its ranges.
     let private spanOf (parts: Paged.PagedPart[]) : GitDiffPageSpan =
@@ -1704,21 +1722,10 @@ module GitDiffPageLoader =
             )
 
         let lastOn (side: Paged.PagedDiffSide) =
-            let lineOf (row: Paged.PagedRow) =
-                match side with
-                | Paged.PagedDiffSide.Previous -> row.Previous
-                | Paged.PagedDiffSide.Current -> row.Current
-
             let numbers =
                 parts
                 |> Array.collect (
                     function
-                    | Paged.PagedPart.HunkRows(_, _, _, _, _, rows)
-                    | Paged.PagedPart.ExpandedRows(_, rows) -> rows |> Array.choose (lineOf >> Option.map _.Number)
-                    | Paged.PagedPart.UnalignedRegion(_, previous, current, _, _) ->
-                        match side with
-                        | Paged.PagedDiffSide.Previous -> previous |> Array.map _.Number
-                        | Paged.PagedDiffSide.Current -> current |> Array.map _.Number
                     | Paged.PagedPart.HiddenGap(_, previous, current) ->
                         let range =
                             match side with
@@ -1729,7 +1736,7 @@ module GitDiffPageLoader =
                             [| range.Start + range.Count - 1.0 |]
                         else
                             [||]
-                    | Paged.PagedPart.EvictedPage _ -> [||]
+                    | part -> linesOnSide side part |> Array.map _.Number
                 )
 
             if numbers.Length = 0 then None else Some(Array.max numbers)
@@ -1875,25 +1882,7 @@ module GitDiffPageLoader =
         )
 
     let private showsLine (side: Paged.PagedDiffSide) (number: float) (part: Paged.PagedPart) =
-        let lineOf (row: Paged.PagedRow) =
-            match side with
-            | Paged.PagedDiffSide.Previous -> row.Previous
-            | Paged.PagedDiffSide.Current -> row.Current
-
-        match part with
-        | Paged.PagedPart.HunkRows(_, _, _, _, _, rows)
-        | Paged.PagedPart.ExpandedRows(_, rows) ->
-            rows
-            |> Array.exists (fun row -> lineOf row |> Option.exists (fun line -> line.Number = number))
-        | Paged.PagedPart.UnalignedRegion(_, previous, current, _, _) ->
-            let lines =
-                match side with
-                | Paged.PagedDiffSide.Previous -> previous
-                | Paged.PagedDiffSide.Current -> current
-
-            lines |> Array.exists (fun line -> line.Number = number)
-        | Paged.PagedPart.HiddenGap _
-        | Paged.PagedPart.EvictedPage _ -> false
+        linesOnSide side part |> Array.exists (fun line -> line.Number = number)
 
     /// The loaded page that shows the line on that side.
     let private pageIndexOfLine (side: DiffSideDto) (number: float) (page: GitDiffPageData) =
@@ -2232,7 +2221,7 @@ module GitDiffPageLoader =
             // One replay at a time. Each answer evicts other pages, and replays running side by
             // side would evict each other's pages.
             match handleRequest (), page.Pages |> Array.tryFindIndex (fun windowPage -> windowPage.PageId = pageId) with
-            | Some handle, Some index when isEvicted && page.PendingReplays.IsEmpty ->
+            | Some handle, Some index when isEvicted && page.PendingReplays.IsNone ->
                 let request: ReplayTextDiffPageRequestDto = {
                     OperationId = deps.newOperationId ()
                     HandleId = handle.Id
@@ -2246,7 +2235,7 @@ module GitDiffPageLoader =
                 // the pages on screen.
                 track request.OperationId {
                     page with
-                        PendingReplays = [ pageId ]
+                        PendingReplays = Some pageId
                         RequestedPageIndex = index
                         VisiblePages = pageId :: visiblePages |> List.distinct
                         KeepRequestedPage = page.KeepRequestedPage || page.NextRequest.IsSome
@@ -2342,7 +2331,7 @@ module GitDiffPageLoader =
         | GitDiffMsg.ReplayCompleted(_, request, result) ->
             let page = {
                 finish request.OperationId page with
-                    PendingReplays = page.PendingReplays |> List.filter (fun pageId -> pageId <> request.PageId)
+                    PendingReplays = page.PendingReplays |> Option.filter (fun pageId -> pageId <> request.PageId)
             }
 
             if isSettled page.Status then
@@ -2493,7 +2482,7 @@ module GitDiffPageLoader =
                         NextRequest = None
                         PendingLineSlices = []
                         ExpandingGaps = []
-                        PendingReplays = []
+                        PendingReplays = None
                         VisiblePages = []
                         KeepRequestedPage = false
                         FailedGaps = []

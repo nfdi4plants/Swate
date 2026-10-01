@@ -8,9 +8,15 @@ open Swate.Components.Page.GitComparison
 
 module Presentation = Renderer.GitDiffPresentation
 
-/// Removes every User Timing measure of the page.
-[<Emit("performance.clearMeasures()")>]
-let private clearPerformanceMeasures () : unit = jsNative
+[<AllowNullLiteral>]
+type private IPerformance =
+    /// Removes every User Timing measure of the page.
+    abstract clearMeasures: unit -> unit
+
+[<Global("performance")>]
+let private performance: IPerformance = jsNative
+
+let private clearPerformanceMeasures () : unit = performance.clearMeasures ()
 
 [<ReactComponent>]
 let Main (page: GitDiffPageData) =
@@ -27,7 +33,7 @@ let Main (page: GitDiffPageData) =
     // records no measures, and Swate reads none.
     React.useEffect ((fun () -> FsReact.createDisposable clearPerformanceMeasures), [| box page.Pages |])
 
-    // The viewer caches its rows per part object, so the parts are collected only when the pages change.
+    // The viewer builds its rows again when the parts array changes, so the parts are collected only when the pages change.
     let parts =
         React.useMemo ((fun () -> page.Pages |> Array.collect _.Parts), [| box page.Pages |])
 
@@ -110,7 +116,7 @@ let Main (page: GitDiffPageData) =
                             (fun pageId firstPart lastPart ->
                                 send (GitDiffMsg.Replay(generation, pageId, visiblePages firstPart lastPart))
                             ),
-                        pendingReplays = Array.ofList page.PendingReplays,
+                        pendingReplays = Option.toArray page.PendingReplays,
                         chooseEncoding =
                             (fun side encoding ->
                                 send (GitDiffMsg.ChooseEncoding(generation, Presentation.sideDto side, encoding))
