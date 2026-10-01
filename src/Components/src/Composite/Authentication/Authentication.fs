@@ -191,13 +191,28 @@ type Authentication =
                             prop.value pat
                             prop.onChange (fun value -> setPat value)
                         ]
+                        Html.p [
+                            prop.className "swt:text-xs swt:text-base-content/60 swt:mt-1"
+                            prop.text
+                                "New to access tokens? Swate can open GitLab with everything preconfigured for you. Then copy the token and paste it here!"
+                        ]
                     ]
                 ]
                 Authentication.DataHubSelect(dataHubUrl, setDataHubUrl)
                 Html.a [
                     prop.testId "GeneratePatLink"
-                    prop.className "swt:link swt:link-info swt:text-sm swt:text-center swt:py-2"
-                    prop.text "Click here to generate a new GitLab Personal Access Token"
+                    prop.className "swt:btn swt:btn-soft swt:btn-info swt:px-1"
+                    prop.children [
+                        Html.span [
+                            prop.className "swt:flex swt:items-center swt:gap-2"
+                            prop.children [
+                                Html.text "Generate Personal Access Token"
+                                Html.i [
+                                    prop.className "swt:iconify swt:fluent--open-20-regular swt:size-4"
+                                ]
+                            ]
+                        ]
+                    ]
                     prop.href (Helper.GitLabUrls.prefillGitLabPATScopes dataHubUrl.Url)
                     prop.target.blank
                     prop.rel "noopener noreferrer"

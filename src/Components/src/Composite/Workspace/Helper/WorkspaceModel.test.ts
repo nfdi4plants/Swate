@@ -31,8 +31,6 @@ import {
     Msg$1_SetSplitRatio as SetSplitRatio,
     type Tab as TabType,
     type WorkspaceModel$1 as WorkspaceModel,
-    type PaneId,
-    type TabId,
     type EdgeDirection,
     type SplitDirection,
     type Msg$1_$union as Msg,
