@@ -497,7 +497,8 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "bulk child removal uses one subtree pass and preserves surviving directory descendants",
+            "removed directory traversal stays inside its indexed subtree with 64k unrelated entries",
+            TestOptions(timeout = 120000),
             fun () -> promise {
                 let! tempPath = createTempDirectoryAsync ()
 
@@ -513,6 +514,12 @@ Vitest.describe (
                     let removedNestedPath =
                         join [| removedDirectoryPath; "old.txt" |] |> PathHelpers.normalizePath
 
+                    let removedDeepDirectoryPath =
+                        join [| removedDirectoryPath; "deep" |] |> PathHelpers.normalizePath
+
+                    let removedDeepFilePath =
+                        join [| removedDeepDirectoryPath; "deep.txt" |] |> PathHelpers.normalizePath
+
                     do! createDirectoryAsync keepPath
                     do! writeUtf8FileAsync nestedPath "keep"
 
@@ -523,53 +530,49 @@ Vitest.describe (
                     tree.[nestedPath] <- createFileEntry "nested.txt" nestedPath
                     tree.[removedDirectoryPath] <- directoryEntry "removed" removedDirectoryPath
                     tree.[removedNestedPath] <- createFileEntry "old.txt" removedNestedPath
+                    tree.[removedDeepDirectoryPath] <- directoryEntry "deep" removedDeepDirectoryPath
+                    tree.[removedDeepFilePath] <- createFileEntry "deep.txt" removedDeepFilePath
 
-                    let removedFilePaths =
-                        Array.init
-                            1000
-                            (fun index ->
-                                let name = $"file{index + 1}.txt"
-                                let path = join [| datasetPath; name |] |> PathHelpers.normalizePath
-                                tree.[path] <- createFileEntry name path
-                                path
-                            )
+                    let totalKnownEntryCount = 64000
 
-                    let removalRoots = HashSet<string>()
-                    removalRoots.Add removedDirectoryPath |> ignore
-                    let mutable subtreePassCount = 0
-                    let mutable visitedPathCount = 0
-
-                    let countedPaths = seq {
-                        subtreePassCount <- subtreePassCount + 1
-
-                        for path in tree.Keys do
-                            visitedPathCount <- visitedPathCount + 1
-                            yield path
-                    }
-
-                    let subtreeRemovalKeys =
-                        FileTreeCreator.collectDirectChildSubtreeRemovalKeys datasetPath removalRoots countedPaths
-
-                    Vitest.expect(subtreePassCount).toBe (1)
-                    Vitest.expect(visitedPathCount).toBe (tree.Count)
-                    Vitest.expect(subtreeRemovalKeys).toContain (removedDirectoryPath)
-                    Vitest.expect(subtreeRemovalKeys).toContain (removedNestedPath)
-                    Vitest.expect(subtreeRemovalKeys).not.toContain (keepPath)
-                    Vitest.expect(subtreeRemovalKeys).not.toContain (nestedPath)
+                    for index in 1 .. totalKnownEntryCount - tree.Count do
+                        let name = $"unrelated-{index}.txt"
+                        let path = join [| arcPath; "unrelated"; name |] |> PathHelpers.normalizePath
+                        tree.[path] <- createFileEntry name path
 
                     let directChildrenIndex = createDirectChildrenIndex tree
+
+                    let subtreeRemovalKeys, visitedPathCount =
+                        directChildrenIndex.CollectKnownSubtreePaths [| removedDirectoryPath |]
+
+                    Vitest.expect(tree.Count).toBe (totalKnownEntryCount)
+                    Vitest.expect(visitedPathCount).toBe (4)
+                    Vitest.expect(subtreeRemovalKeys.Length).toBe (4)
+                    Vitest.expect(subtreeRemovalKeys).toContain (removedDirectoryPath)
+                    Vitest.expect(subtreeRemovalKeys).toContain (removedNestedPath)
+                    Vitest.expect(subtreeRemovalKeys).toContain (removedDeepDirectoryPath)
+                    Vitest.expect(subtreeRemovalKeys).toContain (removedDeepFilePath)
+                    Vitest.expect(subtreeRemovalKeys).not.toContain (keepPath)
+                    Vitest.expect(subtreeRemovalKeys).not.toContain (nestedPath)
 
                     let! reconciled =
                         FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset" tree directChildrenIndex
 
                     let reconciledTree = reconciled |> Option.get
-
-                    Vitest.expect(removedFilePaths |> Array.forall (reconciledTree.ContainsKey >> not)).toBe (true)
-
+                    Vitest.expect(reconciledTree).toBe (tree)
+                    Vitest.expect(reconciledTree.Count).toBe (totalKnownEntryCount - 4)
                     Vitest.expect(reconciledTree.ContainsKey removedDirectoryPath).toBe (false)
                     Vitest.expect(reconciledTree.ContainsKey removedNestedPath).toBe (false)
+                    Vitest.expect(reconciledTree.ContainsKey removedDeepDirectoryPath).toBe (false)
+                    Vitest.expect(reconciledTree.ContainsKey removedDeepFilePath).toBe (false)
                     Vitest.expect(reconciledTree.ContainsKey keepPath).toBe (true)
                     Vitest.expect(reconciledTree.ContainsKey nestedPath).toBe (true)
+
+                    let remainingDirectChildren =
+                        directChildrenIndex.GetKnownDirectChildren(datasetPath, reconciledTree)
+
+                    Vitest.expect(remainingDirectChildren.Count).toBe (1)
+                    Vitest.expect(remainingDirectChildren.ContainsKey keepPath).toBe (true)
                     do! removeDirectoryAsync tempPath
                 with error ->
                     do! removeDirectoryAsync tempPath
@@ -750,24 +753,27 @@ Vitest.describe (
                         do! createDirectoryAsync datasetPath
                         do! createFiles ()
 
-                        let warmupIndex = createDirectChildrenIndex unmaterializedTree
+                        let cloneState (sourceTree: Dictionary<string, FileEntry>) =
+                            let tree = Dictionary<string, FileEntry>(sourceTree)
+                            tree, createDirectChildrenIndex tree
 
-                        let! _ =
-                            FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset" unmaterializedTree warmupIndex
+                        let warmupTree, warmupIndex = cloneState unmaterializedTree
+
+                        let! _ = FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset" warmupTree warmupIndex
 
                         let discoveryDurations = ResizeArray<float>()
                         let mutable materializedTree = Dictionary<string, FileEntry>()
                         let mutable materializedIndex = FileTreeCreator.FileTreeDirectChildrenIndex()
 
                         for _ in 1..3 do
-                            let directChildrenIndex = createDirectChildrenIndex unmaterializedTree
+                            let discoveryTree, directChildrenIndex = cloneState unmaterializedTree
 
                             let! discoveryResult, duration =
                                 measurePromise (fun () ->
                                     FileTreeCreator.reconcileFileTreeDirectory
                                         arcPath
                                         "dataset"
-                                        unmaterializedTree
+                                        discoveryTree
                                         directChildrenIndex
                                 )
 
@@ -778,6 +784,8 @@ Vitest.describe (
                             materializedTree <- discoveredTree
                             materializedIndex <- directChildrenIndex
                             discoveryDurations.Add duration
+
+                        let materializedBaseline = Dictionary<string, FileEntry>(materializedTree)
 
                         let indexedDirectChildren =
                             materializedIndex.GetKnownDirectChildren(datasetPath, materializedTree)
@@ -822,13 +830,13 @@ Vitest.describe (
 
                         let addedWarmupPath = join [| datasetPath; "added-warmup.txt" |]
                         do! writeUtf8FileAsync addedWarmupPath "added"
-                        let addedWarmupIndex = createDirectChildrenIndex materializedTree
+                        let addedWarmupTree, addedWarmupIndex = cloneState materializedBaseline
 
                         let! addedWarmup =
                             FileTreeCreator.reconcileFileTreeDirectory
                                 arcPath
                                 "dataset"
-                                materializedTree
+                                addedWarmupTree
                                 addedWarmupIndex
 
                         Vitest.expect(addedWarmup.IsSome).toBe (true)
@@ -840,20 +848,25 @@ Vitest.describe (
                                 join [| datasetPath; $"added-{sampleIndex}.txt" |] |> PathHelpers.normalizePath
 
                             do! writeUtf8FileAsync addedPath "added"
-                            let incrementalIndex = createDirectChildrenIndex materializedTree
+                            let incrementalTree, incrementalIndex = cloneState materializedBaseline
 
                             let! incrementalResult, duration =
                                 measurePromise (fun () ->
                                     FileTreeCreator.reconcileFileTreeDirectory
                                         arcPath
                                         "dataset"
-                                        materializedTree
+                                        incrementalTree
                                         incrementalIndex
                                 )
 
-                            let incrementalTree = incrementalResult |> Option.get
-                            Vitest.expect(incrementalTree.Count).toBe (totalKnownEntryCount + childCount + 1)
-                            Vitest.expect(incrementalTree.ContainsKey addedPath).toBe (true)
+                            let incrementallyReconciledTree = incrementalResult |> Option.get
+                            Vitest.expect(incrementallyReconciledTree).toBe (incrementalTree)
+
+                            Vitest
+                                .expect(incrementallyReconciledTree.Count)
+                                .toBe (totalKnownEntryCount + childCount + 1)
+
+                            Vitest.expect(incrementallyReconciledTree.ContainsKey addedPath).toBe (true)
                             incrementalDurations.Add duration
                             do! removeFileAsync addedPath
 
@@ -871,18 +884,19 @@ Vitest.describe (
 
                             do! removeDirectoryAsync datasetPath
                             do! createDirectoryAsync datasetPath
-                            let removalIndex = createDirectChildrenIndex materializedTree
+                            let removalTree, removalIndex = cloneState materializedBaseline
 
                             let! removalResult, duration =
                                 measurePromise (fun () ->
                                     FileTreeCreator.reconcileFileTreeDirectory
                                         arcPath
                                         "dataset"
-                                        materializedTree
+                                        removalTree
                                         removalIndex
                                 )
 
                             let removedTree = removalResult |> Option.get
+                            Vitest.expect(removedTree).toBe (removalTree)
                             Vitest.expect(removedTree.Count).toBe (totalKnownEntryCount)
                             Vitest.expect(removedTree.ContainsKey(filePath 0)).toBe (false)
                             Vitest.expect(removedTree.ContainsKey(filePath (childCount - 1))).toBe (false)

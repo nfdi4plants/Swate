@@ -69,6 +69,27 @@ type FileTreeDirectChildrenIndex() =
             )
             |> Map.ofSeq
 
+    /// Walks only indexed child relations below the supplied roots.
+    /// The visit count makes the traversal boundary observable without timing assumptions.
+    member _.CollectKnownSubtreePaths(rootPaths: seq<string>) =
+        let pending = Stack<string>()
+        let visited = HashSet<string>()
+        let paths = ResizeArray<string>()
+
+        rootPaths |> Seq.iter (PathHelpers.normalizePath >> pending.Push)
+
+        while pending.Count > 0 do
+            let path = pending.Pop()
+
+            if visited.Add path then
+                paths.Add path
+
+                match childrenByParent.TryGetValue path with
+                | true, childPaths -> childPaths |> Seq.iter pending.Push
+                | false, _ -> ()
+
+        paths.ToArray(), visited.Count
+
     member _.ApplyChanges(removedPaths: seq<string>, upsertedEntries: seq<FileEntry>) =
         removedPaths |> Seq.iter removePath
         upsertedEntries |> Seq.iter (fun entry -> addChildPath entry.path)
@@ -231,41 +252,6 @@ let refreshFileTreeEntry
         return upsertFileEntry entry fileTree
     }
 
-/// Finds entries below any collected direct-child directory root in one pass over the FileTree paths.
-let internal collectDirectChildSubtreeRemovalKeys
-    (directoryPath: string)
-    (directChildDirectoryRoots: HashSet<string>)
-    (fileTreePaths: seq<string>)
-    =
-    if directChildDirectoryRoots.Count = 0 then
-        [||]
-    else
-        let directoryPrefix = PathHelpers.normalizePath directoryPath + "/"
-
-        fileTreePaths
-        |> Seq.choose (fun originalPath ->
-            let path = PathHelpers.normalizePath originalPath
-
-            if directChildDirectoryRoots.Contains path then
-                Some originalPath
-            elif path.StartsWith(directoryPrefix, StringComparison.Ordinal) then
-                let relativePath = path.Substring(directoryPrefix.Length)
-                let separatorIndex = relativePath.IndexOf('/')
-
-                if separatorIndex > 0 then
-                    let directChildPath = directoryPrefix + relativePath.Substring(0, separatorIndex)
-
-                    if directChildDirectoryRoots.Contains directChildPath then
-                        Some originalPath
-                    else
-                        None
-                else
-                    None
-            else
-                None
-        )
-        |> Seq.toArray
-
 /// Reconciles only the immediate children of one ARC-relative directory.
 /// Returns None when the current snapshot already matches disk.
 let reconcileFileTreeDirectory
@@ -346,7 +332,6 @@ let reconcileFileTreeDirectory
                 if not hasRemovedChildren && not hasAddedOrChangedChildren then
                     return None
                 else
-                    let nextTree = Dictionary<string, FileEntry>(fileTree)
                     let missingFilePaths = ResizeArray<string>()
 
                     let directChildDirectoryRemovalRoots = HashSet<string>()
@@ -361,14 +346,11 @@ let reconcileFileTreeDirectory
                         | Some _ -> ()
                     )
 
-                    let subtreeRemovalKeys =
-                        collectDirectChildSubtreeRemovalKeys
-                            absoluteDirectoryPath
-                            directChildDirectoryRemovalRoots
-                            nextTree.Keys
+                    let subtreeRemovalKeys, _ =
+                        directChildrenIndex.CollectKnownSubtreePaths directChildDirectoryRemovalRoots
 
                     let removedPaths = Array.append (missingFilePaths.ToArray()) subtreeRemovalKeys
-                    removedPaths |> Array.iter (fun path -> nextTree.Remove(path) |> ignore)
+                    removedPaths |> Array.iter (fun path -> fileTree.Remove(path) |> ignore)
 
                     diskChildren
                     |> Map.iter (fun childPath diskEntry ->
@@ -380,12 +362,12 @@ let reconcileFileTreeDirectory
                               }
                             | _ -> diskEntry
 
-                        nextTree.[childPath] <- nextEntry
+                        fileTree.[childPath] <- nextEntry
                     )
 
                     directChildrenIndex.ApplyChanges(removedPaths, diskChildren.Values)
 
-                    return Some nextTree
+                    return Some fileTree
     }
 
 let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {

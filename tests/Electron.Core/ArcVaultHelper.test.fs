@@ -91,6 +91,74 @@ let private createWatcherFilesInBatches directoryPath count = promise {
         offset <- lastIndex + 1
 }
 
+type private TestWatcherStartupSignal =
+    | SignalReady
+    | SignalError
+    | NoSignal
+
+type private TestWatcher = {
+    Watcher: Main.Bindings.Chokidar.IWatcher
+    CloseCount: unit -> int
+}
+
+let private createTestWatcher signal =
+    let mutable watcherObject: obj = null
+    let mutable closeCount = 0
+    let mutable isClosed = false
+    let mutable signalScheduled = false
+    let readyCallbacks = ResizeArray<obj>()
+    let errorCallbacks = ResizeArray<obj>()
+
+    let scheduleSignal () =
+        if not signalScheduled then
+            signalScheduled <- true
+
+            JS.setTimeout
+                (fun () ->
+                    if not isClosed then
+                        match signal with
+                        | SignalReady -> readyCallbacks |> Seq.iter (fun callback -> (unbox<unit -> unit> callback) ())
+                        | SignalError ->
+                            let error = exn "Expected structural watcher readiness error"
+                            errorCallbacks |> Seq.iter (fun callback -> (unbox<obj -> unit> callback) error)
+                        | NoSignal -> ()
+                )
+                0
+            |> ignore
+
+    let register (eventName: string) (callback: obj) =
+        if eventName = "ready" then
+            readyCallbacks.Add callback
+        elif eventName = "error" then
+            errorCallbacks.Add callback
+
+        match signal, eventName with
+        | SignalReady, "ready"
+        | SignalError, "error" -> scheduleSignal ()
+        | _ -> ()
+
+        watcherObject
+
+    let registerJs: obj =
+        emitJsExpr register "((eventName, callback) => $0(eventName, callback))"
+
+    watcherObject <-
+        createObj [
+            "on" ==> registerJs
+            "close"
+            ==> (fun () ->
+                closeCount <- closeCount + 1
+                isClosed <- true
+                JS.Constructors.Promise.resolve ()
+            )
+            "getWatched" ==> (fun () -> createObj [])
+        ]
+
+    {
+        Watcher = unbox watcherObject
+        CloseCount = fun () -> closeCount
+    }
+
 let private recordingWatcherApi (loadingChanges: ResizeArray<bool>) : IArcFileWatcherApi = {
     IsLoadingChanges = fun isLoading -> loadingChanges.Add isLoading
 }
@@ -639,6 +707,73 @@ let private withAsyncCleanup cleanup operation = promise {
     | Error operationError, _ -> return raise operationError
     | Ok _, Error cleanupError -> return raise cleanupError
 }
+
+let private verifyRecoverableWatcherStartupDegradation
+    tempPrefix
+    windowId
+    initialSignal
+    readinessTimeoutMs
+    expectedOutcome
+    =
+    TestHelpers.withTempArcWith
+        tempPrefix
+        "Watcher Startup Degradation"
+        ignore
+        (fun arcPath -> promise {
+            let windowState = createTestWindow (testWindowOptions windowId)
+            let vault = ArcVault(windowState.Window)
+            let vaults = ArcVaults()
+            let createdWatchers = ResizeArray<TestWatcher>()
+            vaults.Vaults.Add(windowId, vault)
+            vault.FileWatcherReadinessTimeoutMs <- readinessTimeoutMs
+
+            vault.FileWatcherFactory <-
+                fun _ _ ->
+                    let signal =
+                        if createdWatchers.Count = 0 then
+                            initialSignal
+                        else
+                            SignalReady
+
+                    let watcher = createTestWatcher signal
+                    createdWatchers.Add watcher
+                    watcher.Watcher
+
+            try
+                do! vaults.OpenARCInVault(windowId, arcPath)
+
+                Vitest.expect(vault.arc.IsSome).toBe (true)
+                Vitest.expect(vault.fileTree.Count > 0).toBe (true)
+                Vitest.expect(vault.isInitializingArc).toBe (false)
+                Vitest.expect(vault.LastFileWatcherInitializationOutcome).toEqual (Some expectedOutcome)
+                Vitest.expect(vault.watcher.IsNone).toBe (true)
+                Vitest.expect(vault.fileWatcherReady).toBe (false)
+                Vitest.expect(createdWatchers.Count).toBe (1)
+                Vitest.expect(createdWatchers.[0].CloseCount()).toBe (1)
+
+                let! retryOutcome = vault.PrepareFileWatcherForInitialization()
+
+                Vitest.expect(retryOutcome).toEqual (FileWatcherInitializationOutcome.Ready)
+
+                Vitest
+                    .expect(vault.LastFileWatcherInitializationOutcome)
+                    .toEqual (Some FileWatcherInitializationOutcome.Ready)
+
+                Vitest.expect(vault.watcher.IsSome).toBe (true)
+                Vitest.expect(vault.fileWatcherReady).toBe (true)
+                Vitest.expect(createdWatchers.Count).toBe (2)
+                Vitest.expect(createdWatchers.[1].CloseCount()).toBe (0)
+
+                do! vault.StopFileWatcher()
+                Vitest.expect(createdWatchers.[1].CloseCount()).toBe (1)
+                Vitest.expect(vault.watcher.IsNone).toBe (true)
+                Vitest.expect(vault.fileWatcherReady).toBe (false)
+                vaults.Vaults.Remove(windowId) |> ignore
+            with error ->
+                do! vault.StopFileWatcher()
+                vaults.Vaults.Remove(windowId) |> ignore
+                return raise error
+        })
 
 let private expectRegistrationLoadFailure
     (expectedError: exn)
@@ -4751,6 +4886,28 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "watcher error before readiness degrades to snapshots and permits a fresh ready watcher",
+            fun () ->
+                verifyRecoverableWatcherStartupDegradation
+                    "swate-watcher-ready-error-"
+                    91339
+                    SignalError
+                    10000
+                    FileWatcherInitializationOutcome.ErrorBeforeReady
+        )
+
+        Vitest.test (
+            "watcher readiness timeout degrades to snapshots and permits a fresh ready watcher",
+            fun () ->
+                verifyRecoverableWatcherStartupDegradation
+                    "swate-watcher-ready-timeout-"
+                    91340
+                    NoSignal
+                    0
+                    FileWatcherInitializationOutcome.TimedOut
+        )
+
+        Vitest.test (
             "structural events after watcher readiness are buffered until initialization snapshots are installed",
             TestOptions(timeout = 30000),
             fun () ->
@@ -4789,6 +4946,12 @@ Vitest.describe (
                         try
                             do! vaults.OpenARCInVault(windowId, arcPath)
 
+                            Vitest
+                                .expect(vault.LastFileWatcherInitializationOutcome)
+                                .toEqual (Some FileWatcherInitializationOutcome.Ready)
+
+                            Vitest.expect(vault.watcher.IsSome).toBe (true)
+                            Vitest.expect(vault.fileWatcherReady).toBe (true)
                             Vitest.expect(pendingBeforeMutation).toBe (0)
                             Vitest.expect(pendingArcMergesBeforeMutation).toBe (0)
 

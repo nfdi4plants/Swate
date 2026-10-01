@@ -50,6 +50,14 @@ type WatcherMergeOutcome =
     /// Snapshot loading or merging failed, so the caller can publish the tree batch after logging the error.
     | Failed of exn
 
+/// Describes whether the structural watcher was usable before authoritative initialization snapshots began.
+[<RequireQualifiedAccess>]
+type FileWatcherInitializationOutcome =
+    | Ready
+    | ErrorBeforeReady
+    | TimedOut
+    | FailedToStart
+
 /// <summary>
 /// Represents a vault window in the application, optionally associated with a file path.
 /// </summary>
@@ -91,6 +99,15 @@ type ArcVault(window: BrowserWindow) =
     member internal _.InstallReconciledFileTree(value: Dictionary<string, FileEntry>) = fileTreeValue <- value
     member val watcher: Chokidar.IWatcher option = None with get, set
     member val internal fileWatcherReady = false with get, set
+    member val internal fileWatcherReadinessError: obj option = None with get, set
+    member val internal FileWatcherReadinessTimeoutMs = 10000 with get, set
+
+    member val internal FileWatcherFactory: (string -> bool option -> Chokidar.IWatcher) =
+        (fun path usePolling -> createFileWatcher path usePolling) with get, set
+
+    member val internal LastFileWatcherInitializationOutcome: FileWatcherInitializationOutcome option =
+        None with get, set
+
     member val internal flushBufferedFileWatcherEvents: (unit -> unit) option = None with get, set
     member val fileWatcherReloadArcTimeout: int option = None with get, set
     member val fileWatcherPendingEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
@@ -759,9 +776,13 @@ module ArcVaultExtensions =
         member private this.EnsureFileWatcher(?usePolling: bool) =
             if this.path.IsSome then
                 match this.watcher with
-                | Some watcher -> watcher
+                | Some watcher when this.fileWatcherReady -> watcher
+                | Some _ -> swatefailfn this.window.id "The structural file watcher is still starting."
                 | None ->
-                    let watcher = createFileWatcher this.path.Value usePolling
+                    this.fileWatcherReady <- false
+                    this.fileWatcherReadinessError <- None
+                    let watcher = this.FileWatcherFactory this.path.Value usePolling
+                    this.watcher <- Some watcher
 
                     let sendWatcherMessage = WindowSend.sender<IArcFileWatcherApi> this.window
 
@@ -771,14 +792,27 @@ module ArcVaultExtensions =
                     }
 
                     watcher.on (Chokidar.Events.All, this._FileEventController sendMsgApi) |> ignore
-                    watcher.onReady (fun () -> this.fileWatcherReady <- true) |> ignore
+
+                    watcher.onReady (fun () ->
+                        match this.watcher with
+                        | Some currentWatcher when System.Object.ReferenceEquals(currentWatcher, watcher) ->
+                            if this.fileWatcherReadinessError.IsNone then
+                                this.fileWatcherReady <- true
+                        | _ -> ()
+                    )
+                    |> ignore
 
                     watcher.onError (fun error ->
+                        match this.watcher with
+                        | Some currentWatcher when System.Object.ReferenceEquals(currentWatcher, watcher) ->
+                            if not this.fileWatcherReady then
+                                this.fileWatcherReadinessError <- Some error
+                        | _ -> ()
+
                         swatelogfn this.window.id "Structural file watcher error: %s" (string error)
                     )
                     |> ignore
 
-                    this.watcher <- Some watcher
                     watcher
             else
                 swatefailfn this.window.id "No path set for StartFileWatcher."
@@ -792,47 +826,70 @@ module ArcVaultExtensions =
             try
                 let watcher = this.EnsureFileWatcher(?usePolling = usePolling)
 
-                if not this.fileWatcherReady then
-                    do!
+                let! outcome =
+                    if this.fileWatcherReadinessError.IsSome then
+                        promise { return FileWatcherInitializationOutcome.ErrorBeforeReady }
+                    elif this.fileWatcherReady then
+                        promise { return FileWatcherInitializationOutcome.Ready }
+                    else
                         JS.Constructors.Promise.Create(fun resolve _ ->
                             let mutable settled = false
                             let mutable timeoutId: int option = None
 
-                            let finish () =
+                            let finish outcome =
                                 if not settled then
                                     settled <- true
                                     timeoutId |> Option.iter JS.clearTimeout
-                                    resolve ()
+                                    resolve outcome
 
                             timeoutId <-
                                 JS.setTimeout
-                                    (fun () ->
-                                        swatelogfn
-                                            this.window.id
-                                            "Structural watcher readiness timed out; continuing with snapshot initialization."
-
-                                        finish ()
-                                    )
-                                    10000
+                                    (fun () -> finish FileWatcherInitializationOutcome.TimedOut)
+                                    this.FileWatcherReadinessTimeoutMs
                                 |> Some
 
-                            watcher.onReady finish |> ignore
+                            watcher.onReady (fun () ->
+                                if this.fileWatcherReady then
+                                    finish FileWatcherInitializationOutcome.Ready
+                            )
+                            |> ignore
 
-                            watcher.onError (fun error ->
-                                swatelogfn
-                                    this.window.id
-                                    "Structural watcher readiness degraded after an error: %s"
-                                    (string error)
-
-                                finish ()
+                            watcher.onError (fun _ ->
+                                if not this.fileWatcherReady then
+                                    finish FileWatcherInitializationOutcome.ErrorBeforeReady
                             )
                             |> ignore
                         )
+
+                match outcome with
+                | FileWatcherInitializationOutcome.Ready -> ()
+                | FileWatcherInitializationOutcome.ErrorBeforeReady ->
+                    swatelogfn
+                        this.window.id
+                        "Structural watcher failed before readiness; continuing with snapshot initialization."
+
+                    do! this.StopFileWatcher()
+                | FileWatcherInitializationOutcome.TimedOut ->
+                    swatelogfn
+                        this.window.id
+                        "Structural watcher readiness timed out; continuing with snapshot initialization."
+
+                    do! this.StopFileWatcher()
+                | FileWatcherInitializationOutcome.FailedToStart -> ()
+
+                this.LastFileWatcherInitializationOutcome <- Some outcome
+                return outcome
             with watcherError ->
+                do! this.StopFileWatcher()
+
                 swatelogfn
                     this.window.id
                     "Unable to start the structural watcher; continuing with snapshot initialization: %s"
                     watcherError.Message
+
+                let outcome = FileWatcherInitializationOutcome.FailedToStart
+                this.LastFileWatcherInitializationOutcome <- Some outcome
+                return outcome
         }
 
         member this.ClearPendingFileWatcherState() =
@@ -855,6 +912,7 @@ module ArcVaultExtensions =
 
             this.watcher <- None
             this.fileWatcherReady <- false
+            this.fileWatcherReadinessError <- None
             this.flushBufferedFileWatcherEvents <- None
             this.ClearPendingFileWatcherState()
         }
@@ -912,7 +970,7 @@ module ArcVaultExtensions =
                 this.path <- Some normalizedPath
 
                 try
-                    do! this.PrepareFileWatcherForInitialization()
+                    let! _ = this.PrepareFileWatcherForInitialization()
                     do! this.Startup()
                 with error ->
                     do! this.RestoreEmptyVaultAfterFailedInitialization()
@@ -944,7 +1002,7 @@ module ArcVaultExtensions =
                         })
 
                     try
-                        do! this.PrepareFileWatcherForInitialization()
+                        let! _ = this.PrepareFileWatcherForInitialization()
                         do! this.Startup()
                     with ArcLoadCancelledException targetWindowId ->
                         return raise (ArcCreatedButClosedException targetWindowId)
