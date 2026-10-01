@@ -5,6 +5,18 @@ open Fable.Electron
 open Fable.Electron.Remoting.Main
 open Main
 
+let private registerRequiredWindow (failureContext: string) =
+    ARC_VAULTS.RegisterVault(
+        onFailureBeforeCleanup =
+            fun error ->
+                eprintfn "%s: %s" failureContext error.Message
+
+                dialog.showErrorBox ("Swate could not start", $"{failureContext}\n\n{error.Message}")
+    )
+    |> Promise.map ignore
+    |> Promise.catch (fun _ -> app.quit ())
+    |> Promise.start
+
 if SquirrelStartup.started then
     app.quit ()
 
@@ -23,7 +35,7 @@ app
         with error ->
             Browser.Dom.console.error ("Version control host initialization failed", error.Message)
 
-        ARC_VAULTS.RegisterVault() |> ignore
+        registerRequiredWindow "The application window could not be loaded."
 
         Remoting.createIpc () |> Remoting.fromIpcMainEvent IPC.IVersionControlApi.api
         Remoting.createIpc () |> Remoting.fromValue IPC.IGitLabApi.api
@@ -34,7 +46,7 @@ app
 
         app.onActivate (fun _ ->
             if BrowserWindow.getAllWindows().Length = 0 then
-                ARC_VAULTS.RegisterVault() |> ignore
+                registerRequiredWindow "The application window could not be reopened."
         )
     )
 |> ignore

@@ -10384,6 +10384,37 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "An unsupported base content result skips the word diff and current file readers",
+            fun () -> promise {
+                let path = "binary.dat"
+                let mutable wordDiffCalls = 0
+                let mutable currentReadCalls = 0
+
+                let getBaseContent =
+                    fun _ -> promise { return Ok(failed Unsupported "binary" "binary content") }
+
+                let getWordDiff =
+                    fun _ ->
+                        wordDiffCalls <- wordDiffCalls + 1
+                        promise { return Ok(succeeded (ContentViewDto.Text "")) }
+
+                let readCurrentContent =
+                    fun _ ->
+                        currentReadCalls <- currentReadCalls + 1
+                        promise { return Ok "must not be read" }
+
+                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "M")
+
+                match result with
+                | Ok(PageState.GitUnsupportedPage _) -> ()
+                | _ -> failwith "Expected an unsupported diff page."
+
+                Vitest.expect(wordDiffCalls).toBe (0)
+                Vitest.expect(currentReadCalls).toBe (0)
+            }
+        )
+
+        Vitest.test (
             "An unsupported word diff opens the unsupported page",
             fun () -> promise {
                 let path = "binary.dat"
@@ -10402,5 +10433,165 @@ Vitest.describe (
                 | Ok(PageState.GitUnsupportedPage _) -> ()
                 | _ -> failwith "Expected an unsupported diff page."
             }
+        )
+
+        Vitest.test (
+            "A previous version that is only an LFS pointer opens the unsupported page without comparing",
+            fun () -> promise {
+                let path = "runs/data2.bin"
+                let mutable wordDiffCalls = 0
+                let mutable currentReadCalls = 0
+
+                let oid = String.replicate 64 "a"
+
+                let pointer =
+                    $"version https://git-lfs.github.com/spec/v1\noid sha256:{oid}\nsize 24577\n"
+
+                let getBaseContent =
+                    fun _ -> promise { return Ok(succeeded (ContentViewDto.Text pointer)) }
+
+                let getWordDiff =
+                    fun _ ->
+                        wordDiffCalls <- wordDiffCalls + 1
+                        promise { return Ok(succeeded (ContentViewDto.Text "")) }
+
+                let readCurrentContent =
+                    fun _ ->
+                        currentReadCalls <- currentReadCalls + 1
+                        promise { return Ok "binary bytes" }
+
+                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "M")
+
+                match result with
+                | Ok(PageState.GitUnsupportedPage page) ->
+                    Vitest.expect(page.Path).toBe (path)
+                    Vitest.expect(page.Reason.IsSome).toBe (true)
+                | _ -> failwith "Expected an unsupported diff page."
+
+                Vitest.expect(wordDiffCalls).toBe (0)
+                Vitest.expect(currentReadCalls).toBe (0)
+            }
+        )
+
+        // The provider also returns the pointer when the object is local but above its base diff
+        // size limit. The loader only sees the pointer text, so the page stays unsupported.
+        Vitest.test (
+            "A previous version held as an LFS pointer whose object is local and large opens the unsupported page",
+            fun () -> promise {
+                let path = "runs/large.bin"
+                let mutable wordDiffCalls = 0
+                let mutable currentReadCalls = 0
+
+                let oid = String.replicate 64 "b"
+
+                let pointer =
+                    $"version https://git-lfs.github.com/spec/v1\noid sha256:{oid}\nsize 52428800\n"
+
+                let getBaseContent =
+                    fun _ -> promise { return Ok(succeeded (ContentViewDto.Text pointer)) }
+
+                let getWordDiff =
+                    fun _ ->
+                        wordDiffCalls <- wordDiffCalls + 1
+                        promise { return Ok(succeeded (ContentViewDto.Text "")) }
+
+                let readCurrentContent =
+                    fun _ ->
+                        currentReadCalls <- currentReadCalls + 1
+                        promise { return Ok "large binary bytes" }
+
+                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "M")
+
+                match result with
+                | Ok(PageState.GitUnsupportedPage page) ->
+                    Vitest.expect(page.Path).toBe (path)
+                    Vitest.expect(page.Reason.IsSome).toBe (true)
+                | _ -> failwith "Expected an unsupported diff page."
+
+                Vitest.expect(wordDiffCalls).toBe (0)
+                Vitest.expect(currentReadCalls).toBe (0)
+            }
+        )
+)
+
+Vitest.describe (
+    "GitDiffPageLoader.isLfsPointerText",
+    fun () ->
+        let oid = String.replicate 32 "0" + String.replicate 32 "f"
+
+        let pointerLines = [
+            "version https://git-lfs.github.com/spec/v1"
+            $"oid sha256:{oid}"
+            "size 53687091200"
+        ]
+
+        Vitest.test (
+            "A pointer file is detected",
+            fun () ->
+                let text = (pointerLines |> String.concat "\n") + "\n"
+                Vitest.expect(GitDiffPageLoader.isLfsPointerText text).toBe (true)
+        )
+
+        Vitest.test (
+            "A pointer file with extension lines is detected",
+            fun () ->
+                let text =
+                    [
+                        pointerLines.[0]
+                        $"ext-0-foo sha256:{oid}"
+                        $"ext-1-bar sha256:{oid}"
+                        pointerLines.[1]
+                        pointerLines.[2]
+                    ]
+                    |> String.concat "\n"
+
+                Vitest.expect(GitDiffPageLoader.isLfsPointerText (text + "\n")).toBe (true)
+        )
+
+        Vitest.test (
+            "A pointer file with any extension name git-lfs accepts is detected",
+            fun () ->
+                let text =
+                    [
+                        pointerLines.[0]
+                        $"ext-0-env-test sha256:{oid}"
+                        $"ext-1-Env_Test sha256:{oid}"
+                        $"ext-2-env.test sha256:{oid}"
+                        pointerLines.[1]
+                        pointerLines.[2]
+                    ]
+                    |> String.concat "\n"
+
+                Vitest.expect(GitDiffPageLoader.isLfsPointerText (text + "\n")).toBe (true)
+        )
+
+        Vitest.test (
+            "A pointer file with CRLF line endings is detected",
+            fun () ->
+                let text = (pointerLines |> String.concat "\r\n") + "\r\n"
+                Vitest.expect(GitDiffPageLoader.isLfsPointerText text).toBe (true)
+        )
+
+        Vitest.test (
+            "Text that only starts like a pointer is not a pointer",
+            fun () ->
+                let text =
+                    (pointerLines |> String.concat "\n") + "\nfirst line of the real content\n"
+
+                Vitest.expect(GitDiffPageLoader.isLfsPointerText text).toBe (false)
+        )
+
+        Vitest.test (
+            "A pointer without its size line is not a pointer",
+            fun () ->
+                let text = pointerLines |> List.take 2 |> String.concat "\n"
+                Vitest.expect(GitDiffPageLoader.isLfsPointerText text).toBe (false)
+        )
+
+        Vitest.test (
+            "A real text file is not a pointer",
+            fun () ->
+                let text = "sample\tvalue\nA\t1\nB\t2\n"
+                Vitest.expect(GitDiffPageLoader.isLfsPointerText text).toBe (false)
         )
 )

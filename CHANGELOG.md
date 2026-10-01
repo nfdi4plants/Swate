@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Discard asks for confirmation.
 -   The cancel button also covers the upload step of a save. Canceling it keeps the saved-locally notice and opens no error dialog.
 -   The main process logs the start and end of every version control operation with its result.
+-   Added a new colour scheme for Swate and ARCitectGX (@paulineHans GitHub)
 
 ### 🔄 Changed
 
@@ -57,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   The file watcher no longer overwrites the in-memory ARC in the middle of one of Swate's own writes.
 -   A Git operation that fails after it already changed the workspace refreshes the sidebar before it shows the error.
 -   Added fallback support for broken repository image links in datahub browser. #1180 (by @Freymaurer)
+-   Show a native error message instead of crashing or silently failing when a selected folder is not a valid ARC.
 
 ## 2.3.1 - 2026-09-16
 

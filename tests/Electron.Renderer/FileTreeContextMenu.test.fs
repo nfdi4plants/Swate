@@ -31,6 +31,7 @@ let private createContextMenuConfig () : ContextMenuConfig = {
     runToggleLfsMark = fun _ _ -> promise { return Ok() }
     runDownloadLfsFile = fun _ -> promise { return Ok() }
     runFreeLocalLfsCopy = fun _ -> promise { return Ok() }
+    lfsActivePaths = []
 }
 
 let private createComposedContextMenuItems config item = createContextMenuItems config None item
@@ -45,6 +46,7 @@ let private createLfsFileItem (name: string) (path: string) (downloaded: bool) (
         IsLFS = Some true
         Downloaded = Some downloaded
         IsLFSPointer = Some isPointer
+        LfsActivity = None
         SizeFormatted = Some "42 MB"
 }
 
@@ -668,6 +670,117 @@ Vitest.describe (
                     menuItems |> List.find (fun menuItem -> menuItem.Label = "Unmark Git LFS")
 
                 Vitest.expect(unmarkItem.Disabled).toEqual (None)
+        )
+
+        Vitest.test (
+            "rename and delete are disabled while an LFS action runs on the file",
+            fun () ->
+                let item = {
+                    createLfsFileItem "busy.bin" "data/busy.bin" true false with
+                        LfsActivity = Some "Freeing"
+                }
+
+                let menuItems = createComposedContextMenuItems (createContextMenuConfig ()) item
+                let renameItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Rename")
+                let deleteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Delete")
+
+                Vitest.expect(renameItem.Disabled).toEqual (Some true)
+                Vitest.expect(deleteItem.Disabled).toEqual (Some true)
+        )
+
+        Vitest.test (
+            "rename and delete stay enabled for an idle LFS file",
+            fun () ->
+                let item = createLfsFileItem "idle.bin" "data/idle.bin" true false
+                let menuItems = createComposedContextMenuItems (createContextMenuConfig ()) item
+                let renameItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Rename")
+                let deleteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Delete")
+
+                Vitest.expect(renameItem.Disabled).toEqual (None)
+                Vitest.expect(deleteItem.Disabled).toEqual (None)
+        )
+
+        Vitest.test (
+            "rename and delete are disabled on every folder above a file with a running LFS action",
+            fun () ->
+                let config = {
+                    createContextMenuConfig () with
+                        lfsActivePaths = [ "Data/raw/busy.bin" ]
+                }
+
+                for folder in
+                    [
+                        createFolderItem "data" (Some "data")
+                        createFolderItem "raw" (Some "data/raw")
+                    ] do
+                    let menuItems = createComposedContextMenuItems config folder
+                    let renameItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Rename")
+                    let deleteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Delete")
+
+                    Vitest.expect(renameItem.Disabled).toEqual (Some true)
+                    Vitest.expect(deleteItem.Disabled).toEqual (Some true)
+                    Vitest.expect(isLockedByLfsActivity config.lfsActivePaths folder).toBe (true)
+        )
+
+        Vitest.test (
+            "rename and delete stay enabled on sibling and unrelated folders of a file with a running LFS action",
+            fun () ->
+                let config = {
+                    createContextMenuConfig () with
+                        lfsActivePaths = [ "data/raw/busy.bin" ]
+                }
+
+                let folders = [
+                    createFolderItem "other" (Some "data/other")
+                    createFolderItem "raw-copy" (Some "data/raw-copy")
+                    createFolderItem "results" (Some "results")
+                ]
+
+                for folder in folders do
+                    let menuItems = createComposedContextMenuItems config folder
+                    let renameItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Rename")
+                    let deleteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Delete")
+
+                    Vitest.expect(renameItem.Disabled).toEqual (None)
+                    Vitest.expect(deleteItem.Disabled).toEqual (None)
+                    Vitest.expect(isLockedByLfsActivity config.lfsActivePaths folder).toBe (false)
+        )
+
+        Vitest.test (
+            "delete is disabled on a canonical entity workbook while an LFS action runs inside its entity folder",
+            fun () ->
+                let cases = [
+                    createFileItem "isa.assay.xlsx" (Some "assays/A/isa.assay.xlsx"), "assays/A/dataset/big.bin"
+                    createFileItem "isa.study.xlsx" (Some "studies/S/isa.study.xlsx"), "Studies/S/resources/big.bin"
+                ]
+
+                for workbook, busyPath in cases do
+                    let config = {
+                        createContextMenuConfig () with
+                            lfsActivePaths = [ busyPath ]
+                    }
+
+                    let menuItems = createComposedContextMenuItems config workbook
+                    let deleteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Delete")
+
+                    Vitest.expect(deleteItem.Disabled).toEqual (Some true)
+                    Vitest.expect(isLockedByLfsActivity config.lfsActivePaths workbook).toBe (true)
+        )
+
+        Vitest.test (
+            "delete stays enabled on a canonical entity workbook while an LFS action runs in another entity folder",
+            fun () ->
+                let config = {
+                    createContextMenuConfig () with
+                        lfsActivePaths = [ "assays/B/dataset/big.bin"; "assays/A2/dataset/big.bin" ]
+                }
+
+                let workbook = createFileItem "isa.assay.xlsx" (Some "assays/A/isa.assay.xlsx")
+                let menuItems = createComposedContextMenuItems config workbook
+                let deleteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Delete")
+
+                Vitest.expect(deleteItem.Disabled).toEqual (None)
+                Vitest.expect(isLockedByLfsActivity config.lfsActivePaths workbook).toBe (false)
         )
 
         Vitest.test (
