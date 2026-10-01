@@ -26,6 +26,16 @@ let workerPath (isPackaged: bool) (resourcesPath: string) (moduleDirectory: stri
 let private currentWorkerPath () =
     workerPath app.isPackaged Main.Helper.Assets.processResourcesPath __dirname
 
+/// The folder that holds the text-diff folder of spools and scratch files. A spool can grow to
+/// the size of the file, so on Windows and macOS it goes to the temp folder, which is per user
+/// there and stays out of roaming or redirected profiles. Linux shares its temp folder between
+/// all users, so there it goes to the app data of the user.
+let tempRootNameFor (platform: string) : Enums.App.GetPath.Name =
+    match platform with
+    | "win32"
+    | "darwin" -> Enums.App.GetPath.Name.Temp
+    | _ -> Enums.App.GetPath.Name.UserData
+
 let private logFailure (message: string) (error: exn) =
     Browser.Dom.console.error (message, error.Message)
 
@@ -39,9 +49,7 @@ let private createPool () : JS.Promise<TextDiffPool.TextDiffPool option> = promi
     try
         let! supervisor =
             TextDiffSupervisor.create {
-                // The supervisor keeps its text-diff folder of spools and scratch files in the user's
-                // app data, because the temp folder is shared by all users on Linux.
-                TempRoot = app.getPath Enums.App.GetPath.Name.UserData
+                TempRoot = app.getPath (tempRootNameFor (Main.Bindings.Node.processPlatform ()))
                 GitExecutable = None
                 OnEvent = None
             }

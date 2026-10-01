@@ -517,6 +517,19 @@ Vitest.describe (
                 Vitest.expect(packaged.Replace('\\', '/')).toBe
                     "C:/Swate/resources/app.asar.unpacked/.vite/build/text-diff-worker.cjs"
         )
+
+        Vitest.test (
+            "spools go to the per-user temp folder on Windows and macOS and to the app data on Linux",
+            fun () ->
+                Vitest.expect(TextDiffWorkers.tempRootNameFor "win32").toEqual
+                    Fable.Electron.Main.Enums.App.GetPath.Name.Temp
+
+                Vitest.expect(TextDiffWorkers.tempRootNameFor "darwin").toEqual
+                    Fable.Electron.Main.Enums.App.GetPath.Name.Temp
+
+                Vitest.expect(TextDiffWorkers.tempRootNameFor "linux").toEqual
+                    Fable.Electron.Main.Enums.App.GetPath.Name.UserData
+        )
 )
 
 Vitest.describe (

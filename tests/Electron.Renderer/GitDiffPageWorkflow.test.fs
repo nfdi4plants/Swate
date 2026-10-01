@@ -2480,4 +2480,166 @@ Vitest.describe (
                 Vitest.expect((diffOf state).Status).toEqual (GitDiffPageStatus.SourceChanged)
             }
         )
+
+        Vitest.test (
+            "A reopen whose pages are much smaller than the old ones keeps the page with the target line loaded",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                // The first session reads pages of ten lines, the second one pages of two lines.
+                let pageOf (handleId: string) (index: int) =
+                    let size = if handleId = "diff-1" then 10 else 2
+                    let first = (index - 1) * size
+
+                    diffPage $"{handleId}-p{index}" (Some $"cursor-{index}") [|
+                        hunkWith $"{handleId}-h{index}" [|
+                            for line in first .. first + size - 1 -> rowAt $"{handleId}-r{line}" line
+                        |]
+                    |]
+
+                fake.OpenReply <-
+                    fun _ ->
+                        let openHandle = handleOfOpen fake.Opens.Count
+                        openedOn openHandle (pageOf openHandle.Id 1)
+
+                fake.ReadReply <-
+                    fun request ->
+                        if request.HandleId = "diff-1" && request.Cursor = "cursor-10" then
+                            failedWith "diff_session_closed" None
+                        else
+                            let index = int (request.Cursor.Replace("cursor-", "")) + 1
+                            succeeded (ResumablePageDto.Ready(pageOf request.HandleId index))
+
+                let! state = run fake (select "a.txt") runningState
+                let generation = (diffOf state).Generation
+                let current = ref state
+
+                // The tenth page shows the lines 90 to 99. Reading the eleventh page finds the session closed.
+                for _ in 1..10 do
+                    let! next = run fake (diffMsg (GitDiffMsg.LoadNext generation)) current.Value
+                    current.Value <- next
+
+                let page = diffOf current.Value
+
+                let shownWhileReopening =
+                    fake.PageStates
+                    |> Seq.choose (
+                        function
+                        | Some(PageState.GitDiffPage shown) ->
+                            match shown.Status with
+                            | GitDiffPageStatus.Reopening pagesRead -> Some(shown, pagesRead)
+                            | _ -> None
+                        | _ -> None
+                    )
+                    |> Seq.toArray
+
+                Vitest.expect(shownWhileReopening.Length).toBeGreaterThan (0)
+
+                // The old pages from the fourth to the tenth stay loaded until the new session
+                // reads past them, and the requested page stays on the tenth.
+                for shown, pagesRead in shownWhileReopening do
+                    Vitest.expect(shown.RequestedPageIndex).toBe (9)
+
+                    for index in max 3 pagesRead .. 9 do
+                        Vitest.expect(shown.Pages.[index].PageId).toBe ($"diff-1-p{index + 1}")
+                        Vitest.expect(shown.Pages.[index].IsEvicted).toBe (false)
+
+                // The 46th page of the new session starts with line 90.
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+                Vitest.expect(current.Value.DiffReopen).toEqual (None)
+                Vitest.expect(page.Pages.Length).toBe (46)
+                Vitest.expect(page.RequestedPageIndex).toBe (45)
+                Vitest.expect(page.Pages.[45].PageId).toBe ("diff-2-p46")
+                Vitest.expect(page.Pages.[45].IsEvicted).toBe (false)
+                Vitest.expect(pageParts page.Pages.[45]).toEqual ([| "hunk:diff-2-h46" |])
+            }
+        )
+
+        Vitest.test (
+            "A next page that lands while a replay is still running keeps the pages on screen loaded",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                let pageDto index =
+                    diffPage $"p{index}" (Some $"cursor-{index}") [| hunk $"h{index}" |]
+
+                let! state = openFirstPage fake (pageDto 1)
+                let generation = (diffOf state).Generation
+
+                fake.ReadReply <-
+                    fun request ->
+                        succeeded (ResumablePageDto.Ready(pageDto (int (request.Cursor.Replace("cursor-", "")) + 1)))
+
+                fake.ReplayReply <- fun request -> succeeded (pageDto (int (request.PageId.Replace("p", ""))))
+                let current = ref state
+
+                for _ in 2..9 do
+                    let! next = run fake (diffMsg (GitDiffMsg.LoadNext generation)) current.Value
+                    current.Value <- next
+
+                Vitest.expect((diffOf current.Value).Pages.[0].IsEvicted).toBe (true)
+
+                // The next page is asked for. The user scrolls back up to the second page, and the
+                // first page is replayed. The next page lands before the replay answers.
+                let loading, loadCmd =
+                    update fake.Dependencies fake.SetPageState (diffMsg (GitDiffMsg.LoadNext generation)) current.Value
+
+                let! heldPage = collectMessages loadCmd
+
+                let replaying, replayCmd =
+                    update
+                        fake.Dependencies
+                        fake.SetPageState
+                        (diffMsg (GitDiffMsg.Replay(generation, "p1", [ "p1"; "p2" ])))
+                        loading
+
+                let! heldReplay = collectMessages replayCmd
+                current.Value <- replaying
+
+                for message in heldPage do
+                    let! next = run fake message current.Value
+                    current.Value <- next
+
+                let page = diffOf current.Value
+                Vitest.expect(page.Pages |> Array.map _.PageId).toEqual ([| for index in 1..10 -> $"p{index}" |])
+                Vitest.expect(page.Pages.[1].IsEvicted).toBe (false)
+                Vitest.expect(page.RequestedPageIndex).toBe (0)
+
+                for message in heldReplay do
+                    let! next = run fake message current.Value
+                    current.Value <- next
+
+                let page = diffOf current.Value
+                Vitest.expect(page.Pages.[0].IsEvicted).toBe (false)
+                Vitest.expect(page.Pages.[1].IsEvicted).toBe (false)
+                Vitest.expect(page.RequestedPageIndex).toBe (0)
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+            }
+        )
+
+        Vitest.test (
+            "An open continuation answered with a closed session reopens the diff",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                // The first open scans, its continuation finds the session closed, and the reopen
+                // opens the diff with a handle of its own.
+                fake.OpenReply <-
+                    fun request ->
+                        match fake.Opens.Count, request.Continuation with
+                        | 1, None -> succeeded (ResumableOpenDto.Scanning(progress false, "scan-1", None))
+                        | 2, Some _ -> failedWith "diff_session_closed" None
+                        | count, _ -> openedOn (handleOfOpen count) (diffPage "p1" None [| hunk "h1" |])
+
+                let! state = run fake (select "a.txt") runningState
+                let page = diffOf state
+
+                Vitest.expect(fake.Opens.Count).toBe (3)
+                Vitest.expect(fake.Opens.[2].Continuation).toEqual (None)
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+                Vitest.expect(page.Handle).toEqual (Some(handleOfOpen 3))
+                Vitest.expect(page.Pages |> Array.map _.PageId).toEqual ([| "p1" |])
+                Vitest.expect(state.DiffReopen).toEqual (None)
+            }
+        )
 )

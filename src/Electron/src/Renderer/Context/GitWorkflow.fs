@@ -1596,9 +1596,16 @@ module GitDiffPageLoader =
     /// last replay request while the requested page is one of them, even when they alone exceed
     /// the limits. When the requested page alone still exceeds MaxLoadedBytes, the rows of its
     /// least recently expanded gaps collapse. The newest expansion stays, since the user just
-    /// asked for it.
+    /// asked for it. While the diff reopens, the page the new session read last stays as well,
+    /// since its pages can hold fewer lines and the page with the target line can land far from
+    /// the requested page.
     let evict (page: GitDiffPageData) : GitDiffPageData =
         let anchor = page.RequestedPageIndex
+
+        let lastRead =
+            match page.Status with
+            | GitDiffPageStatus.Reopening pagesRead when pagesRead > 0 -> Some(pagesRead - 1)
+            | _ -> None
 
         // Once the requested page moves away from the pages of the last replay request, those
         // pages are no longer on screen.
@@ -1619,7 +1626,9 @@ module GitDiffPageLoader =
             let candidates =
                 loaded
                 |> Array.filter (fun (index, windowPage) ->
-                    index <> anchor && not (visiblePages |> List.contains windowPage.PageId)
+                    index <> anchor
+                    && Some index <> lastRead
+                    && not (visiblePages |> List.contains windowPage.PageId)
                 )
 
             if
@@ -2221,8 +2230,8 @@ module GitDiffPageLoader =
 
             // One replay at a time. Each answer evicts other pages, and replays running side by
             // side would evict each other's pages.
-            match handleRequest () with
-            | Some handle when isEvicted && page.PendingReplays.IsEmpty ->
+            match handleRequest (), page.Pages |> Array.tryFindIndex (fun windowPage -> windowPage.PageId = pageId) with
+            | Some handle, Some index when isEvicted && page.PendingReplays.IsEmpty ->
                 let request: ReplayTextDiffPageRequestDto = {
                     OperationId = deps.newOperationId ()
                     HandleId = handle.Id
@@ -2231,10 +2240,13 @@ module GitDiffPageLoader =
                 }
 
                 // A replay asked for from a folded placeholder names no visible part of that page,
-                // so the replayed page joins the pages eviction keeps.
+                // so the replayed page joins the pages eviction keeps. The replayed page is also
+                // the requested page, so a next page that lands before the replay answers keeps
+                // the pages on screen.
                 track request.OperationId {
                     page with
                         PendingReplays = [ pageId ]
+                        RequestedPageIndex = index
                         VisiblePages = pageId :: visiblePages |> List.distinct
                         KeepRequestedPage = page.KeepRequestedPage || page.NextRequest.IsSome
                         FailedReplays = page.FailedReplays |> List.filter (fun failed -> failed <> pageId)
@@ -2556,6 +2568,17 @@ module GitDiffPageLoader =
         | _, Some(operationId, _, _, Some DiffSessionClosed) when reopening.IsNone && not (isSettled page.Status) ->
             let target = reopenTargetOf msg page
             let next, cmd = reopen deps target (finish operationId page)
+            next, Some target, cmd
+        // An Open sent with a continuation carries no handle. The library answers it with
+        // diff_session_closed when the session it was scanning in closed or was evicted.
+        | GitDiffMsg.OpenCompleted(_, request, result), _ when
+            reopening.IsNone
+            && not (isSettled page.Status)
+            && request.Continuation.IsSome
+            && failureCode result = Some DiffSessionClosed
+            ->
+            let target = reopenTargetOf msg page
+            let next, cmd = reopen deps target (finish request.OperationId page)
             next, Some target, cmd
         | GitDiffMsg.OpenCompleted(_, request, result), _ when
             reopening.IsNone
