@@ -69,7 +69,10 @@ export const KeyboardOpensOverflowAndSelectsAction: Story = {
     const menu = await screen.findByRole('menu');
     expect(menu).toBeInTheDocument();
 
-    await userEvent.keyboard('o{Enter}');
+    menu.focus();
+    await userEvent.keyboard('o');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open an existing ARC' })).toHaveFocus());
+    await userEvent.keyboard('{Enter}');
     await waitFor(() => {
       expect(canvas.getByTestId('action-result')).toHaveTextContent('open');
       expect(screen.queryByRole('menu')).not.toBeInTheDocument();

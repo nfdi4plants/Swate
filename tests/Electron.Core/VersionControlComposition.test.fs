@@ -152,7 +152,7 @@ let private fakeFactory (id: string) (root: string option) : ProviderFactory =
     }
 
 Vitest.describe (
-    "DataHub identity strategy",
+    "DataHUB identity strategy",
     fun () ->
         Vitest.test (
             "the target host selects the stored account for that hub over the active one",
@@ -244,7 +244,7 @@ Vitest.describe (
 )
 
 Vitest.describe (
-    "DataHub credential strategy",
+    "DataHUB credential strategy",
     fun () ->
         Vitest.test (
             "returns the oauth2 credential for the account of the requested host",
@@ -321,7 +321,7 @@ Vitest.describe (
 )
 
 Vitest.describe (
-    "DataHub revision policy",
+    "DataHUB revision policy",
     fun () ->
         Vitest.test (
             "a metadata workbook is inline whatever its size",

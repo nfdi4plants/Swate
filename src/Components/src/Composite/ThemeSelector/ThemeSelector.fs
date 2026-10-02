@@ -55,6 +55,18 @@ module private ThemeSelectorHelper =
 </svg>"""
 
     [<Literal>]
+    let Amaze =
+        """<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+    <g fill="none" stroke="currentColor" stroke-width="1.3">
+    <ellipse cx="16" cy="16" rx="3.5" ry="13"/>
+    <ellipse cx="16" cy="16" rx="3.5" ry="13" transform="rotate(45 16 16)"/>
+    <ellipse cx="16" cy="16" rx="3.5" ry="13" transform="rotate(90 16 16)"/>
+    <ellipse cx="16" cy="16" rx="3.5" ry="13" transform="rotate(135 16 16)"/>
+    <circle cx="16" cy="16" r="4" fill="white"/>
+    </g>
+</svg>"""
+
+    [<Literal>]
     let Viola =
         """<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
 	<rect width="32" height="32" fill="none" />
@@ -86,6 +98,7 @@ type ThemeSelector =
                     | Theme.Finster -> AnimatedMoon
                     | Theme.Planti -> Planti
                     | Theme.Viola -> Viola
+                    | Theme.Amaze -> Amaze
                     | Theme.Auto -> Browser
 
                 iconRef.current?innerHTML <- icon
@@ -106,6 +119,7 @@ type ThemeSelector =
                         ThemeSelector.SelectItem Theme.Finster
                         ThemeSelector.SelectItem Theme.Planti
                         ThemeSelector.SelectItem Theme.Viola
+                        ThemeSelector.SelectItem Theme.Amaze
                         ThemeSelector.SelectItem Theme.Auto
                     ]
                 ]
