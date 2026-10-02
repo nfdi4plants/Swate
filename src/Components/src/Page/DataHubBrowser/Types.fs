@@ -122,7 +122,7 @@ type ChangedFileStatus =
     | [<CompiledName("deleted")>] Deleted
     | [<CompiledName("moved")>] Moved
 
-/// A file with local changes that hasn't been saved to DataHub yet.
+/// A file with local changes that hasn't been saved to DataHUB yet.
 type ChangedFile = {
     Path: string
     Status: ChangedFileStatus
