@@ -104,34 +104,40 @@ type FilePickerWidget =
                 [| box paths |]
             )
 
-        SortableList.SortableList(
-            items,
-            (fun nextItems -> setPaths (fun _ -> nextItems |> Array.map _.label)),
-            className = "swt:max-h-[45vh]",
-            rowProps =
-                (fun item -> [
-                    prop.className [
-                        "swt:cursor-pointer swt:table-auto"
-                        if List.contains item.id selectedPathsCtx.state then
-                            "swt:bg-base-300"
-                    ]
-                    prop.onClick (fun _ ->
-                        selectedPathsCtx.setStateUpdater (fun current ->
-                            if List.contains item.id current then
-                                current |> List.filter ((<>) item.id)
-                            else
-                                item.id :: current
+        Html.div [
+            prop.className "swt:max-h-[45vh] swt:overflow-auto"
+            prop.children [
+                SortableList.SortableList(
+                    items,
+                    (fun nextItems -> setPaths (fun _ -> nextItems |> Array.map _.label)),
+                    className = "swt:max-h-[45vh]",
+                    rowProps =
+                        (fun item -> [
+                            prop.className [
+                                "swt:cursor-pointer swt:table-auto"
+                                if List.contains item.id selectedPathsCtx.state then
+                                    "swt:bg-base-300"
+                            ]
+                            prop.onClick (fun _ ->
+                                selectedPathsCtx.setStateUpdater (fun current ->
+                                    if List.contains item.id current then
+                                        current |> List.filter ((<>) item.id)
+                                    else
+                                        item.id :: current
+                                )
+                            )
+                        ]),
+                    renderRow =
+                        (fun row ->
+                            RowComponents.DefaultRow(
+                                row,
+                                label = Html.span [ prop.className "swt:font-mono"; prop.text row.item.label ]
+                            )
                         )
-                    )
-                ]),
-            renderRow =
-                (fun row ->
-                    RowComponents.DefaultRow(
-                        row,
-                        label = Html.span [ prop.className "swt:font-mono"; prop.text row.item.label ]
-                    )
                 )
-        )
+            ]
+
+        ]
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private SortPathsButtons(setPaths: (string[] -> string[]) -> unit) =

@@ -228,8 +228,8 @@ function ValidationPackageBrowserFixtureContainer() {
 
 function SortableListContainer() {
   return (
-    <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full swt:justify-center swt:items-center swt:h-screen'>
-      <div className="swt:border-2 swt:border-amber-300 swt:p-4 swt:w-md swt:overflow-hidden">
+    <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full swt:p-10 swt:h-screen'>
+      <div className="swt:border-2 swt:border-amber-300 swt:p-4 swt:w-md swt:overflow-auto">
         <SortableListFixture />
       </div>
     </div>
@@ -238,7 +238,7 @@ function SortableListContainer() {
 
 const App = () => {
     return (
-        <SortableListContainer />
+        <ArcFileEditorContainer />
     );
 };
 
