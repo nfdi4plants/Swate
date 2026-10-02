@@ -37,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Save, Download Changes and Upload Changes run one synchronize operation: refresh, update when the online copy is ahead, then publish. It asks first only when the update needs merge resolution, and it refuses an update or a branch switch that would overwrite local changes and names the files.
 -   A push the online copy refuses (a protected branch, a declined hook) shows the remote's reason, and the save stays local.
 -   The Git LFS threshold and the download preference are held in memory for each open ARC. Every ARC starts at 1 MiB and no download, and the `swate.lfs.*` keys of earlier versions are no longer read.
--   Swate requires Git 2.38 or newer and Git LFS 3.7 or newer, with the Git LFS filter configured.
+-   Swate requires Git 2.42 or newer and Git LFS 3.7 or newer, with the Git LFS filter configured.
 -   Merges Swate creates are titled "Merge online changes".
 -   The busy notice shows the operation and git's progress lines. The raw "Git output" log is removed.
 -   The tooltips of Update ARC from Online, Download Changes and Clean LFS Cache list the git commands that run now.

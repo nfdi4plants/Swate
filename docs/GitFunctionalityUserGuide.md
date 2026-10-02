@@ -176,7 +176,7 @@ Provider specific behavior belongs in the library or in the composition root. Do
 
 ## 13. Requirements and troubleshooting
 
-The library requires Git 2.38 or newer and Git LFS 3.7 or newer. `checkDependencies` reports every component with `Installed`, `Compatible` and a remediation text. The sidebar shows the remediation when a component is missing or too old. Only the Git LFS configuration component can be installed through `installDependency`, which the sidebar offers when an operation fails with category `DependencyMissing`.
+The library requires Git 2.42 or newer and Git LFS 3.7 or newer. Git LFS 3.7 reads the index in `git lfs checkout` only with Git 2.42 or newer, which a conflict pick of an LFS file needs. `checkDependencies` reports every component with `Installed`, `Compatible` and a remediation text. The sidebar shows the remediation when a component is missing or too old. Only the Git LFS configuration component can be installed through `installDependency`, which the sidebar offers when an operation fails with category `DependencyMissing`.
 
 `Authentication` or `Authorization` failures on synchronize:
 

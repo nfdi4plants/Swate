@@ -10,27 +10,27 @@ open Swate.Electron.Shared.VersionControlTypes
 let mutable private dependencyCheckStarted = false
 
 /// The message shown when a version control dependency is missing or too old. The
-/// library decides what is required (Git 2.38, Git LFS 3.7 and the LFS filter
-/// configuration) and says how to fix it.
+/// library decides what is required (Git 2.42, Git LFS 3.7 and the LFS filter
+/// configuration) and says how to fix it. Its remediation text starts with the cause when a
+/// version check failed.
 let dependencyProblemMessage (statuses: DependencyStatusDto[]) : string option =
     let problems =
         statuses
         |> Array.filter (fun status -> not status.Installed || not status.Compatible)
         |> Array.map (fun status ->
-            let state =
-                if not status.Installed then
-                    "is not installed"
-                else
-                    match status.Version with
-                    | Some version -> $"version {version} is not supported"
-                    | None -> "is not supported"
-
             let remediation =
                 status.Remediation
                 |> Option.map (fun text -> $" {text}")
                 |> Option.defaultValue ""
 
-            $"{status.Component} {state}.{remediation}"
+            if not status.Installed then
+                $"{status.Component} was not found or could not be run.{remediation}"
+            elif status.Component = "git-lfs-configuration" then
+                $"Git LFS is installed but not set up.{remediation}"
+            else
+                match status.Version with
+                | Some version -> $"{version} is not supported.{remediation}"
+                | None -> $"{status.Component} is not supported.{remediation}"
         )
 
     if problems.Length = 0 then
