@@ -565,6 +565,107 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "A line slice whose suspended read was dropped restarts once from its start offset",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                let longRow = {
+                    changedRow "r1" with
+                        Current =
+                            Some {
+                                textLine 0 "abc" with
+                                    Slice = {
+                                        OffsetUtf16 = "0"
+                                        TotalUtf16 = Some "6"
+                                        Text = "abc"
+                                        Highlights = [||]
+                                    }
+                            }
+                }
+
+                let! state = openFirstPage fake (diffPage "p1" None [| hunkWith "h1" [| longRow |] |])
+
+                fake.LineReply <-
+                    fun request ->
+                        match request.Continuation with
+                        | None when fake.Lines.Count = 1 ->
+                            succeeded (ResumableLineDto.Scanning(progress false, "line-continuation", None))
+                        | Some _ -> failedWith "continuation_mismatch" None
+                        | None ->
+                            succeeded (
+                                ResumableLineDto.Ready {
+                                    Number = request.Line
+                                    Ending = LineEndingDto.LF
+                                    Slice = {
+                                        OffsetUtf16 = request.OffsetUtf16
+                                        TotalUtf16 = Some "6"
+                                        Text = "def"
+                                        Highlights = [||]
+                                    }
+                                }
+                            )
+
+                let generation = (diffOf state).Generation
+
+                let! state =
+                    run fake (diffMsg (GitDiffMsg.LoadLineSlice(generation, DiffSideDto.Current, 0.0, 3.0))) state
+
+                let page = diffOf state
+
+                Vitest.expect(fake.Lines.Count).toBe (3)
+                Vitest.expect(fake.Lines.[1].Continuation).toEqual (Some "line-continuation")
+                Vitest.expect(fake.Lines.[2].Continuation).toEqual (None)
+                Vitest.expect(fake.Lines.[2].OffsetUtf16).toBe ("3")
+                Vitest.expect((currentLine page).Text).toBe ("abcdef")
+                Vitest.expect(page.FailedLineSlices).toEqual ([])
+                Vitest.expect(page.PendingLineSlices).toEqual ([])
+            }
+        )
+
+        Vitest.test (
+            "A second dropped read of the same line slice fails the slice without another request",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                let longRow = {
+                    changedRow "r1" with
+                        Current =
+                            Some {
+                                textLine 0 "abc" with
+                                    Slice = {
+                                        OffsetUtf16 = "0"
+                                        TotalUtf16 = Some "6"
+                                        Text = "abc"
+                                        Highlights = [||]
+                                    }
+                            }
+                }
+
+                let! state = openFirstPage fake (diffPage "p1" None [| hunkWith "h1" [| longRow |] |])
+
+                fake.LineReply <-
+                    fun request ->
+                        match request.Continuation with
+                        | None -> succeeded (ResumableLineDto.Scanning(progress false, "line-continuation", None))
+                        | Some _ -> failedWith "continuation_mismatch" None
+
+                let generation = (diffOf state).Generation
+
+                let! state =
+                    run fake (diffMsg (GitDiffMsg.LoadLineSlice(generation, DiffSideDto.Current, 0.0, 3.0))) state
+
+                let page = diffOf state
+
+                Vitest.expect(fake.Lines.Count).toBe (4)
+                Vitest.expect(fake.Lines.[2].Continuation).toEqual (None)
+                Vitest.expect(page.FailedLineSlices.Length).toBe (1)
+                Vitest.expect(page.PendingLineSlices).toEqual ([])
+                Vitest.expect(page.RestartedLineSlices).toEqual ([])
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+            }
+        )
+
+        Vitest.test (
             "Consecutive line slices are appended to the displayed line",
             fun () -> promise {
                 let fake = FakeDiffClient()

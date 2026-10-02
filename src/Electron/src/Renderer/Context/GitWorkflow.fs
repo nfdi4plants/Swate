@@ -1352,6 +1352,10 @@ module GitDiffPageLoader =
     [<Literal>]
     let DiffSessionClosed = "diff_session_closed"
 
+    /// The worker dropped the suspended read that the continuation belongs to.
+    [<Literal>]
+    let ContinuationMismatch = "continuation_mismatch"
+
     /// The preparation token of an encoding choice expired or no longer matches the sources.
     [<Literal>]
     let PreparationMismatch = "preparation_mismatch"
@@ -1535,6 +1539,7 @@ module GitDiffPageLoader =
             NextCursor = None
             NextRequest = None
             PendingLineSlices = []
+            RestartedLineSlices = []
             ExpandingGaps = []
             PendingReplay = None
             VisiblePages = []
@@ -2392,12 +2397,38 @@ module GitDiffPageLoader =
             let answered () = {
                 page with
                     PendingLineSlices = page.PendingLineSlices |> List.filter (fun pending -> pending <> slice)
+                    RestartedLineSlices = page.RestartedLineSlices |> List.filter (fun pending -> pending <> slice)
             }
 
             if isSettled page.Status then
                 answered (), Cmd.none
             else
+                let droppedRead =
+                    match result with
+                    | Ok(OperationResultDto.Failed failure) ->
+                        failure.Code = ContinuationMismatch
+                        && request.Continuation.IsSome
+                        && not (page.RestartedLineSlices |> List.contains slice)
+                    | _ -> false
+
                 match valueOf result with
+                | Error _ when droppedRead ->
+                    // The worker keeps eight suspended line reads and dropped this one. The restart
+                    // goes back to the start offset of the slice without a continuation, once per slice.
+                    let restart = {
+                        request with
+                            OperationId = deps.newOperationId ()
+                            Continuation = None
+                    }
+
+                    track restart.OperationId {
+                        page with
+                            RestartedLineSlices = slice :: page.RestartedLineSlices
+                    },
+                    send
+                        deps.textDiff.readTextDiffLine
+                        restart
+                        (fun request result -> GitDiffMsg.LineCompleted(page.Generation, request, result))
                 | Error status when endsDiff status -> { answered () with Status = status }, Cmd.none
                 | Error _ ->
                     let answered = answered ()
@@ -2481,6 +2512,7 @@ module GitDiffPageLoader =
                         NextCursor = None
                         NextRequest = None
                         PendingLineSlices = []
+                        RestartedLineSlices = []
                         ExpandingGaps = []
                         PendingReplay = None
                         VisiblePages = []

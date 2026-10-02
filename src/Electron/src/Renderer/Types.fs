@@ -130,6 +130,8 @@ type GitDiffPageData = {
     NextRequest: GitDiffNextRequest option
     /// Line slices requested and not answered yet.
     PendingLineSlices: PagedLineSliceRequest list
+    /// Pending line slices that restarted once without a continuation after the worker dropped their read.
+    RestartedLineSlices: PagedLineSliceRequest list
     /// Gaps whose expansion is running. A gap is expanded by one request at a time.
     ExpandingGaps: string list
     /// The evicted page whose replay is running.
