@@ -26,6 +26,7 @@ import {Entry as ArcFileEditor} from '../src/Page/ArcFileEditor/ArcFileEditor.fs
 import {Entry as SettingsPage} from '../src/Page/SettingsPage/SettingsPage.fs.ts';
 import WorkspaceEntry from '../src/Composite/Workspace/Workspace.fixture.fs.ts';
 import ValidationPackageBrowserFixture from '../src/Page/ValidationPackageBrowser/ValidationPackageBrowser.sample.fs.ts';
+import SortableListFixture from '../src/Composite/SortableList/SortableList.sample.fs.ts'
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -223,6 +224,16 @@ function ValidationPackageBrowserFixtureContainer() {
       <ValidationPackageBrowserFixture />
     </div>
   );
+}
+
+function SortableListContainer() {
+  return (
+    <div className='swt:flex swt:flex-col swt:gap-4 swt:w-full swt:p-10 swt:h-screen'>
+      <div className="swt:border-2 swt:border-amber-300 swt:p-4 swt:w-md swt:overflow-auto">
+        <SortableListFixture />
+      </div>
+    </div>
+  )
 }
 
 const App = () => {
