@@ -5405,7 +5405,9 @@ Vitest.describe (
                                         .toBe (false)
 
                                     Vitest
-                                        .expect(windowState.SentMessages |> Seq.exists isFileTreeDirectoryUpdateMessage)
+                                        .expect(
+                                            windowState.SentMessages |> Seq.exists isFileTreeDirectoryUpdateMessage
+                                        )
                                         .toBe (false)
 
                                     do! vault.RefreshFileTreeDirectory relativeDatasetPath

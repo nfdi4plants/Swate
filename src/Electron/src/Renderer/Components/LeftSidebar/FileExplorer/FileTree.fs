@@ -292,9 +292,7 @@ type FileTree =
                 else
                     hasObservedFileTreeUpdateRef.current <- true
             ),
-            [|
-                box fileStateCtx.state.FileTree
-            |]
+            [| box fileStateCtx.state.FileTree |]
         )
 
         let handleExpansionChange (item: FileItem) (willExpand: bool) =

@@ -30,7 +30,8 @@ let reconcileMaterializedState
         Paths = Set.empty
       }
     | Some root ->
-        let isKnownDirectory path = isKnownDirectory (PathHelpers.normalizePath path)
+        let isKnownDirectory path =
+            isKnownDirectory (PathHelpers.normalizePath path)
 
         let rec collectSelectedAncestors path collected =
             let normalizedPath = PathHelpers.normalizePath path

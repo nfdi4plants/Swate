@@ -523,8 +523,7 @@ Vitest.describe (
                     do! createDirectoryAsync folderPath
                     do! writeUtf8FileAsync deepPath "deep"
 
-                    let! reconciliation =
-                        FileTreeCreator.reconcileFileTreeDirectory arcPath "" tree directChildrenIndex
+                    let! reconciliation = FileTreeCreator.reconcileFileTreeDirectory arcPath "" tree directChildrenIndex
 
                     let reconciliation = reconciliation |> Option.get
                     Vitest.expect(reconciliation.directoryPath).toBe ("")
@@ -911,8 +910,7 @@ Vitest.describe (
 
                             let incrementalUpdate = incrementalResult |> Option.get
                             Vitest.expect(incrementalUpdate.children.Length).toBe (childCount + 1)
-                            let relativeAddedPath =
-                                tryGetRepoRelativePath arcPath addedPath |> Option.get
+                            let relativeAddedPath = tryGetRepoRelativePath arcPath addedPath |> Option.get
 
                             Vitest.expect(incrementalUpdate.children |> Array.map _.path).toContain (relativeAddedPath)
 

@@ -16,6 +16,7 @@ open Main.ArcMerge
 open Main.ArcVaultHelper
 open Main.FileImportCoordinator
 open Swate.Components.Shared
+open Swate.Components.Shared.PathChildrenIndex
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
@@ -71,7 +72,7 @@ type ArcVault(window: BrowserWindow) =
     let mutable watcherDeferralCount = 0
     let mutable watcherEpoch = 0
     let mutable fileTreeValue = Dictionary<string, FileEntry>()
-    let fileTreeDirectChildrenIndex = FileTreeDirectChildrenIndex()
+    let fileTreeDirectChildrenIndex = PathChildrenIndex()
 
     let mutable fileTreeUpdateTail: Fable.Core.JS.Promise<unit> =
         JS.Constructors.Promise.resolve ()
@@ -91,7 +92,7 @@ type ArcVault(window: BrowserWindow) =
         with get () = fileTreeValue
         and set value =
             fileTreeValue <- value
-            fileTreeDirectChildrenIndex.Rebuild value
+            fileTreeDirectChildrenIndex.Rebuild value.Keys
 
     member internal _.FileTreeDirectChildrenIndex = fileTreeDirectChildrenIndex
 
@@ -739,9 +740,9 @@ module ArcVaultExtensions =
                         with
                         | None -> ()
                         | Some update ->
-                            WindowSend.send<IFileTreeRendererApi> this.window (fun api ->
-                                api.fileTreeDirectoryUpdate update
-                            )
+                            WindowSend.send<IFileTreeRendererApi>
+                                this.window
+                                (fun api -> api.fileTreeDirectoryUpdate update)
                 })
 
             this.FileTreeUpdateTail <- queuedUpdate |> Promise.catch (fun _ -> ())
@@ -790,32 +791,13 @@ module ArcVaultExtensions =
 
                     watcher.on (Chokidar.Events.All, this._FileEventController sendMsgApi) |> ignore
 
-                    watcher.onReady (fun () ->
-                        match this.watcher with
-                        | Some currentWatcher when System.Object.ReferenceEquals(currentWatcher, watcher) ->
-                            if this.fileWatcherReadinessError.IsNone then
-                                this.fileWatcherReady <- true
-                        | _ -> ()
-                    )
-                    |> ignore
-
-                    watcher.onError (fun error ->
-                        match this.watcher with
-                        | Some currentWatcher when System.Object.ReferenceEquals(currentWatcher, watcher) ->
-                            if not this.fileWatcherReady then
-                                this.fileWatcherReadinessError <- Some error
-                        | _ -> ()
-
-                        swatelogfn this.window.id "Structural file watcher error: %s" (string error)
-                    )
-                    |> ignore
-
                     watcher
             else
                 swatefailfn this.window.id "No path set for StartFileWatcher."
 
         member this.StartFileWatcher(?usePolling: bool) =
-            this.EnsureFileWatcher(?usePolling = usePolling) |> ignore
+            this.PrepareFileWatcherForInitialization(?usePolling = usePolling)
+            |> Promise.start
 
         /// Starts the structural watcher before initialization snapshots and waits for its public initial ready signal.
         /// Watcher errors and readiness timeouts degrade to snapshot-only startup instead of rejecting a readable ARC.
@@ -846,14 +828,23 @@ module ArcVaultExtensions =
                                 |> Some
 
                             watcher.onReady (fun () ->
-                                if this.fileWatcherReady then
+                                match this.watcher with
+                                | Some currentWatcher when System.Object.ReferenceEquals(currentWatcher, watcher) ->
+                                    this.fileWatcherReady <- true
                                     finish FileWatcherInitializationOutcome.Ready
+                                | _ -> ()
                             )
                             |> ignore
 
-                            watcher.onError (fun _ ->
-                                if not this.fileWatcherReady then
-                                    finish FileWatcherInitializationOutcome.ErrorBeforeReady
+                            watcher.onError (fun error ->
+                                match this.watcher with
+                                | Some currentWatcher when System.Object.ReferenceEquals(currentWatcher, watcher) ->
+                                    if not this.fileWatcherReady then
+                                        this.fileWatcherReadinessError <- Some error
+                                        finish FileWatcherInitializationOutcome.ErrorBeforeReady
+
+                                    swatelogfn this.window.id "Structural file watcher error: %s" (string error)
+                                | _ -> ()
                             )
                             |> ignore
                         )

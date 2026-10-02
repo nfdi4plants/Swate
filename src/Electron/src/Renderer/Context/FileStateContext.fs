@@ -5,6 +5,7 @@ open Fable.Core
 open Feliz
 open Swate.Components
 open Swate.Components.Shared
+open Swate.Components.Shared.PathChildrenIndex
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
@@ -65,84 +66,11 @@ type FileTreeDirectoryUpdateApplication = {
     authoritativeChildCount: int
 }
 
-type private RendererDirectChildrenIndex() =
-    let childrenByParent = Dictionary<string, HashSet<string>>()
-
-    member this.Rebuild(entriesByPath: Dictionary<string, FileEntry>) =
-        childrenByParent.Clear()
-
-        entriesByPath.Keys
-        |> Seq.iter (fun path ->
-            if not (System.String.IsNullOrWhiteSpace path) then
-                let parentPath = PathHelpers.tryGetParentPath path |> Option.defaultValue ""
-                let normalizedParentPath = PathHelpers.normalizePath parentPath
-
-                match childrenByParent.TryGetValue normalizedParentPath with
-                | true, children -> children.Add(PathHelpers.normalizePath path) |> ignore
-                | false, _ ->
-                    let children = HashSet<string>()
-                    children.Add(PathHelpers.normalizePath path) |> ignore
-                    childrenByParent.[normalizedParentPath] <- children
-        )
-
-    member this.GetDirectChildPaths(directoryPath: string) =
-        match childrenByParent.TryGetValue(PathHelpers.normalizePath directoryPath) with
-        | true, children -> children |> Seq.toArray
-        | false, _ -> [||]
-
-    member this.CollectSubtreePaths(rootPaths: seq<string>) =
-        let pending = Stack<string>()
-        let visited = HashSet<string>()
-        let paths = ResizeArray<string>()
-        rootPaths |> Seq.iter (PathHelpers.normalizePath >> pending.Push)
-
-        while pending.Count > 0 do
-            let path = pending.Pop()
-
-            if visited.Add path then
-                paths.Add path
-
-                match childrenByParent.TryGetValue path with
-                | true, children -> children |> Seq.iter pending.Push
-                | false, _ -> ()
-
-        paths.ToArray()
-
-    member this.Remove(path: string) =
-        let normalizedPath = PathHelpers.normalizePath path
-
-        if not (System.String.IsNullOrWhiteSpace normalizedPath) then
-            let parentPath = PathHelpers.tryGetParentPath normalizedPath |> Option.defaultValue ""
-
-            match childrenByParent.TryGetValue(PathHelpers.normalizePath parentPath) with
-            | true, siblings ->
-                siblings.Remove normalizedPath |> ignore
-
-                if siblings.Count = 0 then
-                    childrenByParent.Remove(PathHelpers.normalizePath parentPath) |> ignore
-            | false, _ -> ()
-
-        childrenByParent.Remove normalizedPath |> ignore
-
-    member this.Add(path: string) =
-        let normalizedPath = PathHelpers.normalizePath path
-
-        if not (System.String.IsNullOrWhiteSpace normalizedPath) then
-            let parentPath = PathHelpers.tryGetParentPath normalizedPath |> Option.defaultValue ""
-            let normalizedParentPath = PathHelpers.normalizePath parentPath
-
-            match childrenByParent.TryGetValue normalizedParentPath with
-            | true, children -> children.Add normalizedPath |> ignore
-            | false, _ ->
-                let children = HashSet<string>()
-                children.Add normalizedPath |> ignore
-                childrenByParent.[normalizedParentPath] <- children
-
 /// The path-keyed dictionary is the renderer's canonical FileTree entry state.
 /// The direct-child index and display tree are derived navigation caches updated only for one directory.
 type RendererFileTreeState = private {
     entriesByPath: Dictionary<string, FileEntry>
-    directChildren: RendererDirectChildrenIndex
+    directChildren: PathChildrenIndex
     displayRoot: FileTreeNode option
 }
 
@@ -207,12 +135,14 @@ module RendererFileTreeState =
             )
 
             directoryNode.children.Clear()
-            nextChildren |> Seq.iter (fun pair -> directoryNode.children.[pair.Key] <- pair.Value)
+
+            nextChildren
+            |> Seq.iter (fun pair -> directoryNode.children.[pair.Key] <- pair.Value)
         )
 
     let empty () = {
         entriesByPath = Dictionary()
-        directChildren = RendererDirectChildrenIndex()
+        directChildren = PathChildrenIndex()
         displayRoot = None
     }
 
@@ -224,11 +154,14 @@ module RendererFileTreeState =
             let normalizedPath = PathHelpers.normalizePath entry.path
 
             entriesByPath.[normalizedPath] <-
-                if normalizedPath = entry.path then entry else { entry with path = normalizedPath }
+                if normalizedPath = entry.path then
+                    entry
+                else
+                    { entry with path = normalizedPath }
         )
 
-        let directChildren = RendererDirectChildrenIndex()
-        directChildren.Rebuild entriesByPath
+        let directChildren = PathChildrenIndex()
+        directChildren.Rebuild entriesByPath.Keys
 
         {
             entriesByPath = entriesByPath
@@ -237,7 +170,10 @@ module RendererFileTreeState =
         }
 
     let count state = state.entriesByPath.Count
-    let entries state = state.entriesByPath.Values :> seq<FileEntry>
+
+    let entries state =
+        state.entriesByPath.Values :> seq<FileEntry>
+
     let displayRoot state = state.displayRoot
 
     let tryFind path state =
@@ -312,7 +248,13 @@ module RendererFileTreeState =
             oldDirectChildPaths.Length + childrenByPath.Count + removedDescendantCount
 
         let nextState =
-            if hasEntryChanges then { state with displayRoot = state.displayRoot } else state
+            if hasEntryChanges then
+                {
+                    state with
+                        displayRoot = state.displayRoot
+                }
+            else
+                state
 
         nextState,
         {
@@ -381,7 +323,10 @@ let FileStateCtxProviderWithSnapshots
             | Error ex when request = snapshotRequestRef.current ->
                 if hadInstalledSnapshot then
                     snapshotInstalledRef.current <- true
-                    latestFileTreeStateRef.current |> applyBufferedDirectoryUpdates |> installFileTreeState
+
+                    latestFileTreeStateRef.current
+                    |> applyBufferedDirectoryUpdates
+                    |> installFileTreeState
 
                 setFileTreeIsLoading false
                 console.error ("Failed to load file tree snapshot.", ex.Message)
@@ -414,9 +359,7 @@ let FileStateCtxProviderWithSnapshots
                         fun update ->
                             if snapshotInstalledRef.current then
                                 let nextState, _ =
-                                    RendererFileTreeState.applyDirectoryUpdate
-                                        update
-                                        latestFileTreeStateRef.current
+                                    RendererFileTreeState.applyDirectoryUpdate update latestFileTreeStateRef.current
 
                                 installFileTreeState nextState
                             else
@@ -436,14 +379,7 @@ let FileStateCtxProviderWithSnapshots
     )
 
     let fileTreeEntries =
-        React.useMemo (
-            (fun () ->
-                seq {
-                    yield! RendererFileTreeState.entries fileTreeState
-                }
-            ),
-            [| box fileTreeState |]
-        )
+        React.useMemo ((fun () -> seq { yield! RendererFileTreeState.entries fileTreeState }), [| box fileTreeState |])
 
     let fileTreeRoot = RendererFileTreeState.displayRoot fileTreeState
 

@@ -8,6 +8,7 @@ open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Main.VersionControl
 open Swate.Components.Shared
+open Swate.Components.Shared.PathChildrenIndex
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.VersionControlTypes
@@ -16,83 +17,14 @@ open VersionControlService.Abstractions
 let normalizeRootPath (path: string) =
     resolve [| path |] |> PathHelpers.normalizePath
 
-/// Maintains the normalized parent -> direct-child relation for the main-process FileTree.
-type FileTreeDirectChildrenIndex() =
-    let childrenByParent = Dictionary<string, HashSet<string>>()
-
-    let addChildPath (path: string) =
-        let normalizedPath = PathHelpers.normalizePath path
-
-        if not (String.IsNullOrWhiteSpace normalizedPath) then
-            let parentPath = PathHelpers.tryGetParentPath normalizedPath |> Option.defaultValue ""
-
-            match childrenByParent.TryGetValue parentPath with
-            | true, childPaths -> childPaths.Add normalizedPath |> ignore
-            | false, _ ->
-                let childPaths = HashSet<string>()
-                childPaths.Add normalizedPath |> ignore
-                childrenByParent.[parentPath] <- childPaths
-
-    let removePath (path: string) =
-        let normalizedPath = PathHelpers.normalizePath path
-
-        if not (String.IsNullOrWhiteSpace normalizedPath) then
-            let parentPath = PathHelpers.tryGetParentPath normalizedPath |> Option.defaultValue ""
-
-            match childrenByParent.TryGetValue parentPath with
-            | true, childPaths ->
-                childPaths.Remove normalizedPath |> ignore
-
-                if childPaths.Count = 0 then
-                    childrenByParent.Remove parentPath |> ignore
-            | false, _ -> ()
-
-        childrenByParent.Remove normalizedPath |> ignore
-
-    member _.Rebuild(fileTree: Dictionary<string, FileEntry>) =
-        childrenByParent.Clear()
-        fileTree.Keys |> Seq.iter addChildPath
-
-    member _.GetKnownDirectChildren
-        (directoryPath: string, fileTree: Dictionary<string, FileEntry>)
-        : Map<string, FileEntry> =
-        let normalizedDirectoryPath = PathHelpers.normalizePath directoryPath
-
-        match childrenByParent.TryGetValue normalizedDirectoryPath with
-        | false, _ -> Map.empty
-        | true, childPaths ->
-            childPaths
-            |> Seq.choose (fun childPath ->
-                match fileTree.TryGetValue childPath with
-                | true, entry -> Some(childPath, entry)
-                | false, _ -> None
-            )
-            |> Map.ofSeq
-
-    /// Walks only indexed child relations below the supplied roots.
-    /// The visit count makes the traversal boundary observable without timing assumptions.
-    member _.CollectKnownSubtreePaths(rootPaths: seq<string>) =
-        let pending = Stack<string>()
-        let visited = HashSet<string>()
-        let paths = ResizeArray<string>()
-
-        rootPaths |> Seq.iter (PathHelpers.normalizePath >> pending.Push)
-
-        while pending.Count > 0 do
-            let path = pending.Pop()
-
-            if visited.Add path then
-                paths.Add path
-
-                match childrenByParent.TryGetValue path with
-                | true, childPaths -> childPaths |> Seq.iter pending.Push
-                | false, _ -> ()
-
-        paths.ToArray(), visited.Count
-
-    member _.ApplyChanges(removedPaths: seq<string>, upsertedEntries: seq<FileEntry>) =
-        removedPaths |> Seq.iter removePath
-        upsertedEntries |> Seq.iter (fun entry -> addChildPath entry.path)
+let private getKnownDirectChildren (index: PathChildrenIndex) directoryPath (fileTree: Dictionary<string, FileEntry>) =
+    index.GetDirectChildPaths directoryPath
+    |> Seq.choose (fun childPath ->
+        match fileTree.TryGetValue childPath with
+        | true, entry -> Some(childPath, entry)
+        | false, _ -> None
+    )
+    |> Map.ofSeq
 
 let private shouldIgnoreDirName (name: string) = name = ".git"
 
@@ -258,7 +190,7 @@ let reconcileFileTreeDirectory
     (arcPath: string)
     (relativeDirectoryPath: string)
     (fileTree: Dictionary<string, FileEntry>)
-    (directChildrenIndex: FileTreeDirectChildrenIndex)
+    (directChildrenIndex: PathChildrenIndex)
     : Fable.Core.JS.Promise<FileTreeDirectoryUpdate option> =
     promise {
         let normalizedArcPath = normalizeRootPath arcPath
@@ -302,7 +234,7 @@ let reconcileFileTreeDirectory
                     |> Map.ofArray
 
                 let knownDirectChildren =
-                    directChildrenIndex.GetKnownDirectChildren(absoluteDirectoryPath, fileTree)
+                    getKnownDirectChildren directChildrenIndex absoluteDirectoryPath fileTree
 
                 let hasRemovedChildren =
                     knownDirectChildren
@@ -347,15 +279,16 @@ let reconcileFileTreeDirectory
                         | Some _ -> ()
                     )
 
-                    let subtreeRemovalKeys, _ =
-                        directChildrenIndex.CollectKnownSubtreePaths directChildDirectoryRemovalRoots
+                    let subtreeRemovalKeys =
+                        directChildrenIndex.CollectSubtreePaths directChildDirectoryRemovalRoots
 
                     let removedPaths = Array.append (missingFilePaths.ToArray()) subtreeRemovalKeys
                     removedPaths |> Array.iter (fun path -> fileTree.Remove(path) |> ignore)
 
                     upsertedEntries |> Array.iter (fun entry -> fileTree.[entry.path] <- entry)
 
-                    directChildrenIndex.ApplyChanges(removedPaths, upsertedEntries)
+                    removedPaths |> Seq.iter directChildrenIndex.Remove
+                    upsertedEntries |> Seq.iter (fun entry -> directChildrenIndex.Add entry.path)
 
                     return
                         Some {

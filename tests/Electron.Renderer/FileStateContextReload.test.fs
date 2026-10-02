@@ -210,7 +210,9 @@ Vitest.describe (
                     RendererFileTreeState.applyDirectoryUpdate
                         {
                             directoryPath = "dataset"
-                            children = [| FileEntry.create ("changed", "dataset/changed", false, None) |]
+                            children = [|
+                                FileEntry.create ("changed", "dataset/changed", false, None)
+                            |]
                         }
                         initialState
 
@@ -218,7 +220,9 @@ Vitest.describe (
                 Vitest.expect(RendererFileTreeState.tryFind "dataset/removed/deep/file.txt" nextState).toEqual (None)
                 Vitest.expect(RendererFileTreeState.tryFind "dataset/changed/old.txt" nextState).toEqual (None)
 
-                let changed = RendererFileTreeState.tryFind "dataset/changed" nextState |> Option.get
+                let changed =
+                    RendererFileTreeState.tryFind "dataset/changed" nextState |> Option.get
+
                 Vitest.expect(changed.isDirectory).toBe (false)
         )
 
@@ -355,8 +359,7 @@ Vitest.describe (
                 let mutable publishDirectoryUpdate: FileTreeDirectoryUpdate -> unit = ignore
                 let mutable directoryListenerRegistered = false
 
-                let mutable resolveSnapshot:
-                    (Result<Dictionary<string, FileEntry>, exn> -> unit) option =
+                let mutable resolveSnapshot: (Result<Dictionary<string, FileEntry>, exn> -> unit) option =
                     None
 
                 let snapshot = Dictionary<string, FileEntry>()
@@ -378,8 +381,7 @@ Vitest.describe (
                     setBridgeProperty
                         fileTreeBridgeName
                         (createObj [
-                            "fileTreeUpdate"
-                            ==> fun (_: Dictionary<string, FileEntry> -> unit) -> dispose
+                            "fileTreeUpdate" ==> fun (_: Dictionary<string, FileEntry> -> unit) -> dispose
                             "fileTreeDirectoryUpdate"
                             ==> fun (listener: FileTreeDirectoryUpdate -> unit) ->
                                 publishDirectoryUpdate <- listener
@@ -406,15 +408,19 @@ Vitest.describe (
 
                     publishDirectoryUpdate {
                         directoryPath = "dataset"
-                        children = [| FileEntry.create ("first.txt", "dataset/first.txt", false, None) |]
+                        children = [|
+                            FileEntry.create ("first.txt", "dataset/first.txt", false, None)
+                        |]
                     }
 
                     publishDirectoryUpdate {
                         directoryPath = "dataset"
-                        children = [| FileEntry.create ("final.txt", "dataset/final.txt", false, None) |]
+                        children = [|
+                            FileEntry.create ("final.txt", "dataset/final.txt", false, None)
+                        |]
                     }
 
-                    resolveSnapshot.Value (Ok snapshot)
+                    resolveSnapshot.Value(Ok snapshot)
 
                     do!
                         waitForEffect (fun () ->
