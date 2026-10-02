@@ -86,7 +86,7 @@ type ArcVault(window: BrowserWindow) =
     /// Dirty marker for unsaved in-memory ARC mutations.
     member val hasUnsavedArcChanges: bool = false with get, private set
 
-    /// Read-only query surface for the main-process FileTree.
+    /// Indexed main-process FileTree state.
     member this.fileTree = indexedFileTree
 
     member internal _.IndexedFileTree = indexedFileTree
@@ -1187,16 +1187,13 @@ type ArcVaults() =
                         swatelogfn id "Unable to refresh the ARC root after window focus: %s" refreshError.Message
                     )
 
-                let onWatcherStarted outcome =
-                    match outcome with
-                    | FileWatcherInitializationOutcome.Ready -> refreshRoot ()
-                    | _ -> JS.Constructors.Promise.resolve ()
-
-                let focusWork =
+                let focusWork = promise {
                     if vault.watcher.IsNone then
-                        vault.PrepareFileWatcherForInitialization() |> Promise.bind onWatcherStarted
-                    else
-                        refreshRoot ()
+                        let! _ = vault.PrepareFileWatcherForInitialization()
+                        ()
+
+                    do! refreshRoot ()
+                }
 
                 focusWork |> Promise.start
         )

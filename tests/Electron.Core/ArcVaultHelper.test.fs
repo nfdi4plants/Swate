@@ -713,7 +713,13 @@ let private withAsyncCleanup cleanup operation = promise {
     | Ok _, Error cleanupError -> return raise cleanupError
 }
 
-let private verifyRecoverableWatcherStartupDegradation tempPrefix windowId initialSignal readinessTimeoutMs =
+let private verifyRecoverableWatcherStartupDegradation
+    tempPrefix
+    windowId
+    initialSignal
+    recoverySignal
+    readinessTimeoutMs
+    =
     TestHelpers.withTempArcWith
         tempPrefix
         "Watcher Startup Degradation"
@@ -733,7 +739,7 @@ let private verifyRecoverableWatcherStartupDegradation tempPrefix windowId initi
                         if createdWatchers.Count = 0 then
                             initialSignal
                         else
-                            SignalReady
+                            recoverySignal
 
                     let watcher = createTestWatcher signal
                     createdWatchers.Add watcher
@@ -749,22 +755,29 @@ let private verifyRecoverableWatcherStartupDegradation tempPrefix windowId initi
                 Vitest.expect(createdWatchers.Count).toBe (1)
                 Vitest.expect(createdWatchers.[0].CloseCount()).toBe (1)
 
-                let externallyAddedPath = join [| arcPath; "recovered-on-focus.txt" |]
+                let externallyAddedPath =
+                    join [| arcPath; "recovered-on-focus.txt" |] |> PathHelpers.normalizePath
+
                 do! writeWatcherTextFileAsync externallyAddedPath "reconciled"
                 vault.FileWatcherReadinessTimeoutMs <- 10000
                 windowState.TriggerFocusEvent()
+
+                let recoverySucceeded = recoverySignal = SignalReady
 
                 do!
                     waitForWatcherCondition
                         "watcher recovery through window focus"
                         (fun () ->
-                            vault.watcher.IsSome
+                            (if recoverySucceeded then
+                                 vault.watcher.IsSome
+                             else
+                                 vault.watcher.IsNone)
                             && createdWatchers.Count = 2
                             && vault.fileTree.ContainsKey externallyAddedPath
                         )
                         300
 
-                Vitest.expect(createdWatchers.[1].CloseCount()).toBe (0)
+                Vitest.expect(createdWatchers.[1].CloseCount()).toBe (if recoverySucceeded then 0 else 1)
 
                 do! vault.StopFileWatcher()
                 Vitest.expect(createdWatchers.[1].CloseCount()).toBe (1)
@@ -1453,8 +1466,7 @@ Vitest.describe (
                             let treeHasEntry () =
                                 let expectedKey = PathHelpers.normalizePath treeEntryPath
 
-                                vault.fileTree.Keys
-                                |> Seq.exists (fun key -> PathHelpers.normalizePath key = expectedKey)
+                                vault.fileTree.ContainsKey expectedKey
 
                             let fallbackPublished () =
                                 vault.HasReachedWatcherDeferralLimit
@@ -4891,12 +4903,30 @@ Vitest.describe (
 
         Vitest.test (
             "watcher error before readiness degrades to snapshots and permits a fresh ready watcher",
-            fun () -> verifyRecoverableWatcherStartupDegradation "swate-watcher-ready-error-" 91339 SignalError 10000
+            fun () ->
+                verifyRecoverableWatcherStartupDegradation
+                    "swate-watcher-ready-error-"
+                    91339
+                    SignalError
+                    SignalReady
+                    10000
         )
 
         Vitest.test (
             "watcher readiness timeout degrades to snapshots and permits a fresh ready watcher",
-            fun () -> verifyRecoverableWatcherStartupDegradation "swate-watcher-ready-timeout-" 91340 NoSignal 10
+            fun () ->
+                verifyRecoverableWatcherStartupDegradation "swate-watcher-ready-timeout-" 91340 NoSignal SignalReady 10
+        )
+
+        Vitest.test (
+            "failed watcher recovery on focus still shallow-refreshes the ARC root",
+            fun () ->
+                verifyRecoverableWatcherStartupDegradation
+                    "swate-watcher-focus-retry-error-"
+                    91341
+                    SignalError
+                    SignalError
+                    10000
         )
 
         Vitest.test (
@@ -5159,6 +5189,11 @@ Vitest.describe (
                         let vaults = ArcVaults()
                         vault.path <- Some arcPath
                         vault.SetFileTree initialTree
+                        let watcher = createTestWatcher SignalReady
+                        vault.FileWatcherFactory <- fun _ _ -> watcher.Watcher
+                        let! watcherOutcome = vault.PrepareFileWatcherForInitialization()
+                        Vitest.expect(watcherOutcome).toEqual (FileWatcherInitializationOutcome.Ready)
+                        Vitest.expect(vault.watcher.IsSome).toBe (true)
                         vaults.OnCloseWindow(windowState.Window, vault, windowId)
 
                         Vitest.expect(windowState.FocusHandlerAttached()).toBe (true)
@@ -5191,6 +5226,8 @@ Vitest.describe (
                         Vitest.expect(vault.fileTree.ContainsKey renameSourcePath).toBe (false)
                         Vitest.expect(vault.fileTree.ContainsKey nestedFolderPath).toBe (false)
                         Vitest.expect(vault.fileTree.ContainsKey deepPath).toBe (false)
+                        do! vault.StopFileWatcher()
+                        Vitest.expect(watcher.CloseCount()).toBe (1)
                     })
         )
 
