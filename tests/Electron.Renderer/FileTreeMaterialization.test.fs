@@ -30,21 +30,33 @@ let private toFileItemTree materializedDirectoryPaths node =
         materializedDirectoryPaths
         node
 
+let private folderItem id children = {
+    FileTree.createFolder id (Some id) FileItemIcon.Folder with
+        Id = id
+        Children = Some children
+}
+
+let private fileItem id = {
+    FileTree.createFile id (Some id) FileItemIcon.Document with
+        Id = id
+}
+
 Vitest.describe (
     "Electron file-tree materialization",
     fun () ->
         Vitest.test (
-            "materializing a directory normalizes its path and preserves its ARC scope",
+            "updating expanded paths materializes them and preserves the ARC scope",
             fun () ->
                 let state = {
                     empty with
                         ArcScopeId = Some "C:/arc"
                 }
 
-                let materialized = materialize "arc\\notes" state
+                let materialized = setExpandedPaths (Set.singleton "arc\\notes") state
 
                 Vitest.expect(materialized.ArcScopeId).toEqual (Some "C:/arc")
                 Vitest.expect(materialized.Paths |> Set.toList).toEqual ([ "arc/notes" ])
+                Vitest.expect(materialized.ExpandedPaths |> Set.toList).toEqual ([ "arc/notes" ])
         )
 
         Vitest.test (
@@ -87,12 +99,14 @@ Vitest.describe (
                 let current = {
                     ArcScopeId = Some "C:/arc"
                     Paths = Set.ofList [ "arc"; "arc/kept"; "arc/removed" ]
+                    ExpandedPaths = Set.ofList [ "arc/kept"; "arc/removed" ]
                 }
 
                 let reconciled =
                     reconcileMaterializedState (Some "C:/arc") (Some "arc/selected/selected.txt") (Some root) current
 
                 Vitest.expect(reconciled.Paths |> Set.toList).toEqual ([ "arc"; "arc/kept"; "arc/selected" ])
+                Vitest.expect(reconciled.ExpandedPaths |> Set.toList).toEqual ([ "arc"; "arc/kept"; "arc/selected" ])
         )
 
         Vitest.test (
@@ -106,6 +120,7 @@ Vitest.describe (
                 let current = {
                     ArcScopeId = Some "C:/old-arc"
                     Paths = Set.ofList [ "arc"; "arc/kept" ]
+                    ExpandedPaths = Set.ofList [ "arc"; "arc/kept" ]
                 }
 
                 let reconciled =
@@ -113,5 +128,66 @@ Vitest.describe (
 
                 Vitest.expect(reconciled.ArcScopeId).toEqual (Some "C:/new-arc")
                 Vitest.expect(reconciled.Paths |> Set.toList).toEqual ([ "arc" ])
+                Vitest.expect(reconciled.ExpandedPaths |> Set.toList).toEqual ([ "arc" ])
+        )
+)
+
+Vitest.describe (
+    "active expanded directory reconciliation",
+    fun () ->
+        let child = folderItem "parent/child" []
+        let sibling = folderItem "sibling" []
+        let file = fileItem "file.txt"
+        let items = [ folderItem "parent" [ child; file ]; sibling ]
+
+        let activeIds expandedIds =
+            FileExplorerLogic.collectActiveExpandedDirectories expandedIds items
+            |> List.map _.Id
+            |> Set.ofList
+
+        Vitest.test (
+            "keeps expanded parents, children, and unrelated siblings active",
+            fun () ->
+                let active = activeIds (Set.ofList [ "parent"; "parent/child"; "sibling" ])
+
+                Vitest.expect(active |> Set.toList).toEqual ([ "parent"; "parent/child"; "sibling" ])
+        )
+
+        Vitest.test (
+            "does not report a stale expanded child below a collapsed parent",
+            fun () ->
+                let active = activeIds (Set.ofList [ "parent/child"; "sibling" ])
+
+                Vitest.expect(active |> Set.toList).toEqual ([ "sibling" ])
+        )
+
+        Vitest.test (
+            "never reports files as active expanded directories",
+            fun () ->
+                let active = activeIds (Set.ofList [ "parent"; "file.txt" ])
+
+                Vitest.expect(active.Contains "file.txt").toBe (false)
+                Vitest.expect(active |> Set.toList).toEqual ([ "parent" ])
+        )
+
+        Vitest.test (
+            "uncontrolled reducer prunes descendants and preserves expanded siblings",
+            fun () ->
+                let parent = items.Head
+
+                let initial = {
+                    FileExplorerLogic.init items with
+                        ExpandedIds = Set.ofList [ "parent"; "parent/child"; "sibling" ]
+                }
+
+                let collapsed =
+                    FileExplorerLogic.update (FileExplorerLogic.SetExpanded(parent, false)) initial
+
+                Vitest.expect(collapsed.ExpandedIds |> Set.toList).toEqual ([ "sibling" ])
+
+                let reopened =
+                    FileExplorerLogic.update (FileExplorerLogic.SetExpanded(parent, true)) collapsed
+
+                Vitest.expect(reopened.ExpandedIds |> Set.toList).toEqual ([ "parent"; "sibling" ])
         )
 )

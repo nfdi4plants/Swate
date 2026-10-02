@@ -27,75 +27,47 @@ let private shouldIgnorePath (path: string) =
     || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
     || isLegacyDataMapPath normalizedPath
 
-let private tryListLargeObjects
-    (repoRoot: string)
-    (openSession: bool)
-    : Fable.Core.JS.Promise<Map<string, ObjectStateDto>> =
-    promise {
-        try
-            let context = OperationContext.detached "file-tree-objects"
-            let host = WorkspaceSessionHost.get ()
+let tryListLargeObjects (repoRoot: string) (openSession: bool) : Fable.Core.JS.Promise<Map<string, ObjectStateDto>> = promise {
+    try
+        let context = OperationContext.detached "file-tree-objects"
+        let host = WorkspaceSessionHost.get ()
 
-            let! hostedSession =
-                if openSession then
-                    promise {
-                        let! opened = host.OpenSession(repoRoot, context) |> Async.StartAsPromise
+        let! hostedSession =
+            if openSession then
+                promise {
+                    let! opened = host.OpenSession(repoRoot, context) |> Async.StartAsPromise
 
-                        return
-                            match opened with
-                            | Succeeded outcome
-                            | PartiallySucceeded(outcome, _) -> Some outcome.Value
-                            | Failed _ -> None
-                    }
-                else
-                    promise { return host.TryGetSession repoRoot }
+                    return
+                        match opened with
+                        | Succeeded outcome
+                        | PartiallySucceeded(outcome, _) -> Some outcome.Value
+                        | Failed _ -> None
+                }
+            else
+                promise { return host.TryGetSession repoRoot }
 
-            match hostedSession with
+        match hostedSession with
+        | None -> return Map.empty
+        | Some hosted ->
+            match hosted.Session.ObjectMaterialization with
             | None -> return Map.empty
-            | Some hosted ->
-                match hosted.Session.ObjectMaterialization with
-                | None -> return Map.empty
-                | Some materialization ->
-                    let! listed = materialization.ListObjects context |> Async.StartAsPromise
+            | Some materialization ->
+                let! listed = materialization.ListObjects context |> Async.StartAsPromise
 
-                    match listed with
-                    | Succeeded outcome
-                    | PartiallySucceeded(outcome, _) ->
-                        return
-                            outcome.Value
-                            |> Array.map (fun (objectState: ObjectState) ->
-                                let dto = Mappings.objectState objectState
-                                dto.Path, dto
-                            )
-                            |> Map.ofArray
-                    | Failed _ -> return Map.empty
-        with _ ->
-            return Map.empty
-    }
-
-let private withFileEntryLfsMetadata
-    (repoRoot: string)
-    (largeObjectsByRelativePath: Map<string, ObjectStateDto>)
-    (largeObjectsByComparisonKey: Map<string, ObjectStateDto>)
-    (entry: FileEntry)
-    : FileEntry =
-    if entry.isDirectory then
-        entry
-    else
-        match tryGetRepoRelativePath repoRoot entry.path with
-        | Some relativePath ->
-            let normalizedRelativePath = PathHelpers.normalizeSeparators relativePath
-
-            let largeObject =
-                match Map.tryFind normalizedRelativePath largeObjectsByRelativePath with
-                | Some largeObject -> Some largeObject
-                | None ->
-                    normalizedRelativePath
-                    |> PathHelpers.normalizeForUnicodeComparison
-                    |> fun comparisonKey -> Map.tryFind comparisonKey largeObjectsByComparisonKey
-
-            { entry with largeObject = largeObject }
-        | None -> { entry with largeObject = None }
+                match listed with
+                | Succeeded outcome
+                | PartiallySucceeded(outcome, _) ->
+                    return
+                        outcome.Value
+                        |> Array.map (fun (objectState: ObjectState) ->
+                            let dto = Mappings.objectState objectState
+                            dto.Path, dto
+                        )
+                        |> Map.ofArray
+                | Failed _ -> return Map.empty
+    with _ ->
+        return Map.empty
+}
 
 let private buildLargeObjectsByComparisonKey (largeObjectsByRelativePath: Map<string, ObjectStateDto>) =
     largeObjectsByRelativePath
@@ -108,16 +80,43 @@ let private buildLargeObjectsByComparisonKey (largeObjectsByRelativePath: Map<st
     )
     |> Map.ofSeq
 
+type LargeObjectPathIndex = {
+    Exact: Map<string, ObjectStateDto>
+    Comparison: Map<string, ObjectStateDto>
+}
+
+let buildLargeObjectPathIndex (largeObjectsByRelativePath: Map<string, ObjectStateDto>) = {
+    Exact = largeObjectsByRelativePath
+    Comparison = buildLargeObjectsByComparisonKey largeObjectsByRelativePath
+}
+
+let withFileEntryLargeObjectMetadata (repoRoot: string) (index: LargeObjectPathIndex) (entry: FileEntry) : FileEntry =
+    if entry.isDirectory then
+        entry
+    else
+        match tryGetRepoRelativePath repoRoot entry.path with
+        | Some relativePath ->
+            let normalizedRelativePath = PathHelpers.normalizeSeparators relativePath
+
+            let largeObject =
+                match Map.tryFind normalizedRelativePath index.Exact with
+                | Some largeObject -> Some largeObject
+                | None ->
+                    normalizedRelativePath
+                    |> PathHelpers.normalizeForUnicodeComparison
+                    |> fun comparisonKey -> Map.tryFind comparisonKey index.Comparison
+
+            { entry with largeObject = largeObject }
+        | None -> { entry with largeObject = None }
+
 let withFileEntriesLfsMetadata
     (repoRoot: string)
     (largeObjectsByRelativePath: Map<string, ObjectStateDto>)
     (entries: FileEntry[])
     : FileEntry[] =
-    let largeObjectsByComparisonKey =
-        buildLargeObjectsByComparisonKey largeObjectsByRelativePath
+    let index = buildLargeObjectPathIndex largeObjectsByRelativePath
 
-    entries
-    |> Array.map (withFileEntryLfsMetadata repoRoot largeObjectsByRelativePath largeObjectsByComparisonKey)
+    entries |> Array.map (withFileEntryLargeObjectMetadata repoRoot index)
 
 /// Build the renderer snapshot using ARC-relative dictionary keys and FileEntry paths.
 let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary<string, FileEntry> =
@@ -132,29 +131,85 @@ let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary
 
     rendererFileTree
 
+/// Logical FileTree keys are case-sensitive even when the host filesystem is not.
+let isSameOrDescendantLogicalPath (path: string) (ancestorPath: string) =
+    let normalizedPath = PathHelpers.normalizePath path
+    let normalizedAncestorPath = PathHelpers.normalizePath ancestorPath
+
+    not (String.IsNullOrWhiteSpace normalizedAncestorPath)
+    && (normalizedPath = normalizedAncestorPath
+        || normalizedPath.StartsWith(normalizedAncestorPath + "/", StringComparison.Ordinal))
+
+let private minimizeLogicalDirectoryPrefixes (targetPaths: seq<string>) =
+    let normalizedTargets =
+        targetPaths
+        |> Seq.map PathHelpers.normalizePath
+        |> Seq.filter (String.IsNullOrWhiteSpace >> not)
+        |> Seq.distinct
+        |> Seq.toArray
+
+    let allTargets = HashSet<string>(normalizedTargets)
+
+    normalizedTargets
+    |> Array.filter (fun candidate ->
+        let mutable parent = PathHelpers.tryGetParentPath candidate
+        let mutable hasDeletedAncestor = false
+
+        while parent.IsSome && not hasDeletedAncestor do
+            let parentPath = parent.Value
+
+            if String.IsNullOrWhiteSpace parentPath then
+                parent <- None
+            elif allTargets.Contains parentPath then
+                hasDeletedAncestor <- true
+            else
+                parent <- PathHelpers.tryGetParentPath parentPath
+
+        not hasDeletedAncestor
+    )
+
+/// Removes several directory paths and their descendants with one FileTree scan.
+let removePathsAndDescendantsInPlace (targetPaths: seq<string>) (fileTree: Dictionary<string, FileEntry>) =
+    let prefixes = minimizeLogicalDirectoryPrefixes targetPaths
+
+    if not (Array.isEmpty prefixes) then
+        let prefixSet = HashSet<string>(prefixes)
+
+        let isUnderRemovedDirectory path =
+            let normalizedPath = PathHelpers.normalizePath path
+            let mutable candidate = Some normalizedPath
+            let mutable shouldRemove = false
+
+            while candidate.IsSome && not shouldRemove do
+                let candidatePath = candidate.Value
+
+                if prefixSet.Contains candidatePath then
+                    shouldRemove <- true
+                else
+                    candidate <- PathHelpers.tryGetParentPath candidatePath
+
+            shouldRemove
+
+        let keysToRemove =
+            fileTree.Keys |> Seq.filter isUnderRemovedDirectory |> Seq.toArray
+
+        keysToRemove |> Array.iter (fun path -> fileTree.Remove(path) |> ignore)
+
 /// Remove a path and all descendants from a file tree dictionary using normalized ancestor checks.
 let removePathAndDescendants
     (targetPath: string)
     (fileTree: Dictionary<string, FileEntry>)
     : Dictionary<string, FileEntry> =
-    let normalizedTargetPath = PathHelpers.normalizePath targetPath
     let nextTree = Dictionary<string, FileEntry>(fileTree)
+    removePathsAndDescendantsInPlace [ targetPath ] nextTree
+    nextTree
 
-    if String.IsNullOrWhiteSpace normalizedTargetPath then
-        nextTree
-    else
-        let keysToRemove =
-            nextTree.Keys
-            |> Seq.filter (fun path -> PathHelpers.isSameOrDescendantPath path normalizedTargetPath)
-            |> Seq.toArray
-
-        keysToRemove |> Array.iter (fun path -> nextTree.Remove(path) |> ignore)
-        nextTree
+let upsertFileEntryInPlace (entry: FileEntry) (fileTree: Dictionary<string, FileEntry>) = fileTree.[entry.path] <- entry
 
 /// Add or replace a single file tree entry without mutating the current snapshot.
 let upsertFileEntry (entry: FileEntry) (fileTree: Dictionary<string, FileEntry>) : Dictionary<string, FileEntry> =
     let nextTree = Dictionary<string, FileEntry>(fileTree)
-    nextTree.[entry.path] <- entry
+    upsertFileEntryInPlace entry nextTree
     nextTree
 
 let getFileEntry (path: string) = promise {
@@ -174,36 +229,20 @@ let refreshFileTreeEntry
         return upsertFileEntry entry fileTree
     }
 
-let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
-    let normalizedRepoRoot = normalizeRootPath repoRoot
-    let! entry = getFileEntry path
+let private scanFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise {
+    let scanRoot = normalizeRootPath path
 
-    if entry.isDirectory then
-        return entry
-    else
-        let! largeObjectsByRelativePath = tryListLargeObjects normalizedRepoRoot true
-
-        let largeObjectsByComparisonKey =
-            buildLargeObjectsByComparisonKey largeObjectsByRelativePath
-
-        return withFileEntryLfsMetadata normalizedRepoRoot largeObjectsByRelativePath largeObjectsByComparisonKey entry
-}
-
-/// Finds all files and subfolders of the given filepath
-let getFileEntries (path: string) (openSession: bool) : Fable.Core.JS.Promise<FileEntry[]> = promise {
-    let repoRoot = normalizeRootPath path
-
-    let! rootStats = statAsync repoRoot
+    let! rootStats = statAsync scanRoot
     let rootIsDir = rootStats.isDirectory ()
 
-    let rootName = basename repoRoot
-    let rootEntry = FileEntry.create (rootName, repoRoot, rootIsDir, None)
+    let rootName = basename scanRoot
+    let rootEntry = FileEntry.create (rootName, scanRoot, rootIsDir, None)
 
     if not rootIsDir then
         return [| rootEntry |]
     else
         let stack = ResizeArray<string>()
-        stack.Add(repoRoot)
+        stack.Add(scanRoot)
 
         let entries = ResizeArray<FileEntry>()
         entries.Add(rootEntry)
@@ -231,9 +270,111 @@ let getFileEntries (path: string) (openSession: bool) : Fable.Core.JS.Promise<Fi
                         entries.Add(FileEntry.create (name, fullPath, false, None))
             )
 
-        let scannedEntries = entries.ToArray()
-        let! largeObjectsByRelativePath = tryListLargeObjects repoRoot openSession
-        return withFileEntriesLfsMetadata repoRoot largeObjectsByRelativePath scannedEntries
+        return entries.ToArray()
+}
+
+/// Reads only the immediate children of a directory. Child directories are represented as entries
+/// and are not traversed.
+let scanImmediateFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise {
+    let scanRoot = normalizeRootPath path
+    let! dirents = readdirWithTypesAsync scanRoot (ReaddirOptions(withFileTypes = true))
+
+    return
+        dirents
+        |> Array.choose (fun dirent ->
+            let name = dirent.name
+            let isDirectory = dirent.isDirectory ()
+            let fullPath = join [| scanRoot; name |] |> PathHelpers.normalizeSeparators
+
+            if
+                (isDirectory && shouldIgnoreDirName name)
+                || (not isDirectory && shouldIgnorePath fullPath)
+            then
+                None
+            else
+                Some(FileEntry.create (name, fullPath, isDirectory, None))
+        )
+}
+
+/// Builds one current large-object lookup for all direct files participating in a shallow
+/// reconciliation. Entries are enriched later, when the current FileTree is applied.
+let prepareImmediateFileEntryLargeObjectIndex
+    (repoRoot: string)
+    (entryBatches: FileEntry[][])
+    : Fable.Core.JS.Promise<LargeObjectPathIndex> =
+    promise {
+        let hasDirectFiles =
+            entryBatches
+            |> Array.collect id
+            |> Array.exists (fun entry -> not entry.isDirectory)
+
+        let! largeObjectsByRelativePath =
+            if hasDirectFiles then
+                tryListLargeObjects (normalizeRootPath repoRoot) false
+            else
+                promise { return Map.empty }
+
+        return buildLargeObjectPathIndex largeObjectsByRelativePath
+    }
+
+/// Reconciles only a directory's direct children. Surviving child directories keep all already
+/// materialized descendants; removed child directories lose their known subtrees.
+let reconcileImmediateFileEntries
+    (directoryPath: string)
+    (entries: FileEntry[])
+    (fileTree: Dictionary<string, FileEntry>)
+    : Dictionary<string, FileEntry> * bool =
+    let normalizedDirectoryPath = PathHelpers.normalizePath directoryPath
+
+    let isDirectChild (path: string) =
+        String.Equals(PathHelpers.normalizePath (dirname path), normalizedDirectoryPath, StringComparison.Ordinal)
+
+    let diskEntries =
+        entries
+        |> Array.map (fun entry -> PathHelpers.normalizePath entry.path, entry)
+        |> Map.ofArray
+
+    let knownDirectChildren =
+        fileTree.Keys
+        |> Seq.filter isDirectChild
+        |> Seq.map PathHelpers.normalizePath
+        |> Seq.toArray
+
+    let removedChildren =
+        knownDirectChildren
+        |> Array.filter (fun path -> not (diskEntries.ContainsKey path))
+
+    let mutable changed = not (Array.isEmpty removedChildren)
+
+    for KeyValue(path, entry) in diskEntries do
+        match fileTree.TryGetValue path with
+        | true, existing when existing = entry -> ()
+        | _ -> changed <- true
+
+    if not changed then
+        fileTree, false
+    else
+        let nextTree = Dictionary<string, FileEntry>(fileTree)
+        removePathsAndDescendantsInPlace removedChildren nextTree
+
+        for KeyValue(_, entry) in diskEntries do
+            match nextTree.TryGetValue entry.path with
+            | true, existing when existing.isDirectory && entry.isDirectory ->
+                // The directory entry itself can change without discarding its known descendants.
+                nextTree.[entry.path] <- entry
+            | true, existing when existing.isDirectory <> entry.isDirectory ->
+                removePathsAndDescendantsInPlace [ entry.path ] nextTree
+                nextTree.[entry.path] <- entry
+            | _ -> nextTree.[entry.path] <- entry
+
+        nextTree, true
+
+/// Finds all files and subfolders of the given filepath
+let getFileEntries (path: string) (openSession: bool) : Fable.Core.JS.Promise<FileEntry[]> = promise {
+    let repoRoot = normalizeRootPath path
+    let! scannedEntries = scanFileEntries repoRoot
+    let! largeObjectsByRelativePath = tryListLargeObjects repoRoot openSession
+    return withFileEntriesLfsMetadata repoRoot largeObjectsByRelativePath scannedEntries
 }
 
 /// Scans a path and builds its keyed file tree.

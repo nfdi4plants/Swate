@@ -2,6 +2,7 @@ module Main.ArcVaultHelper
 
 
 open System
+open System.Collections.Generic
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
@@ -17,6 +18,17 @@ open Swate.Electron.Shared.RenamePathRules
 
 let arcNotOpenError () =
     exn "No ARC is open. Open an ARC and try again."
+
+let canPublishWatcherMergeSnapshot
+    isMergeEligible
+    capturedWriteGeneration
+    currentWriteGeneration
+    capturedWatcherEpoch
+    currentWatcherEpoch
+    =
+    isMergeEligible
+    && capturedWriteGeneration = currentWriteGeneration
+    && capturedWatcherEpoch = currentWatcherEpoch
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"
@@ -361,34 +373,277 @@ let isFileWatcherPathIgnored (path: string) =
     || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryImportPattern)
     || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
 
-let createFileWatcher (path: string) (usePolling: bool option) =
+let private arcStructureZones = [|
+    ArcPathHelper.StudiesFolderName
+    ArcPathHelper.AssaysFolderName
+    ArcPathHelper.WorkflowsFolderName
+    ArcPathHelper.RunsFolderName
+|]
 
-    // Native Windows file events can keep handles that block app-initiated folder renames.
-    let usePolling =
-        defaultArg usePolling (shouldUsePollingByDefault (currentNodePlatform ()))
+let isArcStructureZone (pathSegment: string) =
+    arcStructureZones |> Array.exists (PathHelpers.pathsEqual pathSegment)
 
+let tryGetWatcherRelativePath arcPath path =
+    match tryGetRepoRelativePathOrRoot arcPath path with
+    | Some relativePath -> Some relativePath
+    | None when
+        not (Main.Bindings.Path.isAbsolute path)
+        && not (PathHelpers.containsPathTraversalSegments path)
+        ->
+        Some(PathHelpers.normalizeCanonicalRelativePath path)
+    | None -> None
+
+/// Logical watcher scope keys are case-sensitive even on case-insensitive filesystems.
+let isSameOrDescendantLogicalPath (path: string) (ancestorPath: string) =
+    let normalizedPath = PathHelpers.normalizePath path
+    let normalizedAncestorPath = PathHelpers.normalizePath ancestorPath
+
+    String.IsNullOrWhiteSpace normalizedAncestorPath
+    || normalizedPath = normalizedAncestorPath
+    || normalizedPath.StartsWith(normalizedAncestorPath + "/", StringComparison.Ordinal)
+
+/// Keeps the permanent watcher on ARC metadata and structural directories without traversing payload trees.
+let shouldIgnoreForArcStructureWatcher (arcPath: string) (path: string) (stats: Filesystem.Stats option) =
+    if isFileWatcherPathIgnored path then
+        true
+    else
+        match tryGetWatcherRelativePath arcPath path with
+        | None -> true
+        | Some relativePath ->
+            let segments = getNonEmptyPathParts relativePath
+
+            match segments with
+            | [||] -> false
+            | [| _ |] -> false
+            | [| zone; _ |] when isArcStructureZone zone -> false
+            | [| zone; _; _ |] when isArcStructureZone zone ->
+                stats
+                |> Option.exists (fun stats ->
+                    not (stats.isDirectory ()) && not (isArcModelReadContractPath relativePath)
+                )
+            | _ -> true
+
+/// Bounds payload monitoring to explicitly expanded directories and their immediate children.
+let shouldIgnoreForPayloadWatcher (arcPath: string) (isExpanded: string -> bool) (path: string) =
+    if isFileWatcherPathIgnored path then
+        true
+    else
+        match tryGetWatcherRelativePath arcPath path with
+        | None -> true
+        | Some relativePath ->
+            let relativePath = PathHelpers.normalizeCanonicalRelativePath relativePath
+
+            if String.IsNullOrWhiteSpace relativePath then
+                false
+            else
+                let parentPath = PathHelpers.tryGetParentPath relativePath |> Option.defaultValue ""
+                not (isExpanded relativePath || isExpanded parentPath)
+
+let createWatcherOptions (cwd: string) (usePolling: bool) (ignored: Chokidar.IgnoredPattern) (depth: int option) =
     let watcherOptions =
         if usePolling then
             Chokidar.WatchOptions(
-                cwd = path,
+                cwd = cwd,
                 awaitWriteFinish = true,
-                ignored = !^isFileWatcherPathIgnored,
+                ignored = ignored,
                 ignoreInitial = true,
                 usePolling = true,
                 interval = 200,
-                binaryInterval = 400
+                binaryInterval = 400,
+                ?depth = depth
             )
         else
             Chokidar.WatchOptions(
-                cwd = path,
+                cwd = cwd,
                 awaitWriteFinish = true,
-                ignored = !^isFileWatcherPathIgnored,
-                ignoreInitial = true
+                ignored = ignored,
+                ignoreInitial = true,
+                ?depth = depth
             )
 
-    let watcher = Chokidar.Chokidar.watch (path, watcherOptions)
+    watcherOptions
 
-    watcher
+let createArcStructureWatcherPaths (arcPath: string) =
+    let structuralPaths =
+        arcStructureZones
+        |> Array.choose (fun zone ->
+            let absoluteZonePath = ArcPathHelper.combine arcPath zone
+
+            if Filesystem.existsSync absoluteZonePath then
+                Some(PathHelpers.normalizePath absoluteZonePath)
+            else
+                None
+        )
+
+    Array.append [| PathHelpers.normalizePath arcPath |] structuralPaths
+
+let isArcStructureZoneScopePath (relativePath: string) =
+    match getNonEmptyPathParts relativePath with
+    | [| zone |] -> isArcStructureZone zone
+    | _ -> false
+
+let isArcStructureZoneOrEntityScopePath (relativePath: string) =
+    match getNonEmptyPathParts relativePath with
+    | [| zone |] -> isArcStructureZone zone
+    | [| zone; _ |] -> isArcStructureZone zone
+    | _ -> false
+
+/// Shallowly discovers structure and canonical metadata without entering payload directory contents.
+let reconcileArcStructureScope (arcPath: string) (relativeScopePath: string) =
+
+    let readDirectory relativePath = promise {
+        try
+            let absolutePath = ArcPathHelper.combine arcPath relativePath
+            return! Filesystem.readdirWithTypesAsync absolutePath (Filesystem.ReaddirOptions(withFileTypes = true))
+        with _ ->
+            return [||]
+    }
+
+    let reconcileEntity zone entity = promise {
+        let entityPath =
+            ArcPathHelper.combine zone entity |> PathHelpers.normalizeCanonicalRelativePath
+
+        let! entries = readDirectory entityPath
+
+        return
+            entries
+            |> Array.choose (fun entry ->
+                let relativePath =
+                    ArcPathHelper.combine entityPath entry.name
+                    |> PathHelpers.normalizeCanonicalRelativePath
+
+                if entry.isDirectory () then
+                    Some(Chokidar.Events.AddDir.ToString(), relativePath)
+                elif entry.isFile () && isArcModelReadContractPath relativePath then
+                    Some(Chokidar.Events.Add.ToString(), relativePath)
+                else
+                    None
+            )
+    }
+
+    let reconcileZone zone = promise {
+        let! entries = readDirectory zone
+        let events = ResizeArray<string * string>()
+
+        for entity in entries |> Array.filter (fun entry -> entry.isDirectory ()) do
+            let entityPath =
+                ArcPathHelper.combine zone entity.name
+                |> PathHelpers.normalizeCanonicalRelativePath
+
+            events.Add(Chokidar.Events.AddDir.ToString(), entityPath)
+            let! entityEvents = reconcileEntity zone entity.name
+            events.AddRange entityEvents
+
+        return events.ToArray()
+    }
+
+    promise {
+        match getNonEmptyPathParts relativeScopePath with
+        | [||] ->
+            let events = ResizeArray<string * string>()
+
+            for zone in arcStructureZones do
+                if Filesystem.existsSync (ArcPathHelper.combine arcPath zone) then
+                    events.Add(Chokidar.Events.AddDir.ToString(), zone)
+                    let! zoneEvents = reconcileZone zone
+                    events.AddRange zoneEvents
+
+            return events.ToArray()
+        | [| zone |] when isArcStructureZone zone -> return! reconcileZone zone
+        | [| zone; entity |] when isArcStructureZone zone -> return! reconcileEntity zone entity
+        | _ -> return [||]
+    }
+
+/// Compares the bounded structural disk view with the installed FileTree snapshot. It reports only
+/// additions and removals, so watcher readiness does not replay unchanged metadata into ARC merging.
+let reconcileArcStructureScopeChanges
+    (arcPath: string)
+    (relativeScopePath: string)
+    (getCurrentFileTree: unit -> Dictionary<string, FileEntry>)
+    =
+    promise {
+        let normalizedScopePath =
+            PathHelpers.normalizeCanonicalRelativePath relativeScopePath
+
+        let! discoveredEvents = reconcileArcStructureScope arcPath normalizedScopePath
+        let desired = Dictionary<string, string>()
+
+        for eventName, relativePath in discoveredEvents do
+            desired.[PathHelpers.normalizeCanonicalRelativePath relativePath] <- eventName
+
+        if String.IsNullOrWhiteSpace normalizedScopePath then
+            try
+                let! rootEntries =
+                    Filesystem.readdirWithTypesAsync arcPath (Filesystem.ReaddirOptions(withFileTypes = true))
+
+                for entry in rootEntries do
+                    let relativePath = PathHelpers.normalizeCanonicalRelativePath entry.name
+
+                    if entry.isFile () && isArcModelReadContractPath relativePath then
+                        desired.[relativePath] <- Chokidar.Events.Add.ToString()
+            with _ ->
+                ()
+
+        let isStructuralEntry (entry: FileEntry) (relativePath: string) =
+            match getNonEmptyPathParts relativePath with
+            | [| zone |] ->
+                (entry.isDirectory && isArcStructureZone zone)
+                || (not entry.isDirectory && isArcModelReadContractPath relativePath)
+            | [| zone; _ |] -> entry.isDirectory && isArcStructureZone zone
+            | [| zone; _; _ |] ->
+                isArcStructureZone zone
+                && (entry.isDirectory || isArcModelReadContractPath relativePath)
+            | _ -> false
+
+        let known = Dictionary<string, FileEntry>()
+
+        for entry in (getCurrentFileTree ()).Values do
+            match tryGetRepoRelativePath arcPath entry.path with
+            | Some relativePath ->
+                let relativePath = PathHelpers.normalizeCanonicalRelativePath relativePath
+
+                if
+                    isStructuralEntry entry relativePath
+                    && (String.IsNullOrWhiteSpace normalizedScopePath
+                        || isSameOrDescendantLogicalPath relativePath normalizedScopePath)
+                then
+                    known.[relativePath] <- entry
+            | None -> ()
+
+        let changes = ResizeArray<string * string>()
+
+        for KeyValue(relativePath, eventName) in desired do
+            if not (known.ContainsKey relativePath) then
+                changes.Add(eventName, relativePath)
+
+        for KeyValue(relativePath, entry) in known do
+            let absolutePath = ArcPathHelper.combine arcPath relativePath
+
+            if
+                not (desired.ContainsKey relativePath)
+                && not (Filesystem.existsSync absolutePath)
+            then
+                changes.Add(
+                    (if entry.isDirectory then
+                         Chokidar.Events.UnlinkDir.ToString()
+                     else
+                         Chokidar.Events.Unlink.ToString()),
+                    relativePath
+                )
+
+        return changes.ToArray()
+    }
+
+let createFileWatcher (path: string) =
+    let ignored: Chokidar.IgnoredPattern =
+        !^(System.Func<string, Filesystem.Stats option, bool>(shouldIgnoreForArcStructureWatcher path))
+
+    // Root depth 1 observes zone/entity changes; each explicit zone depth 1 observes only
+    // entity directories and their immediate metadata/payload-directory children.
+    // Native Windows file events can keep handles that block app-initiated folder renames.
+    let usePolling = shouldUsePollingByDefault (currentNodePlatform ())
+
+    Chokidar.Chokidar.watch (createArcStructureWatcherPaths path, createWatcherOptions path usePolling ignored (Some 1))
 
 let sendArcHasUnsavedChangesUpdate (hasUnsavedChanges: bool) (window: BrowserWindow) =
     WindowSend.send<Swate.Electron.Shared.IPCTypes.MainToRendererIpc.IHasUnsavedArcChangesRendererApi>

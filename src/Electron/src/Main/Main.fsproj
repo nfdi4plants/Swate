@@ -7,9 +7,9 @@
   <ItemGroup>
     <None Include="ChokidarTest.fsx" />
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Bindings\Filesystem.fs" />
     <Compile Include="Bindings\Chokidar.fs" />
     <Compile Include="Bindings\Abort.fs" />
-    <Compile Include="Bindings\Filesystem.fs" />
     <Compile Include="Bindings\Path.fs" />
     <Compile Include="Bindings\NodeBindings.fs" />
     <Compile Include="Bindings\PromiseRace.fs" />
@@ -47,6 +47,7 @@
     <Compile Include="ArcVault\FileImportAuthorization.fs" />
     <Compile Include="ArcVault\FileImportCoordinator.fs" />
     <Compile Include="ArcVault\ArcVault.fs" />
+    <Compile Include="ArcVault\FileTree.fs" />
     <Compile Include="Provenance\ProvenanceGroupingReader.fs" />
     <Compile Include="IPC\IPCHelper.fs" />
     <Compile Include="IPC\FileSystemIO.fs" />

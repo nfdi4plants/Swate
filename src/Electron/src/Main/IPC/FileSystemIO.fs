@@ -3,13 +3,12 @@ module Main.IPC.FileSystemIO
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Main.Bindings.Path
+open Main.Bindings.Filesystem
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.RenamePathRules
-open Main.Bindings.Filesystem
-open Main.Bindings.Path
-
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"

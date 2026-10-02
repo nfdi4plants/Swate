@@ -15,6 +15,8 @@ import {
   FileTree_createFolder,
 } from "./Types.fs.js";
 import { ofArray } from "../../fable_modules/fable-library-ts.5.0.0-alpha.21/List.ts";
+import { ofArray as setOfArray } from "../../fable_modules/fable-library-ts.5.0.0-alpha.21/Set.ts";
+import { Comparer, comparePrimitives } from "../../fable_modules/fable-library-ts.5.0.0-alpha.21/Util.ts";
 
 const arcCreateItems = [
   { label: "Add Study", path: "studies/NewStudy/isa.study.xlsx" },
@@ -133,6 +135,7 @@ const DataMapLifecycleFileExplorer = () => {
 
 const LazyLoadDirectoryFileExplorer = () => {
   const [lazyFolderLoaded, setLazyFolderLoaded] = React.useState(false);
+  const [lastExpansion, setLastExpansion] = React.useState("none");
 
   const items = React.useMemo(() => {
     const emptyFolder = createStableFolder("Empty Folder", "arc/empty-folder", "empty-folder", []);
@@ -152,11 +155,13 @@ const LazyLoadDirectoryFileExplorer = () => {
       <FileExplorer
         initialItems={items}
         onDirectoryArrowToggle={(item, willExpand) => {
+          setLastExpansion(`${item.Id}:${willExpand}`);
           if (item.Id === "lazy-folder" && willExpand) {
             setLazyFolderLoaded(true);
           }
         }}
       />
+      <div data-testid="last-directory-expansion">{lastExpansion}</div>
     </div>
   );
 };
@@ -222,6 +227,30 @@ const ExpansionRefreshFileExplorer = () => {
           }
         }}
       />
+    </div>
+  );
+};
+
+const ControlledExpansionFileExplorer = () => {
+  const items = React.useMemo(() => {
+    const leaf = createStableFile("Leaf.txt", "arc/parent/child/Leaf.txt", "leaf");
+    const child = createStableFolder("Child", "arc/parent/child", "child", [leaf]);
+    const parent = createStableFolder("Parent", "arc/parent", "parent", [child]);
+    const sibling = createStableFolder("Sibling", "arc/sibling", "sibling", []);
+    return ofArray([parent, sibling]);
+  }, []);
+  const [expandedIds, setExpandedIds] = React.useState(() =>
+    setOfArray(["parent", "child"], new Comparer(comparePrimitives)),
+  );
+
+  return (
+    <div className="swt:p-4">
+      <FileExplorer
+        initialItems={items}
+        expandedItemIds={expandedIds}
+        onExpandedItemIdsChange={setExpandedIds}
+      />
+      <div data-testid="controlled-expanded-ids">{Array.from(expandedIds).sort().join(",")}</div>
     </div>
   );
 };
@@ -544,14 +573,17 @@ export const Default: Story = {
   }),
 };
 
-export const DirectoryArrowsReflectLoadability: StoryObj<typeof LazyLoadDirectoryFileExplorer> = {
+export const DirectoriesRemainRefreshable: StoryObj<typeof LazyLoadDirectoryFileExplorer> = {
   render: () => <LazyLoadDirectoryFileExplorer />,
 
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
     await canvas.findByText("Empty Folder");
-    await expect(canvas.queryByRole("button", { name: "Expand Empty Folder" })).toBeNull();
+    const emptyFolderToggle = await canvas.findByRole("button", { name: "Expand Empty Folder" });
+    await userEvent.click(emptyFolderToggle);
+    await expect(canvas.getByRole("button", { name: "Collapse Empty Folder" })).toBeInTheDocument();
+    await expect(canvas.getByTestId("last-directory-expansion")).toHaveTextContent("empty-folder:true");
 
     const lazyFolderToggle = await canvas.findByRole("button", { name: "Expand Lazy Folder" });
     await expect(canvas.queryByText("Lazy Child.txt")).toBeNull();
@@ -655,6 +687,29 @@ export const CollapsedDirectoryStaysClosedAfterLazySiblingLoads: StoryObj<typeof
 
     await expect(canvas.queryByText("selected-report.txt")).toBeNull();
     await expect(canvas.getByRole("button", { name: "Expand Selected Parent" })).toBeInTheDocument();
+  },
+};
+
+export const ControlledExpansionReportsAndRendersCompleteState: StoryObj<typeof ControlledExpansionFileExplorer> = {
+  render: () => <ControlledExpansionFileExplorer />,
+
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByText("Leaf.txt")).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "Collapse Parent" }));
+
+    await waitFor(() => {
+      expect(canvas.queryByText("Child")).not.toBeInTheDocument();
+      expect(canvas.getByTestId("controlled-expanded-ids")).toHaveTextContent("");
+    });
+
+    await userEvent.click(canvas.getByRole("button", { name: "Expand Sibling" }));
+    await expect(canvas.getByTestId("controlled-expanded-ids")).toHaveTextContent("sibling");
+
+    await userEvent.click(canvas.getByRole("button", { name: "Expand Parent" }));
+    await expect(canvas.getByTestId("controlled-expanded-ids")).toHaveTextContent("parent,sibling");
+    await expect(canvas.queryByText("Leaf.txt")).not.toBeInTheDocument();
   },
 };
 

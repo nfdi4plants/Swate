@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Main
+open Main.ArcVaultTypes
 open Main.Bindings.Path
 open Main.VersionControl
 open Swate.Components.Composite.Authentication.Types
@@ -16,10 +17,12 @@ open ElectronCore.TestHelpers
 module FileTreeCreator = Main.FileTreeCreator
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
-let private osDynamic: obj = importAll "os"
 let private childProcessDynamic: obj = importAll "node:child_process"
 
 let private fileTreeCreatorTestOptions = TestOptions(timeout = 20000)
+
+[<Emit("$0.mock.calls.length")>]
+let private mockCallCount (mock: obj) : int = jsNative
 
 let private normalizeSlashes (path: string) = path.Replace("\\", "/")
 
@@ -46,23 +49,6 @@ let private enrichFileEntries (objects: (string * ObjectStateDto) list) (entries
     FileTreeCreator.withFileEntriesLfsMetadata "/repo" (Map.ofList objects) entries
 
 type private TempRepositoryContext = { RootPath: string; RepoPath: string }
-
-let private createTempDirectoryAsync () : Fable.Core.JS.Promise<string> =
-    let prefix =
-        join [|
-            osDynamic?tmpdir () |> unbox<string>
-            "swate-electron-file-tree-"
-        |]
-
-    fsPromisesDynamic?mkdtemp (prefix) |> unbox<Fable.Core.JS.Promise<string>>
-
-let private removeDirectoryAsync (path: string) : Fable.Core.JS.Promise<unit> = promise {
-    let! _ =
-        fsPromisesDynamic?rm (path, createObj [ "recursive" ==> true; "force" ==> true ])
-        |> unbox<Fable.Core.JS.Promise<obj>>
-
-    return ()
-}
 
 let private writeUtf8FileAsync (path: string) (content: string) : Fable.Core.JS.Promise<unit> = promise {
     let! _ =
@@ -114,7 +100,7 @@ let private withTempRepository
     (testBody: TempRepositoryContext -> Fable.Core.JS.Promise<unit>)
     : Fable.Core.JS.Promise<unit> =
     promise {
-        let! rootPath = createTempDirectoryAsync ()
+        let! rootPath = createTempDirectoryAsync "swate-electron-file-tree-"
 
         try
             let repoPath = join [| rootPath; "repo" |]
@@ -282,57 +268,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "getFileEntryWithLfsMetadata enriches a single staged LFS file",
-            fileTreeCreatorTestOptions,
-            fun () -> promise {
-                do!
-                    withTempRepository (fun context -> promise {
-                        let pointerFilePath = join [| context.RepoPath; "single-pointer.psd" |]
-
-                        let! _ = runGitAsync context.RepoPath [| "lfs"; "install"; "--local" |]
-                        let! _ = runGitAsync context.RepoPath [| "lfs"; "track"; "*.psd" |]
-                        do! writeUtf8FileAsync pointerFilePath "Single tracked content.\n"
-                        let! _ = runGitAsync context.RepoPath [| "add"; ".gitattributes"; "single-pointer.psd" |]
-                        ()
-
-                        let! enrichedEntry =
-                            FileTreeCreator.getFileEntryWithLfsMetadata context.RepoPath pointerFilePath
-
-                        Vitest.expect(enrichedEntry.largeObject.IsSome).toBe (true)
-                        let largeObject = enrichedEntry.largeObject |> Option.get
-
-                        Vitest.expect(largeObject.Path).toBe ("single-pointer.psd")
-                        Vitest.expect(largeObject.SizeBytes |> Option.get).toBeGreaterThan (0)
-                        Vitest.expect(largeObject.IsMaterialized).toBe (true)
-                        Vitest.expect(largeObject.IsLocallyAvailable).toBe (true)
-                        expectHexObjectId largeObject
-                    })
-            }
-        )
-
-        Vitest.test (
-            "files absent from large-object listing keep metadata None",
-            fileTreeCreatorTestOptions,
-            fun () -> promise {
-                do!
-                    withTempRepository (fun context -> promise {
-                        let untrackedLfsPath = join [| context.RepoPath; "untracked.psd" |]
-
-                        let! _ = runGitAsync context.RepoPath [| "lfs"; "install"; "--local" |]
-                        let! _ = runGitAsync context.RepoPath [| "lfs"; "track"; "*.psd" |]
-                        do! writeUtf8FileAsync untrackedLfsPath "Untracked file content.\n"
-                        let! _ = runGitAsync context.RepoPath [| "add"; ".gitattributes" |]
-                        ()
-
-                        let! enrichedEntry =
-                            FileTreeCreator.getFileEntryWithLfsMetadata context.RepoPath untrackedLfsPath
-
-                        Vitest.expect(enrichedEntry.largeObject).toEqual (None)
-                    })
-            }
-        )
-
-        Vitest.test (
             "no large objects keeps entries without metadata",
             fileTreeCreatorTestOptions,
             fun () -> promise {
@@ -348,6 +283,88 @@ Vitest.describe (
                             |> Array.find (fun entry -> normalizeSlashes entry.path = normalizeSlashes plainFilePath)
 
                         Vitest.expect(plainEntry.largeObject).toEqual (None)
+                    })
+            }
+        )
+
+        Vitest.test (
+            "watcher batches list large objects once for changes and not for deletes",
+            fileTreeCreatorTestOptions,
+            fun () -> promise {
+                do!
+                    withTempRepository (fun context -> promise {
+                        let firstFilePath = join [| context.RepoPath; "first.psd" |]
+                        let secondFilePath = join [| context.RepoPath; "second.psd" |]
+
+                        let! _ = runGitAsync context.RepoPath [| "lfs"; "install"; "--local" |]
+                        let! _ = runGitAsync context.RepoPath [| "lfs"; "track"; "*.psd" |]
+                        do! writeUtf8FileAsync firstFilePath "First tracked content.\n"
+                        do! writeUtf8FileAsync secondFilePath "Second tracked content.\n"
+
+                        let! _ = runGitAsync context.RepoPath [| "add"; ".gitattributes"; "first.psd"; "second.psd" |]
+
+                        // Open the repository session used by watcher LFS lookups without seeding the vault tree.
+                        let! _ = FileTreeCreator.getFileTree context.RepoPath
+                        let vault = ArcVault(testWindow ())
+                        vault.path <- Some context.RepoPath
+
+                        let hostedSession =
+                            WorkspaceSessionHost.get().TryGetSession context.RepoPath
+                            |> Option.defaultWith (fun () -> failwith "Expected an open repository session.")
+
+                        let materialization =
+                            hostedSession.Session.ObjectMaterialization
+                            |> Option.defaultWith (fun () -> failwith "Expected Git LFS object materialization.")
+
+                        let listObjectsSpy = Vitest.vi.spyOn (box materialization, "ListObjects")
+
+                        let createEvent eventName relativePath absolutePath : ArcVaultFileSystemEvent = {
+                            EventName = eventName
+                            RelativePath = relativePath
+                            AbsolutePath = normalizeSlashes absolutePath
+                        }
+
+                        try
+                            do!
+                                vault.ApplyWatcherFileTreeEvents [
+                                    createEvent "change" "first.psd" firstFilePath
+                                    createEvent "change" "second.psd" secondFilePath
+                                ]
+
+                            let firstEntry = vault.fileTree.[normalizeSlashes firstFilePath]
+                            let secondEntry = vault.fileTree.[normalizeSlashes secondFilePath]
+
+                            Vitest
+                                .expect(
+                                    firstEntry.largeObject
+                                    |> Option.map (fun item -> item.Path, item.IsMaterialized)
+                                )
+                                .toEqual (Some("first.psd", true))
+
+                            Vitest
+                                .expect(
+                                    secondEntry.largeObject
+                                    |> Option.map (fun item -> item.Path, item.IsMaterialized)
+                                )
+                                .toEqual (Some("second.psd", true))
+
+                            Vitest.expect(mockCallCount listObjectsSpy).toBe (1)
+
+                            do! fsPromisesDynamic?unlink (firstFilePath) |> unbox<Fable.Core.JS.Promise<unit>>
+
+                            do! fsPromisesDynamic?unlink (secondFilePath) |> unbox<Fable.Core.JS.Promise<unit>>
+
+                            do!
+                                vault.ApplyWatcherFileTreeEvents [
+                                    createEvent "unlink" "first.psd" firstFilePath
+                                    createEvent "unlink" "second.psd" secondFilePath
+                                ]
+
+                            Vitest.expect(vault.fileTree.ContainsKey(normalizeSlashes firstFilePath)).toBe (false)
+                            Vitest.expect(vault.fileTree.ContainsKey(normalizeSlashes secondFilePath)).toBe (false)
+                            Vitest.expect(mockCallCount listObjectsSpy).toBe (1)
+                        finally
+                            Vitest.vi.restoreAllMocks ()
                     })
             }
         )

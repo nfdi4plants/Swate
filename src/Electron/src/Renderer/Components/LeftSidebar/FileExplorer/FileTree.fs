@@ -10,6 +10,7 @@ open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
+open Swate.Electron.Shared.IPCTypes
 open Feliz
 open Fable.Core
 open ARCtrl
@@ -31,6 +32,47 @@ open FileTreeHelper
 
 [<Erase; Mangle(false)>]
 type FileTree =
+
+    [<ReactComponent>]
+    static member ExternalFilePreviewRefresh() =
+        let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+        let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
+
+        let reloadPreview path =
+            let applyReloadError details =
+                pageStateCtx.setState (
+                    Some(
+                        Renderer.Types.PageState.ErrorPage
+                            $"The preview could not be refreshed after the file changed externally. Select the file again. Details: {details}"
+                    )
+                )
+
+            promise {
+                match! openView path with
+                | Ok pageState -> pageStateCtx.setState (Some pageState)
+                | Error errorMessage -> applyReloadError errorMessage
+            }
+            |> Promise.catch (fun exn -> applyReloadError exn.Message)
+            |> Promise.start
+
+        React.useEffect (
+            (fun () ->
+                fileStateCtx.state.ExternalFileContentChange
+                |> Option.bind (fun change ->
+                    FileExplorerStateReconciliation.tryGetExternallyChangedSelectedFilePath
+                        change.Paths
+                        fileStateCtx.state.FileTree
+                        fileStateCtx.state.Selection.TreePath
+                        pageStateCtx.state
+                )
+                |> Option.iter reloadPreview
+            ),
+            [|
+                box (fileStateCtx.state.ExternalFileContentChange |> Option.map _.Revision)
+            |]
+        )
+
+        Html.none
 
     [<ReactComponent>]
     static member private EmptyFileTreePlaceholder() =
@@ -61,7 +103,6 @@ type FileTree =
 
         let activeDialog, setActiveDialog = React.useState<FileTreeDialog option> None
         let isDialogBusy, setIsDialogBusy = React.useState false
-
         let lfsActivityCtx = Renderer.Context.LfsActivityContext.useLfsActivityCtx ()
         let lfsActivityByPath = lfsActivityCtx.activities
         let lfsActivePaths = lfsActivityByPath |> Map.toList |> List.map fst
@@ -139,22 +180,6 @@ type FileTree =
 
         let reconciledMaterializedState =
             reconcileMaterializedState arcScopeId fileStateCtx.state.Selection.TreePath fileTree materializedState
-
-        React.useEffect (
-            (fun () ->
-                setMaterializedState (fun current ->
-                    if reconciledMaterializedState = current then
-                        current
-                    else
-                        reconciledMaterializedState
-                )
-            ),
-            [|
-                box arcScopeId
-                box fileTree
-                box fileStateCtx.state.Selection.TreePath
-            |]
-        )
 
         let fileItem =
             fileTree
@@ -278,7 +303,7 @@ type FileTree =
                         pageStateCtx.setState None
                     | None ->
                         match
-                            FileExplorerStateReconciliation.tryGetReloadableSelectedFilePath
+                            FileExplorerStateReconciliation.tryGetMaterializedSelectedFilePath
                                 fileStateCtx.state.FileTree
                                 fileStateCtx.state.Selection.TreePath
                                 pageStateCtx.state
@@ -291,11 +316,72 @@ type FileTree =
             [| box fileStateCtx.state.FileTree |]
         )
 
-        let handleExpansionChange (item: FileItem) (willExpand: bool) =
-            if willExpand then
-                match item.Path with
-                | Some path -> setMaterializedState (fun _ -> materialize path reconciledMaterializedState)
-                | None -> ()
+        let reportExpansionError (error: exn) =
+            errorModal.enqueue (
+                ErrorModalRequest.create (error.Message, title = "File Explorer update failed", ?scopeId = arcScopeId)
+            )
+
+        let visibleItems = fileItem |> Option.bind _.Children |> Option.defaultValue []
+
+        let reportActiveExpandedDirectories (expandedIds: Set<string>) =
+            let activeDirectories =
+                FileExplorerLogic.collectActiveExpandedDirectories expandedIds visibleItems
+
+            let request: FileTreeDirectoryExpansionRequest = {
+                relativePaths =
+                    activeDirectories
+                    |> List.choose _.Path
+                    |> List.map PathHelpers.normalizeCanonicalRelativePath
+                    |> List.distinct
+                    |> List.toArray
+            }
+
+            promise {
+                match! Api.ipcArcVaultApi.setFileTreeDirectoryExpanded request with
+                | Ok _ -> ()
+                | Error expansionError -> reportExpansionError expansionError
+            }
+            |> Promise.catch reportExpansionError
+            |> Promise.start
+
+        let handleExpandedItemIdsChange (expandedIds: Set<string>) =
+            setMaterializedState (fun current ->
+                current
+                |> reconcileMaterializedState arcScopeId fileStateCtx.state.Selection.TreePath fileTree
+                |> setExpandedPaths expandedIds
+            )
+
+            reportActiveExpandedDirectories expandedIds
+
+        let clearActiveExpandedDirectoriesRef = React.useRef (fun () -> ())
+        clearActiveExpandedDirectoriesRef.current <- fun () -> reportActiveExpandedDirectories Set.empty
+
+        let setFileTreeRootElement =
+            React.useCallback (
+                (fun (element: Browser.Types.Element) ->
+                    if isNull element then
+                        clearActiveExpandedDirectoriesRef.current ()
+                ),
+                [||]
+            )
+
+        React.useEffect (
+            (fun () ->
+                if reconciledMaterializedState <> materializedState then
+                    setMaterializedState (fun _ -> reconciledMaterializedState)
+
+                    if
+                        reconciledMaterializedState.ArcScopeId <> materializedState.ArcScopeId
+                        || reconciledMaterializedState.ExpandedPaths <> materializedState.ExpandedPaths
+                    then
+                        reportActiveExpandedDirectories reconciledMaterializedState.ExpandedPaths
+            ),
+            [|
+                box arcScopeId
+                box fileTree
+                box fileStateCtx.state.Selection.TreePath
+            |]
+        )
 
         let openDialog dialog =
             setIsDialogBusy false
@@ -606,17 +692,17 @@ type FileTree =
 
         match fileItem with
         | Some rootItem ->
-            let visibleItems = rootItem.Children |> Option.defaultValue []
-
             React.Fragment [
                 Html.div [
+                    prop.ref setFileTreeRootElement
                     prop.className "swt:w-full"
                     prop.children [
                         Swate.Components.Page.FileExplorer.FileExplorer.FileExplorer(
                             initialItems = visibleItems,
                             onItemClick = openPreview,
                             directoryChevronToggleOnlyForItem = isArcEntityDirectory,
-                            onDirectoryExpansionChange = handleExpansionChange,
+                            expandedItemIds = reconciledMaterializedState.ExpandedPaths,
+                            onExpandedItemIdsChange = handleExpandedItemIdsChange,
                             onContextMenu = createContextMenuItems,
                             getItemIconClass = getItemIconClass,
                             canCreateItem = canCreateFromItem rootPath,

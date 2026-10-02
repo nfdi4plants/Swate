@@ -1,12 +1,10 @@
-module ElectronCore.FileTreeCompactionTests
+module ElectronCore.FileIOHelperTests
 
 open System.Collections.Generic
-module FileTreeCreator = Main.FileTreeCreator
-
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.VersionControlTypes
-open Swate.Components.Shared
 open Vitest
 
 let private fileNode (name: string) (path: string) =
@@ -26,7 +24,25 @@ let private onlyChild (node: FileTreeNode) =
     node.children.Values |> Seq.exactlyOne
 
 Vitest.describe (
-    "FileIOHelper.collapseSingleChildSameNameDirectories",
+    "FileIOHelper case-insensitive filesystem path comparison",
+    fun () ->
+        Vitest.test (
+            "repository-relative paths use the explicit filesystem-comparison normalization contract",
+            fun () ->
+                Vitest
+                    .expect(PathHelpers.normalizePathForFsComparison "C:/Repo/ARC")
+                    .toBe (PathHelpers.normalizePathForFsComparison "c:\\repo\\arc")
+
+                Vitest.expect(tryGetRepoRelativePathOrRoot "C:/Repo/ARC" "c:\\repo\\arc").toEqual (Some "")
+
+                Vitest
+                    .expect(tryGetRepoRelativePath "C:/Repo/ARC" "c:\\repo\\arc\\studies\\S1")
+                    .toEqual (Some "studies/S1")
+        )
+)
+
+Vitest.describe (
+    "FileIOHelper.collapseSingleChildSameName",
     fun () ->
         Vitest.test (
             "collapses A/A single-child same-name directories",
@@ -111,7 +127,7 @@ Vitest.describe (
 )
 
 Vitest.describe (
-    "FileIOHelper.toFileTreeNode LFS metadata",
+    "FileIOHelper.toFileTreeNode",
     fun () ->
         Vitest.test (
             "preserves Git LFS ls-files metadata from FileEntry to root FileTreeNode",
@@ -220,88 +236,5 @@ Vitest.describe (
                     |> Seq.toArray
 
                 Vitest.expect(targets).toEqual ([| "workflow", "WorkflowA"; "run", "RunA" |])
-        )
-)
-
-Vitest.describe (
-    "FileTreeCreator.removePathAndDescendants",
-    fun () ->
-        let createFileEntry path isDirectory = {
-            name =
-                path
-                |> Swate.Components.Shared.PathHelpers.normalizePath
-                |> Swate.Components.Shared.PathHelpers.getFileName
-            isDirectory = isDirectory
-            path = path
-            largeObject = None
-        }
-
-        Vitest.test (
-            "removes only the target path and descendants",
-            fun () ->
-                let tree = Dictionary<string, FileEntry>()
-                tree.Add("C:/arc", createFileEntry "C:/arc" true)
-                tree.Add("C:/arc/assays", createFileEntry "C:/arc/assays" true)
-                tree.Add("C:/arc/assays/A", createFileEntry "C:/arc/assays/A" true)
-                tree.Add("C:/arc/assays/A/isa.assay.xlsx", createFileEntry "C:/arc/assays/A/isa.assay.xlsx" false)
-                tree.Add("C:/arc/assays/AB", createFileEntry "C:/arc/assays/AB" true)
-                tree.Add("C:/arc/assays/AB/isa.assay.xlsx", createFileEntry "C:/arc/assays/AB/isa.assay.xlsx" false)
-
-                let updatedTree = FileTreeCreator.removePathAndDescendants "C:/arc/assays/A" tree
-
-                Vitest.expect(updatedTree.ContainsKey("C:/arc/assays/A")).toBe (false)
-                Vitest.expect(updatedTree.ContainsKey("C:/arc/assays/A/isa.assay.xlsx")).toBe (false)
-                Vitest.expect(updatedTree.ContainsKey("C:/arc/assays/AB")).toBe (true)
-                Vitest.expect(updatedTree.ContainsKey("C:/arc/assays/AB/isa.assay.xlsx")).toBe (true)
-        )
-)
-
-Vitest.describe (
-    "FileTreeCreator.upsertFileEntry",
-    fun () ->
-        let createFileEntry path isDirectory largeObject = {
-            name =
-                path
-                |> Swate.Components.Shared.PathHelpers.normalizePath
-                |> Swate.Components.Shared.PathHelpers.getFileName
-            isDirectory = isDirectory
-            path = path
-            largeObject = largeObject
-        }
-
-        let pointerInfo: ObjectStateDto = {
-            Path = "data.bin"
-            SizeBytes = Some 128.0
-            IsMaterialized = false
-            IsLocallyAvailable = false
-            ObjectId = Some "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        }
-
-        Vitest.test (
-            "replaces an existing file entry without throwing",
-            fun () ->
-                let tree = Dictionary<string, FileEntry>()
-                tree.Add("C:/arc/data.bin", createFileEntry "C:/arc/data.bin" false None)
-                tree.Add("C:/arc/other.bin", createFileEntry "C:/arc/other.bin" false None)
-
-                let updatedTree =
-                    FileTreeCreator.upsertFileEntry (createFileEntry "C:/arc/data.bin" false (Some pointerInfo)) tree
-
-                Vitest.expect(updatedTree.Count).toBe (2)
-                Vitest.expect(updatedTree.["C:/arc/data.bin"].largeObject).toEqual (Some pointerInfo)
-                Vitest.expect(updatedTree.ContainsKey("C:/arc/other.bin")).toBe (true)
-        )
-
-        Vitest.test (
-            "returns a new dictionary instead of mutating the current file tree",
-            fun () ->
-                let tree = Dictionary<string, FileEntry>()
-                tree.Add("C:/arc/data.bin", createFileEntry "C:/arc/data.bin" false None)
-
-                let updatedTree =
-                    FileTreeCreator.upsertFileEntry (createFileEntry "C:/arc/data.bin" false (Some pointerInfo)) tree
-
-                Vitest.expect(tree.["C:/arc/data.bin"].largeObject).toEqual (None)
-                Vitest.expect(updatedTree.["C:/arc/data.bin"].largeObject).toEqual (Some pointerInfo)
         )
 )

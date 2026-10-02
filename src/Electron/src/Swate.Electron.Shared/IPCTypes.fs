@@ -32,6 +32,8 @@ type CreateArcOutcome =
     | Cancelled
     | CreatedButClosed of path: string
 
+type FileTreeDirectoryExpansionRequest = { relativePaths: string[] }
+
 /// TEMPORARY DUCT-TAPE WORKAROUND: This IPC API only exists because template loading currently cannot run
 /// through ARCtrl on the Swate .NET server or directly in the renderer due to GitHub CORS.
 /// Remove it when ARCtrl provides a working .NET implementation or a CORS-enabled template source.
@@ -68,6 +70,8 @@ type IArcVaultsApi = {
     cancelImportExternalFiles: string -> JS.Promise<Result<unit, exn>>
     getActiveFileImport: unit -> JS.Promise<Result<ActiveFileImportState option, exn>>
     getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
+    /// Replaces the authoritative set of actively expanded, visible File Explorer directories.
+    setFileTreeDirectoryExpanded: FileTreeDirectoryExpansionRequest -> JS.Promise<Result<unit, exn>>
     pathExists: string -> JS.Promise<Result<bool, exn>>
     openFile: string -> JS.Promise<Result<FileContentDTO, exn>>
     openArcFolderInFileExplorer: unit -> JS.Promise<Result<unit, exn>>
@@ -174,6 +178,7 @@ module MainToRendererIpc =
 
     type IFileTreeRendererApi = {
         fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
+        externalFileContentsChanged: string[] -> unit
     }
 
     type IFileImportRendererApi = {

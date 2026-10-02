@@ -250,6 +250,67 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "ARCtrl entity rename refreshes filesystem paths from disk while preserving unsaved metadata",
+            fun () ->
+                withTempArc
+                    (fun arc -> arc.AddAssay(ArcAssay("OldAssay", title = "Persisted title")))
+                    (fun arcPath -> promise {
+                        let oldDatasetPath = join [| arcPath; "assays"; "OldAssay"; "dataset" |]
+                        let unrelatedDirectory = join [| arcPath; "resources" |]
+
+                        let! _ =
+                            Main.Bindings.Filesystem.mkdirAsync
+                                oldDatasetPath
+                                (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                        let! _ =
+                            Main.Bindings.Filesystem.mkdirAsync
+                                unrelatedDirectory
+                                (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                        do! writeFileAsync (join [| oldDatasetPath; "existing.bin" |]) "existing" TextEncoding.Utf8
+
+                        do!
+                            writeFileAsync
+                                (join [| unrelatedDirectory; "unrelated.txt" |])
+                                "unrelated"
+                                TextEncoding.Utf8
+
+                        let! loadedArc = loadArcAsync arcPath
+                        loadedArc.GetAssay("OldAssay").Title <- Some "Unsaved title"
+
+                        do!
+                            writeFileAsync
+                                (join [| oldDatasetPath; "externally-added.bin" |])
+                                "external"
+                                TextEncoding.Utf8
+
+                        match!
+                            ArcRenameHelper.renameArcEntityAsync
+                                arcPath
+                                (renameRequest "assays/OldAssay" "NewAssay")
+                                loadedArc
+                        with
+                        | Error renameError -> return failwith renameError.Message
+                        | Ok renamedArc ->
+                            let filePaths =
+                                renamedArc.FileSystem.Tree.ToFilePaths()
+                                |> Array.map PathHelpers.normalizeCanonicalRelativePath
+                                |> Set.ofArray
+
+                            Vitest.expect(renamedArc.GetAssay("NewAssay").Title).toEqual (Some "Unsaved title")
+
+                            Vitest.expect(filePaths.Contains "assays/NewAssay/dataset/existing.bin").toBe (true)
+
+                            Vitest
+                                .expect(filePaths.Contains "assays/NewAssay/dataset/externally-added.bin")
+                                .toBe (true)
+
+                            Vitest.expect(filePaths.Contains "resources/unrelated.txt").toBe (true)
+                    })
+        )
+
+        Vitest.test (
             "ARCtrl try rename rejects existing targets without mutating local ARC",
             fun () ->
                 withTempArc

@@ -41,10 +41,7 @@ module private FileExplorerHelper =
         (getCopyRelativePath: FileItem -> string option)
         (setExpanded: FileItem -> bool -> unit)
         : Swate.Components.Page.FileExplorer.Types.ContextMenuItem list =
-        let canExpandDirectory =
-            match item.Children with
-            | Some children -> not (List.isEmpty children)
-            | None -> true
+        let canExpandDirectory = item.IsDirectory
 
         [
             if not item.IsDirectory then
@@ -118,6 +115,8 @@ type FileExplorer =
             ?onDeleteItem: FileItem -> unit,
             ?selectedItemId: string option,
             ?onDirectoryExpansionChange: FileItem -> bool -> unit,
+            ?expandedItemIds: Set<string>,
+            ?onExpandedItemIdsChange: Set<string> -> unit,
             ?onExpansionChange: FileItem -> bool -> unit,
             ?onDirectoryArrowToggle: FileItem -> bool -> unit,
             ?directoryInteractionMode: DirectoryInteractionMode,
@@ -161,6 +160,7 @@ type FileExplorer =
 
         let model, dispatch = React.useReducer (reducer, initialModel)
         let containerRef = React.useElementRef ()
+        let effectiveExpandedIds = defaultArg expandedItemIds model.ExpandedIds
 
         let onDirectoryExpansionChange =
             onDirectoryExpansionChange
@@ -199,10 +199,16 @@ type FileExplorer =
         )
 
         let setExpanded (item: FileItem) (willExpand: bool) =
-            let isExpanded = model.ExpandedIds.Contains item.Id
+            let isExpanded = effectiveExpandedIds.Contains item.Id
 
             if isExpanded <> willExpand then
-                dispatch (FileExplorerLogic.SetExpanded(item.Id, willExpand))
+                let nextExpandedIds =
+                    FileExplorerLogic.nextExpandedIdsForItem effectiveExpandedIds item willExpand
+
+                if expandedItemIds.IsNone then
+                    dispatch (FileExplorerLogic.SetExpanded(item, willExpand))
+
+                onExpandedItemIdsChange |> Option.iter (fun notify -> notify nextExpandedIds)
                 onDirectoryExpansionChange |> Option.iter (fun fn -> fn item willExpand)
 
         let selectItem (item: FileItem) =
@@ -218,7 +224,7 @@ type FileExplorer =
                 && canExpand
                 && not (directoryChevronToggleOnlyForItem item)
             then
-                setExpanded item (not (model.ExpandedIds.Contains item.Id))
+                setExpanded item (not (effectiveExpandedIds.Contains item.Id))
 
             selectItem item
 
@@ -226,7 +232,7 @@ type FileExplorer =
             Swate.Components.Primitive.ContextMenu.ContextMenu.ContextMenu(
                 (fun data ->
                     let item = data |> unbox<FileItem>
-                    let isExpanded = model.ExpandedIds.Contains item.Id
+                    let isExpanded = effectiveExpandedIds.Contains item.Id
 
                     FileExplorerHelper.getContextMenuItems
                         item
@@ -257,7 +263,7 @@ type FileExplorer =
                                 let menuItems =
                                     FileExplorerHelper.getContextMenuItems
                                         item
-                                        (model.ExpandedIds.Contains item.Id)
+                                        (effectiveExpandedIds.Contains item.Id)
                                         selectItem
                                         onContextMenu
                                         getCopyPath
@@ -290,12 +296,9 @@ type FileExplorer =
                 else
                     ""
 
-            let isExpanded = model.ExpandedIds.Contains item.Id
+            let isExpanded = effectiveExpandedIds.Contains item.Id
 
-            let canExpand =
-                match item.Children with
-                | Some children -> not (List.isEmpty children)
-                | None -> true
+            let canExpand = item.IsDirectory
 
             let itemActions = getItemActions item
             let statusAction = getItemStatusAction item
