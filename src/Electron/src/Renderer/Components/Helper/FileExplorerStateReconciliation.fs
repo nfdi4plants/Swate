@@ -16,6 +16,11 @@ let isSelectionMissing (paths: string seq) (selectionPath: string option) =
     |> Option.map PathHelpers.normalizePath
     |> Option.exists (fun selectedPath -> containsPath paths selectedPath |> not)
 
+let isSelectionMissingWithLookup (tryFindEntry: string -> FileEntry option) (selectionPath: string option) =
+    selectionPath
+    |> Option.map PathHelpers.normalizePath
+    |> Option.exists (tryFindEntry >> Option.isNone)
+
 let private resetsWhenSelectionIsRemoved =
     function
     | PageState.ArcFilePage _
@@ -28,14 +33,17 @@ let private resetsWhenSelectionIsRemoved =
 let shouldResetPageStateAfterSelectionRemoval (pageState: PageState option) =
     pageState |> Option.exists resetsWhenSelectionIsRemoved
 
-let tryGetDataMapMismatchReload (fileTree: FileEntry[]) (pageState: PageState option) =
+let tryGetDataMapMismatchReloadWithLookup (tryFindEntry: string -> FileEntry option) (pageState: PageState option) =
     match pageState with
     | Some(PageState.ArcFilePage(ArcFiles.DataMap _, _)) -> None
     | Some(PageState.ArcFilePage(arcFile, requestedView)) ->
         match arcFile.TryGetDataMapParentInfo() with
         | Some parentInfo ->
             let treeHasDataMap =
-                containsPath (fileTree |> Array.map _.path) (DatamapParentInfo.toPath parentInfo)
+                DatamapParentInfo.toPath parentInfo
+                |> PathHelpers.normalizePath
+                |> tryFindEntry
+                |> Option.isSome
 
             let pageHasDataMap = arcFile.TryGetDataMap().IsSome
 
@@ -53,6 +61,13 @@ let tryGetDataMapMismatchReload (fileTree: FileEntry[]) (pageState: PageState op
                 )
         | None -> None
     | _ -> None
+
+let tryGetDataMapMismatchReload (fileTree: FileEntry[]) (pageState: PageState option) =
+    let tryFindEntry path =
+        fileTree
+        |> Array.tryFind (fun entry -> PathHelpers.pathsEqual (PathHelpers.normalizePath entry.path) path)
+
+    tryGetDataMapMismatchReloadWithLookup tryFindEntry pageState
 
 let private reloadsWhenSelectedFileChanges =
     function
@@ -76,32 +91,41 @@ let private shouldReloadSelectedFile pageState entry =
         | Some state -> reloadsWhenSelectedFileChanges state
         | None -> isCheckedOutLfsFile entry
 
-let private tryFindSelectedFileEntry (fileTree: FileEntry[]) (selectionPath: string option) =
+let private tryFindSelectedFileEntryWithLookup
+    (tryFindEntry: string -> FileEntry option)
+    (selectionPath: string option)
+    =
     selectionPath
     |> Option.map PathHelpers.normalizePath
-    |> Option.bind (fun selectedPath ->
-        fileTree
-        |> Array.tryFind (fun entry ->
-            not entry.isDirectory
-            && PathHelpers.pathsEqual (PathHelpers.normalizePath entry.path) selectedPath
-        )
-    )
+    |> Option.bind tryFindEntry
+    |> Option.filter (fun entry -> not entry.isDirectory)
+
+let private fileTreeLookup (fileTree: FileEntry[]) path =
+    fileTree
+    |> Array.tryFind (fun entry -> PathHelpers.pathsEqual (PathHelpers.normalizePath entry.path) path)
+
+let shouldClearPageStateForLfsPointerSelectionWithLookup
+    (tryFindEntry: string -> FileEntry option)
+    (selectionPath: string option)
+    (pageState: PageState option)
+    =
+    pageState |> Option.exists resetsWhenSelectionIsRemoved
+    && (tryFindSelectedFileEntryWithLookup tryFindEntry selectionPath
+        |> Option.exists isPointerLfsFile)
 
 let shouldClearPageStateForLfsPointerSelection
     (fileTree: FileEntry[])
     (selectionPath: string option)
     (pageState: PageState option)
     =
-    pageState |> Option.exists resetsWhenSelectionIsRemoved
-    && (tryFindSelectedFileEntry fileTree selectionPath
-        |> Option.exists isPointerLfsFile)
+    shouldClearPageStateForLfsPointerSelectionWithLookup (fileTreeLookup fileTree) selectionPath pageState
 
-let tryGetReloadableSelectedFilePath
-    (fileTree: FileEntry[])
+let tryGetReloadableSelectedFilePathWithLookup
+    (tryFindEntry: string -> FileEntry option)
     (selectionPath: string option)
     (pageState: PageState option)
     =
-    tryFindSelectedFileEntry fileTree selectionPath
+    tryFindSelectedFileEntryWithLookup tryFindEntry selectionPath
     |> Option.bind (fun entry ->
         if shouldReloadSelectedFile pageState entry then
             Some(PathHelpers.normalizePath entry.path)

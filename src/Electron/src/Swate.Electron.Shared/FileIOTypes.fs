@@ -11,6 +11,12 @@ type FileEntry = {
     largeObject: ObjectStateDto option
 }
 
+/// The complete ARC-relative immediate-child state of one directory.
+type FileTreeDirectoryUpdate = {
+    directoryPath: string
+    children: FileEntry[]
+}
+
 [<AutoOpen>]
 module FileEntryExtensions =
 

@@ -349,17 +349,35 @@ let shouldUsePollingByDefault (platform: string) =
 let private currentNodePlatform () : string =
     emitJsExpr () "process.platform" |> unbox<string>
 
-let isFileWatcherPathIgnored (path: string) =
-    let normalizedPath = PathHelpers.normalizeSeparators path
+/// Keeps the permanent watcher on ARC structure only. The optional Stats value mirrors Chokidar's
+/// callback: it is absent during some discovery passes, so path shape must remain the primary guard.
+let isStructuralFileWatcherPath (arcPath: string) (candidatePath: string) (stats: Filesystem.Stats option) =
+    let normalizedCandidatePath = PathHelpers.normalizeSeparators candidatePath
     let tempXlsxPattern = """\.~\$.*\.xlsx$"""
     let temporaryImportPattern = """(^|/)\.swate-import-[0-9a-fA-F]{32}(/|$)"""
     let temporaryLfsBackupPattern = """\.vcs-lfs-backup-[0-9a-fA-F]{32}$"""
 
-    System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
-    || isGitMetadataPath normalizedPath
-    || isLegacyDataMapPath normalizedPath
-    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryImportPattern)
-    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
+    let isIgnored =
+        System.Text.RegularExpressions.Regex.IsMatch(normalizedCandidatePath, tempXlsxPattern)
+        || isGitMetadataPath normalizedCandidatePath
+        || isLegacyDataMapPath normalizedCandidatePath
+        || System.Text.RegularExpressions.Regex.IsMatch(normalizedCandidatePath, temporaryImportPattern)
+        || System.Text.RegularExpressions.Regex.IsMatch(normalizedCandidatePath, temporaryLfsBackupPattern)
+
+    if isIgnored then
+        false
+    else
+        let absoluteCandidatePath =
+            if Main.Bindings.Path.isAbsolute candidatePath then
+                Main.Bindings.Path.resolve [| candidatePath |]
+            else
+                Main.Bindings.Path.resolve [| arcPath; candidatePath |]
+
+        match tryGetRepoRelativePathOrRoot arcPath absoluteCandidatePath with
+        | None -> false
+        | Some relativePath ->
+            let isDirectory = stats |> Option.map (fun value -> value.isDirectory ())
+            ArcEntityPathRules.isStructuralWatcherPath relativePath isDirectory
 
 let createFileWatcher (path: string) (usePolling: bool option) =
 
@@ -372,7 +390,10 @@ let createFileWatcher (path: string) (usePolling: bool option) =
             Chokidar.WatchOptions(
                 cwd = path,
                 awaitWriteFinish = true,
-                ignored = !^isFileWatcherPathIgnored,
+                ignored =
+                    !^(System.Func<string, Filesystem.Stats option, bool>(fun candidatePath stats ->
+                        not (isStructuralFileWatcherPath path candidatePath stats)
+                    )),
                 ignoreInitial = true,
                 usePolling = true,
                 interval = 200,
@@ -382,7 +403,10 @@ let createFileWatcher (path: string) (usePolling: bool option) =
             Chokidar.WatchOptions(
                 cwd = path,
                 awaitWriteFinish = true,
-                ignored = !^isFileWatcherPathIgnored,
+                ignored =
+                    !^(System.Func<string, Filesystem.Stats option, bool>(fun candidatePath stats ->
+                        not (isStructuralFileWatcherPath path candidatePath stats)
+                    )),
                 ignoreInitial = true
             )
 

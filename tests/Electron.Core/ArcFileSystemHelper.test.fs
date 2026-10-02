@@ -117,18 +117,25 @@ Vitest.describe (
                 Vitest.expect(System.Text.RegularExpressions.Regex.IsMatch(directoryName, exactPattern)).toBe (true)
 
                 Vitest
-                    .expect(Main.ArcVaultHelper.isFileWatcherPathIgnored $"C:/arc/{directoryName}/file.txt")
-                    .toBe (true)
+                    .expect(
+                        Main.ArcVaultHelper.isStructuralFileWatcherPath "C:/arc" $"C:/arc/{directoryName}/file.txt" None
+                    )
+                    .toBe (false)
         )
 
         Vitest.test (
-            "ignores LFS backup paths while accepting regular files",
+            "ignores LFS backup paths while accepting canonical metadata files",
             fun () ->
                 let guidSuffix = String.replicate 32 "a"
                 let backupPath = $"C:/arc/data.bin.vcs-lfs-backup-{guidSuffix}"
 
-                Vitest.expect(Main.ArcVaultHelper.isFileWatcherPathIgnored backupPath).toBe (true)
-                Vitest.expect(Main.ArcVaultHelper.isFileWatcherPathIgnored "C:/arc/data.bin").toBe (false)
+                Vitest.expect(Main.ArcVaultHelper.isStructuralFileWatcherPath "C:/arc" backupPath None).toBe (false)
+
+                Vitest
+                    .expect(
+                        Main.ArcVaultHelper.isStructuralFileWatcherPath "C:/arc" "C:/arc/isa.investigation.xlsx" None
+                    )
+                    .toBe (true)
         )
 
         Vitest.test (
