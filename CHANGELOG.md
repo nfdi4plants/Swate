@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   The busy notice shows the operation and git's progress lines. The raw "Git output" log is removed.
 -   The tooltips of Update ARC from Online, Download Changes and Clean LFS Cache list the git commands that run now.
 -   Replace git file status icons with shorthand letters (A, M, D, R, N, C) to reduce confusion with "+" icon. #1199 (by @Freymaurer)
+-   Allow custom input for "Add Rows" input in Annotation Table. You can now completely remove the numbers and just type away. [#1351](https://github.com/nfdi4plants/Swate/issues/1351) (by @Freymaurer)
 
 ### 🐛 Fixed
 
