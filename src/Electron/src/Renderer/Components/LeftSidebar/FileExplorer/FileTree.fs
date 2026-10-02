@@ -174,7 +174,7 @@ type FileTree =
                     reconciledMaterializedState.Paths
                     parent
                     true
-                )
+            )
 
         let applyPreviewResult itemName result =
             match result with

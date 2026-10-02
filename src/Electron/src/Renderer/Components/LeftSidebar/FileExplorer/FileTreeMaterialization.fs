@@ -81,8 +81,7 @@ let rec toMaterializedFileItemTree
     (isRoot: bool)
     =
     if parent.isDirectory then
-        let normalizedParentPath =
-            PathHelpers.normalizePath parent.path
+        let normalizedParentPath = PathHelpers.normalizePath parent.path
 
         let isDirectoryMaterialized =
             materializedDirectoryPaths.Contains normalizedParentPath
@@ -91,19 +90,12 @@ let rec toMaterializedFileItemTree
             if isDirectoryMaterialized then
                 let childNodes =
                     if isRoot then
-                        parent.children.Values
-                        |> Seq.sortBy rootItemSortKey
+                        parent.children.Values |> Seq.sortBy rootItemSortKey
                     else
                         parent.children.Values :> seq<FileTreeNode>
 
                 childNodes
-                |> Seq.map (fun parent ->
-                    toMaterializedFileItemTree
-                        createItem
-                        materializedDirectoryPaths
-                        parent
-                        false
-                )
+                |> Seq.map (fun parent -> toMaterializedFileItemTree createItem materializedDirectoryPaths parent false)
                 |> List.ofSeq
                 |> Some
 
