@@ -9,6 +9,7 @@ open Main.Bindings.Path
 open Main.VersionControl
 open Swate.Components.Shared
 open Swate.Components.Composite.Authentication.Types
+open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.VersionControlTypes
 open VersionControlService.Abstractions
@@ -461,10 +462,10 @@ Vitest.describe (
                     let! datasetRefresh =
                         FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset" initialTree directChildrenIndex
 
-                    let datasetDelta = datasetRefresh |> Option.get
-                    Vitest.expect(datasetDelta.removedPaths.Length).toBe (0)
-                    Vitest.expect(datasetDelta.upsertedEntries.Length).toBe (1)
-                    Vitest.expect(datasetDelta.upsertedEntries.[0].path).toBe (payloadPath)
+                    let datasetUpdate = datasetRefresh |> Option.get
+                    Vitest.expect(datasetUpdate.directoryPath).toBe ("dataset")
+                    Vitest.expect(datasetUpdate.children.Length).toBe (1)
+                    Vitest.expect(datasetUpdate.children.[0].path).toBe ("dataset/payload")
                     Vitest.expect(initialTree.ContainsKey payloadPath).toBe (true)
                     Vitest.expect(initialTree.ContainsKey rawPath).toBe (false)
 
@@ -475,9 +476,9 @@ Vitest.describe (
                             initialTree
                             directChildrenIndex
 
-                    let payloadDelta = payloadRefresh |> Option.get
-                    Vitest.expect(payloadDelta.upsertedEntries.Length).toBe (1)
-                    Vitest.expect(payloadDelta.upsertedEntries.[0].path).toBe (rawPath)
+                    let payloadUpdate = payloadRefresh |> Option.get
+                    Vitest.expect(payloadUpdate.children.Length).toBe (1)
+                    Vitest.expect(payloadUpdate.children.[0].path).toBe ("dataset/payload/raw.bin")
                     Vitest.expect(initialTree.ContainsKey rawPath).toBe (true)
 
                     let! unchanged =
@@ -491,12 +492,48 @@ Vitest.describe (
                     let! removed =
                         FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset" initialTree directChildrenIndex
 
-                    let removedDelta = removed |> Option.get
-                    Vitest.expect(removedDelta.removedPaths).toContain (payloadPath)
-                    Vitest.expect(removedDelta.removedPaths).toContain (rawPath)
-                    Vitest.expect(removedDelta.upsertedEntries.Length).toBe (0)
+                    let removedUpdate = removed |> Option.get
+                    Vitest.expect(removedUpdate.children.Length).toBe (0)
                     Vitest.expect(initialTree.ContainsKey payloadPath).toBe (false)
                     Vitest.expect(initialTree.ContainsKey rawPath).toBe (false)
+                    do! removeDirectoryAsync arcPath
+                with error ->
+                    do! removeDirectoryAsync arcPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
+            "root reconciliation publishes authoritative relative children without discovering descendants",
+            fun () -> promise {
+                let! arcPath = createTempDirectoryAsync ()
+
+                try
+                    let oldPath = join [| arcPath; "old.txt" |] |> PathHelpers.normalizePath
+                    let folderPath = join [| arcPath; "new-folder" |] |> PathHelpers.normalizePath
+                    let deepPath = join [| folderPath; "deep.txt" |] |> PathHelpers.normalizePath
+                    do! writeUtf8FileAsync oldPath "old"
+
+                    let tree = Dictionary<string, FileEntry>()
+                    tree.[arcPath] <- directoryEntry (basename arcPath) arcPath
+                    tree.[oldPath] <- createFileEntry "old.txt" oldPath
+                    let directChildrenIndex = createDirectChildrenIndex tree
+
+                    do! removeFileAsync oldPath
+                    do! createDirectoryAsync folderPath
+                    do! writeUtf8FileAsync deepPath "deep"
+
+                    let! reconciliation =
+                        FileTreeCreator.reconcileFileTreeDirectory arcPath "" tree directChildrenIndex
+
+                    let reconciliation = reconciliation |> Option.get
+                    Vitest.expect(reconciliation.directoryPath).toBe ("")
+                    Vitest.expect(reconciliation.children.Length).toBe (1)
+                    Vitest.expect(reconciliation.children.[0].path).toBe ("new-folder")
+                    Vitest.expect(tree.ContainsKey oldPath).toBe (false)
+                    Vitest.expect(tree.ContainsKey folderPath).toBe (true)
+                    Vitest.expect(tree.ContainsKey deepPath).toBe (false)
+
                     do! removeDirectoryAsync arcPath
                 with error ->
                     do! removeDirectoryAsync arcPath
@@ -566,13 +603,9 @@ Vitest.describe (
                     let! reconciled =
                         FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset" tree directChildrenIndex
 
-                    let delta = reconciled |> Option.get
-                    Vitest.expect(delta.removedPaths.Length).toBe (4)
-                    Vitest.expect(delta.upsertedEntries.Length).toBe (0)
-                    Vitest.expect(delta.removedPaths).toContain (removedDirectoryPath)
-                    Vitest.expect(delta.removedPaths).toContain (removedNestedPath)
-                    Vitest.expect(delta.removedPaths).toContain (removedDeepDirectoryPath)
-                    Vitest.expect(delta.removedPaths).toContain (removedDeepFilePath)
+                    let update = reconciled |> Option.get
+                    Vitest.expect(update.children.Length).toBe (1)
+                    Vitest.expect(update.children.[0].path).toBe ("dataset/keep")
                     Vitest.expect(tree.Count).toBe (totalKnownEntryCount - 4)
                     Vitest.expect(tree.ContainsKey removedDirectoryPath).toBe (false)
                     Vitest.expect(tree.ContainsKey removedNestedPath).toBe (false)
@@ -641,9 +674,9 @@ Vitest.describe (
                             shallowTree
                             directChildrenIndex
 
-                    let shallowDelta = shallowRefresh |> Option.get
-                    Vitest.expect(shallowDelta.upsertedEntries.Length).toBe (1)
-                    Vitest.expect(shallowDelta.upsertedEntries.[0].path).toBe (level1Path)
+                    let shallowUpdate = shallowRefresh |> Option.get
+                    Vitest.expect(shallowUpdate.children.Length).toBe (1)
+                    Vitest.expect(shallowUpdate.children.[0].path).toBe ("studies/S1/resources/level1")
                     Vitest.expect(shallowTree.ContainsKey level1Path).toBe (true)
                     Vitest.expect(shallowTree.ContainsKey level2Path).toBe (false)
                     Vitest.expect(shallowTree.ContainsKey level3Path).toBe (false)
@@ -701,8 +734,8 @@ Vitest.describe (
                             FileTreeCreator.reconcileFileTreeDirectory arcPath "dataset" measuredTree measuredIndex
                         )
 
-                    let measuredDelta = measuredRefresh |> Option.get
-                    Vitest.expect(measuredDelta.upsertedEntries.Length).toBe (directDirectoryCount)
+                    let measuredUpdate = measuredRefresh |> Option.get
+                    Vitest.expect(measuredUpdate.children.Length).toBe (directDirectoryCount)
 
                     for index in 0 .. directDirectoryCount - 1 do
                         let directDirectoryName = $"folder{index + 1}"
@@ -793,8 +826,8 @@ Vitest.describe (
                                         directChildrenIndex
                                 )
 
-                            let discoveryDelta = discoveryResult |> Option.get
-                            Vitest.expect(discoveryDelta.upsertedEntries.Length).toBe (childCount)
+                            let discoveryUpdate = discoveryResult |> Option.get
+                            Vitest.expect(discoveryUpdate.children.Length).toBe (childCount)
                             Vitest.expect(discoveryTree.Count).toBe (totalKnownEntryCount + childCount)
                             Vitest.expect(discoveryTree.ContainsKey(filePath 0)).toBe (true)
                             Vitest.expect(discoveryTree.ContainsKey(filePath (childCount - 1))).toBe (true)
@@ -876,10 +909,12 @@ Vitest.describe (
                                         incrementalIndex
                                 )
 
-                            let incrementalDelta = incrementalResult |> Option.get
-                            Vitest.expect(incrementalDelta.removedPaths.Length).toBe (0)
-                            Vitest.expect(incrementalDelta.upsertedEntries.Length).toBe (1)
-                            Vitest.expect(incrementalDelta.upsertedEntries.[0].path).toBe (addedPath)
+                            let incrementalUpdate = incrementalResult |> Option.get
+                            Vitest.expect(incrementalUpdate.children.Length).toBe (childCount + 1)
+                            let relativeAddedPath =
+                                tryGetRepoRelativePath arcPath addedPath |> Option.get
+
+                            Vitest.expect(incrementalUpdate.children |> Array.map _.path).toContain (relativeAddedPath)
 
                             Vitest.expect(incrementalTree.Count).toBe (totalKnownEntryCount + childCount + 1)
 
@@ -912,9 +947,8 @@ Vitest.describe (
                                         removalIndex
                                 )
 
-                            let removalDelta = removalResult |> Option.get
-                            Vitest.expect(removalDelta.removedPaths.Length).toBe (childCount)
-                            Vitest.expect(removalDelta.upsertedEntries.Length).toBe (0)
+                            let removalUpdate = removalResult |> Option.get
+                            Vitest.expect(removalUpdate.children.Length).toBe (0)
                             Vitest.expect(removalTree.Count).toBe (totalKnownEntryCount)
                             Vitest.expect(removalTree.ContainsKey(filePath 0)).toBe (false)
                             Vitest.expect(removalTree.ContainsKey(filePath (childCount - 1))).toBe (false)

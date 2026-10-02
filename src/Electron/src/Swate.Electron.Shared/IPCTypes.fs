@@ -176,7 +176,7 @@ module MainToRendererIpc =
 
     type IFileTreeRendererApi = {
         fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
-        fileTreeDelta: FileTreeDelta -> unit
+        fileTreeDirectoryUpdate: FileTreeDirectoryUpdate -> unit
     }
 
     type IFileImportRendererApi = {

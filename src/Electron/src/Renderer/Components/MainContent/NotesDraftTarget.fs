@@ -44,7 +44,6 @@ let NotesDraftTarget () =
             ),
             [|
                 box fileStateCtx.state.FileTree
-                box fileStateCtx.state.FileTreeRevision
             |]
         )
 

@@ -1639,8 +1639,8 @@ let private isPathChangeMessage (args: obj array) =
 let private isFileTreeMessage (args: obj array) =
     args.Length > 0 && (string args.[0]).Contains("fileTreeUpdate")
 
-let private isFileTreeDeltaMessage (args: obj array) =
-    args.Length > 0 && (string args.[0]).Contains("fileTreeDelta")
+let private isFileTreeDirectoryUpdateMessage (args: obj array) =
+    args.Length > 0 && (string args.[0]).Contains("fileTreeDirectoryUpdate")
 
 Vitest.describe (
     "ArcVaultHelper",
@@ -5405,7 +5405,7 @@ Vitest.describe (
                                         .toBe (false)
 
                                     Vitest
-                                        .expect(windowState.SentMessages |> Seq.exists isFileTreeDeltaMessage)
+                                        .expect(windowState.SentMessages |> Seq.exists isFileTreeDirectoryUpdateMessage)
                                         .toBe (false)
 
                                     do! vault.RefreshFileTreeDirectory relativeDatasetPath
@@ -5419,24 +5419,28 @@ Vitest.describe (
                                         .expect(windowState.SentMessages |> Seq.exists isFileTreeMessage)
                                         .toBe (false)
 
-                                    let deltaMessages =
-                                        windowState.SentMessages |> Seq.filter isFileTreeDeltaMessage |> Seq.toArray
+                                    let directoryUpdateMessages =
+                                        windowState.SentMessages
+                                        |> Seq.filter isFileTreeDirectoryUpdateMessage
+                                        |> Seq.toArray
 
-                                    Vitest.expect(deltaMessages.Length).toBe (1)
-                                    let rendererDelta = unbox<FileTreeDelta> deltaMessages.[0].[1]
-                                    Vitest.expect(rendererDelta.removedPaths.Length).toBe (0)
-                                    Vitest.expect(rendererDelta.upsertedEntries.Length).toBe (2)
+                                    Vitest.expect(directoryUpdateMessages.Length).toBe (1)
 
-                                    let upsertedPaths = rendererDelta.upsertedEntries |> Array.map _.path
-                                    Vitest.expect(upsertedPaths).toContain ($"{relativeDatasetPath}/new.txt")
-                                    Vitest.expect(upsertedPaths).toContain ($"{relativeDatasetPath}/nested")
+                                    let rendererUpdate =
+                                        unbox<FileTreeDirectoryUpdate> directoryUpdateMessages.[0].[1]
+
+                                    Vitest.expect(rendererUpdate.directoryPath).toBe (relativeDatasetPath)
+                                    let childPaths = rendererUpdate.children |> Array.map _.path
+                                    Vitest.expect(childPaths).toContain ($"{relativeDatasetPath}/existing.txt")
+                                    Vitest.expect(childPaths).toContain ($"{relativeDatasetPath}/new.txt")
+                                    Vitest.expect(childPaths).toContain ($"{relativeDatasetPath}/nested")
 
                                     do! vault.RefreshFileTreeDirectory relativeDatasetPath
 
                                     Vitest
                                         .expect(
                                             windowState.SentMessages
-                                            |> Seq.filter isFileTreeDeltaMessage
+                                            |> Seq.filter isFileTreeDirectoryUpdateMessage
                                             |> Seq.length
                                         )
                                         .toBe (1)

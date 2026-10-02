@@ -1,6 +1,5 @@
 module Renderer.Components.LeftSidebar.FileExplorer.FileTreeMaterialization
 
-open System.Collections.Generic
 open Swate.Components.Shared
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Electron.Shared.FileIOTypes
@@ -17,19 +16,12 @@ let materialize path state = {
         Paths = state.Paths.Add(PathHelpers.normalizePath path)
 }
 
-let rec private collectDirectoryPaths (node: FileTreeNode) (directoryPaths: Set<string>) =
-    if node.isDirectory then
-        node.children.Values
-        |> Seq.fold
-            (fun state child -> collectDirectoryPaths child state)
-            (Set.add (PathHelpers.normalizePath node.path) directoryPaths)
-    else
-        directoryPaths
-
+/// Reconciles expansion state through the canonical FileTree lookup without walking the tree.
 let reconcileMaterializedState
     (arcScopeId: string option)
     (selectedTreeItemPath: string option)
     (root: FileTreeNode option)
+    (isKnownDirectory: string -> bool)
     (current: MaterializedState)
     =
     match root with
@@ -38,48 +30,7 @@ let reconcileMaterializedState
         Paths = Set.empty
       }
     | Some root ->
-        let validDirectoryPaths = collectDirectoryPaths root Set.empty
-
-        let requiredPaths =
-            selectedTreeItemPath
-            |> Option.map (fun selectedPath ->
-                validDirectoryPaths
-                |> Set.filter (fun directoryPath -> PathHelpers.isSameOrDescendantPath selectedPath directoryPath)
-            )
-            |> Option.defaultValue Set.empty
-            |> fun paths ->
-                if root.isDirectory then
-                    paths.Add(PathHelpers.normalizePath root.path)
-                else
-                    paths
-
-        let persistedPaths =
-            if current.ArcScopeId = arcScopeId then
-                Set.intersect current.Paths validDirectoryPaths
-            else
-                Set.empty
-
-        {
-            ArcScopeId = arcScopeId
-            Paths = Set.union persistedPaths requiredPaths
-        }
-
-/// Reconciles expansion state from indexed directory membership without walking the complete FileTree.
-let reconcileMaterializedStateWithKnownDirectories
-    (arcScopeId: string option)
-    (selectedTreeItemPath: string option)
-    (root: FileTreeNode option)
-    (knownDirectoryPaths: HashSet<string>)
-    (current: MaterializedState)
-    =
-    match root with
-    | None -> {
-        ArcScopeId = arcScopeId
-        Paths = Set.empty
-      }
-    | Some root ->
-        let isKnownDirectory path =
-            knownDirectoryPaths.Contains(PathHelpers.normalizePath path)
+        let isKnownDirectory path = isKnownDirectory (PathHelpers.normalizePath path)
 
         let rec collectSelectedAncestors path collected =
             let normalizedPath = PathHelpers.normalizePath path

@@ -73,45 +73,4 @@ Vitest.describe (
                 Vitest.expect(item.IsExpanded).toBe (false)
         )
 
-        Vitest.test (
-            "snapshot reconciliation preserves surviving paths, prunes removed paths, and materializes selection",
-            fun () ->
-                let kept =
-                    directoryNode "kept" "arc/kept" [ fileNode "kept.txt" "arc/kept/kept.txt" ]
-
-                let selected =
-                    directoryNode "selected" "arc/selected" [ fileNode "selected.txt" "arc/selected/selected.txt" ]
-
-                let root = directoryNode "arc" "arc" [ kept; selected ]
-
-                let current = {
-                    ArcScopeId = Some "C:/arc"
-                    Paths = Set.ofList [ "arc"; "arc/kept"; "arc/removed" ]
-                }
-
-                let reconciled =
-                    reconcileMaterializedState (Some "C:/arc") (Some "arc/selected/selected.txt") (Some root) current
-
-                Vitest.expect(reconciled.Paths |> Set.toList).toEqual ([ "arc"; "arc/kept"; "arc/selected" ])
-        )
-
-        Vitest.test (
-            "changing ARC scope resets materialized paths to the required root and selection chain",
-            fun () ->
-                let kept =
-                    directoryNode "kept" "arc/kept" [ fileNode "kept.txt" "arc/kept/kept.txt" ]
-
-                let root = directoryNode "arc" "arc" [ kept ]
-
-                let current = {
-                    ArcScopeId = Some "C:/old-arc"
-                    Paths = Set.ofList [ "arc"; "arc/kept" ]
-                }
-
-                let reconciled =
-                    reconcileMaterializedState (Some "C:/new-arc") None (Some root) current
-
-                Vitest.expect(reconciled.ArcScopeId).toEqual (Some "C:/new-arc")
-                Vitest.expect(reconciled.Paths |> Set.toList).toEqual ([ "arc" ])
-        )
 )

@@ -718,13 +718,6 @@ module ArcVaultExtensions =
 
             WindowSend.send<IFileTreeRendererApi> this.window (fun api -> api.fileTreeUpdate rendererFileTree)
 
-        member private this.PublishFileTreeDelta(delta: ShallowFileTreeReconciliationDelta) =
-            match this.path with
-            | None -> ()
-            | Some arcPath ->
-                let rendererDelta = toRendererFileTreeDelta arcPath delta
-                WindowSend.send<IFileTreeRendererApi> this.window (fun api -> api.fileTreeDelta rendererDelta)
-
         member this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
             this.fileTree <- fileTree
             this.PublishFileTree()
@@ -745,7 +738,10 @@ module ArcVaultExtensions =
                                 this.FileTreeDirectChildrenIndex
                         with
                         | None -> ()
-                        | Some delta -> this.PublishFileTreeDelta delta
+                        | Some update ->
+                            WindowSend.send<IFileTreeRendererApi> this.window (fun api ->
+                                api.fileTreeDirectoryUpdate update
+                            )
                 })
 
             this.FileTreeUpdateTail <- queuedUpdate |> Promise.catch (fun _ -> ())

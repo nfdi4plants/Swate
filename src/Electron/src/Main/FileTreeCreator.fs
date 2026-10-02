@@ -23,9 +23,9 @@ type FileTreeDirectChildrenIndex() =
     let addChildPath (path: string) =
         let normalizedPath = PathHelpers.normalizePath path
 
-        match PathHelpers.tryGetParentPath normalizedPath with
-        | None -> ()
-        | Some parentPath ->
+        if not (String.IsNullOrWhiteSpace normalizedPath) then
+            let parentPath = PathHelpers.tryGetParentPath normalizedPath |> Option.defaultValue ""
+
             match childrenByParent.TryGetValue parentPath with
             | true, childPaths -> childPaths.Add normalizedPath |> ignore
             | false, _ ->
@@ -36,8 +36,9 @@ type FileTreeDirectChildrenIndex() =
     let removePath (path: string) =
         let normalizedPath = PathHelpers.normalizePath path
 
-        match PathHelpers.tryGetParentPath normalizedPath with
-        | Some parentPath ->
+        if not (String.IsNullOrWhiteSpace normalizedPath) then
+            let parentPath = PathHelpers.tryGetParentPath normalizedPath |> Option.defaultValue ""
+
             match childrenByParent.TryGetValue parentPath with
             | true, childPaths ->
                 childPaths.Remove normalizedPath |> ignore
@@ -45,7 +46,6 @@ type FileTreeDirectChildrenIndex() =
                 if childPaths.Count = 0 then
                     childrenByParent.Remove parentPath |> ignore
             | false, _ -> ()
-        | None -> ()
 
         childrenByParent.Remove normalizedPath |> ignore
 
@@ -93,12 +93,6 @@ type FileTreeDirectChildrenIndex() =
     member _.ApplyChanges(removedPaths: seq<string>, upsertedEntries: seq<FileEntry>) =
         removedPaths |> Seq.iter removePath
         upsertedEntries |> Seq.iter (fun entry -> addChildPath entry.path)
-
-/// The exact absolute-path changes applied by one shallow directory reconciliation.
-type ShallowFileTreeReconciliationDelta = {
-    removedPaths: string[]
-    upsertedEntries: FileEntry[]
-}
 
 let private shouldIgnoreDirName (name: string) = name = ".git"
 
@@ -216,21 +210,6 @@ let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary
 
     rendererFileTree
 
-/// Converts only a shallow reconciliation delta to the renderer's ARC-relative path contract.
-let toRendererFileTreeDelta (repoRoot: string) (delta: ShallowFileTreeReconciliationDelta) : FileTreeDelta =
-    let toRelativePath path =
-        tryGetRepoRelativePathOrRoot repoRoot path
-
-    {
-        removedPaths = delta.removedPaths |> Array.choose toRelativePath
-        upsertedEntries =
-            delta.upsertedEntries
-            |> Array.choose (fun entry ->
-                toRelativePath entry.path
-                |> Option.map (fun relativePath -> { entry with path = relativePath })
-            )
-    }
-
 /// Remove a path and all descendants from a file tree dictionary using normalized ancestor checks.
 let removePathAndDescendants
     (targetPath: string)
@@ -280,7 +259,7 @@ let reconcileFileTreeDirectory
     (relativeDirectoryPath: string)
     (fileTree: Dictionary<string, FileEntry>)
     (directChildrenIndex: FileTreeDirectChildrenIndex)
-    : Fable.Core.JS.Promise<ShallowFileTreeReconciliationDelta option> =
+    : Fable.Core.JS.Promise<FileTreeDirectoryUpdate option> =
     promise {
         let normalizedArcPath = normalizeRootPath arcPath
 
@@ -380,8 +359,14 @@ let reconcileFileTreeDirectory
 
                     return
                         Some {
-                            removedPaths = removedPaths
-                            upsertedEntries = upsertedEntries
+                            directoryPath = normalizedRelativePath
+                            children =
+                                reconciledDiskChildren.Values
+                                |> Seq.choose (fun entry ->
+                                    tryGetRepoRelativePath normalizedArcPath entry.path
+                                    |> Option.map (fun relativePath -> { entry with path = relativePath })
+                                )
+                                |> Seq.toArray
                         }
     }
 
