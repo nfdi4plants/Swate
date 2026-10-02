@@ -1,5 +1,6 @@
 module Renderer.Components.LeftSidebar.FileExplorer.FileTreeMaterialization
 
+open System.Collections.Generic
 open Swate.Components.Shared
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Electron.Shared.FileIOTypes
@@ -55,6 +56,57 @@ let reconcileMaterializedState
         let persistedPaths =
             if current.ArcScopeId = arcScopeId then
                 Set.intersect current.Paths validDirectoryPaths
+            else
+                Set.empty
+
+        {
+            ArcScopeId = arcScopeId
+            Paths = Set.union persistedPaths requiredPaths
+        }
+
+/// Reconciles expansion state from indexed directory membership without walking the complete FileTree.
+let reconcileMaterializedStateWithKnownDirectories
+    (arcScopeId: string option)
+    (selectedTreeItemPath: string option)
+    (root: FileTreeNode option)
+    (knownDirectoryPaths: HashSet<string>)
+    (current: MaterializedState)
+    =
+    match root with
+    | None -> {
+        ArcScopeId = arcScopeId
+        Paths = Set.empty
+      }
+    | Some root ->
+        let isKnownDirectory path =
+            knownDirectoryPaths.Contains(PathHelpers.normalizePath path)
+
+        let rec collectSelectedAncestors path collected =
+            let normalizedPath = PathHelpers.normalizePath path
+
+            let nextCollected =
+                if isKnownDirectory normalizedPath then
+                    Set.add normalizedPath collected
+                else
+                    collected
+
+            match PathHelpers.tryGetParentPath normalizedPath with
+            | Some parentPath -> collectSelectedAncestors parentPath nextCollected
+            | None -> nextCollected
+
+        let requiredPaths =
+            selectedTreeItemPath
+            |> Option.map (fun path -> collectSelectedAncestors path Set.empty)
+            |> Option.defaultValue Set.empty
+            |> fun paths ->
+                if root.isDirectory then
+                    paths.Add(PathHelpers.normalizePath root.path)
+                else
+                    paths
+
+        let persistedPaths =
+            if current.ArcScopeId = arcScopeId then
+                current.Paths |> Set.filter isKnownDirectory
             else
                 Set.empty
 

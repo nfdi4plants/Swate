@@ -42,7 +42,10 @@ let NotesDraftTarget () =
                     ]
                     fileStateCtx.state.FileTree
             ),
-            [| box fileStateCtx.state.FileTree |]
+            [|
+                box fileStateCtx.state.FileTree
+                box fileStateCtx.state.FileTreeRevision
+            |]
         )
 
     let setSubmitState isSubmitting error =

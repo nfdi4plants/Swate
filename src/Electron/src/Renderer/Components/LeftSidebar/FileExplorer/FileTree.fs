@@ -75,9 +75,7 @@ type FileTree =
             (runAction: string -> JS.Promise<Result<unit, string>>)
             (relativePath: string)
             : JS.Promise<Result<unit, string>> =
-            let entry =
-                fileStateCtx.state.FileTree
-                |> Array.tryFind (fun entry -> PathHelpers.pathsEqual entry.path relativePath)
+            let entry = fileStateCtx.state.TryFindFileTreeEntry relativePath
 
             lfsActivityCtx.run activity entry runAction relativePath
 
@@ -95,10 +93,10 @@ type FileTree =
 
         React.useEffect (
             (fun () ->
-                let filePaths = fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
-
                 if
-                    FileExplorerStateReconciliation.isSelectionMissing filePaths fileStateCtx.state.Selection.TreePath
+                    FileExplorerStateReconciliation.isSelectionMissingWithLookup
+                        fileStateCtx.state.TryFindFileTreeEntry
+                        fileStateCtx.state.Selection.TreePath
                 then
                     fileStateCtx.setSelection ArcSelection.empty
 
@@ -109,36 +107,43 @@ type FileTree =
             ),
             [|
                 box fileStateCtx.state.FileTree
+                box fileStateCtx.state.FileTreeRevision
                 box fileStateCtx.state.Selection.TreePath
                 box pageStateCtx.state
             |]
         )
 
-        let treeEntries =
-            React.useMemo (
-                (fun () ->
-                    Renderer.Context.LfsActivityContext.LfsActivityState.withBusyEntries
-                        lfsActivityByPath
-                        fileStateCtx.state.FileTree
-                ),
-                [| box fileStateCtx.state.FileTree; box lfsActivityByPath |]
-            )
-
         let fileTree: FileTreeNode option =
             React.useMemo (
                 (fun () ->
-                    match treeEntries with
-                    | [||] -> None
-                    | _ -> treeEntries |> toFileTreeNode |> collapseSingleChildSameName |> Some
+                    if lfsActivityByPath.IsEmpty then
+                        fileStateCtx.state.FileTreeRoot
+                    else
+                        match
+                            Renderer.Context.LfsActivityContext.LfsActivityState.withBusyEntries
+                                lfsActivityByPath
+                                fileStateCtx.state.FileTree
+                        with
+                        | [||] -> None
+                        | entries -> entries |> toFileTreeNode |> collapseSingleChildSameName |> Some
                 ),
-                [| box treeEntries |]
+                [|
+                    box fileStateCtx.state.FileTreeRoot
+                    box fileStateCtx.state.FileTreeRevision
+                    box lfsActivityByPath
+                |]
             )
 
         let materializedState, setMaterializedState =
             React.useStateWithUpdater FileTreeMaterialization.empty
 
         let reconciledMaterializedState =
-            reconcileMaterializedState arcScopeId fileStateCtx.state.Selection.TreePath fileTree materializedState
+            reconcileMaterializedStateWithKnownDirectories
+                arcScopeId
+                fileStateCtx.state.Selection.TreePath
+                fileTree
+                fileStateCtx.state.FileTreeDirectoryPaths
+                materializedState
 
         React.useEffect (
             (fun () ->
@@ -257,8 +262,8 @@ type FileTree =
             (fun () ->
                 if hasObservedFileTreeUpdateRef.current then
                     match
-                        FileExplorerStateReconciliation.tryGetDataMapMismatchReload
-                            fileStateCtx.state.FileTree
+                        FileExplorerStateReconciliation.tryGetDataMapMismatchReloadWithLookup
+                            fileStateCtx.state.TryFindFileTreeEntry
                             pageStateCtx.state
                     with
                     | Some(parentPath, requestedView) ->
@@ -270,16 +275,16 @@ type FileTree =
                             | pageState -> pageState
                             )
                     | None when
-                        FileExplorerStateReconciliation.shouldClearPageStateForLfsPointerSelection
-                            fileStateCtx.state.FileTree
+                        FileExplorerStateReconciliation.shouldClearPageStateForLfsPointerSelectionWithLookup
+                            fileStateCtx.state.TryFindFileTreeEntry
                             fileStateCtx.state.Selection.TreePath
                             pageStateCtx.state
                         ->
                         pageStateCtx.setState None
                     | None ->
                         match
-                            FileExplorerStateReconciliation.tryGetReloadableSelectedFilePath
-                                fileStateCtx.state.FileTree
+                            FileExplorerStateReconciliation.tryGetReloadableSelectedFilePathWithLookup
+                                fileStateCtx.state.TryFindFileTreeEntry
                                 fileStateCtx.state.Selection.TreePath
                                 pageStateCtx.state
                         with
@@ -288,7 +293,10 @@ type FileTree =
                 else
                     hasObservedFileTreeUpdateRef.current <- true
             ),
-            [| box fileStateCtx.state.FileTree |]
+            [|
+                box fileStateCtx.state.FileTree
+                box fileStateCtx.state.FileTreeRevision
+            |]
         )
 
         let handleExpansionChange (item: FileItem) (willExpand: bool) =
@@ -475,8 +483,7 @@ type FileTree =
             |> Promise.start
 
         let tryFindDataMapItemByPath path =
-            fileStateCtx.state.FileTree
-            |> Array.tryFind (fun entry -> PathHelpers.pathsEqual entry.path path)
+            fileStateCtx.state.TryFindFileTreeEntry path
             |> Option.map (fun entry ->
                 let item =
                     Swate.Components.Page.FileExplorer.Types.FileTree.createFile

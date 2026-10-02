@@ -41,7 +41,10 @@ let private FileTreeProbe (onFileTree: string[] -> unit) =
 
     React.useEffect (
         (fun () -> fileStateCtx.state.FileTree |> Array.map _.path |> onFileTree),
-        [| box fileStateCtx.state.FileTree |]
+        [|
+            box fileStateCtx.state.FileTree
+            box fileStateCtx.state.FileTreeRevision
+        |]
     )
 
     Html.none
@@ -74,6 +77,86 @@ let private fileImportApi loadActiveImport = {
 }
 
 Vitest.describe (
+    "Renderer FileTree incremental state",
+    fun () ->
+        Vitest.test (
+            "applies a small delta without rebuilding 64k unrelated entries",
+            fun () ->
+                let snapshot = Dictionary<string, FileEntry>()
+                snapshot.[""] <- FileEntry.create ("arc", "", true, None)
+                snapshot.["studies"] <- FileEntry.create ("studies", "studies", true, None)
+                snapshot.["studies/S1"] <- FileEntry.create ("S1", "studies/S1", true, None)
+
+                snapshot.["studies/S1/dataset"] <- FileEntry.create ("dataset", "studies/S1/dataset", true, None)
+
+                let removedDirectoryPath = "studies/S1/dataset/removed"
+                let removedFilePath = $"{removedDirectoryPath}/old.txt"
+                let removedDeepDirectoryPath = $"{removedDirectoryPath}/deep"
+                let removedDeepFilePath = $"{removedDeepDirectoryPath}/deep.txt"
+
+                snapshot.[removedDirectoryPath] <- FileEntry.create ("removed", removedDirectoryPath, true, None)
+
+                snapshot.[removedFilePath] <- FileEntry.create ("old.txt", removedFilePath, false, None)
+
+                snapshot.[removedDeepDirectoryPath] <- FileEntry.create ("deep", removedDeepDirectoryPath, true, None)
+
+                snapshot.[removedDeepFilePath] <- FileEntry.create ("deep.txt", removedDeepFilePath, false, None)
+
+                let unrelatedEntryCount = 64000 - snapshot.Count
+
+                for index in 1..unrelatedEntryCount do
+                    let path = $"unrelated/file-{index}.txt"
+                    snapshot.[path] <- FileEntry.create ($"file-{index}.txt", path, false, None)
+
+                let unrelatedPath = "unrelated/file-1.txt"
+                let unrelatedEntry = snapshot.[unrelatedPath]
+                let initialState = RendererFileTreeState.ofSnapshot snapshot
+                let displayRootBeforeDelta = RendererFileTreeState.displayRoot initialState
+                let addedPath = "studies/S1/dataset/new.txt"
+
+                let nextState, application =
+                    RendererFileTreeState.applyDelta
+                        {
+                            removedPaths = [|
+                                removedDirectoryPath
+                                removedFilePath
+                                removedDeepDirectoryPath
+                                removedDeepFilePath
+                            |]
+                            upsertedEntries = [| FileEntry.create ("new.txt", addedPath, false, None) |]
+                        }
+                        initialState
+
+                Vitest.expect(application.processedPathCount).toBe (5)
+                Vitest.expect(application.removedEntryCount).toBe (4)
+                Vitest.expect(application.upsertedEntryCount).toBe (1)
+                Vitest.expect(application.rebuiltDisplayTree).toBe (false)
+                Vitest.expect(RendererFileTreeState.displayRoot nextState).toBe (displayRootBeforeDelta)
+                Vitest.expect(RendererFileTreeState.count nextState).toBe (63997)
+                Vitest.expect(RendererFileTreeState.tryFind removedDirectoryPath nextState).toEqual (None)
+                Vitest.expect(RendererFileTreeState.tryFind removedDeepFilePath nextState).toEqual (None)
+                Vitest.expect(RendererFileTreeState.tryFind addedPath nextState).toBeDefined ()
+                Vitest.expect(RendererFileTreeState.tryFindDisplayNode removedDirectoryPath nextState).toEqual (None)
+                Vitest.expect(RendererFileTreeState.tryFindDisplayNode addedPath nextState).toBeDefined ()
+
+                let survivingUnrelatedEntry =
+                    RendererFileTreeState.tryFind unrelatedPath nextState |> Option.get
+
+                Vitest.expect(survivingUnrelatedEntry).toBe (unrelatedEntry)
+
+                let materializedState =
+                    Renderer.Components.LeftSidebar.FileExplorer.FileTreeMaterialization.reconcileMaterializedStateWithKnownDirectories
+                        None
+                        (Some addedPath)
+                        (RendererFileTreeState.displayRoot nextState)
+                        (RendererFileTreeState.directoryPaths nextState)
+                        Renderer.Components.LeftSidebar.FileExplorer.FileTreeMaterialization.empty
+
+                Vitest.expect(materializedState.Paths.Contains "studies/S1/dataset").toBe (true)
+        )
+)
+
+Vitest.describe (
     "FileStateContext reload hydration",
     fun () ->
         Vitest.test (
@@ -87,6 +170,7 @@ Vitest.describe (
                 let mutable snapshotLoadCalls = 0
                 let mutable importSubscriptionRegistered = false
                 let mutable importDisposeCalled = false
+                let mutable publishFileTreeDelta: FileTreeDelta -> unit = ignore
 
                 let container = document.createElement ("div") :?> Browser.Types.HTMLDivElement
                 document.body.appendChild container |> ignore
@@ -100,6 +184,11 @@ Vitest.describe (
                             "fileTreeUpdate"
                             ==> fun (_listener: Dictionary<string, FileEntry> -> unit) ->
                                 listenerRegistered <- true
+
+                                fun () -> disposeCalled <- true
+                            "fileTreeDelta"
+                            ==> fun (listener: FileTreeDelta -> unit) ->
+                                publishFileTreeDelta <- listener
 
                                 fun () -> disposeCalled <- true
                         ])
@@ -133,6 +222,22 @@ Vitest.describe (
 
                     Vitest.expect(listenerRegistered).toBe (true)
                     Vitest.expect(snapshotLoadCalls).toBe (1)
+
+                    publishFileTreeDelta {
+                        removedPaths = [| "assays/assay-1/isa.assay.xlsx" |]
+                        upsertedEntries = [|
+                            FileEntry.create ("new.txt", "assays/assay-1/new.txt", false, None)
+                        |]
+                    }
+
+                    do!
+                        waitForEffect (fun () ->
+                            observedFileTrees
+                            |> Seq.exists (fun paths ->
+                                paths |> Array.contains "assays/assay-1/new.txt"
+                                && not (paths |> Array.contains "assays/assay-1/isa.assay.xlsx")
+                            )
+                        )
 
                     root.unmount ()
                     rootUnmounted <- true
@@ -180,6 +285,10 @@ Vitest.describe (
                             ==> fun (_: Dictionary<string, FileEntry> -> unit) ->
                                 fileTreeDisposeCalled <- false
                                 fun () -> fileTreeDisposeCalled <- true
+                            "fileTreeDelta"
+                            ==> fun (_: FileTreeDelta -> unit) ->
+                                let dispose () = fileTreeDisposeCalled <- true
+                                dispose
                         ])
 
                     setBridgeProperty

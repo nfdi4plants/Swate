@@ -11,6 +11,12 @@ type FileEntry = {
     largeObject: ObjectStateDto option
 }
 
+/// An ARC-relative incremental update for an already-loaded renderer FileTree.
+type FileTreeDelta = {
+    removedPaths: string[]
+    upsertedEntries: FileEntry[]
+}
+
 [<AutoOpen>]
 module FileEntryExtensions =
 

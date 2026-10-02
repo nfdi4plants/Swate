@@ -95,8 +95,6 @@ type ArcVault(window: BrowserWindow) =
 
     member internal _.FileTreeDirectChildrenIndex = fileTreeDirectChildrenIndex
 
-    /// Installs a tree produced by shallow reconciliation, whose index delta was applied by the reconciler.
-    member internal _.InstallReconciledFileTree(value: Dictionary<string, FileEntry>) = fileTreeValue <- value
     member val watcher: Chokidar.IWatcher option = None with get, set
     member val internal fileWatcherReady = false with get, set
     member val internal fileWatcherReadinessError: obj option = None with get, set
@@ -720,12 +718,15 @@ module ArcVaultExtensions =
 
             WindowSend.send<IFileTreeRendererApi> this.window (fun api -> api.fileTreeUpdate rendererFileTree)
 
+        member private this.PublishFileTreeDelta(delta: ShallowFileTreeReconciliationDelta) =
+            match this.path with
+            | None -> ()
+            | Some arcPath ->
+                let rendererDelta = toRendererFileTreeDelta arcPath delta
+                WindowSend.send<IFileTreeRendererApi> this.window (fun api -> api.fileTreeDelta rendererDelta)
+
         member this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
             this.fileTree <- fileTree
-            this.PublishFileTree()
-
-        member internal this.SetReconciledFileTree(fileTree: Dictionary<string, FileEntry>) =
-            this.InstallReconciledFileTree fileTree
             this.PublishFileTree()
 
         /// Refreshes one directory without recursively scanning it and serializes the update with watcher tree work.
@@ -744,7 +745,7 @@ module ArcVaultExtensions =
                                 this.FileTreeDirectChildrenIndex
                         with
                         | None -> ()
-                        | Some nextFileTree -> this.SetReconciledFileTree nextFileTree
+                        | Some delta -> this.PublishFileTreeDelta delta
                 })
 
             this.FileTreeUpdateTail <- queuedUpdate |> Promise.catch (fun _ -> ())

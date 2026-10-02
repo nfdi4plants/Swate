@@ -94,6 +94,12 @@ type FileTreeDirectChildrenIndex() =
         removedPaths |> Seq.iter removePath
         upsertedEntries |> Seq.iter (fun entry -> addChildPath entry.path)
 
+/// The exact absolute-path changes applied by one shallow directory reconciliation.
+type ShallowFileTreeReconciliationDelta = {
+    removedPaths: string[]
+    upsertedEntries: FileEntry[]
+}
+
 let private shouldIgnoreDirName (name: string) = name = ".git"
 
 let private shouldIgnorePath (path: string) =
@@ -210,6 +216,21 @@ let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary
 
     rendererFileTree
 
+/// Converts only a shallow reconciliation delta to the renderer's ARC-relative path contract.
+let toRendererFileTreeDelta (repoRoot: string) (delta: ShallowFileTreeReconciliationDelta) : FileTreeDelta =
+    let toRelativePath path =
+        tryGetRepoRelativePathOrRoot repoRoot path
+
+    {
+        removedPaths = delta.removedPaths |> Array.choose toRelativePath
+        upsertedEntries =
+            delta.upsertedEntries
+            |> Array.choose (fun entry ->
+                toRelativePath entry.path
+                |> Option.map (fun relativePath -> { entry with path = relativePath })
+            )
+    }
+
 /// Remove a path and all descendants from a file tree dictionary using normalized ancestor checks.
 let removePathAndDescendants
     (targetPath: string)
@@ -259,7 +280,7 @@ let reconcileFileTreeDirectory
     (relativeDirectoryPath: string)
     (fileTree: Dictionary<string, FileEntry>)
     (directChildrenIndex: FileTreeDirectChildrenIndex)
-    : Fable.Core.JS.Promise<Dictionary<string, FileEntry> option> =
+    : Fable.Core.JS.Promise<ShallowFileTreeReconciliationDelta option> =
     promise {
         let normalizedArcPath = normalizeRootPath arcPath
 
@@ -308,26 +329,27 @@ let reconcileFileTreeDirectory
                     knownDirectChildren
                     |> Map.exists (fun path _ -> not (Map.containsKey path diskChildren))
 
-                let hasAddedOrChangedChildren =
+                let reconciledDiskChildren =
                     diskChildren
-                    |> Map.exists (fun path diskEntry ->
+                    |> Map.map (fun path diskEntry ->
                         match Map.tryFind path knownDirectChildren with
-                        | None -> true
-                        | Some knownEntry ->
-                            let reconciledEntry =
-                                if diskEntry.isDirectory then
-                                    diskEntry
-                                else
-                                    {
-                                        diskEntry with
-                                            largeObject = knownEntry.largeObject
-                                    }
-
-                            knownEntry.name <> reconciledEntry.name
-                            || knownEntry.path <> reconciledEntry.path
-                            || knownEntry.isDirectory <> reconciledEntry.isDirectory
-                            || knownEntry.largeObject <> reconciledEntry.largeObject
+                        | Some knownEntry when not diskEntry.isDirectory -> {
+                            diskEntry with
+                                largeObject = knownEntry.largeObject
+                          }
+                        | _ -> diskEntry
                     )
+
+                let upsertedEntries =
+                    reconciledDiskChildren
+                    |> Map.toArray
+                    |> Array.choose (fun (path, reconciledEntry) ->
+                        match Map.tryFind path knownDirectChildren with
+                        | Some knownEntry when knownEntry = reconciledEntry -> None
+                        | _ -> Some reconciledEntry
+                    )
+
+                let hasAddedOrChangedChildren = upsertedEntries.Length > 0
 
                 if not hasRemovedChildren && not hasAddedOrChangedChildren then
                     return None
@@ -352,22 +374,15 @@ let reconcileFileTreeDirectory
                     let removedPaths = Array.append (missingFilePaths.ToArray()) subtreeRemovalKeys
                     removedPaths |> Array.iter (fun path -> fileTree.Remove(path) |> ignore)
 
-                    diskChildren
-                    |> Map.iter (fun childPath diskEntry ->
-                        let nextEntry =
-                            match Map.tryFind childPath knownDirectChildren with
-                            | Some knownEntry when not diskEntry.isDirectory -> {
-                                diskEntry with
-                                    largeObject = knownEntry.largeObject
-                              }
-                            | _ -> diskEntry
+                    upsertedEntries |> Array.iter (fun entry -> fileTree.[entry.path] <- entry)
 
-                        fileTree.[childPath] <- nextEntry
-                    )
+                    directChildrenIndex.ApplyChanges(removedPaths, upsertedEntries)
 
-                    directChildrenIndex.ApplyChanges(removedPaths, diskChildren.Values)
-
-                    return Some fileTree
+                    return
+                        Some {
+                            removedPaths = removedPaths
+                            upsertedEntries = upsertedEntries
+                        }
     }
 
 let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {

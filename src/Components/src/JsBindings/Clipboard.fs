@@ -29,6 +29,9 @@ module GlobalBindings =
     [<Emit("navigator")>]
     let navigator: Navigator = jsNative
 
+    [<Emit("$0")>]
+    let resizeArrayAsArray<'T> (items: ResizeArray<'T>) : 'T[] = jsNative
+
 module ClipboardBindings =
 
     [<Emit("typeof $0 === 'string'")>]

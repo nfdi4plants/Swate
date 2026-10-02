@@ -1639,6 +1639,9 @@ let private isPathChangeMessage (args: obj array) =
 let private isFileTreeMessage (args: obj array) =
     args.Length > 0 && (string args.[0]).Contains("fileTreeUpdate")
 
+let private isFileTreeDeltaMessage (args: obj array) =
+    args.Length > 0 && (string args.[0]).Contains("fileTreeDelta")
+
 Vitest.describe (
     "ArcVaultHelper",
     fun () ->
@@ -5348,7 +5351,8 @@ Vitest.describe (
 
                         let! loadedArc = TestHelpers.loadArcAsync arcPath
                         let! initialFileTree = Main.FileTreeCreator.getFileTree arcPath
-                        let vault = ArcVault(TestHelpers.testWindow ())
+                        let windowState = createTestWindow (testWindowOptions 91343)
+                        let vault = ArcVault(windowState.Window)
                         vault.path <- Some arcPath
                         vault.SetArc loadedArc
                         vault.fileTree <- initialFileTree
@@ -5366,6 +5370,7 @@ Vitest.describe (
                                 (fun () -> promise {
                                     do! waitForWatcherCondition "ready" (fun () -> isReady) 300
                                     Vitest.expect(treeContains vault existingPath).toBe (true)
+                                    windowState.SentMessages.Clear()
 
                                     let watchedPaths =
                                         watcher.getWatched ()
@@ -5395,12 +5400,46 @@ Vitest.describe (
                                     Vitest.expect(treeContains vault nestedPath).toBe (false)
                                     Vitest.expect(treeContains vault hiddenPath).toBe (false)
 
+                                    Vitest
+                                        .expect(windowState.SentMessages |> Seq.exists isFileTreeMessage)
+                                        .toBe (false)
+
+                                    Vitest
+                                        .expect(windowState.SentMessages |> Seq.exists isFileTreeDeltaMessage)
+                                        .toBe (false)
+
                                     do! vault.RefreshFileTreeDirectory relativeDatasetPath
 
                                     Vitest.expect(treeContains vault existingPath).toBe (true)
                                     Vitest.expect(treeContains vault newPath).toBe (true)
                                     Vitest.expect(treeContains vault nestedPath).toBe (true)
                                     Vitest.expect(treeContains vault hiddenPath).toBe (false)
+
+                                    Vitest
+                                        .expect(windowState.SentMessages |> Seq.exists isFileTreeMessage)
+                                        .toBe (false)
+
+                                    let deltaMessages =
+                                        windowState.SentMessages |> Seq.filter isFileTreeDeltaMessage |> Seq.toArray
+
+                                    Vitest.expect(deltaMessages.Length).toBe (1)
+                                    let rendererDelta = unbox<FileTreeDelta> deltaMessages.[0].[1]
+                                    Vitest.expect(rendererDelta.removedPaths.Length).toBe (0)
+                                    Vitest.expect(rendererDelta.upsertedEntries.Length).toBe (2)
+
+                                    let upsertedPaths = rendererDelta.upsertedEntries |> Array.map _.path
+                                    Vitest.expect(upsertedPaths).toContain ($"{relativeDatasetPath}/new.txt")
+                                    Vitest.expect(upsertedPaths).toContain ($"{relativeDatasetPath}/nested")
+
+                                    do! vault.RefreshFileTreeDirectory relativeDatasetPath
+
+                                    Vitest
+                                        .expect(
+                                            windowState.SentMessages
+                                            |> Seq.filter isFileTreeDeltaMessage
+                                            |> Seq.length
+                                        )
+                                        .toBe (1)
                                 })
                     })
         )
