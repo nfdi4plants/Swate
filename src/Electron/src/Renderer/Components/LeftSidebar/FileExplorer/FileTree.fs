@@ -158,7 +158,7 @@ type FileTree =
 
         let fileItem =
             fileTree
-            |> Option.map (
+            |> Option.map (fun parent ->
                 FileTreeMaterialization.toMaterializedFileItemTree
                     (fun node ->
                         let item = Helper.createItem node
@@ -172,6 +172,8 @@ type FileTree =
                         }
                     )
                     reconciledMaterializedState.Paths
+                    parent
+                    true
             )
 
         let applyPreviewResult itemName result =

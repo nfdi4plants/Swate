@@ -1,5 +1,5 @@
 /// The one place in Swate that knows which version control providers exist. It builds
-/// the Git factory over the DataHub account store and the lakeFS factory over an
+/// the Git factory over the DataHUB account store and the lakeFS factory over an
 /// application-owned state root, and it resolves the factory for a vault from the
 /// persisted binding. Everything above this module works with the neutral SPI only.
 module Main.VersionControl.ProviderComposition
@@ -34,7 +34,7 @@ let dataHubAccountSource: DataHubStrategies.DataHubAccountSource = {
     TryGetTokenForHost = Main.Auth.AuthService.tryGetTokenForHost
 }
 
-/// The DataHub ruleset as the library's revision policy: metadata workbooks stay plain
+/// The DataHUB ruleset as the library's revision policy: metadata workbooks stay plain
 /// content, dataset files and files above 25 MB are large objects, everything else
 /// follows the automatic threshold. Metadata wins over the other two rules.
 let dataHubRevisionPolicy: RevisionPolicyStrategy = {
@@ -80,7 +80,7 @@ let createCatalog (factories: ProviderFactory list) : ProviderResolver.ProviderC
     | Ok catalog -> catalog
     | Error message -> failwith message
 
-/// The production catalog: Git over the DataHub accounts, lakeFS without any
+/// The production catalog: Git over the DataHUB accounts, lakeFS without any
 /// configured connection until lakeFS accounts exist in Swate. The caller passes the
 /// path case sensitivity it also hands to the resolver and the binding store.
 let createProductionCatalog (sensitivity: PathCaseSensitivity) : ProviderResolver.ProviderCatalog =

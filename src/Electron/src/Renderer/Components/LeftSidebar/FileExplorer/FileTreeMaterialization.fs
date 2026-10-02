@@ -63,10 +63,22 @@ let reconcileMaterializedState
             Paths = Set.union persistedPaths requiredPaths
         }
 
+let private rootItemSortKey (node: FileTreeNode) =
+    match node.name.ToLowerInvariant() with
+    | "notes" -> 0, 0, ""
+    | "readme.md" -> 0, 1, ""
+    | "isa.investigation.xlsx" -> 0, 2, ""
+    | "studies" -> 0, 3, ""
+    | "assays" -> 0, 4, ""
+    | "workflows" -> 0, 5, ""
+    | "runs" -> 0, 6, ""
+    | _ -> 1, System.Int32.MaxValue, node.name.ToLowerInvariant()
+
 let rec toMaterializedFileItemTree
     (createItem: FileTreeNode -> FileItem)
     (materializedDirectoryPaths: Set<string>)
     (parent: FileTreeNode)
+    (isRoot: bool)
     =
     if parent.isDirectory then
         let normalizedParentPath = PathHelpers.normalizePath parent.path
@@ -76,10 +88,17 @@ let rec toMaterializedFileItemTree
 
         let children =
             if isDirectoryMaterialized then
-                parent.children.Values
-                |> Seq.map (toMaterializedFileItemTree createItem materializedDirectoryPaths)
+                let childNodes =
+                    if isRoot then
+                        parent.children.Values |> Seq.sortBy rootItemSortKey
+                    else
+                        parent.children.Values :> seq<FileTreeNode>
+
+                childNodes
+                |> Seq.map (fun parent -> toMaterializedFileItemTree createItem materializedDirectoryPaths parent false)
                 |> List.ofSeq
                 |> Some
+
             elif parent.children.Count = 0 then
                 Some []
             else
