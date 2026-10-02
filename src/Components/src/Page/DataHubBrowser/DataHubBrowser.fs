@@ -408,7 +408,7 @@ type DataHubBrowser =
                 Html.div [
                     prop.className "swt:flex swt:items-center swt:gap-2"
                     prop.children [
-                        DataHubBrowser.SectionHeading("GitLab Explore")
+                        DataHubBrowser.SectionHeading("Download ARC from DataHUB")
                         match onClose with
                         | Some closeFn ->
                             Html.div [
