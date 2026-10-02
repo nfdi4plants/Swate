@@ -63,6 +63,19 @@ export { default as ThemeProvider } from './dist/Composite/ThemeSelector/ThemePr
 export { default as ThemeSelector } from './dist/Composite/ThemeSelector/ThemeSelector.fs';
 export { default as TutorialOverlay } from './dist/Composite/TutorialOverlay/TutorialOverlay.fs';
 
+export { default as Tree } from './Composite/Tree/Tree.public';
+export type {
+  TreeApi,
+  TreeContextMenuItem,
+  TreeContextMenuTarget,
+  TreeDataSource,
+  TreeItem,
+  TreeItemProps,
+  TreeProps,
+  TreeRenderProps,
+  TreeSelectionMode,
+} from './Composite/Tree/TreePublicApi';
+
 export { Main as NoteSearch, SearchSuggestion } from './dist/Composite/Notes/NoteSearch/NoteSearch.fs';
 export { WidgetController, Entry as WidgetEntry } from './dist/Composite/Widgets/Widgets.fs';
 

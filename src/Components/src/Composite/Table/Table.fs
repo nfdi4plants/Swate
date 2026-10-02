@@ -101,11 +101,7 @@ swt:p-0"""
                 scrollPaddingStart = 1.5 * float Constants.Table.DefaultRowHeight,
                 scrollPaddingEnd = 1.5 * float Constants.Table.DefaultRowHeight,
                 paddingEnd = WhiteSpacePX, // extra space to improve UX with rightmost columns
-                rangeExtractor =
-                    (fun range ->
-                        let next = set [ 0; yield! Virtual.defaultRangeExtractor range ]
-                        Set.toArray next
-                    )
+                rangeExtractor = Virtual.pinnedRangeExtractor [| 0 |]
             )
 
         let columnVirtualizer =
@@ -117,11 +113,7 @@ swt:p-0"""
                 gap = 0,
                 paddingEnd = WhiteSpacePX, // extra space to improve UX with rightmost columns
                 horizontal = true,
-                rangeExtractor =
-                    (fun range ->
-                        let next = set [ 0; yield! Virtual.defaultRangeExtractor range ]
-                        Set.toArray next
-                    )
+                rangeExtractor = Virtual.pinnedRangeExtractor [| 0 |]
             )
 
         /// ⚠️ There is bug with the ``scrollToIndex`` function and the ``paddingEnd`` option for ``useVirtualizer``.
@@ -394,13 +386,12 @@ swt:p-0"""
                                                     else
                                                         Html.tr [
                                                             prop.key (sprintf "virtualRow-%s" virtualRow.key)
-                                                            prop.style [
-                                                                style.position.absolute
-                                                                style.top 0
-                                                                style.left 0
-                                                                style.custom ("transform", $"translateY({rowStart}px)")
-                                                                style.height virtualRow.size
-                                                            ]
+                                                            yield!
+                                                                Virtual.rowProps (
+                                                                    virtualRow.index,
+                                                                    rowStart,
+                                                                    height = virtualRow.size
+                                                                )
                                                             prop.className "swt:w-full"
                                                             prop.children [
                                                                 for virtualColumn in
