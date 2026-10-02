@@ -1895,10 +1895,10 @@ let private pendingPrimarySaveWarning =
     "Changes were saved locally. Online sync is still pending."
 
 let private projectNameRefusedMessage =
-    "A DataHub repository with this name already exists. Enter a different name."
+    "A DataHUB repository with this name already exists. Enter a different name."
 
 let private missingPublishAccountNotice =
-    "Saved locally. Sign in to a DataHub account to publish this ARC."
+    "Saved locally. Sign in to a DataHUB account to publish this ARC."
 
 /// The saved-locally outcome after a remote step failed. The snapshot is refreshed
 /// first, because the failed step may have changed the workspace.

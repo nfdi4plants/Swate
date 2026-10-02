@@ -1,5 +1,5 @@
 /// Large-object actions of the file explorer over the provider-neutral storage
-/// policy and materialization services. The file explorer checks the DataHub ruleset
+/// policy and materialization services. The file explorer checks the DataHUB ruleset
 /// (isa.*.xlsx never in large-object storage, dataset files always) before it calls
 /// here, and the main process checks it again.
 module Renderer.Components.Helper.GitLfsHelper

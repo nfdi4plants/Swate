@@ -92,7 +92,7 @@ let private normalizeBaseUrl (baseUrl: string) : Result<string, AuthFailure> =
     if String.IsNullOrWhiteSpace trimmed then
         Error {
             Kind = AuthFailureKind.EndpointInvalid
-            Message = "DataHub URL is empty."
+            Message = "DataHUB URL is empty."
         }
     else
         let mutable uri = Unchecked.defaultof<Uri>
@@ -102,7 +102,7 @@ let private normalizeBaseUrl (baseUrl: string) : Result<string, AuthFailure> =
         else
             Error {
                 Kind = AuthFailureKind.EndpointInvalid
-                Message = "DataHub URL must be a valid HTTPS URL."
+                Message = "DataHUB URL must be a valid HTTPS URL."
             }
 
 
@@ -248,7 +248,7 @@ let tryGetActiveAccountWithToken () : (AuthUserDto * string) option =
     |> Option.filter canUseToken
     |> Option.map (fun accountState -> accountState.Summary.User, accountState.Token)
 
-/// Main-process helper to resolve a DataHub endpoint for unauthenticated/public browsing.
+/// Main-process helper to resolve a DataHUB endpoint for unauthenticated/public browsing.
 let tryGetPreferredDataHub () : string option =
     match getActiveAccountState () with
     | Some accountState when not (String.IsNullOrWhiteSpace accountState.Summary.User.TargetDataHub) ->
