@@ -149,7 +149,7 @@ type DataHubBrowser =
                         prop.children [
                             Html.option [
                                 prop.value ""
-                                prop.text "Select organisation"
+                                prop.text "Select group"
                                 prop.disabled true
                             ]
                             for g in groups do
@@ -170,7 +170,7 @@ type DataHubBrowser =
                     ExploreTab.All, "All", "All"
                     ExploreTab.YourRepos, "Your Repos", "YourRepos"
                     ExploreTab.MostStarred, "Most Starred", "MostStarred"
-                    ExploreTab.YourOrganisations, "Your Organisations", "YourOrganisations"
+                    ExploreTab.YourOrganisations, "Your Groups", "YourOrganisations"
                 ]
 
                 for mode, label, tid in tabs do
