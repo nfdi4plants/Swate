@@ -1027,8 +1027,8 @@ export const ReplaysOnlyPagesInView: Story = {
     const pageHeight = VIEWPORT_PAGE_ROWS * 28;
     const pagesInView = Math.ceil(scroll.clientHeight / pageHeight);
 
-    await waitFor(() => expect(canvas.queryByTestId("git-paged-viewport-row-evicted:page-0")).toBeNull());
-    await waitFor(() => expect(canvas.queryByTestId(`git-paged-viewport-row-evicted:page-${pagesInView - 1}`)).toBeNull());
+    // Replays run one after another, so the last page in view shows its rows only after all the others.
+    await waitFor(() => expect(canvas.queryByTestId(`git-paged-viewport-row-row-${(pagesInView - 1) * VIEWPORT_PAGE_ROWS}`)).not.toBeNull());
     await new Promise((resolve) => window.setTimeout(resolve, 200));
 
     const records = onViewportReplay.mock.calls.map(([record]) => record as ReplayRecord);
