@@ -1,6 +1,7 @@
 module ElectronRenderer.FileTreeMaterializationTests
 
 open System.Collections.Generic
+open Renderer.Components.LeftSidebar.FileExplorer.Helper
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeMaterialization
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Electron.Shared.FileIOTypes
@@ -83,7 +84,7 @@ Vitest.describe (
                         directoryNode "runs" "arc/runs" []
                         directoryNode "assays" "arc/assays" []
                         directoryNode "studies" "arc/studies" []
-                        directoryNode "investigation" "arc/investigation" []
+                        fileNode "isa.investigation.xlsx" "arc/isa.investigation.xlsx"
                         fileNode "README.md" "arc/README.md"
                         directoryNode "notes" "arc/notes" []
                         directoryNode "workflows" "arc/workflows" []
@@ -94,7 +95,7 @@ Vitest.describe (
                 Vitest.expect(item.Children.Value |> List.map _.Name).toEqual [
                     "notes"
                     "README.md"
-                    "investigation"
+                    "isa.investigation.xlsx"
                     "studies"
                     "assays"
                     "workflows"

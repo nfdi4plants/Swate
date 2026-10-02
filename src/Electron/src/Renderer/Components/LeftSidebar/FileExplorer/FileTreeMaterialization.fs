@@ -67,7 +67,7 @@ let private rootItemSortKey (node: FileTreeNode) =
     match node.name.ToLowerInvariant() with
     | "notes" -> 0, 0, ""
     | "readme.md" -> 0, 1, ""
-    | "investigation" -> 0, 2, ""
+    | "isa.investigation.xlsx" -> 0, 2, ""
     | "studies" -> 0, 3, ""
     | "assays" -> 0, 4, ""
     | "workflows" -> 0, 5, ""

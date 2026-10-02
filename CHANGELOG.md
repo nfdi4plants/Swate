@@ -45,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🐛 Fixed
 
--   The root elements that are displayed in the filetree are now displayed in the order provided by the ISA standard.
+-   Root-level ARC items in the file tree follow the ISA standard order, and the `isa.investigation.xlsx` workbook has a distinctive violet icon.
 -   The diff of a changed, downloaded Git LFS text file shows the changed lines instead of the pointer text, without downloading anything.
 -   Mark and Unmark Git LFS take effect on the next save, so the file's storage changes. Unmark is refused when the file's object is not local.
 -   Discarding a downloaded Git LFS file keeps it downloaded.
