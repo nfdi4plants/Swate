@@ -75,6 +75,11 @@ let private mkdirWatcherDirectoryAsync (directoryPath: string) = promise {
 let private writeWatcherTextFileAsync (filePath: string) (content: string) =
     writeFileAsync filePath content TextEncoding.Utf8
 
+let private seedVaultFileTree (vault: ArcVault) (entry: FileEntry) =
+    let snapshot = System.Collections.Generic.Dictionary<string, FileEntry>()
+    snapshot.[entry.path] <- entry
+    vault.SetFileTree snapshot
+
 let private createWatcherFilesInBatches directoryPath count = promise {
     let mutable offset = 0
 
@@ -719,6 +724,7 @@ let private verifyRecoverableWatcherStartupDegradation tempPrefix windowId initi
             let vaults = ArcVaults()
             let createdWatchers = ResizeArray<TestWatcher>()
             vaults.Vaults.Add(windowId, vault)
+            vaults.OnCloseWindow(windowState.Window, vault, windowId)
             vault.FileWatcherReadinessTimeoutMs <- readinessTimeoutMs
 
             vault.FileWatcherFactory <-
@@ -743,13 +749,21 @@ let private verifyRecoverableWatcherStartupDegradation tempPrefix windowId initi
                 Vitest.expect(createdWatchers.Count).toBe (1)
                 Vitest.expect(createdWatchers.[0].CloseCount()).toBe (1)
 
+                let externallyAddedPath = join [| arcPath; "recovered-on-focus.txt" |]
+                do! writeWatcherTextFileAsync externallyAddedPath "reconciled"
                 vault.FileWatcherReadinessTimeoutMs <- 10000
-                let! retryOutcome = vault.PrepareFileWatcherForInitialization()
+                windowState.TriggerFocusEvent()
 
-                Vitest.expect(retryOutcome).toEqual (FileWatcherInitializationOutcome.Ready)
+                do!
+                    waitForWatcherCondition
+                        "watcher recovery through window focus"
+                        (fun () ->
+                            vault.watcher.IsSome
+                            && createdWatchers.Count = 2
+                            && vault.fileTree.ContainsKey externallyAddedPath
+                        )
+                        300
 
-                Vitest.expect(vault.watcher.IsSome).toBe (true)
-                Vitest.expect(createdWatchers.Count).toBe (2)
                 Vitest.expect(createdWatchers.[1].CloseCount()).toBe (0)
 
                 do! vault.StopFileWatcher()
@@ -1784,7 +1798,7 @@ Vitest.describe (
 
                 callingVault.path <- Some existingArcPath
                 callingVault.SetArc(existingArc)
-                callingVault.fileTree.Add(seededEntry.path, seededEntry)
+                seedVaultFileTree callingVault seededEntry
 
                 let targetWindow = (createTestWindow (testWindowOptions targetWindowId)).Window
 
@@ -4643,7 +4657,7 @@ Vitest.describe (
                 let seededEntry = FileEntry.create ("seeded.txt", "seeded.txt", false)
                 let mutable createdWindowCount = 0
 
-                vault.fileTree.Add(seededEntry.path, seededEntry)
+                seedVaultFileTree vault seededEntry
                 vaults.Vaults.Add(windowId, vault)
                 do! writeTextFileAsync blockedParent "This file prevents creation of a nested ARC directory."
 
@@ -4723,7 +4737,7 @@ Vitest.describe (
                 let sentMessages = windowState.SentMessages
                 let vault = ArcVault(windowState.Window)
                 let seededEntry = FileEntry.create ("seeded.txt", "seeded.txt", false)
-                vault.fileTree.Add(seededEntry.path, seededEntry)
+                seedVaultFileTree vault seededEntry
                 do! writeTextFileAsync blockedParent "This file prevents creation of a nested ARC directory."
 
                 try
@@ -4776,7 +4790,7 @@ Vitest.describe (
                 let sentMessages = windowState.SentMessages
                 let vault = ArcVault(windowState.Window)
                 let seededEntry = FileEntry.create ("seeded.txt", "seeded.txt", false)
-                vault.fileTree.Add(seededEntry.path, seededEntry)
+                seedVaultFileTree vault seededEntry
 
                 try
                     let mutable creationError: exn option = None
@@ -4827,7 +4841,7 @@ Vitest.describe (
                 try
                     let vault = ArcVault(TestHelpers.testWindow ())
                     let seededEntry = FileEntry.create ("seeded.txt", "seeded.txt", false)
-                    vault.fileTree.Add(seededEntry.path, seededEntry)
+                    seedVaultFileTree vault seededEntry
                     let mutable failed = false
 
                     Vitest.expect(vault.fileTree.Count).toBe (1)
@@ -5031,7 +5045,7 @@ Vitest.describe (
                         let vault = TestHelpers.registerVault windowId arcPath
                         vault.SetArc(ARC("Bounded Mutation Refresh"))
                         let! rootEntry = Main.FileTreeCreator.getFileEntry arcPath
-                        vault.fileTree <- createFileEntryTree [| rootEntry |]
+                        vault.SetFileTree(createFileEntryTree [| rootEntry |])
                         let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId windowId)
 
                         let absolute relativePath =
@@ -5144,7 +5158,7 @@ Vitest.describe (
                         let vault = ArcVault(windowState.Window)
                         let vaults = ArcVaults()
                         vault.path <- Some arcPath
-                        vault.fileTree <- initialTree
+                        vault.SetFileTree initialTree
                         vaults.OnCloseWindow(windowState.Window, vault, windowId)
 
                         Vitest.expect(windowState.FocusHandlerAttached()).toBe (true)
@@ -5325,7 +5339,7 @@ Vitest.describe (
                         let vault = ArcVault(windowState.Window)
                         vault.path <- Some arcPath
                         vault.SetArc loadedArc
-                        vault.fileTree <- initialFileTree
+                        vault.SetFileTree initialFileTree
                         vault.StartFileWatcher(usePolling = true)
 
                         let watcher = vault.watcher.Value

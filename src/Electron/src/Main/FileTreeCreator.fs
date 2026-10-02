@@ -24,7 +24,16 @@ type IndexedFileTree(entries: Dictionary<string, FileEntry>) =
 
     new() = IndexedFileTree(Dictionary<string, FileEntry>())
 
-    member _.Entries = entries
+    member _.Count = entries.Count
+
+    member _.Values = entries.Values
+
+    member _.ContainsKey(path: string) = entries.ContainsKey path
+
+    member _.TryGetValue(path: string) = entries.TryGetValue path
+
+    /// Creates a mutable working snapshot for an explicit replacement operation.
+    member _.CopySnapshot() = Dictionary<string, FileEntry>(entries)
 
     member _.GetKnownDirectChildren(directoryPath: string) =
         children.GetDirectChildPaths directoryPath
@@ -48,6 +57,10 @@ type IndexedFileTree(entries: Dictionary<string, FileEntry>) =
             entries.Clear()
             snapshot |> Seq.iter (fun pair -> entries.[pair.Key] <- pair.Value)
 
+        children.Rebuild entries.Keys
+
+    member _.Clear() =
+        entries.Clear()
         children.Rebuild entries.Keys
 
 let private shouldIgnoreDirName (name: string) = name = ".git"

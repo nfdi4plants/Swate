@@ -86,9 +86,8 @@ type ArcVault(window: BrowserWindow) =
     /// Dirty marker for unsaved in-memory ARC mutations.
     member val hasUnsavedArcChanges: bool = false with get, private set
 
-    member _.fileTree
-        with get () = indexedFileTree.Entries
-        and set value = indexedFileTree.ReplaceSnapshot value
+    /// Read-only query surface for the main-process FileTree.
+    member this.fileTree = indexedFileTree
 
     member internal _.IndexedFileTree = indexedFileTree
 
@@ -282,7 +281,7 @@ module ArcVaultExtensions =
                     | Some _ when capturedWatcherEpoch <> this.WatcherEpoch -> ()
                     | Some arcPath ->
                         let normalizedEvents = WatcherHelpers.normalizeAgainstDisk events
-                        let mutable nextFileTree = this.fileTree
+                        let mutable nextFileTree = this.fileTree.CopySnapshot()
                         let mutable hasFileTreeChanges = false
 
                         for event in normalizedEvents do
@@ -682,7 +681,7 @@ module ArcVaultExtensions =
                                             refreshFileTreeEntry
                                                 arcPath
                                                 (DatamapParentInfo.toPath parentInfo)
-                                                this.fileTree
+                                                (this.fileTree.CopySnapshot())
 
                                         this.SetFileTree refreshedFileTree
                                     | _ -> ()
@@ -713,7 +712,7 @@ module ArcVaultExtensions =
             WindowSend.send<IFileTreeRendererApi> this.window (fun api -> api.fileTreeUpdate rendererFileTree)
 
         member this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
-            this.fileTree <- fileTree
+            this.IndexedFileTree.ReplaceSnapshot fileTree
             this.PublishFileTree()
 
         /// Refreshes one directory without recursively scanning it and serializes the update with watcher tree work.
@@ -741,7 +740,7 @@ module ArcVaultExtensions =
             | Some arcPath ->
                 if this.fileTree.Count = 0 then
                     let! fileTree = getFileTree arcPath
-                    this.fileTree <- fileTree
+                    this.IndexedFileTree.ReplaceSnapshot fileTree
 
                 return this.CurrentRendererFileTree()
         }
@@ -879,7 +878,7 @@ module ArcVaultExtensions =
 
             this.isInitializingArc <- false
             this.path <- None
-            this.fileTree <- Dictionary<string, FileEntry>()
+            this.IndexedFileTree.Clear()
 
             try
                 this.ClearArc()
@@ -907,7 +906,7 @@ module ArcVaultExtensions =
 
                 // Install the authoritative snapshot before publishing any initialized state.
                 // Keep the renderer's established path-before-tree message order.
-                this.fileTree <- fileTree
+                this.IndexedFileTree.ReplaceSnapshot fileTree
 
                 WindowSend.send<IPathChangeRendererApi> this.window (fun api -> api.pathChange (Some normalizedPath))
 
@@ -1182,11 +1181,24 @@ type ArcVaults() =
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
         window.onFocus (fun () ->
             if vault.path.IsSome && not vault.isInitializingArc && not (window.isDestroyed ()) then
-                vault.RefreshFileTreeDirectory ""
-                |> Promise.catch (fun refreshError ->
-                    swatelogfn id "Unable to refresh the ARC root after window focus: %s" refreshError.Message
-                )
-                |> Promise.start
+                let refreshRoot () =
+                    vault.RefreshFileTreeDirectory ""
+                    |> Promise.catch (fun refreshError ->
+                        swatelogfn id "Unable to refresh the ARC root after window focus: %s" refreshError.Message
+                    )
+
+                let onWatcherStarted outcome =
+                    match outcome with
+                    | FileWatcherInitializationOutcome.Ready -> refreshRoot ()
+                    | _ -> JS.Constructors.Promise.resolve ()
+
+                let focusWork =
+                    if vault.watcher.IsNone then
+                        vault.PrepareFileWatcherForInitialization() |> Promise.bind onWatcherStarted
+                    else
+                        refreshRoot ()
+
+                focusWork |> Promise.start
         )
 
         window.onClose (fun closeEvent ->

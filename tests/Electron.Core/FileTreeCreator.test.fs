@@ -493,6 +493,43 @@ Vitest.describe (
 )
 
 Vitest.describe (
+    "IndexedFileTree ownership",
+    fun () ->
+        Vitest.test (
+            "ReplaceSnapshot replaces entries and indexed direct children",
+            fun () ->
+                let oldPath = "/repo/old.txt"
+                let newPath = "/repo/new.txt"
+                let initial = Dictionary<string, FileEntry>()
+                initial.[oldPath] <- createFileEntry "old.txt" oldPath
+                let tree = IndexedFileTree(initial)
+                let replacement = Dictionary<string, FileEntry>()
+                replacement.[newPath] <- createFileEntry "new.txt" newPath
+
+                tree.ReplaceSnapshot replacement
+
+                Vitest.expect(tree.ContainsKey oldPath).toBe (false)
+                Vitest.expect(tree.ContainsKey newPath).toBe (true)
+                Vitest.expect(tree.GetKnownDirectChildren "/repo" |> Map.containsKey newPath).toBe (true)
+                Vitest.expect(tree.GetKnownDirectChildren "/repo" |> Map.containsKey oldPath).toBe (false)
+        )
+
+        Vitest.test (
+            "Clear removes entries and indexed child relations",
+            fun () ->
+                let path = "/repo/folder/file.txt"
+                let snapshot = Dictionary<string, FileEntry>()
+                snapshot.[path] <- createFileEntry "file.txt" path
+                let tree = IndexedFileTree(snapshot)
+
+                tree.Clear()
+
+                Vitest.expect(tree.Count).toBe (0)
+                Vitest.expect(tree.GetKnownDirectChildren "/repo/folder" |> Map.isEmpty).toBe (true)
+        )
+)
+
+Vitest.describe (
     "FileTreeCreator shallow directory reconciliation",
     fun () ->
         Vitest.test (
