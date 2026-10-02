@@ -23,12 +23,6 @@ type Clipboard =
 type Navigator =
     abstract member clipboard: Clipboard
 
-[<AutoOpen>]
-module GlobalBindings =
-
-    [<Emit("navigator")>]
-    let navigator: Navigator = jsNative
-
 module ClipboardBindings =
 
     [<Emit("typeof $0 === 'string'")>]
