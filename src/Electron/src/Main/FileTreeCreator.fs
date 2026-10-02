@@ -17,14 +17,38 @@ open VersionControlService.Abstractions
 let normalizeRootPath (path: string) =
     resolve [| path |] |> PathHelpers.normalizePath
 
-let private getKnownDirectChildren (index: PathChildrenIndex) directoryPath (fileTree: Dictionary<string, FileEntry>) =
-    index.GetDirectChildPaths directoryPath
-    |> Seq.choose (fun childPath ->
-        match fileTree.TryGetValue childPath with
-        | true, entry -> Some(childPath, entry)
-        | false, _ -> None
-    )
-    |> Map.ofSeq
+/// Keeps main-process FileTree entries and their path index synchronized.
+type IndexedFileTree(entries: Dictionary<string, FileEntry>) =
+    let children = PathChildrenIndex()
+    do children.Rebuild entries.Keys
+
+    new() = IndexedFileTree(Dictionary<string, FileEntry>())
+
+    member _.Entries = entries
+
+    member _.GetKnownDirectChildren(directoryPath: string) =
+        children.GetDirectChildPaths directoryPath
+        |> Seq.choose (fun childPath ->
+            match entries.TryGetValue childPath with
+            | true, entry -> Some(childPath, entry)
+            | false, _ -> None
+        )
+        |> Map.ofSeq
+
+    member _.CollectSubtreePaths(rootPaths: seq<string>) = children.CollectSubtreePaths rootPaths
+
+    member _.ApplyChanges(removedPaths: string[], upsertedEntries: FileEntry[]) =
+        removedPaths |> Array.iter (fun path -> entries.Remove(path) |> ignore)
+        upsertedEntries |> Array.iter (fun entry -> entries.[entry.path] <- entry)
+        removedPaths |> Seq.iter children.Remove
+        upsertedEntries |> Seq.iter (fun entry -> children.Add entry.path)
+
+    member _.ReplaceSnapshot(snapshot: Dictionary<string, FileEntry>) =
+        if not (System.Object.ReferenceEquals(entries, snapshot)) then
+            entries.Clear()
+            snapshot |> Seq.iter (fun pair -> entries.[pair.Key] <- pair.Value)
+
+        children.Rebuild entries.Keys
 
 let private shouldIgnoreDirName (name: string) = name = ".git"
 
@@ -189,8 +213,7 @@ let refreshFileTreeEntry
 let reconcileFileTreeDirectory
     (arcPath: string)
     (relativeDirectoryPath: string)
-    (fileTree: Dictionary<string, FileEntry>)
-    (directChildrenIndex: PathChildrenIndex)
+    (fileTree: IndexedFileTree)
     : Fable.Core.JS.Promise<FileTreeDirectoryUpdate option> =
     promise {
         let normalizedArcPath = normalizeRootPath arcPath
@@ -233,8 +256,7 @@ let reconcileFileTreeDirectory
                     )
                     |> Map.ofArray
 
-                let knownDirectChildren =
-                    getKnownDirectChildren directChildrenIndex absoluteDirectoryPath fileTree
+                let knownDirectChildren = fileTree.GetKnownDirectChildren absoluteDirectoryPath
 
                 let hasRemovedChildren =
                     knownDirectChildren
@@ -280,15 +302,10 @@ let reconcileFileTreeDirectory
                     )
 
                     let subtreeRemovalKeys =
-                        directChildrenIndex.CollectSubtreePaths directChildDirectoryRemovalRoots
+                        fileTree.CollectSubtreePaths directChildDirectoryRemovalRoots
 
                     let removedPaths = Array.append (missingFilePaths.ToArray()) subtreeRemovalKeys
-                    removedPaths |> Array.iter (fun path -> fileTree.Remove(path) |> ignore)
-
-                    upsertedEntries |> Array.iter (fun entry -> fileTree.[entry.path] <- entry)
-
-                    removedPaths |> Seq.iter directChildrenIndex.Remove
-                    upsertedEntries |> Seq.iter (fun entry -> directChildrenIndex.Add entry.path)
+                    fileTree.ApplyChanges(removedPaths, upsertedEntries)
 
                     return
                         Some {

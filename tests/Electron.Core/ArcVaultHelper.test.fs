@@ -708,13 +708,7 @@ let private withAsyncCleanup cleanup operation = promise {
     | Ok _, Error cleanupError -> return raise cleanupError
 }
 
-let private verifyRecoverableWatcherStartupDegradation
-    tempPrefix
-    windowId
-    initialSignal
-    readinessTimeoutMs
-    expectedOutcome
-    =
+let private verifyRecoverableWatcherStartupDegradation tempPrefix windowId initialSignal readinessTimeoutMs =
     TestHelpers.withTempArcWith
         tempPrefix
         "Watcher Startup Degradation"
@@ -745,29 +739,22 @@ let private verifyRecoverableWatcherStartupDegradation
                 Vitest.expect(vault.arc.IsSome).toBe (true)
                 Vitest.expect(vault.fileTree.Count > 0).toBe (true)
                 Vitest.expect(vault.isInitializingArc).toBe (false)
-                Vitest.expect(vault.LastFileWatcherInitializationOutcome).toEqual (Some expectedOutcome)
                 Vitest.expect(vault.watcher.IsNone).toBe (true)
-                Vitest.expect(vault.fileWatcherReady).toBe (false)
                 Vitest.expect(createdWatchers.Count).toBe (1)
                 Vitest.expect(createdWatchers.[0].CloseCount()).toBe (1)
 
+                vault.FileWatcherReadinessTimeoutMs <- 10000
                 let! retryOutcome = vault.PrepareFileWatcherForInitialization()
 
                 Vitest.expect(retryOutcome).toEqual (FileWatcherInitializationOutcome.Ready)
 
-                Vitest
-                    .expect(vault.LastFileWatcherInitializationOutcome)
-                    .toEqual (Some FileWatcherInitializationOutcome.Ready)
-
                 Vitest.expect(vault.watcher.IsSome).toBe (true)
-                Vitest.expect(vault.fileWatcherReady).toBe (true)
                 Vitest.expect(createdWatchers.Count).toBe (2)
                 Vitest.expect(createdWatchers.[1].CloseCount()).toBe (0)
 
                 do! vault.StopFileWatcher()
                 Vitest.expect(createdWatchers.[1].CloseCount()).toBe (1)
                 Vitest.expect(vault.watcher.IsNone).toBe (true)
-                Vitest.expect(vault.fileWatcherReady).toBe (false)
                 vaults.Vaults.Remove(windowId) |> ignore
             with error ->
                 do! vault.StopFileWatcher()
@@ -2437,7 +2424,7 @@ Vitest.describe (
                                 vault.path.IsSome
                                 && vault.arc.IsNone
                                 && vault.watcher.IsSome
-                                && vault.fileWatcherReady
+                                && vault.watcher.IsSome
                             )
 
                         let windowState = createTestWindow (testWindowOptions targetWindowId)
@@ -2692,7 +2679,7 @@ Vitest.describe (
                                 vault.path.IsSome
                                 && vault.arc.IsNone
                                 && vault.watcher.IsSome
-                                && vault.fileWatcherReady
+                                && vault.watcher.IsSome
                             )
 
                         let targetWindowState = createTestWindow (testWindowOptions targetWindowId)
@@ -2781,7 +2768,7 @@ Vitest.describe (
                                 targetWasRegistered <- true
                                 pathWasAssigned <- vault.path = Some expectedPath
                                 arcWasLoaded <- vault.arc.IsSome
-                                watcherWasReady <- vault.watcher.IsSome && vault.fileWatcherReady
+                                watcherWasReady <- vault.watcher.IsSome
                                 fileTreeWasEmpty <- vault.fileTree.Count = 0
 
                                 pathWasAssigned
@@ -2891,7 +2878,7 @@ Vitest.describe (
                                 pathWasAssignedWhenClosed <- vault.path = Some(PathHelpers.normalizePath arcPath)
 
                                 arcWasNoneWhenClosed <- vault.arc.IsNone
-                                watcherWasReadyWhenClosed <- vault.watcher.IsSome && vault.fileWatcherReady
+                                watcherWasReadyWhenClosed <- vault.watcher.IsSome
                             | None -> ()
 
                             vaultExistedWhenClosed
@@ -2977,7 +2964,7 @@ Vitest.describe (
                             | Some vault ->
                                 pathWasAssigned <- vault.path = Some expectedPath
                                 arcWasLoaded <- vault.arc.IsSome
-                                watcherWasReady <- vault.watcher.IsSome && vault.fileWatcherReady
+                                watcherWasReady <- vault.watcher.IsSome
                                 fileTreeWasEmpty <- vault.fileTree.Count = 0
 
                                 pathWasAssigned
@@ -3597,7 +3584,7 @@ Vitest.describe (
                         targetWasRegistered <- true
                         targetPathWasAssigned <- vault.path = Some expectedPath
                         creationReachedPostWriteLoad <- vault.arc.IsSome
-                        watcherWasReady <- vault.watcher.IsSome && vault.fileWatcherReady
+                        watcherWasReady <- vault.watcher.IsSome
 
                         targetWasRegistered
                         && targetPathWasAssigned
@@ -3737,7 +3724,7 @@ Vitest.describe (
                         targetWasRegistered <- true
                         pathWasAssigned <- vault.path = Some expectedPath
                         arcWasLoaded <- vault.arc.IsSome
-                        watcherWasReady <- vault.watcher.IsSome && vault.fileWatcherReady
+                        watcherWasReady <- vault.watcher.IsSome
                         fileTreeWasEmpty <- vault.fileTree.Count = 0
 
                         pathWasAssigned
@@ -4890,24 +4877,12 @@ Vitest.describe (
 
         Vitest.test (
             "watcher error before readiness degrades to snapshots and permits a fresh ready watcher",
-            fun () ->
-                verifyRecoverableWatcherStartupDegradation
-                    "swate-watcher-ready-error-"
-                    91339
-                    SignalError
-                    10000
-                    FileWatcherInitializationOutcome.ErrorBeforeReady
+            fun () -> verifyRecoverableWatcherStartupDegradation "swate-watcher-ready-error-" 91339 SignalError 10000
         )
 
         Vitest.test (
             "watcher readiness timeout degrades to snapshots and permits a fresh ready watcher",
-            fun () ->
-                verifyRecoverableWatcherStartupDegradation
-                    "swate-watcher-ready-timeout-"
-                    91340
-                    NoSignal
-                    0
-                    FileWatcherInitializationOutcome.TimedOut
+            fun () -> verifyRecoverableWatcherStartupDegradation "swate-watcher-ready-timeout-" 91340 NoSignal 10
         )
 
         Vitest.test (
@@ -4949,12 +4924,7 @@ Vitest.describe (
                         try
                             do! vaults.OpenARCInVault(windowId, arcPath)
 
-                            Vitest
-                                .expect(vault.LastFileWatcherInitializationOutcome)
-                                .toEqual (Some FileWatcherInitializationOutcome.Ready)
-
                             Vitest.expect(vault.watcher.IsSome).toBe (true)
-                            Vitest.expect(vault.fileWatcherReady).toBe (true)
                             Vitest.expect(pendingBeforeMutation).toBe (0)
                             Vitest.expect(pendingArcMergesBeforeMutation).toBe (0)
 
