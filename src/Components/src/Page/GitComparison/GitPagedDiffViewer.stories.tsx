@@ -1,6 +1,6 @@
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { within, expect, waitFor, fn, fireEvent } from "storybook/test";
+import { within, expect, waitFor, fn, fireEvent, userEvent } from "storybook/test";
 import { Viewer as GitPagedDiffViewerComponent } from "./GitPagedDiffViewer.fs.js";
 import {
   PagedEncodingCandidate,
@@ -2080,13 +2080,13 @@ function anchorPart(prefix: string, start: number, count: number) {
 // A loaded page of 100 rows, 20 evicted pages and a loaded page. The button evicts the first page,
 // which had arrived with 40 rows and grew to 100 by expansions, so everything below it moves up.
 // With replayed, the button also loads the eleventh evicted page in the same update.
-function ShrinkHarness({ replayed = false }: { replayed?: boolean }) {
+function ShrinkHarness({ replayed = false, middlePages = ANCHOR_PAGE_COUNT }: { replayed?: boolean; middlePages?: number }) {
   const [evicted, setEvicted] = React.useState(false);
   const parts = React.useMemo(
     () => [
       evicted ? PagedPart_EvictedPage("first", ANCHOR_PAGE_ROWS - ANCHOR_SHRINK_ROWS) : anchorPart("first", 0, ANCHOR_PAGE_ROWS),
-      ...Array.from({ length: ANCHOR_PAGE_COUNT }, (_, index) =>
-        evicted && replayed && index === 10
+      ...Array.from({ length: middlePages }, (_, index) =>
+        evicted && replayed && index === Math.min(10, middlePages - 1)
           ? anchorPart("replayed", 2000, ANCHOR_PAGE_ROWS)
           : PagedPart_EvictedPage(`middle-${index}`, ANCHOR_PAGE_ROWS),
       ),
@@ -2242,17 +2242,58 @@ export const ScrollKeysLeaveTheButtonsOfARowAlone: Story = {
     const scroll = scrollElementFor(canvasElement, "git-paged-capped-button-grid");
     await expect(Math.abs(scroll.scrollHeight - 2500)).toBeLessThan(1);
 
-    // Space on a focused button belongs to the button, so the viewer leaves the event alone.
+    // Arrow keys on a focused button move the view by the usual 40 logical pixels.
     const button = canvas.getByTestId("git-paged-capped-button-gap-expand-start-capped-gap");
+    const rowTop = () => canvas.getByTestId("git-paged-capped-button-row-directory-row-5").getBoundingClientRect().top;
+    const topBefore = rowTop();
+    button.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
+    await waitFor(() => expect(Math.abs(topBefore - rowTop() - 40)).toBeLessThan(1.5));
+
+    // Space on a focused button belongs to the button, so the viewer leaves the event alone.
     const onButton = new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true });
     button.dispatchEvent(onButton);
     await expect(onButton.defaultPrevented).toBe(false);
-    await expect(scroll.scrollTop).toBe(0);
 
     // The same key on the scroll element moves the view by a page of logical pixels.
     const onScroller = new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true });
     scroll.dispatchEvent(onScroller);
     await expect(onScroller.defaultPrevented).toBe(true);
     await waitFor(() => expect(scroll.scrollTop).toBeGreaterThan(0));
+  },
+};
+
+export const ClickingARowGivesTheScrollKeysTheFocus: Story = {
+  render: () => <CappedButtonHarness onExpand={() => {}} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-capped-button-grid");
+    const rowTop = () => canvas.getByTestId("git-paged-capped-button-row-directory-row-10").getBoundingClientRect().top;
+
+    // A click on a row text moves the focus to the scroll element, and PageDown then moves the view
+    // by the logical page step, not by the native step of the mapped range.
+    await userEvent.click(canvas.getByTestId("git-paged-capped-button-line-text-current-10"));
+    await expect(document.activeElement).toBe(scroll);
+    const before = rowTop();
+    await userEvent.keyboard("{PageDown}");
+    await waitFor(() => expect(Math.abs(before - rowTop() - scroll.clientHeight * 0.875)).toBeLessThan(2));
+  },
+};
+
+export const ReplayOfOnePageWithEvictionKeepsTheRequestedOffset: Story = {
+  render: () => <ShrinkHarness replayed middlePages={1} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-shrink-grid");
+
+    // The view lies inside the only evicted page. The loaded rows around it anchor the view when
+    // that page loads in the update that evicts the first page.
+    await scrollTo(scroll, (ANCHOR_PAGE_ROWS + 20) * 28);
+    await fireEvent.click(canvas.getByTestId("git-paged-shrink-evict"));
+
+    await waitFor(() => {
+      const view = scroll.getBoundingClientRect();
+      const row = canvas.getByTestId("git-paged-shrink-row-replayed-20").getBoundingClientRect();
+      expect(Math.abs(row.top - view.top)).toBeLessThan(2);
+    });
   },
 };

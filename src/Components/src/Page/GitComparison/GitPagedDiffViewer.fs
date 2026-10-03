@@ -1267,19 +1267,18 @@ type GitPagedDiffViewer =
                         let keyboard = unbox<KeyboardEvent> event
                         let view = float bodyScroll.clientHeight
 
-                        // A key pressed on a button of a row belongs to the button.
-                        if
-                            isCapped ()
-                            && obj.ReferenceEquals(event.target, bodyScroll)
-                            && not (keyboard.ctrlKey || keyboard.altKey || keyboard.metaKey)
-                        then
+                        // Space on a button of a row presses the button.
+                        let onScroller = obj.ReferenceEquals(event.target, bodyScroll)
+
+                        if isCapped () && not (keyboard.ctrlKey || keyboard.altKey || keyboard.metaKey) then
                             let target =
                                 match keyboard.key with
                                 | "ArrowDown" -> Some(logicalTop () + 40.0)
                                 | "ArrowUp" -> Some(logicalTop () - 40.0)
                                 | "PageDown" -> Some(logicalTop () + view * 0.875)
                                 | "PageUp" -> Some(logicalTop () - view * 0.875)
-                                | " " -> Some(logicalTop () + (if keyboard.shiftKey then -0.875 else 0.875) * view)
+                                | " " when onScroller ->
+                                    Some(logicalTop () + (if keyboard.shiftKey then -0.875 else 0.875) * view)
                                 | "Home" -> Some 0.0
                                 | "End" -> Some totalRef.current
                                 | _ -> None
@@ -1510,8 +1509,8 @@ type GitPagedDiffViewer =
 
             // A row anchors by its key, and a placeholder by the page at the top of the viewport
             // and the offset of that page.
-            let candidates =
-                rowsInViewport ()
+            let candidatesOf (items: GitPagedDiffDisplay.VirtualRow[]) =
+                items
                 |> Array.collect (fun item ->
                     let anchorAt key (start: float) = [|
                         ({
@@ -1522,12 +1521,12 @@ type GitPagedDiffViewer =
                         : GitPagedDiffDisplay.AnchorCandidate)
                     |]
 
-                    match rows.[item.index].Content with
+                    match rows.[item.Index].Content with
                     | GitPagedDiffDisplay.Evicted(pageId, _) ->
-                        anchorAt (GitPagedDiffDisplay.pageAnchorKey pageId) (float item.start)
+                        anchorAt (GitPagedDiffDisplay.pageAnchorKey pageId) (float item.Start)
                     | GitPagedDiffDisplay.Folded(_, pageIds, ends) ->
                         let pageIndex =
-                            GitPagedDiffDisplay.pageAtOffset ends (max top (float item.start) - float item.start)
+                            GitPagedDiffDisplay.pageAtOffset ends (max top (float item.Start) - float item.Start)
 
                         // The neighbours anchor as well. When a replay turns the top page into rows in
                         // the same update that evicts a page above, a neighbour is still a placeholder.
@@ -1537,15 +1536,53 @@ type GitPagedDiffViewer =
                         |> Array.collect (fun index ->
                             anchorAt
                                 (GitPagedDiffDisplay.pageAnchorKey pageIds.[index])
-                                (float item.start
+                                (float item.Start
                                  + float (
                                      GitPagedDiffDisplay.RowHeightPx * GitPagedDiffDisplay.pageStartRows ends index
                                  ))
                         )
-                    | content when GitPagedDiffDisplay.isAnchorable content -> anchorAt item.key (float item.start)
+                    | content when GitPagedDiffDisplay.isAnchorable content -> anchorAt item.Key (float item.Start)
                     | _ -> [||]
                 )
-                |> Array.sortBy _.Start
+
+            // The rows in the viewport anchor first. The rows rendered around the viewport follow,
+            // so a placeholder that holds the whole viewport still has rows to anchor to.
+            // The rows around the viewport are the rows the virtualizer renders as overscan.
+            let toRow (item: Virtual.VirtualItem) : GitPagedDiffDisplay.VirtualRow = {
+                Key = item.key
+                Index = item.index
+                Start = item.start
+                Size = item.size
+            }
+
+            let inView = rowsInViewport () |> Array.map toRow
+
+            let around =
+                if inView.Length = 0 then
+                    [||]
+                else
+                    let measurements = rowVirtualizer.measurementsCache
+                    let limit = (min rows.Length measurements.Length) - 1
+                    let first = inView.[0].Index
+                    let last = inView.[inView.Length - 1].Index
+
+                    Array.append [|
+                        max 0 (first - GitPagedDiffDisplay.OverscanRows) .. first - 1
+                    |] [|
+                        last + 1 .. min limit (last + GitPagedDiffDisplay.OverscanRows)
+                    |]
+                    |> Array.map (fun index -> toRow measurements.[index])
+
+            // Rows below the viewport come before the rows above it, since they move with every change above.
+            let candidates =
+                Array.append
+                    (candidatesOf (inView |> Array.sortBy _.Start))
+                    (candidatesOf (
+                        around
+                        |> Array.sortBy (fun item ->
+                            (if float item.Start >= top then 0 else 1), abs (float item.Start - top)
+                        )
+                    ))
 
             ({
                 Keys = rows |> Array.map (fun row -> row.Key)
@@ -1902,7 +1939,10 @@ type GitPagedDiffViewer =
                 ]
                 Html.div [
                     prop.ref bodyScrollRef
-                    prop.className "swt:min-h-0 swt:flex-1 swt:overflow-auto swt:scrollbar-fade"
+                    // The scroll element takes focus when a row is clicked, so the scroll keys reach it.
+                    prop.tabIndex 0
+                    prop.className
+                        "swt:min-h-0 swt:flex-1 swt:overflow-auto swt:scrollbar-fade swt:focus-visible:outline swt:focus-visible:outline-2 swt:focus-visible:-outline-offset-2 swt:focus-visible:outline-primary"
                     prop.onScroll (fun event ->
                         previousLayout.current <- Some(captureAnchor ())
                         let element = event.currentTarget :?> HTMLElement
