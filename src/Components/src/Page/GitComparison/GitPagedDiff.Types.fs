@@ -68,7 +68,23 @@ type PagedPart =
         currentRange: PagedRange
     | HiddenGap of gapId: string * previous: PagedRange * current: PagedRange
     | ExpandedRows of gapId: string * rows: PagedRow[]
+    /// A page whose rows are not loaded. The row count is the number of display rows the page has
+    /// when it is loaded: one for each hunk header, unaligned label and hidden gap, plus the line
+    /// rows. The placeholder is as tall as those rows. The page has no extent when the count is 0.
     | EvictedPage of pageId: string * rowCount: int
+
+/// The display rows of the parts, which is the count an evicted page keeps. The viewer lays out
+/// the same rows, so a placeholder and the replayed page have the same height.
+let displayRowCount (parts: PagedPart[]) =
+    parts
+    |> Array.sumBy (
+        function
+        | HunkRows(_, _, _, startsHunk, _, rows) -> (if startsHunk then 1 else 0) + rows.Length
+        | ExpandedRows(_, rows) -> rows.Length
+        | UnalignedRegion(_, previous, current, _, _) -> 1 + max previous.Length current.Length
+        | HiddenGap _ -> 1
+        | EvictedPage(_, count) -> count
+    )
 
 type PagedProgress = {
     ValidatedBytes: float

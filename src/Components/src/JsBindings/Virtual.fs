@@ -68,6 +68,12 @@ module Virtual =
 
         member this.measureElement: VirtualMeasureElementRef = jsNative
 
+        /// Decides whether a size change of a measured item moves the scroll position. Without a
+        /// predicate, the virtualizer moves the scroll position when the item lies above the offset.
+        member this.shouldAdjustScrollPositionOnItemSizeChange
+            with get (): System.Func<VirtualItem, float, obj, bool> option = jsNative
+            and set (_: System.Func<VirtualItem, float, obj, bool> option) = jsNative
+
 [<Erase>]
 type Virtual =
 
@@ -96,6 +102,9 @@ type Virtual =
             ?paddingEnd: int,
             ?gap: int,
             ?lanes: int,
-            ?scrollEndThreshold: int
+            ?scrollEndThreshold: int,
+            // Reports the scroll offset of the scroll element to the callback and returns the
+            // function that stops the reporting.
+            ?observeElementOffset: System.Func<obj, System.Action<float, bool>, System.Action>
         ) : Virtual.Virtualizer<obj, obj> =
         jsNative

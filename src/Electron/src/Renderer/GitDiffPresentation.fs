@@ -157,20 +157,6 @@ let sourceTitle (info: DiffSourceInfoDto) =
     | Some revision when revision.Length > 0 -> $"{info.Path} @ {revision.Substring(0, min 7 revision.Length)}"
     | _ -> info.Path
 
-/// Number of display rows of the parts, the rows the viewer lays out at one fixed height each.
-/// A hunk header, an unaligned label and a hidden gap take one row each, and an evicted page
-/// takes the rows it stood for. An evicted page keeps this count as its extent.
-let rowCount (parts: PagedPart[]) =
-    parts
-    |> Array.sumBy (
-        function
-        | PagedPart.HunkRows(_, _, _, startsHunk, _, rows) -> (if startsHunk then 1 else 0) + rows.Length
-        | PagedPart.ExpandedRows(_, rows) -> rows.Length
-        | PagedPart.UnalignedRegion(_, previous, current, _, _) -> 1 + max previous.Length current.Length
-        | PagedPart.HiddenGap _ -> 1
-        | PagedPart.EvictedPage(_, count) -> count
-    )
-
 /// Puts the part of the slice before the displayed start in front of the displayed text. The
 /// highlights of the displayed text move by the length of the prepended text. A slice that
 /// starts at or after the displayed start adds nothing, and so does a slice that ends before it,

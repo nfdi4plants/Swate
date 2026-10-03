@@ -31,6 +31,7 @@ import {
   PagedDiffStatus_SourceChanged,
   PagedDiffStatus_WorkerFailed,
 } from "./GitPagedDiff.Types.fs.js";
+import { displayRowCount } from "./GitPagedDiff.Types.fs.js";
 import type { PagedPart_$union } from "./GitPagedDiff.Types.fs.js";
 
 const PAGE_LIMIT = 20;
@@ -619,18 +620,24 @@ function directoryPart(index: number) {
 // only the first page is known, and the continue row reads the next pages.
 function DirectoryHarness({
   fromStart = false,
+  initialKnown = DIRECTORY_PAGE_COUNT,
+  appendButton = false,
+  indexing = false,
   onReplay,
   onNext,
   maxScrollHeight,
 }: {
   fromStart?: boolean;
+  initialKnown?: number;
+  appendButton?: boolean;
+  indexing?: boolean;
   onReplay?: (pageId: string) => void;
   onNext?: () => void;
   maxScrollHeight?: number;
 }) {
   const cache = React.useRef(new Map<string, PagedPart_$union>());
   const [model, setModel] = React.useState(() => ({
-    known: fromStart ? DIRECTORY_PAGE_COUNT : 1,
+    known: fromStart ? initialKnown : 1,
     loaded: fromStart ? [0, 1, 2, 3] : [0],
   }));
   const [pendingReplays, setPendingReplays] = React.useState<string[]>([]);
@@ -681,9 +688,15 @@ function DirectoryHarness({
 
   return (
     <div style={{ height: "40rem" }}>
+      {appendButton ? (
+        <button data-testid="git-paged-directory-append" onClick={requestNext}>
+          Append page
+        </button>
+      ) : null}
       <GitPagedDiffViewerComponent
         parts={parts}
         status={PagedDiffStatus_Ready()}
+        indexing={indexing}
         progress={new PagedProgress(model.known, DIRECTORY_PAGE_COUNT, model.known >= DIRECTORY_PAGE_COUNT)}
         hasMore={model.known < DIRECTORY_PAGE_COUNT}
         outputComplete={model.known >= DIRECTORY_PAGE_COUNT}
@@ -921,13 +934,6 @@ async function scrollToEnd(element: HTMLElement) {
 async function scrollTo(element: HTMLElement, top: number) {
   element.scrollTop = top;
   await fireEvent.scroll(element, { target: { scrollTop: top } });
-}
-
-// Scrolls up in steps shorter than the viewport, the way the wheel does.
-async function wheelToTop(element: HTMLElement) {
-  while (element.scrollTop > 0) {
-    await scrollTo(element, Math.max(0, element.scrollTop - element.clientHeight / 2));
-  }
 }
 
 const onRequestExpand = fn();
@@ -1187,7 +1193,7 @@ export const LongLineStaysInItsColumn: Story = {
     const currentCell = currentText.getBoundingClientRect();
     const loadMore = canvas.getByTestId("git-paged-long-line-more-current-0").getBoundingClientRect();
 
-    // The line stays on one row, and the content grows wider than the view instead of wrapping.
+    // The line stays on one row, and the content grows wider than the view.
     const scroll = canvas.getByTestId("git-paged-long-content").parentElement as HTMLElement;
     await expect(Math.abs(canvas.getByTestId("git-paged-long-row-long-row").getBoundingClientRect().height - 28)).toBeLessThan(1);
     await expect(scroll.scrollWidth).toBeGreaterThan(scroll.clientWidth);
@@ -2001,12 +2007,181 @@ export const IndexingFollowsTheEndInACappedRange: Story = {
       await expect(Math.abs(scroll.scrollHeight - 2500)).toBeLessThan(1);
     }
 
-    // A view the user moved away from stays where it is, and the new rows stay out of it.
-    await scrollTo(scroll, 100);
-    await fireEvent.click(canvas.getByTestId("git-paged-indexing-add"));
-    await new Promise((resolve) => window.setTimeout(resolve, 100));
-    await expect(scroll.scrollTop).toBe(100);
-    await expect(canvas.queryByTestId(lastRowOf(6))).toBeNull();
+    // A view the user moved away from keeps its rows in place while the diff grows, and the thumb
+    // keeps the fraction of the track that the logical offset has in the larger diff.
+    await scrollTo(scroll, 700);
+    const visibleRow = () => {
+      const view = scroll.getBoundingClientRect();
+      const row = Array.from(scroll.querySelectorAll<HTMLElement>('[data-paged-diff-key^="directory-row-"]'))
+        .filter((element) => {
+          const box = element.getBoundingClientRect();
+          return box.bottom > view.top + 1 && box.top < view.bottom - 1;
+        })
+        .sort((left, right) => left.getBoundingClientRect().top - right.getBoundingClientRect().top)[0];
+      const key = row.dataset.pagedDiffKey ?? "";
+      return { key, index: Number(key.replace("directory-row-", "")), top: row.getBoundingClientRect().top - view.top };
+    };
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
+    const before = visibleRow();
+    for (const pages of [6, 7, 8]) {
+      await fireEvent.click(canvas.getByTestId("git-paged-indexing-add"));
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
+      await expect(canvas.queryByTestId(lastRowOf(pages))).toBeNull();
+    }
+    const after = visibleRow();
+    await expect(after.key).toBe(before.key);
+    await expect(Math.abs(after.top - before.top)).toBeLessThan(2);
+    const logical = after.index * DIRECTORY_ROW_HEIGHT - after.top;
+    const total = 8 * DIRECTORY_PAGE_ROWS * DIRECTORY_ROW_HEIGHT + 60;
+    const fraction = scroll.scrollTop / (scroll.scrollHeight - scroll.clientHeight);
+    await expect(Math.abs(fraction - logical / (total - scroll.clientHeight))).toBeLessThan(0.05);
     await expect(content).toHaveAttribute("data-provisional", "true");
+  },
+};
+
+export const ReplayedRowsShowWhileTheScrollbarIsHeld: Story = {
+  render: () => <DirectoryHarness fromStart initialKnown={20} appendButton indexing onReplay={onDirectoryReplay} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-directory-grid");
+    const before = scroll.scrollHeight;
+
+    // A page arrives while the scrollbar is held. The scroll height stays, and the rows of a
+    // replay still show where the thumb is.
+    await fireEvent.pointerDown(scroll);
+    await fireEvent.click(canvas.getByTestId("git-paged-directory-append"));
+    const row = 10 * DIRECTORY_PAGE_ROWS + 5;
+    await scrollTo(scroll, row * DIRECTORY_ROW_HEIGHT);
+    await waitFor(() => expect(onDirectoryReplay).toHaveBeenCalledWith("page-10"));
+    await waitFor(() => {
+      const view = scroll.getBoundingClientRect();
+      const box = canvas.getByTestId(`git-paged-directory-row-directory-row-${row}`).getBoundingClientRect();
+      expect(box.bottom).toBeGreaterThan(view.top);
+      expect(box.top).toBeLessThan(view.bottom);
+    });
+    await expect(Math.abs(scroll.scrollHeight - before)).toBeLessThan(1);
+
+    await fireEvent.pointerUp(window);
+    await waitFor(() => expect(scroll.scrollHeight).toBeGreaterThan(before));
+  },
+};
+
+const ANCHOR_PAGE_COUNT = 20;
+const ANCHOR_PAGE_ROWS = 100;
+const ANCHOR_SHRINK_ROWS = 60;
+
+function anchorPart(prefix: string, start: number, count: number) {
+  const rows = Array.from({ length: count }, (_, offset) =>
+    new PagedRow(`${prefix}-${offset}`, "added", undefined, makeLine(start + offset, `Row ${prefix} ${offset}`)),
+  );
+  return PagedPart_HunkRows(`hunk-${prefix}`, range(start, 0), range(start, count), false, false, rows);
+}
+
+// A loaded page of 100 rows, 20 evicted pages and a loaded page. The button evicts the first page,
+// which had arrived with 40 rows and grew to 100 by expansions, so everything below it moves up.
+function ShrinkHarness() {
+  const [evicted, setEvicted] = React.useState(false);
+  const parts = React.useMemo(
+    () => [
+      evicted ? PagedPart_EvictedPage("first", ANCHOR_PAGE_ROWS - ANCHOR_SHRINK_ROWS) : anchorPart("first", 0, ANCHOR_PAGE_ROWS),
+      ...Array.from({ length: ANCHOR_PAGE_COUNT }, (_, index) => PagedPart_EvictedPage(`middle-${index}`, ANCHOR_PAGE_ROWS)),
+      anchorPart("last", 5000, 20),
+    ],
+    [evicted],
+  );
+  return (
+    <div style={{ height: "30rem" }}>
+      <button data-testid="git-paged-shrink-evict" onClick={() => setEvicted(true)}>
+        Evict
+      </button>
+      <GitPagedDiffViewerComponent
+        parts={parts}
+        status={PagedDiffStatus_Ready()}
+        progress={new PagedProgress(100, 100, true)}
+        hasMore={false}
+        outputComplete={true}
+        testIdPrefix="git-paged-shrink"
+      />
+    </div>
+  );
+}
+
+export const EvictingAPageAboveKeepsThePageInView: Story = {
+  render: () => <ShrinkHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-shrink-grid");
+
+    // The view sits 20 rows into the eleventh evicted page.
+    await scrollTo(scroll, (ANCHOR_PAGE_ROWS + 10 * ANCHOR_PAGE_ROWS + 20) * 28);
+    const before = scroll.scrollTop;
+    await fireEvent.click(canvas.getByTestId("git-paged-shrink-evict"));
+
+    // The rows above shrink, and the view stays on the same offset of the same page.
+    await waitFor(() => expect(Math.abs(before - scroll.scrollTop - ANCHOR_SHRINK_ROWS * 28)).toBeLessThan(2));
+  },
+};
+
+const ROW_COUNT_PAGE = () => [
+  PagedPart_HunkRows("count-hunk", range(0, 3), range(0, 3), true, false, makeAlignedRows(0, 3, -1, -1)),
+  PagedPart_HiddenGap("count-gap", range(3, 10), range(3, 10)),
+  PagedPart_UnalignedRegion(
+    "count-split",
+    Array.from({ length: 3 }, (_, index) => makeLine(13 + index, `Previous split ${index}`)),
+    Array.from({ length: 5 }, (_, index) => makeLine(13 + index, `Current split ${index}`)),
+    range(13, 3),
+    range(13, 5),
+  ),
+  PagedPart_UnalignedRegion(
+    "count-split",
+    Array.from({ length: 2 }, (_, index) => makeLine(16 + index, `Previous tail ${index}`)),
+    Array.from({ length: 1 }, (_, index) => makeLine(18 + index, `Current tail ${index}`)),
+    range(16, 2),
+    range(18, 1),
+  ),
+];
+
+function RowCountHarness() {
+  const [loaded, setLoaded] = React.useState(true);
+  const page = React.useMemo(ROW_COUNT_PAGE, []);
+  const parts = [
+    PagedPart_HunkRows("count-before", range(100, 4), range(100, 4), false, false, makeAlignedRows(100, 4, -1, -1)),
+    ...(loaded ? page : [PagedPart_EvictedPage("counted", displayRowCount(page))]),
+    PagedPart_HunkRows("count-after", range(200, 4), range(200, 4), false, false, makeAlignedRows(200, 4, -1, -1)),
+  ];
+  return (
+    <div style={{ height: "40rem" }}>
+      <button data-testid="git-paged-count-toggle" onClick={() => setLoaded((current) => !current)}>
+        Toggle
+      </button>
+      <GitPagedDiffViewerComponent
+        parts={parts}
+        status={PagedDiffStatus_Ready()}
+        progress={new PagedProgress(100, 100, true)}
+        hasMore={false}
+        outputComplete={true}
+        testIdPrefix="git-paged-count"
+      />
+    </div>
+  );
+}
+
+export const EvictedPageIsAsTallAsItsReplay: Story = {
+  render: () => <RowCountHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const content = canvas.getByTestId("git-paged-count-content");
+
+    // A hunk header, a gap and a split unaligned region have rows of their own. The evicted page
+    // is as tall as the loaded page, so the page after it keeps its place.
+    const loadedHeight = content.getBoundingClientRect().height;
+    const lastRow = () => canvas.getByTestId("git-paged-count-row-row-203").getBoundingClientRect().top;
+    const loadedTop = lastRow();
+    await expect(loadedHeight).toBe((4 + displayRowCount(ROW_COUNT_PAGE()) + 4) * 28);
+
+    await fireEvent.click(canvas.getByTestId("git-paged-count-toggle"));
+    await waitFor(() => expect(canvas.queryByTestId("git-paged-count-row-folded:between:counted")).not.toBeNull());
+    await expect(content.getBoundingClientRect().height).toBe(loadedHeight);
+    await expect(Math.abs(lastRow() - loadedTop)).toBeLessThan(1);
   },
 };

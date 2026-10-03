@@ -36,18 +36,11 @@ let Main (page: GitDiffPageData) =
     // Once the first page is ready, the loader reads every other page in the background, so the
     // viewer knows the extent of the whole diff.
     React.useEffect (
-        (fun () ->
-            if
-                not page.Indexing
-                && page.NextCursor.IsSome
-                && page.Handle.IsSome
-                && page.Status = GitDiffPageStatus.Ready
-            then
-                send (GitDiffMsg.Index generation)
-        ),
+        (fun () -> GitDiffPageLoader.indexingRequest page |> Option.iter send),
         [|
             box generation
             box page.Indexing
+            box page.NextFailed
             box page.NextCursor
             box page.Status
         |]
@@ -110,7 +103,8 @@ let Main (page: GitDiffPageData) =
                         status = Presentation.status page.Status,
                         progress = (page.Progress |> Option.map Presentation.progress),
                         hasMore = page.NextCursor.IsSome,
-                        indexing = page.Indexing,
+                        indexing = (page.Indexing && not page.NextFailed),
+                        nextFailed = page.NextFailed,
                         outputComplete = page.OutputComplete,
                         ?pending = (page.Pending |> Option.map Presentation.pending),
                         requestNext = (fun () -> send (GitDiffMsg.LoadNext generation)),

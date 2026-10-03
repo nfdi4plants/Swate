@@ -147,6 +147,9 @@ type GitDiffPageData = {
     /// Set once the viewer asked for the background read of every remaining page. While it is
     /// set, each arriving page starts the read of the next one, until the output is exhausted.
     Indexing: bool
+    /// The last read of the next page failed with an error that leaves the rows usable. The rows
+    /// stay, the indexing waits, and the continue button of the viewer asks again.
+    NextFailed: bool
     /// Gaps, line slices and evicted pages whose last request failed. The viewer marks their
     /// controls, and the next request of the same control clears the mark.
     FailedGaps: string list

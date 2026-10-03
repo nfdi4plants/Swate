@@ -1422,7 +1422,7 @@ module GitDiffPageLoader =
     let private endsDiff (status: GitDiffPageStatus) =
         match status with
         | GitDiffPageStatus.SourceChanged
-        | GitDiffPageStatus.Blocked(_, GitDiffBlockReason.NotText _)
+        | GitDiffPageStatus.Blocked _
         | GitDiffPageStatus.EncodingChoice _
         | GitDiffPageStatus.WorkerFailed _ -> true
         | _ -> false
@@ -1549,6 +1549,7 @@ module GitDiffPageLoader =
             VisiblePages = []
             KeepRequestedPage = false
             Indexing = false
+            NextFailed = false
             FailedGaps = []
             FailedLineSlices = []
             FailedReplays = []
@@ -1767,7 +1768,7 @@ module GitDiffPageLoader =
         {
             PageId = dto.PageId
             Parts = parts
-            RowCount = Presentation.rowCount parts
+            RowCount = Paged.displayRowCount parts
             PayloadBytes = payloadBytes dto
             IsEvicted = false
             ExpandedGaps = []
@@ -1851,6 +1852,7 @@ module GitDiffPageLoader =
                     RequestedPageIndex = requestedPageIndex
                     KeepRequestedPage = false
                     NextCursor = dto.NextCursor
+                    NextFailed = false
                     Progress = Some dto.Progress
                     Pending = dto.Pending
                     OutputComplete = dto.OutputComplete
@@ -2178,6 +2180,7 @@ module GitDiffPageLoader =
                             Status = GitDiffPageStatus.LoadingNext
                             VisiblePages = []
                             KeepRequestedPage = false
+                            NextFailed = false
                     }
                     cursor
             | _ -> page, Cmd.none
@@ -2332,7 +2335,17 @@ module GitDiffPageLoader =
                 page, Cmd.none
             else
                 match valueOf result with
-                | Error status -> { page with Status = status }, Cmd.none
+                // An error that ends the diff, or one while the diff has no rows or reopens,
+                // settles the page. Any other error keeps the rows, and the continue button asks again.
+                | Error status when endsDiff status || isReopening page.Status || page.Pages.Length = 0 ->
+                    { page with Status = status }, Cmd.none
+                | Error _ ->
+                    {
+                        page with
+                            Status = GitDiffPageStatus.Ready
+                            NextFailed = true
+                    },
+                    Cmd.none
                 | Ok resumable -> applyResumablePage deps page resumable
         | GitDiffMsg.ReplayCompleted(_, request, result) ->
             let page = {
@@ -2518,6 +2531,7 @@ module GitDiffPageLoader =
                         PendingReplay = None
                         VisiblePages = []
                         KeepRequestedPage = false
+                        NextFailed = false
                         FailedGaps = []
                         FailedLineSlices = []
                         FailedReplays = []
@@ -2608,10 +2622,20 @@ module GitDiffPageLoader =
     /// pending read stays the only read, and the answer of a closed diff finds no page to continue.
     let private continueIndexing (deps: GitDependencies) (page: GitDiffPageData) =
         match page.Status, page.NextCursor, page.Handle with
-        | GitDiffPageStatus.Ready, Some cursor, Some _ when page.Indexing && page.NextRequest.IsNone ->
+        | GitDiffPageStatus.Ready, Some cursor, Some _ when
+            page.Indexing && not page.NextFailed && page.NextRequest.IsNone
+            ->
             readPage deps { page with KeepRequestedPage = true } cursor
         | GitDiffPageStatus.Ready, None, _ when page.Indexing -> { page with Indexing = false }, Cmd.none
         | _ -> page, Cmd.none
+
+    /// The message that starts the indexing, once the first page is ready and more pages follow.
+    /// None while the indexing runs or waits for a retry.
+    let indexingRequest (page: GitDiffPageData) : GitDiffMsg option =
+        match page.Status, page.NextCursor, page.Handle with
+        | GitDiffPageStatus.Ready, Some _, Some _ when not page.Indexing && not page.NextFailed ->
+            Some(GitDiffMsg.Index page.Generation)
+        | _ -> None
 
     let private choosesWithoutToken (side: DiffSideDto) (status: GitDiffPageStatus) =
         match status with

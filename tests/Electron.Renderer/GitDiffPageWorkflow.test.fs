@@ -796,8 +796,7 @@ Vitest.describe (
                          else
                              [| hunk $"h{index}" |])
 
-                let displayRows (windowPage: GitDiffWindowPage) =
-                    Renderer.GitDiffPresentation.rowCount windowPage.Parts
+                let displayRows (windowPage: GitDiffWindowPage) = Paged.displayRowCount windowPage.Parts
 
                 let! state = openFirstPage fake (pageDto 1)
 
@@ -893,7 +892,7 @@ Vitest.describe (
                 Vitest
                     .expect(
                         page.Pages
-                        |> Array.sumBy (fun windowPage -> Renderer.GitDiffPresentation.rowCount windowPage.Parts)
+                        |> Array.sumBy (fun windowPage -> Paged.displayRowCount windowPage.Parts)
                     )
                     .toBe (2 * lastIndex)
             }
@@ -956,24 +955,92 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "Indexing stops at the first failed read and leaves the failure status",
+            "A failed read keeps the rows and stops the indexing until the next page is asked for again",
             fun () -> promise {
                 let fake = FakeDiffClient()
                 let! state = openFirstPage fake (diffPage "p1" (Some "cursor-1") [| hunk "h1" |])
+                let generation = (diffOf state).Generation
+
+                let pageDto index =
+                    diffPage $"p{index}" (if index < 4 then Some $"cursor-{index}" else None) [| hunk $"h{index}" |]
+
+                let failing = ref true
 
                 fake.ReadReply <-
                     fun request ->
-                        match request.Cursor with
-                        | "cursor-1" ->
-                            succeeded (ResumablePageDto.Ready(diffPage "p2" (Some "cursor-2") [| hunk "h2" |]))
-                        | _ -> failedWith "git_failure" None
+                        let index = int (request.Cursor.Replace("cursor-", "")) + 1
 
-                let! state = run fake (diffMsg (GitDiffMsg.Index (diffOf state).Generation)) state
+                        if index = 3 && failing.Value then
+                            failedWith "git_failure" None
+                        else
+                            succeeded (ResumablePageDto.Ready(pageDto index))
+
+                let! state = run fake (diffMsg (GitDiffMsg.Index generation)) state
                 let page = diffOf state
 
+                // The failure leaves the two pages read, and no further read starts by itself.
                 Vitest.expect(fake.Reads.Count).toBe (2)
-                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Failed "git_failure")
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+                Vitest.expect(page.NextFailed).toBe (true)
                 Vitest.expect(page.Pages.Length).toBe (2)
+                Vitest.expect(GitDiffPageLoader.indexingRequest page).toEqual (None)
+
+                // Asking for the next page again reads it, and the indexing goes on to the end.
+                failing.Value <- false
+                let! state = run fake (diffMsg (GitDiffMsg.LoadNext generation)) state
+                let page = diffOf state
+
+                Vitest.expect(page.NextFailed).toBe (false)
+                Vitest.expect(page.Pages |> Array.map _.PageId).toEqual ([| "p1"; "p2"; "p3"; "p4" |])
+                Vitest.expect(page.NextCursor).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A read that ends the diff settles the page while the indexing runs",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let! state = openFirstPage fake (diffPage "p1" (Some "cursor-1") [| hunk "h1" |])
+                fake.ReadReply <- fun _ -> failedWith "source_changed" None
+
+                let! state = run fake (diffMsg (GitDiffMsg.Index (diffOf state).Generation)) state
+
+                Vitest.expect(fake.Reads.Count).toBe (1)
+                Vitest.expect((diffOf state).Status).toEqual (GitDiffPageStatus.SourceChanged)
+            }
+        )
+
+        Vitest.test (
+            "The loader asks for the indexing once the first page is ready and more pages follow",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let! single = openFirstPage fake (diffPage "p1" None [| hunk "h1" |])
+                Vitest.expect(GitDiffPageLoader.indexingRequest (diffOf single)).toEqual (None)
+
+                let fake = FakeDiffClient()
+                let! state = openFirstPage fake (diffPage "p1" (Some "cursor-1") [| hunk "h1" |])
+                let page = diffOf state
+
+                Vitest.expect(GitDiffPageLoader.indexingRequest page).toEqual (Some(GitDiffMsg.Index page.Generation))
+
+                // Once the indexing runs, or while a page loads, the loader asks for nothing.
+                fake.ReadReply <-
+                    fun _ -> succeeded (ResumablePageDto.Ready(diffPage "p2" (Some "cursor-2") [| hunk "h2" |]))
+
+                let indexing, indexCmd =
+                    update fake.Dependencies fake.SetPageState (diffMsg (GitDiffMsg.Index page.Generation)) state
+
+                let! _ = collectMessages indexCmd
+                Vitest.expect(GitDiffPageLoader.indexingRequest (diffOf indexing)).toEqual (None)
+
+                Vitest
+                    .expect(
+                        GitDiffPageLoader.indexingRequest {
+                            page with
+                                Status = GitDiffPageStatus.LoadingNext
+                        }
+                    )
+                    .toEqual (None)
             }
         )
 
@@ -1155,7 +1222,6 @@ Vitest.describe (
                     GitDiffPageStatus.Blocked(Some DiffSideDto.Current, GitDiffBlockReason.NotText "invalid utf-8")
                     failedWith "service_unavailable" None,
                     GitDiffPageStatus.Blocked(None, GitDiffBlockReason.ProviderUnsupported)
-                    failedWith "git_failure" None, GitDiffPageStatus.Failed "git_failure"
                 ]
 
                 for failure, expected in cases do

@@ -55,6 +55,8 @@ module internal GitPagedDiffDisplay =
         /// The loader reads the remaining pages on its own, so the continue row shows the progress
         /// of that reading and no button.
         Indexing: bool
+        /// The last read of the next page failed. The continue button shows the failure and asks again.
+        NextFailed: bool
         Progress: PagedProgress option
         /// The columns of the row share one minimum width, so the rows line up.
         ColumnMin: string
@@ -118,14 +120,11 @@ module internal GitPagedDiffDisplay =
     [<Literal>]
     let RowHeightPx = 28
 
-    /// The rows an evicted page takes. A page without rows still shows its placeholder.
-    let pageRows (rowCount: int) = max 1 rowCount
-
     /// The height of a row the virtualizer lays out. The continue row has no fixed height and
     /// counts as one row until it is measured.
     let rowExtent (content: Content) =
         match content with
-        | Evicted(_, rowCount) -> RowHeightPx * pageRows rowCount
+        | Evicted(_, rowCount) -> RowHeightPx * rowCount
         | Folded(_, _, ends) -> RowHeightPx * Array.last ends
         | _ -> RowHeightPx
 
@@ -136,11 +135,23 @@ module internal GitPagedDiffDisplay =
         | Folded _ -> true
         | _ -> false
 
-    /// The tallest scroll height the viewer asks the browser for. Browsers stop laying out content
-    /// at about 2^25 device pixels, which is 11.1 million CSS pixels at a pixel ratio of 3. A diff
-    /// taller than this maps the native scroll range to the logical offsets.
+    /// The tallest scroll height the viewer asks the browser for. A diff taller than this maps the
+    /// native scroll range to the logical offsets. Dragging the thumb, the wheel and the keys map
+    /// exactly. A click on the scrollbar track or on a scrollbar arrow moves the native position by
+    /// its usual step, which is several logical steps. Row counts and heights are 32-bit integers,
+    /// so a diff has at most about 76 million display rows.
     [<Literal>]
     let DefaultMaxScrollHeightPx = 10000000
+
+    /// The tallest scroll height the browser lays out for the pixel ratio, with a quarter of
+    /// margin under 2^25 device pixels.
+    let layoutLimitPx (devicePixelRatio: float) =
+        let ratio = if devicePixelRatio >= 1.0 then devicePixelRatio else 1.0
+        int (0.75 * 33554432.0 / ratio)
+
+    /// The start of a page inside a placeholder, in rows from the top of the placeholder.
+    let pageStartRows (ends: int[]) (pageIndex: int) =
+        if pageIndex = 0 then 0 else ends.[pageIndex - 1]
 
     /// The height of the scroll content. A diff above the cap takes the cap.
     let physicalHeight (cap: float) (total: float) = min total cap
@@ -315,7 +326,7 @@ module internal GitPagedDiffDisplay =
             parts.[first..last]
             |> Array.choose (
                 function
-                | PagedPart.EvictedPage(pageId, rowCount) -> Some(pageId, pageRows rowCount)
+                | PagedPart.EvictedPage(pageId, rowCount) -> Some(pageId, rowCount)
                 | _ -> None
             )
 
@@ -337,15 +348,17 @@ module internal GitPagedDiffDisplay =
         | Later -> "later"
         | Between -> "between"
 
-    /// Whether the scroll position can follow the row when the rows change. Placeholders and the
-    /// continue row change their start when pages around them load or evict, so they cannot hold
-    /// the position.
+    /// Whether the scroll position can follow the row when the rows change. The continue row
+    /// changes its start when pages load. A placeholder is followed by the page at the top of the
+    /// viewport and its offset, since the placeholder itself changes its start and size when pages
+    /// around it load or evict.
     let isAnchorable (content: Content) =
         match content with
-        | Evicted _
-        | Folded _
         | Continue _ -> false
         | _ -> true
+
+    /// The key of the anchor that follows a page of a placeholder.
+    let pageAnchorKey (pageId: string) = $"page:{pageId}"
 
     /// The line a row shows on the side, if it shows one.
     let lineOfRow (side: PagedDiffSide) (content: Content) =
@@ -473,7 +486,8 @@ module internal GitPagedDiffDisplay =
         else
             clamp 0 100 (int (Math.Round(progress.ValidatedBytes / progress.TotalBytes * 100.0)))
 
-    /// An evicted page with rows counts as content, since its rows come back when it is replayed.
+    /// An evicted page with display rows counts as content, since its rows come back when it is
+    /// replayed. A page of hidden gaps only counts as well.
     let hasChanges (parts: PagedPart[]) =
         parts
         |> Array.exists (
@@ -544,26 +558,6 @@ module internal GitPagedDiffDisplay =
         | PagedSnippetEnd.MoreTextPending -> "more-text-pending"
         | PagedSnippetEnd.LineEnd -> "line-end"
         | PagedSnippetEnd.EndOfFile -> "end-of-file"
-
-/// The virtualizer with the two options the capped scroll range needs. The offset it follows is the
-/// logical one, and it does not move the native scroll position when a row changes its size.
-[<Erase>]
-type internal CappedVirtual =
-
-    [<ImportMember(Virtual.ImportPath)>]
-    [<NamedParamsAttribute>]
-    static member useVirtualizer
-        (
-            count: int,
-            getScrollElement: unit -> option<Browser.Types.HTMLElement>,
-            estimateSize: int -> int,
-            ?getItemKey: int -> string,
-            ?overscan: int,
-            ?gap: int,
-            ?observeElementOffset: Func<obj, Action<float, bool>, Action>,
-            ?shouldAdjustScrollPositionOnItemSizeChange: Func<Virtual.VirtualItem, float, obj, bool>
-        ) : Virtual.Virtualizer<obj, obj> =
-        jsNative
 
 [<Erase; Mangle(false)>]
 type GitPagedDiffViewer =
@@ -881,7 +875,8 @@ type GitPagedDiffViewer =
             // The placeholder is as tall as the rows it stands for. Its label sticks to the top of
             // the viewport, so the loading state and the retry control sit where the user looks.
             Html.div [
-                prop.className "swt:col-span-2 swt:bg-base-200/60 swt:text-xs swt:text-base-content/65 swt:font-sans"
+                prop.className
+                    "swt:col-span-2 swt:overflow-clip swt:bg-base-200/60 swt:text-xs swt:text-base-content/65 swt:font-sans"
                 yield! attributes
                 prop.custom ("data-loading", (if replaying then "true" else "false"))
                 prop.style [ style.height height ]
@@ -1055,7 +1050,11 @@ type GitPagedDiffViewer =
 
                                         Html.button [
                                             prop.testId $"{props.Prefix}-continue-button"
-                                            prop.className "swt:btn swt:btn-primary swt:btn-xs"
+                                            GitPagedDiffDisplay.failedAttribute props.NextFailed
+                                            prop.className [
+                                                "swt:btn swt:btn-primary swt:btn-xs"
+                                                GitPagedDiffDisplay.failedClass props.NextFailed
+                                            ]
                                             prop.disabled (busy || props.RequestNext.IsNone)
                                             prop.onClick (fun _ ->
                                                 props.RequestNext |> Option.iter (fun callback -> callback ())
@@ -1102,6 +1101,7 @@ type GitPagedDiffViewer =
             nextKey: string option,
             hasMore: bool,
             indexing: bool,
+            nextFailed: bool,
             maxScrollHeight: int,
             progress: PagedProgress option,
             status: PagedDiffStatus,
@@ -1125,15 +1125,18 @@ type GitPagedDiffViewer =
         let contentMeasureRef, contentRect = React.useMeasure<Element> ()
         let previousLayout = React.useRef<GitPagedDiffDisplay.AnchorSnapshot option> None
         let appliedScrollToken = React.useRef<int option> None
-        // Whether the user holds the scrollbar. The thumb keeps its meaning while it is held, so
-        // changes to the total height wait until the user lets go.
         // The user reached the end while the diff was still being indexed. The view then stays at
         // the end as the diff grows, until the user scrolls away or the indexing ends.
         let followEnd = React.useRef false
-        let gesture, setGesture = React.useState false
-        let heldRows = React.useRef (incomingRows, incomingParts)
+        // Whether the user holds the scrollbar. The state renders the viewer again when the user
+        // lets go.
+        let _, setGesture = React.useState false
+        // The total height while the scrollbar is held. The thumb keeps its meaning, so the content
+        // height and the mapping of the scroll range keep this total, while the rows change as
+        // pages replay and arrive.
+        let pinnedTotal = React.useRef<float option> None
         // The rows in the viewport while the diff reopens. The scroll target of the reopen names
-        // the first line of a page, and the view lands at the line the user was reading instead.
+        // the first line of a page, and the view lands on the line the user was reading.
         let readingRows = React.useRef<GitPagedDiffDisplay.Content[]> [||]
         // Changed after the scroll position was restored, so the rows render for the new position
         // before the browser paints.
@@ -1142,13 +1145,20 @@ type GitPagedDiffViewer =
         // The scroll range above the cap maps the native scroll position to a logical offset. The
         // rows lay out at the logical offsets, and the refs let the scroll handlers read the
         // latest values.
-        let cap = float maxScrollHeight
+        let cap =
+            float (min maxScrollHeight (GitPagedDiffDisplay.layoutLimitPx Browser.Dom.window.devicePixelRatio))
+
         let capRef = React.useRef cap
         capRef.current <- cap
         let totalRef = React.useRef 0.0
+        // The logical scroll offset is the source of truth. The native position follows it.
         let logicalRef = React.useRef 0.0
         // The native scroll position of the last write or read, which logicalRef belongs to.
         let physicalRef = React.useRef -1.0
+        // Whether the scroll range was capped when the scroll position was placed last.
+        let wasCapped = React.useRef false
+        // Brings the virtualizer to the logical offset, for the handlers that outlive a render.
+        let syncRef = React.useRef ignore
 
         let isCapped () = totalRef.current > capRef.current
 
@@ -1167,7 +1177,11 @@ type GitPagedDiffViewer =
                     physicalRef.current <- physical
 
                 logicalRef.current
-            | Some element -> element.scrollTop
+            | Some element when wasCapped.current -> logicalRef.current
+            | Some element ->
+                logicalRef.current <- element.scrollTop
+                physicalRef.current <- element.scrollTop
+                element.scrollTop
             | None -> 0.0
 
         let setLogicalTop (logical: float) =
@@ -1184,15 +1198,7 @@ type GitPagedDiffViewer =
                     element.scrollTop <- logical
             | None -> ()
 
-        let rows, rowParts =
-            let totalExtent (candidates: GitPagedDiffDisplay.Row[]) =
-                candidates |> Array.sumBy (fun row -> GitPagedDiffDisplay.rowExtent row.Content)
-
-            if gesture && totalExtent incomingRows <> totalExtent (fst heldRows.current) then
-                heldRows.current
-            else
-                heldRows.current <- (incomingRows, incomingParts)
-                incomingRows, incomingParts
+        let rows, rowParts = incomingRows, incomingParts
 
         // While the diff reopens, the rows stay on screen and take no requests.
         let interactive = status <> PagedDiffStatus.Reopening
@@ -1221,19 +1227,26 @@ type GitPagedDiffViewer =
                     // press that targets the element and not a row.
                     let startGesture (event: Event) =
                         if obj.ReferenceEquals(event.target, bodyScroll) then
+                            pinnedTotal.current <- Some totalRef.current
                             setGesture true
 
-                    let endGesture (_: Event) = setGesture false
+                    let endGesture (_: Event) =
+                        pinnedTotal.current <- None
+                        setGesture false
 
                     // A release outside the window can go unnoticed, so a move without a pressed
                     // button also ends the gesture.
                     let moveGesture (event: Event) =
                         if (unbox<MouseEvent> event).buttons = 0 then
-                            setGesture false
+                            endGesture event
 
                     // Above the cap a wheel step or a key press moves by its usual amount of logical
-                    // pixels. The native step would move by the ratio of the two ranges.
-                    let moveLogical (delta: float) = setLogicalTop (logicalTop () + delta)
+                    // pixels. The native step would move by the ratio of the two ranges. The rows
+                    // render for the new offset even when the step is too small to move the native
+                    // position.
+                    let moveLogical (delta: float) =
+                        setLogicalTop (logicalTop () + delta)
+                        syncRef.current ()
 
                     let onWheel (event: Event) =
                         let wheel = unbox<WheelEvent> event
@@ -1260,6 +1273,7 @@ type GitPagedDiffViewer =
                                 | "ArrowUp" -> Some(logicalTop () - 40.0)
                                 | "PageDown" -> Some(logicalTop () + view * 0.875)
                                 | "PageUp" -> Some(logicalTop () - view * 0.875)
+                                | " " -> Some(logicalTop () + (if keyboard.shiftKey then -0.875 else 0.875) * view)
                                 | "Home" -> Some 0.0
                                 | "End" -> Some totalRef.current
                                 | _ -> None
@@ -1268,6 +1282,7 @@ type GitPagedDiffViewer =
                             | Some value ->
                                 event.preventDefault ()
                                 setLogicalTop value
+                                syncRef.current ()
                             | None -> ()
 
                     let window = Browser.Dom.window
@@ -1275,7 +1290,9 @@ type GitPagedDiffViewer =
                     bodyScroll.addEventListener (
                         "wheel",
                         onWheel,
-                        unbox<bool> (Fable.Core.JsInterop.createObj [ "passive", box false ])
+                        Fable.Core.JsInterop.jsOptions<AddEventListenerOptions> (fun options ->
+                            options.passive <- false
+                        )
                     )
 
                     bodyScroll.addEventListener ("keydown", onKeyDown)
@@ -1337,26 +1354,36 @@ type GitPagedDiffViewer =
                 | None -> Action(fun () -> ())
             )
 
-        // The native scroll position stays where the viewer put it, since the logical offset
-        // above the cap does not equal it.
-        let adjustOnResize =
-            Func<Virtual.VirtualItem, float, obj, bool>(fun item _ _ ->
-                not (isCapped ()) && float item.start < logicalTop ()
-            )
-
         let rowVirtualizer =
-            CappedVirtual.useVirtualizer (
+            Virtual.useVirtualizer (
                 count = rows.Length,
                 getScrollElement = (fun () -> bodyScrollRef.current),
                 estimateSize = (fun index -> GitPagedDiffDisplay.rowExtent rows.[index].Content),
                 getItemKey = (fun index -> rows.[index].Key),
                 overscan = GitPagedDiffDisplay.OverscanRows,
                 gap = 0,
-                observeElementOffset = observeOffset,
-                shouldAdjustScrollPositionOnItemSizeChange = adjustOnResize
+                observeElementOffset = observeOffset
             )
 
-        totalRef.current <- float (rowVirtualizer.getTotalSize ())
+        // Above the cap a size change must not move the native position, which does not equal the
+        // logical offset the virtualizer would write.
+        rowVirtualizer.shouldAdjustScrollPositionOnItemSizeChange <-
+            (if isCapped () then
+                 Some(Func<Virtual.VirtualItem, float, obj, bool>(fun _ _ _ -> false))
+             else
+                 None)
+
+        totalRef.current <- defaultArg pinnedTotal.current (float (rowVirtualizer.getTotalSize ()))
+
+        // Brings the virtualizer to the logical offset, and renders the rows for it.
+        let syncVirtualizer () =
+            let logical = logicalTop ()
+
+            if abs (rowVirtualizer.scrollOffset - logical) >= 1.0 then
+                rowVirtualizer.scrollOffset <- logical
+                setLayoutVersion (layoutVersion + 1)
+
+        syncRef.current <- syncVirtualizer
 
         let visibleItems = rowVirtualizer.getVirtualItems ()
 
@@ -1475,18 +1502,39 @@ type GitPagedDiffViewer =
         let captureAnchor () : GitPagedDiffDisplay.AnchorSnapshot =
             let top = logicalTop ()
 
+            // A row anchors by its key, and a placeholder by the page at the top of the viewport
+            // and the offset of that page.
             let candidates =
                 rowsInViewport ()
-                |> Array.filter (fun item -> GitPagedDiffDisplay.isAnchorable rows.[item.index].Content)
-                |> Array.sortBy (fun item -> item.start)
-                |> Array.map (fun item ->
-                    ({
-                        Key = item.key
-                        Start = float item.start
-                        Offset = float item.start - top
-                    }
-                    : GitPagedDiffDisplay.AnchorCandidate)
+                |> Array.choose (fun item ->
+                    let anchorAt key (start: float) =
+                        Some(
+                            {
+                                Key = key
+                                Start = start
+                                Offset = start - top
+                            }
+                            : GitPagedDiffDisplay.AnchorCandidate
+                        )
+
+                    match rows.[item.index].Content with
+                    | GitPagedDiffDisplay.Evicted(pageId, _) ->
+                        anchorAt (GitPagedDiffDisplay.pageAnchorKey pageId) (float item.start)
+                    | GitPagedDiffDisplay.Folded(_, pageIds, ends) ->
+                        let pageIndex =
+                            GitPagedDiffDisplay.pageAtOffset ends (max top (float item.start) - float item.start)
+
+                        anchorAt
+                            (GitPagedDiffDisplay.pageAnchorKey pageIds.[pageIndex])
+                            (float item.start
+                             + float (
+                                 GitPagedDiffDisplay.RowHeightPx
+                                 * GitPagedDiffDisplay.pageStartRows ends pageIndex
+                             ))
+                    | content when GitPagedDiffDisplay.isAnchorable content -> anchorAt item.key (float item.start)
+                    | _ -> None
                 )
+                |> Array.sortBy _.Start
 
             ({
                 Keys = rows |> Array.map (fun row -> row.Key)
@@ -1510,22 +1558,46 @@ type GitPagedDiffViewer =
                     let indexOfKey = Dictionary<string, int>()
                     keys |> Array.iteri (fun index key -> indexOfKey.[key] <- index)
 
+                    // The row of each page of a placeholder, and the rows of the placeholder in front of it.
+                    let pageRows = Dictionary<string, int * int>()
+
+                    rows
+                    |> Array.iteri (fun index row ->
+                        match row.Content with
+                        | GitPagedDiffDisplay.Evicted(pageId, _) ->
+                            pageRows.[GitPagedDiffDisplay.pageAnchorKey pageId] <- (index, 0)
+                        | GitPagedDiffDisplay.Folded(_, pageIds, ends) ->
+                            pageIds
+                            |> Array.iteri (fun pageIndex pageId ->
+                                pageRows.[GitPagedDiffDisplay.pageAnchorKey pageId] <-
+                                    (index, GitPagedDiffDisplay.pageStartRows ends pageIndex)
+                            )
+                        | _ -> ()
+                    )
+
+                    // Asking for the total size brings the measurements up to date with the rows
+                    // measured in this commit.
+                    rowVirtualizer.getTotalSize () |> ignore
+
+                    let startOf (key: string) =
+                        match pageRows.TryGetValue key, indexOfKey.TryGetValue key with
+                        | (true, (index, before)), _ ->
+                            Some(
+                                float rowVirtualizer.measurementsCache.[index].start
+                                + float (GitPagedDiffDisplay.RowHeightPx * before)
+                            )
+                        | _, (true, index) -> Some(float rowVirtualizer.measurementsCache.[index].start)
+                        | _ -> None
+
                     let anchor =
                         previous.Candidates
                         |> Array.tryPick (fun candidate ->
-                            match indexOfKey.TryGetValue candidate.Key with
-                            | true, index -> Some(candidate, index)
-                            | _ -> None
+                            startOf candidate.Key |> Option.map (fun start -> candidate, start)
                         )
 
                     let target =
                         match anchor with
-                        | Some(candidate, index) ->
-                            // Asking for the total size brings the measurements up to date with the
-                            // rows measured in this commit.
-                            rowVirtualizer.getTotalSize () |> ignore
-                            let start = float rowVirtualizer.measurementsCache.[index].start
-
+                        | Some(candidate, start) ->
                             if abs (start - candidate.Start) >= 1.0 then
                                 Some(start - candidate.Offset)
                             else
@@ -1540,9 +1612,7 @@ type GitPagedDiffViewer =
                         // Until the scroll event arrives, the virtualizer would lay rows out for
                         // the old position and correct size changes against it, which moves the
                         // view back.
-                        if abs (rowVirtualizer.scrollOffset - logicalTop ()) >= 1.0 then
-                            rowVirtualizer.scrollOffset <- logicalTop ()
-                            setLayoutVersion (layoutVersion + 1)
+                        syncVirtualizer ()
                     | None -> ()
                 | _ -> ()
 
@@ -1561,10 +1631,7 @@ type GitPagedDiffViewer =
                         readingRows.current <- [||]
                         rowVirtualizer.getTotalSize () |> ignore
                         setLogicalTop (float rowVirtualizer.measurementsCache.[index].start)
-
-                        if abs (rowVirtualizer.scrollOffset - logicalTop ()) >= 1.0 then
-                            rowVirtualizer.scrollOffset <- logicalTop ()
-                            setLayoutVersion (layoutVersion + 1)
+                        syncVirtualizer ()
                     | None -> ()
                 | _ -> ()
 
@@ -1576,19 +1643,44 @@ type GitPagedDiffViewer =
             |]
         )
 
+        // The logical offset stays when the total, the cap or the view height change, and when the
+        // scroll range crosses the cap in either direction. The native position follows it, so the
+        // thumb keeps its fraction of the track.
+        let viewHeight =
+            match bodyScrollRef.current with
+            | Some element -> element.clientHeight
+            | None -> 0.0
+
+        React.useLayoutEffect (
+            (fun () ->
+                let capped = isCapped ()
+
+                if capped || wasCapped.current then
+                    let before = bodyScrollRef.current |> Option.map _.scrollTop
+                    setLogicalTop logicalRef.current
+                    syncVirtualizer ()
+
+                    // The rows were placed for the native position before it moved.
+                    if before <> (bodyScrollRef.current |> Option.map _.scrollTop) then
+                        setLayoutVersion (layoutVersion + 1)
+
+                wasCapped.current <- capped
+            ),
+            [| box totalRef.current; box cap; box viewHeight |]
+        )
+
         // The diff grows while it is indexed. A view at the end moves to the new end.
         let totalSize = rowVirtualizer.getTotalSize ()
 
         React.useLayoutEffect (
             (fun () ->
                 match bodyScrollRef.current with
-                | Some element when followEnd.current ->
+                | Some element when followEnd.current && pinnedTotal.current.IsNone ->
                     let target = float totalSize - element.clientHeight
 
                     if target > logicalTop () + 1.0 then
                         setLogicalTop target
-                        rowVirtualizer.scrollOffset <- logicalTop ()
-                        setLayoutVersion (layoutVersion + 1)
+                        syncVirtualizer ()
 
                     if not hasMore then
                         followEnd.current <- false
@@ -1818,14 +1910,11 @@ type GitPagedDiffViewer =
                             prop.custom ("data-provisional", (if hasMore then "true" else "false"))
                             prop.className "swt:relative swt:w-full swt:font-mono swt:text-xs"
                             prop.style [
-                                style.height (
-                                    int (
-                                        GitPagedDiffDisplay.physicalHeight cap (float (rowVirtualizer.getTotalSize ()))
-                                    )
-                                )
+                                style.height (int (GitPagedDiffDisplay.physicalHeight cap totalRef.current))
                                 style.custom ("minWidth", $"calc(2 * {columnMin})")
-                                // Rows laid out past the capped height must not add to the scroll range.
-                                if isCapped () then
+                                // Rows laid out past the content height must not add to the scroll
+                                // range. That happens above the cap and while the scrollbar is held.
+                                if isCapped () || pinnedTotal.current.IsSome then
                                     style.custom ("overflow", "clip")
                             ]
                             prop.children [
@@ -1844,6 +1933,7 @@ type GitPagedDiffViewer =
                                                 LoadingNext = status = PagedDiffStatus.LoadingNext
                                                 HasMore = hasMore
                                                 Indexing = indexing
+                                                NextFailed = nextFailed
                                                 Progress = progress
                                                 ColumnMin = columnMin
                                                 FoldedTarget =
@@ -2073,6 +2163,8 @@ type GitPagedDiffViewer =
             // read so far is provisional and grows with each page. A view at the end stays there
             // as the diff grows.
             ?indexing: bool,
+            // The last read of the next page failed. The continue button shows it and asks again.
+            ?nextFailed: bool,
             // The tallest scroll height the viewer asks the browser for. A diff above it maps the
             // native scroll range to the logical offsets.
             ?maxScrollHeight: int
@@ -2091,8 +2183,8 @@ type GitPagedDiffViewer =
                     let rowParts = ResizeArray<int>()
                     let mutable lastRowKey = None
 
-                    // Evicted pages far from the loaded ones fold into one short placeholder, so
-                    // the scroll height stays bounded however many pages the diff has.
+                    // Evicted pages fold into one placeholder for each run, as tall as the rows of its
+                    // pages together.
                     let foldRuns = GitPagedDiffDisplay.foldRuns parts
                     let mutable partIndex = 0
 
@@ -2224,6 +2316,7 @@ type GitPagedDiffViewer =
                             nextPageKey |> Option.orElse lastRowKey,
                             hasMore,
                             defaultArg indexing false,
+                            defaultArg nextFailed false,
                             defaultArg maxScrollHeight GitPagedDiffDisplay.DefaultMaxScrollHeightPx,
                             progress,
                             status,
