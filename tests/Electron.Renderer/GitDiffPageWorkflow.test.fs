@@ -2769,4 +2769,51 @@ Vitest.describe (
                 Vitest.expect(state.DiffReopen).toEqual (None)
             }
         )
+
+        Vitest.test (
+            "A closed session answering the first page read reopens the diff once",
+            fun () -> promise {
+                let scanningOn (openCount: int) =
+                    succeeded (
+                        ResumableOpenDto.Ready(
+                            OpenDiffResultDto.Opened(
+                                handleOfOpen openCount,
+                                sourceInfo "a.txt",
+                                sourceInfo "a.txt",
+                                ResumablePageDto.Scanning(progress false, "scan", None)
+                            )
+                        )
+                    )
+
+                // The pool closed the first session before its first page was read.
+                let fake = FakeDiffClient()
+                fake.OpenReply <- fun _ -> scanningOn fake.Opens.Count
+
+                fake.ReadReply <-
+                    fun request ->
+                        if request.HandleId = "diff-1" then
+                            failedWith "diff_session_closed" None
+                        else
+                            succeeded (ResumablePageDto.Ready(diffPage "p1" None [| hunk "h1" |]))
+
+                let! state = run fake (select "a.txt") runningState
+                let page = diffOf state
+
+                Vitest.expect(fake.Opens.Count).toBe (2)
+                Vitest.expect(page.Handle).toEqual (Some(handleOfOpen 2))
+                Vitest.expect(page.Pages |> Array.map _.PageId).toEqual ([| "p1" |])
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+                Vitest.expect(state.DiffReopen).toEqual (None)
+
+                // The reopened session is closed as well, so the failure shows and nothing loops.
+                let closedAgain = FakeDiffClient()
+                closedAgain.OpenReply <- fun _ -> scanningOn closedAgain.Opens.Count
+                closedAgain.ReadReply <- fun _ -> failedWith "diff_session_closed" None
+
+                let! state = run closedAgain (select "a.txt") runningState
+
+                Vitest.expect(closedAgain.Opens.Count).toBe (2)
+                Vitest.expect(isFailed (diffOf state).Status).toBe (true)
+            }
+        )
 )
