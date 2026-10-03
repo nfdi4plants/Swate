@@ -510,6 +510,10 @@ type private RoutedFailure =
 [<RequireQualifiedAccess>]
 type GitDiffMsg =
     | LoadNext of generation: int
+    /// Starts the background read of every page after the loaded ones. The pages arrive one
+    /// request at a time and are evicted within the window limits, so the viewer learns the extent
+    /// of the whole diff.
+    | Index of generation: int
     | Expand of generation: int * gapId: string * fromStart: bool
     | LoadLineSlice of generation: int * side: DiffSideDto * line: float * offsetUtf16: float
     /// Asks for the text in front of the displayed slice of a line, which starts at displayedStart.
@@ -1544,6 +1548,7 @@ module GitDiffPageLoader =
             PendingReplay = None
             VisiblePages = []
             KeepRequestedPage = false
+            Indexing = false
             FailedGaps = []
             FailedLineSlices = []
             FailedReplays = []
@@ -2090,6 +2095,7 @@ module GitDiffPageLoader =
     let private generationOf (msg: GitDiffMsg) =
         match msg with
         | GitDiffMsg.LoadNext generation
+        | GitDiffMsg.Index generation
         | GitDiffMsg.Expand(generation, _, _)
         | GitDiffMsg.LoadLineSlice(generation, _, _, _)
         | GitDiffMsg.LoadLineBefore(generation, _, _, _)
@@ -2159,6 +2165,7 @@ module GitDiffPageLoader =
 
         match msg with
         | GitDiffMsg.PageStateObserved _ -> page, Cmd.none
+        | GitDiffMsg.Index _ -> { page with Indexing = true }, Cmd.none
         | GitDiffMsg.LoadNext _ ->
             match page.Status, page.NextCursor, page.NextRequest with
             | GitDiffPageStatus.Ready, Some cursor, None ->
@@ -2593,6 +2600,19 @@ module GitDiffPageLoader =
                 finished, None, Cmd.none
         | _ -> page, None, Cmd.none
 
+    /// Reads the page after the last one while the viewer asked for the indexing, once no other
+    /// read runs. The page joins the window without becoming the requested page, so the pages the
+    /// user looks at stay loaded and the new page goes first when the window is full. A diff
+    /// whose output is exhausted ends the indexing. Only a ready page reads on, so a failed or
+    /// settled diff, a reopen and a user request for the next page all hold it back. The one
+    /// pending read stays the only read, and the answer of a closed diff finds no page to continue.
+    let private continueIndexing (deps: GitDependencies) (page: GitDiffPageData) =
+        match page.Status, page.NextCursor, page.Handle with
+        | GitDiffPageStatus.Ready, Some cursor, Some _ when page.Indexing && page.NextRequest.IsNone ->
+            readPage deps { page with KeepRequestedPage = true } cursor
+        | GitDiffPageStatus.Ready, None, _ when page.Indexing -> { page with Indexing = false }, Cmd.none
+        | _ -> page, Cmd.none
+
     let private choosesWithoutToken (side: DiffSideDto) (status: GitDiffPageStatus) =
         match status with
         | GitDiffPageStatus.EncodingChoice(choiceSide, None, _) -> choiceSide = side
@@ -2649,11 +2669,19 @@ module GitDiffPageLoader =
         | _ ->
             let next, cmd = updatePage deps msg page
 
-            match reopening with
-            | Some target ->
-                let next, reopening, readCmd = continueReopen deps target next
-                next, reopening, Cmd.batch [ cmd; readCmd ]
-            | None -> next, None, cmd
+            let next, reopening, cmd =
+                match reopening with
+                | Some target ->
+                    let next, reopening, readCmd = continueReopen deps target next
+                    next, reopening, Cmd.batch [ cmd; readCmd ]
+                | None -> next, None, cmd
+
+            // A reopen reads on by itself, and the indexing waits for it to land.
+            if reopening.IsSome then
+                next, reopening, cmd
+            else
+                let next, indexCmd = continueIndexing deps next
+                next, reopening, Cmd.batch [ cmd; indexCmd ]
 
     /// Leaving the diff only drops the page here. The workflow's update closes the handle of
     /// any diff page that disappears or is replaced.

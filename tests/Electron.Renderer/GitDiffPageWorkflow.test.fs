@@ -842,6 +842,184 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "Indexing reads every page after the first, one request at a time, and evicts within the window",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let lastIndex = 12
+
+                let pageDto index =
+                    diffPage $"p{index}" (if index < lastIndex then Some $"cursor-{index}" else None) [|
+                        hunk $"h{index}"
+                    |]
+
+                let! state = openFirstPage fake (pageDto 1)
+
+                fake.ReadReply <-
+                    fun request ->
+                        let index = int (request.Cursor.Replace("cursor-", "")) + 1
+                        succeeded (ResumablePageDto.Ready(pageDto index))
+
+                let! state = run fake (diffMsg (GitDiffMsg.Index (diffOf state).Generation)) state
+                let page = diffOf state
+
+                // The loop stops at the end of the output, and no read is left running.
+                Vitest
+                    .expect(fake.Reads |> Seq.map _.Cursor |> Seq.toArray)
+                    .toEqual ([| for index in 1 .. lastIndex - 1 -> $"cursor-{index}" |])
+
+                Vitest.expect(page.Pages.Length).toBe (lastIndex)
+                Vitest.expect(page.NextCursor).toEqual (None)
+                Vitest.expect(page.NextRequest).toEqual (None)
+                Vitest.expect(page.OutputComplete).toBe (true)
+                Vitest.expect(page.Indexing).toBe (false)
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+
+                // The first window stays loaded. Every other page is a placeholder with the rows it had.
+                let loadedIds =
+                    page.Pages
+                    |> Array.filter (fun windowPage -> not windowPage.IsEvicted)
+                    |> Array.map _.PageId
+
+                Vitest
+                    .expect(loadedIds)
+                    .toEqual (
+                        [|
+                            for index in 1 .. GitDiffPageLoader.MaxLoadedPages -> $"p{index}"
+                        |]
+                    )
+
+                Vitest.expect(page.Pages |> Array.forall (fun windowPage -> windowPage.RowCount = 2)).toBe (true)
+
+                Vitest
+                    .expect(
+                        page.Pages
+                        |> Array.sumBy (fun windowPage -> Renderer.GitDiffPresentation.rowCount windowPage.Parts)
+                    )
+                    .toBe (2 * lastIndex)
+            }
+        )
+
+        Vitest.test (
+            "Indexing keeps one read pending, and a request for the next page does not start another",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let! state = openFirstPage fake (diffPage "p1" (Some "cursor-1") [| hunk "h1" |])
+                let generation = (diffOf state).Generation
+
+                fake.ReadReply <-
+                    fun _ -> succeeded (ResumablePageDto.Ready(diffPage "p2" (Some "cursor-2") [| hunk "h2" |]))
+
+                let step msg state =
+                    update fake.Dependencies fake.SetPageState (diffMsg msg) state
+
+                let indexing, indexCmd = step (GitDiffMsg.Index generation) state
+                let again, againCmd = step (GitDiffMsg.Index generation) indexing
+                let other, otherCmd = step (GitDiffMsg.LoadNext generation) again
+
+                let! _ = collectMessages indexCmd
+                let! _ = collectMessages againCmd
+                let! _ = collectMessages otherCmd
+
+                Vitest.expect(fake.Reads.Count).toBe (1)
+                Vitest.expect((diffOf other).NextRequest.IsSome).toBe (true)
+                Vitest.expect((diffOf other).Indexing).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "Indexing stops when the diff closes, and the late answer starts no read",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let! state = openFirstPage fake (diffPage "p1" (Some "cursor-1") [| hunk "h1" |])
+                let generation = (diffOf state).Generation
+
+                fake.ReadReply <-
+                    fun _ -> succeeded (ResumablePageDto.Ready(diffPage "p2" (Some "cursor-2") [| hunk "h2" |]))
+
+                let indexing, indexCmd =
+                    update fake.Dependencies fake.SetPageState (diffMsg (GitDiffMsg.Index generation)) state
+
+                let! answers = collectMessages indexCmd
+
+                let! closed = run fake (diffMsg (GitDiffMsg.PageStateObserved None)) indexing
+                Vitest.expect(closed.DiffPage).toEqual (None)
+
+                let current = ref closed
+
+                for answer in answers do
+                    let! next = run fake answer current.Value
+                    current.Value <- next
+
+                Vitest.expect(current.Value.DiffPage).toEqual (None)
+                Vitest.expect(fake.Reads.Count).toBe (1)
+            }
+        )
+
+        Vitest.test (
+            "Indexing stops at the first failed read and leaves the failure status",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let! state = openFirstPage fake (diffPage "p1" (Some "cursor-1") [| hunk "h1" |])
+
+                fake.ReadReply <-
+                    fun request ->
+                        match request.Cursor with
+                        | "cursor-1" ->
+                            succeeded (ResumablePageDto.Ready(diffPage "p2" (Some "cursor-2") [| hunk "h2" |]))
+                        | _ -> failedWith "git_failure" None
+
+                let! state = run fake (diffMsg (GitDiffMsg.Index (diffOf state).Generation)) state
+                let page = diffOf state
+
+                Vitest.expect(fake.Reads.Count).toBe (2)
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Failed "git_failure")
+                Vitest.expect(page.Pages.Length).toBe (2)
+            }
+        )
+
+        Vitest.test (
+            "Indexing goes on after the session expired and the diff reopened",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let lastIndex = 5
+
+                let pageDto index =
+                    diffPage $"p{index}" (if index < lastIndex then Some $"cursor-{index}" else None) [|
+                        hunkAt $"h{index}" (index * 10)
+                    |]
+
+                fake.OpenReply <- fun _ -> openedOn (handleOfOpen fake.Opens.Count) (pageDto 1)
+
+                fake.ReadReply <-
+                    fun request ->
+                        let index = int (request.Cursor.Replace("cursor-", "")) + 1
+
+                        if request.HandleId = "diff-1" && index > 2 then
+                            failedWith "diff_session_closed" None
+                        else
+                            succeeded (ResumablePageDto.Ready(pageDto index))
+
+                let! state = run fake (select "a.txt") runningState
+                let! state = run fake (diffMsg (GitDiffMsg.Index (diffOf state).Generation)) state
+                let page = diffOf state
+
+                Vitest.expect(fake.Opens.Count).toBe (2)
+
+                Vitest
+                    .expect(
+                        fake.Reads
+                        |> Seq.exists (fun read -> read.HandleId = "diff-2" && read.Cursor = $"cursor-{lastIndex - 1}")
+                    )
+                    .toBe (true)
+
+                Vitest.expect(page.Pages |> Array.map _.PageId).toEqual ([| for index in 1..lastIndex -> $"p{index}" |])
+                Vitest.expect(page.NextCursor).toEqual (None)
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+                Vitest.expect(state.DiffReopen).toEqual (None)
+            }
+        )
+
+        Vitest.test (
             "Loaded pages above 8 MiB evict the page farthest from the requested page, and a single oversized page stays loaded",
             fun () -> promise {
                 let fake = FakeDiffClient()

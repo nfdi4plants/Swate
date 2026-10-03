@@ -49,6 +49,9 @@ module internal GitPagedDiffDisplay =
         ExpandingGaps: string[]
         LoadingNext: bool
         HasMore: bool
+        /// The loader reads the remaining pages on its own, so the continue row shows the progress
+        /// of that reading and no button.
+        Indexing: bool
         Progress: PagedProgress option
         /// The columns of the row share one minimum width, so the rows line up.
         ColumnMin: string
@@ -236,10 +239,8 @@ module internal GitPagedDiffDisplay =
 
     /// The runs of evicted pages that fold into one placeholder, as first part index, last part
     /// index and side. The evicted pages before the first loaded part fold into one run, and so do
-    /// the pages after the last one. Between loaded parts, a run folds once it holds two or more
-    /// pages. A single evicted page there keeps its full-height placeholder, since the loaded rows
-    /// around it keep the scroll position meaningful. Without a loaded part nothing folds, since
-    /// there is no loaded window to fold around.
+    /// the pages after the last one. Each run between loaded parts folds as well. Without a loaded
+    /// part nothing folds, since there is no loaded window to fold around.
     let foldRuns (parts: PagedPart[]) : (int * int * FoldSide)[] =
         match
             parts |> Array.tryFindIndex (isEvictedPage >> not), parts |> Array.tryFindIndexBack (isEvictedPage >> not)
@@ -260,8 +261,7 @@ module internal GitPagedDiffDisplay =
                         elif first > lastLoaded then Later
                         else Between
 
-                    if side <> Between || index > first then
-                        runs.Add(first, index, side)
+                    runs.Add(first, index, side)
 
                 index <- index + 1
 
@@ -977,19 +977,35 @@ type GitPagedDiffViewer =
                                                 $"{GitPagedDiffDisplay.progressPercentage value}%% ({GitPagedDiffDisplay.formatBytes value.ValidatedBytes} / {GitPagedDiffDisplay.formatBytes value.TotalBytes})"
                                         ]
                                     | None -> ()
-                                    Html.span [
-                                        prop.className "swt:text-xs swt:text-base-content/65"
-                                        prop.text "More diff content is available"
-                                    ]
-                                    Html.button [
-                                        prop.testId $"{props.Prefix}-continue-button"
-                                        prop.className "swt:btn swt:btn-primary swt:btn-xs"
-                                        prop.disabled (busy || props.RequestNext.IsNone)
-                                        prop.onClick (fun _ ->
-                                            props.RequestNext |> Option.iter (fun callback -> callback ())
-                                        )
-                                        prop.text (if busy then "Loading" else "Continue loading diff")
-                                    ]
+                                    if props.Indexing then
+                                        Html.span [
+                                            prop.testId $"{props.Prefix}-indexing"
+                                            prop.className
+                                                "swt:flex swt:items-center swt:gap-2 swt:text-xs swt:text-base-content/65"
+                                            prop.children [
+                                                Html.span [
+                                                    prop.className "swt:loading swt:loading-spinner swt:loading-xs"
+                                                ]
+                                                Html.span [
+                                                    prop.text "Indexing the diff, the scrollbar is not exact yet"
+                                                ]
+                                            ]
+                                        ]
+                                    else
+                                        Html.span [
+                                            prop.className "swt:text-xs swt:text-base-content/65"
+                                            prop.text "More diff content is available"
+                                        ]
+
+                                        Html.button [
+                                            prop.testId $"{props.Prefix}-continue-button"
+                                            prop.className "swt:btn swt:btn-primary swt:btn-xs"
+                                            prop.disabled (busy || props.RequestNext.IsNone)
+                                            prop.onClick (fun _ ->
+                                                props.RequestNext |> Option.iter (fun callback -> callback ())
+                                            )
+                                            prop.text (if busy then "Loading" else "Continue loading diff")
+                                        ]
                                 ]
                             ]
                     ]
@@ -1029,6 +1045,7 @@ type GitPagedDiffViewer =
             prefix: string,
             nextKey: string option,
             hasMore: bool,
+            indexing: bool,
             progress: PagedProgress option,
             status: PagedDiffStatus,
             expandingGaps: string[],
@@ -1053,6 +1070,9 @@ type GitPagedDiffViewer =
         let appliedScrollToken = React.useRef<int option> None
         // Whether the user holds the scrollbar. The thumb keeps its meaning while it is held, so
         // changes to the total height wait until the user lets go.
+        // The user reached the end while the diff was still being indexed. The view then stays at
+        // the end as the diff grows, until the user scrolls away or the indexing ends.
+        let followEnd = React.useRef false
         let gesture, setGesture = React.useState false
         let heldRows = React.useRef (incomingRows, incomingParts)
         // The rows in the viewport while the diff reopens. The scroll target of the reopen names
@@ -1372,6 +1392,27 @@ type GitPagedDiffViewer =
             |]
         )
 
+        // The diff grows while it is indexed. A view at the end moves to the new end.
+        let totalSize = rowVirtualizer.getTotalSize ()
+
+        React.useLayoutEffect (
+            (fun () ->
+                match bodyScrollRef.current with
+                | Some element when followEnd.current ->
+                    let target = float totalSize - element.clientHeight
+
+                    if target > element.scrollTop + 1.0 then
+                        element.scrollTop <- target
+                        rowVirtualizer.scrollOffset <- element.scrollTop
+                        setLayoutVersion (layoutVersion + 1)
+
+                    if not hasMore then
+                        followEnd.current <- false
+                | _ -> ()
+            ),
+            [| box totalSize |]
+        )
+
         let renderedKeys =
             virtualItems
             |> Array.map (fun item -> rows.[item.Index].Key)
@@ -1540,11 +1581,21 @@ type GitPagedDiffViewer =
                 Html.div [
                     prop.ref bodyScrollRef
                     prop.className "swt:min-h-0 swt:flex-1 swt:overflow-auto swt:scrollbar-fade"
-                    prop.onScroll (fun _ -> previousLayout.current <- Some(captureAnchor ()))
+                    prop.onScroll (fun event ->
+                        previousLayout.current <- Some(captureAnchor ())
+                        let element = event.currentTarget :?> HTMLElement
+
+                        followEnd.current <-
+                            indexing
+                            && hasMore
+                            && element.scrollTop > 1.0
+                            && element.scrollTop >= element.scrollHeight - element.clientHeight - 1.0
+                    )
                     prop.children [
                         Html.div [
                             prop.ref bodyContentRef
                             prop.testId $"{prefix}-content"
+                            prop.custom ("data-provisional", (if hasMore then "true" else "false"))
                             prop.className "swt:relative swt:w-full swt:font-mono swt:text-xs"
                             prop.style [
                                 style.height (rowVirtualizer.getTotalSize ())
@@ -1564,6 +1615,7 @@ type GitPagedDiffViewer =
                                                 ExpandingGaps = expandingGaps
                                                 LoadingNext = status = PagedDiffStatus.LoadingNext
                                                 HasMore = hasMore
+                                                Indexing = indexing
                                                 Progress = progress
                                                 ColumnMin = columnMin
                                                 FoldedTarget =
@@ -1788,7 +1840,11 @@ type GitPagedDiffViewer =
             ?failedLineSlices: PagedLineSliceRequest[],
             ?failedReplays: string[],
             // A source line to scroll to once a row shows it. The viewer scrolls once per token.
-            ?scrollTarget: PagedScrollTarget
+            ?scrollTarget: PagedScrollTarget,
+            // The caller reads the remaining pages on its own. The scroll range below the pages
+            // read so far is provisional and grows with each page. A view at the end stays there
+            // as the diff grows.
+            ?indexing: bool
         ) =
         let prefix = defaultArg testIdPrefix "git-paged-diff"
         let previousTitle = defaultArg previousTitle "Previous version"
@@ -1936,6 +1992,7 @@ type GitPagedDiffViewer =
                             prefix,
                             nextPageKey |> Option.orElse lastRowKey,
                             hasMore,
+                            defaultArg indexing false,
                             progress,
                             status,
                             defaultArg expandingGaps [||],

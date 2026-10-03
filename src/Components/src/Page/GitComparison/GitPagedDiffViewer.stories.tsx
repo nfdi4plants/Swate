@@ -245,11 +245,14 @@ function collapseOlderParts(parts: PagedPart_$union[], evictions: number) {
   if (parts.length < 2) return parts;
   const older = parts.slice(0, -1);
   const rowCount = older.reduce((total, part) => {
-    if (part.tag === 0) return total + (part.fields[5] as PagedRow[]).length;
+    // A hunk header, an unaligned label and a gap take one display row each.
+    if (part.tag === 0) return total + (part.fields[3] ? 1 : 0) + (part.fields[5] as PagedRow[]).length;
     if (part.tag === 1) {
       const [, previous, current] = part.fields as [string, PagedLine[], PagedLine[]];
-      return total + Math.max(previous.length, current.length);
+      return total + 1 + Math.max(previous.length, current.length);
     }
+    if (part.tag === 2) return total + 1;
+    if (part.tag === 3) return total + (part.fields[1] as PagedRow[]).length;
     if (part.tag === 4) return total + (part.fields[1] as number);
     return total;
   }, 0);
@@ -708,6 +711,34 @@ function GestureHarness() {
         hasMore={false}
         outputComplete={true}
         testIdPrefix="git-paged-gesture"
+      />
+    </div>
+  );
+}
+
+// A diff the caller indexes in the background. It starts with three pages known, and a click on
+// the first button reads one more page. The second button ends the indexing.
+function IndexingHarness() {
+  const [known, setKnown] = React.useState(3);
+  const [complete, setComplete] = React.useState(false);
+  const parts = React.useMemo(() => Array.from({ length: known }, (_, index) => directoryPart(index)), [known]);
+  return (
+    <div style={{ height: "30rem" }}>
+      <button data-testid="git-paged-indexing-add" onClick={() => setKnown((current) => current + 1)}>
+        Read page
+      </button>
+      <button data-testid="git-paged-indexing-finish" onClick={() => setComplete(true)}>
+        Finish
+      </button>
+      <GitPagedDiffViewerComponent
+        parts={parts}
+        status={PagedDiffStatus_Ready()}
+        progress={new PagedProgress(known, 10, complete)}
+        hasMore={!complete}
+        outputComplete={complete}
+        indexing={!complete}
+        nextPageKey={`cursor-${known}`}
+        testIdPrefix="git-paged-indexing"
       />
     </div>
   );
@@ -1175,15 +1206,15 @@ export const EvictedPageReplaysWhenVisible: Story = {
     await waitFor(() => expect(onRequestReplay).toHaveBeenCalledTimes(1));
 
     // The placeholder is as tall as the rows it stands for.
-    const placeholder = canvas.getByTestId("git-paged-replay-row-evicted:old-page");
+    const placeholder = canvas.getByTestId("git-paged-replay-row-folded:between:old-page");
     const rowHeight = canvas.getByTestId("git-paged-replay-row-row-60").getBoundingClientRect().height;
     await expect(Math.abs(placeholder.getBoundingClientRect().height - PAGE_LIMIT * rowHeight)).toBeLessThan(1);
     await expect(onRequestReplay).toHaveBeenCalledWith("old-page");
-    await waitFor(() => expect(canvas.getByTestId("git-paged-replay-evicted-old-page")).toBeDisabled());
+    await waitFor(() => expect(canvas.getByTestId("git-paged-replay-folded-replay-old-page")).toBeDisabled());
     await expect(onRequestReplay).toHaveBeenCalledTimes(1);
 
     await fireEvent.click(canvas.getByTestId("git-paged-replay-complete"));
-    await waitFor(() => expect(canvas.queryByTestId("git-paged-replay-row-evicted:old-page")).toBeNull());
+    await waitFor(() => expect(canvas.queryByTestId("git-paged-replay-row-folded:between:old-page")).toBeNull());
     await expect(canvas.getByTestId("git-paged-replay-row-row-59")).toBeInTheDocument();
     await expect(onRequestReplay).toHaveBeenCalledTimes(1);
   },
@@ -1780,5 +1811,40 @@ export const GeometryChangesWaitForTheScrollbarGesture: Story = {
 
     await fireEvent.pointerUp(window);
     await waitFor(() => expect(scroll.scrollHeight).toBeGreaterThan(before));
+  },
+};
+
+export const IndexingKeepsTheTailProvisional: Story = {
+  render: () => <IndexingHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-indexing-grid");
+    const content = canvas.getByTestId("git-paged-indexing-content");
+    const pageHeight = DIRECTORY_PAGE_ROWS * DIRECTORY_ROW_HEIGHT;
+    const distanceToEnd = () => scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop;
+
+    // While pages are read, the range below the read pages is provisional and shows the progress.
+    await expect(content).toHaveAttribute("data-provisional", "true");
+
+    // A view at the end shows the progress below the read pages and follows the end as the diff grows.
+    await scrollToEnd(scroll);
+    await expect(await canvas.findByTestId("git-paged-indexing-indexing")).toBeInTheDocument();
+    await expect(canvas.queryByTestId("git-paged-indexing-continue-button")).toBeNull();
+    await scrollToEnd(scroll);
+    const height = scroll.scrollHeight;
+    await fireEvent.click(canvas.getByTestId("git-paged-indexing-add"));
+    await waitFor(() => expect(scroll.scrollHeight).toBeGreaterThanOrEqual(height + pageHeight));
+    await waitFor(() => expect(distanceToEnd()).toBeLessThan(2));
+
+    // A view the user moved away from stays where it is.
+    await scrollTo(scroll, 200);
+    await fireEvent.click(canvas.getByTestId("git-paged-indexing-add"));
+    await new Promise((resolve) => window.setTimeout(resolve, 100));
+    await expect(scroll.scrollTop).toBe(200);
+
+    await fireEvent.click(canvas.getByTestId("git-paged-indexing-finish"));
+    await waitFor(() => expect(content).toHaveAttribute("data-provisional", "false"));
+    await expect(canvas.queryByTestId("git-paged-indexing-indexing")).toBeNull();
+    await expect(canvas.queryByTestId("git-paged-indexing-row-continue")).toBeNull();
   },
 };

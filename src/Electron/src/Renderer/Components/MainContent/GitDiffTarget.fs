@@ -33,6 +33,26 @@ let Main (page: GitDiffPageData) =
     // records no measures, and Swate reads none.
     React.useEffect ((fun () -> FsReact.createDisposable clearPerformanceMeasures), [| box page.Pages |])
 
+    // Once the first page is ready, the loader reads every other page in the background, so the
+    // viewer knows the extent of the whole diff.
+    React.useEffect (
+        (fun () ->
+            if
+                not page.Indexing
+                && page.NextCursor.IsSome
+                && page.Handle.IsSome
+                && page.Status = GitDiffPageStatus.Ready
+            then
+                send (GitDiffMsg.Index generation)
+        ),
+        [|
+            box generation
+            box page.Indexing
+            box page.NextCursor
+            box page.Status
+        |]
+    )
+
     // The viewer rebuilds the rows of the parts only when the parts array changes.
     // The parts are collected only when the pages change.
     let parts =
@@ -90,6 +110,7 @@ let Main (page: GitDiffPageData) =
                         status = Presentation.status page.Status,
                         progress = (page.Progress |> Option.map Presentation.progress),
                         hasMore = page.NextCursor.IsSome,
+                        indexing = page.Indexing,
                         outputComplete = page.OutputComplete,
                         ?pending = (page.Pending |> Option.map Presentation.pending),
                         requestNext = (fun () -> send (GitDiffMsg.LoadNext generation)),

@@ -144,6 +144,9 @@ type GitDiffPageData = {
     /// page then joins the window without becoming the requested page, so the page the user
     /// went back to stays loaded.
     KeepRequestedPage: bool
+    /// Set once the viewer asked for the background read of every remaining page. While it is
+    /// set, each arriving page starts the read of the next one, until the output is exhausted.
+    Indexing: bool
     /// Gaps, line slices and evicted pages whose last request failed. The viewer marks their
     /// controls, and the next request of the same control clears the mark.
     FailedGaps: string list
