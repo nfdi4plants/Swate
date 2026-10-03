@@ -2249,7 +2249,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "A diff of 2,000 pages of 1,000 rows keeps the height of all its rows, with the unloaded pages folded into one placeholder",
+            "A diff of 2,000 pages of 1,000 rows renders at the capped scroll height, with the unloaded pages folded into one placeholder",
             TestOptions(timeout = 120000),
             fun () -> promise {
                 let fake = FakeDiffClient()
@@ -2291,9 +2291,11 @@ Vitest.describe (
                         .Groups.[1].Value
                     |> float
 
-                // Every page has a header row besides its rows, and the continue row follows the pages.
+                // The rows are taller than the browser lays out, so the scroll content takes the cap.
+                // Every page has a header row besides its rows.
                 let displayRowsPerPage = rowsPerPage + 1
-                Vitest.expect(height).toBe (float (pageCount * displayRowsPerPage * 28 + 28))
+                Vitest.expect(float (pageCount * displayRowsPerPage * 28)).toBeGreaterThan (10000000.0)
+                Vitest.expect(height).toBe (10000000.0)
 
                 let folded = rendered.querySelector "[data-folded-side=\"earlier\"]"
 

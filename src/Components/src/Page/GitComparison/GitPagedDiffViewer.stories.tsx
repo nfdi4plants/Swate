@@ -432,7 +432,7 @@ function ViewportReplayHarness({ onReplay }: { onReplay: (record: ReplayRecord) 
   );
 }
 
-const FOLD_PAGE_COUNT = 200;
+const FOLD_PAGE_COUNT = 2000;
 const FOLD_PAGE_ROWS = 1000;
 const FOLD_WINDOW = 8;
 
@@ -621,10 +621,12 @@ function DirectoryHarness({
   fromStart = false,
   onReplay,
   onNext,
+  maxScrollHeight,
 }: {
   fromStart?: boolean;
   onReplay?: (pageId: string) => void;
   onNext?: () => void;
+  maxScrollHeight?: number;
 }) {
   const cache = React.useRef(new Map<string, PagedPart_$union>());
   const [model, setModel] = React.useState(() => ({
@@ -689,6 +691,7 @@ function DirectoryHarness({
         requestNext={requestNext}
         requestReplay={requestReplay}
         pendingReplays={pendingReplays}
+        maxScrollHeight={maxScrollHeight}
         testIdPrefix="git-paged-directory"
       />
     </div>
@@ -718,7 +721,7 @@ function GestureHarness() {
 
 // A diff the caller indexes in the background. It starts with three pages known, and a click on
 // the first button reads one more page. The second button ends the indexing.
-function IndexingHarness() {
+function IndexingHarness({ maxScrollHeight }: { maxScrollHeight?: number }) {
   const [known, setKnown] = React.useState(3);
   const [complete, setComplete] = React.useState(false);
   const parts = React.useMemo(() => Array.from({ length: known }, (_, index) => directoryPart(index)), [known]);
@@ -737,6 +740,7 @@ function IndexingHarness() {
         hasMore={!complete}
         outputComplete={complete}
         indexing={!complete}
+        maxScrollHeight={maxScrollHeight}
         nextPageKey={`cursor-${known}`}
         testIdPrefix="git-paged-indexing"
       />
@@ -1544,9 +1548,11 @@ export const FoldedPagesKeepTheirHeightAndTheEndReachable: Story = {
     const earlier = () => canvas.getByTestId("git-paged-folded-row-folded:earlier").firstElementChild as HTMLElement;
     const firstFolded = FOLD_PAGE_COUNT - 1 - FOLD_WINDOW;
 
-    // The folded pages are as tall as all their rows together.
+    // The folded pages stand for all their rows. The diff is taller than the browser lays out, so
+    // the scroll height is the cap, and the placeholder shows the part the view reaches.
     await expect(earlier()).toHaveAttribute("data-page-count", String(firstFolded));
-    await expect(Math.abs(earlier().getBoundingClientRect().height - firstFolded * FOLD_PAGE_ROWS * 28)).toBeLessThan(1);
+    await expect(earlier()).toHaveAttribute("data-row-count", String(firstFolded * FOLD_PAGE_ROWS));
+    await expect(Math.abs(scroll.scrollHeight - 10000000)).toBeLessThan(1);
     const height = scroll.scrollHeight;
 
     // The view starts at the top, so the first page of the diff replays and lands in place.
@@ -1577,12 +1583,17 @@ export const JumpingToTheTopShowsTheFirstPage: Story = {
     await waitFor(() => expect(canvas.getByTestId("git-paged-folded-row-fold-1-0")).toBeInTheDocument());
 
     // A jump into the middle replays the page at that offset, and no page next to the loaded rows.
+    // The diff is taller than the cap, so the native position maps to the logical offset by the
+    // ratio of the two ranges. The continue row adds a few pixels at most.
     const middlePage = Math.floor(FOLD_PAGE_COUNT / 2) + 1;
-    await scrollTo(scroll, (middlePage - 1) * FOLD_PAGE_ROWS * 28 + 10 * 28);
+    const logicalTotal = (FOLD_PAGE_COUNT - 1) * FOLD_PAGE_ROWS * 28 + 28;
+    const logical = (middlePage - 1) * FOLD_PAGE_ROWS * 28 + 20 * 28;
+    const viewHeight = scroll.clientHeight;
+    await scrollTo(scroll, (logical * (scroll.scrollHeight - viewHeight)) / (logicalTotal - viewHeight));
     await waitFor(() => expect(onFoldedReplay).toHaveBeenCalledTimes(2));
     await expect(replayed()[1]).toBe(`page-${middlePage}`);
     await fireEvent.click(canvas.getByTestId("git-paged-folded-complete"));
-    await waitFor(() => expect(canvas.getByTestId(`git-paged-folded-row-fold-${middlePage}-10`)).toBeInTheDocument());
+    await waitFor(() => expect(canvas.getByTestId(`git-paged-folded-row-fold-${middlePage}-20`)).toBeInTheDocument());
 
     // Dragging the thumb to the top is one jump to the top. The viewer asks for the first page of
     // the diff.
@@ -1846,5 +1857,156 @@ export const IndexingKeepsTheTailProvisional: Story = {
     await waitFor(() => expect(content).toHaveAttribute("data-provisional", "false"));
     await expect(canvas.queryByTestId("git-paged-indexing-indexing")).toBeNull();
     await expect(canvas.queryByTestId("git-paged-indexing-row-continue")).toBeNull();
+  },
+};
+
+const CAP_TEST_HEIGHT = 8000;
+
+export const CappedScrollRangeMapsToPages: Story = {
+  render: () => <DirectoryHarness fromStart maxScrollHeight={CAP_TEST_HEIGHT} onReplay={onDirectoryReplay} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-directory-grid");
+    const total = DIRECTORY_TOTAL_ROWS * DIRECTORY_ROW_HEIGHT;
+    const rowTestId = (index: number) => `git-paged-directory-row-directory-row-${index}`;
+
+    // The diff is taller than the cap, so the native range is the cap and rows keep their size.
+    await expect(Math.abs(scroll.scrollHeight - CAP_TEST_HEIGHT)).toBeLessThan(1);
+    const ratio = () => (total - scroll.clientHeight) / (scroll.scrollHeight - scroll.clientHeight);
+    await expect(ratio()).toBeGreaterThan(2);
+
+    // Waits until the rows at the logical offset are drawn at their distance from the viewport top.
+    const expectRowsAt = async (logical: number) => {
+      const firstRow = Math.floor(logical / DIRECTORY_ROW_HEIGHT);
+      const lastRow = Math.min(
+        DIRECTORY_TOTAL_ROWS - 1,
+        Math.ceil((logical + scroll.clientHeight) / DIRECTORY_ROW_HEIGHT) - 1,
+      );
+      await waitFor(() => {
+        const view = scroll.getBoundingClientRect();
+        for (const index of [firstRow, lastRow]) {
+          const row = canvas.getByTestId(rowTestId(index)).getBoundingClientRect();
+          expect(Math.abs(row.top - (view.top + index * DIRECTORY_ROW_HEIGHT - logical))).toBeLessThan(2);
+          expect(Math.abs(row.height - DIRECTORY_ROW_HEIGHT)).toBeLessThan(1);
+        }
+      });
+    };
+
+    const jumpTo = async (physical: number, firstPage: number) => {
+      onDirectoryReplay.mockClear();
+      await scrollTo(scroll, physical);
+      const logical = scroll.scrollTop * ratio();
+      if (firstPage >= 0) {
+        await waitFor(() => expect(onDirectoryReplay).toHaveBeenCalled());
+        await expect(onDirectoryReplay.mock.calls[0][0]).toBe(`page-${firstPage}`);
+      }
+      await expectRowsAt(logical);
+      await expect(Math.abs(scroll.scrollHeight - CAP_TEST_HEIGHT)).toBeLessThan(1);
+      return logical;
+    };
+
+    // The first window is loaded, so the top needs no replay.
+    await jumpTo(0, -1);
+
+    const middle = Math.floor(scroll.scrollHeight / 2);
+    const middleLogical = middle * ratio();
+    const middleLogicalRow = Math.floor(middleLogical / DIRECTORY_ROW_HEIGHT);
+    const logical = await jumpTo(middle, Math.floor(middleLogicalRow / DIRECTORY_PAGE_ROWS));
+
+    // A wheel step moves by its own number of logical pixels, and a key press by its usual amount.
+    const wheel = (deltaY: number) =>
+      scroll.dispatchEvent(new WheelEvent("wheel", { deltaY, bubbles: true, cancelable: true }));
+    const press = (key: string) => scroll.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    let expected = logical;
+    for (let step = 0; step < 3; step += 1) {
+      wheel(100);
+      expected += 100;
+      await expectRowsAt(expected);
+    }
+    wheel(-60);
+    expected -= 60;
+    await expectRowsAt(expected);
+    press("ArrowDown");
+    expected += 40;
+    await expectRowsAt(expected);
+    press("PageDown");
+    expected += scroll.clientHeight * 0.875;
+    await expectRowsAt(expected);
+
+    await jumpTo(0, 0);
+    await jumpTo(scroll.scrollHeight, DIRECTORY_PAGE_COUNT - 1);
+    await expect(scroll.scrollTop * ratio()).toBeGreaterThan(total - scroll.clientHeight - 2 * ratio());
+    await expect(canvas.getByTestId(rowTestId(DIRECTORY_TOTAL_ROWS - 1))).toBeInTheDocument();
+  },
+};
+
+export const CappedScrollRangeRendersEveryRow: Story = {
+  render: () => <DirectoryHarness fromStart maxScrollHeight={CAP_TEST_HEIGHT} onReplay={onDirectoryReplay} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-directory-grid");
+    const total = DIRECTORY_TOTAL_ROWS * DIRECTORY_ROW_HEIGHT;
+    const ratio = (total - scroll.clientHeight) / (scroll.scrollHeight - scroll.clientHeight);
+    const maxTop = scroll.scrollHeight - scroll.clientHeight;
+    // The thumb moves by steps that stand for less than half a view of rows.
+    const step = Math.floor(scroll.clientHeight / 2 / ratio);
+    const seen = new Set<number>();
+
+    for (let top = 0; ; top = Math.min(top + step, maxTop)) {
+      await scrollTo(scroll, top);
+      const logical = scroll.scrollTop * ratio;
+      const firstRow = Math.floor(logical / DIRECTORY_ROW_HEIGHT);
+      const lastRow = Math.min(
+        DIRECTORY_TOTAL_ROWS - 1,
+        Math.ceil((logical + scroll.clientHeight) / DIRECTORY_ROW_HEIGHT) - 1,
+      );
+
+      await waitFor(() => {
+        for (let index = firstRow; index <= lastRow; index += 1) {
+          expect(canvas.getByTestId(`git-paged-directory-row-directory-row-${index}`)).toBeInTheDocument();
+        }
+      });
+      for (let index = firstRow; index <= lastRow; index += 1) seen.add(index);
+      if (top >= maxTop) break;
+    }
+
+    await expect(seen.size).toBe(DIRECTORY_TOTAL_ROWS);
+    await expect(onDirectoryReplay.mock.calls.length).toBeGreaterThan(DIRECTORY_PAGE_COUNT - DIRECTORY_WINDOW - 1);
+  },
+};
+
+export const IndexingFollowsTheEndInACappedRange: Story = {
+  render: () => <IndexingHarness maxScrollHeight={2500} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-indexing-grid");
+    const content = canvas.getByTestId("git-paged-indexing-content");
+    const lastRowOf = (pages: number) => `git-paged-indexing-row-directory-row-${pages * DIRECTORY_PAGE_ROWS - 1}`;
+
+    // Three pages are 3,360 logical pixels, above the cap of 2,500.
+    await scrollToEnd(scroll);
+    await expect(await canvas.findByTestId("git-paged-indexing-indexing")).toBeInTheDocument();
+    await scrollToEnd(scroll);
+    await expect(Math.abs(scroll.scrollHeight - 2500)).toBeLessThan(1);
+
+    // The view stays at the end while pages arrive, and the native range stays at the cap.
+    for (const pages of [4, 5]) {
+      await fireEvent.click(canvas.getByTestId("git-paged-indexing-add"));
+      await waitFor(() => {
+        const view = scroll.getBoundingClientRect();
+        const row = canvas.getByTestId(lastRowOf(pages)).getBoundingClientRect();
+        expect(row.bottom).toBeGreaterThan(view.top);
+        expect(row.top).toBeLessThan(view.bottom);
+      });
+      await expect(Math.abs(scroll.scrollHeight - 2500)).toBeLessThan(1);
+    }
+
+    // A view the user moved away from stays where it is, and the new rows stay out of it.
+    await scrollTo(scroll, 100);
+    await fireEvent.click(canvas.getByTestId("git-paged-indexing-add"));
+    await new Promise((resolve) => window.setTimeout(resolve, 100));
+    await expect(scroll.scrollTop).toBe(100);
+    await expect(canvas.queryByTestId(lastRowOf(6))).toBeNull();
+    await expect(content).toHaveAttribute("data-provisional", "true");
   },
 };
