@@ -139,7 +139,7 @@ module internal GitPagedDiffDisplay =
     /// native scroll range to the logical offsets. Dragging the thumb, the wheel and the keys map
     /// exactly. A click on the scrollbar track or on a scrollbar arrow moves the native position by
     /// its usual step, which is several logical steps. Row counts and heights are 32-bit integers,
-    /// so a diff has at most about 76 million display rows.
+    /// so a diff above about 76 million display rows lays out wrong.
     [<Literal>]
     let DefaultMaxScrollHeightPx = 10000000
 
@@ -1130,10 +1130,11 @@ type GitPagedDiffViewer =
         let followEnd = React.useRef false
         // Whether the user holds the scrollbar. The state renders the viewer again when the user
         // lets go.
-        let _, setGesture = React.useState false
+        let gesture, setGesture = React.useState false
         // The total height while the scrollbar is held. The thumb keeps its meaning, so the content
         // height and the mapping of the scroll range keep this total, while the rows change as
-        // pages replay and arrive.
+        // pages replay and arrive. The anchor still keeps the rows in view when the rows above change
+        // height during the hold, and the thumb drag overwrites that write on its next move.
         let pinnedTotal = React.useRef<float option> None
         // The rows in the viewport while the diff reopens. The scroll target of the reopen names
         // the first line of a page, and the view lands on the line the user was reading.
@@ -1266,7 +1267,12 @@ type GitPagedDiffViewer =
                         let keyboard = unbox<KeyboardEvent> event
                         let view = float bodyScroll.clientHeight
 
-                        if isCapped () && not (keyboard.ctrlKey || keyboard.altKey || keyboard.metaKey) then
+                        // A key pressed on a button of a row belongs to the button.
+                        if
+                            isCapped ()
+                            && obj.ReferenceEquals(event.target, bodyScroll)
+                            && not (keyboard.ctrlKey || keyboard.altKey || keyboard.metaKey)
+                        then
                             let target =
                                 match keyboard.key with
                                 | "ArrowDown" -> Some(logicalTop () + 40.0)
@@ -1506,16 +1512,15 @@ type GitPagedDiffViewer =
             // and the offset of that page.
             let candidates =
                 rowsInViewport ()
-                |> Array.choose (fun item ->
-                    let anchorAt key (start: float) =
-                        Some(
-                            {
-                                Key = key
-                                Start = start
-                                Offset = start - top
-                            }
-                            : GitPagedDiffDisplay.AnchorCandidate
-                        )
+                |> Array.collect (fun item ->
+                    let anchorAt key (start: float) = [|
+                        ({
+                            Key = key
+                            Start = start
+                            Offset = start - top
+                        }
+                        : GitPagedDiffDisplay.AnchorCandidate)
+                    |]
 
                     match rows.[item.index].Content with
                     | GitPagedDiffDisplay.Evicted(pageId, _) ->
@@ -1524,15 +1529,21 @@ type GitPagedDiffViewer =
                         let pageIndex =
                             GitPagedDiffDisplay.pageAtOffset ends (max top (float item.start) - float item.start)
 
-                        anchorAt
-                            (GitPagedDiffDisplay.pageAnchorKey pageIds.[pageIndex])
-                            (float item.start
-                             + float (
-                                 GitPagedDiffDisplay.RowHeightPx
-                                 * GitPagedDiffDisplay.pageStartRows ends pageIndex
-                             ))
+                        // The neighbours anchor as well. When a replay turns the top page into rows in
+                        // the same update that evicts a page above, a neighbour is still a placeholder.
+                        [|
+                            max 0 (pageIndex - 1) .. min (pageIds.Length - 1) (pageIndex + 1)
+                        |]
+                        |> Array.collect (fun index ->
+                            anchorAt
+                                (GitPagedDiffDisplay.pageAnchorKey pageIds.[index])
+                                (float item.start
+                                 + float (
+                                     GitPagedDiffDisplay.RowHeightPx * GitPagedDiffDisplay.pageStartRows ends index
+                                 ))
+                        )
                     | content when GitPagedDiffDisplay.isAnchorable content -> anchorAt item.key (float item.start)
-                    | _ -> None
+                    | _ -> [||]
                 )
                 |> Array.sortBy _.Start
 
@@ -1686,7 +1697,7 @@ type GitPagedDiffViewer =
                         followEnd.current <- false
                 | _ -> ()
             ),
-            [| box totalSize |]
+            [| box totalSize; box gesture |]
         )
 
         let renderedKeys =

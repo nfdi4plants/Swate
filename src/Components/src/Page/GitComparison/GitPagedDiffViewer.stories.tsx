@@ -2079,12 +2079,17 @@ function anchorPart(prefix: string, start: number, count: number) {
 
 // A loaded page of 100 rows, 20 evicted pages and a loaded page. The button evicts the first page,
 // which had arrived with 40 rows and grew to 100 by expansions, so everything below it moves up.
-function ShrinkHarness() {
+// With replayed, the button also loads the eleventh evicted page in the same update.
+function ShrinkHarness({ replayed = false }: { replayed?: boolean }) {
   const [evicted, setEvicted] = React.useState(false);
   const parts = React.useMemo(
     () => [
       evicted ? PagedPart_EvictedPage("first", ANCHOR_PAGE_ROWS - ANCHOR_SHRINK_ROWS) : anchorPart("first", 0, ANCHOR_PAGE_ROWS),
-      ...Array.from({ length: ANCHOR_PAGE_COUNT }, (_, index) => PagedPart_EvictedPage(`middle-${index}`, ANCHOR_PAGE_ROWS)),
+      ...Array.from({ length: ANCHOR_PAGE_COUNT }, (_, index) =>
+        evicted && replayed && index === 10
+          ? anchorPart("replayed", 2000, ANCHOR_PAGE_ROWS)
+          : PagedPart_EvictedPage(`middle-${index}`, ANCHOR_PAGE_ROWS),
+      ),
       anchorPart("last", 5000, 20),
     ],
     [evicted],
@@ -2100,6 +2105,7 @@ function ShrinkHarness() {
         progress={new PagedProgress(100, 100, true)}
         hasMore={false}
         outputComplete={true}
+        requestReplay={replayed ? () => {} : undefined}
         testIdPrefix="git-paged-shrink"
       />
     </div>
@@ -2183,5 +2189,70 @@ export const EvictedPageIsAsTallAsItsReplay: Story = {
     await waitFor(() => expect(canvas.queryByTestId("git-paged-count-row-folded:between:counted")).not.toBeNull());
     await expect(content.getBoundingClientRect().height).toBe(loadedHeight);
     await expect(Math.abs(lastRow() - loadedTop)).toBeLessThan(1);
+  },
+};
+
+export const ReplayWithEvictionKeepsTheRequestedOffset: Story = {
+  render: () => <ShrinkHarness replayed />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-shrink-grid");
+
+    // The view sits 20 rows into the eleventh evicted page. That page loads in the update that
+    // evicts the first page, so the rows of the page replace the placeholder the view anchored to.
+    await scrollTo(scroll, (ANCHOR_PAGE_ROWS + 10 * ANCHOR_PAGE_ROWS + 20) * 28);
+    await fireEvent.click(canvas.getByTestId("git-paged-shrink-evict"));
+
+    await waitFor(() => {
+      const view = scroll.getBoundingClientRect();
+      const row = canvas.getByTestId("git-paged-shrink-row-replayed-20").getBoundingClientRect();
+      expect(Math.abs(row.top - view.top)).toBeLessThan(2);
+    });
+  },
+};
+
+function CappedButtonHarness({ onExpand }: { onExpand: () => void }) {
+  const parts = React.useMemo(
+    () => [
+      PagedPart_HiddenGap("capped-gap", range(0, 5), range(0, 5)),
+      ...Array.from({ length: 3 }, (_, index) => directoryPart(index)),
+    ],
+    [],
+  );
+  return (
+    <div style={{ height: "30rem" }}>
+      <GitPagedDiffViewerComponent
+        parts={parts}
+        status={PagedDiffStatus_Ready()}
+        progress={new PagedProgress(100, 100, true)}
+        hasMore={false}
+        outputComplete={true}
+        requestExpand={onExpand}
+        maxScrollHeight={2500}
+        testIdPrefix="git-paged-capped-button"
+      />
+    </div>
+  );
+}
+
+export const ScrollKeysLeaveTheButtonsOfARowAlone: Story = {
+  render: () => <CappedButtonHarness onExpand={() => {}} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-capped-button-grid");
+    await expect(Math.abs(scroll.scrollHeight - 2500)).toBeLessThan(1);
+
+    // Space on a focused button belongs to the button, so the viewer leaves the event alone.
+    const button = canvas.getByTestId("git-paged-capped-button-gap-expand-start-capped-gap");
+    const onButton = new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true });
+    button.dispatchEvent(onButton);
+    await expect(onButton.defaultPrevented).toBe(false);
+    await expect(scroll.scrollTop).toBe(0);
+
+    // The same key on the scroll element moves the view by a page of logical pixels.
+    const onScroller = new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true });
+    scroll.dispatchEvent(onScroller);
+    await expect(onScroller.defaultPrevented).toBe(true);
+    await waitFor(() => expect(scroll.scrollTop).toBeGreaterThan(0));
   },
 };
