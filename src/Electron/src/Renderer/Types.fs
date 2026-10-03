@@ -100,6 +100,8 @@ type GitDiffPageSpan = {
 type GitDiffWindowPage = {
     PageId: string
     Parts: PagedPart[]
+    /// Display rows of the page as it arrived. An evicted page keeps them, so its placeholder is
+    /// as tall as the replayed rows. Expanding a gap does not change them.
     RowCount: int
     /// JSON length of the DTOs this page was built from, including expanded context and line slices.
     PayloadBytes: float

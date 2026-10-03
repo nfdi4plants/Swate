@@ -1559,19 +1559,15 @@ module GitDiffPageLoader =
 
         openFresh deps page None
 
-    let private evictedCopy (windowPage: GitDiffWindowPage) =
-        let rowCount = Presentation.rowCount windowPage.Parts
-
-        {
-            windowPage with
-                Parts = [|
-                    Paged.PagedPart.EvictedPage(windowPage.PageId, rowCount)
-                |]
-                RowCount = rowCount
-                PayloadBytes = 0.0
-                IsEvicted = true
-                ExpandedGaps = []
-        }
+    let private evictedCopy (windowPage: GitDiffWindowPage) = {
+        windowPage with
+            Parts = [|
+                Paged.PagedPart.EvictedPage(windowPage.PageId, windowPage.RowCount)
+            |]
+            PayloadBytes = 0.0
+            IsEvicted = true
+            ExpandedGaps = []
+    }
 
     /// Puts the rows of the least recently expanded gap of the page back as a hidden gap with
     /// that gap's id. Gaps the expansion returned stay where they are.
@@ -1591,7 +1587,6 @@ module GitDiffPageLoader =
             {
                 windowPage with
                     Parts = parts
-                    RowCount = Presentation.rowCount parts
                     PayloadBytes = windowPage.PayloadBytes - oldest.PayloadBytes
                     ExpandedGaps = rest
             }
@@ -1967,7 +1962,6 @@ module GitDiffPageLoader =
             let updated = {
                 windowPage with
                     Parts = replaced
-                    RowCount = Presentation.rowCount replaced
                     PayloadBytes = windowPage.PayloadBytes + bytes
                     ExpandedGaps =
                         (windowPage.ExpandedGaps |> List.filter (fun expanded -> expanded.GapId <> gapId))

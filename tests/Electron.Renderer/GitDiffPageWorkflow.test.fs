@@ -782,6 +782,66 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "An evicted page keeps the display rows it arrived with, and its replay has the same rows",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                // A header and a row, a gap, and a second hunk with its own header make five rows.
+                let pageDto index =
+                    diffPage
+                        $"p{index}"
+                        (Some $"cursor-{index}")
+                        (if index = 1 then
+                             [| hunk "h1"; gap "g1"; hunk "h2" |]
+                         else
+                             [| hunk $"h{index}" |])
+
+                let displayRows (windowPage: GitDiffWindowPage) =
+                    Renderer.GitDiffPresentation.rowCount windowPage.Parts
+
+                let! state = openFirstPage fake (pageDto 1)
+
+                // Expanding the gap adds rows to the loaded page and leaves the extent it arrived with.
+                fake.ExpandReply <-
+                    fun _ ->
+                        succeeded (
+                            ResumablePartsDto.Ready [|
+                                DiffPartDto.ExpandedContext(
+                                    "g1",
+                                    [| changedRow "e1"; changedRow "e2"; changedRow "e3" |]
+                                )
+                                gap "g2"
+                            |]
+                        )
+
+                let! state = run fake (diffMsg (GitDiffMsg.Expand((diffOf state).Generation, "g1", true))) state
+                Vitest.expect((diffOf state).Pages.[0].RowCount).toBe (5)
+                Vitest.expect(displayRows (diffOf state).Pages.[0]).toBe (8)
+
+                fake.ReadReply <-
+                    fun request ->
+                        let index = int (request.Cursor.Replace("cursor-", "")) + 1
+                        succeeded (ResumablePageDto.Ready(pageDto index))
+
+                let current = ref state
+
+                for _ in 2..9 do
+                    let! next = run fake (diffMsg (GitDiffMsg.LoadNext (diffOf current.Value).Generation)) current.Value
+                    current.Value <- next
+
+                let page = diffOf current.Value
+                Vitest.expect(pageParts page.Pages.[0]).toEqual ([| "evicted:p1" |])
+                Vitest.expect(displayRows page.Pages.[0]).toBe (5)
+
+                fake.ReplayReply <- fun _ -> succeeded (pageDto 1)
+                let! state = run fake (diffMsg (GitDiffMsg.Replay(page.Generation, "p1", []))) current.Value
+                let replayed = (diffOf state).Pages.[0]
+                Vitest.expect(replayed.IsEvicted).toBe (false)
+                Vitest.expect(displayRows replayed).toBe (5)
+            }
+        )
+
+        Vitest.test (
             "Loaded pages above 8 MiB evict the page farthest from the requested page, and a single oversized page stays loaded",
             fun () -> promise {
                 let fake = FakeDiffClient()
@@ -2011,7 +2071,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "A diff of 2,000 pages of 1,000 rows renders within a fixed height, with the unloaded pages folded into one placeholder",
+            "A diff of 2,000 pages of 1,000 rows keeps the height of all its rows, with the unloaded pages folded into one placeholder",
             TestOptions(timeout = 120000),
             fun () -> promise {
                 let fake = FakeDiffClient()
@@ -2053,10 +2113,9 @@ Vitest.describe (
                         .Groups.[1].Value
                     |> float
 
-                Vitest.expect(height).toBeGreaterThan (0.0)
-
-                // The loaded window holds eight pages. Ten pages of rows at the row height is the bound.
-                Vitest.expect(height).toBeLessThan (float (10 * rowsPerPage * 28))
+                // Every page has a header row besides its rows, and the continue row follows the pages.
+                let displayRowsPerPage = rowsPerPage + 1
+                Vitest.expect(height).toBe (float (pageCount * displayRowsPerPage * 28 + 28))
 
                 let folded = rendered.querySelector "[data-folded-side=\"earlier\"]"
 
@@ -2066,11 +2125,10 @@ Vitest.describe (
 
                 Vitest
                     .expect(folded.getAttribute "data-row-count")
-                    .toBe (string ((pageCount - GitDiffPageLoader.MaxLoadedPages) * rowsPerPage))
+                    .toBe (string ((pageCount - GitDiffPageLoader.MaxLoadedPages) * displayRowsPerPage))
 
-                Vitest
-                    .expect(folded.getAttribute "data-next-page")
-                    .toBe ($"p{pageCount - GitDiffPageLoader.MaxLoadedPages}")
+                // Without a viewport the placeholder replays its first page.
+                Vitest.expect(folded.getAttribute "data-next-page").toBe ("p1")
             }
         )
 
