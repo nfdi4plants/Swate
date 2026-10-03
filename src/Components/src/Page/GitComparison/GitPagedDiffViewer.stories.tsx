@@ -443,12 +443,15 @@ function foldedPageRows(index: number) {
 // Keeps a window of eight loaded pages out of 2,000 pages of 1,000 rows, the way the app does.
 // Every other page is an evicted placeholder. A replay waits for the complete button, so the
 // story can look at the rows before and after it.
-function FoldedPagesHarness() {
+// With fromStart, the diff is complete and the first eight pages are the loaded ones.
+function FoldedPagesHarness({ fromStart = false }: { fromStart?: boolean }) {
   const loadedParts = React.useRef(new Map<number, PagedPart_$union>());
   const evictedParts = React.useRef(new Map<number, PagedPart_$union>());
   const [model, setModel] = React.useState(() => ({
-    known: FOLD_PAGE_COUNT - 1,
-    loaded: Array.from({ length: FOLD_WINDOW }, (_, offset) => FOLD_PAGE_COUNT - FOLD_WINDOW + offset),
+    known: fromStart ? FOLD_PAGE_COUNT : FOLD_PAGE_COUNT - 1,
+    loaded: Array.from({ length: FOLD_WINDOW }, (_, offset) =>
+      fromStart ? offset + 1 : FOLD_PAGE_COUNT - FOLD_WINDOW + offset,
+    ),
   }));
   const [pendingReplays, setPendingReplays] = React.useState<string[]>([]);
 
@@ -715,6 +718,32 @@ function ScrollTargetHarness() {
   );
 }
 
+// Four loaded pages. The diff reopens while the user reads in the middle of the second page, and
+// lands with a scroll target on the first line of that page, the way the renderer sets it.
+function ReopenLandsHarness() {
+  const [step, setStep] = React.useState<"ready" | "reopening" | "landed">("ready");
+  const parts = React.useMemo(() => Array.from({ length: 4 }, (_, index) => targetPage(index)), []);
+  return (
+    <div style={{ height: "32rem" }}>
+      <button data-testid="git-paged-landing-reopen" onClick={() => setStep("reopening")}>
+        Reopen
+      </button>
+      <button data-testid="git-paged-landing-land" onClick={() => setStep("landed")}>
+        Land
+      </button>
+      <GitPagedDiffViewerComponent
+        parts={parts}
+        status={step === "reopening" ? PagedDiffStatus_Reopening() : PagedDiffStatus_Ready()}
+        progress={new PagedProgress(100, 100, true)}
+        hasMore={false}
+        outputComplete={true}
+        scrollTarget={step === "landed" ? new PagedScrollTarget("previous", TARGET_PAGE_ROWS, 1) : undefined}
+        testIdPrefix="git-paged-landing"
+      />
+    </div>
+  );
+}
+
 function scrollElementFor(container: HTMLElement, gridTestId: string) {
   const grid = within(container).getByTestId(gridTestId);
   const scrollElement = Array.from(grid.querySelectorAll<HTMLElement>("div")).find(
@@ -733,6 +762,13 @@ async function scrollToEnd(element: HTMLElement) {
 async function scrollTo(element: HTMLElement, top: number) {
   element.scrollTop = top;
   await fireEvent.scroll(element, { target: { scrollTop: top } });
+}
+
+// Scrolls up in steps shorter than the viewport, the way the wheel does.
+async function wheelToTop(element: HTMLElement) {
+  while (element.scrollTop > 0) {
+    await scrollTo(element, Math.max(0, element.scrollTop - element.clientHeight / 2));
+  }
 }
 
 const onRequestExpand = fn();
@@ -1347,11 +1383,11 @@ export const FoldedPagesKeepTheEndReachable: Story = {
     await expect(scroll.scrollHeight).toBeLessThan(heightBound);
     await expect(earlier()).toHaveAttribute("data-page-count", String(firstFolded));
 
-    // At the top, the folded page next to the loaded rows replays, nearest first, and the rows
-    // in view stay where they are.
+    // Reaching the top step by step, the folded page next to the loaded rows replays, nearest
+    // first, and the rows in view stay where they are.
     for (let step = 0; step < 3; step += 1) {
       const pageIndex = firstFolded - step;
-      await scrollTo(scroll, 0);
+      await wheelToTop(scroll);
       await waitFor(() => expect(onFoldedReplay).toHaveBeenCalledTimes(step + 1));
       await expect(earlier()).toHaveAttribute("data-next-page", `page-${pageIndex}`);
       const anchorTop = canvas.getByTestId(`git-paged-folded-row-fold-${pageIndex + 1}-0`).getBoundingClientRect().top;
@@ -1378,6 +1414,70 @@ export const FoldedPagesKeepTheEndReachable: Story = {
     await waitFor(() => expect(onFoldedNext).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(canvas.queryByTestId("git-paged-folded-row-continue")).toBeNull());
     await expect(scroll.scrollHeight).toBeLessThan(heightBound);
+  },
+};
+
+export const JumpingToTheTopShowsTheFirstPage: Story = {
+  render: () => <FoldedPagesHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-folded-grid");
+    const replayed = () => onFoldedReplay.mock.calls.map(([pageId]) => pageId);
+
+    // The first replay answers the fold at the top. It leaves the view well below the top.
+    await waitFor(() => expect(onFoldedReplay).toHaveBeenCalledTimes(1));
+    await fireEvent.click(canvas.getByTestId("git-paged-folded-complete"));
+    await waitFor(() => expect(scroll.scrollTop).toBeGreaterThan(scroll.clientHeight));
+
+    // Dragging the thumb to the top is one jump to the top. The viewer asks for the first page of
+    // the diff and not for the page next to the loaded rows.
+    await scrollTo(scroll, 0);
+    await waitFor(() => expect(onFoldedReplay).toHaveBeenCalledTimes(2));
+    await expect(replayed()[1]).toBe("page-1");
+    await fireEvent.click(canvas.getByTestId("git-paged-folded-complete"));
+
+    await waitFor(() => expect(canvas.getByTestId("git-paged-folded-row-fold-1-0")).toBeInTheDocument());
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
+    await expect(scroll.scrollTop).toBe(0);
+    const view = scroll.getBoundingClientRect();
+    await expect(canvas.getByTestId("git-paged-folded-row-fold-1-0").getBoundingClientRect().top).toBeGreaterThanOrEqual(view.top - 1);
+  },
+};
+
+export const JumpingToTheEndShowsTheLastPage: Story = {
+  render: () => <FoldedPagesHarness fromStart />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-folded-grid");
+
+    await scrollToEnd(scroll);
+    await waitFor(() => expect(onFoldedReplay).toHaveBeenCalledTimes(1));
+    await expect(onFoldedReplay).toHaveBeenLastCalledWith(`page-${FOLD_PAGE_COUNT}`);
+    await fireEvent.click(canvas.getByTestId("git-paged-folded-complete"));
+
+    const lastRow = `git-paged-folded-row-fold-${FOLD_PAGE_COUNT}-${FOLD_PAGE_ROWS - 1}`;
+    await waitFor(() => expect(canvas.getByTestId(lastRow)).toBeInTheDocument());
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
+    await expect(scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop).toBeLessThan(2);
+    await expect(canvas.getByTestId(lastRow).getBoundingClientRect().bottom).toBeLessThanOrEqual(scroll.getBoundingClientRect().bottom + 1);
+  },
+};
+
+export const ReopenLandsAtTheLineBeingRead: Story = {
+  render: () => <ReopenLandsHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-landing-grid");
+    const readingRow = TARGET_PAGE_ROWS + 30;
+    await scrollTo(scroll, readingRow * 28);
+
+    await fireEvent.click(canvas.getByTestId("git-paged-landing-reopen"));
+    await fireEvent.click(canvas.getByTestId("git-paged-landing-land"));
+    await waitFor(() => {
+      const view = scroll.getBoundingClientRect();
+      const row = canvas.getByTestId(`git-paged-landing-row-row-${readingRow}`).getBoundingClientRect();
+      expect(Math.abs(row.top - view.top)).toBeLessThan(2);
+    });
   },
 };
 

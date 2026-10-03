@@ -248,6 +248,22 @@ module internal GitPagedDiffDisplay =
         | Later -> pageIds.[0]
         | Between -> if fromAbove then pageIds.[0] else Array.last pageIds
 
+    /// Whether a jump to the top (Earlier) or to the end (Later) found a folded placeholder at
+    /// that edge, and the replay put diff rows there.
+    let foldLanded (edge: FoldSide option) (previous: string[]) (current: string[]) =
+        match edge with
+        | Some Earlier ->
+            previous.Length > 0
+            && previous.[0] = "folded:earlier"
+            && current.Length > 0
+            && current.[0] <> "folded:earlier"
+        | Some Later ->
+            previous.Length > 0
+            && previous.[previous.Length - 1] = "folded:later"
+            && current.Length > 0
+            && current.[current.Length - 1] <> "folded:later"
+        | _ -> false
+
     let foldSideName side =
         match side with
         | Earlier -> "earlier"
@@ -262,6 +278,17 @@ module internal GitPagedDiffDisplay =
         | Folded _ -> 1
         | Continue _ -> 2
         | _ -> 0
+
+    /// The line a row shows on the side, if it shows one.
+    let lineOfRow (side: PagedDiffSide) (content: Content) =
+        let numberOf (value: PagedLine option) = value |> Option.map _.Number
+
+        match content, side with
+        | AlignedRow(aligned, _), PagedDiffSide.Previous -> numberOf aligned.Previous
+        | AlignedRow(aligned, _), PagedDiffSide.Current -> numberOf aligned.Current
+        | UnalignedLines(previous, _), PagedDiffSide.Previous -> numberOf previous
+        | UnalignedLines(_, current), PagedDiffSide.Current -> numberOf current
+        | _ -> None
 
     /// The first row that shows the line or a later line of the side. A hidden gap counts with
     /// the lines it covers.
@@ -937,6 +964,14 @@ type GitPagedDiffViewer =
         let contentMeasureRef, contentRect = React.useMeasure<Element> ()
         let previousLayout = React.useRef<GitPagedDiffDisplay.AnchorSnapshot option> None
         let appliedScrollToken = React.useRef<int option> None
+        // The edge the last scroll jumped to, Earlier for the top and Later for the end. A thumb
+        // drag to an edge shows a folded placeholder there, and the replay then starts at the
+        // edge page of the diff.
+        let jumpedEdge = React.useRef<GitPagedDiffDisplay.FoldSide option> None
+        let lastScrollTop = React.useRef 0.0
+        // The rows in the viewport while the diff reopens. The scroll target of the reopen names
+        // the first line of a page, and the view lands at the line the user was reading instead.
+        let readingRows = React.useRef<GitPagedDiffDisplay.Content[]> [||]
         // Changed after the scroll position was restored, so the rows render for the new position
         // before the browser paints.
         let layoutVersion, setLayoutVersion = React.useState 0
@@ -964,9 +999,29 @@ type GitPagedDiffViewer =
                     let syncHeaderToBody (_: Event) =
                         headerScroll.scrollLeft <- bodyScroll.scrollLeft
 
+                    // Runs in the capture phase, before the virtualizer renders for the new position.
+                    let trackEdgeJump (_: Event) =
+                        let top = bodyScroll.scrollTop
+                        let view = bodyScroll.clientHeight
+                        let bottom = bodyScroll.scrollHeight - view
+
+                        if top <= 1.0 && lastScrollTop.current - top > view then
+                            jumpedEdge.current <- Some GitPagedDiffDisplay.Earlier
+                        elif top >= bottom - 1.0 && top - lastScrollTop.current > view then
+                            jumpedEdge.current <- Some GitPagedDiffDisplay.Later
+                        elif top > 1.0 && top < bottom - 1.0 then
+                            jumpedEdge.current <- None
+
+                        lastScrollTop.current <- top
+
                     bodyScroll.addEventListener ("scroll", syncHeaderToBody)
+                    bodyScroll.addEventListener ("scroll", trackEdgeJump, true)
                     syncHeaderToBody (unbox null)
-                    FsReact.createDisposable (fun () -> bodyScroll.removeEventListener ("scroll", syncHeaderToBody))
+
+                    FsReact.createDisposable (fun () ->
+                        bodyScroll.removeEventListener ("scroll", syncHeaderToBody)
+                        bodyScroll.removeEventListener ("scroll", trackEdgeJump, true)
+                    )
                 | _ -> FsReact.createDisposable (fun () -> ())
             ),
             [||]
@@ -1128,15 +1183,28 @@ type GitPagedDiffViewer =
                             | _ -> None
                         )
 
-                    match anchor with
-                    | Some(candidate, index) ->
-                        // Asking for the total size brings the measurements up to date with the
-                        // rows measured in this commit.
-                        rowVirtualizer.getTotalSize () |> ignore
-                        let target = float rowVirtualizer.measurementsCache.[index].start - candidate.Offset
+                    // Rows that replace the folded placeholder at an edge the view jumped to keep the
+                    // view at that edge. Anchoring would move it to the loaded rows.
+                    let target =
+                        if GitPagedDiffDisplay.foldLanded jumpedEdge.current previous.Keys keys then
+                            if jumpedEdge.current = Some GitPagedDiffDisplay.Earlier then
+                                Some 0.0
+                            else
+                                Some(float (rowVirtualizer.getTotalSize ()) - scrollElement.clientHeight)
+                        else
+                            match anchor with
+                            | Some(candidate, index) ->
+                                // Asking for the total size brings the measurements up to date with the
+                                // rows measured in this commit.
+                                rowVirtualizer.getTotalSize () |> ignore
+                                Some(float rowVirtualizer.measurementsCache.[index].start - candidate.Offset)
+                            | None -> None
 
+                    match target with
+                    | Some target ->
                         if abs (scrollElement.scrollTop - target) >= 1.0 then
                             scrollElement.scrollTop <- target
+                            lastScrollTop.current <- scrollElement.scrollTop
 
                         // Until the scroll event arrives, the virtualizer would lay rows out for
                         // the old position and correct size changes against it, which moves the
@@ -1151,11 +1219,18 @@ type GitPagedDiffViewer =
                 // over the row kept in place above.
                 match scrollTarget, bodyScrollRef.current with
                 | Some target, Some scrollElement when appliedScrollToken.current <> Some target.Token ->
-                    match GitPagedDiffDisplay.rowIndexOfLine target.Side target.Line rows with
+                    let line =
+                        readingRows.current
+                        |> Array.tryPick (GitPagedDiffDisplay.lineOfRow target.Side)
+                        |> Option.defaultValue target.Line
+
+                    match GitPagedDiffDisplay.rowIndexOfLine target.Side line rows with
                     | Some index ->
                         appliedScrollToken.current <- Some target.Token
+                        readingRows.current <- [||]
                         rowVirtualizer.getTotalSize () |> ignore
                         scrollElement.scrollTop <- float rowVirtualizer.measurementsCache.[index].start
+                        lastScrollTop.current <- scrollElement.scrollTop
 
                         if abs (rowVirtualizer.scrollOffset - scrollElement.scrollTop) >= 1.0 then
                             rowVirtualizer.scrollOffset <- scrollElement.scrollTop
@@ -1180,6 +1255,16 @@ type GitPagedDiffViewer =
             viewportItems ()
             |> Array.map (fun item -> rows.[item.Index].Key)
             |> String.concat "\u001f"
+
+        React.useEffect (
+            (fun () ->
+                if status = PagedDiffStatus.Reopening then
+                    readingRows.current <- rowsInViewport () |> Array.map (fun item -> rows.[item.index].Content)
+
+                FsReact.createDisposable (fun () -> ())
+            ),
+            [| box status; box viewportKeys |]
+        )
 
         let replaySignature = pendingReplays |> String.concat "\u001f"
         let requestedReplay = React.useRef (HashSet<string>())
@@ -1232,7 +1317,12 @@ type GitPagedDiffViewer =
                         | GitPagedDiffDisplay.Evicted(pageId, _) when mayReplay pageId -> Some pageId
                         | GitPagedDiffDisplay.Folded(side, pageIds, _) ->
                             let fromAbove = float item.Start + float item.Size / 2.0 > viewportMiddle
-                            let pageId = GitPagedDiffDisplay.nearestFoldedPage side pageIds fromAbove
+
+                            let pageId =
+                                match side, jumpedEdge.current with
+                                | GitPagedDiffDisplay.Earlier, Some GitPagedDiffDisplay.Earlier -> pageIds.[0]
+                                | GitPagedDiffDisplay.Later, Some GitPagedDiffDisplay.Later -> Array.last pageIds
+                                | _ -> GitPagedDiffDisplay.nearestFoldedPage side pageIds fromAbove
 
                             if mayReplay pageId then Some pageId else None
                         | _ -> None
