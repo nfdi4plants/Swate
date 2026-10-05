@@ -18,6 +18,11 @@ let private performance: IPerformance = jsNative
 
 let private clearPerformanceMeasures () : unit = performance.clearMeasures ()
 
+/// The key the viewer uses to ask for the next page at most once. It is the id of the last
+/// loaded page, which changes when a new page joins or a reopen replaces the pages.
+let nextPageKeyOf (page: GitDiffPageData) : string option =
+    page.Pages |> Array.tryLast |> Option.map _.PageId
+
 [<ReactComponent>]
 let Main (page: GitDiffPageData) =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
@@ -141,9 +146,11 @@ let Main (page: GitDiffPageData) =
                         currentTitle = currentTitle,
                         ?changeKind = page.ChangeKind,
                         testIdPrefix = "renderer-git-diff",
-                        // Evicting or replaying the last page changes the last part but not the
-                        // cursor, so the cursor keeps the continue row from reading again.
-                        ?nextPageKey = page.NextCursor,
+                        // Eviction, replay and Scanning continuations keep the last page, so the
+                        // continue row does not read again. The cursor changes with each Scanning
+                        // answer, and a diff paused after one would otherwise show the viewer an
+                        // unused key and read on its closed session.
+                        ?nextPageKey = nextPageKeyOf page,
                         failedGaps = Array.ofList page.FailedGaps,
                         failedLineSlices = Array.ofList page.FailedLineSlices,
                         failedReplays = Array.ofList page.FailedReplays,

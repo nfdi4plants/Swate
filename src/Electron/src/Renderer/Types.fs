@@ -112,8 +112,8 @@ type GitDiffWindowPage = {
     Span: GitDiffPageSpan
 }
 
-/// The running request for the page after the last loaded one. Background is set when the read
-/// belongs to the background indexing. A Scanning continuation of it inherits the flag.
+/// The running request for the page after the last loaded one. The background indexing sets
+/// Background on its reads, and a Scanning continuation of such a read keeps it.
 type GitDiffNextRequest = {
     Cursor: string
     OperationId: string

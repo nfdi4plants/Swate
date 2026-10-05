@@ -1097,9 +1097,22 @@ Vitest.describe (
                         | "diff-1", "scan-1" -> failedWith "diff_session_closed" None
                         | _ -> closingReply request
 
+                let nextKey state =
+                    Renderer.Components.MainContent.GitDiffTarget.nextPageKeyOf (diffOf state)
+
                 let! state = run fake (select "a.txt") runningState
-                let! state = run fake (diffMsg (GitDiffMsg.Index (diffOf state).Generation)) state
+                let generation = (diffOf state).Generation
+                let keyOfFirstPage = nextKey state
+
+                let! state = run fake (diffMsg (GitDiffMsg.LoadNext generation)) state
+                let keyOfSecondPage = nextKey state
+                let! state = run fake (diffMsg (GitDiffMsg.Index generation)) state
                 let page = diffOf state
+
+                // The key moves when a page joins. The Scanning answer and the pause keep it, so
+                // the viewer does not ask for the next page again on the closed handle.
+                Vitest.expect(keyOfSecondPage).not.toEqual (keyOfFirstPage)
+                Vitest.expect(nextKey state).toEqual (keyOfSecondPage)
 
                 Vitest
                     .expect(fake.Reads |> Seq.map (fun read -> read.HandleId, read.Cursor) |> Seq.toArray)
