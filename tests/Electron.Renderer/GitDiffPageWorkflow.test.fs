@@ -91,6 +91,9 @@ type private FakeDiffClient() =
     member val LineReply: ReadTextDiffLineRequestDto -> OperationResultDto<ResumableLineDto> =
         fun _ -> failwith "line" with get, set
 
+    /// Answers the waits of the workflow. A test sets it to hold a wait back.
+    member val Delay: int -> JS.Promise<unit> = (fun _ -> promise { return () }) with get, set
+
     /// The page state the app shows, changed by plain sets and by functional updates.
     member val CurrentPageState: PageState option = None with get, set
 
@@ -163,7 +166,7 @@ type private FakeDiffClient() =
                     reply (succeeded ())
         }
         hasUsableAccount = fun () -> true
-        delay = fun _ -> promise { return () }
+        delay = fun milliseconds -> this.Delay milliseconds
         newOperationId =
             fun () ->
                 operationCount <- operationCount + 1
@@ -1058,6 +1061,97 @@ Vitest.describe (
                         }
                     )
                     .toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "Background arrivals show together after a short wait and a user request shows at once",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let releases = ResizeArray<unit -> unit>()
+
+                fake.Delay <- fun _ -> Promise.create (fun resolve _ -> releases.Add(fun () -> resolve ()))
+
+                fake.ReadReply <-
+                    fun _ -> succeeded (ResumablePageDto.Ready(diffPage "unused" (Some "cursor-x") [| hunk "hx" |]))
+
+                let! opened = openFirstPage fake (diffPage "p1" (Some "cursor-1") [| hunk "h1" |])
+                let generation = (diffOf opened).Generation
+                let deps = fake.Dependencies
+
+                let dispatchNothing (cmd: Cmd<Msg>) =
+                    cmd |> List.iter (fun sub -> sub ignore)
+
+                let indexing, indexCmd =
+                    update deps fake.SetPageState (diffMsg (GitDiffMsg.Index generation)) opened
+
+                dispatchNothing indexCmd
+
+                // Answers the background read that runs and returns the state with the new page.
+                let arrive (state: GitState) (index: int) =
+                    let page = diffOf state
+                    let running = page.NextRequest.Value
+
+                    let request: ReadTextDiffPageRequestDto = {
+                        OperationId = running.OperationId
+                        HandleId = page.Handle.Value.Id
+                        HandleVersion = page.Handle.Value.Version
+                        Cursor = running.Cursor
+                    }
+
+                    let answer =
+                        Ok(
+                            succeeded (
+                                ResumablePageDto.Ready(
+                                    diffPage $"p{index}" (Some $"cursor-{index}") [| hunk $"h{index}" |]
+                                )
+                            )
+                        )
+
+                    let next, cmd =
+                        update
+                            deps
+                            fake.SetPageState
+                            (diffMsg (GitDiffMsg.PageCompleted(generation, request, answer)))
+                            state
+
+                    dispatchNothing cmd
+                    next
+
+                let shownPageCount () =
+                    match fake.CurrentPageState with
+                    | Some(PageState.GitDiffPage shown) -> shown.Pages.Length
+                    | _ -> -1
+
+                let publishedBefore = fake.PageStates.Count
+                let state = arrive (arrive indexing 2) 3
+
+                // The model has both pages, and the shown page waits for the one delayed publish.
+                Vitest.expect((diffOf state).Pages.Length).toBe (3)
+                Vitest.expect(fake.PageStates.Count).toBe (publishedBefore)
+                Vitest.expect(releases.Count).toBe (1)
+
+                releases.[0] ()
+                do! Promise.sleep 0
+                Vitest.expect(fake.PageStates.Count).toBe (publishedBefore + 1)
+                Vitest.expect(shownPageCount ()).toBe (3)
+
+                // A page that arrives later waits again, and a user request shows the newest page
+                // at once. The delayed publish that is still waiting has nothing left to show.
+                let state = arrive state 4
+                Vitest.expect(releases.Count).toBe (2)
+                Vitest.expect(shownPageCount ()).toBe (3)
+
+                let _, loadCmd =
+                    update deps fake.SetPageState (diffMsg (GitDiffMsg.LoadNext generation)) state
+
+                dispatchNothing loadCmd
+                Vitest.expect(shownPageCount ()).toBe (4)
+
+                let publishedAfterRequest = fake.PageStates.Count
+                releases.[1] ()
+                do! Promise.sleep 0
+                Vitest.expect(fake.PageStates.Count).toBe (publishedAfterRequest)
             }
         )
 

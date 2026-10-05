@@ -56,20 +56,16 @@ let Main (page: GitDiffPageData) =
     let parts =
         React.useMemo ((fun () -> page.Pages |> Array.collect _.Parts), [| box page.Pages |])
 
-    // The page of each part, so the part range the viewer reports maps back to page ids.
-    let partPages =
-        React.useMemo (
-            (fun () ->
-                page.Pages
-                |> Array.collect (fun windowPage -> windowPage.Parts |> Array.map (fun _ -> windowPage.PageId))
-            ),
-            [| box page.Pages |]
-        )
-
+    // The part range the viewer reports for a replay maps back to page ids. A replay is rare, so
+    // the page of each part is looked up when one is asked for.
     let visiblePages (firstPart: int) (lastPart: int) =
         if firstPart < 0 || lastPart < firstPart then
             []
         else
+            let partPages =
+                page.Pages
+                |> Array.collect (fun windowPage -> windowPage.Parts |> Array.map (fun _ -> windowPage.PageId))
+
             [
                 for index in firstPart .. min lastPart (partPages.Length - 1) -> partPages.[index]
             ]

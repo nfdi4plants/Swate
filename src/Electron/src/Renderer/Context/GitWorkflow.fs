@@ -1328,6 +1328,11 @@ module GitDiffPageLoader =
     [<Literal>]
     let MaxLoadedPages = 8
 
+    /// The time background page arrivals wait before the viewer shows them. The arrivals in that
+    /// time show as one update.
+    [<Literal>]
+    let PublishCoalesceMs = 100
+
     /// The size limit of the loaded pages. Sizes are JSON lengths in UTF-16 code units, which
     /// match bytes for ASCII text.
     let MaxLoadedBytes = 8.0 * 1024.0 * 1024.0
@@ -1452,14 +1457,40 @@ module GitDiffPageLoader =
 
     /// Shows the updated page only while the page state still shows this diff. An answer that
     /// arrives after the user went to another page leaves that page in place.
-    let private publishShownCmd (deps: GitDependencies) (page: GitDiffPageData) : Cmd<Msg> = [
+    let private publishShown (deps: GitDependencies) (page: GitDiffPageData) =
+        deps.updatePageState (fun current ->
+            match current with
+            | Some(PageState.GitDiffPage shown) when shown.Generation = page.Generation ->
+                Some(PageState.GitDiffPage page)
+            | other -> other
+        )
+
+    /// The page the delayed publish of background arrivals shows. It is set while a publish is waiting.
+    let mutable private pendingPublish: GitDiffPageData option = None
+
+    /// Shows the page at once. A delayed publish that waits is older than this page and drops out.
+    let private publishNowCmd (deps: GitDependencies) (page: GitDiffPageData) : Cmd<Msg> = [
         fun _ ->
-            deps.updatePageState (fun current ->
-                match current with
-                | Some(PageState.GitDiffPage shown) when shown.Generation = page.Generation ->
-                    Some(PageState.GitDiffPage page)
-                | other -> other
-            )
+            pendingPublish <- None
+            publishShown deps page
+    ]
+
+    /// Shows the page after PublishCoalesceMs. The pages that arrive in the meantime replace it, so
+    /// background arrivals that follow each other render the viewer once.
+    let private publishLaterCmd (deps: GitDependencies) (page: GitDiffPageData) : Cmd<Msg> = [
+        fun _ ->
+            let waiting = pendingPublish.IsSome
+            pendingPublish <- Some page
+
+            if not waiting then
+                deps.delay PublishCoalesceMs
+                |> Promise.iter (fun () ->
+                    match pendingPublish with
+                    | Some latest ->
+                        pendingPublish <- None
+                        publishShown deps latest
+                    | None -> ()
+                )
     ]
 
     let private send
@@ -1622,44 +1653,62 @@ module GitDiffPageLoader =
             | Some anchorPage when page.VisiblePages |> List.contains anchorPage.PageId -> page.VisiblePages
             | _ -> []
 
-        let rec loop (pages: GitDiffWindowPage[]) =
-            let loaded =
-                pages
-                |> Array.indexed
-                |> Array.filter (fun (_, windowPage) -> not windowPage.IsEvicted)
+        // A diff has thousands of evicted pages and a few loaded ones. The loaded pages are found
+        // in one pass, and the array is copied only when a page changes.
+        let loadedIndices = ResizeArray<int>()
+        let mutable loadedBytes = 0.0
 
-            let loadedBytes =
-                loaded |> Array.sumBy (fun (_, windowPage) -> windowPage.PayloadBytes)
+        for index in 0 .. page.Pages.Length - 1 do
+            let windowPage = page.Pages.[index]
 
-            let candidates =
-                loaded
-                |> Array.filter (fun (index, windowPage) ->
-                    index <> anchor
-                    && Some index <> lastRead
-                    && not (visiblePages |> List.contains windowPage.PageId)
-                )
+            if not windowPage.IsEvicted then
+                loadedIndices.Add index
+                loadedBytes <- loadedBytes + windowPage.PayloadBytes
 
-            if
-                (loaded.Length > MaxLoadedPages || loadedBytes > MaxLoadedBytes)
-                && candidates.Length > 0
-            then
-                let index, victim =
-                    candidates |> Array.maxBy (fun (index, _) -> abs (index - anchor))
+        let pages = ref page.Pages
+        let copied = ref false
 
-                loop (pages |> Array.updateAt index (evictedCopy victim))
+        let changePage (index: int) (changed: GitDiffWindowPage) =
+            if not copied.Value then
+                pages.Value <- Array.copy pages.Value
+                copied.Value <- true
+
+            pages.Value.[index] <- changed
+
+        let mutable evicting = true
+
+        while evicting do
+            if loadedIndices.Count > MaxLoadedPages || loadedBytes > MaxLoadedBytes then
+                // The loaded page farthest from the requested one goes first, the lowest index on a tie.
+                let mutable victim = -1
+                let mutable farthest = -1
+
+                for index in loadedIndices do
+                    if
+                        abs (index - anchor) > farthest
+                        && index <> anchor
+                        && Some index <> lastRead
+                        && not (visiblePages |> List.contains pages.Value.[index].PageId)
+                    then
+                        victim <- index
+                        farthest <- abs (index - anchor)
+
+                if victim < 0 then
+                    evicting <- false
+                else
+                    loadedBytes <- loadedBytes - pages.Value.[victim].PayloadBytes
+                    loadedIndices.Remove victim |> ignore
+                    changePage victim (evictedCopy pages.Value.[victim])
             else
-                pages
-
-        let pages = loop page.Pages
+                evicting <- false
 
         let otherBytes =
-            pages
-            |> Array.indexed
-            |> Array.sumBy (fun (index, windowPage) ->
-                if index = anchor || windowPage.IsEvicted then
-                    0.0
+            loadedIndices
+            |> Seq.sumBy (fun index ->
+                if index <> anchor then
+                    pages.Value.[index].PayloadBytes
                 else
-                    windowPage.PayloadBytes
+                    0.0
             )
 
         let rec collapse (windowPage: GitDiffWindowPage) =
@@ -1672,13 +1721,13 @@ module GitDiffPageLoader =
             else
                 windowPage
 
-        let pages =
-            if anchor >= 0 && anchor < pages.Length then
-                pages |> Array.updateAt anchor (collapse pages.[anchor])
-            else
-                pages
+        if anchor >= 0 && anchor < pages.Value.Length then
+            let collapsed = collapse pages.Value.[anchor]
 
-        { page with Pages = pages }
+            if not (obj.ReferenceEquals(collapsed, pages.Value.[anchor])) then
+                changePage anchor collapsed
+
+        { page with Pages = pages.Value }
 
     let private position (side: DiffSideDto) (number: float) : GitDiffLinePosition = { Side = side; Number = number }
 
@@ -2766,12 +2815,39 @@ module GitDiffPageLoader =
 
             let next, reopening, cmd = updateWithReopen deps msg reopening page
 
+            // The answer of a background read that leaves the indexing running shows after a
+            // short delay. Every other message shows its page at once, so a page the user asked
+            // for never waits.
+            let backgroundArrival =
+                match msg with
+                | GitDiffMsg.PageCompleted(_, request, _) ->
+                    page.NextRequest
+                    |> Option.exists (fun running -> running.OperationId = request.OperationId && running.Background)
+                | _ -> false
+
+            let indexingContinues =
+                next.Indexing
+                && not next.NextFailed
+                && next.NextCursor.IsSome
+                && (
+                    match next.Status with
+                    | GitDiffPageStatus.Ready
+                    | GitDiffPageStatus.LoadingNext -> true
+                    | _ -> false
+                )
+
+            let publish =
+                if backgroundArrival && indexingContinues then
+                    publishLaterCmd deps next
+                else
+                    publishNowCmd deps next
+
             {
                 model with
                     DiffPage = Some next
                     DiffReopen = reopening
             },
-            Cmd.batch [ publishShownCmd deps next; cmd ]
+            Cmd.batch [ publish; cmd ]
         | GitDiffMsg.OpenCompleted(_, request, result), _ -> model, releaseArrivedOpenCmd deps request result
         | _ -> model, Cmd.none
 
