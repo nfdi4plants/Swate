@@ -146,10 +146,10 @@ let Main (page: GitDiffPageData) =
                         currentTitle = currentTitle,
                         ?changeKind = page.ChangeKind,
                         testIdPrefix = "renderer-git-diff",
-                        // Eviction, replay and Scanning continuations keep the last page, so the
-                        // continue row does not read again. The cursor changes with each Scanning
-                        // answer, and a diff paused after one would otherwise show the viewer an
-                        // unused key and read on its closed session.
+                        // Eviction and replay keep the last page, so the continue row does not read
+                        // again. A Scanning answer adds no page either. The cursor does change with
+                        // each Scanning answer, and a diff paused after one would show the viewer an
+                        // unused cursor and read on its closed session.
                         ?nextPageKey = nextPageKeyOf page,
                         failedGaps = Array.ofList page.FailedGaps,
                         failedLineSlices = Array.ofList page.FailedLineSlices,
