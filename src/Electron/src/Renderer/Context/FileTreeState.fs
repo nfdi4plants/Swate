@@ -196,6 +196,7 @@ let useFileTreeState (loadSnapshot: FileTreeSnapshotLoader) =
     let state, setState = React.useStateWithUpdater (RendererFileTreeState.empty ())
     let isLoading, setIsLoading = React.useState true
     let requestRef = React.useRef 0
+    let snapshotInstalledRef = React.useRef false
     let snapshotPendingRef = React.useRef true
     let bufferedUpdatesRef = React.useRef (ResizeArray<FileTreeDirectoryUpdate>())
 
@@ -212,19 +213,23 @@ let useFileTreeState (loadSnapshot: FileTreeSnapshotLoader) =
     let refresh () =
         requestRef.current <- requestRef.current + 1
         let request = requestRef.current
+        let hadInstalledSnapshot = snapshotInstalledRef.current
         snapshotPendingRef.current <- true
         setIsLoading true
 
         promise {
             match! loadSnapshot () with
             | Error ex when request = requestRef.current ->
-                let updates = takeBufferedUpdates ()
-                setState (applyUpdates updates)
+                if hadInstalledSnapshot then
+                    let updates = takeBufferedUpdates ()
+                    setState (applyUpdates updates)
+
                 setIsLoading false
                 console.error ("Failed to load file tree snapshot.", ex.Message)
             | Error _ -> ()
             | Ok snapshot when request = requestRef.current ->
                 let updates = takeBufferedUpdates ()
+                snapshotInstalledRef.current <- true
 
                 snapshot
                 |> RendererFileTreeState.ofSnapshot
@@ -238,6 +243,7 @@ let useFileTreeState (loadSnapshot: FileTreeSnapshotLoader) =
 
     let installSnapshot snapshot =
         requestRef.current <- requestRef.current + 1
+        snapshotInstalledRef.current <- true
         snapshotPendingRef.current <- false
         bufferedUpdatesRef.current.Clear()
         let state = RendererFileTreeState.ofSnapshot snapshot

@@ -55,6 +55,14 @@ let private FileImportProbe (onImport: ActiveFileImportState option -> unit) =
 
     Html.none
 
+[<ReactComponent>]
+let private FileStateProbe (onState: FileStateController -> unit) =
+    let fileStateCtx = useFileStateCtx ()
+
+    React.useEffect ((fun () -> onState fileStateCtx), [| box fileStateCtx |])
+
+    Html.none
+
 let private createSnapshot () =
     let snapshot = Dictionary<string, FileEntry>()
     snapshot.Add("", FileEntry.create ("arc", "", true, None))
@@ -420,6 +428,183 @@ Vitest.describe (
                                 && not (paths |> Array.contains "dataset/first.txt")
                             )
                         )
+                finally
+                    root.unmount ()
+                    container.remove ()
+                    clearBridgeProperty fileTreeBridgeName
+                    clearBridgeProperty importBridgeName
+            }
+        )
+
+        Vitest.test (
+            "keeps buffered updates hidden after an initial snapshot failure and replays them on retry",
+            fun () -> promise {
+                let fileTreeBridgeName = bridgeName "IFileTreeRendererApi"
+                let importBridgeName = bridgeName "IFileImportRendererApi"
+
+                let snapshotResolvers =
+                    ResizeArray<Result<Dictionary<string, FileEntry>, exn> -> unit>()
+
+                let mutable publishDirectoryUpdate: FileTreeDirectoryUpdate -> unit = ignore
+                let mutable latestState: FileStateController option = None
+                let dispose () = ()
+
+                let loadSnapshot () =
+                    Promise.create (fun resolve _reject -> snapshotResolvers.Add resolve)
+
+                let container = document.createElement ("div") :?> Browser.Types.HTMLDivElement
+                document.body.appendChild container |> ignore
+                let root = ReactDOM.createRoot container
+
+                try
+                    setBridgeProperty
+                        fileTreeBridgeName
+                        (createObj [
+                            "fileTreeUpdate" ==> fun (_: Dictionary<string, FileEntry> -> unit) -> dispose
+                            "fileTreeDirectoryUpdate"
+                            ==> fun (listener: FileTreeDirectoryUpdate -> unit) ->
+                                publishDirectoryUpdate <- listener
+                                dispose
+                        ])
+
+                    setBridgeProperty
+                        importBridgeName
+                        (createObj [
+                            "fileImportStateUpdate"
+                            ==> fun (_: ActiveFileImportState option -> unit) -> dispose
+                        ])
+
+                    root.render (
+                        FileStateCtxProviderWithSnapshots(
+                            loadSnapshot,
+                            fileImportApi (fun () -> JS.Constructors.Promise.resolve (Ok None)),
+                            FileStateProbe(fun state -> latestState <- Some state)
+                        )
+                    )
+
+                    do! waitForEffect (fun () -> snapshotResolvers.Count = 1 && latestState.IsSome)
+
+                    publishDirectoryUpdate {
+                        directoryPath = "dataset"
+                        children = [|
+                            FileEntry.create ("new.txt", "dataset/new.txt", false, None)
+                        |]
+                    }
+
+                    snapshotResolvers.[0] (Error(System.Exception "initial snapshot failed"))
+                    do! waitForEffect (fun () -> latestState.Value.fileTreeIsLoading |> not)
+
+                    Vitest.expect(latestState.Value.state.TryFindFileTreeEntry "dataset/new.txt").toEqual (None)
+
+                    latestState.Value.refreshFileTree ()
+                    do! waitForEffect (fun () -> snapshotResolvers.Count = 2)
+
+                    let snapshot = Dictionary<string, FileEntry>()
+                    snapshot.[""] <- FileEntry.create ("arc", "", true, None)
+                    snapshot.["dataset"] <- FileEntry.create ("dataset", "dataset", true, None)
+                    snapshot.["dataset/old.txt"] <- FileEntry.create ("old.txt", "dataset/old.txt", false, None)
+                    snapshot.["unrelated.txt"] <- FileEntry.create ("unrelated.txt", "unrelated.txt", false, None)
+                    snapshotResolvers.[1] (Ok snapshot)
+
+                    do!
+                        waitForEffect (fun () ->
+                            latestState.Value.state.TryFindFileTreeEntry "dataset/new.txt" |> Option.isSome
+                        )
+
+                    Vitest.expect(latestState.Value.state.TryFindFileTreeEntry "unrelated.txt").toBeDefined ()
+
+                    Vitest.expect(latestState.Value.state.TryFindFileTreeEntry "dataset/old.txt").toEqual (None)
+                finally
+                    root.unmount ()
+                    container.remove ()
+                    clearBridgeProperty fileTreeBridgeName
+                    clearBridgeProperty importBridgeName
+            }
+        )
+
+        Vitest.test (
+            "failed refresh preserves the installed snapshot and applies buffered updates",
+            fun () -> promise {
+                let fileTreeBridgeName = bridgeName "IFileTreeRendererApi"
+                let importBridgeName = bridgeName "IFileImportRendererApi"
+
+                let snapshotResolvers =
+                    ResizeArray<Result<Dictionary<string, FileEntry>, exn> -> unit>()
+
+                let mutable publishDirectoryUpdate: FileTreeDirectoryUpdate -> unit = ignore
+                let mutable latestState: FileStateController option = None
+                let dispose () = ()
+
+                let loadSnapshot () =
+                    Promise.create (fun resolve _reject -> snapshotResolvers.Add resolve)
+
+                let container = document.createElement ("div") :?> Browser.Types.HTMLDivElement
+                document.body.appendChild container |> ignore
+                let root = ReactDOM.createRoot container
+
+                try
+                    setBridgeProperty
+                        fileTreeBridgeName
+                        (createObj [
+                            "fileTreeUpdate" ==> fun (_: Dictionary<string, FileEntry> -> unit) -> dispose
+                            "fileTreeDirectoryUpdate"
+                            ==> fun (listener: FileTreeDirectoryUpdate -> unit) ->
+                                publishDirectoryUpdate <- listener
+                                dispose
+                        ])
+
+                    setBridgeProperty
+                        importBridgeName
+                        (createObj [
+                            "fileImportStateUpdate"
+                            ==> fun (_: ActiveFileImportState option -> unit) -> dispose
+                        ])
+
+                    root.render (
+                        FileStateCtxProviderWithSnapshots(
+                            loadSnapshot,
+                            fileImportApi (fun () -> JS.Constructors.Promise.resolve (Ok None)),
+                            FileStateProbe(fun state -> latestState <- Some state)
+                        )
+                    )
+
+                    do! waitForEffect (fun () -> snapshotResolvers.Count = 1)
+
+                    let snapshot = Dictionary<string, FileEntry>()
+                    snapshot.[""] <- FileEntry.create ("arc", "", true, None)
+                    snapshot.["dataset"] <- FileEntry.create ("dataset", "dataset", true, None)
+                    snapshot.["dataset/old.txt"] <- FileEntry.create ("old.txt", "dataset/old.txt", false, None)
+                    snapshot.["unrelated.txt"] <- FileEntry.create ("unrelated.txt", "unrelated.txt", false, None)
+                    snapshotResolvers.[0] (Ok snapshot)
+
+                    do!
+                        waitForEffect (fun () ->
+                            latestState
+                            |> Option.bind (fun state -> state.state.TryFindFileTreeEntry "dataset/old.txt")
+                            |> Option.isSome
+                        )
+
+                    latestState.Value.refreshFileTree ()
+                    do! waitForEffect (fun () -> snapshotResolvers.Count = 2)
+
+                    publishDirectoryUpdate {
+                        directoryPath = "dataset"
+                        children = [|
+                            FileEntry.create ("new.txt", "dataset/new.txt", false, None)
+                        |]
+                    }
+
+                    snapshotResolvers.[1] (Error(System.Exception "refresh failed"))
+
+                    do!
+                        waitForEffect (fun () ->
+                            latestState.Value.state.TryFindFileTreeEntry "dataset/new.txt" |> Option.isSome
+                        )
+
+                    Vitest.expect(latestState.Value.state.TryFindFileTreeEntry "unrelated.txt").toBeDefined ()
+
+                    Vitest.expect(latestState.Value.state.TryFindFileTreeEntry "dataset/old.txt").toEqual (None)
+                    Vitest.expect(latestState.Value.fileTreeIsLoading).toBe (false)
                 finally
                     root.unmount ()
                     container.remove ()
