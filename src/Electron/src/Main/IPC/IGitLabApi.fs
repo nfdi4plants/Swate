@@ -13,7 +13,7 @@ let private defaultPublicDataHubBaseUrl = Default_DataHub_Url
 let private tryGetActiveGitLabContext () : Result<string * string, GitLabError> =
     match AuthService.tryGetActiveAccountWithToken () with
     | Some(user, token) when not (String.IsNullOrWhiteSpace user.TargetDataHub) -> Ok(user.TargetDataHub, token)
-    | Some _ -> Error(GitLabError.InvalidRequest "Active account has no DataHub endpoint configured.")
+    | Some _ -> Error(GitLabError.InvalidRequest "Active account has no DataHUB endpoint configured.")
     | None -> Error GitLabError.Unauthorized
 
 let private tryGetBrowseContext () : Result<string * string, GitLabError> =

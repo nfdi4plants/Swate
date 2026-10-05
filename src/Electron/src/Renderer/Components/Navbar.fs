@@ -40,7 +40,7 @@ type private Selector =
                 )
                 ButtonInfo.create (
                     "swt:fluent--cloud-beaker-24-regular swt:size-5",
-                    "Download ARC from DataHub",
+                    "Download ARC from DataHUB",
                     fun _ ->
                         pageStateCtx.setState (Some PageState.DataHubBrowser)
                         setSelectorIsOpen false

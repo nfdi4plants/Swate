@@ -1,4 +1,4 @@
-/// Git provider strategies backed by the DataHub account store. The library asks
+/// Git provider strategies backed by the DataHUB account store. The library asks
 /// for a credential per host and for a revision identity per operation. Both lookups
 /// read the in-memory account state without writing anything and never throw.
 module Main.VersionControl.DataHubStrategies
@@ -7,7 +7,7 @@ open System
 open Swate.Components.Composite.Authentication.Types
 open VersionControlService.Git.GitCredentialStrategy
 
-/// Username git sends together with a DataHub personal access token.
+/// Username git sends together with a DataHUB personal access token.
 [<Literal>]
 let TokenUsername = "oauth2"
 

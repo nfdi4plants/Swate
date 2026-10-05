@@ -17,7 +17,17 @@ module Object =
     [<Emit("Object.keys($0)")>]
     let keys (o: IObject) = jsNative
 
+    /// Shallowly merges objects without mutating either input; right-hand fields win.
+    [<Emit("Object.assign({}, $0, $1)")>]
+    let merge (left: obj) (right: obj) : obj = jsNative
+
 module DndKit =
+
+    type ScreenReaderInstructions = {| draggable: string |}
+
+    type Accessibility = {|
+        screenReaderInstructions: ScreenReaderInstructions
+    |}
 
     type ISensor = obj
 
@@ -129,7 +139,8 @@ type DndKit =
             ?sensors,
             ?collisionDetection,
             ?children: ReactElement,
-            ?key
+            ?key,
+            ?accessibility: Accessibility
         ) =
         React.Imported()
 

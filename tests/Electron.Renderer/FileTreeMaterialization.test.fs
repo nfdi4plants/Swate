@@ -1,6 +1,7 @@
 module ElectronRenderer.FileTreeMaterializationTests
 
 open System.Collections.Generic
+open Renderer.Components.LeftSidebar.FileExplorer.Helper
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeMaterialization
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Electron.Shared.FileIOTypes
@@ -92,11 +93,11 @@ Vitest.describe (
                 let knownDirectoryPaths = HashSet<string>([ "arc"; "arc/kept"; "arc/selected" ])
 
                 let reconciled =
-                    reconcileMaterializedStateWithKnownDirectories
+                    reconcileMaterializedState
                         (Some "C:/arc")
                         (Some "arc/selected/selected.txt")
                         (Some root)
-                        knownDirectoryPaths
+                        knownDirectoryPaths.Contains
                         current
 
                 Vitest.expect(reconciled.Paths |> Set.toList).toEqual ([ "arc"; "arc/kept"; "arc/selected" ])
@@ -118,11 +119,11 @@ Vitest.describe (
                 let knownDirectoryPaths = HashSet<string>([ "arc"; "arc/kept" ])
 
                 let reconciled =
-                    reconcileMaterializedStateWithKnownDirectories
+                    reconcileMaterializedState
                         (Some "C:/new-arc")
                         None
                         (Some root)
-                        knownDirectoryPaths
+                        knownDirectoryPaths.Contains
                         current
 
                 Vitest.expect(reconciled.ArcScopeId).toEqual (Some "C:/new-arc")

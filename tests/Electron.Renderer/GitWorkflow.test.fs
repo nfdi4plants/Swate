@@ -1837,7 +1837,7 @@ Vitest.describe (
 
                 Vitest
                     .expect(next.PendingPublishRename |> Option.map _.Message)
-                    .toEqual (Some "A DataHub repository with this name already exists. Enter a different name.")
+                    .toEqual (Some "A DataHUB repository with this name already exists. Enter a different name.")
             }
         )
 
@@ -1852,7 +1852,7 @@ Vitest.describe (
                         PendingPublishRename =
                             Some {
                                 CurrentName = "Existing ARC"
-                                Message = "A DataHub repository with this name already exists. Enter a different name."
+                                Message = "A DataHUB repository with this name already exists. Enter a different name."
                             }
                 }
 
@@ -2947,7 +2947,7 @@ Vitest.describe (
                         PendingPublishRename =
                             Some {
                                 CurrentName = "Existing ARC"
-                                Message = "A DataHub repository named 'Existing ARC' already exists."
+                                Message = "A DataHUB repository named 'Existing ARC' already exists."
                             }
                 }
 
@@ -3039,7 +3039,7 @@ Vitest.describe (
                         PendingPublishRename =
                             Some {
                                 CurrentName = "Existing ARC"
-                                Message = "A DataHub repository named 'Existing ARC' already exists."
+                                Message = "A DataHUB repository named 'Existing ARC' already exists."
                             }
                 }
 
@@ -3103,7 +3103,7 @@ Vitest.describe (
                         PendingPublishRename =
                             Some {
                                 CurrentName = "Existing ARC"
-                                Message = "A DataHub repository named 'Existing ARC' already exists."
+                                Message = "A DataHUB repository named 'Existing ARC' already exists."
                             }
                 }
 
@@ -4768,10 +4768,10 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "Primary save stays local when its publish target is missing without a DataHub account",
+            "Primary save stays local when its publish target is missing without a DataHUB account",
             fun () -> promise {
                 let mutable createProjectCalls = 0
-                let notice = "Saved locally. Sign in to a DataHub account to publish this ARC."
+                let notice = "Saved locally. Sign in to a DataHUB account to publish this ARC."
 
                 let deps = {
                     (withRefresh cleanStatus defaultDependencies) with
@@ -9208,7 +9208,7 @@ Vitest.describe (
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
                             remoteActionsEnabled = false,
-                            remoteActionsWarning = "Sign in to a DataHub account to use fetch, pull, push, or update."
+                            remoteActionsWarning = "Sign in to a DataHUB account to use fetch, pull, push, or update."
                         )
                     )
 
@@ -9216,7 +9216,7 @@ Vitest.describe (
                     container.querySelector ("[data-testid='GitSidebarUpdateArcButton']") :?> HTMLButtonElement
 
                 Vitest.expect(updateButton.disabled).toBe (true)
-                Vitest.expect(container.textContent.Contains("Sign in to a DataHub account")).toBe (true)
+                Vitest.expect(container.textContent.Contains("Sign in to a DataHUB account")).toBe (true)
 
                 cleanup ()
             }
@@ -10085,7 +10085,7 @@ Vitest.describe (
                             lfsAutoTrackThresholdMb = 5,
                             publishRenamePrompt = {
                                 CurrentName = "Existing ARC"
-                                Message = "A DataHub repository named 'Existing ARC' already exists."
+                                Message = "A DataHUB repository named 'Existing ARC' already exists."
                             },
                             onSubmitPublishRename = (fun name -> submittedName <- Some name),
                             onCancelPublishRename = (fun () -> cancelCalls <- cancelCalls + 1)

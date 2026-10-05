@@ -100,7 +100,7 @@ type Authentication =
             prop.children [
                 Html.legend [
                     prop.className "swt:fieldset-legend"
-                    prop.text "Select DataHub"
+                    prop.text "Select DataHUB"
                 ]
                 Html.div [
                     prop.className
@@ -169,11 +169,11 @@ type Authentication =
             prop.className "swt:flex swt:flex-col swt:p-4 swt:w-md swt:gap-2"
             prop.children [
                 Html.h1 [
-                    prop.text "DataHub Authentication"
+                    prop.text "DataHUB Authentication"
                     prop.className "swt:text-center swt:text-3xl swt:font-bold swt:mb-2"
                 ]
                 Html.p [
-                    prop.text "Sign in to your DataHub account to access your ARCs."
+                    prop.text "Sign in to your DataHUB account to access your ARCs."
                     prop.className "swt:text-center swt:text-sm swt:text-base-content/80"
                 ]
                 Html.fieldSet [
@@ -191,13 +191,28 @@ type Authentication =
                             prop.value pat
                             prop.onChange (fun value -> setPat value)
                         ]
+                        Html.p [
+                            prop.className "swt:text-xs swt:text-base-content/60 swt:mt-1"
+                            prop.text
+                                "New to access tokens? Swate can open GitLab with everything preconfigured for you. Then copy the token and paste it here!"
+                        ]
                     ]
                 ]
                 Authentication.DataHubSelect(dataHubUrl, setDataHubUrl)
                 Html.a [
                     prop.testId "GeneratePatLink"
-                    prop.className "swt:link swt:link-info swt:text-sm swt:text-center swt:py-2"
-                    prop.text "Click here to generate a new GitLab Personal Access Token"
+                    prop.className "swt:btn swt:btn-soft swt:btn-info swt:px-1"
+                    prop.children [
+                        Html.span [
+                            prop.className "swt:flex swt:items-center swt:gap-2"
+                            prop.children [
+                                Html.text "Generate Personal Access Token"
+                                Html.i [
+                                    prop.className "swt:iconify swt:fluent--open-20-regular swt:size-4"
+                                ]
+                            ]
+                        ]
+                    ]
                     prop.href (Helper.GitLabUrls.prefillGitLabPATScopes dataHubUrl.Url)
                     prop.target.blank
                     prop.rel "noopener noreferrer"
@@ -220,7 +235,7 @@ type Authentication =
                 ]
                 Html.p [
                     prop.className "swt:text-sm swt:text-center swt:text-base-content/80"
-                    prop.text "Don't have an account? Sign up on your DataHub instance to create one."
+                    prop.text "Don't have an account? Sign up on your DataHUB instance to create one."
                 ]
             ]
         ]
@@ -458,7 +473,7 @@ type Authentication =
                     do! Promise.sleep 1000
                     // Testing, ignore for story tests
                     // let! userInformation = GitLabAPI.getUserAPIRequest signInInfo
-                    // Here should be try get user information from the DataHub using the provided signInInfo and handle possible errors by calling signInInfo.OnErrorCallback with the error message. For now we just simulate a successful sign in with example user information and a delay.
+                    // Here should be try get user information from the DataHUB using the provided signInInfo and handle possible errors by calling signInInfo.OnErrorCallback with the error message. For now we just simulate a successful sign in with example user information and a delay.
                     let activeUser = {
                         Authentication.ExmpUserInformation with
                             TargetDataHub = signInInfo.GitLabBaseUrl

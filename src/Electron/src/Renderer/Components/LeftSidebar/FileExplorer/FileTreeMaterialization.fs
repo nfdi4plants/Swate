@@ -1,6 +1,5 @@
 module Renderer.Components.LeftSidebar.FileExplorer.FileTreeMaterialization
 
-open System.Collections.Generic
 open Swate.Components.Shared
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Electron.Shared.FileIOTypes
@@ -17,59 +16,12 @@ let materialize path state = {
         Paths = state.Paths.Add(PathHelpers.normalizePath path)
 }
 
-let rec private collectDirectoryPaths (node: FileTreeNode) (directoryPaths: Set<string>) =
-    if node.isDirectory then
-        node.children.Values
-        |> Seq.fold
-            (fun state child -> collectDirectoryPaths child state)
-            (Set.add (PathHelpers.normalizePath node.path) directoryPaths)
-    else
-        directoryPaths
-
+/// Reconciles expansion state through the canonical FileTree lookup without walking the tree.
 let reconcileMaterializedState
     (arcScopeId: string option)
     (selectedTreeItemPath: string option)
     (root: FileTreeNode option)
-    (current: MaterializedState)
-    =
-    match root with
-    | None -> {
-        ArcScopeId = arcScopeId
-        Paths = Set.empty
-      }
-    | Some root ->
-        let validDirectoryPaths = collectDirectoryPaths root Set.empty
-
-        let requiredPaths =
-            selectedTreeItemPath
-            |> Option.map (fun selectedPath ->
-                validDirectoryPaths
-                |> Set.filter (fun directoryPath -> PathHelpers.isSameOrDescendantPath selectedPath directoryPath)
-            )
-            |> Option.defaultValue Set.empty
-            |> fun paths ->
-                if root.isDirectory then
-                    paths.Add(PathHelpers.normalizePath root.path)
-                else
-                    paths
-
-        let persistedPaths =
-            if current.ArcScopeId = arcScopeId then
-                Set.intersect current.Paths validDirectoryPaths
-            else
-                Set.empty
-
-        {
-            ArcScopeId = arcScopeId
-            Paths = Set.union persistedPaths requiredPaths
-        }
-
-/// Reconciles expansion state from indexed directory membership without walking the complete FileTree.
-let reconcileMaterializedStateWithKnownDirectories
-    (arcScopeId: string option)
-    (selectedTreeItemPath: string option)
-    (root: FileTreeNode option)
-    (knownDirectoryPaths: HashSet<string>)
+    (isKnownDirectory: string -> bool)
     (current: MaterializedState)
     =
     match root with
@@ -79,7 +31,7 @@ let reconcileMaterializedStateWithKnownDirectories
       }
     | Some root ->
         let isKnownDirectory path =
-            knownDirectoryPaths.Contains(PathHelpers.normalizePath path)
+            isKnownDirectory (PathHelpers.normalizePath path)
 
         let rec collectSelectedAncestors path collected =
             let normalizedPath = PathHelpers.normalizePath path
@@ -115,10 +67,22 @@ let reconcileMaterializedStateWithKnownDirectories
             Paths = Set.union persistedPaths requiredPaths
         }
 
-let rec toMaterializedFileItemTree
+let private rootItemSortKey (node: FileTreeNode) =
+    match node.name.ToLowerInvariant() with
+    | "notes" -> 0, 0, ""
+    | "readme.md" -> 0, 1, ""
+    | "isa.investigation.xlsx" -> 0, 2, ""
+    | "studies" -> 0, 3, ""
+    | "assays" -> 0, 4, ""
+    | "workflows" -> 0, 5, ""
+    | "runs" -> 0, 6, ""
+    | _ -> 1, System.Int32.MaxValue, node.name.ToLowerInvariant()
+
+let rec private toMaterializedFileItemTreeCore
     (createItem: FileTreeNode -> FileItem)
     (materializedDirectoryPaths: Set<string>)
     (parent: FileTreeNode)
+    (isRoot: bool)
     =
     if parent.isDirectory then
         let normalizedParentPath = PathHelpers.normalizePath parent.path
@@ -128,10 +92,19 @@ let rec toMaterializedFileItemTree
 
         let children =
             if isDirectoryMaterialized then
-                parent.children.Values
-                |> Seq.map (toMaterializedFileItemTree createItem materializedDirectoryPaths)
+                let childNodes =
+                    if isRoot then
+                        parent.children.Values |> Seq.sortBy rootItemSortKey
+                    else
+                        parent.children.Values :> seq<FileTreeNode>
+
+                childNodes
+                |> Seq.map (fun parent ->
+                    toMaterializedFileItemTreeCore createItem materializedDirectoryPaths parent false
+                )
                 |> List.ofSeq
                 |> Some
+
             elif parent.children.Count = 0 then
                 Some []
             else
@@ -143,3 +116,10 @@ let rec toMaterializedFileItemTree
         }
     else
         createItem parent
+
+let toMaterializedFileItemTree
+    (createItem: FileTreeNode -> FileItem)
+    (materializedDirectoryPaths: Set<string>)
+    (root: FileTreeNode)
+    =
+    toMaterializedFileItemTreeCore createItem materializedDirectoryPaths root true

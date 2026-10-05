@@ -992,7 +992,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     host.SetSettings(hosted.Binding.WorkspaceRoot, settings, context)
                 )
                 id
-    // The DataHub ruleset is checked here as well as in the renderer, because the main
+    // The DataHUB ruleset is checked here as well as in the renderer, because the main
     // process is the trust boundary. The main process reads the file size from the
     // workspace before checking the size rule.
     setPathStoragePolicy =

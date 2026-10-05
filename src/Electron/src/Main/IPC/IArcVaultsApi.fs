@@ -878,7 +878,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                         Main.Bindings.Path.join [| arcPath; normalizedDataMapPath |]
 
                                                     vault.SetFileTree(
-                                                        removePathAndDescendants absoluteDataMapPath vault.fileTree
+                                                        removePathAndDescendants
+                                                            absoluteDataMapPath
+                                                            (vault.fileTree.CopySnapshot())
                                                     )
 
                                                     return Ok()

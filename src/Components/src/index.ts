@@ -1,4 +1,8 @@
 import '../tailwind.css';
+import type { SortableList as SortableListComponent } from './dist/Composite/SortableList/SortableList.fs';
+
+export type SortableListItem<A> = Parameters<typeof SortableListComponent<A>>[0]['items'][number];
+export type SortableListRowRender<A> = Parameters<NonNullable<Parameters<typeof SortableListComponent<A>>[0]['renderRow']>>[0];
 
 // ---------------------------------------------------------------------------
 // Primitive
@@ -43,6 +47,8 @@ export { default as JsonImport } from './dist/Composite/Widgets/JsonImport/JsonI
 export { default as Layout } from './dist/Composite/Layout/Layout.fs';
 export { default as MarkdownTextInput } from './dist/Composite/MarkdownText/TextInputWithMarkdown.fs';
 export { default as Notes } from './dist/Composite/Notes/Editor/Notes.fs';
+export { default as SortableList } from './dist/Composite/SortableList/SortableList.fs';
+export { DragHandle, MoveUpButton, MoveDownButton, RemoveButton, DefaultRow } from './dist/Composite/SortableList/RowComponents.fs';
 export { default as Table } from './dist/Composite/Table/Table.fs';
 export { default as TemplateBrowser } from './dist/Composite/TemplateBrowser/TemplateBrowser.fs';
 export { default as TemplateCacheProvider } from './dist/Composite/TemplateBrowser/TemplateCacheProvider.fs';

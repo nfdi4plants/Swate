@@ -36,8 +36,11 @@ module GitLabUrls =
         let scopeParam = scopes |> String.concat ","
 
         let description =
-            "Swate Electron App. Gives access to your repositories and allows Swate to read your user information. This is used to authenticate you and access your ARCs. You can revoke this token at any time without affecting any other tokens or your account."
-                .Replace(" ", "%20")
+            "👉 What to do:
+The permissions are already selected. Simply click \"Generate token\" below, then copy it and paste it back into Swate.
+
+Swate uses this token to access your repositories and user information. You can revoke it at any time."
+            |> Fable.Core.JS.encodeURIComponent
 
         sprintf
             "%s/-/user_settings/personal_access_tokens?name=swate-electron&description=%s&scopes=%s"

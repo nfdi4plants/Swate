@@ -16,17 +16,6 @@ open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Composite.AnnotationTable
 open Swate.Components.Composite.Widgets.DataAnnotator.Types
 
-module private ArcFileEditorTypes =
-    type AddRowsFooterViewProps = {
-        rowsToAdd: int
-        minRowsToAdd: int
-        onRowsToAddChange: int -> unit
-        onAddRows: unit -> unit
-        onAddRowsAndReset: unit -> unit
-    }
-
-open ArcFileEditorTypes
-
 type private LazyComponents =
 
     [<ReactLazyComponent>]
@@ -110,35 +99,6 @@ type Main =
     [<ReactComponent>]
     static member LazyLoaderWithMessage(lazyComponent: ReactElement, message: string) =
         React.Suspense([ lazyComponent ], fallback = Main.LazyFallback(message))
-
-    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
-    static member private AddRowsFooterView(props: AddRowsFooterViewProps) =
-        Html.div [
-            prop.className
-                "swt:w-full swt:flex swt:justify-center swt:items-center swt:shrink-0 swt:p-2 swt:bg-base-200 swt:border-t swt:border-base-300"
-            prop.title "Add Rows"
-            prop.children [
-                Html.div [
-                    prop.className "swt:join"
-                    prop.children [
-                        Html.input [
-                            prop.className "swt:input swt:join-item swt:border-current"
-                            prop.type'.number
-                            prop.min props.minRowsToAdd
-                            prop.value props.rowsToAdd
-                            prop.onChange props.onRowsToAddChange
-                            prop.onKeyDown (key.enter, fun _ -> props.onAddRows ())
-                            prop.style [ style.width 100 ]
-                        ]
-                        Html.button [
-                            prop.className "swt:btn swt:btn-outline swt:join-item"
-                            prop.onClick (fun _ -> props.onAddRowsAndReset ())
-                            prop.children [ Icons.Plus() ]
-                        ]
-                    ]
-                ]
-            ]
-        ]
 
     [<ReactComponent>]
     static member private TableView(table: ArcTable, setTableInArcFile: ArcTable -> unit) =
@@ -236,22 +196,11 @@ type Main =
     static member private AddRowsFooter
         (activeView: ActiveView, arcFileState: ArcFiles, setArcFileState: ArcFiles -> unit)
         =
-        let minRowsToAdd = 1
-        let rowsToAdd, setRowsToAdd = React.useState minRowsToAdd
-
-        let clampRowsToAdd rows = max minRowsToAdd rows
-
-        let tryGetAddRowsTarget () =
-            Helper.tryGetAddRowsTarget (activeView, arcFileState)
-
-        let canAddRows =
-            match tryGetAddRowsTarget () with
-            | Some(AddRowsTarget.Table table) -> table.ColumnCount > 0
-            | Some(AddRowsTarget.DataMap dataMap) -> dataMap.ColumnCount > 0
-            | None -> false
+        // Use inputRef to get the number of rows to add. Parsing directly into React.useState does not allow completly removing the number of rows to add.
+        let inputRef = React.useInputRef ()
 
         let addRowsWithCount rowCount =
-            match tryGetAddRowsTarget () with
+            match Helper.tryGetAddRowsTarget (activeView, arcFileState) with
             | Some(AddRowsTarget.Table table) ->
                 table.AddRowsEmptyKeepingUnits rowCount
                 setArcFileState (ArcFiles.refreshRef arcFileState)
@@ -260,24 +209,54 @@ type Main =
                 setArcFileState (ArcFiles.refreshRef arcFileState)
             | None -> ()
 
-        let addRows () =
-            rowsToAdd |> clampRowsToAdd |> addRowsWithCount
+        let addRows =
+            fun () ->
+                match inputRef.current with
+                | Some input ->
+                    match System.Int32.TryParse(input.value) with
+                    | true, value when value > 0 -> addRowsWithCount value
+                    | true, value -> console.error $"Invalid row count {value}"
+                    | false, _ -> console.error $"Invalid row input: {input.value}"
+                | None -> ()
 
-        let addRowsAndReset () =
-            let rowCount = clampRowsToAdd rowsToAdd
-            setRowsToAdd minRowsToAdd
-            addRowsWithCount rowCount
+        let canAddRows =
+            match Helper.tryGetAddRowsTarget (activeView, arcFileState) with
+            | Some(AddRowsTarget.Table table) -> table.ColumnCount > 0
+            | Some(AddRowsTarget.DataMap dataMap) -> dataMap.ColumnCount > 0
+            | None -> false
 
-        if canAddRows then
-            Main.AddRowsFooterView {
-                rowsToAdd = rowsToAdd
-                minRowsToAdd = minRowsToAdd
-                onRowsToAddChange = clampRowsToAdd >> setRowsToAdd
-                onAddRows = addRows
-                onAddRowsAndReset = addRowsAndReset
-            }
-        else
+        if not canAddRows then
             Html.none
+        else
+            Html.div [
+                prop.className
+                    "swt:w-full swt:flex swt:justify-center swt:items-center swt:shrink-0 swt:p-2 swt:bg-base-200 swt:border-t swt:border-base-300"
+                prop.title "Add Rows"
+                prop.children [
+                    Html.div [
+                        prop.className "swt:join"
+                        prop.children [
+                            Html.input [
+                                prop.ref inputRef
+                                prop.className "swt:input swt:join-item swt:border-current swt:validator"
+                                prop.type'.number
+                                prop.min 1
+                                prop.required true
+                                prop.defaultValue 1
+                                prop.onKeyDown (key.enter, fun _ -> addRows ())
+                                prop.style [ style.width 100 ]
+                                prop.title "Must be a positive number"
+                            ]
+                            Html.button [
+                                prop.className "swt:btn swt:btn-outline swt:join-item"
+                                prop.onClick (fun _ -> addRows ())
+                                prop.children [ Icons.Plus() ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+
 
     /// <summary>Renders an editor for an ARC file.</summary>
     /// <param name="startingActiveView">

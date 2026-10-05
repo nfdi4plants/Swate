@@ -75,6 +75,11 @@ let private mkdirWatcherDirectoryAsync (directoryPath: string) = promise {
 let private writeWatcherTextFileAsync (filePath: string) (content: string) =
     writeFileAsync filePath content TextEncoding.Utf8
 
+let private seedVaultFileTree (vault: ArcVault) (entry: FileEntry) =
+    let snapshot = System.Collections.Generic.Dictionary<string, FileEntry>()
+    snapshot.[entry.path] <- entry
+    vault.SetFileTree snapshot
+
 let private createWatcherFilesInBatches directoryPath count = promise {
     let mutable offset = 0
 
@@ -712,8 +717,8 @@ let private verifyRecoverableWatcherStartupDegradation
     tempPrefix
     windowId
     initialSignal
+    recoverySignal
     readinessTimeoutMs
-    expectedOutcome
     =
     TestHelpers.withTempArcWith
         tempPrefix
@@ -725,6 +730,7 @@ let private verifyRecoverableWatcherStartupDegradation
             let vaults = ArcVaults()
             let createdWatchers = ResizeArray<TestWatcher>()
             vaults.Vaults.Add(windowId, vault)
+            vaults.OnCloseWindow(windowState.Window, vault, windowId)
             vault.FileWatcherReadinessTimeoutMs <- readinessTimeoutMs
 
             vault.FileWatcherFactory <-
@@ -733,7 +739,7 @@ let private verifyRecoverableWatcherStartupDegradation
                         if createdWatchers.Count = 0 then
                             initialSignal
                         else
-                            SignalReady
+                            recoverySignal
 
                     let watcher = createTestWatcher signal
                     createdWatchers.Add watcher
@@ -745,29 +751,37 @@ let private verifyRecoverableWatcherStartupDegradation
                 Vitest.expect(vault.arc.IsSome).toBe (true)
                 Vitest.expect(vault.fileTree.Count > 0).toBe (true)
                 Vitest.expect(vault.isInitializingArc).toBe (false)
-                Vitest.expect(vault.LastFileWatcherInitializationOutcome).toEqual (Some expectedOutcome)
                 Vitest.expect(vault.watcher.IsNone).toBe (true)
-                Vitest.expect(vault.fileWatcherReady).toBe (false)
                 Vitest.expect(createdWatchers.Count).toBe (1)
                 Vitest.expect(createdWatchers.[0].CloseCount()).toBe (1)
 
-                let! retryOutcome = vault.PrepareFileWatcherForInitialization()
+                let externallyAddedPath =
+                    join [| arcPath; "recovered-on-focus.txt" |] |> PathHelpers.normalizePath
 
-                Vitest.expect(retryOutcome).toEqual (FileWatcherInitializationOutcome.Ready)
+                do! writeWatcherTextFileAsync externallyAddedPath "reconciled"
+                vault.FileWatcherReadinessTimeoutMs <- 10000
+                windowState.TriggerFocusEvent()
 
-                Vitest
-                    .expect(vault.LastFileWatcherInitializationOutcome)
-                    .toEqual (Some FileWatcherInitializationOutcome.Ready)
+                let recoverySucceeded = recoverySignal = SignalReady
 
-                Vitest.expect(vault.watcher.IsSome).toBe (true)
-                Vitest.expect(vault.fileWatcherReady).toBe (true)
-                Vitest.expect(createdWatchers.Count).toBe (2)
-                Vitest.expect(createdWatchers.[1].CloseCount()).toBe (0)
+                do!
+                    waitForWatcherCondition
+                        "watcher recovery through window focus"
+                        (fun () ->
+                            (if recoverySucceeded then
+                                 vault.watcher.IsSome
+                             else
+                                 vault.watcher.IsNone)
+                            && createdWatchers.Count = 2
+                            && vault.fileTree.ContainsKey externallyAddedPath
+                        )
+                        300
+
+                Vitest.expect(createdWatchers.[1].CloseCount()).toBe (if recoverySucceeded then 0 else 1)
 
                 do! vault.StopFileWatcher()
                 Vitest.expect(createdWatchers.[1].CloseCount()).toBe (1)
                 Vitest.expect(vault.watcher.IsNone).toBe (true)
-                Vitest.expect(vault.fileWatcherReady).toBe (false)
                 vaults.Vaults.Remove(windowId) |> ignore
             with error ->
                 do! vault.StopFileWatcher()
@@ -1452,8 +1466,7 @@ Vitest.describe (
                             let treeHasEntry () =
                                 let expectedKey = PathHelpers.normalizePath treeEntryPath
 
-                                vault.fileTree.Keys
-                                |> Seq.exists (fun key -> PathHelpers.normalizePath key = expectedKey)
+                                vault.fileTree.ContainsKey expectedKey
 
                             let fallbackPublished () =
                                 vault.HasReachedWatcherDeferralLimit
@@ -1639,8 +1652,8 @@ let private isPathChangeMessage (args: obj array) =
 let private isFileTreeMessage (args: obj array) =
     args.Length > 0 && (string args.[0]).Contains("fileTreeUpdate")
 
-let private isFileTreeDeltaMessage (args: obj array) =
-    args.Length > 0 && (string args.[0]).Contains("fileTreeDelta")
+let private isFileTreeDirectoryUpdateMessage (args: obj array) =
+    args.Length > 0 && (string args.[0]).Contains("fileTreeDirectoryUpdate")
 
 Vitest.describe (
     "ArcVaultHelper",
@@ -1797,7 +1810,7 @@ Vitest.describe (
 
                 callingVault.path <- Some existingArcPath
                 callingVault.SetArc(existingArc)
-                callingVault.fileTree.Add(seededEntry.path, seededEntry)
+                seedVaultFileTree callingVault seededEntry
 
                 let targetWindow = (createTestWindow (testWindowOptions targetWindowId)).Window
 
@@ -2437,7 +2450,7 @@ Vitest.describe (
                                 vault.path.IsSome
                                 && vault.arc.IsNone
                                 && vault.watcher.IsSome
-                                && vault.fileWatcherReady
+                                && vault.watcher.IsSome
                             )
 
                         let windowState = createTestWindow (testWindowOptions targetWindowId)
@@ -2692,7 +2705,7 @@ Vitest.describe (
                                 vault.path.IsSome
                                 && vault.arc.IsNone
                                 && vault.watcher.IsSome
-                                && vault.fileWatcherReady
+                                && vault.watcher.IsSome
                             )
 
                         let targetWindowState = createTestWindow (testWindowOptions targetWindowId)
@@ -2781,7 +2794,7 @@ Vitest.describe (
                                 targetWasRegistered <- true
                                 pathWasAssigned <- vault.path = Some expectedPath
                                 arcWasLoaded <- vault.arc.IsSome
-                                watcherWasReady <- vault.watcher.IsSome && vault.fileWatcherReady
+                                watcherWasReady <- vault.watcher.IsSome
                                 fileTreeWasEmpty <- vault.fileTree.Count = 0
 
                                 pathWasAssigned
@@ -2891,7 +2904,7 @@ Vitest.describe (
                                 pathWasAssignedWhenClosed <- vault.path = Some(PathHelpers.normalizePath arcPath)
 
                                 arcWasNoneWhenClosed <- vault.arc.IsNone
-                                watcherWasReadyWhenClosed <- vault.watcher.IsSome && vault.fileWatcherReady
+                                watcherWasReadyWhenClosed <- vault.watcher.IsSome
                             | None -> ()
 
                             vaultExistedWhenClosed
@@ -2977,7 +2990,7 @@ Vitest.describe (
                             | Some vault ->
                                 pathWasAssigned <- vault.path = Some expectedPath
                                 arcWasLoaded <- vault.arc.IsSome
-                                watcherWasReady <- vault.watcher.IsSome && vault.fileWatcherReady
+                                watcherWasReady <- vault.watcher.IsSome
                                 fileTreeWasEmpty <- vault.fileTree.Count = 0
 
                                 pathWasAssigned
@@ -3597,7 +3610,7 @@ Vitest.describe (
                         targetWasRegistered <- true
                         targetPathWasAssigned <- vault.path = Some expectedPath
                         creationReachedPostWriteLoad <- vault.arc.IsSome
-                        watcherWasReady <- vault.watcher.IsSome && vault.fileWatcherReady
+                        watcherWasReady <- vault.watcher.IsSome
 
                         targetWasRegistered
                         && targetPathWasAssigned
@@ -3737,7 +3750,7 @@ Vitest.describe (
                         targetWasRegistered <- true
                         pathWasAssigned <- vault.path = Some expectedPath
                         arcWasLoaded <- vault.arc.IsSome
-                        watcherWasReady <- vault.watcher.IsSome && vault.fileWatcherReady
+                        watcherWasReady <- vault.watcher.IsSome
                         fileTreeWasEmpty <- vault.fileTree.Count = 0
 
                         pathWasAssigned
@@ -4656,7 +4669,7 @@ Vitest.describe (
                 let seededEntry = FileEntry.create ("seeded.txt", "seeded.txt", false)
                 let mutable createdWindowCount = 0
 
-                vault.fileTree.Add(seededEntry.path, seededEntry)
+                seedVaultFileTree vault seededEntry
                 vaults.Vaults.Add(windowId, vault)
                 do! writeTextFileAsync blockedParent "This file prevents creation of a nested ARC directory."
 
@@ -4736,7 +4749,7 @@ Vitest.describe (
                 let sentMessages = windowState.SentMessages
                 let vault = ArcVault(windowState.Window)
                 let seededEntry = FileEntry.create ("seeded.txt", "seeded.txt", false)
-                vault.fileTree.Add(seededEntry.path, seededEntry)
+                seedVaultFileTree vault seededEntry
                 do! writeTextFileAsync blockedParent "This file prevents creation of a nested ARC directory."
 
                 try
@@ -4789,7 +4802,7 @@ Vitest.describe (
                 let sentMessages = windowState.SentMessages
                 let vault = ArcVault(windowState.Window)
                 let seededEntry = FileEntry.create ("seeded.txt", "seeded.txt", false)
-                vault.fileTree.Add(seededEntry.path, seededEntry)
+                seedVaultFileTree vault seededEntry
 
                 try
                     let mutable creationError: exn option = None
@@ -4840,7 +4853,7 @@ Vitest.describe (
                 try
                     let vault = ArcVault(TestHelpers.testWindow ())
                     let seededEntry = FileEntry.create ("seeded.txt", "seeded.txt", false)
-                    vault.fileTree.Add(seededEntry.path, seededEntry)
+                    seedVaultFileTree vault seededEntry
                     let mutable failed = false
 
                     Vitest.expect(vault.fileTree.Count).toBe (1)
@@ -4895,19 +4908,25 @@ Vitest.describe (
                     "swate-watcher-ready-error-"
                     91339
                     SignalError
+                    SignalReady
                     10000
-                    FileWatcherInitializationOutcome.ErrorBeforeReady
         )
 
         Vitest.test (
             "watcher readiness timeout degrades to snapshots and permits a fresh ready watcher",
             fun () ->
+                verifyRecoverableWatcherStartupDegradation "swate-watcher-ready-timeout-" 91340 NoSignal SignalReady 10
+        )
+
+        Vitest.test (
+            "failed watcher recovery on focus still shallow-refreshes the ARC root",
+            fun () ->
                 verifyRecoverableWatcherStartupDegradation
-                    "swate-watcher-ready-timeout-"
-                    91340
-                    NoSignal
-                    0
-                    FileWatcherInitializationOutcome.TimedOut
+                    "swate-watcher-focus-retry-error-"
+                    91341
+                    SignalError
+                    SignalError
+                    10000
         )
 
         Vitest.test (
@@ -4949,12 +4968,7 @@ Vitest.describe (
                         try
                             do! vaults.OpenARCInVault(windowId, arcPath)
 
-                            Vitest
-                                .expect(vault.LastFileWatcherInitializationOutcome)
-                                .toEqual (Some FileWatcherInitializationOutcome.Ready)
-
                             Vitest.expect(vault.watcher.IsSome).toBe (true)
-                            Vitest.expect(vault.fileWatcherReady).toBe (true)
                             Vitest.expect(pendingBeforeMutation).toBe (0)
                             Vitest.expect(pendingArcMergesBeforeMutation).toBe (0)
 
@@ -5061,7 +5075,7 @@ Vitest.describe (
                         let vault = TestHelpers.registerVault windowId arcPath
                         vault.SetArc(ARC("Bounded Mutation Refresh"))
                         let! rootEntry = Main.FileTreeCreator.getFileEntry arcPath
-                        vault.fileTree <- createFileEntryTree [| rootEntry |]
+                        vault.SetFileTree(createFileEntryTree [| rootEntry |])
                         let api = Main.IPC.ArcVaultsApi.api (ipcEventWithSenderId windowId)
 
                         let absolute relativePath =
@@ -5174,7 +5188,12 @@ Vitest.describe (
                         let vault = ArcVault(windowState.Window)
                         let vaults = ArcVaults()
                         vault.path <- Some arcPath
-                        vault.fileTree <- initialTree
+                        vault.SetFileTree initialTree
+                        let watcher = createTestWatcher SignalReady
+                        vault.FileWatcherFactory <- fun _ _ -> watcher.Watcher
+                        let! watcherOutcome = vault.PrepareFileWatcherForInitialization()
+                        Vitest.expect(watcherOutcome).toEqual (FileWatcherInitializationOutcome.Ready)
+                        Vitest.expect(vault.watcher.IsSome).toBe (true)
                         vaults.OnCloseWindow(windowState.Window, vault, windowId)
 
                         Vitest.expect(windowState.FocusHandlerAttached()).toBe (true)
@@ -5207,6 +5226,8 @@ Vitest.describe (
                         Vitest.expect(vault.fileTree.ContainsKey renameSourcePath).toBe (false)
                         Vitest.expect(vault.fileTree.ContainsKey nestedFolderPath).toBe (false)
                         Vitest.expect(vault.fileTree.ContainsKey deepPath).toBe (false)
+                        do! vault.StopFileWatcher()
+                        Vitest.expect(watcher.CloseCount()).toBe (1)
                     })
         )
 
@@ -5355,7 +5376,7 @@ Vitest.describe (
                         let vault = ArcVault(windowState.Window)
                         vault.path <- Some arcPath
                         vault.SetArc loadedArc
-                        vault.fileTree <- initialFileTree
+                        vault.SetFileTree initialFileTree
                         vault.StartFileWatcher(usePolling = true)
 
                         let watcher = vault.watcher.Value
@@ -5405,7 +5426,9 @@ Vitest.describe (
                                         .toBe (false)
 
                                     Vitest
-                                        .expect(windowState.SentMessages |> Seq.exists isFileTreeDeltaMessage)
+                                        .expect(
+                                            windowState.SentMessages |> Seq.exists isFileTreeDirectoryUpdateMessage
+                                        )
                                         .toBe (false)
 
                                     do! vault.RefreshFileTreeDirectory relativeDatasetPath
@@ -5419,24 +5442,28 @@ Vitest.describe (
                                         .expect(windowState.SentMessages |> Seq.exists isFileTreeMessage)
                                         .toBe (false)
 
-                                    let deltaMessages =
-                                        windowState.SentMessages |> Seq.filter isFileTreeDeltaMessage |> Seq.toArray
+                                    let directoryUpdateMessages =
+                                        windowState.SentMessages
+                                        |> Seq.filter isFileTreeDirectoryUpdateMessage
+                                        |> Seq.toArray
 
-                                    Vitest.expect(deltaMessages.Length).toBe (1)
-                                    let rendererDelta = unbox<FileTreeDelta> deltaMessages.[0].[1]
-                                    Vitest.expect(rendererDelta.removedPaths.Length).toBe (0)
-                                    Vitest.expect(rendererDelta.upsertedEntries.Length).toBe (2)
+                                    Vitest.expect(directoryUpdateMessages.Length).toBe (1)
 
-                                    let upsertedPaths = rendererDelta.upsertedEntries |> Array.map _.path
-                                    Vitest.expect(upsertedPaths).toContain ($"{relativeDatasetPath}/new.txt")
-                                    Vitest.expect(upsertedPaths).toContain ($"{relativeDatasetPath}/nested")
+                                    let rendererUpdate =
+                                        unbox<FileTreeDirectoryUpdate> directoryUpdateMessages.[0].[1]
+
+                                    Vitest.expect(rendererUpdate.directoryPath).toBe (relativeDatasetPath)
+                                    let childPaths = rendererUpdate.children |> Array.map _.path
+                                    Vitest.expect(childPaths).toContain ($"{relativeDatasetPath}/existing.txt")
+                                    Vitest.expect(childPaths).toContain ($"{relativeDatasetPath}/new.txt")
+                                    Vitest.expect(childPaths).toContain ($"{relativeDatasetPath}/nested")
 
                                     do! vault.RefreshFileTreeDirectory relativeDatasetPath
 
                                     Vitest
                                         .expect(
                                             windowState.SentMessages
-                                            |> Seq.filter isFileTreeDeltaMessage
+                                            |> Seq.filter isFileTreeDirectoryUpdateMessage
                                             |> Seq.length
                                         )
                                         .toBe (1)

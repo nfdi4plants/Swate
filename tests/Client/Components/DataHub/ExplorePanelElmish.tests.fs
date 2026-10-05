@@ -28,7 +28,7 @@ let private mkPageMeta page : PaginationMetadata = {
 }
 
 let Main =
-    testList "DataHub ExplorePanel Elmish" [
+    testList "DataHUB ExplorePanel Elmish" [
         testCase "SetTab resets page to first"
         <| fun _ ->
             let initial, _ = DataHubBrowserModel.init None

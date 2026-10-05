@@ -43,6 +43,7 @@ let private iconForArcWorkbookFile =
 
 let private colorClassForArcWorkbookFile =
     function
+    | "isa.investigation.xlsx" -> Some "swt:text-violet-400"
     | "isa.study.xlsx" -> Some "swt:text-amber-300"
     | "isa.assay.xlsx" -> Some "swt:text-lime-300"
     | "isa.workflow.xlsx" -> Some "swt:text-emerald-300"

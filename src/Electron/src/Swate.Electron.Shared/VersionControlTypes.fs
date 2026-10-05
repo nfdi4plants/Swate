@@ -176,7 +176,7 @@ module VersionControlCodes =
     [<Literal>]
     let TransportError = "transport_error"
 
-    // Produced by the main process when the DataHub ruleset refuses a storage policy change.
+    // Produced by the main process when the DataHUB ruleset refuses a storage policy change.
     // The renderer checks the same rules before calling.
     [<Literal>]
     let StoragePolicyBlocked = "storage_policy_blocked"

@@ -70,8 +70,7 @@ type ArcVault(window: BrowserWindow) =
     let mutable writeGeneration = 0
     let mutable watcherDeferralCount = 0
     let mutable watcherEpoch = 0
-    let mutable fileTreeValue = Dictionary<string, FileEntry>()
-    let fileTreeDirectChildrenIndex = FileTreeDirectChildrenIndex()
+    let indexedFileTree = IndexedFileTree()
 
     let mutable fileTreeUpdateTail: Fable.Core.JS.Promise<unit> =
         JS.Constructors.Promise.resolve ()
@@ -87,24 +86,16 @@ type ArcVault(window: BrowserWindow) =
     /// Dirty marker for unsaved in-memory ARC mutations.
     member val hasUnsavedArcChanges: bool = false with get, private set
 
-    member _.fileTree
-        with get () = fileTreeValue
-        and set value =
-            fileTreeValue <- value
-            fileTreeDirectChildrenIndex.Rebuild value
+    /// Indexed main-process FileTree state.
+    member this.fileTree = indexedFileTree
 
-    member internal _.FileTreeDirectChildrenIndex = fileTreeDirectChildrenIndex
+    member internal _.IndexedFileTree = indexedFileTree
 
     member val watcher: Chokidar.IWatcher option = None with get, set
-    member val internal fileWatcherReady = false with get, set
-    member val internal fileWatcherReadinessError: obj option = None with get, set
     member val internal FileWatcherReadinessTimeoutMs = 10000 with get, set
 
     member val internal FileWatcherFactory: (string -> bool option -> Chokidar.IWatcher) =
         (fun path usePolling -> createFileWatcher path usePolling) with get, set
-
-    member val internal LastFileWatcherInitializationOutcome: FileWatcherInitializationOutcome option =
-        None with get, set
 
     member val internal flushBufferedFileWatcherEvents: (unit -> unit) option = None with get, set
     member val fileWatcherReloadArcTimeout: int option = None with get, set
@@ -290,7 +281,7 @@ module ArcVaultExtensions =
                     | Some _ when capturedWatcherEpoch <> this.WatcherEpoch -> ()
                     | Some arcPath ->
                         let normalizedEvents = WatcherHelpers.normalizeAgainstDisk events
-                        let mutable nextFileTree = this.fileTree
+                        let mutable nextFileTree = this.fileTree.CopySnapshot()
                         let mutable hasFileTreeChanges = false
 
                         for event in normalizedEvents do
@@ -690,7 +681,7 @@ module ArcVaultExtensions =
                                             refreshFileTreeEntry
                                                 arcPath
                                                 (DatamapParentInfo.toPath parentInfo)
-                                                this.fileTree
+                                                (this.fileTree.CopySnapshot())
 
                                         this.SetFileTree refreshedFileTree
                                     | _ -> ()
@@ -710,23 +701,18 @@ module ArcVaultExtensions =
             | _ -> return Error(arcNotOpenError ())
         }
 
+        member private this.CurrentRendererFileTree() =
+            match this.path with
+            | Some arcPath -> toRendererFileTree arcPath this.fileTree.Values
+            | None -> Dictionary<string, FileEntry>()
+
         member private this.PublishFileTree() =
-            let rendererFileTree =
-                match this.path with
-                | Some arcPath -> toRendererFileTree arcPath this.fileTree.Values
-                | None -> Dictionary<string, FileEntry>()
+            let rendererFileTree = this.CurrentRendererFileTree()
 
             WindowSend.send<IFileTreeRendererApi> this.window (fun api -> api.fileTreeUpdate rendererFileTree)
 
-        member private this.PublishFileTreeDelta(delta: ShallowFileTreeReconciliationDelta) =
-            match this.path with
-            | None -> ()
-            | Some arcPath ->
-                let rendererDelta = toRendererFileTreeDelta arcPath delta
-                WindowSend.send<IFileTreeRendererApi> this.window (fun api -> api.fileTreeDelta rendererDelta)
-
         member this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
-            this.fileTree <- fileTree
+            this.IndexedFileTree.ReplaceSnapshot fileTree
             this.PublishFileTree()
 
         /// Refreshes one directory without recursively scanning it and serializes the update with watcher tree work.
@@ -737,15 +723,12 @@ module ArcVaultExtensions =
                     match this.path with
                     | None -> return raise (arcNotOpenError ())
                     | Some arcPath ->
-                        match!
-                            reconcileFileTreeDirectory
-                                arcPath
-                                relativeDirectoryPath
-                                this.fileTree
-                                this.FileTreeDirectChildrenIndex
-                        with
+                        match! reconcileFileTreeDirectory arcPath relativeDirectoryPath this.IndexedFileTree with
                         | None -> ()
-                        | Some delta -> this.PublishFileTreeDelta delta
+                        | Some update ->
+                            WindowSend.send<IFileTreeRendererApi>
+                                this.window
+                                (fun api -> api.fileTreeDirectoryUpdate update)
                 })
 
             this.FileTreeUpdateTail <- queuedUpdate |> Promise.catch (fun _ -> ())
@@ -757,9 +740,9 @@ module ArcVaultExtensions =
             | Some arcPath ->
                 if this.fileTree.Count = 0 then
                     let! fileTree = getFileTree arcPath
-                    this.fileTree <- fileTree
+                    this.IndexedFileTree.ReplaceSnapshot fileTree
 
-                return toRendererFileTree arcPath this.fileTree.Values
+                return this.CurrentRendererFileTree()
         }
 
         member this.LoadArc() = promise {
@@ -774,65 +757,33 @@ module ArcVaultExtensions =
                 swatefailfn this.window.id "No path set for StartFileWatcher."
         }
 
-        member private this.EnsureFileWatcher(?usePolling: bool) =
-            if this.path.IsSome then
-                match this.watcher with
-                | Some watcher when this.fileWatcherReady -> watcher
-                | Some _ -> swatefailfn this.window.id "The structural file watcher is still starting."
-                | None ->
-                    this.fileWatcherReady <- false
-                    this.fileWatcherReadinessError <- None
-                    let watcher = this.FileWatcherFactory this.path.Value usePolling
-                    this.watcher <- Some watcher
-
-                    let sendWatcherMessage = WindowSend.sender<IArcFileWatcherApi> this.window
-
-                    let sendMsgApi: IArcFileWatcherApi = {
-                        IsLoadingChanges =
-                            fun isLoading -> sendWatcherMessage (fun api -> api.IsLoadingChanges isLoading)
-                    }
-
-                    watcher.on (Chokidar.Events.All, this._FileEventController sendMsgApi) |> ignore
-
-                    watcher.onReady (fun () ->
-                        match this.watcher with
-                        | Some currentWatcher when System.Object.ReferenceEquals(currentWatcher, watcher) ->
-                            if this.fileWatcherReadinessError.IsNone then
-                                this.fileWatcherReady <- true
-                        | _ -> ()
-                    )
-                    |> ignore
-
-                    watcher.onError (fun error ->
-                        match this.watcher with
-                        | Some currentWatcher when System.Object.ReferenceEquals(currentWatcher, watcher) ->
-                            if not this.fileWatcherReady then
-                                this.fileWatcherReadinessError <- Some error
-                        | _ -> ()
-
-                        swatelogfn this.window.id "Structural file watcher error: %s" (string error)
-                    )
-                    |> ignore
-
-                    watcher
-            else
-                swatefailfn this.window.id "No path set for StartFileWatcher."
-
         member this.StartFileWatcher(?usePolling: bool) =
-            this.EnsureFileWatcher(?usePolling = usePolling) |> ignore
+            this.PrepareFileWatcherForInitialization(?usePolling = usePolling)
+            |> Promise.start
 
         /// Starts the structural watcher before initialization snapshots and waits for its public initial ready signal.
         /// Watcher errors and readiness timeouts degrade to snapshot-only startup instead of rejecting a readable ARC.
-        member internal this.PrepareFileWatcherForInitialization(?usePolling: bool) = promise {
-            try
-                let watcher = this.EnsureFileWatcher(?usePolling = usePolling)
+        member internal this.PrepareFileWatcherForInitialization(?usePolling: bool) =
+            let mutable startedWatcher: Chokidar.IWatcher option = None
 
-                let! outcome =
-                    if this.fileWatcherReadinessError.IsSome then
-                        promise { return FileWatcherInitializationOutcome.ErrorBeforeReady }
-                    elif this.fileWatcherReady then
-                        promise { return FileWatcherInitializationOutcome.Ready }
-                    else
+            let startup =
+                try
+                    match this.watcher, this.path with
+                    | Some _, _ -> JS.Constructors.Promise.resolve FileWatcherInitializationOutcome.Ready
+                    | None, None -> raise (arcNotOpenError ())
+                    | None, Some arcPath ->
+                        let watcher = this.FileWatcherFactory arcPath usePolling
+                        startedWatcher <- Some watcher
+                        this.watcher <- Some watcher
+                        let sendWatcherMessage = WindowSend.sender<IArcFileWatcherApi> this.window
+
+                        let sendMsgApi = {
+                            IsLoadingChanges =
+                                fun isLoading -> sendWatcherMessage (fun api -> api.IsLoadingChanges isLoading)
+                        }
+
+                        watcher.on (Chokidar.Events.All, this._FileEventController sendMsgApi) |> ignore
+
                         JS.Constructors.Promise.Create(fun resolve _ ->
                             let mutable settled = false
                             let mutable timeoutId: int option = None
@@ -849,18 +800,21 @@ module ArcVaultExtensions =
                                     this.FileWatcherReadinessTimeoutMs
                                 |> Some
 
-                            watcher.onReady (fun () ->
-                                if this.fileWatcherReady then
-                                    finish FileWatcherInitializationOutcome.Ready
-                            )
+                            watcher.onReady (fun () -> finish FileWatcherInitializationOutcome.Ready)
                             |> ignore
 
-                            watcher.onError (fun _ ->
-                                if not this.fileWatcherReady then
-                                    finish FileWatcherInitializationOutcome.ErrorBeforeReady
+                            watcher.onError (fun error ->
+                                swatelogfn this.window.id "Structural file watcher error: %s" (string error)
+                                finish FileWatcherInitializationOutcome.ErrorBeforeReady
                             )
                             |> ignore
                         )
+                with watcherError ->
+                    swatelogfn this.window.id "Unable to start the structural watcher: %s" watcherError.Message
+                    JS.Constructors.Promise.resolve FileWatcherInitializationOutcome.FailedToStart
+
+            promise {
+                let! outcome = startup
 
                 match outcome with
                 | FileWatcherInitializationOutcome.Ready -> ()
@@ -868,30 +822,31 @@ module ArcVaultExtensions =
                     swatelogfn
                         this.window.id
                         "Structural watcher failed before readiness; continuing with snapshot initialization."
-
-                    do! this.StopFileWatcher()
                 | FileWatcherInitializationOutcome.TimedOut ->
                     swatelogfn
                         this.window.id
                         "Structural watcher readiness timed out; continuing with snapshot initialization."
-
-                    do! this.StopFileWatcher()
                 | FileWatcherInitializationOutcome.FailedToStart -> ()
 
-                this.LastFileWatcherInitializationOutcome <- Some outcome
-                return outcome
-            with watcherError ->
-                do! this.StopFileWatcher()
+                if outcome <> FileWatcherInitializationOutcome.Ready then
+                    match startedWatcher with
+                    | Some watcher ->
+                        try
+                            do! watcher.close ()
+                        with _ ->
+                            ()
+                    | None -> ()
 
-                swatelogfn
-                    this.window.id
-                    "Unable to start the structural watcher; continuing with snapshot initialization: %s"
-                    watcherError.Message
+                    match this.watcher, startedWatcher with
+                    | Some currentWatcher, Some watcher when System.Object.ReferenceEquals(currentWatcher, watcher) ->
+                        this.watcher <- None
+                    | _ -> ()
 
-                let outcome = FileWatcherInitializationOutcome.FailedToStart
-                this.LastFileWatcherInitializationOutcome <- Some outcome
+                    this.flushBufferedFileWatcherEvents <- None
+                    this.ClearPendingFileWatcherState()
+
                 return outcome
-        }
+            }
 
         member this.ClearPendingFileWatcherState() =
             this.IncrementWatcherEpoch()
@@ -912,8 +867,6 @@ module ArcVaultExtensions =
                     ()
 
             this.watcher <- None
-            this.fileWatcherReady <- false
-            this.fileWatcherReadinessError <- None
             this.flushBufferedFileWatcherEvents <- None
             this.ClearPendingFileWatcherState()
         }
@@ -925,7 +878,7 @@ module ArcVaultExtensions =
 
             this.isInitializingArc <- false
             this.path <- None
-            this.fileTree <- Dictionary<string, FileEntry>()
+            this.IndexedFileTree.Clear()
 
             try
                 this.ClearArc()
@@ -953,7 +906,7 @@ module ArcVaultExtensions =
 
                 // Install the authoritative snapshot before publishing any initialized state.
                 // Keep the renderer's established path-before-tree message order.
-                this.fileTree <- fileTree
+                this.IndexedFileTree.ReplaceSnapshot fileTree
 
                 WindowSend.send<IPathChangeRendererApi> this.window (fun api -> api.pathChange (Some normalizedPath))
 
@@ -1228,11 +1181,21 @@ type ArcVaults() =
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
         window.onFocus (fun () ->
             if vault.path.IsSome && not vault.isInitializingArc && not (window.isDestroyed ()) then
-                vault.RefreshFileTreeDirectory ""
-                |> Promise.catch (fun refreshError ->
-                    swatelogfn id "Unable to refresh the ARC root after window focus: %s" refreshError.Message
-                )
-                |> Promise.start
+                let refreshRoot () =
+                    vault.RefreshFileTreeDirectory ""
+                    |> Promise.catch (fun refreshError ->
+                        swatelogfn id "Unable to refresh the ARC root after window focus: %s" refreshError.Message
+                    )
+
+                let focusWork = promise {
+                    if vault.watcher.IsNone then
+                        let! _ = vault.PrepareFileWatcherForInitialization()
+                        ()
+
+                    do! refreshRoot ()
+                }
+
+                focusWork |> Promise.start
         )
 
         window.onClose (fun closeEvent ->

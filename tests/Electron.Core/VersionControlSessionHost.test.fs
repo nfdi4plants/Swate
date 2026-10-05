@@ -822,7 +822,7 @@ Vitest.describe (
                 try
                     try
                         let api = Main.IPC.IVersionControlApi.api (ipcEvent 65)
-                        vault.fileTree.Clear()
+                        vault.IndexedFileTree.Clear()
 
                         let! succeeded =
                             api.materializeObject {
@@ -1216,12 +1216,12 @@ Vitest.describe (
                     let! created =
                         api.createRevision {
                             OperationId = "policy-metadata-and-resource"
-                            Message = "Save DataHub files"
+                            Message = "Save DataHUB files"
                             Paths = [| metadataPath; largePlainPath |]
                             ExpectedWorkspaceVersion = version
                         }
 
-                    expectDtoValue "save DataHub files" created |> ignore
+                    expectDtoValue "save DataHUB files" created |> ignore
 
                     Vitest.expect(git fixture.RepoRoot [ "cat-file"; "-s"; $"HEAD:{metadataPath}" ] |> _.Trim()).toBe
                         "2097152"
@@ -2378,7 +2378,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "the DataHub ruleset blocks a storage policy change before the provider runs",
+            "the DataHUB ruleset blocks a storage policy change before the provider runs",
             fun () ->
                 withFixture (fun fixture -> promise {
                     registerVault 47 fixture.RepoRoot |> ignore

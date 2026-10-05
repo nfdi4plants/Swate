@@ -107,7 +107,6 @@ type FileTree =
             ),
             [|
                 box fileStateCtx.state.FileTree
-                box fileStateCtx.state.FileTreeRevision
                 box fileStateCtx.state.Selection.TreePath
                 box pageStateCtx.state
             |]
@@ -122,14 +121,14 @@ type FileTree =
                         match
                             Renderer.Context.LfsActivityContext.LfsActivityState.withBusyEntries
                                 lfsActivityByPath
-                                fileStateCtx.state.FileTree
+                                (fileStateCtx.state.FileTree |> Seq.toArray)
                         with
                         | [||] -> None
                         | entries -> entries |> toFileTreeNode |> collapseSingleChildSameName |> Some
                 ),
                 [|
                     box fileStateCtx.state.FileTreeRoot
-                    box fileStateCtx.state.FileTreeRevision
+                    box fileStateCtx.state.FileTree
                     box lfsActivityByPath
                 |]
             )
@@ -138,11 +137,11 @@ type FileTree =
             React.useStateWithUpdater FileTreeMaterialization.empty
 
         let reconciledMaterializedState =
-            reconcileMaterializedStateWithKnownDirectories
+            reconcileMaterializedState
                 arcScopeId
                 fileStateCtx.state.Selection.TreePath
                 fileTree
-                fileStateCtx.state.FileTreeDirectoryPaths
+                fileStateCtx.state.IsFileTreeDirectory
                 materializedState
 
         React.useEffect (
@@ -163,7 +162,7 @@ type FileTree =
 
         let fileItem =
             fileTree
-            |> Option.map (
+            |> Option.map (fun parent ->
                 FileTreeMaterialization.toMaterializedFileItemTree
                     (fun node ->
                         let item = Helper.createItem node
@@ -177,6 +176,7 @@ type FileTree =
                         }
                     )
                     reconciledMaterializedState.Paths
+                    parent
             )
 
         let applyPreviewResult itemName result =
@@ -293,10 +293,7 @@ type FileTree =
                 else
                     hasObservedFileTreeUpdateRef.current <- true
             ),
-            [|
-                box fileStateCtx.state.FileTree
-                box fileStateCtx.state.FileTreeRevision
-            |]
+            [| box fileStateCtx.state.FileTree |]
         )
 
         let handleExpansionChange (item: FileItem) (willExpand: bool) =
@@ -395,7 +392,7 @@ type FileTree =
         let createArcEntry kind (identifier: string) =
             if not isDialogBusy then
                 let existingPaths =
-                    fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
+                    fileStateCtx.state.FileTree |> Seq.map (fun entry -> entry.path) |> Seq.toArray
 
                 match tryBuildArcCreateDraft kind identifier existingPaths with
                 | Error errorMessage -> applyCreateError errorMessage

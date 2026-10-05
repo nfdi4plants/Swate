@@ -28,7 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Discard asks for confirmation.
 -   The cancel button also covers the upload step of a save. Canceling it keeps the saved-locally notice and opens no error dialog.
 -   The main process logs the start and end of every version control operation with its result.
--   Added a new colour scheme for Swate and ARCitectGX (@paulineHans GitHub)
+-   Added a new colour scheme for Swate (@paulineHans GitHub)
+-   Added guidance for generating and using GitLab Personal Access Tokens. #1267 (by @Freymaurer)
 
 ### 🔄 Changed
 
@@ -41,14 +42,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   The busy notice shows the operation and git's progress lines. The raw "Git output" log is removed.
 -   The tooltips of Update ARC from Online, Download Changes and Clean LFS Cache list the git commands that run now.
 -   Replace git file status icons with shorthand letters (A, M, D, R, N, C) to reduce confusion with "+" icon. #1199 (by @Freymaurer)
+-   Allow custom input for "Add Rows" input in Annotation Table. You can now completely remove the numbers and just type away. [#1351](https://github.com/nfdi4plants/Swate/issues/1351) (by @Freymaurer)
 
 ### 🐛 Fixed
 
+-   Root-level ARC items in the file tree follow the ISA standard order, and the `isa.investigation.xlsx` workbook has a distinctive violet icon.
 -   The diff of a changed, downloaded Git LFS text file shows the changed lines instead of the pointer text, without downloading anything.
 -   Mark and Unmark Git LFS take effect on the next save, so the file's storage changes. Unmark is refused when the file's object is not local.
 -   Discarding a downloaded Git LFS file keeps it downloaded.
 -   Git LFS conflicts are no longer shown as editable pointer text.
--   The DataHub storage rules apply to every save: `isa.*.xlsx` workbooks are never stored as Git LFS pointers, and dataset files and files above 25 MB always are.
+-   The DataHUB storage rules apply to every save: `isa.*.xlsx` workbooks are never stored as Git LFS pointers, and dataset files and files above 25 MB always are.
 -   Saving more than about 1000 files at once works on Windows, and a save starts a fixed number of git processes whatever the file count.
 -   Clean LFS Cache works after a discarded Git LFS edit.
 -   A clone whose Git LFS download fails keeps the clone, opens it and offers to download the large files.
@@ -58,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Closing a window during an operation no longer crashes the main process with "Object has been destroyed". Every message to a window checks that the window still exists.
 -   The file watcher no longer overwrites the in-memory ARC in the middle of one of Swate's own writes.
 -   A Git operation that fails after it already changed the workspace refreshes the sidebar before it shows the error.
--   Added fallback support for broken repository image links in datahub browser. #1180 (by @Freymaurer)
+-   Added fallback support for broken repository image links in DataHUB browser. #1180 (by @Freymaurer)
 -   Show a native error message instead of crashing or silently failing when a selected folder is not a valid ARC.
 
 ## 2.3.1 - 2026-09-16
@@ -79,7 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### ✨ Added
 
 -   Add external file importing to the Electron FileTree, including cancellation and cleanup of temporary or partially imported files on cancellation or failure.
--   Allow canceling in-flight Git network operations (ARC download/clone, fetch, update preview, pull, push, and Git LFS transfers) from the Git sidebar and the DataHub download view. Cancellation kills the underlying git process and restores a clean repository state: a canceled pull aborts any half-applied merge or rebase, and a canceled ARC download removes the partially cloned folder #1306.
+-   Allow canceling in-flight Git network operations (ARC download/clone, fetch, update preview, pull, push, and Git LFS transfers) from the Git sidebar and the DataHUB download view. Cancellation kills the underlying git process and restores a clean repository state: a canceled pull aborts any half-applied merge or rebase, and a canceled ARC download removes the partially cloned folder #1306.
 -   Keep open ARC editors synchronized when DataMaps are added or deleted through the File Explorer or by external filesystem changes.
 -   Show **Delete DataMap**, rather than **Add DataMap**, in the context menu of a collapsed ARC entity folder that already contains a DataMap.
 -   Prevent newly added DataMaps from incorrectly appearing as unsaved after they have been written to disk.
@@ -88,7 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🔄 Changed
 
 -   Rotate the Import JSON icon by 180 degrees in all navbars.
--   Restore the **Download ARC from DataHub** action to the Electron ARC selector.
+-   Restore the **Download ARC from DataHUB** action to the Electron ARC selector.
 
 ### 🐛 Fixed
 
@@ -112,14 +115,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Add separate FileTree context-menu actions to open a selected folder and reveal a selected file or folder in its parent location #1228.
 -   Keep expanded FileTree parent folders visible while scrolling through nested content #1231.
 -   Add annotation-table actions for assigning a unit to a cell and removing a unit while retaining its value #1229.
--   Enforce the DataHub Git LFS tracking ruleset: `isa.*.xlsx` metadata files are never tracked with Git LFS (skipped by automatic tracking, exempt from the commit size policy, and blocked from manual marking), while files inside a `dataset` folder or larger than 25 MB can no longer be unmarked #1316.
+-   Enforce the DataHUB Git LFS tracking ruleset: `isa.*.xlsx` metadata files are never tracked with Git LFS (skipped by automatic tracking, exempt from the commit size policy, and blocked from manual marking), while files inside a `dataset` folder or larger than 25 MB can no longer be unmarked #1316.
 -   Add an editor button and a File Explorer action for adding DataMaps to assays, studies, runs, and workflows. The button remains visible but disabled when a DataMap cannot be added.
 -   Add the ability to remove DataMaps from their editor-tab context menu or through the File Explorer delete action.
 
 ### 🔄 Changed
 
 -   Write DataMap additions and deletions to the ARC on disk immediately. Newly created DataMaps are loaded into the FileTree before their editor tab becomes available, while the currently selected editor tab remains active.
--   Simplify Electron FileTree navigation so ARC editors initialize the requested Metadata, table, or DataMap view directly, and show the DataHub download action only in the sidebar.
+-   Simplify Electron FileTree navigation so ARC editors initialize the requested Metadata, table, or DataMap view directly, and show the DataHUB download action only in the sidebar.
 -   Consolidate Electron ARC editor page state, safely resolve canonical entity workbooks, and reuse shared path normalization for ARC-root-relative references.
 -   Harden canonical entity path resolution for Electron rename and delete operations, and document the behavior of the shared path-normalization helpers.
 -   Keep table deletion in the existing footer-tab context menu instead of exposing a second, inconsistent navbar action.
@@ -138,7 +141,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Keep table-tab keys unambiguous by rejecting duplicate table names.
 -   Append imported templates to a fresh table model when the active table is empty.
 -   Allow hidden filesystem files such as `.DS_Store` to be deleted from ARC add-zone roots without treating them as ARC entities.
--   Sign commits created in Swate with the stored DataHub account matching the ARC's remote host (using the active account when no remote is configured yet, and leaving the user's own git config untouched for hubs without a stored account) instead of git's OS-derived fallback identity, so commits link to the account on the hub they are pushed to #1304.
+-   Sign commits created in Swate with the stored DataHUB account matching the ARC's remote host (using the active account when no remote is configured yet, and leaving the user's own git config untouched for hubs without a stored account) instead of git's OS-derived fallback identity, so commits link to the account on the hub they are pushed to #1304.
 -   Report a missing git identity as its own failure with setup guidance instead of passing git's raw "Please tell me who you are" output to the user #1305.
 -   Respect GitLab's "use a private email in commits" setting by signing commits with the account's commit email instead of its primary email.
 -   Fix Template bug "You've hit dummy code" #1266, #1264 (by @Freymaurer) 
