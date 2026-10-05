@@ -89,8 +89,15 @@ Vitest.describe (
                     Paths = Set.ofList [ "arc"; "arc/kept"; "arc/removed" ]
                 }
 
+                let knownDirectoryPaths = HashSet<string>([ "arc"; "arc/kept"; "arc/selected" ])
+
                 let reconciled =
-                    reconcileMaterializedState (Some "C:/arc") (Some "arc/selected/selected.txt") (Some root) current
+                    reconcileMaterializedStateWithKnownDirectories
+                        (Some "C:/arc")
+                        (Some "arc/selected/selected.txt")
+                        (Some root)
+                        knownDirectoryPaths
+                        current
 
                 Vitest.expect(reconciled.Paths |> Set.toList).toEqual ([ "arc"; "arc/kept"; "arc/selected" ])
         )
@@ -108,8 +115,15 @@ Vitest.describe (
                     Paths = Set.ofList [ "arc"; "arc/kept" ]
                 }
 
+                let knownDirectoryPaths = HashSet<string>([ "arc"; "arc/kept" ])
+
                 let reconciled =
-                    reconcileMaterializedState (Some "C:/new-arc") None (Some root) current
+                    reconcileMaterializedStateWithKnownDirectories
+                        (Some "C:/new-arc")
+                        None
+                        (Some root)
+                        knownDirectoryPaths
+                        current
 
                 Vitest.expect(reconciled.ArcScopeId).toEqual (Some "C:/new-arc")
                 Vitest.expect(reconciled.Paths |> Set.toList).toEqual ([ "arc" ])

@@ -19,16 +19,6 @@ type Clipboard =
     abstract member write: ClipboardItem[] -> JS.Promise<unit>
     abstract member read: unit -> JS.Promise<ClipboardItem[]>
 
-[<Erase>]
-type Navigator =
-    abstract member clipboard: Clipboard
-
-[<AutoOpen>]
-module GlobalBindings =
-
-    [<Emit("navigator")>]
-    let navigator: Navigator = jsNative
-
 module ClipboardBindings =
 
     [<Emit("typeof $0 === 'string'")>]
