@@ -314,32 +314,28 @@ type DataAnnotator =
             ]
         ]
 
-    // [<ReactComponent>]
-    // static member private UpdateIsHeaderCheckbox(model: Model, dispatch: Msg -> unit) =
-    //     let hasHeader = model.ParsedFile.IsSome && model.ParsedFile.Value.HeaderRow.IsSome
+    [<ReactComponent>]
+    static member private UpdateIsHeaderCheckbox(dataFileParseConfig: DataFileParseConfig, setDataFileParseConfig) =
 
-    //     Html.button [
-    //         if hasHeader then
-    //             prop.className "swt:btn swt:btn-primary"
-    //         else
-    //             prop.className "swt:btn"
-    //         prop.onClick (fun _ ->
-    //             promise {
-    //                 UpdateLoading true |> dispatch
-    //                 do! Promise.sleep 0 // let React re-render the loading state
-    //                 let next = model.ParsedFile.Value.ToggleHeader()
-    //                 UpdateParsedDataFile next |> dispatch
-    //             }
-    //             |> Promise.start
-    //         )
-    //         prop.children [
-    //             Html.p [
-    //                 if not hasHeader then
-    //                     prop.className "swt:line-through"
-    //                 prop.text "Has Header"
-    //             ]
-    //         ]
-    //     ]
+        Html.button [
+            if dataFileParseConfig.HasHeader then
+                prop.className "swt:btn swt:btn-primary"
+            else
+                prop.className "swt:btn"
+            prop.onClick (fun _ ->
+                setDataFileParseConfig {
+                    dataFileParseConfig with
+                        HasHeader = not dataFileParseConfig.HasHeader
+                }
+            )
+            prop.children [
+                Html.p [
+                    if not dataFileParseConfig.HasHeader then
+                        prop.className "swt:line-through"
+                    prop.text "Has Header"
+                ]
+            ]
+        ]
 
     [<ReactComponent>]
     static member private DataFileConfigComponent
@@ -349,7 +345,7 @@ type DataAnnotator =
             prop.className "swt:flex swt:flex-row swt:gap-4"
             prop.children [
                 DataAnnotator.UpdateSeparatorButton(dataFileParseConfig, setDataFileParseConfig)
-            // DataAnnotator.UpdateIsHeaderCheckbox(dataFileParseConfig, setDataFileParseConfig)
+                DataAnnotator.UpdateIsHeaderCheckbox(dataFileParseConfig, setDataFileParseConfig)
             ]
         ]
 
@@ -426,7 +422,7 @@ type DataAnnotator =
             modalActions = modalActivity,
             footer = footer,
             className = "swt:max-w-none",
-            modalActionsClassName = "swt:z-999"
+            modalActionsClassName = "swt:z-9999"
         )
 
     [<ReactComponent(true)>]

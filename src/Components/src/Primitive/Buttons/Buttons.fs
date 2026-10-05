@@ -134,7 +134,7 @@ type Buttons =
             defaultArg tooltipPosition "swt:tooltip-center swt:tooltip-bottom"
 
         Html.div [
-            prop.className [ "swt:tooltip swt:z-9999"; tooltipPosition ]
+            prop.className [ "swt:tooltip swt:z-99"; tooltipPosition ]
             prop.custom ("data-tip", title)
             prop.children [
                 Html.button [
