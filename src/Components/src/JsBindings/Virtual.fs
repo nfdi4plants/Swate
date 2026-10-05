@@ -74,6 +74,16 @@ module Virtual =
             with get (): System.Func<VirtualItem, float, obj, bool> option = jsNative
             and set (_: System.Func<VirtualItem, float, obj, bool> option) = jsNative
 
+/// The part of react-dom the virtualized lists need. TanStack renders its own updates through the
+/// same function.
+[<Erase>]
+type ReactDomApi =
+
+    /// Renders the updates the callback makes before it returns, so the DOM is current when the
+    /// browser paints.
+    [<ImportMember("react-dom")>]
+    static member flushSync(callback: unit -> unit) : unit = jsNative
+
 [<Erase>]
 type Virtual =
 
