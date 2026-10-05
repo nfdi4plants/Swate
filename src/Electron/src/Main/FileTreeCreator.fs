@@ -282,6 +282,7 @@ let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
 
         return withFileEntryLfsMetadata normalizedRepoRoot largeObjectsByRelativePath largeObjectsByComparisonKey entry
 }
+
 /// Finds all files and subfolders of the given filepath
 /// Not used currently but we keep it because the logic is sound and proved
 let getFileEntries (path: string) (openSession: bool) : Fable.Core.JS.Promise<FileEntry[]> = promise {
