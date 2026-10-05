@@ -32,17 +32,6 @@ let tryParseDataFile (separator: string) (file: DataFile) =
     with exceptionValue ->
         Error exceptionValue.Message
 
-let tryGetTargetHeader (table: ArcTable) (targetColumn: TargetColumn) =
-    match targetColumn with
-    | TargetColumn.Input -> Ok(CompositeHeader.Input IOType.Data)
-    | TargetColumn.Output -> Ok(CompositeHeader.Output IOType.Data)
-    | TargetColumn.Autodetect ->
-        match table.TryGetInputColumn(), table.TryGetOutputColumn() with
-        | Some _, None
-        | None, None -> Ok(CompositeHeader.Output IOType.Data)
-        | None, Some _ -> Ok(CompositeHeader.Input IOType.Data)
-        | Some _, Some _ -> Error "Both Input and Output columns already exist. Select Input or Output explicitly."
-
 let private isSomeNonEmptyString = Option.exists (String.IsNullOrWhiteSpace >> not)
 
 let private findLastNonEmptyDataCellIndex (cells: ResizeArray<CompositeCell>) =
@@ -79,102 +68,6 @@ let private setDataContextFields (fileName: string) (fileType: string) (selector
     data.Format <- Some fileType
     data.SelectorFormat <- Some URLs.Data.SelectorFormat.csv
     data
-
-let applyToTable (table: ArcTable) (input: AnnotationInput) =
-    match input.Target with
-    | AnnotationTarget.DataMap _ -> Error "DataMap target cannot be applied to a table destination."
-    | AnnotationTarget.Table(targetColumn, writeMode) ->
-        let headerResult =
-            match targetColumn, writeMode with
-            | TargetColumn.Autodetect, WriteMode.Append ->
-                Error "Append mode requires selecting Input or Output explicitly."
-            | TargetColumn.Autodetect, WriteMode.Replace -> tryGetTargetHeader table targetColumn
-            | TargetColumn.Input, _ -> Ok(CompositeHeader.Input IOType.Data)
-            | TargetColumn.Output, _ -> Ok(CompositeHeader.Output IOType.Data)
-
-        match headerResult with
-        | Error errorMessage -> Error errorMessage
-        | Ok header ->
-            try
-                let existingColumn =
-                    match targetColumn with
-                    | TargetColumn.Input -> table.TryGetInputColumn()
-                    | TargetColumn.Output -> table.TryGetOutputColumn()
-                    | TargetColumn.Autodetect -> None
-
-                let startRowIndex =
-                    match writeMode, existingColumn with
-                    | WriteMode.Append, Some column -> findLastNonEmptyDataCellIndex column.Cells + 1
-                    | WriteMode.Append, None -> 0
-                    | WriteMode.Replace, _ -> 0
-
-                let targetRowCount =
-                    System.Math.Max(table.RowCount, startRowIndex + input.Selectors.Length)
-
-                if targetRowCount > table.RowCount && table.ColumnCount > 0 then
-                    table.AddRowsEmpty(targetRowCount - table.RowCount)
-
-                let selectorEndExclusive = startRowIndex + input.Selectors.Length
-
-                let values =
-                    [|
-                        for rowIndex in 0 .. targetRowCount - 1 do
-                            if rowIndex >= startRowIndex && rowIndex < selectorEndExclusive then
-                                let selectorIndex = rowIndex - startRowIndex
-
-                                Data()
-                                |> setDataContextFields input.FileName input.FileType input.Selectors.[selectorIndex]
-                                |> CompositeCell.createData
-                            else
-                                match writeMode, existingColumn with
-                                | WriteMode.Append, Some column when rowIndex < column.Cells.Count ->
-                                    column.Cells.[rowIndex]
-                                | _ -> CompositeCell.createData (Data())
-                    |]
-                    |> ResizeArray
-
-                table.AddColumn(header, values, forceReplace = true)
-                Ok input.Selectors.Length
-            with exceptionValue ->
-                Error exceptionValue.Message
-
-let applyToDataMap (dataMap: DataMap) (input: AnnotationInput) =
-    match input.Target with
-    | AnnotationTarget.Table _ -> Error "Table target cannot be applied to a DataMap destination."
-    | AnnotationTarget.DataMap writeMode ->
-        try
-            let startIndex =
-                match writeMode with
-                | WriteMode.Replace -> 0
-                | WriteMode.Append -> findLastNonEmptyDataContextIndex dataMap + 1
-
-            let requiredCount = startIndex + input.Selectors.Length
-
-            if requiredCount > dataMap.DataContexts.Count then
-                let toAdd =
-                    Array.init (requiredCount - dataMap.DataContexts.Count) (fun _ -> DataContext())
-
-                dataMap.DataContexts.AddRange toAdd
-
-            if writeMode = WriteMode.Replace then
-                for index in requiredCount .. dataMap.DataContexts.Count - 1 do
-                    let dataContext = dataMap.DataContexts.[index]
-                    dataContext.FilePath <- None
-                    dataContext.Selector <- None
-                    dataContext.Format <- None
-                    dataContext.SelectorFormat <- None
-
-            for selectorOffset in 0 .. input.Selectors.Length - 1 do
-                let targetIndex = startIndex + selectorOffset
-                let selector = input.Selectors.[selectorOffset]
-
-                dataMap.DataContexts.[targetIndex]
-                |> setDataContextFields input.FileName input.FileType selector
-                |> ignore
-
-            Ok input.Selectors.Length
-        with exceptionValue ->
-            Error exceptionValue.Message
 
 let DefaultSeparatorOptions: (string * string)[] = [|
     "\\t", "Tab (\\t)"

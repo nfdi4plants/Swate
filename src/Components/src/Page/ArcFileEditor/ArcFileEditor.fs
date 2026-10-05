@@ -75,9 +75,9 @@ type private LazyComponents =
     static member LazyJsonExportWidget(arcFile: ArcFiles, onError: exn -> unit) =
         Swate.Components.Composite.Widgets.JsonExport.JsonExport.JsonExport(arcFile = arcFile, onError = onError)
 
-    [<ReactLazyComponent>]
-    static member LazyDataAnnotator(destination: AnnotationDestination, setAnnotationInput, onError) =
-        Swate.Components.Composite.Widgets.DataAnnotator.DataAnnotator.Main(destination, setAnnotationInput, onError)
+    // [<ReactLazyComponent>]
+    // static member LazyDataAnnotator(destination: AnnotationDestination, setAnnotationInput, onError) =
+    //     Swate.Components.Composite.Widgets.DataAnnotator.DataAnnotator.Main(destination, setAnnotationInput, onError)
 
     [<ReactLazyComponent>]
     static member LazyArcFileMetadata(arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
@@ -360,22 +360,22 @@ type Main =
                     LazyComponents.LazyFilePickerWidget(arcFile, activeTableIndex, setArcFile, pickPaths),
                     "Loading File Picker Widget..."
                 )
-            dataAnnotator =
-                match Helper.tryGetDataAnnotatorDestination (activeView, arcFile) with
-                | Ok destination ->
-                    Main.LazyLoaderWithMessage(
-                        LazyComponents.LazyDataAnnotator(
-                            destination,
-                            Helper.applyDataAnnotatorInputToArcFile (destination, arcFile, setArcFile),
-                            onError = onError
-                        ),
-                        "Loading Data Annotator Widget..."
-                    )
-                | Error message ->
-                    Html.div [
-                        prop.className "swt:p-3 swt:text-sm swt:opacity-70"
-                        prop.text message
-                    ]
+            dataAnnotator = Html.none
+            // match Helper.tryGetDataAnnotatorDestination (activeView, arcFile) with
+            // | Ok destination ->
+            //     Main.LazyLoaderWithMessage(
+            //         LazyComponents.LazyDataAnnotator(
+            //             destination,
+            //             Helper.applyDataAnnotatorInputToArcFile (destination, arcFile, setArcFile),
+            //             onError = onError
+            //         ),
+            //         "Loading Data Annotator Widget..."
+            //     )
+            // | Error message ->
+            //     Html.div [
+            //         prop.className "swt:p-3 swt:text-sm swt:opacity-70"
+            //         prop.text message
+            //     ]
             jsonImport =
                 Main.LazyLoaderWithMessage(
                     LazyComponents.LazyJsonImportWidget(

@@ -14,45 +14,6 @@ open Swate.Components.Composite.Widgets.Context
 open Swate.Components.Composite.Widgets.DataAnnotator.Types
 open Swate.Components.Composite.Widgets.DataAnnotator.Helper
 
-module private DataAnnotatorWidgetModel =
-
-    type Model = {
-        DataFile: DataFile option
-        ParsedFile: ParsedDataFile option
-        Loading: bool
-    } with
-
-        static member init() = {
-            DataFile = None
-            ParsedFile = None
-            Loading = false
-        }
-
-    type Msg =
-        | UpdateDataFile of DataFile option
-        | UpdateParsedDataFile of ParsedDataFile
-        // | ToggleHeader
-        | UpdateLoading of bool
-
-    let update (state: Model) (msg: Msg) =
-        match msg with
-        | UpdateDataFile dataFile -> {
-            state with
-                DataFile = dataFile
-                ParsedFile = None
-          }
-        | UpdateParsedDataFile parsedFile ->
-            let nextState = {
-                state with
-                    ParsedFile = Some parsedFile
-                    Loading = false
-            }
-
-            nextState
-        | UpdateLoading isLoading -> { state with Loading = isLoading }
-
-open DataAnnotatorWidgetModel
-
 [<Erase; Mangle(false)>]
 type DataAnnotator =
 
@@ -66,10 +27,16 @@ type DataAnnotator =
 
     [<ReactComponent>]
     static member private InfoText() =
-        Html.div [
-            prop.role.alert
-            prop.className "swt:alert"
-            prop.children [
+        Primitive.Popover.Popover.Simple(
+            Html.button [
+                prop.className "swt:btn swt:btn-square swt:btn-ghost"
+                prop.children [
+                    Html.i [
+                        prop.className "swt:iconify swt:fluent--info-24-regular swt:text-info swt:size-6"
+                    ]
+                ]
+            ],
+            Html.div [
                 Html.i [
                     prop.className "swt:iconify swt:fluent--info-24-regular swt:text-info swt:size-6"
                 ]
@@ -82,40 +49,35 @@ type DataAnnotator =
                     ]
                 ]
             ]
-        ]
+        )
 
     [<ReactComponent>]
-    static member private UploadButton
-        (ref: IRefValue<#Browser.Types.HTMLElement option>, uploadFile: Browser.Types.File -> unit)
-        =
+    static member private UploadButton(uploadFile: Browser.Types.File -> unit) =
 
         Html.input [
             prop.type'.file
-            prop.className "swt:file-input swt:file-input-primary swt:w-full"
-            prop.ref ref
+            prop.ariaLabel "Upload a CSV or TSV file to preview its contents as a selectable table."
+            prop.className "swt:file-input swt:file-input-primary swt:grow"
             prop.onChange uploadFile
         ]
 
     [<ReactComponent>]
-    static member private OpenAnnotatorTableModal(model: Model, openModal) =
-        let isDisabled = model.DataFile.IsNone || model.ParsedFile.IsNone || model.Loading
+    static member private OpenAnnotatorTableModal(fileIsUploaded: bool, isLoading: bool, openModal: unit -> unit) =
+
+        let isDisabled = not fileIsUploaded || isLoading
 
         Html.button [
-            prop.className "swt:btn swt:btn-primary swt:w-full"
+            prop.className "swt:btn swt:btn-primary swt:grow"
             prop.disabled isDisabled
-            match model with
-            | { Loading = true } ->
+            if isLoading then
                 prop.children [
                     Html.span [ prop.className "swt:loading swt:loading-spinner" ]
                 ]
-            | { ParsedFile = None; DataFile = None } -> prop.text "Preview and Select Targets"
-            | {
-                  ParsedFile = Some _
-                  DataFile = Some _
-              } ->
+            elif not fileIsUploaded then
+                prop.text "Upload a file to select targets"
+            else
                 prop.text "Preview and Select Targets"
                 prop.onClick (fun _ -> openModal ())
-            | _ -> prop.text "..."
         ]
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
@@ -306,225 +268,113 @@ type DataAnnotator =
         ]
 
     [<ReactComponent>]
-    static member private UpdateSeparatorDropdownElement(text: string, setSeperator) =
-        Html.li [
-            Html.a [
-                prop.onClick setSeperator
-                prop.children [ Html.span [ prop.text text ] ]
-            ]
-        ]
+    static member private UpdateSeparatorButton(dataFileParseConfig: DataFileParseConfig, setDataFileParseConfig) =
 
-    [<ReactComponent>]
-    static member private UpdateSeparatorButton(dataFile: DataFile, dispatch) =
-
-        let input, setInput = React.useState ("")
-        let isOpen, setOpen = React.useState false
+        let input, setInput = React.useState (dataFileParseConfig.Separator)
         let hasError = String.IsNullOrEmpty input
 
-        let dispatchUpdateSeparator s =
-            promise {
-                UpdateLoading true |> dispatch
-                do! Promise.sleep 0 // let React re-render the loading state
-                let parsed = ParsedDataFile.fromFileBySeparator s dataFile
-                UpdateParsedDataFile parsed |> dispatch
-                setOpen false
-            }
-            |> Promise.start
+        let applySeperatorInputToConfig () =
+            if not hasError then
+                setDataFileParseConfig {
+                    dataFileParseConfig with
+                        Separator = input
+                }
+            else
+                console.warn "Cannot set separator to an empty string."
+
+        let PresetButton (text: string, separator: string) =
+            Html.button [
+                prop.className "swt:btn swt:join-item"
+                prop.text text
+                prop.onClick (fun _ -> setInput separator)
+            ]
 
         Html.div [
             prop.className "swt:join"
             prop.children [
-                Dropdown.Main(
-                    isOpen,
-                    setOpen,
-                    Html.button [
-                        prop.onClick (fun _ -> setOpen (not isOpen))
-                        prop.role.button
-                        prop.className "swt:btn swt:btn-primary swt:join-item swt:flex-nowrap"
-                        prop.children [ Primitive.Icons.AngleDown() ]
-                    ],
-                    React.Fragment [
-                        DataAnnotator.UpdateSeparatorDropdownElement(
-                            "Tab (\\t)",
-                            fun _ -> dispatchUpdateSeparator "\\t"
-                        )
-                        DataAnnotator.UpdateSeparatorDropdownElement(",", fun _ -> dispatchUpdateSeparator ",")
-                        DataAnnotator.UpdateSeparatorDropdownElement(";", fun _ -> dispatchUpdateSeparator ";")
-                        DataAnnotator.UpdateSeparatorDropdownElement("|", fun _ -> dispatchUpdateSeparator "|")
-                    ]
-                )
+                PresetButton("Tab (\\t)", "\\t")
+                PresetButton(",", ",")
+                PresetButton(";", ";")
+                PresetButton("|", "|")
                 Html.input [
                     prop.className "swt:input swt:join-item"
                     prop.placeholder ".. update separator"
                     prop.value input
                     prop.onChange (fun s -> setInput s)
-                    prop.onKeyDown (
-                        key.enter,
-                        fun _ ->
-                            if not hasError then
-                                dispatchUpdateSeparator input
-                    )
+                    prop.onKeyDown (key.enter, fun _ -> applySeperatorInputToConfig ())
                 ]
                 Html.button [
                     prop.className "swt:btn swt:join-item"
                     prop.text "Update"
                     prop.disabled hasError
-                    prop.onClick (fun _ -> dispatchUpdateSeparator input)
+                    prop.onClick (fun _ -> applySeperatorInputToConfig ())
                 ]
             ]
         ]
 
-    [<ReactComponent>]
-    static member private UpdateIsHeaderCheckbox(model: Model, dispatch: Msg -> unit) =
-        let hasHeader = model.ParsedFile.IsSome && model.ParsedFile.Value.HeaderRow.IsSome
+    // [<ReactComponent>]
+    // static member private UpdateIsHeaderCheckbox(model: Model, dispatch: Msg -> unit) =
+    //     let hasHeader = model.ParsedFile.IsSome && model.ParsedFile.Value.HeaderRow.IsSome
 
-        Html.button [
-            if hasHeader then
-                prop.className "swt:btn swt:btn-primary"
-            else
-                prop.className "swt:btn"
-            prop.onClick (fun _ ->
-                promise {
-                    UpdateLoading true |> dispatch
-                    do! Promise.sleep 0 // let React re-render the loading state
-                    let next = model.ParsedFile.Value.ToggleHeader()
-                    UpdateParsedDataFile next |> dispatch
-                }
-                |> Promise.start
-            )
-            prop.children [
-                Html.p [
-                    if not hasHeader then
-                        prop.className "swt:line-through"
-                    prop.text "Has Header"
-                ]
-            ]
-        ]
-
-    [<ReactComponent>]
-    static member private UpdateTargetColumn(current: TargetColumn, writeMode: WriteMode, setTarget) =
-        let mkOption (target) =
-            Html.option [ prop.value (string target); prop.text (string target) ]
-
-        let infoText =
-            match current, writeMode with
-            | TargetColumn.Autodetect, WriteMode.Replace ->
-                "Auto-selects missing Input or Output column. Fails when both exist."
-            | TargetColumn.Input, WriteMode.Replace -> "Replace Input data values from the first row."
-            | TargetColumn.Output, WriteMode.Replace -> "Replace Output data values from the first row."
-            | TargetColumn.Input, WriteMode.Append -> "Append after last non-empty Input data value."
-            | TargetColumn.Output, WriteMode.Append -> "Append after last non-empty Output data value."
-            | TargetColumn.Autodetect, WriteMode.Append ->
-                "Autodetect is not available in append mode. Select Input or Output."
-
-        Html.div [
-            prop.className "swt:tooltip swt:tooltip-bottom"
-            prop.custom ("data-tip", infoText)
-            prop.children [
-                Html.div [
-                    prop.className "swt:indicator"
-                    prop.children [
-                        Primitive.Icons.InfoCircle([| "swt:indicator-item swt:text-accent" |])
-                        Html.select [
-                            prop.className "swt:select swt:join-item swt:min-w-fit"
-                            prop.title infoText
-                            prop.value (string current)
-                            prop.onChange (fun (e: string) -> TargetColumn.fromString e |> setTarget)
-                            prop.children [
-                                if writeMode = WriteMode.Replace then
-                                    mkOption TargetColumn.Autodetect
-                                mkOption TargetColumn.Input
-                                mkOption TargetColumn.Output
-                            ]
-                        ]
-                    ]
-                ]
-            ]
-        ]
-
-    [<ReactComponent>]
-    static member private UpdateWriteMode(current: WriteMode, setWriteMode) =
-        let mkOption (mode: WriteMode) =
-            Html.option [ prop.value (string mode); prop.text (string mode) ]
-
-        let infoText =
-            match current with
-            | WriteMode.Replace -> "Replace existing annotation values from the first row."
-            | WriteMode.Append -> "Append new annotation values after the last non-empty value."
-
-        Html.div [
-            prop.className "swt:tooltip swt:tooltip-bottom"
-            prop.custom ("data-tip", infoText)
-            prop.children [
-                Html.select [
-                    prop.className "swt:select swt:join-item swt:min-w-fit"
-                    prop.title infoText
-                    prop.value (string current)
-                    prop.onChange (fun (e: string) -> WriteMode.fromString e |> setWriteMode)
-                    prop.children [ mkOption WriteMode.Replace; mkOption WriteMode.Append ]
-                ]
-            ]
-        ]
+    //     Html.button [
+    //         if hasHeader then
+    //             prop.className "swt:btn swt:btn-primary"
+    //         else
+    //             prop.className "swt:btn"
+    //         prop.onClick (fun _ ->
+    //             promise {
+    //                 UpdateLoading true |> dispatch
+    //                 do! Promise.sleep 0 // let React re-render the loading state
+    //                 let next = model.ParsedFile.Value.ToggleHeader()
+    //                 UpdateParsedDataFile next |> dispatch
+    //             }
+    //             |> Promise.start
+    //         )
+    //         prop.children [
+    //             Html.p [
+    //                 if not hasHeader then
+    //                     prop.className "swt:line-through"
+    //                 prop.text "Has Header"
+    //             ]
+    //         ]
+    //     ]
 
     [<ReactComponent>]
     static member private DataFileConfigComponent
-        (
-            model: Model,
-            destination: AnnotationDestination,
-            target,
-            setTarget,
-            writeMode,
-            setWriteMode,
-            dispatch: Msg -> unit
-        ) =
+        (dataFileParseConfig: DataFileParseConfig, setDataFileParseConfig: (DataFileParseConfig -> unit))
+        =
         Html.div [
             prop.className "swt:flex swt:flex-row swt:gap-4"
             prop.children [
-                DataAnnotator.UpdateSeparatorButton(model.DataFile.Value, dispatch)
-                DataAnnotator.UpdateIsHeaderCheckbox(model, dispatch)
-                match destination with
-                | AnnotationDestination.Table _ -> DataAnnotator.UpdateTargetColumn(target, writeMode, setTarget)
-                | AnnotationDestination.DataMap _ -> Html.none
-                DataAnnotator.UpdateWriteMode(writeMode, setWriteMode)
+                DataAnnotator.UpdateSeparatorButton(dataFileParseConfig, setDataFileParseConfig)
+            // DataAnnotator.UpdateIsHeaderCheckbox(dataFileParseConfig, setDataFileParseConfig)
             ]
         ]
 
     [<ReactComponent>]
-    static member private Modal(destination: AnnotationDestination, model: Model, dispatch, isOpen, setIsOpen, submit) =
+    static member private Modal
+        (
+            dataFile: DataFile,
+            parsedDataFile: ParsedDataFile,
+            dataFileParseConfig,
+            setDataFileParseConfig,
+            isOpen,
+            setIsOpen,
+            isLoading,
+            submit: AnnotationInput option -> unit
+        ) =
         let state, setState: Set<DataTarget> * (((Set<DataTarget> -> Set<DataTarget>) -> unit)) =
             React.useStateWithUpdater (Set.empty<DataTarget>)
 
         let errorMessage, setErrorMessage = React.useState (None: string option)
 
-        let (targetCol: TargetColumn), setTargetCol =
-            React.useState (TargetColumn.Autodetect)
-
-        let writeMode, setWriteMode = React.useState WriteMode.Replace
-
-        React.useEffect (
-            (fun () ->
-                if writeMode = WriteMode.Append && targetCol = TargetColumn.Autodetect then
-                    setTargetCol TargetColumn.Output
-            ),
-            [| box writeMode; box targetCol |]
-        )
-
         let modalActivity =
             Html.div [
-                DataAnnotator.DataFileConfigComponent(
-                    model,
-                    destination,
-                    targetCol,
-                    setTargetCol,
-                    writeMode,
-                    setWriteMode,
-                    dispatch
-                )
-                DataAnnotator.FileMetadataComponent model.DataFile.Value
+                DataAnnotator.DataFileConfigComponent(dataFileParseConfig, setDataFileParseConfig)
+                DataAnnotator.FileMetadataComponent dataFile
             ]
 
-        let content =
-            DataAnnotator.Table(model.ParsedFile.Value, state, setState, model.Loading)
+        let content = DataAnnotator.Table(parsedDataFile, state, setState, isLoading)
 
         let footer =
             Html.div [
@@ -550,38 +400,22 @@ type DataAnnotator =
                                             // match DataAnnotator.tryValidateSubmit (model, state, targetCol) with
                                             // | Some message -> setErrorMessage (Some message)
                                             // | None ->
-                                            match model.DataFile with
-                                            | Some dtf ->
-                                                let selectors = [|
-                                                    for x in state do
-                                                        x.ToFragmentSelectorString(
-                                                            model.ParsedFile.Value.HeaderRow.IsSome
-                                                        )
-                                                |]
 
-                                                let name = dtf.DataFileName
-                                                let dt = dtf.DataFileType
+                                            let selectors = [|
+                                                for x in state do
+                                                    x.ToFragmentSelectorString(parsedDataFile.HeaderRow.IsSome)
+                                            |]
 
-                                                let target =
-                                                    match destination with
-                                                    | AnnotationDestination.Table _ ->
-                                                        AnnotationTarget.Table(targetCol, writeMode)
-                                                    | AnnotationDestination.DataMap _ ->
-                                                        AnnotationTarget.DataMap(writeMode)
+                                            let name = dataFile.DataFileName
+                                            let dt = dataFile.DataFileType
 
-                                                let input: AnnotationInput = {
-                                                    Selectors = selectors
-                                                    FileName = name
-                                                    FileType = dt
-                                                    Target = target
-                                                }
+                                            let input: AnnotationInput = {
+                                                Selectors = selectors
+                                                FileName = name
+                                                FileType = dt
+                                            }
 
-                                                match submit input with
-                                                | Ok _ ->
-                                                    setErrorMessage None
-                                                    setIsOpen false
-                                                | Error message -> setErrorMessage (Some message)
-                                            | None -> setErrorMessage (Some "No file selected.")
+                                            submit (Some input)
                                         )
                                     ]
                                 ]
@@ -608,83 +442,169 @@ type DataAnnotator =
         )
 
     [<ReactComponent(true)>]
-    static member Main
-        (
-            destination: AnnotationDestination,
-            setAnnotationInput: AnnotationInput -> Result<int, string>,
-            ?onError: string -> unit
-        ) =
+    static member Main(?onError: string -> unit) =
 
-        let onError =
-            defaultArg onError (fun message -> console.error ("DataAnnotatorWidget error: " + message))
+        let isLoading, setIsLoading = React.useState false
+        let dataFile, setDataFile = React.useState (None: DataFile option)
 
-        let model, dispatch =
-            React.useReducer (DataAnnotatorWidgetModel.update, DataAnnotatorWidgetModel.Model.init ())
+        let dataFileParseConfig, setDataFileParseConfig =
+            React.useState (None: DataFileParseConfig option)
+
+        let annotation, setAnnotation = React.useState (None: AnnotationInput option)
+
+        let parsedFile =
+            React.useMemo (
+                (fun () ->
+                    match dataFile, dataFileParseConfig with
+                    | Some dtf, Some config ->
+                        console.log ("Rerunning parsedFile useMemo due to dataFile or dataFileParseConfig change.")
+                        console.log ("config:", config)
+                        let splitRows = dtf.SplitBySeparator(separator = config.Separator)
+
+                        match config.HasHeader with
+                        | true when splitRows.Length > 1 ->
+                            let parsed = {
+                                HeaderRow = Some splitRows.[0]
+                                BodyRows = splitRows.[1..]
+                            }
+
+                            Some parsed
+                        | _ ->
+                            let parsed = {
+                                HeaderRow = None
+                                BodyRows = splitRows
+                            }
+
+                            Some parsed
+                    | _ -> None
+                ),
+                [| box dataFile; box dataFileParseConfig |]
+            )
 
         let showModal, setShowModal = React.useState false
 
-        let UploadButtonInputRef = React.useInputRef ()
-
-        let reset () =
-            UpdateDataFile None |> dispatch
-
-            if UploadButtonInputRef.current.IsSome then
-                UploadButtonInputRef.current.Value.value <- null
+        let handleShowModal =
+            fun () ->
+                match parsedFile with
+                | Some _ -> setShowModal true
+                | None ->
+                    onError
+                    |> Option.iter (fun f -> f "No parsed file available to show in the modal.")
 
         let pickFile (file: Browser.Types.File) =
             promise {
-                UpdateLoading true |> dispatch
+                setDataFile None
+                setDataFileParseConfig None
+                setIsLoading true
 
                 try
-                    let! content = file.text ()
+                    try
+                        let! content = file.text ()
 
-                    let name = file.name
+                        let name = file.name
 
-                    let loadedDataFile =
-                        DataFile.create (name, fileTypeFromName name, content, float file.size)
+                        let loadedDataFile =
+                            DataFile.create (name, fileTypeFromName name, content, float file.size)
 
-                    UpdateDataFile(Some loadedDataFile) |> dispatch
-                    do! Promise.sleep 0
+                        let parseConfig = DataFileParseConfig.createDefault (loadedDataFile)
 
-                    let parsedFile =
-                        ParsedDataFile.fromFileBySeparator loadedDataFile.ExpectedSeparator loadedDataFile
 
-                    UpdateParsedDataFile parsedFile |> dispatch
-                with ex ->
-                    onError $"Failed to read file: {ex.Message}"
-                    UpdateLoading false |> dispatch
+                        setDataFile (Some loadedDataFile)
+                        setDataFileParseConfig (Some parseConfig)
+                    with ex ->
+                        onError |> Option.iter (fun f -> f $"Failed to read file: {ex.Message}")
+                finally
+                    setIsLoading false
             }
             |> Promise.start
 
-        let submit =
-            fun (input: AnnotationInput) ->
-                match model with
-                | {
-                      DataFile = Some _
-                      ParsedFile = Some _
-                  } ->
-                    try
-                        setAnnotationInput input
-                    with exceptionValue ->
-                        Error exceptionValue.Message
-                | _ -> Error "Load a file first."
+        let setDataFileParseConfig =
+            React.useCallback (
+                (fun (config: DataFileParseConfig) -> setDataFileParseConfig (Some config)),
+                [| box setDataFileParseConfig |]
+            )
 
-        React.Fragment [
+        let sortableListAnnotations =
+            React.useMemo (
+                (fun () ->
+                    let sortableListAnnotations =
+                        match annotation with
+                        | Some ann ->
+                            ann.Selectors
+                            |> Array.map (fun selector ->
+                                Composite.SortableList.Types.SortableListItem.create (
+                                    selector,
+                                    selector,
+                                    Some selector
+                                )
+                            )
+                        | None -> [||]
 
-            Html.div [
-                prop.className "swt:flex swt:flex-col swt:gap-2"
-                prop.children [
-                    DataAnnotator.InfoText()
-                    DataAnnotator.UploadButton(UploadButtonInputRef, pickFile)
-                    DataAnnotator.OpenAnnotatorTableModal(model, (fun () -> setShowModal true))
+                    let setSortableListAnnotations (newList: Composite.SortableList.Types.SortableListItem<string>[]) =
+                        let newSelectors = newList |> Array.map (fun item -> item.id)
+
+                        let newAnnotations =
+                            match annotation with
+                            | Some ann -> { ann with Selectors = newSelectors }
+                            | None -> {
+                                Selectors = newSelectors
+                                FileName = ""
+                                FileType = ""
+                              }
+
+                        setAnnotation (Some newAnnotations)
+
+                    {|
+                        items = sortableListAnnotations
+                        setItems = setSortableListAnnotations
+                    |}
+                ),
+                [| box annotation |]
+            )
+
+        let setAnnotation =
+            React.useCallback (
+                (fun (newAnnotation: AnnotationInput option) ->
+                    setAnnotation newAnnotation
+                    setShowModal false
+                ),
+                [| box setAnnotation |]
+            )
+
+        Html.div [
+            prop.className "swt:flex swt:flex-col swt:gap-4 swt:grow"
+            prop.children [
+
+                Html.div [
+                    prop.className "swt:flex swt:flex-row swt:gap-2"
+                    prop.children [
+                        DataAnnotator.UploadButton(pickFile)
+                        DataAnnotator.OpenAnnotatorTableModal(dataFile.IsSome, isLoading, handleShowModal)
+                        DataAnnotator.InfoText()
+                    ]
                 ]
+
+                // Selector Modal
+                match dataFile, parsedFile, dataFileParseConfig, showModal with
+                | Some df, Some pdf, Some dfpc, true ->
+                    DataAnnotator.Modal(
+                        df,
+                        pdf,
+                        dfpc,
+                        setDataFileParseConfig,
+                        showModal,
+                        setShowModal,
+                        isLoading,
+                        setAnnotation
+                    )
+                | _, _, _, _ -> Html.none
+
+                // Sortable List for annotations
+                Composite.SortableList.SortableList.SortableList(
+                    sortableListAnnotations.items,
+                    sortableListAnnotations.setItems
+                )
+
             ]
 
-            match model, showModal with
-            | {
-                  DataFile = Some _
-                  ParsedFile = Some _
-              },
-              true -> DataAnnotator.Modal(destination, model, dispatch, showModal, setShowModal, submit)
-            | _, _ -> Html.none
         ]
