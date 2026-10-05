@@ -376,9 +376,7 @@ let FileStateCtxProviderWithSnapshots
                 FileTreeRoot = fileTreeRoot
                 TryFindFileTreeEntry = fun path -> RendererFileTreeState.tryFind path fileTreeState
                 IsFileTreeDirectory =
-                    fun path ->
-                        RendererFileTreeState.tryFind path fileTreeState
-                        |> Option.exists _.isDirectory
+                    fun path -> RendererFileTreeState.tryFind path fileTreeState |> Option.exists _.isDirectory
                 Selection = selection
             }),
             [| box fileTreeState; box selection |]

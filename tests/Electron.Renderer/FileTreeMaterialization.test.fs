@@ -119,12 +119,7 @@ Vitest.describe (
                 let knownDirectoryPaths = HashSet<string>([ "arc"; "arc/kept" ])
 
                 let reconciled =
-                    reconcileMaterializedState
-                        (Some "C:/new-arc")
-                        None
-                        (Some root)
-                        knownDirectoryPaths.Contains
-                        current
+                    reconcileMaterializedState (Some "C:/new-arc") None (Some root) knownDirectoryPaths.Contains current
 
                 Vitest.expect(reconciled.ArcScopeId).toEqual (Some "C:/new-arc")
                 Vitest.expect(reconciled.Paths |> Set.toList).toEqual ([ "arc" ])
