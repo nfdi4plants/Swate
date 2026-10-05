@@ -337,30 +337,11 @@ type Main =
             | None -> Html.none
 
         let navbar =
-            Html.div [
-                prop.className "swt:shrink-0 swt:border-b swt:border-base-300"
-                prop.children [
-                    Navbar.Main(
-                        left =
-                            Html.div [
-                                prop.className "swt:flex swt:items-center swt:gap-2"
-                                prop.children [
-                                    Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns()
-                                    Buttons.QuickAccessButton(
-                                        Html.i [
-                                            prop.className
-                                                "swt:iconify swt:fluent--database-arrow-up-20-regular swt:size-6"
-                                        ],
-                                        "Add DataMap",
-                                        (fun _ -> onAddDataMap |> Option.iter (fun handler -> handler ())),
-                                        isDisabled = not canAddDataMap
-                                    )
-                                ]
-                            ],
-                        right = trailingNavbarElement
-                    )
-                ]
-            ]
+            Navbar.Main(
+                left = Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns(),
+                right = trailingNavbarElement
+            )
+
 
         let widgetElements = {|
             buildingBlock =

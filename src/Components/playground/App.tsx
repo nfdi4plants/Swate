@@ -28,6 +28,7 @@ import WorkspaceEntry from '../src/Composite/Workspace/Workspace.fixture.fs.ts';
 import ValidationPackageBrowserFixture from '../src/Page/ValidationPackageBrowser/ValidationPackageBrowser.sample.fs.ts';
 import SortableListFixture from '../src/Composite/SortableList/SortableList.sample.fs.ts'
 import DataAnnotator from '../src/Composite/Widgets/DataAnnotator/DataAnnotator.fs.ts'
+import {QuickAccessButton} from '../src/Primitive/Buttons/Buttons.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);
@@ -248,8 +249,9 @@ function DataAnnotatorContainer() {
 }
 
 const App = () => {
+    let [isActive, setIsActive] = React.useState(false)
     return (
-        <DataAnnotatorContainer />
+        <ArcFileEditor />
     );
 };
 
