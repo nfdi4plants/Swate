@@ -129,7 +129,29 @@ Vitest.describe (
                 let guidSuffix = String.replicate 32 "a"
                 let backupPath = $"C:/arc/data.bin.vcs-lfs-backup-{guidSuffix}"
 
+                Vitest.expect(Swate.Electron.Shared.FileIOHelper.isIgnoredArcInventoryPath backupPath).toBe (true)
+
                 Vitest.expect(Main.ArcVaultHelper.isStructuralFileWatcherPath "C:/arc" backupPath None).toBe (false)
+
+                let temporaryWorkbookPath = "C:/arc/assays/A1/.~$isa.assay.xlsx"
+
+                Vitest
+                    .expect(Swate.Electron.Shared.FileIOHelper.isIgnoredArcInventoryPath temporaryWorkbookPath)
+                    .toBe (true)
+
+                Vitest
+                    .expect(Main.ArcVaultHelper.isStructuralFileWatcherPath "C:/arc" temporaryWorkbookPath None)
+                    .toBe (false)
+
+                let legacyDataMapPath = "C:/arc/assays/A1/isa_datamap"
+
+                Vitest
+                    .expect(Swate.Electron.Shared.FileIOHelper.isIgnoredArcInventoryPath legacyDataMapPath)
+                    .toBe (true)
+
+                Vitest
+                    .expect(Main.ArcVaultHelper.isStructuralFileWatcherPath "C:/arc" legacyDataMapPath None)
+                    .toBe (false)
 
                 Vitest
                     .expect(

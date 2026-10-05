@@ -353,16 +353,12 @@ let private currentNodePlatform () : string =
 /// callback: it is absent during some discovery passes, so path shape must remain the primary guard.
 let isStructuralFileWatcherPath (arcPath: string) (candidatePath: string) (stats: Filesystem.Stats option) =
     let normalizedCandidatePath = PathHelpers.normalizeSeparators candidatePath
-    let tempXlsxPattern = """\.~\$.*\.xlsx$"""
     let temporaryImportPattern = """(^|/)\.swate-import-[0-9a-fA-F]{32}(/|$)"""
-    let temporaryLfsBackupPattern = """\.vcs-lfs-backup-[0-9a-fA-F]{32}$"""
 
     let isIgnored =
-        System.Text.RegularExpressions.Regex.IsMatch(normalizedCandidatePath, tempXlsxPattern)
+        isIgnoredArcInventoryPath normalizedCandidatePath
         || isGitMetadataPath normalizedCandidatePath
-        || isLegacyDataMapPath normalizedCandidatePath
         || System.Text.RegularExpressions.Regex.IsMatch(normalizedCandidatePath, temporaryImportPattern)
-        || System.Text.RegularExpressions.Regex.IsMatch(normalizedCandidatePath, temporaryLfsBackupPattern)
 
     if isIgnored then
         false

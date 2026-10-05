@@ -94,7 +94,7 @@ type FileTree =
         React.useEffect (
             (fun () ->
                 if
-                    FileExplorerStateReconciliation.isSelectionMissingWithLookup
+                    FileExplorerStateReconciliation.isSelectionMissing
                         fileStateCtx.state.TryFindFileTreeEntry
                         fileStateCtx.state.Selection.TreePath
                 then
@@ -262,7 +262,7 @@ type FileTree =
             (fun () ->
                 if hasObservedFileTreeUpdateRef.current then
                     match
-                        FileExplorerStateReconciliation.tryGetDataMapMismatchReloadWithLookup
+                        FileExplorerStateReconciliation.tryGetDataMapMismatchReload
                             fileStateCtx.state.TryFindFileTreeEntry
                             pageStateCtx.state
                     with
@@ -275,7 +275,7 @@ type FileTree =
                             | pageState -> pageState
                             )
                     | None when
-                        FileExplorerStateReconciliation.shouldClearPageStateForLfsPointerSelectionWithLookup
+                        FileExplorerStateReconciliation.shouldClearPageStateForLfsPointerSelection
                             fileStateCtx.state.TryFindFileTreeEntry
                             fileStateCtx.state.Selection.TreePath
                             pageStateCtx.state
@@ -283,7 +283,7 @@ type FileTree =
                         pageStateCtx.setState None
                     | None ->
                         match
-                            FileExplorerStateReconciliation.tryGetReloadableSelectedFilePathWithLookup
+                            FileExplorerStateReconciliation.tryGetReloadableSelectedFilePath
                                 fileStateCtx.state.TryFindFileTreeEntry
                                 fileStateCtx.state.Selection.TreePath
                                 pageStateCtx.state

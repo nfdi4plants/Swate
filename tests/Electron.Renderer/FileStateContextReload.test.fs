@@ -66,6 +66,17 @@ let private createSnapshot () =
 
     snapshot
 
+let private createFileTreeLookup (entries: FileEntry[]) =
+    let entriesByPath =
+        entries
+        |> Array.map (fun entry -> PathHelpers.normalizePath entry.path, entry)
+        |> dict
+
+    fun path ->
+        match entriesByPath.TryGetValue(PathHelpers.normalizePath path) with
+        | true, entry -> Some entry
+        | false, _ -> None
+
 let private fileImportApi loadActiveImport = {
     loadActiveImport = loadActiveImport
     pickAbsolutePaths = fun () -> JS.Constructors.Promise.resolve (Ok None)
@@ -110,7 +121,7 @@ Vitest.describe (
                 let initialState = RendererFileTreeState.ofSnapshot snapshot
                 let addedPath = "studies/S1/dataset/new.txt"
 
-                let nextState, application =
+                let nextState =
                     RendererFileTreeState.applyDirectoryUpdate
                         {
                             directoryPath = "studies/S1/dataset"
@@ -118,12 +129,12 @@ Vitest.describe (
                         }
                         initialState
 
-                Vitest.expect(application.processedPathCount).toBe (5)
-                Vitest.expect(application.removedEntryCount).toBe (4)
-                Vitest.expect(application.authoritativeChildCount).toBe (1)
                 Vitest.expect(RendererFileTreeState.tryFind removedDirectoryPath nextState).toEqual (None)
+                Vitest.expect(RendererFileTreeState.tryFind removedFilePath nextState).toEqual (None)
+                Vitest.expect(RendererFileTreeState.tryFind removedDeepDirectoryPath nextState).toEqual (None)
                 Vitest.expect(RendererFileTreeState.tryFind removedDeepFilePath nextState).toEqual (None)
                 Vitest.expect(RendererFileTreeState.tryFind addedPath nextState).toBeDefined ()
+                Vitest.expect(nextState.entriesByPath.Count).toBe (snapshot.Count - 4 + 1)
 
                 let survivingUnrelatedEntry =
                     RendererFileTreeState.tryFind unrelatedPath nextState |> Option.get
@@ -155,8 +166,8 @@ Vitest.describe (
                 }
 
                 let initialState = RendererFileTreeState.ofSnapshot snapshot
-                let once, _ = RendererFileTreeState.applyDirectoryUpdate update initialState
-                let twice, _ = RendererFileTreeState.applyDirectoryUpdate update once
+                let once = RendererFileTreeState.applyDirectoryUpdate update initialState
+                let twice = RendererFileTreeState.applyDirectoryUpdate update once
 
                 Vitest.expect(RendererFileTreeState.tryFind "dataset/folder-a/deep.txt" twice).toBeDefined ()
                 Vitest.expect(RendererFileTreeState.tryFind "dataset/new-folder" twice).toBeDefined ()
@@ -183,7 +194,7 @@ Vitest.describe (
 
                 let initialState = RendererFileTreeState.ofSnapshot snapshot
 
-                let nextState, _ =
+                let nextState =
                     RendererFileTreeState.applyDirectoryUpdate
                         {
                             directoryPath = "dataset"
@@ -211,7 +222,7 @@ Vitest.describe (
                 snapshot.["old.txt"] <- FileEntry.create ("old.txt", "old.txt", false, None)
                 let initialState = RendererFileTreeState.ofSnapshot snapshot
 
-                let nextState, _ =
+                let nextState =
                     RendererFileTreeState.applyDirectoryUpdate
                         {
                             directoryPath = ""
@@ -495,12 +506,18 @@ Vitest.describe (
         Vitest.test (
             "isSelectionMissing detects removed selections after file-tree updates",
             fun () ->
-                let remainingPaths = [| ""; "assays"; "assays/assay-a/isa.assay.xlsx" |]
+                let tryFindEntry =
+                    [|
+                        FileEntry.create ("arc", "", true, None)
+                        FileEntry.create ("assays", "assays", true, None)
+                        FileEntry.create ("isa.assay.xlsx", "assays/assay-a/isa.assay.xlsx", false, None)
+                    |]
+                    |> createFileTreeLookup
 
                 Vitest
                     .expect(
                         FileExplorerStateReconciliation.isSelectionMissing
-                            remainingPaths
+                            tryFindEntry
                             (Some "assays/assay-b/isa.assay.xlsx")
                     )
                     .toBe (true)
@@ -508,7 +525,7 @@ Vitest.describe (
                 Vitest
                     .expect(
                         FileExplorerStateReconciliation.isSelectionMissing
-                            remainingPaths
+                            tryFindEntry
                             (Some "assays/assay-a/isa.assay.xlsx")
                     )
                     .toBe (false)
@@ -595,8 +612,12 @@ Vitest.describe (
                     FileEntry.create ("isa.datamap.xlsx", "assays/DataMapAssay/isa.datamap.xlsx", false, None)
                 |]
 
+                let tryFindEntryWithDataMap = createFileTreeLookup fileTreeWithDataMap
+
                 Vitest
-                    .expect(FileExplorerStateReconciliation.tryGetDataMapMismatchReload fileTreeWithDataMap pageState)
+                    .expect(
+                        FileExplorerStateReconciliation.tryGetDataMapMismatchReload tryFindEntryWithDataMap pageState
+                    )
                     .toEqual (None)
 
                 let fileTree = [|
@@ -604,14 +625,18 @@ Vitest.describe (
                     FileEntry.create ("isa.assay.xlsx", "assays/DataMapAssay/isa.assay.xlsx", false, None)
                 |]
 
+                let tryFindEntry = createFileTreeLookup fileTree
+
                 Vitest
-                    .expect(FileExplorerStateReconciliation.tryGetDataMapMismatchReload fileTree pageState)
+                    .expect(FileExplorerStateReconciliation.tryGetDataMapMismatchReload tryFindEntry pageState)
                     .toEqual (Some("assays/DataMapAssay/isa.assay.xlsx", Some ActiveView.Metadata))
 
                 assay.DataMap <- None
 
                 Vitest
-                    .expect(FileExplorerStateReconciliation.tryGetDataMapMismatchReload fileTreeWithDataMap pageState)
+                    .expect(
+                        FileExplorerStateReconciliation.tryGetDataMapMismatchReload tryFindEntryWithDataMap pageState
+                    )
                     .toEqual (Some("assays/DataMapAssay/isa.assay.xlsx", Some ActiveView.DataMap))
 
                 let standaloneDataMapPage =
@@ -626,7 +651,9 @@ Vitest.describe (
                     )
 
                 Vitest
-                    .expect(FileExplorerStateReconciliation.tryGetDataMapMismatchReload fileTree standaloneDataMapPage)
+                    .expect(
+                        FileExplorerStateReconciliation.tryGetDataMapMismatchReload tryFindEntry standaloneDataMapPage
+                    )
                     .toEqual (None)
         )
 

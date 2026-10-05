@@ -14,8 +14,6 @@ open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.VersionControlTypes
 open VersionControlService.Abstractions
 
-let normalizeRootPath (path: string) =
-    resolve [| path |] |> PathHelpers.normalizePath
 
 /// Keeps main-process FileTree entries and their path index synchronized.
 type IndexedFileTree(entries: Dictionary<string, FileEntry>) =
@@ -64,15 +62,6 @@ type IndexedFileTree(entries: Dictionary<string, FileEntry>) =
         children.Rebuild entries.Keys
 
 let private shouldIgnoreDirName (name: string) = name = ".git"
-
-let private shouldIgnorePath (path: string) =
-    let normalizedPath = PathHelpers.normalizeSeparators path
-    let tempXlsxPattern = """\.~\$.*\.xlsx$"""
-    let temporaryLfsBackupPattern = """\.vcs-lfs-backup-[0-9a-fA-F]{32}$"""
-
-    System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
-    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
-    || isLegacyDataMapPath normalizedPath
 
 let private tryListLargeObjects
     (repoRoot: string)
@@ -229,7 +218,7 @@ let reconcileFileTreeDirectory
     (fileTree: IndexedFileTree)
     : Fable.Core.JS.Promise<FileTreeDirectoryUpdate option> =
     promise {
-        let normalizedArcPath = normalizeRootPath arcPath
+        let normalizedArcPath = resolve [| arcPath |] |> PathHelpers.normalizePath
 
         let normalizedRelativePath =
             PathHelpers.normalizeCanonicalRelativePath relativeDirectoryPath
@@ -259,7 +248,7 @@ let reconcileFileTreeDirectory
                     dirents
                     |> Array.filter (fun dirent ->
                         not (shouldIgnoreDirName dirent.name)
-                        && not (shouldIgnorePath (join [| absoluteDirectoryPath; dirent.name |]))
+                        && not (isIgnoredArcInventoryPath (join [| absoluteDirectoryPath; dirent.name |]))
                     )
                     |> Array.map (fun dirent ->
                         let childPath =
@@ -334,7 +323,7 @@ let reconcileFileTreeDirectory
     }
 
 let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
-    let normalizedRepoRoot = normalizeRootPath repoRoot
+    let normalizedRepoRoot = resolve [| repoRoot |] |> PathHelpers.normalizePath
     let! entry = getFileEntry path
 
     if entry.isDirectory then
@@ -350,8 +339,7 @@ let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
 
 /// Finds all files and subfolders of the given filepath
 let getFileEntries (path: string) (openSession: bool) : Fable.Core.JS.Promise<FileEntry[]> = promise {
-    let repoRoot = normalizeRootPath path
-
+    let repoRoot = resolve [| path |] |> PathHelpers.normalizePath
     let! rootStats = statAsync repoRoot
     let rootIsDir = rootStats.isDirectory ()
 
@@ -386,7 +374,7 @@ let getFileEntries (path: string) (openSession: bool) : Fable.Core.JS.Promise<Fi
                 else
                     let fullPath = join [| currentDir; name |] |> PathHelpers.normalizeSeparators
 
-                    if not (shouldIgnorePath fullPath) then
+                    if not (isIgnoredArcInventoryPath fullPath) then
                         entries.Add(FileEntry.create (name, fullPath, false, None))
             )
 

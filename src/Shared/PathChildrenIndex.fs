@@ -12,22 +12,7 @@ type PathChildrenIndex() =
         |> Option.defaultValue ""
         |> PathHelpers.normalizePath
 
-    member _.Rebuild(paths: seq<string>) =
-        childrenByParent.Clear()
-
-        paths
-        |> Seq.iter (fun path ->
-            let path = PathHelpers.normalizePath path
-
-            if not (String.IsNullOrWhiteSpace path) then
-                let parent = normalizedParent path
-
-                match childrenByParent.TryGetValue parent with
-                | true, children -> children.Add path |> ignore
-                | false, _ -> childrenByParent.[parent] <- HashSet [ path ]
-        )
-
-    member _.Add(path: string) =
+    let addPath path =
         let path = PathHelpers.normalizePath path
 
         if not (String.IsNullOrWhiteSpace path) then
@@ -36,6 +21,13 @@ type PathChildrenIndex() =
             match childrenByParent.TryGetValue parent with
             | true, children -> children.Add path |> ignore
             | false, _ -> childrenByParent.[parent] <- HashSet [ path ]
+
+    member _.Rebuild(paths: seq<string>) =
+        childrenByParent.Clear()
+
+        paths |> Seq.iter addPath
+
+    member _.Add(path: string) = addPath path
 
     member _.Remove(path: string) =
         let path = PathHelpers.normalizePath path

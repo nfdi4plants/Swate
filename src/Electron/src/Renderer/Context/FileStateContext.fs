@@ -60,12 +60,6 @@ let useFileStateCtx () = React.useContext FileStateCtx
 type FileTreeSnapshotLoader = unit -> JS.Promise<Result<Dictionary<string, FileEntry>, exn>>
 type ActiveFileImportLoader = unit -> JS.Promise<Result<ActiveFileImportState option, exn>>
 
-type FileTreeDirectoryUpdateApplication = {
-    processedPathCount: int
-    removedEntryCount: int
-    authoritativeChildCount: int
-}
-
 /// The path-keyed dictionary is the renderer's canonical FileTree entry state.
 /// The direct-child index and display tree are derived navigation caches updated only for one directory.
 type RendererFileTreeState = private {
@@ -228,26 +222,13 @@ module RendererFileTreeState =
 
             updateDisplayDirectory directoryPath (childrenByPath.Values |> Seq.toArray) state.displayRoot
 
-        let removedDescendantCount = max 0 (removedPaths.Length - removalRoots.Length)
-
-        let processedPathCount =
-            oldDirectChildPaths.Length + childrenByPath.Count + removedDescendantCount
-
-        let nextState =
-            if hasEntryChanges then
-                {
-                    state with
-                        displayRoot = state.displayRoot
-                }
-            else
-                state
-
-        nextState,
-        {
-            processedPathCount = processedPathCount
-            removedEntryCount = removedPaths.Length
-            authoritativeChildCount = childrenByPath.Count
-        }
+        if hasEntryChanges then
+            {
+                state with
+                    displayRoot = state.displayRoot
+            }
+        else
+            state
 
 type FileImportApi = {
     loadActiveImport: ActiveFileImportLoader
@@ -290,10 +271,7 @@ let FileStateCtxProviderWithSnapshots
         bufferedDirectoryUpdatesRef.current.Clear()
 
         updates
-        |> Array.iter (fun update ->
-            let updatedState, _ = RendererFileTreeState.applyDirectoryUpdate update nextState
-            nextState <- updatedState
-        )
+        |> Array.iter (fun update -> nextState <- RendererFileTreeState.applyDirectoryUpdate update nextState)
 
         nextState
 
@@ -344,7 +322,7 @@ let FileStateCtxProviderWithSnapshots
                     fileTreeDirectoryUpdate =
                         fun update ->
                             if snapshotInstalledRef.current then
-                                let nextState, _ =
+                                let nextState =
                                     RendererFileTreeState.applyDirectoryUpdate update latestFileTreeStateRef.current
 
                                 installFileTreeState nextState

@@ -822,7 +822,7 @@ Vitest.describe (
                 try
                     try
                         let api = Main.IPC.IVersionControlApi.api (ipcEvent 65)
-                        vault.IndexedFileTree.Clear()
+                        vault.fileTree.Clear()
 
                         let! succeeded =
                             api.materializeObject {

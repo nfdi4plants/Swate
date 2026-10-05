@@ -89,8 +89,6 @@ type ArcVault(window: BrowserWindow) =
     /// Indexed main-process FileTree state.
     member this.fileTree = indexedFileTree
 
-    member internal _.IndexedFileTree = indexedFileTree
-
     member val watcher: Chokidar.IWatcher option = None with get, set
     member val internal FileWatcherReadinessTimeoutMs = 10000 with get, set
 
@@ -712,7 +710,7 @@ module ArcVaultExtensions =
             WindowSend.send<IFileTreeRendererApi> this.window (fun api -> api.fileTreeUpdate rendererFileTree)
 
         member this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
-            this.IndexedFileTree.ReplaceSnapshot fileTree
+            this.fileTree.ReplaceSnapshot fileTree
             this.PublishFileTree()
 
         /// Refreshes one directory without recursively scanning it and serializes the update with watcher tree work.
@@ -723,7 +721,7 @@ module ArcVaultExtensions =
                     match this.path with
                     | None -> return raise (arcNotOpenError ())
                     | Some arcPath ->
-                        match! reconcileFileTreeDirectory arcPath relativeDirectoryPath this.IndexedFileTree with
+                        match! reconcileFileTreeDirectory arcPath relativeDirectoryPath this.fileTree with
                         | None -> ()
                         | Some update ->
                             WindowSend.send<IFileTreeRendererApi>
@@ -740,7 +738,7 @@ module ArcVaultExtensions =
             | Some arcPath ->
                 if this.fileTree.Count = 0 then
                     let! fileTree = getFileTree arcPath
-                    this.IndexedFileTree.ReplaceSnapshot fileTree
+                    this.fileTree.ReplaceSnapshot fileTree
 
                 return this.CurrentRendererFileTree()
         }
@@ -878,7 +876,7 @@ module ArcVaultExtensions =
 
             this.isInitializingArc <- false
             this.path <- None
-            this.IndexedFileTree.Clear()
+            this.fileTree.Clear()
 
             try
                 this.ClearArc()
@@ -906,7 +904,7 @@ module ArcVaultExtensions =
 
                 // Install the authoritative snapshot before publishing any initialized state.
                 // Keep the renderer's established path-before-tree message order.
-                this.IndexedFileTree.ReplaceSnapshot fileTree
+                this.fileTree.ReplaceSnapshot fileTree
 
                 WindowSend.send<IPathChangeRendererApi> this.window (fun api -> api.pathChange (Some normalizedPath))
 

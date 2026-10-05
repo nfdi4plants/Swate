@@ -5,18 +5,7 @@ open Swate.Electron.Shared.FileIOTypes
 open Renderer.Types
 open Swate.Components.Page.ArcFileEditor.Types
 
-let containsPath (paths: string seq) (relativePath: string) =
-    let normalizedTargetPath = PathHelpers.normalizePath relativePath
-
-    paths
-    |> Seq.exists (fun path -> PathHelpers.pathsEqual (PathHelpers.normalizePath path) normalizedTargetPath)
-
-let isSelectionMissing (paths: string seq) (selectionPath: string option) =
-    selectionPath
-    |> Option.map PathHelpers.normalizePath
-    |> Option.exists (fun selectedPath -> containsPath paths selectedPath |> not)
-
-let isSelectionMissingWithLookup (tryFindEntry: string -> FileEntry option) (selectionPath: string option) =
+let isSelectionMissing (tryFindEntry: string -> FileEntry option) (selectionPath: string option) =
     selectionPath
     |> Option.map PathHelpers.normalizePath
     |> Option.exists (tryFindEntry >> Option.isNone)
@@ -33,7 +22,7 @@ let private resetsWhenSelectionIsRemoved =
 let shouldResetPageStateAfterSelectionRemoval (pageState: PageState option) =
     pageState |> Option.exists resetsWhenSelectionIsRemoved
 
-let tryGetDataMapMismatchReloadWithLookup (tryFindEntry: string -> FileEntry option) (pageState: PageState option) =
+let tryGetDataMapMismatchReload (tryFindEntry: string -> FileEntry option) (pageState: PageState option) =
     match pageState with
     | Some(PageState.ArcFilePage(ArcFiles.DataMap _, _)) -> None
     | Some(PageState.ArcFilePage(arcFile, requestedView)) ->
@@ -62,13 +51,6 @@ let tryGetDataMapMismatchReloadWithLookup (tryFindEntry: string -> FileEntry opt
         | None -> None
     | _ -> None
 
-let tryGetDataMapMismatchReload (fileTree: FileEntry[]) (pageState: PageState option) =
-    let tryFindEntry path =
-        fileTree
-        |> Array.tryFind (fun entry -> PathHelpers.pathsEqual (PathHelpers.normalizePath entry.path) path)
-
-    tryGetDataMapMismatchReloadWithLookup tryFindEntry pageState
-
 let private reloadsWhenSelectedFileChanges =
     function
     | PageState.MarkdownPage _
@@ -91,41 +73,27 @@ let private shouldReloadSelectedFile pageState entry =
         | Some state -> reloadsWhenSelectedFileChanges state
         | None -> isCheckedOutLfsFile entry
 
-let private tryFindSelectedFileEntryWithLookup
-    (tryFindEntry: string -> FileEntry option)
-    (selectionPath: string option)
-    =
+let private tryFindSelectedFileEntry (tryFindEntry: string -> FileEntry option) (selectionPath: string option) =
     selectionPath
     |> Option.map PathHelpers.normalizePath
     |> Option.bind tryFindEntry
     |> Option.filter (fun entry -> not entry.isDirectory)
 
-let private fileTreeLookup (fileTree: FileEntry[]) path =
-    fileTree
-    |> Array.tryFind (fun entry -> PathHelpers.pathsEqual (PathHelpers.normalizePath entry.path) path)
-
-let shouldClearPageStateForLfsPointerSelectionWithLookup
+let shouldClearPageStateForLfsPointerSelection
     (tryFindEntry: string -> FileEntry option)
     (selectionPath: string option)
     (pageState: PageState option)
     =
     pageState |> Option.exists resetsWhenSelectionIsRemoved
-    && (tryFindSelectedFileEntryWithLookup tryFindEntry selectionPath
+    && (tryFindSelectedFileEntry tryFindEntry selectionPath
         |> Option.exists isPointerLfsFile)
 
-let shouldClearPageStateForLfsPointerSelection
-    (fileTree: FileEntry[])
-    (selectionPath: string option)
-    (pageState: PageState option)
-    =
-    shouldClearPageStateForLfsPointerSelectionWithLookup (fileTreeLookup fileTree) selectionPath pageState
-
-let tryGetReloadableSelectedFilePathWithLookup
+let tryGetReloadableSelectedFilePath
     (tryFindEntry: string -> FileEntry option)
     (selectionPath: string option)
     (pageState: PageState option)
     =
-    tryFindSelectedFileEntryWithLookup tryFindEntry selectionPath
+    tryFindSelectedFileEntry tryFindEntry selectionPath
     |> Option.bind (fun entry ->
         if shouldReloadSelectedFile pageState entry then
             Some(PathHelpers.normalizePath entry.path)

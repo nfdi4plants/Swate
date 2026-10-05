@@ -84,9 +84,6 @@ module PathHelpers =
     let pathMatchesAny (candidates: string seq) (path: string) =
         candidates |> Seq.exists (fun candidate -> pathsEqual candidate path)
 
-    let getNameFromPath (path: string) =
-        normalizePath path |> (fun normalized -> normalized.Split('/')) |> Array.last
-
     let tryGetParentPath (path: string) =
         let normalizedPath = normalizePath path
         let separatorIndex = normalizedPath.LastIndexOf('/')
