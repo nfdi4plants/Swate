@@ -112,8 +112,13 @@ type GitDiffWindowPage = {
     Span: GitDiffPageSpan
 }
 
-/// The running request for the page after the last loaded one.
-type GitDiffNextRequest = { Cursor: string; OperationId: string }
+/// The running request for the page after the last loaded one. Background is set when the read
+/// belongs to the background indexing. A Scanning continuation of it inherits the flag.
+type GitDiffNextRequest = {
+    Cursor: string
+    OperationId: string
+    Background: bool
+}
 
 /// A paged text diff of one changed file. Generation is the page load request id of the
 /// selection that opened it, so responses for an older selection can be recognized.
@@ -147,6 +152,9 @@ type GitDiffPageData = {
     /// Set once the viewer asked for the background read of every remaining page. While it is
     /// set, each arriving page starts the read of the next one, until the output is exhausted.
     Indexing: bool
+    /// The indexing stopped because the worker session of a background read closed. The rows
+    /// stay and the indexing waits. A user request reopens the diff and lifts the pause.
+    IndexingPaused: bool
     /// The last read of the next page failed with an error that leaves the rows usable. The rows
     /// stay, the indexing waits, and the continue button of the viewer asks again.
     NextFailed: bool

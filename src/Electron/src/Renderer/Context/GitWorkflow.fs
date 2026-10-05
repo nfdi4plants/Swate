@@ -1549,6 +1549,7 @@ module GitDiffPageLoader =
             VisiblePages = []
             KeepRequestedPage = false
             Indexing = false
+            IndexingPaused = false
             NextFailed = false
             FailedGaps = []
             FailedLineSlices = []
@@ -1775,8 +1776,9 @@ module GitDiffPageLoader =
             Span = spanOf parts
         }
 
-    /// Requests the page at the cursor, unless that cursor is already being read.
-    let private readPage (deps: GitDependencies) (page: GitDiffPageData) (cursor: string) =
+    /// Requests the page at the cursor, unless that cursor is already being read. The request
+    /// remembers whether the background indexing sent it.
+    let private readPage (deps: GitDependencies) (page: GitDiffPageData) (cursor: string) (background: bool) =
         match page.Handle, page.NextRequest with
         | None, _ -> page, Cmd.none
         | Some _, Some running when running.Cursor = cursor -> page, Cmd.none
@@ -1794,6 +1796,7 @@ module GitDiffPageLoader =
                         Some {
                             Cursor = cursor
                             OperationId = request.OperationId
+                            Background = background
                         }
             },
             send
@@ -1805,7 +1808,13 @@ module GitDiffPageLoader =
     /// While the diff reopens, the page takes the place of the old page at the same index, and
     /// the requested page stays where the user was.
     /// A Scanning result keeps its continuation as the cursor and asks for the page again with it.
-    let private applyResumablePage (deps: GitDependencies) (page: GitDiffPageData) (result: ResumablePageDto) =
+    /// The continuation belongs to the background indexing when the read that answered did.
+    let private applyResumablePage
+        (deps: GitDependencies)
+        (page: GitDiffPageData)
+        (background: bool)
+        (result: ResumablePageDto)
+        =
         // While the diff reopens, only the pages the new session has read count as read.
         let readPages =
             match page.Status with
@@ -1876,6 +1885,7 @@ module GitDiffPageLoader =
                         Status = status
                 }
                 continuation
+                background
 
     let private isGap (gapId: string) (part: Paged.PagedPart) =
         match part with
@@ -2183,6 +2193,7 @@ module GitDiffPageLoader =
                             NextFailed = false
                     }
                     cursor
+                    false
             | _ -> page, Cmd.none
         | GitDiffMsg.Expand(_, gapId, fromStart) ->
             match handleRequest (), pageIndexOfGap gapId page with
@@ -2322,9 +2333,16 @@ module GitDiffPageLoader =
                                     : DiffSourceInfoPairDto
                                 )
                     }
+                    false
                     first
         | GitDiffMsg.PageCompleted(_, request, result) ->
             let page = finish request.OperationId page
+
+            // A Scanning answer reads on with a continuation, which keeps the origin of this read.
+            let background =
+                match page.NextRequest with
+                | Some running when running.OperationId = request.OperationId -> running.Background
+                | _ -> false
 
             let page =
                 match page.NextRequest with
@@ -2346,7 +2364,7 @@ module GitDiffPageLoader =
                             NextFailed = true
                     },
                     Cmd.none
-                | Ok resumable -> applyResumablePage deps page resumable
+                | Ok resumable -> applyResumablePage deps page background resumable
         | GitDiffMsg.ReplayCompleted(_, request, result) ->
             let page = {
                 finish request.OperationId page with
@@ -2531,6 +2549,7 @@ module GitDiffPageLoader =
                         PendingReplay = None
                         VisiblePages = []
                         KeepRequestedPage = false
+                        IndexingPaused = false
                         NextFailed = false
                         FailedGaps = []
                         FailedLineSlices = []
@@ -2569,7 +2588,7 @@ module GitDiffPageLoader =
 
             match landing, page.NextCursor with
             | None, Some cursor ->
-                let next, cmd = readPage deps page cursor
+                let next, cmd = readPage deps page cursor false
                 next, Some target, cmd
             | _ ->
                 let requested = landing |> Option.defaultValue (max 0 (pagesRead - 1))
@@ -2625,15 +2644,17 @@ module GitDiffPageLoader =
         | GitDiffPageStatus.Ready, Some cursor, Some _ when
             page.Indexing && not page.NextFailed && page.NextRequest.IsNone
             ->
-            readPage deps { page with KeepRequestedPage = true } cursor
+            readPage deps { page with KeepRequestedPage = true } cursor true
         | GitDiffPageStatus.Ready, None, _ when page.Indexing -> { page with Indexing = false }, Cmd.none
         | _ -> page, Cmd.none
 
     /// The message that starts the indexing, once the first page is ready and more pages follow.
-    /// None while the indexing runs or waits for a retry.
+    /// None while the indexing runs, waits for a retry or is paused.
     let indexingRequest (page: GitDiffPageData) : GitDiffMsg option =
         match page.Status, page.NextCursor, page.Handle with
-        | GitDiffPageStatus.Ready, Some _, Some _ when not page.Indexing && not page.NextFailed ->
+        | GitDiffPageStatus.Ready, Some _, Some _ when
+            not page.Indexing && not page.NextFailed && not page.IndexingPaused
+            ->
             Some(GitDiffMsg.Index page.Generation)
         | _ -> None
 
@@ -2658,6 +2679,31 @@ module GitDiffPageLoader =
             |> Option.forall (fun handle -> handle.Id <> handleId || handle.Version <> handleVersion)
             ->
             finish operationId page, reopening, Cmd.none
+        // A background indexing read whose session closed pauses the indexing. Reopening here
+        // would evict the next indexer, which would reopen in turn, so no indexer would keep its
+        // progress. Any user request still reopens, and the reopen lifts the pause. The read
+        // may be the continuation of a Scanning answer, which left the page LoadingNext, so the
+        // pause sets that page Ready for the continue button. Any other status, such as an
+        // encoding choice that an expansion asked for meanwhile, stays.
+        | GitDiffMsg.PageCompleted(_, request, result), _ when
+            reopening.IsNone
+            && not (isSettled page.Status)
+            && page.NextRequest
+               |> Option.exists (fun running -> running.OperationId = request.OperationId && running.Background)
+            && failureCode result = Some DiffSessionClosed
+            ->
+            {
+                finish request.OperationId page with
+                    NextRequest = None
+                    Indexing = false
+                    IndexingPaused = true
+                    Status =
+                        match page.Status with
+                        | GitDiffPageStatus.LoadingNext -> GitDiffPageStatus.Ready
+                        | status -> status
+            },
+            reopening,
+            Cmd.none
         | _, Some(operationId, _, _, Some DiffSessionClosed) when reopening.IsNone && not (isSettled page.Status) ->
             let target = reopenTargetOf msg page
             let next, cmd = reopen deps target (finish operationId page)

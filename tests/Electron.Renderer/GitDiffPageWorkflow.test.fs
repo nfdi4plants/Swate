@@ -359,6 +359,23 @@ let private renderTarget (page: GitDiffPageData) =
     container.innerHTML <- renderToStaticMarkup (Renderer.Components.MainContent.GitDiffTarget.Main page)
     container
 
+/// A diff of five pages whose first worker session closes once the indexing reads past the second
+/// page. The reopened diff gets a session of its own that answers every read.
+let private pagesOfClosingSession (fake: FakeDiffClient) =
+    let pageDto index =
+        diffPage $"p{index}" (if index < 5 then Some $"cursor-{index}" else None) [| hunkAt $"h{index}" (index * 10) |]
+
+    fake.OpenReply <- fun _ -> openedOn (handleOfOpen fake.Opens.Count) (pageDto 1)
+
+    fake.ReadReply <-
+        fun request ->
+            let index = int (request.Cursor.Replace("cursor-", "")) + 1
+
+            if request.HandleId = "diff-1" && index > 2 then
+                failedWith "diff_session_closed" None
+            else
+                succeeded (ResumablePageDto.Ready(pageDto index))
+
 Vitest.describe (
     "Git diff page workflow",
     fun () ->
@@ -1045,44 +1062,97 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "Indexing goes on after the session expired and the diff reopened",
+            "A background read that finds the session closed pauses the indexing without reopening the diff",
             fun () -> promise {
                 let fake = FakeDiffClient()
-                let lastIndex = 5
-
-                let pageDto index =
-                    diffPage $"p{index}" (if index < lastIndex then Some $"cursor-{index}" else None) [|
-                        hunkAt $"h{index}" (index * 10)
-                    |]
-
-                fake.OpenReply <- fun _ -> openedOn (handleOfOpen fake.Opens.Count) (pageDto 1)
-
-                fake.ReadReply <-
-                    fun request ->
-                        let index = int (request.Cursor.Replace("cursor-", "")) + 1
-
-                        if request.HandleId = "diff-1" && index > 2 then
-                            failedWith "diff_session_closed" None
-                        else
-                            succeeded (ResumablePageDto.Ready(pageDto index))
+                pagesOfClosingSession fake
 
                 let! state = run fake (select "a.txt") runningState
                 let! state = run fake (diffMsg (GitDiffMsg.Index (diffOf state).Generation)) state
                 let page = diffOf state
 
-                Vitest.expect(fake.Opens.Count).toBe (2)
-
-                Vitest
-                    .expect(
-                        fake.Reads
-                        |> Seq.exists (fun read -> read.HandleId = "diff-2" && read.Cursor = $"cursor-{lastIndex - 1}")
-                    )
-                    .toBe (true)
-
-                Vitest.expect(page.Pages |> Array.map _.PageId).toEqual ([| for index in 1..lastIndex -> $"p{index}" |])
-                Vitest.expect(page.NextCursor).toEqual (None)
+                Vitest.expect(fake.Opens.Count).toBe (1)
+                Vitest.expect(page.Pages |> Array.map _.PageId).toEqual ([| "p1"; "p2" |])
+                Vitest.expect(page.Handle).toEqual (Some(handleOfOpen 1))
+                Vitest.expect(page.NextRequest).toEqual (None)
+                Vitest.expect(page.Indexing).toBe (false)
+                Vitest.expect(page.IndexingPaused).toBe (true)
                 Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
                 Vitest.expect(state.DiffReopen).toEqual (None)
+                Vitest.expect(GitDiffPageLoader.indexingRequest page).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A background read that answers Scanning and then finds the session closed pauses the indexing as well",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                pagesOfClosingSession fake
+                let closingReply = fake.ReadReply
+
+                fake.ReadReply <-
+                    fun request ->
+                        match request.HandleId, request.Cursor with
+                        | "diff-1", "cursor-2" -> succeeded (ResumablePageDto.Scanning(progress false, "scan-1", None))
+                        | "diff-1", "scan-1" -> failedWith "diff_session_closed" None
+                        | _ -> closingReply request
+
+                let! state = run fake (select "a.txt") runningState
+                let! state = run fake (diffMsg (GitDiffMsg.Index (diffOf state).Generation)) state
+                let page = diffOf state
+
+                Vitest
+                    .expect(fake.Reads |> Seq.map (fun read -> read.HandleId, read.Cursor) |> Seq.toArray)
+                    .toEqual (
+                        [|
+                            "diff-1", "cursor-1"
+                            "diff-1", "cursor-2"
+                            "diff-1", "scan-1"
+                        |]
+                    )
+
+                Vitest.expect(fake.Opens.Count).toBe (1)
+                Vitest.expect(page.Pages |> Array.map _.PageId).toEqual ([| "p1"; "p2" |])
+                Vitest.expect(page.NextRequest).toEqual (None)
+                Vitest.expect(page.Indexing).toBe (false)
+                Vitest.expect(page.IndexingPaused).toBe (true)
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+                Vitest.expect(state.DiffReopen).toEqual (None)
+                Vitest.expect(GitDiffPageLoader.indexingRequest page).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A user request on a paused diff reopens it once, and the indexing then reads on to the end with the new handle",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                pagesOfClosingSession fake
+
+                let! state = run fake (select "a.txt") runningState
+                let generation = (diffOf state).Generation
+                let! state = run fake (diffMsg (GitDiffMsg.Index generation)) state
+                Vitest.expect(fake.Opens.Count).toBe (1)
+                Vitest.expect((diffOf state).IndexingPaused).toBe (true)
+
+                let! state = run fake (diffMsg (GitDiffMsg.LoadNext generation)) state
+                let page = diffOf state
+
+                Vitest.expect(fake.Opens.Count).toBe (2)
+                Vitest.expect(page.Handle).toEqual (Some(handleOfOpen 2))
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+                Vitest.expect(page.IndexingPaused).toBe (false)
+                Vitest.expect(state.DiffReopen).toEqual (None)
+                Vitest.expect(GitDiffPageLoader.indexingRequest page).toEqual (Some(GitDiffMsg.Index generation))
+
+                let! state = run fake (diffMsg (GitDiffMsg.Index generation)) state
+                let page = diffOf state
+
+                Vitest.expect(fake.Opens.Count).toBe (2)
+                Vitest.expect(fake.Reads |> Seq.last |> _.HandleId).toBe ("diff-2")
+                Vitest.expect(page.Pages |> Array.map _.PageId).toEqual ([| for index in 1..5 -> $"p{index}" |])
+                Vitest.expect(page.NextCursor).toEqual (None)
+                Vitest.expect(page.Indexing).toBe (false)
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
             }
         )
 
