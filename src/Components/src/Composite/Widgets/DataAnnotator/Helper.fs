@@ -5,6 +5,8 @@ open ARCtrl
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Composite.Widgets.DataAnnotator.Types
+open Swate.Components.Composite.Widgets.Types
+open Swate.Components.Composite.DataMapTable.ClipboardTarget
 
 let private compareTargets (left: DataTarget) (right: DataTarget) =
     let key =
@@ -32,42 +34,96 @@ let tryParseDataFile (separator: string) (file: DataFile) =
     with exceptionValue ->
         Error exceptionValue.Message
 
-let private isSomeNonEmptyString = Option.exists (String.IsNullOrWhiteSpace >> not)
-
-let private findLastNonEmptyDataCellIndex (cells: ResizeArray<CompositeCell>) =
-    let mutable lastNonEmptyIndex = -1
-
-    for index in 0 .. cells.Count - 1 do
-        if
-            cells.[index].GetContentSwate()
-            |> Array.exists (String.IsNullOrWhiteSpace >> not)
-        then
-            lastNonEmptyIndex <- index
-
-    lastNonEmptyIndex
-
-let private findLastNonEmptyDataContextIndex (dataMap: DataMap) =
-    let mutable lastNonEmptyIndex = -1
-
-    for index in 0 .. dataMap.DataContexts.Count - 1 do
-        let dataContext = dataMap.DataContexts.[index]
-
-        if
-            isSomeNonEmptyString dataContext.FilePath
-            || isSomeNonEmptyString dataContext.Selector
-            || isSomeNonEmptyString dataContext.Format
-            || isSomeNonEmptyString dataContext.SelectorFormat
-        then
-            lastNonEmptyIndex <- index
-
-    lastNonEmptyIndex
-
 let private setDataContextFields (fileName: string) (fileType: string) (selector: string) (data: Data) =
     data.FilePath <- Some fileName
     data.Selector <- Some selector
     data.Format <- Some fileType
     data.SelectorFormat <- Some URLs.Data.SelectorFormat.csv
     data
+
+let appendAnnotation (current: AnnotationInput option) (next: AnnotationInput) =
+    match current with
+    | Some current when current.FileName = next.FileName && current.FileType = next.FileType -> {
+        next with
+            Selectors = Array.append current.Selectors next.Selectors |> Array.distinct
+      }
+    | _ -> {
+        next with
+            Selectors = Array.distinct next.Selectors
+      }
+
+let insertAnnotationIntoSelectedCells
+    (arcFile: ArcFiles)
+    (setArcFile: ArcFiles -> unit)
+    (input: AnnotationInput)
+    (target: InsertTarget option)
+    =
+    try
+        if input.Selectors.Length = 0 then
+            Error "Select at least one selector to insert."
+        else
+            let nextArcFile = ArcFiles.refreshRef arcFile
+            let fileName = toArcRootRelativeFilePath arcFile input.FileName
+
+            let cells =
+                input.Selectors
+                |> Array.map (fun selector ->
+                    Data()
+                    |> setDataContextFields fileName input.FileType selector
+                    |> CompositeCell.createData
+                )
+
+            match target with
+            | Some(InsertTarget.Table(tableIndex, selection)) ->
+                match nextArcFile.TryGetActiveTable(Some tableIndex) with
+                | Some(_, table) when
+                    selection.xStart >= 0
+                    && selection.xStart < table.ColumnCount
+                    && selection.yStart >= 0
+                    && selection.yStart < table.RowCount
+                    ->
+                    let cellsToInsert =
+                        cells
+                        |> Array.truncate (table.RowCount - selection.yStart)
+                        |> Array.mapi (fun offset source ->
+                            let coordinate: CellCoordinate = {|
+                                x = selection.xStart
+                                y = selection.yStart + offset
+                            |}
+
+                            let current = table.GetCellAt(coordinate.x, coordinate.y)
+
+                            let next =
+                                match current with
+                                | CompositeCell.Data _ -> source
+                                | _ -> current.UpdateMainField(source.ToVisibleString())
+
+                            coordinate, next
+                        )
+
+                    table.SetCellsAt cellsToInsert
+                    setArcFile nextArcFile
+                    Ok cellsToInsert.Length
+                | _ -> Error "Select a table cell to insert selectors."
+            | Some(InsertTarget.DataMap selection) ->
+                match nextArcFile.TryGetDataMap() with
+                | Some dataMap when
+                    selection.xStart > 0
+                    && selection.xStart <= dataMap.ColumnCount
+                    && selection.yStart > 0
+                    ->
+                    let anchor: CellCoordinate = {|
+                        x = selection.xStart
+                        y = selection.yStart
+                    |}
+
+                    dataMap.PasteStructuredCells(anchor, [| anchor |], cells |> Array.map Array.singleton)
+                    setArcFile nextArcFile
+                    Ok cells.Length
+                | _ -> Error "Select a DataMap cell to insert selectors."
+            | None -> Error "Select table or DataMap cells before inserting selectors."
+    with ex ->
+        Error ex.Message
 
 let DefaultSeparatorOptions: (string * string)[] = [|
     "\\t", "Tab (\\t)"

@@ -13,6 +13,8 @@ open Swate.Components.Primitive.Dropdown
 open Swate.Components.Composite.Widgets.Context
 open Swate.Components.Composite.Widgets.DataAnnotator.Types
 open Swate.Components.Composite.Widgets.DataAnnotator.Helper
+open Swate.Components.Composite.SortableList
+open Swate.Components.Composite.SortableList.Types
 
 [<Erase; Mangle(false)>]
 type DataAnnotator =
@@ -45,7 +47,7 @@ type DataAnnotator =
                     Html.p [
                         prop.className "swt:text-xs swt:text-base-content/50"
                         prop.text
-                            "Click column headers, row numbers, or individual cells to select annotation targets. Selections are highlighted and included when you submit."
+                            "Select columns, rows, or cells in the preview and add their selectors to the list. Select destination cells in your table, then insert all selectors or only the highlighted list entries."
                     ]
                 ]
             ]
@@ -361,12 +363,10 @@ type DataAnnotator =
             isOpen,
             setIsOpen,
             isLoading,
-            submit: AnnotationInput option -> unit
+            submit: AnnotationInput -> unit
         ) =
         let state, setState: Set<DataTarget> * (((Set<DataTarget> -> Set<DataTarget>) -> unit)) =
             React.useStateWithUpdater (Set.empty<DataTarget>)
-
-        let errorMessage, setErrorMessage = React.useState (None: string option)
 
         let modalActivity =
             Html.div [
@@ -394,17 +394,10 @@ type DataAnnotator =
                                     ]
                                     Html.button [
                                         prop.className "swt:btn swt:btn-primary"
-                                        prop.text "Submit"
+                                        prop.text "Add selectors"
                                         prop.disabled state.IsEmpty
                                         prop.onClick (fun _ ->
-                                            // match DataAnnotator.tryValidateSubmit (model, state, targetCol) with
-                                            // | Some message -> setErrorMessage (Some message)
-                                            // | None ->
-
-                                            let selectors = [|
-                                                for x in state do
-                                                    x.ToFragmentSelectorString(parsedDataFile.HeaderRow.IsSome)
-                                            |]
+                                            let selectors = selectorsFromTargets parsedDataFile.HeaderRow.IsSome state
 
                                             let name = dataFile.DataFileName
                                             let dt = dataFile.DataFileType
@@ -415,18 +408,13 @@ type DataAnnotator =
                                                 FileType = dt
                                             }
 
-                                            submit (Some input)
+                                            submit input
                                         )
                                     ]
                                 ]
                             ]
                         ]
                     ]
-                    if errorMessage.IsSome then
-                        Html.div [
-                            prop.className "swt:alert swt:alert-error swt:text-sm"
-                            prop.children [ Html.text errorMessage.Value ]
-                        ]
                 ]
             ]
 
@@ -442,7 +430,7 @@ type DataAnnotator =
         )
 
     [<ReactComponent(true)>]
-    static member Main(?onError: string -> unit) =
+    static member Main(?onInsert: AnnotationInput -> Result<int, string>, ?canInsert: bool, ?onError: string -> unit) =
 
         let isLoading, setIsLoading = React.useState false
         let dataFile, setDataFile = React.useState (None: DataFile option)
@@ -450,15 +438,23 @@ type DataAnnotator =
         let dataFileParseConfig, setDataFileParseConfig =
             React.useState (None: DataFileParseConfig option)
 
-        let annotation, setAnnotation = React.useState (None: AnnotationInput option)
+        let annotation, setAnnotation =
+            React.useStateWithUpdater (None: AnnotationInput option)
+
+        let selectedSelectors, setSelectedSelectors =
+            React.useStateWithUpdater ([]: string list)
+
+        let errorMessage, setErrorMessage = React.useState (None: string option)
+
+        let reportError message =
+            setErrorMessage (Some message)
+            onError |> Option.iter (fun handler -> handler message)
 
         let parsedFile =
             React.useMemo (
                 (fun () ->
                     match dataFile, dataFileParseConfig with
                     | Some dtf, Some config ->
-                        console.log ("Rerunning parsedFile useMemo due to dataFile or dataFileParseConfig change.")
-                        console.log ("config:", config)
                         let splitRows = dtf.SplitBySeparator(separator = config.Separator)
 
                         match config.HasHeader with
@@ -487,14 +483,15 @@ type DataAnnotator =
             fun () ->
                 match parsedFile with
                 | Some _ -> setShowModal true
-                | None ->
-                    onError
-                    |> Option.iter (fun f -> f "No parsed file available to show in the modal.")
+                | None -> reportError "No parsed file available to show in the modal."
 
         let pickFile (file: Browser.Types.File) =
             promise {
                 setDataFile None
                 setDataFileParseConfig None
+                setAnnotation (fun _ -> None)
+                setSelectedSelectors (fun _ -> [])
+                setErrorMessage None
                 setIsLoading true
 
                 try
@@ -512,7 +509,7 @@ type DataAnnotator =
                         setDataFile (Some loadedDataFile)
                         setDataFileParseConfig (Some parseConfig)
                     with ex ->
-                        onError |> Option.iter (fun f -> f $"Failed to read file: {ex.Message}")
+                        reportError $"Failed to read file: {ex.Message}"
                 finally
                     setIsLoading false
             }
@@ -524,52 +521,50 @@ type DataAnnotator =
                 [| box setDataFileParseConfig |]
             )
 
-        let sortableListAnnotations =
+        let items: SortableListItem<string>[] =
             React.useMemo (
                 (fun () ->
-                    let sortableListAnnotations =
-                        match annotation with
-                        | Some ann ->
-                            ann.Selectors
-                            |> Array.map (fun selector ->
-                                Composite.SortableList.Types.SortableListItem.create (
-                                    selector,
-                                    selector,
-                                    Some selector
-                                )
-                            )
-                        | None -> [||]
-
-                    let setSortableListAnnotations (newList: Composite.SortableList.Types.SortableListItem<string>[]) =
-                        let newSelectors = newList |> Array.map (fun item -> item.id)
-
-                        let newAnnotations =
-                            match annotation with
-                            | Some ann -> { ann with Selectors = newSelectors }
-                            | None -> {
-                                Selectors = newSelectors
-                                FileName = ""
-                                FileType = ""
-                              }
-
-                        setAnnotation (Some newAnnotations)
-
-                    {|
-                        items = sortableListAnnotations
-                        setItems = setSortableListAnnotations
-                    |}
+                    annotation
+                    |> Option.map (fun ann ->
+                        ann.Selectors
+                        |> Array.map (fun selector -> SortableListItem.create (selector, selector, Some selector))
+                    )
+                    |> Option.defaultValue [||]
                 ),
                 [| box annotation |]
             )
 
-        let setAnnotation =
-            React.useCallback (
-                (fun (newAnnotation: AnnotationInput option) ->
-                    setAnnotation newAnnotation
-                    setShowModal false
-                ),
-                [| box setAnnotation |]
-            )
+        let setSelectors selectors =
+            setAnnotation (Option.map (fun ann -> { ann with Selectors = selectors }))
+            setSelectedSelectors (List.filter (fun selector -> Array.contains selector selectors))
+
+        let addAnnotation next =
+            setAnnotation (fun current -> Some(appendAnnotation current next))
+            setErrorMessage None
+            setShowModal false
+
+        let insertSelectors () =
+            match annotation, onInsert with
+            | Some ann, Some insert ->
+                let selectors =
+                    if List.isEmpty selectedSelectors then
+                        ann.Selectors
+                    else
+                        ann.Selectors
+                        |> Array.filter (fun selector -> List.contains selector selectedSelectors)
+
+                match insert { ann with Selectors = selectors } with
+                | Ok _ -> setErrorMessage None
+                | Error message -> reportError message
+            | _ -> ()
+
+        let hasSelection = not (List.isEmpty selectedSelectors)
+
+        let canInsert =
+            defaultArg canInsert true
+            && onInsert.IsSome
+            && items.Length > 0
+            && not isLoading
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:gap-4 swt:grow"
@@ -595,15 +590,115 @@ type DataAnnotator =
                         showModal,
                         setShowModal,
                         isLoading,
-                        setAnnotation
+                        addAnnotation
                     )
                 | _, _, _, _ -> Html.none
 
                 // Sortable List for annotations
-                Composite.SortableList.SortableList.SortableList(
-                    sortableListAnnotations.items,
-                    sortableListAnnotations.setItems
-                )
+                if items.Length > 0 then
+                    Html.div [
+                        prop.className "swt:join"
+                        prop.children [
+                            Html.button [
+                                prop.className "swt:btn swt:btn-sm swt:join-item"
+                                prop.title "Sort selectors ascending"
+                                prop.onClick (fun _ -> items |> Array.map _.id |> Array.sort |> setSelectors)
+                                prop.children [ Primitive.Icons.ArrowDownAZ() ]
+                            ]
+                            Html.button [
+                                prop.className "swt:btn swt:btn-sm swt:join-item"
+                                prop.title "Sort selectors descending"
+                                prop.onClick (fun _ -> items |> Array.map _.id |> Array.sortDescending |> setSelectors)
+                                prop.children [ Primitive.Icons.ArrowDownZA() ]
+                            ]
+                        ]
+                    ]
+
+                Html.div [
+                    prop.className "swt:max-h-[45vh] swt:overflow-auto"
+                    prop.children [
+                        SortableList.SortableList(
+                            items,
+                            (fun nextItems -> nextItems |> Array.map _.id |> setSelectors),
+                            rowProps =
+                                (fun item -> [
+                                    prop.className [
+                                        "swt:cursor-pointer swt:table-auto"
+                                        if List.contains item.id selectedSelectors then
+                                            "swt:bg-base-300"
+                                    ]
+                                    prop.onClick (fun _ ->
+                                        setSelectedSelectors (fun current ->
+                                            if List.contains item.id current then
+                                                List.filter ((<>) item.id) current
+                                            else
+                                                item.id :: current
+                                        )
+                                    )
+                                ]),
+                            renderRow =
+                                (fun row ->
+                                    RowComponents.DefaultRow(
+                                        row,
+                                        label = Html.span [ prop.className "swt:font-mono"; prop.text row.item.label ]
+                                    )
+                                )
+                        )
+                    ]
+                ]
+
+                if items.Length > 0 then
+                    Html.div [
+                        prop.className "swt:flex swt:gap-2 swt:w-full"
+                        prop.children [
+                            Html.button [
+                                prop.className "swt:btn swt:btn-outline"
+                                prop.text "Select more targets"
+                                prop.disabled isLoading
+                                prop.onClick (fun _ -> handleShowModal ())
+                            ]
+                            Html.button [
+                                prop.className "swt:btn swt:btn-neutral"
+                                prop.text (if hasSelection then "Clear Selected" else "Clear")
+                                prop.title (
+                                    if hasSelection then
+                                        "Clear only the selected selectors from the list"
+                                    else
+                                        "Clear all selectors from the list"
+                                )
+                                prop.onClick (fun _ ->
+                                    if hasSelection then
+                                        items
+                                        |> Array.map _.id
+                                        |> Array.filter (fun selector ->
+                                            not (List.contains selector selectedSelectors)
+                                        )
+                                        |> setSelectors
+                                    else
+                                        setSelectors [||]
+                                )
+                            ]
+                            Html.button [
+                                prop.className "swt:btn swt:btn-primary swt:ml-auto"
+                                prop.text (
+                                    if hasSelection then
+                                        "Insert selected"
+                                    else
+                                        "Insert selectors"
+                                )
+                                prop.title "Insert selectors into the currently selected table or DataMap cells."
+                                prop.disabled (not canInsert)
+                                prop.onClick (fun _ -> insertSelectors ())
+                            ]
+                        ]
+                    ]
+
+                if errorMessage.IsSome then
+                    Html.div [
+                        prop.role "alert"
+                        prop.className "swt:alert swt:alert-error swt:text-sm"
+                        prop.text errorMessage.Value
+                    ]
 
             ]
 

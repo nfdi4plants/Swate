@@ -14,6 +14,7 @@ open Swate.Components.Primitive.LoadingSpinner
 open Swate.Components.Composite.AnnotationTable.Context
 open Swate.Components.Composite.DataMapTable
 open Swate.Components.Composite.DataMapTable.Types
+open Swate.Components.Composite.Widgets.Types
 
 /// This context is designed to be used only internally in this file.
 module private FilePickerWidgetContext =
@@ -23,14 +24,6 @@ module private FilePickerWidgetContext =
 
     [<Hook>]
     let useSelectedPathsCtx () = React.useContext SelectedPathsCtx
-
-module private FilePickerWidgetTypes =
-    [<RequireQualifiedAccess>]
-    type InsertTarget =
-        | Table of index: int * selection: CellCoordinateRange
-        | DataMap of selection: CellCoordinateRange
-
-open FilePickerWidgetTypes
 
 module private FilePickerWidgetHelper =
     let appendPickedPaths (setPaths: (string[] -> string[]) -> unit) =
@@ -246,28 +239,9 @@ type FilePickerWidget =
         let isLoading, setIsLoading = React.useState false
 
         let annotationCtx = useAnnotationTableStateCtx ()
-        let activeTable = arcFile.TryGetActiveTable(activeTableIndex)
 
-        let insertionTarget: InsertTarget option =
-            match activeTable with
-            | Some(tableIndex, table) ->
-                annotationCtx.state
-                |> Map.tryFind table.Name
-                |> Option.bind (fun tableCtx -> tableCtx.SelectedCells)
-                |> Option.map (fun selectedRange -> {|
-                    xStart = selectedRange.xStart - 1
-                    xEnd = selectedRange.xEnd - 1
-                    yStart = selectedRange.yStart - 1
-                    yEnd = selectedRange.yEnd - 1
-                |})
-                |> unbox<CellCoordinateRange option>
-                |> Option.map (fun selection -> InsertTarget.Table(tableIndex, selection))
-            | None ->
-                annotationCtx.state
-                |> Map.tryFind DataMapTable.SelectionContextKey
-                |> Option.bind _.SelectedCells
-                |> unbox<CellCoordinateRange option>
-                |> Option.map InsertTarget.DataMap
+        let insertionTarget =
+            CellInsertion.tryGetTarget arcFile activeTableIndex annotationCtx.state
 
         let hasPaths = paths.Length > 0
 

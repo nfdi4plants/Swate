@@ -6,6 +6,11 @@ open Fable.Core
 open Swate.Components.Shared
 
 [<RequireQualifiedAccess>]
+type InsertTarget =
+    | Table of index: int * selection: Swate.Components.CellCoordinateRange
+    | DataMap of selection: Swate.Components.CellCoordinateRange
+
+[<RequireQualifiedAccess>]
 type WidgetHostView =
     | TableView
     | DataMapView
