@@ -77,24 +77,12 @@ type private LazyComponents =
 
     [<ReactLazyComponent>]
     static member LazyDataAnnotator
-        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit, onError: string -> unit)
+        (?onInsert: AnnotationInput -> Result<int, string>, ?canInsert: bool, ?onError: string -> unit)
         =
-        let annotationCtx = Context.useAnnotationTableStateCtx ()
-
-        let target =
-            Composite.Widgets.CellInsertion.tryGetTarget arcFile activeTableIndex annotationCtx.state
-
         Composite.Widgets.DataAnnotator.DataAnnotator.Main(
-            onInsert =
-                (fun input ->
-                    Composite.Widgets.DataAnnotator.Helper.insertAnnotationIntoSelectedCells
-                        arcFile
-                        setArcFile
-                        input
-                        target
-                ),
-            canInsert = target.IsSome,
-            onError = onError
+            ?onInsert = onInsert,
+            ?canInsert = canInsert,
+            ?onError = onError
         )
 
     [<ReactLazyComponent>]
@@ -117,6 +105,28 @@ type Main =
     [<ReactComponent>]
     static member LazyLoaderWithMessage(lazyComponent: ReactElement, message: string) =
         React.Suspense([ lazyComponent ], fallback = Main.LazyFallback(message))
+
+    [<ReactComponent>]
+    static member internal DataAnnotatorWidget
+        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit, onError: string -> unit)
+        =
+        let annotationCtx = Context.useAnnotationTableStateCtx ()
+
+        let target =
+            Composite.Widgets.CellInsertion.tryGetTarget arcFile activeTableIndex annotationCtx.state
+
+        LazyComponents.LazyDataAnnotator(
+            onInsert =
+                (fun input ->
+                    Composite.Widgets.DataAnnotator.Helper.insertAnnotationIntoSelectedCells
+                        arcFile
+                        setArcFile
+                        input
+                        target
+                ),
+            canInsert = target.IsSome,
+            onError = onError
+        )
 
     [<ReactComponent>]
     static member private TableView(table: ArcTable, setTableInArcFile: ArcTable -> unit) =
@@ -364,7 +374,7 @@ type Main =
                 | ActiveView.Table _
                 | ActiveView.DataMap ->
                     Main.LazyLoaderWithMessage(
-                        LazyComponents.LazyDataAnnotator(arcFile, activeTableIndex, setArcFile, onError),
+                        Main.DataAnnotatorWidget(arcFile, activeTableIndex, setArcFile, onError),
                         "Loading Data Annotator Widget..."
                     )
                 | _ ->

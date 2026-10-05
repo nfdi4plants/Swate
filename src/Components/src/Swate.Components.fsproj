@@ -238,6 +238,7 @@
     <Compile Include="Composite\Widgets\DataAnnotator\Helper.fs" />
     <Compile Include="Composite\Widgets\DataAnnotator\Helper.test.fs" />
     <Compile Include="Composite\Widgets\DataAnnotator\DataAnnotator.fs" />
+    <Compile Include="Composite\Widgets\DataAnnotator\DataAnnotator.test.rtl.fs" />
     <Compile Include="Composite\Widgets\TemplateWidget.fs" />
     <Compile Include="Composite\Widgets\Widgets.fs" />
     <Compile Include="Composite\Workspace\Types.fs" />
@@ -340,6 +341,7 @@
     <Compile Include="Page\ArcFileEditor\Widgets.fs" />
     <Compile Include="Page\ArcFileEditor\ArcFileFooterTabs.fs" />
     <Compile Include="Page\ArcFileEditor\ArcFileEditor.fs" />
+    <Compile Include="Page\ArcFileEditor\ArcFileEditor.test.rtl.fs" />
 
     <Compile Include="Style.fs" />
   </ItemGroup>
