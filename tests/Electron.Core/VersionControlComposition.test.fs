@@ -519,16 +519,37 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "spools go to the per-user temp folder on Windows and macOS and to the app data on Linux",
+            "spools go to the Electron temp folder on Windows and macOS",
             fun () ->
-                Vitest.expect(TextDiffWorkers.tempRootNameFor "win32").toEqual
-                    Fable.Electron.Main.Enums.App.GetPath.Name.Temp
+                let tempRoot platform =
+                    TextDiffWorkers.tempRootFor
+                        platform
+                        (Some "/xdg/cache")
+                        "/home/carol"
+                        (fun () -> "/electron/temp")
+                        "Swate"
 
-                Vitest.expect(TextDiffWorkers.tempRootNameFor "darwin").toEqual
-                    Fable.Electron.Main.Enums.App.GetPath.Name.Temp
+                Vitest.expect(tempRoot "win32").toBe "/electron/temp"
+                Vitest.expect(tempRoot "darwin").toBe "/electron/temp"
+        )
 
-                Vitest.expect(TextDiffWorkers.tempRootNameFor "linux").toEqual
-                    Fable.Electron.Main.Enums.App.GetPath.Name.UserData
+        Vitest.test (
+            "spools go to the XDG cache folder on Linux, with ~/.cache as the fallback",
+            fun () ->
+                let tempRoot xdgCacheHome =
+                    TextDiffWorkers.tempRootFor
+                        "linux"
+                        xdgCacheHome
+                        "/home/carol"
+                        (fun () -> failwith "Linux does not use the Electron temp folder.")
+                        "Swate"
+
+                let homeCache = Main.Bindings.Path.join [| "/home/carol"; ".cache"; "Swate" |]
+
+                Vitest.expect(tempRoot (Some "/xdg/cache")).toBe (Main.Bindings.Path.join [| "/xdg/cache"; "Swate" |])
+                Vitest.expect(tempRoot None).toBe homeCache
+                Vitest.expect(tempRoot (Some "relative/cache")).toBe homeCache
+                Vitest.expect(tempRoot (Some "")).toBe homeCache
         )
 )
 

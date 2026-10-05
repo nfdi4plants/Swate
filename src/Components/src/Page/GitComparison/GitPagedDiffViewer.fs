@@ -1252,7 +1252,9 @@ type GitPagedDiffViewer =
                     let onWheel (event: Event) =
                         let wheel = unbox<WheelEvent> event
 
-                        if isCapped () && abs wheel.deltaY >= abs wheel.deltaX then
+                        // Chromium sends a trackpad pinch and Ctrl+wheel as wheel events with ctrlKey set.
+                        // They keep the default handling.
+                        if isCapped () && not wheel.ctrlKey && abs wheel.deltaY >= abs wheel.deltaX then
                             let scale =
                                 match int wheel.deltaMode with
                                 | 1 -> float GitPagedDiffDisplay.RowHeightPx
@@ -1270,9 +1272,18 @@ type GitPagedDiffViewer =
                         // Space on a button of a row presses the button.
                         let onScroller = obj.ReferenceEquals(event.target, bodyScroll)
 
-                        if isCapped () && not (keyboard.ctrlKey || keyboard.altKey || keyboard.metaKey) then
+                        if isCapped () then
+                            let modifierFree = not (keyboard.ctrlKey || keyboard.altKey || keyboard.metaKey)
+
+                            // Chromium on macOS scrolls a page for Option+ArrowUp/Down. In a capped diff the
+                            // native step moves several logical pages and skips rows.
+                            let optionOnly = keyboard.altKey && not keyboard.ctrlKey && not keyboard.metaKey
+
                             let target =
                                 match keyboard.key with
+                                | "ArrowDown" when optionOnly -> Some(logicalTop () + view * 0.875)
+                                | "ArrowUp" when optionOnly -> Some(logicalTop () - view * 0.875)
+                                | _ when not modifierFree -> None
                                 | "ArrowDown" -> Some(logicalTop () + 40.0)
                                 | "ArrowUp" -> Some(logicalTop () - 40.0)
                                 | "PageDown" -> Some(logicalTop () + view * 0.875)

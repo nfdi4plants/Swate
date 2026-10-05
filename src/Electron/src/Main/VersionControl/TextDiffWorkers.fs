@@ -27,14 +27,28 @@ let private currentWorkerPath () =
     workerPath app.isPackaged Main.Helper.Assets.processResourcesPath __dirname
 
 /// The folder that holds the text-diff folder of spools and scratch files. A spool can grow to
-/// the size of the file, so on Windows and macOS it goes to the temp folder, which is per user
-/// there and stays out of roaming or redirected profiles. Linux shares its temp folder between
-/// all users, so there it goes to the app data of the user.
-let tempRootNameFor (platform: string) : Enums.App.GetPath.Name =
+/// the size of the diffed file. Windows and macOS use the Electron temp folder, which is per user
+/// there and stays out of roaming or redirected profiles. Linux uses the XDG cache folder of the
+/// user (XDG_CACHE_HOME when it is an absolute path, else ~/.cache) below the app name. The
+/// config folder is often backed up or synced, and /tmp is shared between users and often lives
+/// in memory.
+let tempRootFor
+    (platform: string)
+    (xdgCacheHome: string option)
+    (homeDirectory: string)
+    (electronTemp: unit -> string)
+    (appName: string)
+    : string =
     match platform with
     | "win32"
-    | "darwin" -> Enums.App.GetPath.Name.Temp
-    | _ -> Enums.App.GetPath.Name.UserData
+    | "darwin" -> electronTemp ()
+    | _ ->
+        let cacheRoot =
+            match xdgCacheHome with
+            | Some folder when path.isAbsolute folder -> folder
+            | _ -> path.join (homeDirectory, ".cache")
+
+        path.join (cacheRoot, appName)
 
 let private logFailure (message: string) (error: exn) =
     Browser.Dom.console.error (message, error.Message)
@@ -49,7 +63,13 @@ let private createPool () : JS.Promise<TextDiffPool.TextDiffPool option> = promi
     try
         let! supervisor =
             TextDiffSupervisor.create {
-                TempRoot = app.getPath (tempRootNameFor (Main.Bindings.Node.processPlatform ()))
+                TempRoot =
+                    tempRootFor
+                        (Main.Bindings.Node.processPlatform ())
+                        (Main.Bindings.Node.environmentVariable "XDG_CACHE_HOME")
+                        (Main.Bindings.Node.homeDirectory ())
+                        (fun () -> app.getPath Enums.App.GetPath.Name.Temp)
+                        (app.getName ())
                 GitExecutable = None
                 OnEvent = None
             }

@@ -2279,6 +2279,51 @@ export const ClickingARowGivesTheScrollKeysTheFocus: Story = {
   },
 };
 
+export const OptionArrowMovesOneLogicalPageInACappedRange: Story = {
+  render: () => <CappedButtonHarness onExpand={() => {}} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-capped-button-grid");
+    const rowTop = () => canvas.getByTestId("git-paged-capped-button-row-directory-row-10").getBoundingClientRect().top;
+
+    // Chromium on macOS scrolls a page for Option+Arrow. In a capped diff that native step would skip
+    // rows, so the viewer moves the logical page step of PageDown instead.
+    await userEvent.click(canvas.getByTestId("git-paged-capped-button-line-text-current-10"));
+    await expect(document.activeElement).toBe(scroll);
+    const before = rowTop();
+    await userEvent.keyboard("{Alt>}{ArrowDown}{/Alt}");
+    await waitFor(() => expect(Math.abs(before - rowTop() - scroll.clientHeight * 0.875)).toBeLessThan(2));
+    await userEvent.keyboard("{Alt>}{ArrowUp}{/Alt}");
+    await waitFor(() => expect(Math.abs(before - rowTop())).toBeLessThan(2));
+  },
+};
+
+export const CtrlWheelLeavesACappedRangeAlone: Story = {
+  render: () => <CappedButtonHarness onExpand={() => {}} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = scrollElementFor(canvasElement, "git-paged-capped-button-grid");
+    const rowTop = () => canvas.getByTestId("git-paged-capped-button-row-directory-row-10").getBoundingClientRect().top;
+    const wheel = (ctrlKey: boolean) => {
+      const event = new WheelEvent("wheel", { deltaY: 100, ctrlKey, bubbles: true, cancelable: true });
+      scroll.dispatchEvent(event);
+      return event;
+    };
+
+    // A plain wheel step moves the view, so the viewer handles wheel events here.
+    const before = rowTop();
+    await expect(wheel(false).defaultPrevented).toBe(true);
+    await waitFor(() => expect(Math.abs(before - rowTop() - 100)).toBeLessThan(1.5));
+
+    // Chromium sends a trackpad pinch and Ctrl+wheel as wheel events with ctrlKey set. They keep the
+    // default handling and do not move the view.
+    const settled = rowTop();
+    await expect(wheel(true).defaultPrevented).toBe(false);
+    await new Promise((resolve) => window.setTimeout(resolve, 100));
+    await expect(Math.abs(rowTop() - settled)).toBeLessThan(1);
+  },
+};
+
 export const ReplayOfOnePageWithEvictionKeepsTheRequestedOffset: Story = {
   render: () => <ShrinkHarness replayed middlePages={1} />,
   play: async ({ canvasElement }) => {

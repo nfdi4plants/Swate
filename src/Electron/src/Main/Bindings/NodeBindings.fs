@@ -5,6 +5,13 @@ open Fable.Core
 [<Emit("process.platform")>]
 let processPlatform () : string = jsNative
 
+/// The value of an environment variable, or None when it is not set.
+[<Emit("process.env[$0]")>]
+let environmentVariable (name: string) : string option = jsNative
+
+[<Import("homedir", "os")>]
+let homeDirectory () : string = jsNative
+
 [<Emit("$0.length")>]
 let bufferLength (buffer: obj) : int = jsNative
 
