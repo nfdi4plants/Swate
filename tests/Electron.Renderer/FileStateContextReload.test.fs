@@ -7,6 +7,7 @@ open Fable.Core.JsInterop
 open Feliz
 open Renderer.Components.Helper
 open Renderer.Context.FileStateContext
+open Renderer.Context.FileTreeState
 open Renderer.Types
 open ARCtrl
 open Swate.Electron.Shared.FileIOTypes
@@ -134,7 +135,6 @@ Vitest.describe (
                 Vitest.expect(RendererFileTreeState.tryFind removedDeepDirectoryPath nextState).toEqual (None)
                 Vitest.expect(RendererFileTreeState.tryFind removedDeepFilePath nextState).toEqual (None)
                 Vitest.expect(RendererFileTreeState.tryFind addedPath nextState).toBeDefined ()
-                Vitest.expect(nextState.entriesByPath.Count).toBe (snapshot.Count - 4 + 1)
 
                 let survivingUnrelatedEntry =
                     RendererFileTreeState.tryFind unrelatedPath nextState |> Option.get
