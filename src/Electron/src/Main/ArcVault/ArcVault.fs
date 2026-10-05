@@ -19,6 +19,7 @@ open Swate.Components.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
+open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
 
@@ -78,11 +79,15 @@ type ArcVault(window: BrowserWindow) =
     member val hasUnsavedArcChanges: bool = false with get, private set
     member val fileTree: Dictionary<string, FileEntry> = Dictionary<string, FileEntry>() with get, set
     member val watcher: Chokidar.IWatcher option = None with get, set
+    member val loadedDirectoryWatcher: Chokidar.IWatcher option = None with get, set
+    member val loadedFileTreeDirectories: HashSet<string> = HashSet() with get
     member val fileWatcherReloadArcTimeout: int option = None with get, set
     member val fileWatcherPendingEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
     member val fileWatcherPendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
     /// The barrier stays None outside tests. The watcher path awaits it between snapshot loading and the final eligibility check.
     member val internal WatcherMergeBarrier: (unit -> Fable.Core.JS.Promise<unit>) option = None with get, set
+    /// Tests may pause a queued shallow refresh to verify FileTree serialization.
+    member val internal FileTreeRefreshBarrier: (unit -> Fable.Core.JS.Promise<unit>) option = None with get, set
     /// Imported paths awaiting their delayed Chokidar events. These events update the tree but must not re-merge the import.
     member val importedFileWatcherPaths: HashSet<string> = HashSet() with get
     member val private isBusyWritingValue: bool = false with get, set
@@ -295,6 +300,77 @@ module ArcVaultExtensions =
 
             this.FileTreeUpdateTail <- queuedUpdate |> Promise.catch (fun _ -> ())
             queuedUpdate
+
+        member private this.NormalizeLoadedDirectoryPath(relativeDirectoryPath: string) =
+            PathHelpers.normalizeCanonicalRelativePath relativeDirectoryPath
+
+        member this.IsFileTreeDirectoryLoaded(relativeDirectoryPath: string) =
+            relativeDirectoryPath
+            |> this.NormalizeLoadedDirectoryPath
+            |> this.loadedFileTreeDirectories.Contains
+
+        member private this.RemoveUnavailableLoadedDirectories(arcPath: string) = promise {
+            let unavailable =
+                this.loadedFileTreeDirectories
+                |> Seq.filter (fun relativePath ->
+                    let absolutePath = join [| arcPath; relativePath |] |> PathHelpers.normalizePath
+
+                    this.fileTree.Values
+                    |> Seq.exists (fun entry -> entry.isDirectory && PathHelpers.pathsEqual entry.path absolutePath)
+                    |> not
+                )
+                |> Seq.toArray
+
+            unavailable
+            |> Array.iter (fun relativePath ->
+                this.loadedFileTreeDirectories.Remove(relativePath) |> ignore
+
+                this.loadedDirectoryWatcher
+                |> Option.iter (fun watcher -> watcher.unwatch (join [| arcPath; relativePath |]) |> Promise.start)
+            )
+        }
+
+        member private this.EnsureLoadedDirectoryWatcher(relativeDirectoryPath: string) =
+            match this.path with
+            | None -> ()
+            | Some _ when System.String.IsNullOrWhiteSpace relativeDirectoryPath -> ()
+            | Some arcPath ->
+                let absolutePath = join [| arcPath; relativeDirectoryPath |]
+
+                match this.loadedDirectoryWatcher with
+                | Some watcher -> watcher.add absolutePath
+                | None ->
+                    let watcher = createLoadedDirectoryWatcher arcPath [| absolutePath |]
+
+                    watcher.on (
+                        Chokidar.Events.All,
+                        fun eventName changedPath ->
+                            if
+                                not (WatcherHelpers.eventNameEquals Chokidar.Events.Error eventName)
+                                && not (WatcherHelpers.eventNameEquals Chokidar.Events.Ready eventName)
+                            then
+                                let absoluteChangedPath =
+                                    if isAbsolute changedPath then
+                                        changedPath
+                                    else
+                                        join [| arcPath; changedPath |]
+
+                                match tryGetRepoRelativePath arcPath (dirname absoluteChangedPath) with
+                                | Some parentPath when this.IsFileTreeDirectoryLoaded parentPath ->
+                                    this.RefreshFileTreeDirectory parentPath
+                                    |> Promise.catch (fun refreshError ->
+                                        swatelogfn
+                                            this.window.id
+                                            "Unable to refresh loaded directory '%s': %s"
+                                            parentPath
+                                            refreshError.Message
+                                    )
+                                    |> Promise.start
+                                | _ -> ()
+                    )
+                    |> ignore
+
+                    this.loadedDirectoryWatcher <- Some watcher
 
         /// Returns the load error to the import caller when loading fails. The import can then report that its in-memory merge did not happen.
         member this.TryTriggerArcInMemoryMergeOnFileWatcherEvents(events: ArcVaultFileSystemEvent list) = promise {
@@ -638,13 +714,12 @@ module ArcVaultExtensions =
 
                                     match arcFile with
                                     | ArcFiles.DataMap(Some parentInfo, _) ->
-                                        let! refreshedFileTree =
-                                            refreshFileTreeEntry
-                                                arcPath
-                                                (DatamapParentInfo.toPath parentInfo)
-                                                this.fileTree
+                                        let parentPath =
+                                            DatamapParentInfo.toPath parentInfo
+                                            |> PathHelpers.tryGetParentPath
+                                            |> Option.defaultValue ""
 
-                                        this.SetFileTree refreshedFileTree
+                                        do! this.RefreshFileTreeDirectory parentPath
                                     | _ -> ()
 
                                     return Ok()
@@ -672,16 +747,59 @@ module ArcVaultExtensions =
 
             WindowSend.send<IFileTreeRendererApi> this.window (fun api -> api.fileTreeUpdate rendererFileTree)
 
-        member this.RefreshFileTreeDirectory(relativeDirectoryPath: string) = promise {
-            match this.path with
-            | None -> return raise (arcNotOpenError ())
-            | Some arcPath ->
-                let! children = readFileTreeDirectory arcPath relativeDirectoryPath
+        member this.RefreshFileTreeDirectory(relativeDirectoryPath: string) =
+            let normalizedRelativePath = this.NormalizeLoadedDirectoryPath relativeDirectoryPath
+            let capturedWatcherEpoch = this.WatcherEpoch
 
-                let nextFileTree =
-                    reconcileFileTreeDirectory arcPath relativeDirectoryPath children this.fileTree
+            let queuedUpdate =
+                this.FileTreeUpdateTail
+                |> Promise.bind (fun () -> promise {
+                    match this.path with
+                    | None -> return raise (arcNotOpenError ())
+                    | Some _ when capturedWatcherEpoch <> this.WatcherEpoch -> ()
+                    | Some arcPath ->
+                        try
+                            let! children = readFileTreeDirectory arcPath normalizedRelativePath
 
-                this.SetFileTree nextFileTree
+                            match this.FileTreeRefreshBarrier with
+                            | Some barrier -> do! barrier ()
+                            | None -> ()
+
+                            let nextFileTree =
+                                reconcileFileTreeDirectory arcPath normalizedRelativePath children this.fileTree
+
+                            this.SetFileTree nextFileTree
+
+                            if not (System.String.IsNullOrWhiteSpace normalizedRelativePath) then
+                                this.loadedFileTreeDirectories.Add(normalizedRelativePath) |> ignore
+                                this.EnsureLoadedDirectoryWatcher normalizedRelativePath
+
+                            do! this.RemoveUnavailableLoadedDirectories arcPath
+                        with refreshError ->
+                            if not (System.String.IsNullOrWhiteSpace normalizedRelativePath) then
+                                this.loadedFileTreeDirectories.Remove(normalizedRelativePath) |> ignore
+
+                                match this.loadedDirectoryWatcher with
+                                | Some watcher -> do! watcher.unwatch (join [| arcPath; normalizedRelativePath |])
+                                | None -> ()
+
+                            return raise refreshError
+                })
+
+            this.FileTreeUpdateTail <- queuedUpdate |> Promise.catch (fun _ -> ())
+            queuedUpdate
+
+        /// Refreshes a directory only when File Explorer already knows its contents.
+        /// The root is always visible and is therefore always eligible.
+        member this.RefreshFileTreeDirectoryIfLoaded(relativeDirectoryPath: string) = promise {
+            if
+                System.String.IsNullOrWhiteSpace relativeDirectoryPath
+                || this.IsFileTreeDirectoryLoaded relativeDirectoryPath
+            then
+                do! this.RefreshFileTreeDirectory relativeDirectoryPath
+                return true
+            else
+                return false
         }
 
         member this.GetRendererFileTreeSnapshot() = promise {
@@ -745,6 +863,17 @@ module ArcVaultExtensions =
                     ()
 
             this.watcher <- None
+
+            match this.loadedDirectoryWatcher with
+            | None -> ()
+            | Some watcher ->
+                try
+                    do! watcher.close ()
+                with _ ->
+                    ()
+
+            this.loadedDirectoryWatcher <- None
+            this.loadedFileTreeDirectories.Clear()
             this.ClearPendingFileWatcherState()
         }
 
@@ -857,8 +986,8 @@ module ArcVaultExtensions =
                 else
                     this.ClearPendingFileWatcherState()
 
+                // A write can start while the watcher stops.
                 let! renameResult =
-                    // A write can start while the watcher stops.
                     if this.isBusyWriting then
                         promise { return Error(busyWritingError ()) }
                     else
@@ -1052,6 +1181,15 @@ type ArcVaults() =
     }
 
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
+        window.onFocus (fun () ->
+            if vault.path.IsSome && not vault.isInitializingArc then
+                vault.RefreshFileTreeDirectory ""
+                |> Promise.catch (fun refreshError ->
+                    swatelogfn id "Unable to refresh the ARC root after window focus: %s" refreshError.Message
+                )
+                |> Promise.start
+        )
+
         window.onClose (fun closeEvent ->
             let operationCloseApproved = vault.isOperationCloseApproved
             vault.isOperationCloseApproved <- false

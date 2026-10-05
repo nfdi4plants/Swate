@@ -426,6 +426,20 @@ let createFileWatcher (path: string) (usePolling: bool option) =
 
     watcher
 
+/// Creates the native, shallow watcher used only for FileTree directories that were explicitly loaded.
+let createLoadedDirectoryWatcher (arcPath: string) (paths: string[]) =
+    Chokidar.Chokidar.watch (
+        paths,
+        Chokidar.WatchOptions(
+            cwd = arcPath,
+            awaitWriteFinish = true,
+            ignored = !^isFileWatcherPathIgnored,
+            ignoreInitial = true,
+            usePolling = false,
+            depth = 0
+        )
+    )
+
 let sendArcHasUnsavedChangesUpdate (hasUnsavedChanges: bool) (window: BrowserWindow) =
     WindowSend.send<Swate.Electron.Shared.IPCTypes.MainToRendererIpc.IHasUnsavedArcChangesRendererApi>
         window

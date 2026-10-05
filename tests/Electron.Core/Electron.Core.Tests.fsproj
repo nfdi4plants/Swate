@@ -17,6 +17,7 @@
     <Compile Include="ArcMerge\EdgeCases.test.fs" />
     <Compile Include="FileTreeCompaction.test.fs" />
     <Compile Include="FileTreeCreator.test.fs" />
+    <Compile Include="LoadedDirectoryWatcher.test.fs" />
     <Compile Include="ArcFileMutationHelper.test.fs" />
     <Compile Include="ArcVaultHelper.test.fs" />
     <Compile Include="ArcAddExtensions.test.fs" />

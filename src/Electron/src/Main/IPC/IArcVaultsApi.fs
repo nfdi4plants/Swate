@@ -558,9 +558,20 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                         request.targetRelativePath
                                                         sourceAbsolutePaths
 
-                                                // Chokidar's awaitWriteFinish can emit these well after the import
-                                                // releases the busy flag, so ownership must outlive the write itself.
-                                                importedEvents
+                                                // Only retain ownership for paths covered by the permanent watcher.
+                                                // Loaded payload scopes are refreshed explicitly and their watcher
+                                                // events never enter the ARC metadata merge pipeline.
+                                                let ownedWatcherEvents =
+                                                    importedEvents
+                                                    |> Array.filter (fun event ->
+                                                        not (
+                                                            isPermanentFileWatcherPathIgnored
+                                                                vault.path.Value
+                                                                event.AbsolutePath
+                                                        )
+                                                    )
+
+                                                ownedWatcherEvents
                                                 |> Array.iter (fun event ->
                                                     vault.importedFileWatcherPaths.Add(
                                                         PathHelpers.normalizePath (
@@ -571,7 +582,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                 )
 
                                                 let releaseImportEventOwnership () =
-                                                    importedEvents
+                                                    ownedWatcherEvents
                                                     |> Array.iter (fun event ->
                                                         vault.importedFileWatcherPaths.Remove(
                                                             PathHelpers.normalizePath (
@@ -616,7 +627,12 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                     |> Promise.catch Error
 
                                                 match result with
-                                                | Ok ImportExternalFilesResult.Completed -> ()
+                                                | Ok ImportExternalFilesResult.Completed ->
+                                                    let! _ =
+                                                        vault.RefreshFileTreeDirectoryIfLoaded
+                                                            request.targetRelativePath
+
+                                                    ()
                                                 | _ -> releaseImportEventOwnership ()
 
                                                 vault.window.setProgressBar -1.0
@@ -855,12 +871,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                 | Ok() ->
                                                     vault.RefreshHasUnsavedArcChangesFlag()
 
-                                                    let absoluteDataMapPath =
-                                                        Main.Bindings.Path.join [| arcPath; normalizedDataMapPath |]
+                                                    let parentPath =
+                                                        PathHelpers.tryGetParentPath normalizedDataMapPath
+                                                        |> Option.defaultValue ""
 
-                                                    vault.SetFileTree(
-                                                        removePathAndDescendants absoluteDataMapPath vault.fileTree
-                                                    )
+                                                    do! vault.RefreshFileTreeDirectory parentPath
 
                                                     return Ok()
                                             })
