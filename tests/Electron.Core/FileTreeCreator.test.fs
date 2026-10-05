@@ -14,6 +14,7 @@ open Vitest
 open ElectronCore.TestHelpers
 
 module FileTreeCreator = Main.FileTreeCreator
+module ArcVaultHelper = Main.ArcVaultHelper
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private osDynamic: obj = importAll "os"
@@ -70,6 +71,25 @@ let private writeUtf8FileAsync (path: string) (content: string) : Fable.Core.JS.
         |> unbox<Fable.Core.JS.Promise<obj>>
 
     return ()
+}
+
+let private createDirectoryAtAsync (path: string) : Fable.Core.JS.Promise<unit> = promise {
+    let! _ =
+        fsPromisesDynamic?mkdir (path, createObj [ "recursive" ==> true ])
+        |> unbox<Fable.Core.JS.Promise<obj>>
+
+    return ()
+}
+
+let private withTempDirectory (testBody: string -> Fable.Core.JS.Promise<unit>) = promise {
+    let! rootPath = createTempDirectoryAsync ()
+
+    try
+        do! testBody rootPath
+        do! removeDirectoryAsync rootPath
+    with error ->
+        do! removeDirectoryAsync rootPath
+        return raise error
 }
 
 let private runGitAsync (repoPath: string) (args: string[]) : Fable.Core.JS.Promise<string> = promise {
@@ -350,5 +370,128 @@ Vitest.describe (
                         Vitest.expect(plainEntry.largeObject).toEqual (None)
                     })
             }
+        )
+)
+
+Vitest.describe (
+    "shallow FileTree loading",
+    fun () ->
+        Vitest.test (
+            "startup includes only the root and direct children even for a large nested payload",
+            fileTreeCreatorTestOptions,
+            fun () -> promise {
+                do!
+                    withTempDirectory (fun rootPath -> promise {
+                        let payloadPath = join [| rootPath; "dataset" |]
+                        do! createDirectoryAtAsync payloadPath
+                        do! writeUtf8FileAsync (join [| rootPath; "README.md" |]) "ARC"
+
+                        let writes =
+                            Array.init
+                                1000
+                                (fun index ->
+                                    writeUtf8FileAsync (join [| payloadPath; $"file-{index:D4}.txt" |]) "payload"
+                                )
+
+                        let! _ = Fable.Core.JS.Constructors.Promise.all writes
+                        let! tree = FileTreeCreator.getFileTree rootPath
+                        let names = tree.Values |> Seq.map _.name |> Seq.toArray
+
+                        Vitest.expect(tree.Count).toBe (3)
+                        Vitest.expect(names |> Array.contains "README.md").toBe (true)
+                        Vitest.expect(names |> Array.contains "dataset").toBe (true)
+                        Vitest.expect(names |> Array.contains "file-0000.txt").toBe (false)
+                    })
+            }
+        )
+
+        Vitest.test (
+            "each shallow read loads exactly one expanded level",
+            fileTreeCreatorTestOptions,
+            fun () -> promise {
+                do!
+                    withTempDirectory (fun rootPath -> promise {
+                        let studiesPath = join [| rootPath; "studies" |]
+                        let studyPath = join [| studiesPath; "S1" |]
+                        let datasetPath = join [| studyPath; "dataset" |]
+                        do! createDirectoryAtAsync datasetPath
+                        do! writeUtf8FileAsync (join [| studyPath; "isa.study.xlsx" |]) "study"
+                        do! writeUtf8FileAsync (join [| datasetPath; "sample.txt" |]) "sample"
+
+                        let! studiesChildren = FileTreeCreator.readFileTreeDirectory rootPath "studies"
+                        Vitest.expect(studiesChildren |> Array.map _.name).toEqual ([| "S1" |])
+
+                        let! studyChildren = FileTreeCreator.readFileTreeDirectory rootPath "studies/S1"
+                        let childNames = studyChildren |> Array.map _.name |> Array.sort
+                        Vitest.expect(childNames).toEqual ([| "dataset"; "isa.study.xlsx" |])
+
+                        Vitest
+                            .expect(studyChildren |> Array.exists (fun entry -> entry.name = "sample.txt"))
+                            .toBe (false)
+                    })
+            }
+        )
+
+        Vitest.test (
+            "directory reconciliation adds and removes direct children while preserving surviving descendants",
+            fun () ->
+                let rootPath = "C:/arc"
+                let studiesPath = $"{rootPath}/studies"
+                let removedPath = $"{studiesPath}/removed"
+                let survivingPath = $"{studiesPath}/surviving"
+
+                let initial =
+                    [|
+                        FileEntry.create ("arc", rootPath, true)
+                        FileEntry.create ("studies", studiesPath, true)
+                        FileEntry.create ("removed", removedPath, true)
+                        FileEntry.create ("old.txt", $"{removedPath}/old.txt", false)
+                        FileEntry.create ("surviving", survivingPath, true)
+                        FileEntry.create ("known.txt", $"{survivingPath}/known.txt", false)
+                    |]
+                    |> createFileEntryTree
+
+                let currentChildren = [|
+                    FileEntry.create ("surviving", survivingPath, true)
+                    FileEntry.create ("new.txt", $"{studiesPath}/new.txt", false)
+                |]
+
+                let reconciled =
+                    FileTreeCreator.reconcileFileTreeDirectory rootPath "studies" currentChildren initial
+
+                Vitest.expect(reconciled.ContainsKey(removedPath)).toBe (false)
+                Vitest.expect(reconciled.ContainsKey($"{removedPath}/old.txt")).toBe (false)
+                Vitest.expect(reconciled.ContainsKey($"{survivingPath}/known.txt")).toBe (true)
+                Vitest.expect(reconciled.ContainsKey($"{studiesPath}/new.txt")).toBe (true)
+        )
+
+        Vitest.test (
+            "permanent watcher includes canonical structure and excludes deep payload files",
+            fun () ->
+                let rootPath = "C:/arc"
+
+                Vitest
+                    .expect(ArcVaultHelper.isPermanentFileWatcherPathIgnored rootPath $"{rootPath}/studies")
+                    .toBe (false)
+
+                Vitest
+                    .expect(ArcVaultHelper.isPermanentFileWatcherPathIgnored rootPath $"{rootPath}/studies/S1")
+                    .toBe (false)
+
+                Vitest
+                    .expect(
+                        ArcVaultHelper.isPermanentFileWatcherPathIgnored
+                            rootPath
+                            $"{rootPath}/studies/S1/isa.study.xlsx"
+                    )
+                    .toBe (false)
+
+                Vitest
+                    .expect(
+                        ArcVaultHelper.isPermanentFileWatcherPathIgnored
+                            rootPath
+                            $"{rootPath}/studies/S1/dataset/file-99999.txt"
+                    )
+                    .toBe (true)
         )
 )

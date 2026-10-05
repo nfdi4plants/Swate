@@ -294,10 +294,17 @@ type FileTree =
         )
 
         let handleExpansionChange (item: FileItem) (willExpand: bool) =
-            if willExpand then
-                match item.Path with
-                | Some path -> setMaterializedState (fun _ -> materialize path reconciledMaterializedState)
-                | None -> ()
+            match item.Path with
+            | Some path when willExpand ->
+                setMaterializedState (fun _ -> materialize path reconciledMaterializedState)
+
+                promise {
+                    let! _ = Api.ipcArcVaultApi.refreshFileTreeDirectory path
+                    return ()
+                }
+                |> Promise.start
+            | Some path -> setMaterializedState (fun _ -> dematerialize path reconciledMaterializedState)
+            | None -> ()
 
         let openDialog dialog =
             setIsDialogBusy false

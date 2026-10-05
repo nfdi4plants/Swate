@@ -162,6 +162,100 @@ let getFileEntry (path: string) = promise {
     return FileEntry.create (basename path, path, stats.isDirectory (), None)
 }
 
+let private resolveFileTreeDirectory (arcPath: string) (relativeDirectoryPath: string) =
+    let normalizedArcPath = normalizeRootPath arcPath
+
+    let normalizedRelativePath =
+        PathHelpers.normalizeCanonicalRelativePath relativeDirectoryPath
+
+    if PathHelpers.containsPathTraversalSegments normalizedRelativePath then
+        invalidArg (nameof relativeDirectoryPath) "The FileTree directory must stay inside the ARC."
+
+    let resolvedDirectoryPath =
+        resolve [| normalizedArcPath; normalizedRelativePath |]
+        |> PathHelpers.normalizePath
+
+    if not (PathHelpers.isSameOrDescendantPath resolvedDirectoryPath normalizedArcPath) then
+        invalidArg (nameof relativeDirectoryPath) "The FileTree directory must stay inside the ARC."
+
+    resolvedDirectoryPath
+
+/// Reads exactly the immediate children of one ARC-relative directory.
+let readFileTreeDirectory (arcPath: string) (relativeDirectoryPath: string) : Fable.Core.JS.Promise<FileEntry[]> = promise {
+    let normalizedArcPath = normalizeRootPath arcPath
+    let directoryPath = resolveFileTreeDirectory normalizedArcPath relativeDirectoryPath
+    let! dirents = readdirWithTypesAsync directoryPath (ReaddirOptions(withFileTypes = true))
+
+    let entries =
+        dirents
+        |> Array.choose (fun dirent ->
+            let name = dirent.name
+            let isDirectory = dirent.isDirectory ()
+            let fullPath = join [| directoryPath; name |] |> PathHelpers.normalizeSeparators
+
+            if
+                (isDirectory && shouldIgnoreDirName name)
+                || (not isDirectory && shouldIgnorePath fullPath)
+            then
+                None
+            else
+                Some(FileEntry.create (name, fullPath, isDirectory, None))
+        )
+
+    let! largeObjectsByRelativePath = tryListLargeObjects normalizedArcPath true
+    return withFileEntriesLfsMetadata normalizedArcPath largeObjectsByRelativePath entries
+}
+
+/// Builds the bounded startup snapshot: the ARC root and its immediate children.
+let getFileTree (path: string) : Fable.Core.JS.Promise<Dictionary<string, FileEntry>> = promise {
+    let normalizedArcPath = normalizeRootPath path
+    let! rootEntry = getFileEntry normalizedArcPath
+
+    if not rootEntry.isDirectory then
+        return createFileEntryTree [| rootEntry |]
+    else
+        let! children = readFileTreeDirectory normalizedArcPath ""
+        return createFileEntryTree (Array.append [| rootEntry |] children)
+}
+
+/// Reconciles one directory's direct children while retaining known descendants of surviving directories.
+let reconcileFileTreeDirectory
+    (arcPath: string)
+    (relativeDirectoryPath: string)
+    (currentChildren: FileEntry[])
+    (fileTree: Dictionary<string, FileEntry>)
+    : Dictionary<string, FileEntry> =
+    let directoryPath = resolveFileTreeDirectory arcPath relativeDirectoryPath
+    let nextTree = Dictionary<string, FileEntry>(fileTree)
+
+    let currentByPath =
+        currentChildren
+        |> Array.map (fun entry -> PathHelpers.normalizePath entry.path, entry)
+        |> Map.ofArray
+
+    let knownDirectChildren =
+        nextTree.Values
+        |> Seq.filter (fun entry ->
+            PathHelpers.pathsEqual (dirname (PathHelpers.normalizePath entry.path)) directoryPath
+        )
+        |> Seq.toArray
+
+    knownDirectChildren
+    |> Array.iter (fun knownChild ->
+        let normalizedChildPath = PathHelpers.normalizePath knownChild.path
+
+        if not (currentByPath.ContainsKey normalizedChildPath) then
+            let keysToRemove =
+                nextTree.Keys
+                |> Seq.filter (fun path -> PathHelpers.isSameOrDescendantPath path normalizedChildPath)
+                |> Seq.toArray
+
+            keysToRemove |> Array.iter (fun path -> nextTree.Remove(path) |> ignore)
+    )
+
+    currentChildren |> Array.iter (fun entry -> nextTree.[entry.path] <- entry)
+    nextTree
+
 /// Refreshes one known relative path without rescanning the ARC directory.
 let refreshFileTreeEntry
     (arcPath: string)
@@ -234,16 +328,4 @@ let getFileEntries (path: string) (openSession: bool) : Fable.Core.JS.Promise<Fi
         let scannedEntries = entries.ToArray()
         let! largeObjectsByRelativePath = tryListLargeObjects repoRoot openSession
         return withFileEntriesLfsMetadata repoRoot largeObjectsByRelativePath scannedEntries
-}
-
-/// Scans a path and builds its keyed file tree.
-let getFileTree (path: string) : Fable.Core.JS.Promise<Dictionary<string, FileEntry>> = promise {
-    let! fileEntries = getFileEntries path true
-    return createFileEntryTree fileEntries
-}
-
-/// Refreshes the tree without reopening a session that is being closed.
-let getFileTreeFromOpenSession (path: string) : Fable.Core.JS.Promise<Dictionary<string, FileEntry>> = promise {
-    let! fileEntries = getFileEntries path false
-    return createFileEntryTree fileEntries
 }

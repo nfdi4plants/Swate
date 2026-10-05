@@ -672,6 +672,19 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    refreshFileTreeDirectory =
+        fun (relativeDirectoryPath: string) -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            do! vault.RefreshFileTreeDirectory relativeDirectoryPath
+                            return Ok()
+                        })
+            with e ->
+                return Error e
+        }
     pathExists =
         fun (relativePath: string) ->
             runLoadedArcPathAction
@@ -776,7 +789,13 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     withLoadedArcVault
                         event
                         (fun vault -> promise {
-                            return! ArcFileSystemHelper.createFileSystemItemOnDisk vault.path.Value request
+                            let! result = ArcFileSystemHelper.createFileSystemItemOnDisk vault.path.Value request
+
+                            match result with
+                            | Ok _ -> do! vault.RefreshFileTreeDirectory request.parentPath
+                            | Error _ -> ()
+
+                            return result
                         })
             with e ->
                 return Error e
@@ -861,10 +880,21 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                 "Deletion is only allowed for safe non-ARC filesystem items inside the ARC."
                                         )
                                 else
-                                    return!
+                                    let! result =
                                         ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk
                                             arcPath
                                             normalizedGenericPath
+
+                                    match result with
+                                    | Ok() ->
+                                        let parentPath =
+                                            PathHelpers.tryGetParentPath normalizedGenericPath
+                                            |> Option.defaultValue ""
+
+                                        do! vault.RefreshFileTreeDirectory parentPath
+                                    | Error _ -> ()
+
+                                    return result
                             | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.InvestigationFile,
                                                                                               _) ->
                                 return Error(exn "Deleting the investigation file is not supported.")
@@ -895,7 +925,17 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                             match ArcEntityPathRules.classifyRenameTarget request.relativePath with
                             | ArcEntityPathRules.RenamePathClassification.GenericTarget _ ->
-                                return! ArcFileSystemHelper.renameGenericFileSystemItemOnDisk arcPath request
+                                let! result = ArcFileSystemHelper.renameGenericFileSystemItemOnDisk arcPath request
+
+                                match result with
+                                | Ok() ->
+                                    let parentPath =
+                                        PathHelpers.tryGetParentPath request.relativePath |> Option.defaultValue ""
+
+                                    do! vault.RefreshFileTreeDirectory parentPath
+                                | Error _ -> ()
+
+                                return result
                             | _ ->
                                 match vault.arc with
                                 | None -> return Error(arcNotOpenError ())
@@ -924,7 +964,25 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     withLoadedArcVault
                         event
                         (fun vault -> promise {
-                            return! ArcFileSystemHelper.moveGenericFileSystemItemOnDisk vault.path.Value request
+                            let! result = ArcFileSystemHelper.moveGenericFileSystemItemOnDisk vault.path.Value request
+
+                            match result with
+                            | Ok() ->
+                                let sourceParent =
+                                    PathHelpers.tryGetParentPath request.sourceRelativePath
+                                    |> Option.defaultValue ""
+
+                                let targetParent =
+                                    PathHelpers.tryGetParentPath request.targetRelativePath
+                                    |> Option.defaultValue ""
+
+                                do! vault.RefreshFileTreeDirectory sourceParent
+
+                                if not (PathHelpers.pathsEqual sourceParent targetParent) then
+                                    do! vault.RefreshFileTreeDirectory targetParent
+                            | Error _ -> ()
+
+                            return result
                         })
             with e ->
                 return Error e
@@ -977,8 +1035,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                                             do! ARCtrl.FileSystemHelper.writeFileTextAsync absolutePath request.content
 
-                                            do! refreshVaultFileTree vault
-                                            return Ok()
+                                            match tryGetArcRelativePath arcPath directoryPath with
+                                            | Ok relativeParentPath ->
+                                                do! vault.RefreshFileTreeDirectory relativeParentPath
+                                                return Ok()
+                                            | Error pathError -> return Error pathError
                                         | FileContentType.CLI ->
                                             return Error(exn "Direct writing of CLI files is not supported.")
                                         | FileContentType.FileContentTypeIsISAFileVariant ->

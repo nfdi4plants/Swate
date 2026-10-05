@@ -361,6 +361,42 @@ let isFileWatcherPathIgnored (path: string) =
     || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryImportPattern)
     || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
 
+let isPermanentFileWatcherPathIgnored (arcPath: string) (path: string) =
+    if isFileWatcherPathIgnored path then
+        true
+    else
+        match tryGetRepoRelativePathOrRoot arcPath path with
+        | None -> true
+        | Some relativePath ->
+            let segments =
+                (PathHelpers.normalizeCanonicalRelativePath relativePath)
+                    .Split([| '/' |], System.StringSplitOptions.RemoveEmptyEntries)
+
+            match segments with
+            | [||] -> false
+            | [| rootName |] ->
+                let structuralRootNames = [
+                    ARCtrl.ArcPathHelper.InvestigationFileName
+                    ARCtrl.ArcPathHelper.StudiesFolderName
+                    ARCtrl.ArcPathHelper.AssaysFolderName
+                    ARCtrl.ArcPathHelper.WorkflowsFolderName
+                    ARCtrl.ArcPathHelper.RunsFolderName
+                    ".gitattributes"
+                    "README.md"
+                ]
+
+                PathHelpers.pathMatchesAny structuralRootNames rootName |> not
+            | [| zoneName; _ |] ->
+                let zoneNames = [
+                    ARCtrl.ArcPathHelper.StudiesFolderName
+                    ARCtrl.ArcPathHelper.AssaysFolderName
+                    ARCtrl.ArcPathHelper.WorkflowsFolderName
+                    ARCtrl.ArcPathHelper.RunsFolderName
+                ]
+
+                PathHelpers.pathMatchesAny zoneNames zoneName |> not
+            | _ -> ArcEntityPathRules.tryParseCanonicalArcFileTarget relativePath |> Option.isNone
+
 let createFileWatcher (path: string) (usePolling: bool option) =
 
     // Native Windows file events can keep handles that block app-initiated folder renames.
@@ -372,7 +408,7 @@ let createFileWatcher (path: string) (usePolling: bool option) =
             Chokidar.WatchOptions(
                 cwd = path,
                 awaitWriteFinish = true,
-                ignored = !^isFileWatcherPathIgnored,
+                ignored = !^(isPermanentFileWatcherPathIgnored path),
                 ignoreInitial = true,
                 usePolling = true,
                 interval = 200,
@@ -382,7 +418,7 @@ let createFileWatcher (path: string) (usePolling: bool option) =
             Chokidar.WatchOptions(
                 cwd = path,
                 awaitWriteFinish = true,
-                ignored = !^isFileWatcherPathIgnored,
+                ignored = !^(isPermanentFileWatcherPathIgnored path),
                 ignoreInitial = true
             )
 
