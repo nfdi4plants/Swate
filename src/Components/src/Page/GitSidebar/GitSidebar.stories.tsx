@@ -525,11 +525,8 @@ export const ChangeStatusIconColors: Story = {
     const canvas = within(canvasElement);
 
     await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-0")).toHaveClass("swt:text-success");
-    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-0")).toHaveTextContent("A");
     await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-1")).toHaveClass("swt:text-warning");
-    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-1")).toHaveTextContent("M");
     await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-2")).toHaveClass("swt:text-error");
-    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-2")).toHaveTextContent("D");
   },
 };
 

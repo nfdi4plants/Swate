@@ -75,6 +75,70 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "orders recognized ARC items before other root-level items",
+            fun () ->
+                let root =
+                    directoryNode "arc" "arc" [
+                        fileNode "zebra.txt" "arc/zebra.txt"
+                        directoryNode "studies" "arc/studies" []
+                        directoryNode "notes" "arc/notes" []
+                        directoryNode "runs" "arc/runs" []
+                        fileNode "alpha.txt" "arc/alpha.txt"
+                        fileNode "README.md" "arc/README.md"
+                        directoryNode "workflows" "arc/workflows" []
+                        fileNode "isa.investigation.xlsx" "arc/isa.investigation.xlsx"
+                        directoryNode "assays" "arc/assays" []
+                    ]
+
+                let item = toFileItemTree (Set.singleton "arc") root
+                let childNames = item.Children.Value |> List.map _.Name
+
+                Vitest
+                    .expect(childNames)
+                    .toEqual (
+                        [
+                            "notes"
+                            "README.md"
+                            "isa.investigation.xlsx"
+                            "studies"
+                            "assays"
+                            "workflows"
+                            "runs"
+                            "alpha.txt"
+                            "zebra.txt"
+                        ]
+                    )
+        )
+
+        Vitest.test (
+            "orders only root-level items",
+            fun () ->
+                let notes =
+                    directoryNode "notes" "arc/notes" [
+                        fileNode "zebra.md" "arc/notes/zebra.md"
+                        fileNode "apple.md" "arc/notes/apple.md"
+                    ]
+
+                let root =
+                    directoryNode "arc" "arc" [
+                        fileNode "another-file.txt" "arc/another-file.txt"
+                        notes
+                    ]
+
+                let item = toFileItemTree (Set.ofList [ "arc"; "arc/notes" ]) root
+                let childNames = item.Children.Value |> List.map _.Name
+
+                Vitest.expect(childNames).toEqual ([ "notes"; "another-file.txt" ])
+
+                let materializedNotes =
+                    item.Children.Value |> List.find (fun child -> child.Name = "notes")
+
+                let noteNames = materializedNotes.Children.Value |> List.map _.Name
+
+                Vitest.expect(noteNames).toEqual ([ "zebra.md"; "apple.md" ])
+        )
+
+        Vitest.test (
             "snapshot reconciliation preserves surviving paths, prunes removed paths, and materializes selection",
             fun () ->
                 let kept =
