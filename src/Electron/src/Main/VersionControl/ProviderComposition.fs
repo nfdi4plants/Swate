@@ -53,61 +53,26 @@ let dataHubRevisionPolicy: RevisionPolicyStrategy = {
                 RevisionPathPolicy.Automatic
 }
 
-/// The Git factory whose sessions diff text in the shared worker pool. The pool is set up
-/// asynchronously, so Open waits for it and builds the pooled factory once. When the pool
-/// cannot be set up, sessions open without it. A diff Open then fails with
-/// diff_worker_failed, and calls on a handle answer diff_session_closed. `windowOwnerOf`
-/// names the window that started an operation, and the pool keeps each window's diff
-/// handles apart.
+/// The Git factory whose sessions diff text in the shared worker pool. A session asks for the
+/// pool on each diff Open until the pool is set up, so a failed setup fails only that Open
+/// with diff_worker_failed and the next Open tries the setup again. `windowOwnerOf` names the
+/// window that started an operation, and the pool keeps each window's diff handles apart.
 let createGitFactory
     (source: DataHubStrategies.DataHubAccountSource)
     (windowOwnerOf: OperationContext -> string)
     : ProviderFactory =
-    let credentials = DataHubStrategies.createCredentialStrategy source
-    let identity = DataHubStrategies.createIdentityStrategy source
-
-    let factoryWith textDiff =
-        GitWorkspaceSession.createFactoryWithOptions
-            {
-                Hooks = GitWorkspaceSession.GitSessionHooks.none
-                TextDiff = textDiff
-            }
-            credentials
-            identity
-            dataHubRevisionPolicy
-
-    let withoutPool = factoryWith None
-    let mutable pooled: ProviderFactory option = None
-
-    let pooledFactory pool =
-        match pooled with
-        | Some factory -> factory
-        | None ->
-            let factory =
-                factoryWith (
-                    Some {
-                        Pool = pool
-                        WindowOwnerOf = windowOwnerOf
-                    }
-                )
-
-            pooled <- Some factory
-            factory
-
-    {
-        withoutPool with
-            Open =
-                fun binding context -> async {
-                    let! pool = TextDiffWorkers.pool () |> Async.AwaitPromise
-
-                    let factory =
-                        match pool with
-                        | Some pool -> pooledFactory pool
-                        | None -> withoutPool
-
-                    return! factory.Open binding context
+    GitWorkspaceSession.createFactoryWithOptions
+        {
+            Hooks = GitWorkspaceSession.GitSessionHooks.none
+            TextDiff =
+                Some {
+                    Pool = TextDiffWorkers.pool
+                    WindowOwnerOf = windowOwnerOf
                 }
-    }
+        }
+        (DataHubStrategies.createCredentialStrategy source)
+        (DataHubStrategies.createIdentityStrategy source)
+        dataHubRevisionPolicy
 
 let lakeFsOptions
     (settingsRoot: string)
