@@ -185,7 +185,7 @@ Vitest.describe (
     "FileTreeCreator LFS metadata",
     fun () ->
         Vitest.test (
-            "getFileEntries annotates materialized and pointer large objects",
+            "individual entries annotate materialized and pointer large objects",
             fileTreeCreatorTestOptions,
             fun () -> promise {
                 do!
@@ -213,19 +213,11 @@ Vitest.describe (
 
                         do! writeUtf8FileAsync pointerFilePath pointerContents
 
-                        let! entries = FileTreeCreator.getFileEntries context.RepoPath true
+                        let! pointerEntry =
+                            FileTreeCreator.getFileEntryWithLfsMetadata context.RepoPath pointerFilePath
 
-                        let pointerEntry =
-                            entries
-                            |> Microsoft.FSharp.Collections.Array.find (fun entry ->
-                                normalizeSlashes entry.path = normalizeSlashes pointerFilePath
-                            )
-
-                        let downloadedEntry =
-                            entries
-                            |> Microsoft.FSharp.Collections.Array.find (fun entry ->
-                                normalizeSlashes entry.path = normalizeSlashes downloadedFilePath
-                            )
+                        let! downloadedEntry =
+                            FileTreeCreator.getFileEntryWithLfsMetadata context.RepoPath downloadedFilePath
 
                         Vitest.expect(pointerEntry.largeObject.IsSome).toBe (true)
                         Vitest.expect(downloadedEntry.largeObject.IsSome).toBe (true)
@@ -361,11 +353,7 @@ Vitest.describe (
                         let plainFilePath = join [| context.RepoPath; "plain.txt" |]
                         do! writeUtf8FileAsync plainFilePath "Plain text.\n"
 
-                        let! entries = FileTreeCreator.getFileEntries context.RepoPath true
-
-                        let plainEntry =
-                            entries
-                            |> Array.find (fun entry -> normalizeSlashes entry.path = normalizeSlashes plainFilePath)
+                        let! plainEntry = FileTreeCreator.getFileEntryWithLfsMetadata context.RepoPath plainFilePath
 
                         Vitest.expect(plainEntry.largeObject).toEqual (None)
                     })

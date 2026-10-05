@@ -1237,7 +1237,7 @@ Vitest.describe (
             "a save stores a small dataset file as a large object",
             fun () ->
                 withFixture (fun fixture -> promise {
-                    let vault = registerVault 62 fixture.RepoRoot
+                    registerVault 62 fixture.RepoRoot |> ignore
                     let api = Main.IPC.IVersionControlApi.api (ipcEvent 62)
                     let datasetPath = "assays/a1/dataset/raw.bin"
 
@@ -1264,19 +1264,9 @@ Vitest.describe (
                         git fixture.RepoRoot [ "cat-file"; "-p"; $"HEAD:{datasetPath}" ]
 
                     let attributes = git fixture.RepoRoot [ "cat-file"; "-p"; "HEAD:.gitattributes" ]
-                    let datasetAbsolutePath = join [| fixture.RepoRoot; datasetPath |]
-
-                    let datasetEntry =
-                        vault.fileTree.Values
-                        |> Seq.tryFind (fun entry ->
-                            Swate.Components.Shared.PathHelpers.pathsEqual entry.path datasetAbsolutePath
-                        )
-                        |> Option.defaultWith (fun () -> failwith "The refreshed file tree omitted the dataset file.")
-
                     Vitest.expect(datasetContent.StartsWith("version https://git-lfs.github.com/spec/v1")).toBe true
 
                     Vitest.expect(attributes.Contains(datasetPath)).toBe true
-                    Vitest.expect(datasetEntry.largeObject.IsSome).toBe true
                 })
         )
 

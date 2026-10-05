@@ -3,7 +3,6 @@ module ElectronCore.NoteSearchReaderTests
 open Fable.Core
 open Fable.Core.JsInterop
 open Main.NoteSearchReader
-open Swate.Electron.Shared.FileIOTypes
 open Vitest
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
@@ -75,7 +74,7 @@ Vitest.describe (
                     fsPromisesDynamic?writeFile (notePath, noteMarkdown, "utf8")
                     |> unbox<JS.Promise<unit>>
 
-                let! notes = readNotes repoRoot [| FileEntry.create ("my_note.md", notePath, false) |]
+                let! notes = readNotes repoRoot
 
                 Vitest.expect(notes.Length).toBe (1)
                 let note = notes.[0]
@@ -119,7 +118,7 @@ Vitest.describe (
                     fsPromisesDynamic?writeFile (notePath, markdownWithoutFrontmatter, "utf8")
                     |> unbox<JS.Promise<unit>>
 
-                let! notes = readNotes repoRoot [| FileEntry.create ("plain_note.md", notePath, false) |]
+                let! notes = readNotes repoRoot
 
                 Vitest.expect(notes.Length).toBe (0)
             }
@@ -148,11 +147,115 @@ Vitest.describe (
                     fsPromisesDynamic?writeFile (notePath, noTagsMarkdown, "utf8")
                     |> unbox<JS.Promise<unit>>
 
-                let! notes = readNotes repoRoot [| FileEntry.create ("untagged_note.md", notePath, false) |]
+                let! notes = readNotes repoRoot
 
                 Vitest.expect(notes.Length).toBe (1)
 
                 Vitest.expect(notes.[0].Tags.IsNone).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "discovers nested notes directly while ignoring non-note and out-of-scope files",
+            fun () -> promise {
+                let tmpDir = osDynamic?tmpdir () |> unbox<string>
+
+                let! repoRoot =
+                    fsPromisesDynamic?mkdtemp (pathDynamic?join (tmpDir, "swate-notes-discovery-"))
+                    |> unbox<JS.Promise<string>>
+
+                let nestedNotesDir =
+                    pathDynamic?join (repoRoot, "notes", "2026-04-27", "nested") |> unbox<string>
+
+                let outsideDir = pathDynamic?join (repoRoot, "studies") |> unbox<string>
+
+                let! _ =
+                    fsPromisesDynamic?mkdir (nestedNotesDir, createObj [ "recursive" ==> true ])
+                    |> unbox<JS.Promise<obj>>
+
+                let! _ =
+                    fsPromisesDynamic?mkdir (outsideDir, createObj [ "recursive" ==> true ])
+                    |> unbox<JS.Promise<obj>>
+
+                let nestedNotePath = pathDynamic?join (nestedNotesDir, "nested.md") |> unbox<string>
+
+                let ignoredTextPath =
+                    pathDynamic?join (nestedNotesDir, "ignored.txt") |> unbox<string>
+
+                let outsideNotePath = pathDynamic?join (outsideDir, "outside.md") |> unbox<string>
+
+                let! _ =
+                    fsPromisesDynamic?writeFile (nestedNotePath, noteMarkdown, "utf8")
+                    |> unbox<JS.Promise<unit>>
+
+                let! _ =
+                    fsPromisesDynamic?writeFile (ignoredTextPath, noteMarkdown, "utf8")
+                    |> unbox<JS.Promise<unit>>
+
+                let! _ =
+                    fsPromisesDynamic?writeFile (outsideNotePath, noteMarkdown, "utf8")
+                    |> unbox<JS.Promise<unit>>
+
+                let! notes = readNotes repoRoot
+
+                Vitest.expect(notes.Length).toBe (1)
+                Vitest.expect(notes.[0].RelativePath).toBe ("notes/2026-04-27/nested/nested.md")
+            }
+        )
+
+        Vitest.test (
+            "returns an empty result when the notes folder is missing",
+            fun () -> promise {
+                let tmpDir = osDynamic?tmpdir () |> unbox<string>
+
+                let! repoRoot =
+                    fsPromisesDynamic?mkdtemp (pathDynamic?join (tmpDir, "swate-no-notes-"))
+                    |> unbox<JS.Promise<string>>
+
+                let! notes = readNotes repoRoot
+                Vitest.expect(notes).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
+            "isolates malformed notes and returns valid notes sorted by descending date",
+            fun () -> promise {
+                let tmpDir = osDynamic?tmpdir () |> unbox<string>
+
+                let! repoRoot =
+                    fsPromisesDynamic?mkdtemp (pathDynamic?join (tmpDir, "swate-note-errors-"))
+                    |> unbox<JS.Promise<string>>
+
+                let notesDir = pathDynamic?join (repoRoot, "notes") |> unbox<string>
+
+                let! _ =
+                    fsPromisesDynamic?mkdir (notesDir, createObj [ "recursive" ==> true ])
+                    |> unbox<JS.Promise<obj>>
+
+                let olderMarkdown =
+                    noteMarkdown.Replace("My note", "Older").Replace("2026-04-27", "2025-01-02")
+
+                let newerMarkdown =
+                    noteMarkdown.Replace("My note", "Newer").Replace("2026-04-27", "2027-03-04")
+
+                let writes = [|
+                    fsPromisesDynamic?writeFile (pathDynamic?join (notesDir, "older.md"), olderMarkdown, "utf8")
+                    |> unbox<JS.Promise<unit>>
+                    fsPromisesDynamic?writeFile (
+                        pathDynamic?join (notesDir, "broken.md"),
+                        markdownWithoutFrontmatter,
+                        "utf8"
+                    )
+                    |> unbox<JS.Promise<unit>>
+                    fsPromisesDynamic?writeFile (pathDynamic?join (notesDir, "newer.md"), newerMarkdown, "utf8")
+                    |> unbox<JS.Promise<unit>>
+                |]
+
+                let! _ = Fable.Core.JS.Constructors.Promise.all writes
+                let! notes = readNotes repoRoot
+
+                Vitest.expect(notes.Length).toBe (2)
+                Vitest.expect(notes |> Array.map _.Title).toEqual ([| "Newer"; "Older" |])
             }
         )
 )

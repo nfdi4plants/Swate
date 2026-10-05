@@ -707,13 +707,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     match vault.path with
                     | None -> return Error(arcNotOpenError ())
                     | Some arcPath ->
-                        let! fileEntries =
-                            if vault.fileTree.Count > 0 then
-                                promise { return vault.fileTree.Values |> Seq.toArray }
-                            else
-                                getFileEntries arcPath true
-
-                        let! notes = Main.NoteSearchReader.readNotes arcPath fileEntries
+                        let! notes = Main.NoteSearchReader.readNotes arcPath
                         return Ok(notes |> Array.map NoteSearchNoteDto.ofNote)
             with e ->
                 return Error e
