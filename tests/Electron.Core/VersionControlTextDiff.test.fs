@@ -1090,15 +1090,7 @@ Vitest.describe (
         Vitest.test (
             "a handle arriving after its window closed is closed at once, and one arriving after a reload is recorded under the same window",
             fun () -> promise {
-                let host =
-                    WorkspaceSessionHost.WorkspaceSessionHost(
-                        TestHelpers.createRuntime
-                            "text-diff-registry-settings"
-                            VersionControlService.LakeFs.LakeFsCredentials.unconfigured
-                            (TestHelpers.memoryBindings ())
-                    )
-
-                WorkspaceSessionHost.initialize host
+                let! root = TestHelpers.createTempDirectoryAsync "swate-text-diff-registry-"
                 let originalIsWindowAlive = TextDiffHandles.isWindowAlive
                 let closedWindow = 7
                 let reloadedWindow = 5
@@ -1106,6 +1098,7 @@ Vitest.describe (
 
                 let closes = ResizeArray<string * int option>()
                 let closed, resolveClosed = TestHelpers.deferred ()
+                let bothClosed, resolveBothClosed = TestHelpers.deferred ()
 
                 let unexpected (name: string) : Async<OperationResult<'T>> = async {
                     return failwith $"{name} was not expected."
@@ -1122,30 +1115,61 @@ Vitest.describe (
                     GetSourceInfo = fun _ _ -> unexpected "GetSourceInfo"
                     Close =
                         fun handle context -> async {
-                            closes.Add(handle.Id, host.TryGetOperationWindowId context.OperationId)
+                            closes.Add(
+                                handle.Id,
+                                WorkspaceSessionHost.get().TryGetOperationWindowId context.OperationId
+                            )
 
                             resolveClosed ()
+
+                            if closes.Count = 2 then
+                                resolveBothClosed ()
 
                             return OperationResult.succeeded ()
                         }
                 }
 
+                // The registry closes the handles of a window through the open session of the workspace.
+                let host =
+                    WorkspaceSessionHost.WorkspaceSessionHost(textDiffRuntime root (Promise.lift ()) service)
+
+                WorkspaceSessionHost.initialize host
+
                 let handle (id: string) : DiffHandle = { Id = id; Version = "v1" }
 
                 try
-                    TextDiffHandles.recordOrClose (Some closedWindow) "workspace" service (handle "closed-window")
+                    let! opened =
+                        host.OpenSession(root, TestHelpers.detached "open-registry-session")
+                        |> Async.StartAsPromise
+
+                    let workspaceRoot =
+                        (TestHelpers.expectValue "session open" opened).Binding.WorkspaceRoot
+
+                    TextDiffHandles.recordOrClose (Some closedWindow) workspaceRoot service (handle "closed-window")
                     TextDiffHandles.windowReloaded reloadedWindow
-                    TextDiffHandles.recordOrClose (Some reloadedWindow) "workspace" service (handle "after-reload")
+                    TextDiffHandles.recordOrClose (Some reloadedWindow) workspaceRoot service (handle "after-reload")
 
                     do! within 2000 "Closing the handle of the closed window" closed
 
                     Vitest.expect(closes |> Seq.toArray).toEqual [| "closed-window", Some closedWindow |]
-                    Vitest.expect(TextDiffHandles.isRecorded "closed-window").toBe false
-                    Vitest.expect(TextDiffHandles.isRecorded "after-reload").toBe true
+
+                    // The handle of the closed window was closed on arrival and never recorded. The one
+                    // of the reloaded window is recorded, so closing both windows closes only that one.
+                    TextDiffHandles.windowClosed closedWindow
+                    TextDiffHandles.windowReloaded reloadedWindow
+                    do! within 2000 "Closing the recorded handle" bothClosed
+
+                    Vitest.expect(closes |> Seq.toArray).toEqual [|
+                        "closed-window", Some closedWindow
+                        "after-reload", Some reloadedWindow
+                    |]
                 finally
                     TextDiffHandles.isWindowAlive <- originalIsWindowAlive
                     TextDiffHandles.windowClosed reloadedWindow
                     WorkspaceSessionHost.resetForTests ()
+
+                do! host.CloseAll() |> Async.StartAsPromise
+                do! TestHelpers.removeDirectoryAsync root
             }
         )
 
@@ -1159,6 +1183,7 @@ Vitest.describe (
                 TextDiffHandles.isWindowAlive <- fun _ -> true
                 let closes = ResizeArray<string * int option>()
                 let allClosed, resolveAllClosed = TestHelpers.deferred ()
+                let sentinelClosed, resolveSentinelClosed = TestHelpers.deferred ()
 
                 let service = {
                     unexpectedService with
@@ -1171,6 +1196,9 @@ Vitest.describe (
 
                                 if closes.Count = 3 then
                                     resolveAllClosed ()
+
+                                if handle.Id = "sentinel" then
+                                    resolveSentinelClosed ()
 
                                 return OperationResult.succeeded ()
                             }
@@ -1210,8 +1238,19 @@ Vitest.describe (
                         "reloaded-2", Some reloadedWindow
                     |]
 
-                    for handleId in [ "reloaded-1"; "reloaded-2"; "closed-1" ] do
-                        Vitest.expect(TextDiffHandles.isRecorded handleId).toBe false
+                    // The closed handles left the registry. A second round of closes finds only the
+                    // sentinel, which is recorded after the first round.
+                    record reloadedWindow "sentinel"
+                    TextDiffHandles.windowReloaded reloadedWindow
+                    TextDiffHandles.windowClosed closedWindow
+                    do! within 2000 "Closing the sentinel" sentinelClosed
+
+                    Vitest.expect(closes |> Seq.sort |> Seq.toArray).toEqual [|
+                        "closed-1", Some closedWindow
+                        "reloaded-1", Some reloadedWindow
+                        "reloaded-2", Some reloadedWindow
+                        "sentinel", Some reloadedWindow
+                    |]
                 finally
                     TextDiffHandles.isWindowAlive <- originalIsWindowAlive
                     TextDiffHandles.windowClosed reloadedWindow
@@ -1232,6 +1271,7 @@ Vitest.describe (
                 TextDiffHandles.isWindowAlive <- fun _ -> true
                 let sessionGate, releaseSession = TestHelpers.deferred ()
                 let closes = ResizeArray<string * int option>()
+                let reloadHandleClosed, resolveReloadHandleClosed = TestHelpers.deferred ()
                 let reads = ResizeArray<string>()
 
                 // The stub keeps the contract the library documents on TextDiffService. A handle
@@ -1290,6 +1330,9 @@ Vitest.describe (
                                         WorkspaceSessionHost.get().TryGetOperationWindowId context.OperationId
                                     )
 
+                                    if handle.Id = "h-reload" then
+                                        resolveReloadHandleClosed ()
+
                                 return OperationResult.succeeded ()
                             }
                 }
@@ -1309,13 +1352,12 @@ Vitest.describe (
                     releaseSession ()
                     let! _ = reloadOpen
 
-                    // The handle that arrives after the reload is recorded under the same window.
+                    // The handle that arrives after the reload is recorded under the same window, and
+                    // nothing closes it yet.
                     Vitest.expect(closes.Count).toBe 0
-                    Vitest.expect(TextDiffHandles.isRecorded "h-reload").toBe true
 
                     let! opened = apiA.openTextDiff (openRequest "open-a" "a.txt")
                     TestHelpers.expectDtoValue "open from window A" opened |> ignore
-                    Vitest.expect(TextDiffHandles.isRecorded "h-a").toBe true
 
                     let! readFromB =
                         apiB.readTextDiffPage {
@@ -1379,7 +1421,13 @@ Vitest.describe (
                     let! closeFromA = apiA.closeTextDiff (handleRequest "close-a")
                     TestHelpers.expectDtoValue "close from window A" closeFromA |> ignore
                     Vitest.expect(closes |> Seq.toArray).toEqual [| "h-a", Some windowA |]
-                    Vitest.expect(TextDiffHandles.isRecorded "h-a").toBe false
+
+                    // The close removed h-a from the registry, and h-reload is still recorded. Closing
+                    // window A closes only h-reload.
+                    TextDiffHandles.windowClosed windowA
+                    do! within 2000 "Closing the handle that arrived after the reload" reloadHandleClosed
+
+                    Vitest.expect(closes |> Seq.toArray).toEqual [| "h-a", Some windowA; "h-reload", Some windowA |]
                 finally
                     TextDiffHandles.isWindowAlive <- originalIsWindowAlive
                     TextDiffHandles.windowClosed windowA

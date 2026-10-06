@@ -24,8 +24,6 @@ let mutable isWindowAlive: int -> bool =
         | Some window -> not (window.isDestroyed ())
         | None -> false
 
-let isRecorded (handleId: string) : bool = handles.ContainsKey handleId
-
 let remove (handleId: string) = handles.Remove handleId |> ignore
 
 let private closeInBackground
