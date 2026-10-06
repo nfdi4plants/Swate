@@ -290,6 +290,9 @@ type ArcVault(window: BrowserWindow) =
     member val isInitializingArc = false with get, set
     member val isWaitingForOperationsOnClose = false with get, set
     member val isOperationCloseApproved = false with get, set
+    member val internal FileWatcherReady: Fable.Core.JS.Promise<unit> option = None with get, set
+    member val internal CancelFileWatcherReadyWait: (unit -> unit) option = None with get, set
+    member val internal SchedulePendingFileWatcherEvents: (unit -> unit) option = None with get, set
 
     /// Runs ARC merges sequentially so every operation observes the result of the preceding merge.
     member this.EnqueueArcMerge<'T>(operation: unit -> Fable.Core.JS.Promise<'T>) : Fable.Core.JS.Promise<'T> =
@@ -1102,6 +1105,8 @@ module ArcVaultExtensions =
                 ownTimeoutId <- Some timeoutId
                 this.fileWatcherReloadArcTimeout <- Some timeoutId
 
+            this.SchedulePendingFileWatcherEvents <- Some scheduleReload
+
             fun (eventName: string) (path: string) ->
 
                 swatelogfn this.window.id "File change detected: %s on %s" eventName path
@@ -1122,13 +1127,14 @@ module ArcVaultExtensions =
                     eventName
                     path
 
-                match this.fileWatcherReloadArcTimeout with
-                | Some timeoutId ->
-                    Fable.Core.JS.clearTimeout timeoutId
-                    this.fileWatcherReloadArcTimeout <- None
-                | None -> sendMsgApi.IsLoadingChanges true
+                if not this.isInitializingArc then
+                    match this.fileWatcherReloadArcTimeout with
+                    | Some timeoutId ->
+                        Fable.Core.JS.clearTimeout timeoutId
+                        this.fileWatcherReloadArcTimeout <- None
+                    | None -> sendMsgApi.IsLoadingChanges true
 
-                scheduleReload ()
+                    scheduleReload ()
 
         /// Applies an ARC content DTO to the in-memory ARC and marks the vault dirty.
         member this.UpdateArcByFileContentDTO(request: FileContentDTO) : Result<unit, exn> =
@@ -1380,7 +1386,11 @@ module ArcVaultExtensions =
                 match this.watcher with
                 | Some _ -> ()
                 | None ->
-                    let watcher = createFileWatcher this.path.Value usePolling
+                    let watcher, ready = createFileWatcherWithReady this.path.Value usePolling
+                    let mutable cancelReadyWait = ignore
+
+                    let cancelled =
+                        JS.Constructors.Promise.Create(fun resolve _ -> cancelReadyWait <- fun () -> resolve ())
 
                     let sendWatcherMessage = WindowSend.sender<IArcFileWatcherApi> this.window
 
@@ -1391,8 +1401,18 @@ module ArcVaultExtensions =
 
                     watcher.on (Chokidar.Events.All, this._FileEventController sendMsgApi) |> ignore
                     this.watcher <- Some watcher
+                    this.FileWatcherReady <- Some(race [| ready; cancelled |])
+                    this.CancelFileWatcherReadyWait <- Some cancelReadyWait
             else
                 swatefailfn this.window.id "No path set for StartFileWatcher."
+
+        member this.StartFileWatcherAndWaitUntilReady(?usePolling: bool) = promise {
+            this.StartFileWatcher(?usePolling = usePolling)
+
+            match this.FileWatcherReady with
+            | Some ready -> do! ready
+            | None -> ()
+        }
 
         member this.ClearPendingFileWatcherState() =
             this.IncrementWatcherEpoch()
@@ -1405,6 +1425,8 @@ module ArcVaultExtensions =
 
         member this.StopFileWatcher() = promise {
             this.ClearPendingFileWatcherState()
+            this.CancelFileWatcherReadyWait |> Option.iter (fun cancel -> cancel ())
+            this.CancelFileWatcherReadyWait <- None
             // Reject callbacks synchronously. Requesting retirement below also advances the watcher
             // generation before either close is awaited, so callbacks owned by the retiring watcher
             // cannot join a later restarted lifecycle.
@@ -1422,11 +1444,14 @@ module ArcVaultExtensions =
                     ()
 
             this.watcher <- None
+            this.FileWatcherReady <- None
+            this.SchedulePendingFileWatcherEvents <- None
 
             do! loadedDirectoryWatcherClose
             // A lifecycle queued ahead of retirement may have touched these collections before it
             // observed cancellation. Reassert the completed-stop invariants after it drains.
             this.LoadedDirectoryWatcherController.ClearLifecycleData()
+            this.ClearPendingFileWatcherState()
 
         }
 
@@ -1452,9 +1477,11 @@ module ArcVaultExtensions =
                         swatelogfn this.window.id "Failed to reset ARC dirty state in renderer: %s" error.Message
         }
 
-        /// Loads the ARC during initialization. The watcher is activated only after the initial
-        /// file-tree snapshot has been installed, so an older scan cannot overwrite watcher updates.
-        member this.Startup() = promise { do! this.LoadArc() }
+        /// Starts permanent observation before loading either initialization snapshot.
+        member this.Startup() = promise {
+            do! this.StartFileWatcherAndWaitUntilReady()
+            do! this.LoadArc()
+        }
 
         /// Finalizes a prepared ARC after every asynchronous initialization step succeeded.
         member internal this.FinalizeArcInitialization(fileTree: Dictionary<string, FileEntry>) =
@@ -1463,12 +1490,18 @@ module ArcVaultExtensions =
             | false, None -> swatefailfn this.window.id "Unable to commit ARC initialization without a path."
             | false, Some normalizedPath ->
                 this.fileTree <- fileTree
-                this.StartFileWatcher()
                 this.isInitializingArc <- false
 
                 WindowSend.send<IPathChangeRendererApi> this.window (fun api -> api.pathChange (Some normalizedPath))
 
                 this.SetFileTree fileTree
+
+                if
+                    this.fileWatcherPendingEvents.Count > 0
+                    || this.fileWatcherPendingArcMergeEvents.Count > 0
+                then
+                    this.SchedulePendingFileWatcherEvents
+                    |> Option.iter (fun schedule -> schedule ())
 
         member this.OpenARC(path: string) = promise {
             match this.path with

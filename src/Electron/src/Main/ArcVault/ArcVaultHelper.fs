@@ -426,6 +426,17 @@ let createFileWatcher (path: string) (usePolling: bool option) =
 
     watcher
 
+/// Creates the permanent ARC watcher and captures its one initial readiness notification.
+let createFileWatcherWithReady (path: string) (usePolling: bool option) =
+    let watcher = createFileWatcher path usePolling
+
+    let ready =
+        JS.Constructors.Promise.Create(fun resolve _ ->
+            watcher.on (Chokidar.Events.Ready, fun _ -> resolve ()) |> ignore
+        )
+
+    watcher, ready
+
 /// Creates the native, shallow watcher used only for FileTree directories that were explicitly loaded.
 let createLoadedDirectoryWatcher (arcPath: string) (paths: string[]) =
     Chokidar.Chokidar.watch (
