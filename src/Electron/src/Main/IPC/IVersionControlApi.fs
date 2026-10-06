@@ -606,7 +606,9 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                                     Ok(
                                                         Mappings.result
                                                             (fun (hosted: WorkspaceSessionHost.HostedSession) ->
-                                                                Mappings.sessionInfo hosted.SessionId hosted.Session
+                                                                Mappings.sessionInfo
+                                                                    hosted.SessionId
+                                                                    hosted.Session
                                                             )
                                                             bound
                                                     )
@@ -615,7 +617,8 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                                     do! vault.ResetFileTreeToRoot()
 
                                                 return bound
-                                            }))
+                                            })
+                                        )
                                         |> Async.AwaitPromise
                                     )
 
