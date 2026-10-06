@@ -1169,6 +1169,7 @@ let private titleForWriteRequest =
     | CommitSelection _
     | CommitAll _ -> "Could not commit changes"
     | DiscardSelection _ -> "Could not discard changes"
+    | SaveLfsSettings(GitBusyOperation.SavingDiffIndexingLimit, _) -> "Could not save the background indexing limit"
     | SaveLfsSettings _ -> "Could not save Git LFS settings"
     | PruneLfsCache -> "Could not clean Git LFS cache"
     | DedupLfsStorage -> "Could not reduce Git LFS storage"
