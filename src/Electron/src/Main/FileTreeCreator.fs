@@ -119,6 +119,28 @@ let withFileEntriesLfsMetadata
     entries
     |> Array.map (withFileEntryLfsMetadata repoRoot largeObjectsByRelativePath largeObjectsByComparisonKey)
 
+let internal getFileEntriesWithLfsMetadataUsing
+    (listLargeObjects: string -> Fable.Core.JS.Promise<Map<string, ObjectStateDto>>)
+    (repoRoot: string)
+    (entries: FileEntry[])
+    =
+    promise {
+        if entries |> Array.exists (fun entry -> not entry.isDirectory) then
+            let normalizedRepoRoot = normalizeRootPath repoRoot
+            let! largeObjectsByRelativePath = listLargeObjects normalizedRepoRoot
+            return withFileEntriesLfsMetadata normalizedRepoRoot largeObjectsByRelativePath entries
+        else
+            return entries
+    }
+
+/// Enriches an already-read batch of entries from one large-object metadata snapshot.
+/// Directory-only batches avoid querying the repository entirely.
+let getFileEntriesWithLfsMetadata (repoRoot: string) (entries: FileEntry[]) =
+    getFileEntriesWithLfsMetadataUsing
+        (fun normalizedRepoRoot -> tryListLargeObjects normalizedRepoRoot true)
+        repoRoot
+        entries
+
 /// Build the renderer snapshot using ARC-relative dictionary keys and FileEntry paths.
 let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary<string, FileEntry> =
     let rendererFileTree = Dictionary<string, FileEntry>()
@@ -269,16 +291,7 @@ let refreshFileTreeEntry
     }
 
 let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
-    let normalizedRepoRoot = normalizeRootPath repoRoot
     let! entry = getFileEntry path
-
-    if entry.isDirectory then
-        return entry
-    else
-        let! largeObjectsByRelativePath = tryListLargeObjects normalizedRepoRoot true
-
-        let largeObjectsByComparisonKey =
-            buildLargeObjectsByComparisonKey largeObjectsByRelativePath
-
-        return withFileEntryLfsMetadata normalizedRepoRoot largeObjectsByRelativePath largeObjectsByComparisonKey entry
+    let! enrichedEntries = getFileEntriesWithLfsMetadata repoRoot [| entry |]
+    return enrichedEntries.[0]
 }

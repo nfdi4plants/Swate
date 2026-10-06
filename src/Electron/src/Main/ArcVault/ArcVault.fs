@@ -475,22 +475,72 @@ module ArcVaultExtensions =
                 | Some _ when capturedWatcherEpoch <> this.WatcherEpoch -> ()
                 | Some arcPath ->
                     let normalizedEvents = WatcherHelpers.normalizeAgainstDisk events
-                    let mutable nextFileTree = this.fileTree
+                    let nextFileTree = Dictionary<string, FileEntry>(this.fileTree)
                     let mutable hasFileTreeChanges = false
 
-                    for event in normalizedEvents do
+                    let! readEntries =
+                        normalizedEvents
+                        |> List.map (fun event -> promise {
+                            if
+                                WatcherHelpers.eventNameEquals Chokidar.Events.Add event.EventName
+                                || WatcherHelpers.eventNameEquals Chokidar.Events.Change event.EventName
+                                || WatcherHelpers.eventNameEquals Chokidar.Events.AddDir event.EventName
+                            then
+                                try
+                                    let! entry = getFileEntry event.AbsolutePath
+                                    return Some entry
+                                with fileTreeError ->
+                                    swatelogfn
+                                        this.window.id
+                                        "Unable to update file tree for watcher event '%s' on '%s': %s"
+                                        event.EventName
+                                        event.RelativePath
+                                        fileTreeError.Message
+
+                                    return None
+                            else
+                                return None
+                        })
+                        |> Promise.all
+
+                    let changedFiles =
+                        Array.zip (normalizedEvents |> List.toArray) readEntries
+                        |> Array.choose (fun (event, entry) ->
+                            match entry with
+                            | Some entry when
+                                not entry.isDirectory
+                                && (WatcherHelpers.eventNameEquals Chokidar.Events.Add event.EventName
+                                    || WatcherHelpers.eventNameEquals Chokidar.Events.Change event.EventName)
+                                ->
+                                Some entry
+                            | _ -> None
+                        )
+
+                    let! enrichedChangedFiles = getFileEntriesWithLfsMetadata arcPath changedFiles
+                    let mutable enrichedChangedFileIndex = 0
+
+                    for event, readEntry in Array.zip (normalizedEvents |> List.toArray) readEntries do
                         try
                             if
                                 WatcherHelpers.eventNameEquals Chokidar.Events.Add event.EventName
                                 || WatcherHelpers.eventNameEquals Chokidar.Events.Change event.EventName
                             then
-                                let! changedFile = getFileEntryWithLfsMetadata arcPath event.AbsolutePath
-                                nextFileTree <- upsertFileEntry changedFile nextFileTree
-                                hasFileTreeChanges <- true
+                                match readEntry with
+                                | Some changedFile when not changedFile.isDirectory ->
+                                    let enrichedChangedFile = enrichedChangedFiles.[enrichedChangedFileIndex]
+                                    enrichedChangedFileIndex <- enrichedChangedFileIndex + 1
+                                    nextFileTree.[enrichedChangedFile.path] <- enrichedChangedFile
+                                    hasFileTreeChanges <- true
+                                | Some changedFile ->
+                                    nextFileTree.[changedFile.path] <- changedFile
+                                    hasFileTreeChanges <- true
+                                | None -> ()
                             elif WatcherHelpers.eventNameEquals Chokidar.Events.AddDir event.EventName then
-                                let! addedDirectory = getFileEntry event.AbsolutePath
-                                nextFileTree <- upsertFileEntry addedDirectory nextFileTree
-                                hasFileTreeChanges <- true
+                                match readEntry with
+                                | Some addedDirectory ->
+                                    nextFileTree.[addedDirectory.path] <- addedDirectory
+                                    hasFileTreeChanges <- true
+                                | None -> ()
                             elif
                                 WatcherHelpers.eventNameEquals Chokidar.Events.Unlink event.EventName
                                 || (WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName
@@ -498,7 +548,14 @@ module ArcVaultExtensions =
                             then
                                 // Normalization above already turned the unlink of an existing file into a change. Directory unlinks
                                 // stay admitted, so they still need this check.
-                                nextFileTree <- removePathAndDescendants event.AbsolutePath nextFileTree
+                                let keysToRemove =
+                                    nextFileTree.Keys
+                                    |> Seq.filter (fun path ->
+                                        PathHelpers.isSameOrDescendantPath path event.AbsolutePath
+                                    )
+                                    |> Seq.toArray
+
+                                keysToRemove |> Array.iter (fun path -> nextFileTree.Remove(path) |> ignore)
                                 hasFileTreeChanges <- true
                         with fileTreeError ->
                             swatelogfn

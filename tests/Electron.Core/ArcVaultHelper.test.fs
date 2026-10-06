@@ -933,6 +933,55 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "one watcher batch applies every tree change and publishes once",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let mutable publicationCount = 0
+
+                        let send: obj =
+                            emitJsExpr
+                                (fun (args: obj array) ->
+                                    if args.Length > 0 && (string args.[0]).Contains("fileTreeUpdate") then
+                                        publicationCount <- publicationCount + 1
+                                )
+                                "((...args) => $0(args))"
+
+                        let vault = ArcVault(windowWithStates (fun () -> false) (fun () -> false) send)
+                        vault.path <- Some arcPath
+
+                        let firstPath = join [| arcPath; "batch-first.txt" |]
+                        let secondPath = join [| arcPath; "batch-second.txt" |]
+                        let directoryPath = join [| arcPath; "batch-directory" |]
+                        let removedPath = join [| arcPath; "removed" |]
+                        let removedChildPath = join [| removedPath; "child.txt" |]
+
+                        do! writeWatcherTextFileAsync firstPath "first"
+                        do! writeWatcherTextFileAsync secondPath "second"
+                        do! mkdirWatcherDirectoryAsync directoryPath
+
+                        vault.fileTree.[removedPath] <- FileEntry.create ("removed", removedPath, true)
+                        vault.fileTree.[removedChildPath] <- FileEntry.create ("child.txt", removedChildPath, false)
+
+                        do!
+                            vault.ApplyWatcherFileTreeEvents [
+                                watcherEvent arcPath "add" "batch-first.txt"
+                                watcherEvent arcPath "change" "batch-second.txt"
+                                watcherEvent arcPath "addDir" "batch-directory"
+                                watcherEvent arcPath "unlinkDir" "removed"
+                            ]
+
+                        Vitest.expect(vault.fileTree.ContainsKey(firstPath)).toBe (true)
+                        Vitest.expect(vault.fileTree.ContainsKey(secondPath)).toBe (true)
+                        Vitest.expect(vault.fileTree.ContainsKey(directoryPath)).toBe (true)
+                        Vitest.expect(vault.fileTree.ContainsKey(removedPath)).toBe (false)
+                        Vitest.expect(vault.fileTree.ContainsKey(removedChildPath)).toBe (false)
+                        Vitest.expect(publicationCount).toBe (1)
+                    })
+        )
+
+        Vitest.test (
             "lazy renderer snapshot initialization waits for and preserves earlier queued state",
             fun () ->
                 withTempArc

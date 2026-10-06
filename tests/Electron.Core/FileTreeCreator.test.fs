@@ -294,6 +294,59 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "batch enrichment queries metadata once and annotates every matching file",
+            fun () -> promise {
+                let repoRoot = FileTreeCreator.normalizeRootPath "/repo"
+                let firstObject = createObjectState "first.bin"
+                let secondObject = createObjectState "second.bin"
+                let mutable queryCount = 0
+
+                let listLargeObjects _ = promise {
+                    queryCount <- queryCount + 1
+
+                    return Map.ofList [ "first.bin", firstObject; "second.bin", secondObject ]
+                }
+
+                let! entries =
+                    FileTreeCreator.getFileEntriesWithLfsMetadataUsing listLargeObjects repoRoot [|
+                        createFileEntry "first.bin" (join [| repoRoot; "first.bin" |])
+                        createFileEntry "second.bin" (join [| repoRoot; "second.bin" |])
+                        createFileEntry "plain.txt" (join [| repoRoot; "plain.txt" |])
+                    |]
+
+                Vitest.expect(queryCount).toBe (1)
+                Vitest.expect(entries.[0].largeObject).toEqual (Some firstObject)
+                Vitest.expect(entries.[1].largeObject).toEqual (Some secondObject)
+                Vitest.expect(entries.[2].largeObject).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "directory and removal-only batch enrichment does not query metadata",
+            fun () -> promise {
+                let repoRoot = FileTreeCreator.normalizeRootPath "/repo"
+                let mutable queryCount = 0
+
+                let listLargeObjects _ = promise {
+                    queryCount <- queryCount + 1
+                    return Map.empty
+                }
+
+                let directoryEntry =
+                    FileEntry.create ("dataset", join [| repoRoot; "dataset" |], true, None)
+
+                let! entries =
+                    FileTreeCreator.getFileEntriesWithLfsMetadataUsing listLargeObjects repoRoot [| directoryEntry |]
+
+                let! removedEntries = FileTreeCreator.getFileEntriesWithLfsMetadataUsing listLargeObjects repoRoot [||]
+
+                Vitest.expect(queryCount).toBe (0)
+                Vitest.expect(entries).toEqual ([| directoryEntry |])
+                Vitest.expect(removedEntries).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
             "getFileEntryWithLfsMetadata enriches a single staged LFS file",
             fileTreeCreatorTestOptions,
             fun () -> promise {
