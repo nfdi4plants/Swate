@@ -243,8 +243,13 @@ let private withMutatingSessionUsingRefreshPredicate
                                 (fun context ->
                                     vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
                                         let! result =
-                                            runSessionOperation host arcPath operation context
-                                            |> Async.StartAsPromise
+                                            if context.Cancellation.IsCancellationRequested() then
+                                                JS.Constructors.Promise.resolve (
+                                                    OperationResult.canceled "The operation was canceled."
+                                                )
+                                            else
+                                                runSessionOperation host arcPath operation context
+                                                |> Async.StartAsPromise
 
                                         let mappedResult = Ok(Mappings.result mapValue result)
 
@@ -538,64 +543,83 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 return!
                     withBusyWritingScope
                         vault
-                        (fun () ->
-                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                let! bound =
-                                    runTracked
-                                        host
-                                        bridge
-                                        "bindWorkspace"
-                                        request.OperationId
-                                        (Some arcPath)
-                                        (windowFromIpcEvent event |> Option.map _.id)
-                                        true
-                                        (fun context -> async {
-                                            match locationFor host request.ProviderLocation request.DisplayName with
-                                            | Error failure -> return Failed failure
-                                            | Ok(location, factory) ->
-                                                let! bindResult =
-                                                    factory.Bind
-                                                        {
-                                                            WorkspaceRoot = arcPath
-                                                            Location = location
-                                                        }
-                                                        context
+                        (fun () -> promise {
+                            let! bound =
+                                runTracked
+                                    host
+                                    bridge
+                                    "bindWorkspace"
+                                    request.OperationId
+                                    (Some arcPath)
+                                    (windowFromIpcEvent event |> Option.map _.id)
+                                    true
+                                    (fun context ->
+                                        vault.WithLoadedDirectoryWatcherSuspended(fun () ->
+                                            if context.Cancellation.IsCancellationRequested() then
+                                                JS.Constructors.Promise.resolve (
+                                                    OperationResult.canceled "The bind was canceled."
+                                                )
+                                            else
+                                                runSessionOperation
+                                                    host
+                                                    arcPath
+                                                    (fun _ context -> async {
+                                                        match
+                                                            locationFor
+                                                                host
+                                                                request.ProviderLocation
+                                                                request.DisplayName
+                                                        with
+                                                        | Error failure -> return Failed failure
+                                                        | Ok(location, factory) ->
+                                                            let! bindResult =
+                                                                factory.Bind
+                                                                    {
+                                                                        WorkspaceRoot = arcPath
+                                                                        Location = location
+                                                                    }
+                                                                    context
 
-                                                match persistProvisionedBinding host bindResult with
-                                                | Succeeded _ ->
-                                                    // The open session keeps the location it was opened with.
-                                                    return! reopenWithSavedSettings context
-                                                | PartiallySucceeded(_, failure) when
-                                                    failure.Code = VersionControlCodes.BindingNotPersisted
-                                                    ->
-                                                    return Failed failure
-                                                | PartiallySucceeded(_, failure) ->
-                                                    // The binding is persisted, so the session is reopened and
-                                                    // the provider's partial failure rides along.
-                                                    let! reopened = reopenWithSavedSettings context
+                                                            match persistProvisionedBinding host bindResult with
+                                                            | Succeeded _ ->
+                                                                // The open session keeps the location it was opened with.
+                                                                return! reopenWithSavedSettings context
+                                                            | PartiallySucceeded(_, failure) when
+                                                                failure.Code = VersionControlCodes.BindingNotPersisted
+                                                                ->
+                                                                return Failed failure
+                                                            | PartiallySucceeded(_, failure) ->
+                                                                // The binding is persisted, so the session is reopened and
+                                                                // the provider's partial failure rides along.
+                                                                let! reopened = reopenWithSavedSettings context
 
-                                                    return
-                                                        match reopened with
-                                                        | Succeeded outcome -> PartiallySucceeded(outcome, failure)
-                                                        | other -> other
-                                                | Failed failure -> return Failed failure
-                                        })
-
-                                let result =
-                                    Ok(
-                                        Mappings.result
-                                            (fun (hosted: WorkspaceSessionHost.HostedSession) ->
-                                                Mappings.sessionInfo hosted.SessionId hosted.Session
-                                            )
-                                            bound
+                                                                return
+                                                                    match reopened with
+                                                                    | Succeeded outcome ->
+                                                                        PartiallySucceeded(outcome, failure)
+                                                                    | other -> other
+                                                            | Failed failure -> return Failed failure
+                                                    })
+                                                    context
+                                                |> Async.StartAsPromise
+                                        )
+                                        |> Async.AwaitPromise
                                     )
 
-                                if resultChangedState result then
-                                    do! vault.ResetFileTreeToRoot()
+                            let result =
+                                Ok(
+                                    Mappings.result
+                                        (fun (hosted: WorkspaceSessionHost.HostedSession) ->
+                                            Mappings.sessionInfo hosted.SessionId hosted.Session
+                                        )
+                                        bound
+                                )
 
-                                return result
-                            })
-                        )
+                            if resultChangedState result then
+                                do! vault.ResetFileTreeToRoot()
+
+                            return result
+                        })
         }
     cancelOperation =
         fun key -> promise {
