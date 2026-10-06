@@ -628,9 +628,7 @@ module ArcVaultExtensions =
 
             if not wasAlreadySuspended then
                 this.loadedFileTreeDirectories
-                |> Seq.iter (fun relativePath ->
-                    this.PendingLoadedDirectoryHandoffs.Add(relativePath) |> ignore
-                )
+                |> Seq.iter (fun relativePath -> this.PendingLoadedDirectoryHandoffs.Add(relativePath) |> ignore)
 
             this.BeginLoadedDirectoryWatcherSuspension()
 

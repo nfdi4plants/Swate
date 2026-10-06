@@ -590,7 +590,12 @@ Vitest.describe (
                         let firstOperationGate, releaseFirstOperation = TestHelpers.deferred ()
                         let secondOperationGate, releaseSecondOperation = TestHelpers.deferred ()
                         let enteredOperations = ResizeArray<int>()
-                        let addedPath = join [| datasetPath; "added-during-overlapping-suspensions.txt" |]
+
+                        let addedPath =
+                            join [|
+                                datasetPath
+                                "added-during-overlapping-suspensions.txt"
+                            |]
 
                         let first =
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
