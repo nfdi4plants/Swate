@@ -106,7 +106,7 @@ Vitest.test (
         let updated, _ =
             insert (ArcFiles.Assay assay) (Some 0) "Sparse" (selection 1 1) [| "row=2" |]
 
-        Vitest.expect(updated.Tables().[0].GetCellAt(0, 0).AsData.Selector).toEqual (Some "row=2")
+        Vitest.expect(updated.Tables().[0].GetCellAt(0, 0).ToDataCell().AsData.Selector).toEqual (Some "row=2")
 )
 
 Vitest.test (
