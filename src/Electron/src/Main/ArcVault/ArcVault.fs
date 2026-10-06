@@ -448,7 +448,13 @@ module ArcVaultExtensions =
                 |> Promise.bind (fun () -> promise {
                     do! this.CloseLoadedDirectoryWatcher()
 
-                    let! operationOutcome = operation () |> Promise.map Ok |> Promise.catch (fun error -> Error error)
+                    let! operationOutcome = promise {
+                        try
+                            let! result = operation ()
+                            return Ok result
+                        with error ->
+                            return Error error
+                    }
 
                     let! restorationOutcome =
                         this.RebuildLoadedDirectoryWatcher()
@@ -932,8 +938,12 @@ module ArcVaultExtensions =
             | None -> return Dictionary<string, FileEntry>()
             | Some arcPath ->
                 if this.fileTree.Count = 0 then
-                    let! fileTree = getFileTree arcPath
-                    this.fileTree <- fileTree
+                    do!
+                        this.EnqueueFileTreeUpdate(fun () -> promise {
+                            if this.fileTree.Count = 0 then
+                                let! fileTree = getFileTree arcPath
+                                this.fileTree <- fileTree
+                        })
 
                 return toRendererFileTree arcPath this.fileTree.Values
         }

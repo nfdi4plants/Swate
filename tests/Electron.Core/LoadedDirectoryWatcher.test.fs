@@ -515,6 +515,35 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "watcher suspension restores exactly once after a synchronous operation failure",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                Vitest.vi.clearAllMocks ()
+
+                do!
+                    withLoadedDirectoryFixture (fun vault _ _ _ -> promise {
+                        do! vault.RefreshFileTreeDirectory "dataset"
+
+                        let watcherCount = invocationCount watchMock
+                        let operationError = exn "Expected synchronous operation failure."
+                        let mutable capturedOperationError: exn option = None
+
+                        try
+                            do!
+                                vault.WithLoadedDirectoryWatcherSuspended(fun () ->
+                                    raise operationError
+                                )
+                        with error ->
+                            capturedOperationError <- Some error
+
+                        Vitest.expect(capturedOperationError.Value).toBe operationError
+                        Vitest.expect(invocationCount watchMock).toBe (watcherCount + 1)
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                    })
+            }
+        )
+
+        Vitest.test (
             "concurrent mutation lifecycles are serialized around watcher rebuilds",
             TestOptions(timeout = 15000),
             fun () -> promise {

@@ -933,6 +933,60 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "lazy renderer snapshot initialization waits for and preserves earlier queued state",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+
+                        let queuedTree = System.Collections.Generic.Dictionary<string, FileEntry>()
+                        let queuedPath = join [| arcPath; "queued-tree-entry.txt" |]
+                        let queuedEntry = FileEntry.create("queued-tree-entry.txt", queuedPath, false)
+                        queuedTree.Add(queuedPath, queuedEntry)
+
+                        let queueGate, releaseQueue = TestHelpers.deferred ()
+
+                        vault.FileTreeUpdateTail <- promise {
+                            do! queueGate
+                            vault.fileTree <- queuedTree
+                        }
+
+                        let snapshot = vault.GetRendererFileTreeSnapshot()
+                        releaseQueue ()
+                        let! rendererTree = snapshot
+
+                        Vitest.expect(vault.fileTree).toBe queuedTree
+                        Vitest.expect(rendererTree.Count).toBe 1
+                    })
+        )
+
+        Vitest.test (
+            "concurrent lazy renderer snapshots initialize the root tree only once",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+
+                        let queueGate, releaseQueue = TestHelpers.deferred ()
+                        vault.FileTreeUpdateTail <- queueGate
+
+                        let firstSnapshot = vault.GetRendererFileTreeSnapshot()
+                        let secondSnapshot = vault.GetRendererFileTreeSnapshot()
+
+                        releaseQueue ()
+                        let! _ = firstSnapshot
+                        let initializedTree = vault.fileTree
+                        let! _ = secondSnapshot
+
+                        Vitest.expect(vault.fileTree).toBe initializedTree
+                    })
+        )
+
+        Vitest.test (
             "a snapshot loaded before a rename is not published",
             fun () ->
                 withTempArc
