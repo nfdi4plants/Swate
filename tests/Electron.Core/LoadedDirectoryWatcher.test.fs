@@ -20,6 +20,15 @@ let private invocationCount (_spy: obj) : int = jsNative
 [<Emit("$0.mockImplementationOnce(() => { const handlers = new Map(); const watcher = { on(event, callback) { handlers.set(event, callback); if (event === 'all') { $1(); queueMicrotask(() => handlers.get('ready')?.()); } return watcher; }, close() { return Promise.resolve(); }, add() { return watcher; }, unwatch() { return watcher; }, getWatched() { return {}; } }; return watcher; })")>]
 let private interceptNextWatchReady (_spy: obj) (_beforeReady: unit -> unit) : unit = jsNative
 
+[<Emit("$0.mockImplementationOnce(() => { let ready; const watcher = { on(event, callback) { if (event === 'ready') { ready = callback; $2(() => ready?.()); } if (event === 'all') { $1(); } return watcher; }, close() { $3(); return Promise.resolve(); }, add() { return watcher; }, unwatch() { return watcher; }, getWatched() { return {}; } }; return watcher; })")>]
+let private interceptNextControlledWatch
+    (_spy: obj)
+    (_onCreated: unit -> unit)
+    (_captureReady: (unit -> unit) -> unit)
+    (_onClosed: unit -> unit)
+    : unit =
+    jsNative
+
 let private waitUntil description predicate =
     let rec loop remaining = promise {
         if predicate () then
@@ -544,7 +553,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "concurrent mutation lifecycles are serialized around watcher rebuilds",
+            "concurrent suspended operations overlap and restore only after the final exit",
             TestOptions(timeout = 15000),
             fun () -> promise {
                 do!
@@ -552,6 +561,7 @@ Vitest.describe (
                         do! vault.RefreshFileTreeDirectory "dataset"
 
                         let firstOperationGate, releaseFirstOperation = TestHelpers.deferred ()
+                        let secondOperationGate, releaseSecondOperation = TestHelpers.deferred ()
                         let enteredOperations = ResizeArray<int>()
 
                         let first =
@@ -565,20 +575,21 @@ Vitest.describe (
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
                                 enteredOperations.Add 2
                                 Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                                do! secondOperationGate
                             })
 
-                        do! waitUntil "first mutation lifecycle" (fun () -> enteredOperations.Count = 1)
-                        do! Promise.sleep 50
-                        Vitest.expect(enteredOperations.Count).toBe 1
-                        Vitest.expect(enteredOperations.[0]).toBe 1
-
-                        releaseFirstOperation ()
-                        do! first
-                        do! second
-
+                        do! waitUntil "overlapping mutation lifecycles" (fun () -> enteredOperations.Count = 2)
                         Vitest.expect(enteredOperations.Count).toBe 2
                         Vitest.expect(enteredOperations.[0]).toBe 1
                         Vitest.expect(enteredOperations.[1]).toBe 2
+
+                        releaseFirstOperation ()
+                        do! first
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+
+                        releaseSecondOperation ()
+                        do! second
+
                         Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
                     })
             }
@@ -674,6 +685,105 @@ Vitest.describe (
                             (fun () -> writeFileSync handoffPath "handoff" TextEncoding.Utf8)
 
                         do! vault.RefreshFileTreeDirectory "dataset"
+
+                        Vitest.expect(containsPath handoffPath vault).toBe true
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                    })
+            }
+        )
+
+        Vitest.test (
+            "suspension cancels a watcher establishment that has not become ready",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault _ _ _ -> promise {
+                        let created, signalCreated = TestHelpers.deferred ()
+                        let closed, signalClosed = TestHelpers.deferred ()
+                        let operationGate, releaseOperation = TestHelpers.deferred ()
+                        let operationEntered, signalOperationEntered = TestHelpers.deferred ()
+
+                        interceptNextControlledWatch
+                            watchMock
+                            signalCreated
+                            ignore
+                            signalClosed
+
+                        let refresh = vault.RefreshFileTreeDirectory "dataset"
+                        do! created
+
+                        let suspension =
+                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                                signalOperationEntered ()
+                                do! operationGate
+                            })
+
+                        do! closed
+                        do! operationEntered
+                        do! refresh
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+
+                        releaseOperation ()
+                        do! suspension
+
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                    })
+            }
+        )
+
+        Vitest.test (
+            "first directory load during suspension catches up after restored watcher readiness",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
+                        let handoffPath = join [| datasetPath; "created-while-first-load-suspended.txt" |]
+                        interceptNextWatchReady watchMock ignore
+
+                        do!
+                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                do! vault.RefreshFileTreeDirectory "dataset"
+                                Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                                do! writeFileAsync handoffPath "handoff" TextEncoding.Utf8
+                            })
+
+                        Vitest.expect(containsPath handoffPath vault).toBe true
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                    })
+            }
+        )
+
+        Vitest.test (
+            "suspension during first-load establishment catches up after replacement readiness",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
+                        let handoffPath = join [| datasetPath; "created-during-cancelled-handoff.txt" |]
+                        let created, signalCreated = TestHelpers.deferred ()
+                        let operationGate, releaseOperation = TestHelpers.deferred ()
+                        let operationEntered, signalOperationEntered = TestHelpers.deferred ()
+
+                        interceptNextControlledWatch watchMock signalCreated ignore ignore
+                        interceptNextWatchReady watchMock ignore
+
+                        let refresh = vault.RefreshFileTreeDirectory "dataset"
+                        do! created
+
+                        let suspension =
+                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                signalOperationEntered ()
+                                do! operationGate
+                            })
+
+                        do! operationEntered
+                        do! writeFileAsync handoffPath "handoff" TextEncoding.Utf8
+                        do! refresh
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+
+                        releaseOperation ()
+                        do! suspension
 
                         Vitest.expect(containsPath handoffPath vault).toBe true
                         Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
