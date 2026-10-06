@@ -1014,15 +1014,16 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         try
                             let absolutePath = tryResolveArcRelativePath vault.path.Value relativePath
 
-                        match absolutePath with
-                        | Error pathError -> return Error pathError
-                        | Ok path ->
-                            let fileType = FileContentDTO.inferTextFileTypeFromPath relativePath
-                            let! content = 
-                                if fileType = FileContentType.PDF then
-                                    Main.Bindings.Filesystem.readFileBase64Async path
-                                else
-                                    ARCtrl.FileSystemHelper.readFileTextAsync path
+                            match absolutePath with
+                            | Error pathError -> return Error pathError
+                            | Ok path ->
+                                let fileType = FileContentDTO.inferTextFileTypeFromPath relativePath
+
+                                let! content =
+                                    if fileType = FileContentType.PDF then
+                                        Main.Bindings.Filesystem.readFileBase64Async path
+                                    else
+                                        ARCtrl.FileSystemHelper.readFileTextAsync path
 
                                 let dto = FileContentDTO.create fileType content relativePath
 

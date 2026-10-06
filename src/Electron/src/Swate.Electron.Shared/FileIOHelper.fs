@@ -334,7 +334,7 @@ module FileContentDTO =
 
         if normalizedPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase) then
             FileContentType.Markdown
-            
+
         elif normalizedPath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) then
             FileContentType.PDF
         else

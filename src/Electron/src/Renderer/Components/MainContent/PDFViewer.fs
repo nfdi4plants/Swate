@@ -42,9 +42,9 @@ type DisplayPDF =
 
     [<ReactComponent>]
 
-    static member Main (filehtml) =
+    static member Main(filehtml) =
 
-        let (numPages: int option), setNumPages = React.useState(None)
+        let (numPages: int option), setNumPages = React.useState (None)
         let pdfSource = {| data = PDFData.fromBase64 filehtml |}
 
         let textRender =
@@ -61,7 +61,7 @@ type DisplayPDF =
                 ReactElements.Document(
                     pdfSource,
                     (fun (props: {| numPages: int |}) -> setNumPages (Some props.numPages)),
-                    
+
                     [
                         for i in 1 .. numPages |> Option.defaultValue 1 do
                             ReactElements.Page(i, 1200, textRender, $"page-{i}")
