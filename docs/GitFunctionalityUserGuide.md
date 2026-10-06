@@ -29,7 +29,7 @@ checkDependencies: OperationRequestDto -> JS.Promise<Result<OperationResultDto<D
 installDependency: InstallDependencyRequestDto -> JS.Promise<Result<OperationResultDto<DependencyStatusDto>, string>>
 getStatus, listRefs, createRef, preflightSwitchRef, switchRef
 createRevision, restorePaths
-getWordDiff, getBaseContent
+openTextDiff, readTextDiffPage, replayTextDiffPage, expandTextDiff, readTextDiffLine, getTextDiffSourceInfo, closeTextDiff
 refreshSynchronization, synchronize
 resolveConflict, finalizeConflict, cancelConflict
 listObjects, materializeObject, dematerializeObject
@@ -148,7 +148,15 @@ Clone and synchronize hydrate large objects when `MaterializeAllObjects` (clone)
 
 ## 10. Diff and conflict resolution
 
-The diff page loads `getBaseContent`, `getWordDiff` and the current file content from the vault. The conflict page loads the combined preview of the conflicted item and carries the conflict handle and the workspace version the preview was taken with. Confirming calls `resolveConflict` with the resolved content, then `getStatus`, then `finalizeConflict` when no items remain. A stale handle fails with `refresh_conflict_session` and the page reloads. Abandoning calls `cancelConflict`.
+The diff page is a paged text diff. `openTextDiff` opens it and returns a handle with the first page. While the library still prepares the sources it answers Scanning with a continuation, which the caller passes to the next `openTextDiff` call. `readTextDiffPage` reads the page after the last one by its cursor, and `replayTextDiffPage` returns an earlier page by its page id. `expandTextDiff` reveals lines of a hidden gap from its start or its end, and `readTextDiffLine` reads a further slice of a long line. `getTextDiffSourceInfo` returns the sizes and encodings of the two versions. `closeTextDiff` closes the handle and succeeds when it is already closed.
+
+The diff runs in worker threads that all windows share (`Main/VersionControl/TextDiffWorkers.fs`). The pool has three workers, and each runs one diff. A fourth open diff closes the longest idle one and takes its slot, and a diff that sat idle for 15 minutes is closed. A call on a closed diff fails with `diff_session_closed`. The registry in `TextDiffHandles.fs` remembers which window opened each handle. It closes the handles of a window that reloads or closes, and the library answers a call on a handle of another window like a call on a closed one.
+
+The renderer (`GitDiffPageLoader` in `GitWorkflow.fs`) keeps at most 8 loaded pages and 8 MiB of page JSON. The other pages are placeholders that keep their row count, and the viewer replays them when they scroll into view. A call that finds its session closed reopens the diff once. The new session reads forward from the first page until a page reaches the line the request needed, which is the first line of the replayed page, the requested line of a slice, or the first line of the last page read for a request of the next page. The view lands on that line.
+
+Once the first page is ready, the renderer reads the remaining pages in the background, one read at a time, so the scrollbar covers the whole diff. The Git sidebar setting "Background indexing limit (MB)" stops that reading. It is 1024 by default, accepts 64 to 1048576 and is held in memory for each open ARC like the Git LFS threshold. The renderer adds the UTF-8 size of the JSON of every page the session answered, and the reading stops when the sum reaches the limit. The sum is an upper bound of the temp data that the diff journal of the session keeps, so the limit bounds that journal. The two file versions that the diff keeps in the temp folder are not part of it. The limit never holds back a read the user asks for: scrolling to the end, the continue button, a gap, a long line or a replay. Raising the limit resumes the reading. A background read that finds its session closed pauses the reading. The next request of the user reopens the diff. A status bar above the diff shows the progress while the background reading runs, and it says when the reading stopped at the limit or paused.
+
+The conflict page loads the combined preview of the conflicted item and carries the conflict handle and the workspace version the preview was taken with. Confirming calls `resolveConflict` with the resolved content, then `getStatus`, then `finalizeConflict` when no items remain. A stale handle fails with `refresh_conflict_session` and the page reloads. Abandoning calls `cancelConflict`.
 
 ## 11. Busy, progress and cancellation
 

@@ -300,7 +300,7 @@ type OperationFailureDto = {
     RecoveryAction: RecoveryActionDto option
     Details: string[]
     RevisionEvidence: RevisionEvidenceDto[]
-    /// Set on a diff_content_not_text failure of a text diff call.
+    /// Set on a diff_content_not_text or diff_encoding_mismatch failure of a text diff call.
     DiffDetail: DiffContentBlockedDto option
 }
 

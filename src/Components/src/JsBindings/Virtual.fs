@@ -39,7 +39,8 @@ module Virtual =
     type Virtualizer<'A, 'B> =
         member this.getVirtualItems() : VirtualItem[] = jsNative
         member this.getVirtualIndexes() : int[] = jsNative
-        /// The measured items, current after each render.
+        /// The items as the virtualizer measured them last. They change only when the virtualizer
+        /// measures again, which getTotalSize, getVirtualItems and getVirtualItemForOffset do.
         member this.measurementsCache: VirtualItem[] = jsNative
         member this.getTotalSize() : int = jsNative
 

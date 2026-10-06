@@ -776,8 +776,9 @@ module ArcVaultExtensions =
 
                 this.SetFileTree fileTree
 
-                // Only the first ARC starts the diff workers. Prewarming never throws and
-                // does not hold up the ARC.
+                // Every ARC open asks for the prewarm. It does nothing once the diff workers
+                // started, and a failed prewarm is tried again by the next open. Prewarming never
+                // throws and does not hold up the ARC.
                 Main.VersionControl.TextDiffWorkers.prewarm ()
 
         member this.OpenARC(path: string) = promise {

@@ -281,9 +281,10 @@ let tryRevisionId (value: string) : Result<RevisionId, OperationFailure> =
     RevisionId.tryCreate value
     |> Result.mapError (OperationFailure.create Validation VersionControlCodes.InvalidRevision)
 
-/// The longest operation id or handle id a text diff request may carry. Every other token
-/// (cursors, page ids, gap ids, continuations, preparation tokens, handle versions and
-/// encoding names) is opaque to Swate, and the worker rejects an overlong one.
+/// The longest operation id or handle id a text diff request may carry. Swate checks no length of
+/// the other tokens (cursors, page ids, gap ids, continuations, preparation tokens, handle versions
+/// and encoding names). They are opaque here, and the library rejects a value it did not issue
+/// or does not support.
 [<Literal>]
 let MaxTextDiffIdLength = 128
 

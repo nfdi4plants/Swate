@@ -50,7 +50,9 @@ type GitDiffBlockReason =
     | LocalContentUnavailable of objectId: string option
     | NotRegularFile
     | ProviderUnsupported
-    /// A side failed strict decoding after the diff was opened.
+    /// A side turned out not to be text after the diff was opened. The evidence names what the
+    /// library found: a NUL character, a high share of control characters, an HDF5 signature or
+    /// bytes that fail strict decoding.
     | NotText of evidence: string
 
 [<RequireQualifiedAccess>]
@@ -145,9 +147,9 @@ type GitDiffPageData = {
     PendingReplay: string option
     /// Pages the viewer showed when it asked for the last replay. Eviction keeps them.
     VisiblePages: string list
-    /// Set when a replay or an expansion was asked for while the next page was loading. That
-    /// page then joins the window without becoming the requested page, so the page the user
-    /// went back to stays loaded.
+    /// Set when a replay or an expansion was asked for while the next page was loading, and by
+    /// every background read of the indexing. That page then joins the window without becoming
+    /// the requested page, so the page the user went back to stays loaded.
     KeepRequestedPage: bool
     /// Set once the viewer asked for the background read of every remaining page. While it is
     /// set, each arriving page starts the read of the next one, until the output is exhausted.
