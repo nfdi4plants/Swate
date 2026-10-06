@@ -108,10 +108,11 @@ type ArcVault(window: BrowserWindow) =
     member val fileWatcherPendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
     /// The barrier stays None outside tests. The watcher path awaits it between snapshot loading and the final eligibility check.
     member val internal WatcherMergeBarrier: (unit -> Fable.Core.JS.Promise<unit>) option = None with get, set
+
     /// Test seam for holding a loaded-directory filesystem read at its real asynchronous boundary.
-    member val internal LoadedDirectoryReadOverride:
-        (string -> string -> Fable.Core.JS.Promise<FileEntry[]>) option =
+    member val internal LoadedDirectoryReadOverride: (string -> string -> Fable.Core.JS.Promise<FileEntry[]>) option =
         None with get, set
+
     /// Imported paths awaiting their delayed Chokidar events. These events update the tree but must not re-merge the import.
     member val importedFileWatcherPaths: HashSet<string> = HashSet() with get
     member val private isBusyWritingValue: bool = false with get, set
@@ -426,8 +427,7 @@ module ArcVaultExtensions =
 
             let watcherOwnsActiveLifecycle () =
                 this.IsLoadedDirectoryWatcherLifecycleActive
-                && watcherGeneration
-                   |> Option.forall this.IsLoadedDirectoryWatcherGenerationActive
+                && watcherGeneration |> Option.forall this.IsLoadedDirectoryWatcherGenerationActive
 
             let lifecycleIsCurrent () =
                 capturedWatcherEpoch = this.WatcherEpoch
@@ -553,10 +553,11 @@ module ArcVaultExtensions =
                                                 join [| arcPath; changedPath |]
 
                                         match tryGetRepoRelativePath arcPath (dirname absoluteChangedPath) with
-                                        | Some parentPath
-                                            when this.IsLoadedDirectoryWatcherLifecycleActive
-                                                 && this.IsLoadedDirectoryWatcherGenerationActive generation
-                                                 && this.IsFileTreeDirectoryLoaded parentPath ->
+                                        | Some parentPath when
+                                            this.IsLoadedDirectoryWatcherLifecycleActive
+                                            && this.IsLoadedDirectoryWatcherGenerationActive generation
+                                            && this.IsFileTreeDirectoryLoaded parentPath
+                                            ->
                                             this.QueueLoadedDirectoryRefresh(parentPath, generation)
                                         | _ -> ()
                             )
@@ -1082,6 +1083,7 @@ module ArcVaultExtensions =
                 | Some arcPath ->
                     try
                         let wasLoaded = this.IsFileTreeDirectoryLoaded normalizedRelativePath
+
                         let! children =
                             match this.LoadedDirectoryReadOverride with
                             | Some readDirectory -> readDirectory arcPath normalizedRelativePath

@@ -780,7 +780,11 @@ Vitest.describe (
 
                         let restartedPath = join [| datasetPath; "after-restart.txt" |]
                         do! writeFileAsync restartedPath "restart" TextEncoding.Utf8
-                        do! waitUntil "loaded-directory event after restart" (fun () -> containsPath restartedPath vault)
+
+                        do!
+                            waitUntil
+                                "loaded-directory event after restart"
+                                (fun () -> containsPath restartedPath vault)
                     })
             }
         )
