@@ -943,7 +943,7 @@ Vitest.describe (
 
                         let queuedTree = System.Collections.Generic.Dictionary<string, FileEntry>()
                         let queuedPath = join [| arcPath; "queued-tree-entry.txt" |]
-                        let queuedEntry = FileEntry.create("queued-tree-entry.txt", queuedPath, false)
+                        let queuedEntry = FileEntry.create ("queued-tree-entry.txt", queuedPath, false)
                         queuedTree.Add(queuedPath, queuedEntry)
 
                         let queueGate, releaseQueue = TestHelpers.deferred ()

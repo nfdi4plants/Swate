@@ -529,10 +529,7 @@ Vitest.describe (
                         let mutable capturedOperationError: exn option = None
 
                         try
-                            do!
-                                vault.WithLoadedDirectoryWatcherSuspended(fun () ->
-                                    raise operationError
-                                )
+                            do! vault.WithLoadedDirectoryWatcherSuspended(fun () -> raise operationError)
                         with error ->
                             capturedOperationError <- Some error
 
