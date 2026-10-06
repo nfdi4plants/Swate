@@ -114,13 +114,46 @@ type SortableList =
                                 if lastInteraction.IsSome && item.id = lastInteraction.Value then
                                     "swt:outline swt:outline-primary"
                             ]
-                            prop.onClick (fun _ ->
-                                setSelectedIds (fun current ->
-                                    if List.contains item.id current then
-                                        List.filter ((<>) item.id) current
-                                    else
-                                        item.id :: current
-                                )
+                            prop.onClick (fun event ->
+                                let selectRange () =
+                                    match lastInteraction with
+                                    | Some lastInteractionId when event.shiftKey ->
+                                        let lastIndex =
+                                            items |> Array.tryFindIndex (fun item -> item.id = lastInteractionId)
+
+                                        let currentIndex =
+                                            items |> Array.tryFindIndex (fun currentItem -> currentItem.id = item.id)
+
+                                        match lastIndex, currentIndex with
+                                        | Some lastIndex, Some currentIndex ->
+                                            let firstIndex = min lastIndex currentIndex
+                                            let lastIndex = max lastIndex currentIndex
+
+                                            let rangeIds = items.[firstIndex..lastIndex] |> Array.map _.id
+
+                                            setSelectedIds (fun current ->
+                                                rangeIds
+                                                |> Array.fold
+                                                    (fun selected id ->
+                                                        if List.contains id selected then
+                                                            selected
+                                                        else
+                                                            id :: selected
+                                                    )
+                                                    current
+                                            )
+
+                                            true
+                                        | _ -> false
+                                    | _ -> false
+
+                                if not (selectRange ()) then
+                                    setSelectedIds (fun current ->
+                                        if List.contains item.id current then
+                                            List.filter ((<>) item.id) current
+                                        else
+                                            item.id :: current
+                                    )
 
                                 setLastInteraction (Some item.id)
                             )

@@ -104,22 +104,8 @@ type FilePickerWidget =
                     items,
                     (fun nextItems -> setPaths (fun _ -> nextItems |> Array.map _.label)),
                     className = "swt:max-h-[45vh]",
-                    rowProps =
-                        (fun item -> [
-                            prop.className [
-                                "swt:cursor-pointer swt:table-auto"
-                                if List.contains item.id selectedPathsCtx.state then
-                                    "swt:bg-base-300"
-                            ]
-                            prop.onClick (fun _ ->
-                                selectedPathsCtx.setStateUpdater (fun current ->
-                                    if List.contains item.id current then
-                                        current |> List.filter ((<>) item.id)
-                                    else
-                                        item.id :: current
-                                )
-                            )
-                        ]),
+                    selectedIds = selectedPathsCtx.state,
+                    setSelectedIds = selectedPathsCtx.setStateUpdater,
                     renderRow =
                         (fun row ->
                             RowComponents.DefaultRow(
