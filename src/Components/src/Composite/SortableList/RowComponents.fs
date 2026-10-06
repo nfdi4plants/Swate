@@ -95,7 +95,9 @@ type RowComponents =
             Html.td [
                 prop.className "swt:max-w-md swt:truncate"
                 prop.title row.item.label
-                prop.children [ defaultArg label (Html.span row.item.label) ]
+                prop.children [
+                    defaultArg label (Html.span [ prop.className "swt:font-mono"; prop.text row.item.label ])
+                ]
             ]
             Html.td [
                 prop.className "swt:w-20"

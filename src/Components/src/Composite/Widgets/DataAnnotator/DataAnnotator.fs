@@ -616,29 +616,8 @@ type DataAnnotator =
                         SortableList.SortableList(
                             items,
                             (fun nextItems -> nextItems |> Array.map _.id |> setSelectors),
-                            rowProps =
-                                (fun item -> [
-                                    prop.className [
-                                        "swt:cursor-pointer swt:table-auto"
-                                        if List.contains item.id selectedSelectors then
-                                            "swt:bg-base-300"
-                                    ]
-                                    prop.onClick (fun _ ->
-                                        setSelectedSelectors (fun current ->
-                                            if List.contains item.id current then
-                                                List.filter ((<>) item.id) current
-                                            else
-                                                item.id :: current
-                                        )
-                                    )
-                                ]),
-                            renderRow =
-                                (fun row ->
-                                    RowComponents.DefaultRow(
-                                        row,
-                                        label = Html.span [ prop.className "swt:font-mono"; prop.text row.item.label ]
-                                    )
-                                )
+                            selectedIds = selectedSelectors,
+                            setSelectedIds = setSelectedSelectors
                         )
                     ]
                 ]
