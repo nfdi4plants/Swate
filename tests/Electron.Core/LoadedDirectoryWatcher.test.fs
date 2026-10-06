@@ -402,7 +402,7 @@ Vitest.describe (
                         (fun vault _ _ _ -> promise {
                             do! vault.RefreshFileTreeDirectory "dataset"
                             do! vault.loadedDirectoryWatcher.Value.close ()
-                            vault.loadedDirectoryWatcher <- None
+                            vault.ForgetLoadedDirectoryWatcherForTesting()
                             publications <- 0
 
                             let firstRefreshGate, releaseFirstRefresh = TestHelpers.deferred ()
@@ -460,7 +460,7 @@ Vitest.describe (
                             vaultUnderTest <- Some vault
                             do! vault.RefreshFileTreeDirectory "dataset"
                             do! vault.loadedDirectoryWatcher.Value.close ()
-                            vault.loadedDirectoryWatcher <- None
+                            vault.ForgetLoadedDirectoryWatcherForTesting()
 
                             firstPath <- join [| datasetPath; "race-first.txt" |]
                             intermediatePath <- join [| datasetPath; "race-intermediate.txt" |]
@@ -588,7 +588,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "concurrent suspended operations overlap and restore only after the final exit",
+            "concurrent suspended operations are queued and restore only after the queue drains",
             TestOptions(timeout = 15000),
             fun () -> promise {
                 do!
@@ -620,15 +620,16 @@ Vitest.describe (
                                 do! secondOperationGate
                             })
 
-                        do! waitUntil "overlapping mutation lifecycles" (fun () -> enteredOperations.Count = 2)
-                        Vitest.expect(enteredOperations.Count).toBe 2
+                        do! waitUntil "first queued mutation" (fun () -> enteredOperations.Count = 1)
                         Vitest.expect(enteredOperations.[0]).toBe 1
-                        Vitest.expect(enteredOperations.[1]).toBe 2
 
                         releaseFirstOperation ()
                         do! first
                         Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
                         Vitest.expect(containsPath addedPath vault).toBe false
+
+                        do! waitUntil "second queued mutation" (fun () -> enteredOperations.Count = 2)
+                        Vitest.expect(enteredOperations.[1]).toBe 2
 
                         releaseSecondOperation ()
                         do! second
@@ -862,7 +863,7 @@ Vitest.describe (
                             (fun ready -> signalSecondReady <- ready)
                             (fun () -> closeCount <- closeCount + 1)
 
-                        vault.loadedFileTreeDirectories.Add("dataset") |> ignore
+                        vault.AddLoadedDirectoryForTesting "dataset"
                         let first = vault.RequestLoadedDirectoryWatcherCoverage true
                         do! firstCreated
 
