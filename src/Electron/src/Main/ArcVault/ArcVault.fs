@@ -65,9 +65,14 @@ type ArcVault(window: BrowserWindow) =
     let mutable watcherEpoch = 0
     let mutable loadedDirectoryWatcherSuspensionDepth = 0
     let mutable loadedDirectoryWatcherGeneration = 0
-    let mutable loadedDirectoryWatcherEstablishmentCancellation: (int * (unit -> unit)) option = None
+
+    let mutable loadedDirectoryWatcherEstablishmentCancellation: (int * (unit -> unit)) option =
+        None
+
     let pendingLoadedDirectoryHandoffs = HashSet<string>()
-    let mutable loadedDirectoryWatcherSuspensionClose = JS.Constructors.Promise.resolve ()
+
+    let mutable loadedDirectoryWatcherSuspensionClose =
+        JS.Constructors.Promise.resolve ()
 
     let mutable fileTreeUpdateTail: Fable.Core.JS.Promise<unit> =
         JS.Constructors.Promise.resolve ()
@@ -130,8 +135,7 @@ type ArcVault(window: BrowserWindow) =
     /// Counts pending-state resets. The watcher controller and ARC merge compare it with a captured value.
     member internal this.WatcherEpoch = watcherEpoch
 
-    member internal this.IncrementWatcherEpoch() =
-        watcherEpoch <- watcherEpoch + 1
+    member internal this.IncrementWatcherEpoch() = watcherEpoch <- watcherEpoch + 1
 
     member internal this.IsLoadedDirectoryWatcherSuspended =
         loadedDirectoryWatcherSuspensionDepth > 0
@@ -143,11 +147,16 @@ type ArcVault(window: BrowserWindow) =
         loadedDirectoryWatcherSuspensionDepth <- loadedDirectoryWatcherSuspensionDepth - 1
 
     member internal this.BeginLoadedDirectoryWatcherEstablishment() =
-        loadedDirectoryWatcherEstablishmentCancellation |> Option.iter (fun (_, cancel) -> cancel ())
+        loadedDirectoryWatcherEstablishmentCancellation
+        |> Option.iter (fun (_, cancel) -> cancel ())
+
         loadedDirectoryWatcherGeneration <- loadedDirectoryWatcherGeneration + 1
         let generation = loadedDirectoryWatcherGeneration
         let mutable cancel = ignore
-        let cancellation = JS.Constructors.Promise.Create(fun resolve _ -> cancel <- fun () -> resolve ())
+
+        let cancellation =
+            JS.Constructors.Promise.Create(fun resolve _ -> cancel <- fun () -> resolve ())
+
         loadedDirectoryWatcherEstablishmentCancellation <- Some(generation, cancel)
         generation, cancellation
 
@@ -158,7 +167,9 @@ type ArcVault(window: BrowserWindow) =
         | _ -> ()
 
     member internal this.CancelLoadedDirectoryWatcherEstablishment() =
-        loadedDirectoryWatcherEstablishmentCancellation |> Option.iter (fun (_, cancel) -> cancel ())
+        loadedDirectoryWatcherEstablishmentCancellation
+        |> Option.iter (fun (_, cancel) -> cancel ())
+
         loadedDirectoryWatcherEstablishmentCancellation <- None
 
     member internal this.IsLoadedDirectoryWatcherGenerationCurrent(generation: int) =
@@ -429,47 +440,49 @@ module ArcVaultExtensions =
 
                     this.loadedDirectoryWatcher <- Some watcher
 
-        member private this.CreateLoadedDirectoryWatcherAndWaitForReady(arcPath: string, relativePaths: string[]) =
-            promise {
-                let generation, cancelled = this.BeginLoadedDirectoryWatcherEstablishment()
+        member private this.CreateLoadedDirectoryWatcherAndWaitForReady(arcPath: string, relativePaths: string[]) = promise {
+            let generation, cancelled = this.BeginLoadedDirectoryWatcherEstablishment()
 
-                let absolutePaths =
-                    relativePaths
-                    |> Array.map (fun relativePath -> join [| arcPath; relativePath |])
+            let absolutePaths =
+                relativePaths
+                |> Array.map (fun relativePath -> join [| arcPath; relativePath |])
 
-                let watcher, ready = createLoadedDirectoryWatcherWithReady arcPath absolutePaths
+            let watcher, ready = createLoadedDirectoryWatcherWithReady arcPath absolutePaths
 
-                watcher.on (
-                    Chokidar.Events.All,
-                    fun eventName changedPath ->
-                        if
-                            not (WatcherHelpers.eventNameEquals Chokidar.Events.Error eventName)
-                            && not (WatcherHelpers.eventNameEquals Chokidar.Events.Ready eventName)
-                        then
-                            let absoluteChangedPath =
-                                if isAbsolute changedPath then
-                                    changedPath
-                                else
-                                    join [| arcPath; changedPath |]
+            watcher.on (
+                Chokidar.Events.All,
+                fun eventName changedPath ->
+                    if
+                        not (WatcherHelpers.eventNameEquals Chokidar.Events.Error eventName)
+                        && not (WatcherHelpers.eventNameEquals Chokidar.Events.Ready eventName)
+                    then
+                        let absoluteChangedPath =
+                            if isAbsolute changedPath then
+                                changedPath
+                            else
+                                join [| arcPath; changedPath |]
 
-                            match tryGetRepoRelativePath arcPath (dirname absoluteChangedPath) with
-                            | Some parentPath when this.IsFileTreeDirectoryLoaded parentPath ->
-                                this.QueueLoadedDirectoryRefresh parentPath
-                            | _ -> ()
-                )
-                |> ignore
+                        match tryGetRepoRelativePath arcPath (dirname absoluteChangedPath) with
+                        | Some parentPath when this.IsFileTreeDirectoryLoaded parentPath ->
+                            this.QueueLoadedDirectoryRefresh parentPath
+                        | _ -> ()
+            )
+            |> ignore
 
-                this.loadedDirectoryWatcher <- Some watcher
+            this.loadedDirectoryWatcher <- Some watcher
 
-                let! becameReady =
-                    race [| ready |> Promise.map (fun () -> true); cancelled |> Promise.map (fun () -> false) |]
+            let! becameReady =
+                race [|
+                    ready |> Promise.map (fun () -> true)
+                    cancelled |> Promise.map (fun () -> false)
+                |]
 
-                if becameReady && this.IsLoadedDirectoryWatcherGenerationCurrent generation then
-                    this.CompleteLoadedDirectoryWatcherEstablishment generation
-                    return Some generation
-                else
-                    return None
-            }
+            if becameReady && this.IsLoadedDirectoryWatcherGenerationCurrent generation then
+                this.CompleteLoadedDirectoryWatcherEstablishment generation
+                return Some generation
+            else
+                return None
+        }
 
         member internal this.QueueLoadedDirectoryRefresh(relativeDirectoryPath: string) =
             let normalizedRelativePath = this.NormalizeLoadedDirectoryPath relativeDirectoryPath
@@ -565,7 +578,9 @@ module ArcVaultExtensions =
                     let! children = readFileTreeDirectory arcPath relativePath
 
                     if canPublish () then
-                        let nextFileTree = reconcileFileTreeDirectory arcPath relativePath children this.fileTree
+                        let nextFileTree =
+                            reconcileFileTreeDirectory arcPath relativePath children this.fileTree
+
                         this.SetFileTree nextFileTree
                         this.PendingLoadedDirectoryHandoffs.Remove(relativePath) |> ignore
         }

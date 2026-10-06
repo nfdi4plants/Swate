@@ -703,11 +703,7 @@ Vitest.describe (
                         let operationGate, releaseOperation = TestHelpers.deferred ()
                         let operationEntered, signalOperationEntered = TestHelpers.deferred ()
 
-                        interceptNextControlledWatch
-                            watchMock
-                            signalCreated
-                            ignore
-                            signalClosed
+                        interceptNextControlledWatch watchMock signalCreated ignore signalClosed
 
                         let refresh = vault.RefreshFileTreeDirectory "dataset"
                         do! created
