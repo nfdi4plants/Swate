@@ -625,6 +625,13 @@ module ArcVaultExtensions =
 
             let wasAlreadySuspended = this.IsLoadedDirectoryWatcherSuspended
             let hadOwnedWatcher = this.HasOwnedLoadedDirectoryWatcher
+
+            if not wasAlreadySuspended then
+                this.loadedFileTreeDirectories
+                |> Seq.iter (fun relativePath ->
+                    this.PendingLoadedDirectoryHandoffs.Add(relativePath) |> ignore
+                )
+
             this.BeginLoadedDirectoryWatcherSuspension()
 
             let closePromise =

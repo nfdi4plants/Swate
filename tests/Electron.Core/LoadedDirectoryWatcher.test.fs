@@ -557,16 +557,40 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "watcher restoration catches up scopes that were loaded before suspension",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
+                        do! vault.RefreshFileTreeDirectory "dataset"
+                        let addedPath = join [| datasetPath; "added-while-suspended.txt" |]
+
+                        do!
+                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                                do! writeFileAsync addedPath "suspended" TextEncoding.Utf8
+                                Vitest.expect(containsPath addedPath vault).toBe false
+                            })
+
+                        Vitest.expect(containsPath addedPath vault).toBe true
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
+                    })
+            }
+        )
+
+        Vitest.test (
             "concurrent suspended operations overlap and restore only after the final exit",
             TestOptions(timeout = 15000),
             fun () -> promise {
                 do!
-                    withLoadedDirectoryFixture (fun vault _ _ _ -> promise {
+                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
                         do! vault.RefreshFileTreeDirectory "dataset"
 
                         let firstOperationGate, releaseFirstOperation = TestHelpers.deferred ()
                         let secondOperationGate, releaseSecondOperation = TestHelpers.deferred ()
                         let enteredOperations = ResizeArray<int>()
+                        let addedPath = join [| datasetPath; "added-during-overlapping-suspensions.txt" |]
 
                         let first =
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
@@ -579,6 +603,7 @@ Vitest.describe (
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
                                 enteredOperations.Add 2
                                 Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                                do! writeFileAsync addedPath "overlap" TextEncoding.Utf8
                                 do! secondOperationGate
                             })
 
@@ -590,11 +615,14 @@ Vitest.describe (
                         releaseFirstOperation ()
                         do! first
                         Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                        Vitest.expect(containsPath addedPath vault).toBe false
 
                         releaseSecondOperation ()
                         do! second
 
                         Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                        Vitest.expect(containsPath addedPath vault).toBe true
+                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
                     })
             }
         )
