@@ -440,6 +440,18 @@ let createLoadedDirectoryWatcher (arcPath: string) (paths: string[]) =
         )
     )
 
+/// Creates a loaded-directory watcher and captures its one initial readiness notification.
+/// Chokidar emits `ready` once after the watcher's initial scan, not after later `add` calls.
+let createLoadedDirectoryWatcherWithReady (arcPath: string) (paths: string[]) =
+    let watcher = createLoadedDirectoryWatcher arcPath paths
+
+    let ready =
+        JS.Constructors.Promise.Create(fun resolve _ ->
+            watcher.on (Chokidar.Events.Ready, fun _ -> resolve ()) |> ignore
+        )
+
+    watcher, ready
+
 let sendArcHasUnsavedChangesUpdate (hasUnsavedChanges: bool) (window: BrowserWindow) =
     WindowSend.send<Swate.Electron.Shared.IPCTypes.MainToRendererIpc.IHasUnsavedArcChangesRendererApi>
         window

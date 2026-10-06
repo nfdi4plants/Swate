@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Electron
 open Main
+open Main.ArcVault
 open Main.Bindings.Path
 open Main.VersionControl
 open Swate.Components.Composite.Authentication.Types
@@ -20,6 +21,19 @@ let private mockResolvedValue (mock: obj) (value: obj) : unit = jsNative
 
 [<Emit("$0.mock.calls.length")>]
 let private mockCallCount (mock: obj) : int = jsNative
+
+let private waitUntil description predicate =
+    let rec loop remaining = promise {
+        if predicate () then
+            return ()
+        elif remaining = 0 then
+            return failwith $"Timed out waiting for {description}."
+        else
+            do! Promise.sleep 10
+            return! loop (remaining - 1)
+    }
+
+    loop 500
 
 let private git (cwd: string) (args: string list) = execFile "git" (List.toArray args) cwd
 
@@ -1719,8 +1733,14 @@ Vitest.describe (
             fun () ->
                 withFixture (fun fixture -> promise {
                     let vault = registerVault 48 fixture.RepoRoot
+                    let datasetPath = join [| fixture.RepoRoot; "dataset" |]
+                    Main.Bindings.Filesystem.mkdirSync datasetPath (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+                    let! initialTree = Main.FileTreeCreator.getFileTree fixture.RepoRoot
+                    vault.fileTree <- initialTree
+                    do! vault.RefreshFileTreeDirectory "dataset"
                     let api = Main.IPC.IVersionControlApi.api (ipcEvent 48)
                     Vitest.expect(vault.isBusyWriting).toBe false
+                    Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
 
                     let running =
                         api.restorePaths {
@@ -1733,6 +1753,8 @@ Vitest.describe (
                     let! result = running
                     expectDtoFailure "stale restore" result |> ignore
                     Vitest.expect(vault.isBusyWriting).toBe false
+                    Vitest.expect(vault.loadedFileTreeDirectories.Contains "dataset").toBe true
+                    Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
                 })
         )
 
@@ -1974,6 +1996,15 @@ Vitest.describe (
 
                     try
                         let vault = registerVault 52 coreOnlyRoot
+                        let datasetPath = join [| coreOnlyRoot; "dataset" |]
+
+                        Main.Bindings.Filesystem.mkdirSync
+                            datasetPath
+                            (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                        let! initialTree = Main.FileTreeCreator.getFileTree coreOnlyRoot
+                        vault.fileTree <- initialTree
+                        do! vault.RefreshFileTreeDirectory "dataset"
                         let api = Main.IPC.IVersionControlApi.api (ipcEvent 52)
                         let firstGate, releaseFirst = deferred ()
                         let secondGate, releaseSecond = deferred ()
@@ -1987,7 +2018,13 @@ Vitest.describe (
                                 ExpectedWorkspaceVersion = "v1"
                             }
 
+                        do!
+                            waitUntil "first restore mutation to start" (fun () ->
+                                fakeHost.RunningMutationIdsForWindow 52 = [| "restore-first" |]
+                            )
+
                         Vitest.expect(fakeHost.RunningMutationIdsForWindow 52).toEqual [| "restore-first" |]
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
 
                         let second =
                             api.restorePaths {
@@ -2003,6 +2040,8 @@ Vitest.describe (
                         releaseSecond ()
                         let! _ = second
                         Vitest.expect(vault.isBusyWriting).toBe false
+                        Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
                     finally
                         restoreGates.Clear()
                         WorkspaceSessionHost.initialize fixture.Host

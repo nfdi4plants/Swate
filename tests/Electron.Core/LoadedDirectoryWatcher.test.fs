@@ -17,6 +17,9 @@ let private watchMock: obj = jsNative
 [<Emit("$0.mock.calls.length")>]
 let private invocationCount (_spy: obj) : int = jsNative
 
+[<Emit("$0.mockImplementationOnce(() => { const handlers = new Map(); const watcher = { on(event, callback) { handlers.set(event, callback); if (event === 'all') { $1(); queueMicrotask(() => handlers.get('ready')?.()); } return watcher; }, close() { return Promise.resolve(); }, add() { return watcher; }, unwatch() { return watcher; }, getWatched() { return {}; } }; return watcher; })")>]
+let private interceptNextWatchReady (_spy: obj) (_beforeReady: unit -> unit) : unit = jsNative
+
 let private waitUntil description predicate =
     let rec loop remaining = promise {
         if predicate () then
@@ -576,6 +579,100 @@ Vitest.describe (
                         Vitest.expect(enteredOperations.Count).toBe 2
                         Vitest.expect(enteredOperations.[0]).toBe 1
                         Vitest.expect(enteredOperations.[1]).toBe 2
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                    })
+            }
+        )
+
+        Vitest.test (
+            "refresh during watcher suspension does not recreate coverage before restoration",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault rootPath _ _ -> promise {
+                        do! vault.RefreshFileTreeDirectory "dataset"
+
+                        let suspension =
+                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                                do! vault.RefreshFileTreeDirectory "dataset"
+                                Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                            })
+
+                        do! suspension
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+
+                        Vitest.expect(isWatchedPath rootPath "dataset/existing.txt" vault.loadedDirectoryWatcher.Value).toBe true
+                    })
+            }
+        )
+
+        Vitest.test (
+            "refresh invalidated by StopFileWatcher cannot publish or restore loaded scopes",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
+                        do! vault.RefreshFileTreeDirectory "dataset"
+                        let stalePath = join [| datasetPath; "stale-after-stop.txt" |]
+                        do! writeFileAsync stalePath "stale" TextEncoding.Utf8
+
+                        let queueGate, releaseQueue = TestHelpers.deferred ()
+                        vault.FileTreeUpdateTail <- queueGate
+                        let refresh = vault.RefreshFileTreeDirectory "dataset"
+
+                        do! vault.StopFileWatcher()
+                        releaseQueue ()
+                        do! refresh
+
+                        Vitest.expect(containsPath stalePath vault).toBe false
+                        Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                    })
+            }
+        )
+
+        Vitest.test (
+            "refresh invalidated by a root reset cannot repopulate loaded scopes",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
+                        do! vault.RefreshFileTreeDirectory "dataset"
+                        let stalePath = join [| datasetPath; "stale-after-reset.txt" |]
+                        do! writeFileAsync stalePath "stale" TextEncoding.Utf8
+
+                        let queueGate, releaseQueue = TestHelpers.deferred ()
+                        vault.FileTreeUpdateTail <- queueGate
+                        let refresh = vault.RefreshFileTreeDirectory "dataset"
+                        let reset = vault.ResetFileTreeToRoot()
+
+                        releaseQueue ()
+                        do! refresh
+                        do! reset
+
+                        Vitest.expect(containsPath stalePath vault).toBe false
+                        Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                    })
+            }
+        )
+
+        Vitest.test (
+            "first directory load catches changes made while watcher coverage is established",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
+                        let handoffPath = join [| datasetPath; "created-during-watch-handoff.txt" |]
+
+                        interceptNextWatchReady watchMock (fun () ->
+                            writeFileSync handoffPath "handoff" TextEncoding.Utf8
+                        )
+
+                        do! vault.RefreshFileTreeDirectory "dataset"
+
+                        Vitest.expect(containsPath handoffPath vault).toBe true
                         Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
                     })
             }
