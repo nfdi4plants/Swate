@@ -602,7 +602,10 @@ Vitest.describe (
                         do! suspension
                         Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
 
-                        Vitest.expect(isWatchedPath rootPath "dataset/existing.txt" vault.loadedDirectoryWatcher.Value).toBe true
+                        Vitest
+                            .expect(isWatchedPath rootPath "dataset/existing.txt" vault.loadedDirectoryWatcher.Value)
+                            .toBe
+                            true
                     })
             }
         )
@@ -666,9 +669,9 @@ Vitest.describe (
                     withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
                         let handoffPath = join [| datasetPath; "created-during-watch-handoff.txt" |]
 
-                        interceptNextWatchReady watchMock (fun () ->
-                            writeFileSync handoffPath "handoff" TextEncoding.Utf8
-                        )
+                        interceptNextWatchReady
+                            watchMock
+                            (fun () -> writeFileSync handoffPath "handoff" TextEncoding.Utf8)
 
                         do! vault.RefreshFileTreeDirectory "dataset"
 

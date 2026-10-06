@@ -233,7 +233,8 @@ let private withMutatingSessionUsingRefreshPredicate
                                 do! vault.ResetFileTreeToRoot()
 
                             return result
-                        }))
+                        })
+                    )
     }
 
 /// Same as withSession, with the vault marked busy for the duration and the file tree
@@ -567,7 +568,8 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                     do! vault.ResetFileTreeToRoot()
 
                                 return result
-                            }))
+                            })
+                        )
         }
     cancelOperation =
         fun key -> promise {

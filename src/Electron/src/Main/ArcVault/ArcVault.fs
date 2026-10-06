@@ -139,7 +139,8 @@ type ArcVault(window: BrowserWindow) =
 
     member internal this.WatcherEpochInvalidated = watcherEpochInvalidated
 
-    member internal this.IsLoadedDirectoryWatcherSuspended = loadedDirectoryWatcherSuspensionDepth > 0
+    member internal this.IsLoadedDirectoryWatcherSuspended =
+        loadedDirectoryWatcherSuspensionDepth > 0
 
     member internal this.BeginLoadedDirectoryWatcherSuspension() =
         loadedDirectoryWatcherSuspensionDepth <- loadedDirectoryWatcherSuspensionDepth + 1
@@ -406,7 +407,10 @@ module ArcVaultExtensions =
                     this.loadedDirectoryWatcher <- Some watcher
 
         member private this.CreateLoadedDirectoryWatcherAndWaitForReady(arcPath: string, relativePaths: string[]) =
-            let absolutePaths = relativePaths |> Array.map (fun relativePath -> join [| arcPath; relativePath |])
+            let absolutePaths =
+                relativePaths
+                |> Array.map (fun relativePath -> join [| arcPath; relativePath |])
+
             let watcher, ready = createLoadedDirectoryWatcherWithReady arcPath absolutePaths
 
             watcher.on (
@@ -417,7 +421,10 @@ module ArcVaultExtensions =
                         && not (WatcherHelpers.eventNameEquals Chokidar.Events.Ready eventName)
                     then
                         let absoluteChangedPath =
-                            if isAbsolute changedPath then changedPath else join [| arcPath; changedPath |]
+                            if isAbsolute changedPath then
+                                changedPath
+                            else
+                                join [| arcPath; changedPath |]
 
                         match tryGetRepoRelativePath arcPath (dirname absoluteChangedPath) with
                         | Some parentPath when this.IsFileTreeDirectoryLoaded parentPath ->
@@ -460,8 +467,7 @@ module ArcVaultExtensions =
 
                         if
                             lifecycleIsCurrent ()
-                            &&
-                            this.PendingFileTreeReset.IsNone
+                            && this.PendingFileTreeReset.IsNone
                             && this.LoadedDirectoryRefreshes.TryFind normalizedRelativePath = Some true
                             && this.IsFileTreeDirectoryLoaded normalizedRelativePath
                         then
@@ -515,30 +521,30 @@ module ArcVaultExtensions =
                     JS.Constructors.Promise.resolve (Error error)
 
             let completeLifecycle operationOutcomePromise = promise {
-                    let! operationOutcome = operationOutcomePromise
+                let! operationOutcome = operationOutcomePromise
 
-                    this.EndLoadedDirectoryWatcherSuspension()
+                this.EndLoadedDirectoryWatcherSuspension()
 
-                    let! restorationOutcome =
-                        if this.IsLoadedDirectoryWatcherSuspended then
-                            promise { return Ok() }
-                        else
-                            this.RebuildLoadedDirectoryWatcher()
-                            |> Promise.map Ok
-                            |> Promise.catch (fun error -> Error error)
+                let! restorationOutcome =
+                    if this.IsLoadedDirectoryWatcherSuspended then
+                        promise { return Ok() }
+                    else
+                        this.RebuildLoadedDirectoryWatcher()
+                        |> Promise.map Ok
+                        |> Promise.catch (fun error -> Error error)
 
-                    match operationOutcome, restorationOutcome with
-                    | Ok result, Ok() -> return result
-                    | Error operationError, Ok() -> return raise operationError
-                    | Ok _, Error restorationError -> return raise restorationError
-                    | Error operationError, Error restorationError ->
-                        swatelogfn
-                            this.window.id
-                            "Unable to restore loaded-directory watcher after failed operation: %s"
-                            restorationError.Message
+                match operationOutcome, restorationOutcome with
+                | Ok result, Ok() -> return result
+                | Error operationError, Ok() -> return raise operationError
+                | Ok _, Error restorationError -> return raise restorationError
+                | Error operationError, Error restorationError ->
+                    swatelogfn
+                        this.window.id
+                        "Unable to restore loaded-directory watcher after failed operation: %s"
+                        restorationError.Message
 
-                        return raise operationError
-                }
+                    return raise operationError
+            }
 
             let runLifecycleWithClose () =
                 this.BeginLoadedDirectoryWatcherSuspension()
@@ -965,10 +971,7 @@ module ArcVaultExtensions =
                         if lifecycleIsCurrent () then
                             let mutable currentChildren = children
 
-                            if
-                                not wasLoaded
-                                && not (System.String.IsNullOrWhiteSpace normalizedRelativePath)
-                            then
+                            if not wasLoaded && not (System.String.IsNullOrWhiteSpace normalizedRelativePath) then
                                 this.loadedFileTreeDirectories.Add(normalizedRelativePath) |> ignore
 
                                 if not this.IsLoadedDirectoryWatcherSuspended then
@@ -982,7 +985,11 @@ module ArcVaultExtensions =
 
                             if lifecycleIsCurrent () then
                                 let nextFileTree =
-                                    reconcileFileTreeDirectory arcPath normalizedRelativePath currentChildren this.fileTree
+                                    reconcileFileTreeDirectory
+                                        arcPath
+                                        normalizedRelativePath
+                                        currentChildren
+                                        this.fileTree
 
                                 this.SetFileTree nextFileTree
 

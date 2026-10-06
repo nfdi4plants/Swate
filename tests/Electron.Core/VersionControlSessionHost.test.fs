@@ -1734,7 +1734,11 @@ Vitest.describe (
                 withFixture (fun fixture -> promise {
                     let vault = registerVault 48 fixture.RepoRoot
                     let datasetPath = join [| fixture.RepoRoot; "dataset" |]
-                    Main.Bindings.Filesystem.mkdirSync datasetPath (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    Main.Bindings.Filesystem.mkdirSync
+                        datasetPath
+                        (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
                     let! initialTree = Main.FileTreeCreator.getFileTree fixture.RepoRoot
                     vault.fileTree <- initialTree
                     do! vault.RefreshFileTreeDirectory "dataset"
@@ -2019,9 +2023,9 @@ Vitest.describe (
                             }
 
                         do!
-                            waitUntil "first restore mutation to start" (fun () ->
-                                fakeHost.RunningMutationIdsForWindow 52 = [| "restore-first" |]
-                            )
+                            waitUntil
+                                "first restore mutation to start"
+                                (fun () -> fakeHost.RunningMutationIdsForWindow 52 = [| "restore-first" |])
 
                         Vitest.expect(fakeHost.RunningMutationIdsForWindow 52).toEqual [| "restore-first" |]
                         Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
