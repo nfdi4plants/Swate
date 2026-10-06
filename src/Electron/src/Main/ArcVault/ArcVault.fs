@@ -210,7 +210,10 @@ type internal LoadedDirectoryWatcherController() =
         })
 
     member this.SetLifecycleTail promise =
-        this.Update(fun current -> { current with WatcherTransitionTail = promise })
+        this.Update(fun current -> {
+            current with
+                WatcherTransitionTail = promise
+        })
 
     member this.UpdateRefreshes update =
         this.Update(fun current -> {
