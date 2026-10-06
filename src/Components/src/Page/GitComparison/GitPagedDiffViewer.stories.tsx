@@ -2513,6 +2513,74 @@ export const HostStatusOptionHidesTheIndexingNoteAndTheProgress: Story = {
   },
 };
 
+const endNoteWithNextSpy = fn();
+const endNoteWithoutNextSpy = fn();
+const noEndNoteSpy = fn();
+
+// Three viewers with a continue row. The first has an end note and a next callback, the second an end
+// note without a callback, and the third no note, which asks for the next page by itself.
+function EndNoteHarness() {
+  const parts = React.useMemo(
+    () => [PagedPart_HunkRows("end-note-hunk", range(0, 0), range(0, 40), false, false, makeAlignedRows(0, 40))],
+    [],
+  );
+  const viewer = (prefix: string, endNote: string | undefined, requestNext: (() => void) | undefined) => (
+    <div style={{ height: "18rem" }}>
+      <GitPagedDiffViewerComponent
+        parts={parts}
+        status={PagedDiffStatus_Ready()}
+        progress={new PagedProgress(300, 1000, false)}
+        hasMore={true}
+        outputComplete={false}
+        endNote={endNote}
+        requestNext={requestNext}
+        nextPageKey="end-note-cursor"
+        testIdPrefix={prefix}
+      />
+    </div>
+  );
+  return (
+    <div>
+      {viewer("git-paged-end-note-retry", "The reading stopped.", () => endNoteWithNextSpy())}
+      {viewer("git-paged-end-note-final", "The reading ended.", undefined)}
+      {viewer("git-paged-end-note-none", undefined, () => noEndNoteSpy())}
+    </div>
+  );
+}
+
+export const EndNoteStopsTheAutomaticRequest: Story = {
+  render: () => <EndNoteHarness />,
+  play: async ({ canvasElement }) => {
+    endNoteWithNextSpy.mockClear();
+    endNoteWithoutNextSpy.mockClear();
+    noEndNoteSpy.mockClear();
+    const canvas = within(canvasElement);
+
+    // Every viewer scrolls to its end row.
+    for (const prefix of ["retry", "final", "none"]) {
+      await scrollToEnd(scrollElementFor(canvasElement, `git-paged-end-note-${prefix}-grid`));
+    }
+
+    // Without a note the viewer asks for the next page once the end row is in view.
+    await waitFor(() => expect(noEndNoteSpy).toHaveBeenCalledTimes(1));
+    await expect(canvas.queryByTestId("git-paged-end-note-none-continue-note")).toBeNull();
+
+    // With a note it never asks by itself, and the note replaces the label of the row.
+    await expect(await canvas.findByTestId("git-paged-end-note-retry-continue-note")).toBeInTheDocument();
+    await expect(canvas.queryByTestId("git-paged-end-note-retry-continue-label")).toBeNull();
+    await expect(endNoteWithNextSpy).not.toHaveBeenCalled();
+
+    // The button shows when the host passes a callback, and it asks once for each click.
+    const button = canvas.getByTestId("git-paged-end-note-retry-continue-button");
+    await userEvent.click(button);
+    await expect(endNoteWithNextSpy).toHaveBeenCalledTimes(1);
+
+    // Without a callback the note stands alone.
+    await expect(await canvas.findByTestId("git-paged-end-note-final-continue-note")).toBeInTheDocument();
+    await expect(canvas.queryByTestId("git-paged-end-note-final-continue-button")).toBeNull();
+  },
+};
+
 const LARGE_NUMBER_START = 2168270;
 
 // Rows with line numbers of seven digits, context rows and changed rows, next to rows with small

@@ -128,6 +128,19 @@ let blockReasonText (reason: Renderer.Types.GitDiffBlockReason) =
     | Renderer.Types.GitDiffBlockReason.NotRegularFile -> "The path is not a regular file."
     | Renderer.Types.GitDiffBlockReason.ProviderUnsupported -> "The version control provider cannot compare this file."
     | Renderer.Types.GitDiffBlockReason.NotText evidence -> $"The content is not text ({evidence})."
+    | Renderer.Types.GitDiffBlockReason.TooLargeForMemory(blobBytes, limitBytes, cause) ->
+        let sizes =
+            $"The committed file is {formatBytes blobBytes} and the memory budget allows {formatBytes limitBytes} for it."
+
+        match cause with
+        | MemoryCauseDto.BySetting ->
+            $"{sizes} The indexing limit setting keeps the diff in memory. Raise the indexing limit to 64 or more to use temp files."
+        | MemoryCauseDto.ByLowSpace ->
+            $"{sizes} The temp drive is low on free space, so the diff is kept in memory. Free space on the temp drive or lower the reserve."
+    | Renderer.Types.GitDiffBlockReason.TempSpaceLow ->
+        "The temp drive has less free space than the reserve. Free space on the temp drive or lower the reserve, then open the diff again."
+    | Renderer.Types.GitDiffBlockReason.MemoryBudgetReached ->
+        "The memory budget of the diff is used up. Raise the indexing limit to 64 or more to use temp files, or free space on the temp drive or lower the reserve, then open the diff again."
 
 let status (value: Renderer.Types.GitDiffPageStatus) : PagedDiffStatus =
     match value with

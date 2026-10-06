@@ -5,6 +5,7 @@ open Feliz
 open Renderer.Types
 open Renderer.Context.GitWorkflow
 open Swate.Components.Page.GitComparison
+open Swate.Electron.Shared.VersionControlTypes
 
 module Presentation = Renderer.GitDiffPresentation
 module Paged = Swate.Components.Page.GitComparison.GitPagedDiffTypes
@@ -28,9 +29,21 @@ type BackgroundReading =
     | LimitReached
     /// The worker session closed during a background read, and the next request continues.
     | Paused
+    /// A memory diff reads the remaining pages on its own.
+    | MemoryIndexing
+    /// A memory diff stopped its background reading at most of its budget. The rest is kept for
+    /// the actions of the user.
+    | MemoryShareKept
+    /// A read was refused because the temp drive is low on free space. Continue retries it.
+    | TempSpaceStopped
+    /// A read was refused because the memory budget is used up. Only a reopen reads on.
+    | MemoryBudgetStopped
+    /// The last read of the next page failed, and the continue button asks again.
+    | ReadFailed of message: string
 
 /// The background state of the diff, or None when there is nothing to tell: the indexing finished
-/// or never started, the last read failed, or the diff shows no rows.
+/// or never started, or the diff shows no rows. A failed read shows its message only when the
+/// loader kept one.
 let backgroundReadingOf (limitMb: int) (page: GitDiffPageData) : BackgroundReading option =
     let showsRows =
         match page.Status with
@@ -39,16 +52,52 @@ let backgroundReadingOf (limitMb: int) (page: GitDiffPageData) : BackgroundReadi
         | GitDiffPageStatus.Reopening _ -> true
         | _ -> false
 
-    if not showsRows || page.NextCursor.IsNone || page.NextFailed then
+    let inMemory =
+        match page.Storage with
+        | Some(DiffStorageDto.InMemory _) -> true
+        | _ -> false
+
+    if not showsRows then
         None
-    elif page.IndexingPaused then
-        Some BackgroundReading.Paused
-    elif page.Indexing then
-        Some BackgroundReading.Indexing
-    elif GitDiffPageLoader.indexingLimitReached limitMb page then
-        Some BackgroundReading.LimitReached
     else
-        None
+        match page.Stop with
+        | Some GitDiffStop.MemoryShareUsed -> Some BackgroundReading.MemoryShareKept
+        | Some GitDiffStop.MemoryBudget -> Some BackgroundReading.MemoryBudgetStopped
+        | Some GitDiffStop.TempSpaceLow -> Some BackgroundReading.TempSpaceStopped
+        | None ->
+            if page.NextCursor.IsNone then
+                None
+            elif page.NextFailed then
+                page.NextFailure |> Option.map BackgroundReading.ReadFailed
+            elif page.IndexingPaused then
+                Some BackgroundReading.Paused
+            elif page.Indexing then
+                Some(
+                    if inMemory then
+                        BackgroundReading.MemoryIndexing
+                    else
+                        BackgroundReading.Indexing
+                )
+            elif GitDiffPageLoader.indexingLimitReached limitMb page then
+                Some BackgroundReading.LimitReached
+            else
+                None
+
+/// The note at the end of the pages read when a stop ends the reading, and whether the continue
+/// button stays. A low-space stop can be retried. The full memory budget cannot.
+let endNoteOf (page: GitDiffPageData) : string option * bool =
+    match page.Stop with
+    | Some GitDiffStop.TempSpaceLow -> Some "Reading stopped because the temp drive is low on free space.", true
+    | Some GitDiffStop.MemoryBudget -> Some "Reading stopped because the memory budget of the diff is used up.", false
+    | _ -> None, true
+
+/// The reason a failed gap or line control names, when the library refused its request because
+/// of where the diff keeps its data.
+let failureNoteOf (page: GitDiffPageData) : string option =
+    match page.FailureCause with
+    | Some GitDiffStop.TempSpaceLow -> Some "The temp drive is low on free space. Free space on it, then try again."
+    | Some GitDiffStop.MemoryBudget -> Some "The memory budget of the diff is used up. Reopen the diff to read more."
+    | _ -> None
 
 /// The key the viewer uses to ask for the next page at most once. It is the id of the last
 /// loaded page, which changes when a new page joins or a reopen replaces the pages.
@@ -81,6 +130,7 @@ let Main (page: GitDiffPageData) =
             box page.NextFailed
             box page.NextCursor
             box page.Status
+            box page.Stop
             box indexingLimitMb
         |]
     )
@@ -110,23 +160,63 @@ let Main (page: GitDiffPageData) =
         | Some infos -> Presentation.sourceTitle infos.Previous, Presentation.sourceTitle infos.Current
         | None -> page.PreviousPath |> Option.defaultValue page.Path, page.Path
 
+    let endNote, canRequestNext = endNoteOf page
+
     // The bar shows the background state on the left, so the viewer leaves it out of its rows.
     let backgroundNote =
         match backgroundReadingOf indexingLimitMb page with
         | None -> Html.none
         | Some reading ->
+            let progress =
+                match page.Progress |> Option.map Presentation.progress with
+                | Some value ->
+                    $" {Paged.progressPercentage value}%% ({Paged.formatBytes value.ValidatedBytes} / {Paged.formatBytes value.TotalBytes})"
+                | None -> ""
+
+            // Why the diff lives in memory and how large its budget is.
+            let memory =
+                match page.Storage with
+                | Some(DiffStorageDto.InMemory(budgetBytes, cause)) ->
+                    let why =
+                        match cause with
+                        | MemoryCauseDto.BySetting -> "because of the indexing limit setting"
+                        | MemoryCauseDto.ByLowSpace -> "because the temp drive is low on space"
+
+                    $"The diff is kept in memory {why} (budget {Paged.formatBytes (Presentation.number budgetBytes)})."
+                | _ -> "The diff is kept in memory."
+
             let state, icon, text =
                 match reading with
                 | BackgroundReading.Indexing ->
-                    let progress =
-                        match page.Progress |> Option.map Presentation.progress with
-                        | Some value ->
-                            $" {Paged.progressPercentage value}%% ({Paged.formatBytes value.ValidatedBytes} / {Paged.formatBytes value.TotalBytes})"
-                        | None -> ""
-
                     "indexing",
                     "swt:loading swt:loading-spinner swt:loading-xs",
                     $"Indexing the diff in the background{progress}. The scrollbar is not exact yet."
+                | BackgroundReading.MemoryIndexing ->
+                    "memory",
+                    "swt:loading swt:loading-spinner swt:loading-xs",
+                    $"{memory} Indexing the diff in the background{progress}. The scrollbar is not exact yet."
+                | BackgroundReading.MemoryShareKept ->
+                    "memory",
+                    "swt:iconify swt:fluent--info-24-regular swt:size-4",
+                    $"{memory} Background reading stopped, and the rest of the budget is kept for your actions. The scrollbar covers the part read so far."
+                | BackgroundReading.TempSpaceStopped ->
+                    "stopped",
+                    "swt:iconify swt:fluent--warning-24-regular swt:size-4",
+                    "Reading stopped because the temp drive is low on free space. Free space on the temp drive, then press Continue."
+                | BackgroundReading.MemoryBudgetStopped ->
+                    let advice =
+                        match page.Storage with
+                        | Some(DiffStorageDto.InMemory(_, MemoryCauseDto.BySetting)) ->
+                            "Raise the indexing limit to 64 or more to use temp files, then reopen the diff."
+                        | Some(DiffStorageDto.InMemory(_, MemoryCauseDto.ByLowSpace)) ->
+                            "Free space on the temp drive or lower the reserve, then reopen the diff."
+                        | _ -> "Reopen the diff to read on."
+
+                    "stopped",
+                    "swt:iconify swt:fluent--warning-24-regular swt:size-4",
+                    $"Reading stopped because the memory budget is used up. {advice}"
+                | BackgroundReading.ReadFailed message ->
+                    "failed", "swt:iconify swt:fluent--error-circle-24-regular swt:size-4", message
                 | BackgroundReading.LimitReached ->
                     "limit",
                     "swt:iconify swt:fluent--info-24-regular swt:size-4",
@@ -185,7 +275,13 @@ let Main (page: GitDiffPageData) =
                         nextFailed = page.NextFailed,
                         outputComplete = page.OutputComplete,
                         ?pending = (page.Pending |> Option.map Presentation.pending),
-                        requestNext = (fun () -> send (GitDiffMsg.LoadNext generation)),
+                        ?requestNext =
+                            (if canRequestNext then
+                                 Some(fun () -> send (GitDiffMsg.LoadNext generation))
+                             else
+                                 None),
+                        ?endNote = endNote,
+                        ?failureNote = failureNoteOf page,
                         requestExpand = (fun gapId fromStart -> send (GitDiffMsg.Expand(generation, gapId, fromStart))),
                         expandingGaps = Array.ofList page.ExpandingGaps,
                         requestLineSlice =

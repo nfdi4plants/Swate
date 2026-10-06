@@ -78,6 +78,11 @@ module internal GitPagedDiffDisplay =
         FailedGaps: string[]
         FailedLineSlices: PagedLineSliceRequest[]
         FailedReplays: string[]
+        /// The reason the failed gap and line controls name in their tooltip.
+        FailureNote: string option
+        /// The continue row shows this note instead of the label. It keeps the button only when
+        /// RequestNext is set.
+        EndNote: string option
     }
 
     type LineProps = {
@@ -92,6 +97,8 @@ module internal GitPagedDiffDisplay =
         SlicePending: bool
         /// The last slice request of this line failed.
         SliceFailed: bool
+        /// The reason the failed slice controls name in their tooltip.
+        FailureNote: string option
     }
 
     /// A row the scroll position can follow, with its start and its distance from the top of the
@@ -677,6 +684,8 @@ type GitPagedDiffViewer =
                                         "swt:btn swt:btn-ghost swt:btn-xs swt:shrink-0"
                                         GitPagedDiffDisplay.failedClass props.SliceFailed
                                     ]
+                                    if props.SliceFailed && props.FailureNote.IsSome then
+                                        prop.title props.FailureNote.Value
                                     prop.disabled (props.SlicePending || props.RequestLineBefore.IsNone)
                                     prop.onClick (fun _ ->
                                         props.RequestLineBefore
@@ -720,6 +729,8 @@ type GitPagedDiffViewer =
                                         "swt:btn swt:btn-ghost swt:btn-xs swt:shrink-0"
                                         GitPagedDiffDisplay.failedClass props.SliceFailed
                                     ]
+                                    if props.SliceFailed && props.FailureNote.IsSome then
+                                        prop.title props.FailureNote.Value
                                     prop.disabled (props.SlicePending || props.RequestLineSlice.IsNone)
                                     prop.onClick (fun _ ->
                                         props.RequestLineSlice
@@ -874,6 +885,7 @@ type GitPagedDiffViewer =
                         props.FailedLineSlices
                         |> Array.exists (fun request -> request.Side = side && request.Line = shown.Number)
                     )
+                FailureNote = props.FailureNote
             }
 
         /// The placeholder of unloaded rows with its button, which replays the page it names.
@@ -960,7 +972,12 @@ type GitPagedDiffViewer =
                             "swt:btn swt:btn-ghost swt:btn-xs swt:gap-1"
                             GitPagedDiffDisplay.failedClass failed
                         ]
-                        prop.title label
+                        prop.title (
+                            if failed then
+                                props.FailureNote |> Option.defaultValue label
+                            else
+                                label
+                        )
                         prop.ariaLabel label
                         prop.disabled (isExpanding || props.RequestExpand.IsNone)
                         prop.onClick (fun _ ->
@@ -1064,28 +1081,38 @@ type GitPagedDiffViewer =
                                                 ]
                                             ]
                                     else
+                                        match props.EndNote with
+                                        | Some note ->
+                                            Html.span [
+                                                prop.testId $"{props.Prefix}-continue-note"
+                                                prop.className "swt:text-xs swt:text-base-content/65"
+                                                prop.text note
+                                            ]
                                         // The host that shows the status itself leaves the label out, and the
                                         // row keeps the button.
-                                        if not props.HideIndexingStatus then
+                                        | None when not props.HideIndexingStatus ->
                                             Html.span [
                                                 prop.testId $"{props.Prefix}-continue-label"
                                                 prop.className "swt:text-xs swt:text-base-content/65"
                                                 prop.text "More diff content is available"
                                             ]
+                                        | None -> ()
 
-                                        Html.button [
-                                            prop.testId $"{props.Prefix}-continue-button"
-                                            GitPagedDiffDisplay.failedAttribute props.NextFailed
-                                            prop.className [
-                                                "swt:btn swt:btn-primary swt:btn-xs"
-                                                GitPagedDiffDisplay.failedClass props.NextFailed
+                                        // A note that ends the diff leaves the button to the host.
+                                        if props.EndNote.IsNone || props.RequestNext.IsSome then
+                                            Html.button [
+                                                prop.testId $"{props.Prefix}-continue-button"
+                                                GitPagedDiffDisplay.failedAttribute props.NextFailed
+                                                prop.className [
+                                                    "swt:btn swt:btn-primary swt:btn-xs"
+                                                    GitPagedDiffDisplay.failedClass props.NextFailed
+                                                ]
+                                                prop.disabled (busy || props.RequestNext.IsNone)
+                                                prop.onClick (fun _ ->
+                                                    props.RequestNext |> Option.iter (fun callback -> callback ())
+                                                )
+                                                prop.text (if busy then "Loading" else "Continue loading diff")
                                             ]
-                                            prop.disabled (busy || props.RequestNext.IsNone)
-                                            prop.onClick (fun _ ->
-                                                props.RequestNext |> Option.iter (fun callback -> callback ())
-                                            )
-                                            prop.text (if busy then "Loading" else "Continue loading diff")
-                                        ]
                                 ]
                             ]
                     ]
@@ -1144,7 +1171,9 @@ type GitPagedDiffViewer =
             failedGaps: string[],
             failedLineSlices: PagedLineSliceRequest[],
             failedReplays: string[],
-            scrollTarget: PagedScrollTarget option
+            scrollTarget: PagedScrollTarget option,
+            failureNote: string option,
+            endNote: string option
         ) =
         let rowHeight = GitPagedDiffDisplay.RowHeightPx
         let headerScrollRef: IRefValue<HTMLElement option> = React.useElementRef ()
@@ -1953,9 +1982,11 @@ type GitPagedDiffViewer =
                         | _ -> false
                     | _ -> false
 
+                // A note at the end of the diff says that reading on is the choice of the host.
                 match requestNext with
                 | Some callback when
                     continueNear
+                    && endNote.IsNone
                     && status <> PagedDiffStatus.LoadingNext
                     && requestedNext.current <> Some nextKey
                     ->
@@ -1973,6 +2004,7 @@ type GitPagedDiffViewer =
                 box requestNext
                 box replaySignature
                 box nextKey
+                box endNote
             |]
         )
 
@@ -2133,6 +2165,8 @@ type GitPagedDiffViewer =
                                                 FailedGaps = failedGaps
                                                 FailedLineSlices = failedLineSlices
                                                 FailedReplays = failedReplays
+                                                FailureNote = failureNote
+                                                EndNote = endNote
                                             }
                                         ]
                                     )
@@ -2340,6 +2374,11 @@ type GitPagedDiffViewer =
             ?hideIndexingStatus: bool,
             // The last read of the next page failed. The continue button shows it and asks again.
             ?nextFailed: bool,
+            // The reason a gap or line control names in its tooltip while its last request failed.
+            ?failureNote: string,
+            // The continue row shows this note at the end of the pages read. The viewer then never asks
+            // for the next page by itself, and the continue button shows only when requestNext is set.
+            ?endNote: string,
             // The tallest scroll height the viewer asks the browser for. A diff above it maps the
             // native scroll range to the logical offsets.
             ?maxScrollHeight: int
@@ -2533,7 +2572,9 @@ type GitPagedDiffViewer =
                             defaultArg failedGaps [||],
                             defaultArg failedLineSlices [||],
                             defaultArg failedReplays [||],
-                            scrollTarget
+                            scrollTarget,
+                            failureNote,
+                            endNote
                         )
                     ]
 

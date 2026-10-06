@@ -35,6 +35,7 @@ const baseCallbacks = {
   OnSaveDownloadLargeFiles: noopWithDownloadPreference,
   OnSaveLfsAutoTrackThreshold: noopWithThreshold,
   OnSaveDiffIndexingLimit: noopWithThreshold,
+  OnSaveDiffFreeSpaceReserve: noopWithThreshold,
   OnCreateBranch: noopWithArg,
   OnSwitchBranch: noopWithBranch,
   OnSelectChange: noopSelectChange,
@@ -199,6 +200,7 @@ export const CleanRepo: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -223,6 +225,7 @@ export const CleanRepoWithoutUpstream: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -250,6 +253,7 @@ export const NotPublishedYet: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
     hasRemote: false,
   },
   play: async ({ canvasElement }) => {
@@ -270,6 +274,7 @@ export const ChangedFiles: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -296,6 +301,7 @@ export const MarkedSelectionWithoutLastClickedHighlight: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -328,6 +334,7 @@ export const SlowOpenDoesNotGreyRows: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -347,6 +354,7 @@ export const AdvancedActions: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
     canOpenRemoteRepository: true,
     onOpenRemoteRepository: noopOpenRemoteRepository,
   },
@@ -386,6 +394,7 @@ export const ResponsiveActionLabels: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -421,6 +430,7 @@ export const ConflictsPresent: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -448,6 +458,7 @@ export const LargeChangedSet: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -489,6 +500,7 @@ export const DeletedFile: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -533,6 +545,7 @@ export const ChangeStatusIconColors: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -560,6 +573,7 @@ export const LongWrappedFile: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -582,6 +596,7 @@ export const HoverDiscardChange: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
   },
   play: async ({ canvasElement }) => {
     discardSelectionSpy.mockClear();
@@ -618,6 +633,7 @@ export const BusyProgressState: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -666,6 +682,7 @@ export const CancelableUploadProgressState: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
   },
   play: async ({ canvasElement }) => {
     cancelOperationSpy.mockClear();
@@ -691,6 +708,7 @@ export const ClonePhaseProgressState: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -711,6 +729,7 @@ export const BusyNoticeState: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -729,6 +748,7 @@ export const CreateBranchModal: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -757,6 +777,7 @@ export const SwitchBranchModal: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -782,6 +803,7 @@ export const CommitComposer: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -827,6 +849,7 @@ export const RemoteActionsDisabled: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
     remoteActionsEnabled: false,
     remoteActionsWarning:
       "Sign in to a DataHub account to use fetch, pull, push, or update.",
@@ -854,6 +877,7 @@ export const OpenRemoteRepositoryButton: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
     canOpenRemoteRepository: true,
     onOpenRemoteRepository: openRemoteRepositorySpy,
   },
@@ -877,5 +901,88 @@ export const GlobalErrorState: Story = {
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
     diffIndexingLimitMb: 1024,
+    diffFreeSpaceReserveMb: 1024,
+  },
+};
+
+const saveDiffIndexingLimitSpy = fn();
+const saveDiffFreeSpaceReserveSpy = fn();
+
+const diffSettingsArgs = () => ({
+  status: baseStatus,
+  changedFiles: changedFiles.slice(),
+  branchOptions: branchOptions.slice(),
+  callbacks: buildCallbacks({
+    OnSaveDiffIndexingLimit: saveDiffIndexingLimitSpy,
+    OnSaveDiffFreeSpaceReserve: saveDiffFreeSpaceReserveSpy,
+  }),
+  downloadLargeFiles: true,
+  lfsAutoTrackThresholdMb: 1,
+  diffIndexingLimitMb: 1024,
+  diffFreeSpaceReserveMb: 1024,
+});
+
+const setNumberInput = async (input: HTMLElement, value: string) => {
+  await userEvent.clear(input);
+  await userEvent.type(input, value);
+};
+
+export const SavesTheDiffFreeSpaceReserve: Story = {
+  args: diffSettingsArgs(),
+  play: async ({ canvasElement }) => {
+    saveDiffFreeSpaceReserveSpy.mockClear();
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
+    const input = canvas.getByTestId("GitSidebarDiffFreeSpaceReserveInput");
+    await expect(input).toHaveValue(1024);
+    await expect(canvas.getByTestId("GitSidebarDiffFreeSpaceReserveSaveButton")).toBeDisabled();
+
+    await setNumberInput(input, "0");
+    await userEvent.click(canvas.getByTestId("GitSidebarDiffFreeSpaceReserveSaveButton"));
+    await expect(saveDiffFreeSpaceReserveSpy).toHaveBeenCalledTimes(1);
+    await expect(saveDiffFreeSpaceReserveSpy).toHaveBeenCalledWith(0);
+    await expect(canvas.queryByTestId("GitSidebarErrorNotice")).toBeNull();
+  },
+};
+
+export const RefusesAnInvalidDiffFreeSpaceReserve: Story = {
+  args: diffSettingsArgs(),
+  play: async ({ canvasElement }) => {
+    saveDiffFreeSpaceReserveSpy.mockClear();
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
+    const input = canvas.getByTestId("GitSidebarDiffFreeSpaceReserveInput");
+
+    await setNumberInput(input, "1048577");
+    await userEvent.click(canvas.getByTestId("GitSidebarDiffFreeSpaceReserveSaveButton"));
+    await expect(canvas.getByTestId("GitSidebarErrorNotice")).toBeVisible();
+
+    await setNumberInput(input, "-1");
+    await userEvent.click(canvas.getByTestId("GitSidebarDiffFreeSpaceReserveSaveButton"));
+    await expect(canvas.getByTestId("GitSidebarErrorNotice")).toBeVisible();
+    await expect(saveDiffFreeSpaceReserveSpy).not.toHaveBeenCalled();
+  },
+};
+
+export const SavesADiffIndexingLimitInTheMemoryRange: Story = {
+  args: diffSettingsArgs(),
+  play: async ({ canvasElement }) => {
+    saveDiffIndexingLimitSpy.mockClear();
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
+    const input = canvas.getByTestId("GitSidebarDiffIndexingLimitInput");
+
+    await setNumberInput(input, "0");
+    await userEvent.click(canvas.getByTestId("GitSidebarDiffIndexingLimitSaveButton"));
+    await expect(canvas.getByTestId("GitSidebarErrorNotice")).toBeVisible();
+    await expect(saveDiffIndexingLimitSpy).not.toHaveBeenCalled();
+
+    await setNumberInput(input, "8");
+    await userEvent.click(canvas.getByTestId("GitSidebarDiffIndexingLimitSaveButton"));
+    await expect(saveDiffIndexingLimitSpy).toHaveBeenCalledTimes(1);
+    await expect(saveDiffIndexingLimitSpy).toHaveBeenCalledWith(8);
   },
 };

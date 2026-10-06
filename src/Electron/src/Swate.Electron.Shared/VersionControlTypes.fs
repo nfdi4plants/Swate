@@ -170,6 +170,19 @@ type EncodingCandidateDto = { Encoding: string; Preview: string }
 
 type PreparationTokenDto = { Id: string }
 
+/// Why a diff keeps its data in memory. The indexing limit setting asks for it (1 to 63 MB), or
+/// the temp drive had less free space than the reserve and the library chose memory.
+[<StringEnum(CaseRules.None); RequireQualifiedAccess>]
+type MemoryCauseDto =
+    | BySetting
+    | ByLowSpace
+
+/// Where an opened diff keeps its data. The budget is in bytes as a decimal string.
+[<RequireQualifiedAccess>]
+type DiffStorageDto =
+    | OnDisk
+    | InMemory of budgetBytes: string * cause: MemoryCauseDto
+
 [<RequireQualifiedAccess>]
 type DiffBlockerDto =
     | Binary of side: DiffSideDto * evidence: string
@@ -177,6 +190,9 @@ type DiffBlockerDto =
     | EncodingRequired of side: DiffSideDto * token: PreparationTokenDto * candidates: EncodingCandidateDto[]
     | NotRegularFile of side: DiffSideDto
     | ProviderUnsupported
+    /// A committed side is larger than the share of the memory budget that holds it. The sizes are
+    /// in bytes as decimal strings.
+    | BlobTooLargeForMemory of side: DiffSideDto * blobBytes: string * limitBytes: string * cause: MemoryCauseDto
 
 // A Scanning result carries no value yet. The renderer passes its continuation back with
 // the next request of the same kind. Each payload type has its own resumable DTO.
@@ -193,7 +209,8 @@ type OpenDiffResultDto =
         handle: DiffHandleDto *
         previous: DiffSourceInfoDto *
         current: DiffSourceInfoDto *
-        first: ResumablePageDto
+        first: ResumablePageDto *
+        storage: DiffStorageDto
 
 [<RequireQualifiedAccess>]
 type ResumableOpenDto =
@@ -229,6 +246,9 @@ type ReadTextDiffPageRequestDto = {
     HandleId: string
     HandleVersion: string
     Cursor: string
+    /// The host reads ahead of the user. The library refuses such a read earlier than a user read
+    /// once a memory diff holds most of its budget.
+    Background: bool
 }
 
 type ReplayTextDiffPageRequestDto = {
@@ -398,6 +418,10 @@ module VersionControlCodes =
     /// Produced by the Swate main process when the background indexing limit is out of range.
     [<Literal>]
     let InvalidDiffIndexingLimit = "invalid_diff_indexing_limit"
+
+    /// Produced by the Swate main process when the free-space reserve of a diff is out of range.
+    [<Literal>]
+    let InvalidDiffFreeSpaceReserve = "invalid_diff_free_space_reserve"
 
     // Produced by the Swate main process (session host and IPC handler).
     [<Literal>]
@@ -614,6 +638,9 @@ type StoragePolicySettingsDto = {
     /// Whole MiB. The background indexing of a diff stops when the pages it read add up to this
     /// size. None keeps the value the session has.
     DiffIndexingLimitMb: int option
+    /// Whole MiB. A diff keeps its data in memory when the temp drive has less free space than
+    /// this reserve plus 5 %. None keeps the value the session has.
+    DiffFreeSpaceReserveMb: int option
 }
 
 type DependencyStatusDto = {

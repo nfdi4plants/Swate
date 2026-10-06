@@ -54,6 +54,27 @@ type GitDiffBlockReason =
     /// library found: a NUL character, a high share of control characters, an HDF5 signature or
     /// bytes that fail strict decoding.
     | NotText of evidence: string
+    /// A committed side is larger than the share of the memory budget that holds it. The sizes are
+    /// in bytes. The cause tells whether the indexing limit setting or the low space of the temp
+    /// drive put the diff in memory.
+    | TooLargeForMemory of blobBytes: float * limitBytes: float * cause: MemoryCauseDto
+    /// The open was refused because the temp drive has less free space than the reserve.
+    | TempSpaceLow
+    /// The open was refused because the memory budget of the diff is used up.
+    | MemoryBudgetReached
+
+/// Why a diff stopped reading data. The session stays usable in each case.
+[<RequireQualifiedAccess>]
+type GitDiffStop =
+    /// A read was refused because the temp drive has less free space than the reserve. A retry
+    /// after freeing space may work.
+    | TempSpaceLow
+    /// A background read was refused because a memory diff holds most of its budget. The rest of
+    /// the budget is kept for reads the user asks for.
+    | MemoryShareUsed
+    /// A read the user asked for was refused because the memory budget is used up. Only a reopen
+    /// starts a new session.
+    | MemoryBudget
 
 [<RequireQualifiedAccess>]
 type GitDiffPageStatus =
@@ -161,9 +182,19 @@ type GitDiffPageData = {
     /// is an upper bound of what the session keeps for them. The background indexing stops when
     /// it reaches the indexing limit. A reopen starts a new session and starts it again at 0.
     JournalBytes: float
+    /// Where the session of the open diff keeps its data. None until the diff opened. The storage
+    /// of a reopened diff can differ from the one before, since the library decides again.
+    Storage: DiffStorageDto option
+    /// Why the diff stopped reading, if it did. A new diff and a reopen start without a stop.
+    Stop: GitDiffStop option
+    /// Why the last expansion or line slice that failed was refused, when the library refused it
+    /// because of the storage of the diff. None for any other failure.
+    FailureCause: GitDiffStop option
     /// The last read of the next page failed with an error that leaves the rows usable. The rows
     /// stay, the indexing waits, and the continue button of the viewer asks again.
     NextFailed: bool
+    /// The message of the failed read behind NextFailed, which the status bar shows.
+    NextFailure: string option
     /// Gaps, line slices and evicted pages whose last request failed. The viewer marks their
     /// controls, and the next request of the same control clears the mark.
     FailedGaps: string list

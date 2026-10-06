@@ -130,6 +130,7 @@ let private lfsSettings n materialize : StoragePolicySettingsDto = {
     AutoPolicyThresholdMb = Some n
     MaterializeLargeObjects = materialize
     DiffIndexingLimitMb = None
+    DiffFreeSpaceReserveMb = None
 }
 
 let private sessionInfo: WorkspaceSessionInfoDto = {
@@ -395,6 +396,7 @@ let private noopCallbacks: GitSidebarCallbacks = {
     OnSaveDownloadLargeFiles = fun _ -> ()
     OnSaveLfsAutoTrackThreshold = fun _ -> ()
     OnSaveDiffIndexingLimit = fun _ -> ()
+    OnSaveDiffFreeSpaceReserve = fun _ -> ()
     OnCreateBranch = fun _ -> ()
     OnSwitchBranch = fun _ -> ()
     OnSelectChange = fun _ -> promise { return Ok() }
@@ -917,22 +919,24 @@ Vitest.describe (
                 }
 
                 Vitest
-                    .expect(buildUpdatedLfsSettings state (Some 4) None None)
+                    .expect(buildUpdatedLfsSettings state (Some 4) None None None)
                     .toEqual (
                         {
                             AutoPolicyThresholdMb = Some 4
                             MaterializeLargeObjects = true
                             DiffIndexingLimitMb = Some 1024
+                            DiffFreeSpaceReserveMb = Some 1024
                         }
                     )
 
                 Vitest
-                    .expect(buildUpdatedLfsSettings state None (Some false) None)
+                    .expect(buildUpdatedLfsSettings state None (Some false) None None)
                     .toEqual (
                         {
                             AutoPolicyThresholdMb = Some 7
                             MaterializeLargeObjects = false
                             DiffIndexingLimitMb = Some 1024
+                            DiffFreeSpaceReserveMb = Some 1024
                         }
                     )
         )
@@ -1959,6 +1963,40 @@ Vitest.describe (
                             AutoPolicyThresholdMb = Some 4
                             MaterializeLargeObjects = false
                             DiffIndexingLimitMb = Some 1024
+                            DiffFreeSpaceReserveMb = Some 1024
+                        }
+                    )
+            }
+        )
+
+        Vitest.test (
+            "Saving the free-space reserve sends it with the other storage settings unchanged",
+            fun () -> promise {
+                let mutable captured = None
+
+                let deps = {
+                    defaultDependencies with
+                        setStoragePolicySettings =
+                            fun request ->
+                                captured <- Some request
+                                promise { return Ok(succeeded ()) }
+                }
+
+                let model, command =
+                    update deps ignore (SaveDiffFreeSpaceReserveRequested 2048) runningState
+
+                let! messages = collectMessages command
+                let model, write = update deps ignore messages[0] model
+                let! _ = collectMessages write
+
+                Vitest
+                    .expect(captured.Value.Settings)
+                    .toEqual (
+                        {
+                            AutoPolicyThresholdMb = Some 1
+                            MaterializeLargeObjects = false
+                            DiffIndexingLimitMb = Some 1024
+                            DiffFreeSpaceReserveMb = Some 2048
                         }
                     )
             }
@@ -9058,6 +9096,7 @@ Vitest.describe (
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnSaveDiffIndexingLimit = fun _ -> ()
+                                OnSaveDiffFreeSpaceReserve = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9067,7 +9106,8 @@ Vitest.describe (
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
-                            diffIndexingLimitMb = 1024
+                            diffIndexingLimitMb = 1024,
+                            diffFreeSpaceReserveMb = 1024
                         )
                     )
 
@@ -9141,6 +9181,7 @@ Vitest.describe (
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnSaveDiffIndexingLimit = fun _ -> ()
+                                OnSaveDiffFreeSpaceReserve = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9151,6 +9192,7 @@ Vitest.describe (
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
                             diffIndexingLimitMb = 1024,
+                            diffFreeSpaceReserveMb = 1024,
                             remoteActionsEnabled = false,
                             remoteActionsWarning = "Sign in to a DataHUB account to use fetch, pull, push, or update."
                         )
@@ -9198,6 +9240,7 @@ Vitest.describe (
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnSaveDiffIndexingLimit = fun _ -> ()
+                                OnSaveDiffFreeSpaceReserve = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9207,7 +9250,8 @@ Vitest.describe (
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
-                            diffIndexingLimitMb = 1024
+                            diffIndexingLimitMb = 1024,
+                            diffFreeSpaceReserveMb = 1024
                         )
                     )
 
@@ -9253,6 +9297,7 @@ Vitest.describe (
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnSaveDiffIndexingLimit = fun _ -> ()
+                                OnSaveDiffFreeSpaceReserve = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9262,7 +9307,8 @@ Vitest.describe (
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
-                            diffIndexingLimitMb = 1024
+                            diffIndexingLimitMb = 1024,
+                            diffFreeSpaceReserveMb = 1024
                         )
                     )
 
@@ -9308,6 +9354,7 @@ Vitest.describe (
                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                         OnSaveDiffIndexingLimit = fun _ -> ()
+                                        OnSaveDiffFreeSpaceReserve = fun _ -> ()
                                         OnCreateBranch = fun _ -> ()
                                         OnSwitchBranch = fun _ -> ()
                                         OnSelectChange = fun _ -> promise { return Ok() }
@@ -9317,7 +9364,8 @@ Vitest.describe (
                                     },
                                     downloadLargeFiles = true,
                                     lfsAutoTrackThresholdMb = 5,
-                                    diffIndexingLimitMb = 1024
+                                    diffIndexingLimitMb = 1024,
+                                    diffFreeSpaceReserveMb = 1024
                                 )
                             ]
                         ]
@@ -9402,6 +9450,7 @@ Vitest.describe (
                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                         OnSaveDiffIndexingLimit = fun _ -> ()
+                                        OnSaveDiffFreeSpaceReserve = fun _ -> ()
                                         OnCreateBranch = fun _ -> ()
                                         OnSwitchBranch = fun _ -> ()
                                         OnSelectChange = fun _ -> promise { return Ok() }
@@ -9411,7 +9460,8 @@ Vitest.describe (
                                     },
                                     downloadLargeFiles = true,
                                     lfsAutoTrackThresholdMb = 5,
-                                    diffIndexingLimitMb = 1024
+                                    diffIndexingLimitMb = 1024,
+                                    diffFreeSpaceReserveMb = 1024
                                 )
                             ]
                         ]
@@ -9492,6 +9542,7 @@ Vitest.describe (
                                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                                         OnSaveDiffIndexingLimit = fun _ -> ()
+                                                        OnSaveDiffFreeSpaceReserve = fun _ -> ()
                                                         OnCreateBranch = fun _ -> ()
                                                         OnSwitchBranch = fun _ -> ()
                                                         OnSelectChange = fun _ -> promise { return Ok() }
@@ -9501,7 +9552,8 @@ Vitest.describe (
                                                     },
                                                     downloadLargeFiles = true,
                                                     lfsAutoTrackThresholdMb = 5,
-                                                    diffIndexingLimitMb = 1024
+                                                    diffIndexingLimitMb = 1024,
+                                                    diffFreeSpaceReserveMb = 1024
                                                 )
                                             ]
                                         ]
@@ -9564,6 +9616,7 @@ Vitest.describe (
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnSaveDiffIndexingLimit = fun _ -> ()
+                                OnSaveDiffFreeSpaceReserve = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9573,7 +9626,8 @@ Vitest.describe (
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
-                            diffIndexingLimitMb = 1024
+                            diffIndexingLimitMb = 1024,
+                            diffFreeSpaceReserveMb = 1024
                         )
                     )
 
@@ -9626,6 +9680,7 @@ Vitest.describe (
                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                         OnSaveDiffIndexingLimit = fun _ -> ()
+                                        OnSaveDiffFreeSpaceReserve = fun _ -> ()
                                         OnCreateBranch = fun _ -> ()
                                         OnSwitchBranch = fun _ -> ()
                                         OnSelectChange = fun _ -> promise { return Ok() }
@@ -9635,7 +9690,8 @@ Vitest.describe (
                                     },
                                     downloadLargeFiles = true,
                                     lfsAutoTrackThresholdMb = 5,
-                                    diffIndexingLimitMb = 1024
+                                    diffIndexingLimitMb = 1024,
+                                    diffFreeSpaceReserveMb = 1024
                                 )
                             ]
                         ]
@@ -9683,6 +9739,7 @@ Vitest.describe (
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnSaveDiffIndexingLimit = fun _ -> ()
+                                OnSaveDiffFreeSpaceReserve = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9692,7 +9749,8 @@ Vitest.describe (
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
-                            diffIndexingLimitMb = 1024
+                            diffIndexingLimitMb = 1024,
+                            diffFreeSpaceReserveMb = 1024
                         )
                     )
 
@@ -9746,7 +9804,8 @@ Vitest.describe (
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
-                            diffIndexingLimitMb = 1024
+                            diffIndexingLimitMb = 1024,
+                            diffFreeSpaceReserveMb = 1024
                         )
                     )
 
@@ -9816,6 +9875,7 @@ Vitest.describe (
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnSaveDiffIndexingLimit = fun _ -> ()
+                                OnSaveDiffFreeSpaceReserve = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9825,7 +9885,8 @@ Vitest.describe (
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
-                            diffIndexingLimitMb = 1024
+                            diffIndexingLimitMb = 1024,
+                            diffFreeSpaceReserveMb = 1024
                         )
                     )
 
@@ -9905,6 +9966,7 @@ Vitest.describe (
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnSaveDiffIndexingLimit = fun _ -> ()
+                                OnSaveDiffFreeSpaceReserve = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9914,7 +9976,8 @@ Vitest.describe (
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
-                            diffIndexingLimitMb = 1024
+                            diffIndexingLimitMb = 1024,
+                            diffFreeSpaceReserveMb = 1024
                         )
                     )
 
@@ -10002,6 +10065,7 @@ Vitest.describe (
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnSaveDiffIndexingLimit = fun _ -> ()
+                                OnSaveDiffFreeSpaceReserve = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Error "Diff failed to load." }
@@ -10011,7 +10075,8 @@ Vitest.describe (
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
-                            diffIndexingLimitMb = 1024
+                            diffIndexingLimitMb = 1024,
+                            diffFreeSpaceReserveMb = 1024
                         )
                     )
 
@@ -10051,6 +10116,7 @@ Vitest.describe (
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
                             diffIndexingLimitMb = 1024,
+                            diffFreeSpaceReserveMb = 1024,
                             publishRenamePrompt = {
                                 CurrentName = "Existing ARC"
                                 Message = "A DataHUB repository named 'Existing ARC' already exists."
@@ -10116,6 +10182,7 @@ Vitest.describe (
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnSaveDiffIndexingLimit = fun _ -> ()
+                                OnSaveDiffFreeSpaceReserve = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -10125,7 +10192,8 @@ Vitest.describe (
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
-                            diffIndexingLimitMb = 1024
+                            diffIndexingLimitMb = 1024,
+                            diffFreeSpaceReserveMb = 1024
                         )
                     )
 
@@ -10179,7 +10247,8 @@ Vitest.describe (
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
-                            diffIndexingLimitMb = 1024
+                            diffIndexingLimitMb = 1024,
+                            diffFreeSpaceReserveMb = 1024
                         )
                     )
 
@@ -10216,7 +10285,8 @@ Vitest.describe (
                             callbacks = noopCallbacks,
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
-                            diffIndexingLimitMb = 1024
+                            diffIndexingLimitMb = 1024,
+                            diffFreeSpaceReserveMb = 1024
                         )
                     )
 

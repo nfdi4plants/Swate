@@ -303,8 +303,13 @@ let private diffPage pageId (nextCursor: string option) parts : DiffPageDto = {
     Pending = None
 }
 
+let private openedWithStorage (storage: DiffStorageDto) first =
+    succeeded (
+        ResumableOpenDto.Ready(OpenDiffResultDto.Opened(handle, sourceInfo "a.txt", sourceInfo "a.txt", first, storage))
+    )
+
 let private openedWith first =
-    succeeded (ResumableOpenDto.Ready(OpenDiffResultDto.Opened(handle, sourceInfo "a.txt", sourceInfo "a.txt", first)))
+    openedWithStorage DiffStorageDto.OnDisk first
 
 let private openedPage page =
     openedWith (ResumablePageDto.Ready page)
@@ -318,7 +323,13 @@ let private handleOfOpen (openCount: int) : DiffHandleDto = {
 let private openedOn (openHandle: DiffHandleDto) page =
     succeeded (
         ResumableOpenDto.Ready(
-            OpenDiffResultDto.Opened(openHandle, sourceInfo "a.txt", sourceInfo "a.txt", ResumablePageDto.Ready page)
+            OpenDiffResultDto.Opened(
+                openHandle,
+                sourceInfo "a.txt",
+                sourceInfo "a.txt",
+                ResumablePageDto.Ready page,
+                DiffStorageDto.OnDisk
+            )
         )
     )
 
@@ -378,6 +389,34 @@ let private pagesOfClosingSession (fake: FakeDiffClient) =
                 failedWith "diff_session_closed" None
             else
                 succeeded (ResumablePageDto.Ready(pageDto index))
+
+let private memoryStorage =
+    DiffStorageDto.InMemory("5242880", MemoryCauseDto.BySetting)
+
+let private openedInMemory page =
+    openedWithStorage memoryStorage (ResumablePageDto.Ready page)
+
+/// A page of a chain that ends at the page numbered last. Each page has a hunk and a gap.
+let private chainPage (index: int) (last: int) : DiffPageDto =
+    diffPage $"p{index}" (if index < last then Some $"cursor-{index}" else None) [|
+        hunkAt $"h{index}" (index * 10)
+        gap $"g{index}"
+    |]
+
+let private cursorIndex (cursor: string) = int (cursor.Replace("cursor-", ""))
+
+/// The data-state of the status bar of the rendered diff, or None when it shows none.
+let private barState (page: GitDiffPageData) =
+    let status =
+        (renderTarget page).querySelector "[data-testid=\"renderer-git-diff-status\"]"
+
+    if isNull status then
+        None
+    else
+        Some(status.getAttribute "data-state")
+
+let private shows (page: GitDiffPageData) (testId: string) =
+    not (isNull ((renderTarget page).querySelector $"[data-testid=\"{testId}\"]"))
 
 Vitest.describe (
     "Git diff page workflow",
@@ -1241,6 +1280,7 @@ Vitest.describe (
                         HandleId = page.Handle.Value.Id
                         HandleVersion = page.Handle.Value.Version
                         Cursor = running.Cursor
+                        Background = running.Background
                     }
 
                     let reply = Ok(succeeded (ResumablePageDto.Ready(pageOf 2)))
@@ -1374,6 +1414,7 @@ Vitest.describe (
                         HandleId = page.Handle.Value.Id
                         HandleVersion = page.Handle.Value.Version
                         Cursor = running.Cursor
+                        Background = running.Background
                     }
 
                     let answer =
@@ -3804,7 +3845,8 @@ Vitest.describe (
                                 handleOfOpen openCount,
                                 sourceInfo "a.txt",
                                 sourceInfo "a.txt",
-                                ResumablePageDto.Scanning(progress false, "scan", None)
+                                ResumablePageDto.Scanning(progress false, "scan", None),
+                                DiffStorageDto.OnDisk
                             )
                         )
                     )
@@ -3838,6 +3880,456 @@ Vitest.describe (
 
                 Vitest.expect(closedAgain.Opens.Count).toBe (2)
                 Vitest.expect(isFailed (diffOf state).Status).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "A background read sends the background flag and a user read does not",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                fake.OpenReply <- fun _ -> openedPage (chainPage 1 3)
+
+                fake.ReadReply <-
+                    fun request -> succeeded (ResumablePageDto.Ready(chainPage (cursorIndex request.Cursor + 1) 3))
+
+                let! state = run fake (select "a.txt") runningState
+                let generation = (diffOf state).Generation
+                let! state = run fake (diffMsg (GitDiffMsg.LoadNext generation)) state
+                Vitest.expect(fake.Reads |> Seq.map _.Background |> Seq.toArray).toEqual [| false |]
+
+                let! _ = run fake (diffMsg (GitDiffMsg.Index generation)) state
+                Vitest.expect(fake.Reads |> Seq.map _.Background |> Seq.toArray).toEqual [| false; true |]
+            }
+        )
+
+        Vitest.test (
+            "A memory diff ignores the limit in MB while a disk diff stops at it",
+            fun () -> promise {
+                // Every page is a bit above 1 MiB of JSON, and the limit is 1 MiB.
+                let bigPage (index: int) =
+                    diffPage $"p{index}" (if index < 3 then Some $"cursor-{index}" else None) [|
+                        hunkWith $"h{index}" [|
+                            {
+                                changedRow $"h{index}-row" with
+                                    Current = Some(textLine index (String.replicate 1100000 "x"))
+                            }
+                        |]
+                    |]
+
+                let limited = {
+                    runningState with
+                        DiffIndexingLimitMb = 1
+                }
+
+                let indexedPages (storage: DiffStorageDto) = promise {
+                    let fake = FakeDiffClient()
+                    fake.OpenReply <- fun _ -> openedWithStorage storage (ResumablePageDto.Ready(bigPage 1))
+
+                    fake.ReadReply <-
+                        fun request -> succeeded (ResumablePageDto.Ready(bigPage (cursorIndex request.Cursor + 1)))
+
+                    let! state = run fake (select "a.txt") limited
+                    let! state = run fake (diffMsg (GitDiffMsg.Index (diffOf state).Generation)) state
+                    return diffOf state
+                }
+
+                let! inMemory = indexedPages memoryStorage
+                Vitest.expect(inMemory.Pages |> Array.map _.PageId).toEqual ([| "p1"; "p2"; "p3" |])
+                Vitest.expect(GitDiffPageLoader.indexingLimitReached 1 inMemory).toBe (false)
+
+                let! onDisk = indexedPages DiffStorageDto.OnDisk
+                Vitest.expect(onDisk.Pages |> Array.map _.PageId).toEqual ([| "p1" |])
+                Vitest.expect(GitDiffPageLoader.indexingLimitReached 1 onDisk).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "A background read refused with either code ends the indexing, keeps the rows and offers the continue button",
+            fun () -> promise {
+                let cases = [
+                    "diff_temp_space_low", DiffStorageDto.OnDisk, GitDiffStop.TempSpaceLow, "stopped", true
+                    "diff_memory_budget_reached", memoryStorage, GitDiffStop.MemoryShareUsed, "memory", false
+                ]
+
+                for code, storage, expected, bar, hasNote in cases do
+                    let fake = FakeDiffClient()
+                    fake.OpenReply <- fun _ -> openedWithStorage storage (ResumablePageDto.Ready(chainPage 1 5))
+
+                    fake.ReadReply <-
+                        fun request ->
+                            if request.Cursor = "cursor-1" then
+                                succeeded (ResumablePageDto.Ready(chainPage 2 5))
+                            else
+                                failedWith code None
+
+                    let! state = run fake (select "a.txt") runningState
+                    let generation = (diffOf state).Generation
+                    let! state = run fake (diffMsg (GitDiffMsg.Index generation)) state
+                    let page = diffOf state
+
+                    Vitest.expect(page.Pages |> Array.map _.PageId).toEqual ([| "p1"; "p2" |])
+                    Vitest.expect(page.Indexing).toBe (false)
+                    Vitest.expect(page.NextFailed).toBe (false)
+                    Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+                    Vitest.expect(page.NextCursor).toEqual (Some "cursor-2")
+                    Vitest.expect(page.Stop).toEqual (Some expected)
+                    Vitest.expect(fake.Reads.[fake.Reads.Count - 1].Background).toBe (true)
+                    Vitest.expect(GitDiffPageLoader.indexingRequest DefaultDiffIndexingLimitMb page).toEqual (None)
+                    Vitest.expect(barState page).toEqual (Some bar)
+                    Vitest.expect(shows page "renderer-git-diff-continue-button").toBe (true)
+                    Vitest.expect(shows page "renderer-git-diff-continue-note").toBe (hasNote)
+            }
+        )
+
+        Vitest.test (
+            "A user read refused with the memory budget ends the diff there, and one refused for low space can retry",
+            fun () -> promise {
+                let cases = [
+                    "diff_memory_budget_reached", memoryStorage, GitDiffStop.MemoryBudget, false
+                    "diff_temp_space_low", DiffStorageDto.OnDisk, GitDiffStop.TempSpaceLow, true
+                ]
+
+                for code, storage, expected, canRetry in cases do
+                    let fake = FakeDiffClient()
+                    fake.OpenReply <- fun _ -> openedWithStorage storage (ResumablePageDto.Ready(chainPage 1 5))
+                    fake.ReadReply <- fun _ -> failedWith code None
+
+                    let! state = run fake (select "a.txt") runningState
+                    let generation = (diffOf state).Generation
+                    let! state = run fake (diffMsg (GitDiffMsg.LoadNext generation)) state
+                    let page = diffOf state
+
+                    Vitest.expect(page.Pages |> Array.map _.PageId).toEqual ([| "p1" |])
+                    Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+                    Vitest.expect(page.NextFailed).toBe (false)
+                    Vitest.expect(page.NextCursor).toEqual (Some "cursor-1")
+                    Vitest.expect(page.Stop).toEqual (Some expected)
+                    Vitest.expect(barState page).toEqual (Some "stopped")
+                    Vitest.expect(shows page "renderer-git-diff-continue-note").toBe (true)
+                    Vitest.expect(shows page "renderer-git-diff-continue-button").toBe (canRetry)
+
+                    // The continue button is the only way to read on, and the full budget offers none.
+                    let! again = run fake (diffMsg (GitDiffMsg.LoadNext generation)) state
+                    Vitest.expect(fake.Reads.Count).toBe (if canRetry then 2 else 1)
+                    Vitest.expect((diffOf again).Stop).toEqual (Some expected)
+            }
+        )
+
+        Vitest.test (
+            "A user read after a low-space stop clears it and resumes the indexing, and the memory budget stop stays",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                fake.OpenReply <- fun _ -> openedPage (chainPage 1 5)
+                let mutable code = Some "diff_temp_space_low"
+
+                fake.ReadReply <-
+                    fun request ->
+                        match code with
+                        | Some refused -> failedWith refused None
+                        | None -> succeeded (ResumablePageDto.Ready(chainPage (cursorIndex request.Cursor + 1) 5))
+
+                let! state = run fake (select "a.txt") runningState
+                let generation = (diffOf state).Generation
+                let! stopped = run fake (diffMsg (GitDiffMsg.LoadNext generation)) state
+                Vitest.expect((diffOf stopped).Stop).toEqual (Some GitDiffStop.TempSpaceLow)
+
+                // The stop holds the indexing back, even when the page asks for it.
+                Vitest
+                    .expect(GitDiffPageLoader.indexingRequest DefaultDiffIndexingLimitMb (diffOf stopped))
+                    .toEqual (None)
+
+                let! stillStopped = run fake (diffMsg (GitDiffMsg.Index generation)) stopped
+                Vitest.expect((diffOf stillStopped).Indexing).toBe (false)
+
+                code <- None
+                let! resumed = run fake (diffMsg (GitDiffMsg.LoadNext generation)) stopped
+                Vitest.expect((diffOf resumed).Stop).toEqual (None)
+                Vitest.expect((diffOf resumed).Pages |> Array.map _.PageId).toEqual ([| "p1"; "p2" |])
+
+                Vitest
+                    .expect(GitDiffPageLoader.indexingRequest DefaultDiffIndexingLimitMb (diffOf resumed))
+                    .toEqual (Some(GitDiffMsg.Index generation))
+
+                // A user read that goes through does not lift the stop of the full memory budget.
+                let budget = {
+                    diffOf resumed with
+                        Stop = Some GitDiffStop.MemoryBudget
+                }
+
+                Vitest.expect(GitDiffPageLoader.indexingRequest DefaultDiffIndexingLimitMb budget).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A reopen starts without the stop of the old session and takes the storage of the new one",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                fake.OpenReply <-
+                    fun _ ->
+                        if fake.Opens.Count = 1 then
+                            openedWithStorage memoryStorage (ResumablePageDto.Ready(chainPage 1 5))
+                        else
+                            openedOn (handleOfOpen fake.Opens.Count) (chainPage 1 5)
+
+                fake.ReadReply <- fun _ -> failedWith "diff_memory_budget_reached" None
+                let! state = run fake (select "a.txt") runningState
+                let generation = (diffOf state).Generation
+                let! stopped = run fake (diffMsg (GitDiffMsg.LoadNext generation)) state
+                Vitest.expect((diffOf stopped).Stop).toEqual (Some GitDiffStop.MemoryBudget)
+                Vitest.expect((diffOf stopped).Storage).toEqual (Some memoryStorage)
+
+                // The session closes later, and the next expansion reopens the diff.
+                fake.ExpandReply <- fun _ -> failedWith "diff_session_closed" None
+                let! reopened = run fake (diffMsg (GitDiffMsg.Expand(generation, "g1", true))) stopped
+                let page = diffOf reopened
+
+                Vitest.expect(fake.Opens.Count).toBe (2)
+                Vitest.expect(page.Stop).toEqual (None)
+                Vitest.expect(page.Storage).toEqual (Some DiffStorageDto.OnDisk)
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+            }
+        )
+
+        Vitest.test (
+            "A reopen answered with either code lands at the last page read, keeps the rows and sets the stop",
+            fun () -> promise {
+                let cases = [
+                    "diff_temp_space_low", GitDiffStop.TempSpaceLow
+                    "diff_memory_budget_reached", GitDiffStop.MemoryBudget
+                ]
+
+                for code, expected in cases do
+                    let fake = FakeDiffClient()
+
+                    let pageOf (handleId: string) (index: int) =
+                        diffPage $"{handleId}-p{index}" (Some $"cursor-{index}") [|
+                            hunkAt $"{handleId}-h{index}" (index * 10)
+                        |]
+
+                    fake.OpenReply <-
+                        fun _ ->
+                            let openHandle = handleOfOpen fake.Opens.Count
+                            openedOn openHandle (pageOf openHandle.Id 1)
+
+                    // The first session closes at its fourth page. The second one reads two pages and
+                    // refuses the third.
+                    fake.ReadReply <-
+                        fun request ->
+                            let index = cursorIndex request.Cursor + 1
+
+                            if request.HandleId = "diff-1" && index = 4 then
+                                failedWith "diff_session_closed" None
+                            elif request.HandleId = "diff-2" && index = 3 then
+                                failedWith code None
+                            else
+                                succeeded (ResumablePageDto.Ready(pageOf request.HandleId index))
+
+                    let! state = run fake (select "a.txt") runningState
+                    let generation = (diffOf state).Generation
+                    let current = ref state
+
+                    for _ in 1..3 do
+                        let! next = run fake (diffMsg (GitDiffMsg.LoadNext generation)) current.Value
+                        current.Value <- next
+
+                    let page = diffOf current.Value
+
+                    Vitest.expect(page.Pages |> Array.map _.PageId).toEqual ([| "diff-2-p1"; "diff-2-p2" |])
+                    Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+                    Vitest.expect(page.RequestedPageIndex).toBe (1)
+                    Vitest.expect(page.NextCursor).toEqual (Some "cursor-2")
+                    Vitest.expect(page.Stop).toEqual (Some expected)
+                    Vitest.expect(current.Value.DiffReopen).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "An open answered with either code shows a blocked page, and a blob that is too large for memory names its cause",
+            fun () -> promise {
+                let refusals = [
+                    "diff_temp_space_low", GitDiffBlockReason.TempSpaceLow
+                    "diff_memory_budget_reached", GitDiffBlockReason.MemoryBudgetReached
+                ]
+
+                for code, reason in refusals do
+                    let fake = FakeDiffClient()
+                    fake.OpenReply <- fun _ -> failedWith code None
+                    let! state = run fake (select "a.txt") runningState
+                    Vitest.expect((diffOf state).Status).toEqual (GitDiffPageStatus.Blocked(None, reason))
+                    Vitest.expect((diffOf state).Handle).toEqual (None)
+
+                let textOf (cause: MemoryCauseDto) = promise {
+                    let fake = FakeDiffClient()
+
+                    fake.OpenReply <-
+                        fun _ ->
+                            succeeded (
+                                ResumableOpenDto.Ready(
+                                    OpenDiffResultDto.NotDiffable(
+                                        DiffBlockerDto.BlobTooLargeForMemory(
+                                            DiffSideDto.Current,
+                                            "9000000000",
+                                            "3932160",
+                                            cause
+                                        )
+                                    )
+                                )
+                            )
+
+                    let! state = run fake (select "a.txt") runningState
+
+                    Vitest
+                        .expect((diffOf state).Status)
+                        .toEqual (
+                            GitDiffPageStatus.Blocked(
+                                Some DiffSideDto.Current,
+                                GitDiffBlockReason.TooLargeForMemory(9000000000.0, 3932160.0, cause)
+                            )
+                        )
+
+                    return
+                        match (diffOf state).Status with
+                        | GitDiffPageStatus.Blocked(_, reason) -> Renderer.GitDiffPresentation.blockReasonText reason
+                        | _ -> ""
+                }
+
+                let! bySetting = textOf MemoryCauseDto.BySetting
+                let! byLowSpace = textOf MemoryCauseDto.ByLowSpace
+                Vitest.expect((bySetting = byLowSpace)).toBe (false)
+            }
+        )
+
+        Vitest.test (
+            "An expansion or line slice refused with either code marks its control with the reason",
+            fun () -> promise {
+                let longRow = {
+                    changedRow "long" with
+                        Current =
+                            Some {
+                                textLine 0 "abc" with
+                                    Slice = {
+                                        OffsetUtf16 = "0"
+                                        TotalUtf16 = Some "9"
+                                        Text = "abc"
+                                        Highlights = [||]
+                                    }
+                            }
+                }
+
+                let fake = FakeDiffClient()
+
+                let! state =
+                    openFirstPage fake (diffPage "p1" (Some "cursor-1") [| hunkWith "h1" [| longRow |]; gap "g1" |])
+
+                let generation = (diffOf state).Generation
+
+                let titleOf (page: GitDiffPageData) (testId: string) =
+                    ((renderTarget page).querySelector $"[data-testid=\"{testId}\"]").getAttribute "title"
+
+                for code, expected in
+                    [
+                        "diff_memory_budget_reached", GitDiffStop.MemoryBudget
+                        "diff_temp_space_low", GitDiffStop.TempSpaceLow
+                    ] do
+                    fake.ExpandReply <- fun _ -> failedWith code None
+                    fake.LineReply <- fun _ -> failedWith code None
+
+                    let! refused = run fake (diffMsg (GitDiffMsg.Expand(generation, "g1", true))) state
+
+                    let! refused =
+                        run fake (diffMsg (GitDiffMsg.LoadLineSlice(generation, DiffSideDto.Current, 0.0, 3.0))) refused
+
+                    let page = diffOf refused
+                    Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+                    Vitest.expect(page.FailedGaps).toEqual ([ "g1" ])
+                    Vitest.expect(page.FailedLineSlices.Length).toBe (1)
+                    Vitest.expect(page.FailureCause).toEqual (Some expected)
+
+                    // The tooltip of a failed control carries the reason, so it differs from the one without.
+                    let withoutReason = { page with FailureCause = None }
+                    let gapId = "renderer-git-diff-gap-expand-start-g1"
+                    let lineId = "renderer-git-diff-line-more-current-0"
+                    Vitest.expect((titleOf page gapId = titleOf withoutReason gapId)).toBe (false)
+                    Vitest.expect((titleOf page lineId = titleOf withoutReason lineId)).toBe (false)
+            }
+        )
+
+        Vitest.test (
+            "A failed read of the next page keeps its message, and the bar shows it",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let! state = openFirstPage fake (chainPage 1 5)
+                let generation = (diffOf state).Generation
+                fake.ReadReply <- fun _ -> failedWith "git_failure" None
+                let! failed = run fake (diffMsg (GitDiffMsg.LoadNext generation)) state
+                let page = diffOf failed
+
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+                Vitest.expect(page.NextFailed).toBe (true)
+                Vitest.expect(page.NextFailure.IsSome).toBe (true)
+                Vitest.expect(barState page).toEqual (Some "failed")
+
+                // The next successful read drops the message.
+                fake.ReadReply <- fun _ -> succeeded (ResumablePageDto.Ready(chainPage 2 5))
+                let! retried = run fake (diffMsg (GitDiffMsg.LoadNext generation)) failed
+                Vitest.expect((diffOf retried).NextFailure).toEqual (None)
+                Vitest.expect(barState (diffOf retried)).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "The bar names memory mode and each stop",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let! state = openFirstPage fake (chainPage 1 5)
+                let page = diffOf state
+
+                let inMemory = {
+                    page with
+                        Storage = Some memoryStorage
+                }
+
+                Vitest.expect(barState inMemory).toEqual (None)
+                Vitest.expect(barState { inMemory with Indexing = true }).toEqual (Some "memory")
+                Vitest.expect(barState { page with Indexing = true }).toEqual (Some "indexing")
+
+                Vitest
+                    .expect(
+                        barState {
+                            inMemory with
+                                Stop = Some GitDiffStop.MemoryShareUsed
+                        }
+                    )
+                    .toEqual (Some "memory")
+
+                Vitest
+                    .expect(
+                        barState {
+                            inMemory with
+                                Stop = Some GitDiffStop.MemoryBudget
+                        }
+                    )
+                    .toEqual (Some "stopped")
+
+                Vitest
+                    .expect(
+                        barState {
+                            page with
+                                Stop = Some GitDiffStop.TempSpaceLow
+                        }
+                    )
+                    .toEqual (Some "stopped")
+
+                // The pages read do not stop a memory diff at the limit of the context.
+                Vitest
+                    .expect(
+                        barState {
+                            inMemory with
+                                JournalBytes = 1024.0 * 1024.0 * 1024.0
+                        }
+                    )
+                    .toEqual (None)
             }
         )
 )

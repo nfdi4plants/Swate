@@ -32,6 +32,12 @@ let private structuredCloneOf (_value: obj) : obj = jsNative
 let private ipcPayloadBytes (payload: Result<OperationResultDto<'T>, exn>) : int =
     max (jsonBytes (box payload)) (jsonBytes (structuredCloneOf (box payload)))
 
+/// The policy the mappings of a test read the cause of a memory diff from. A disk policy that
+/// ended in memory is the low-space fallback, a memory policy is the indexing limit setting.
+let private diskPolicy = DiffStoragePolicy.PreferDisk(1073741824L, 67108864L)
+
+let private memoryPolicy = DiffStoragePolicy.MemoryOnly 5242880L
+
 let private reply (mapValue: 'T -> 'U) (value: 'T) : Result<OperationResultDto<'U>, exn> =
     Ok(Mappings.textDiffResult mapValue (OperationResult.succeeded value))
 
@@ -352,7 +358,7 @@ let private sourceInfo (path: string) : DiffSourceInfo = {
     HasBom = false
 }
 
-let private openedDiff (handleId: string) (path: string) : OpenDiffResult =
+let private openedDiffWith (storage: DiffStorage) (handleId: string) (path: string) : OpenDiffResult =
     OpenDiffResult.Opened(
         { Id = handleId; Version = "v1" },
         sourceInfo path,
@@ -364,8 +370,12 @@ let private openedDiff (handleId: string) (path: string) : OpenDiffResult =
             Progress = { progress with ScanComplete = true }
             OutputComplete = true
             Pending = None
-        }
+        },
+        storage
     )
+
+let private openedDiff (handleId: string) (path: string) : OpenDiffResult =
+    openedDiffWith DiffStorage.OnDisk handleId path
 
 let private openRequest (operationId: string) (path: string) : OpenTextDiffRequestDto = {
     OperationId = operationId
@@ -457,7 +467,7 @@ Vitest.describe (
                     Resumable.Scanning(progress, token "continuation-", Some maximumPreview)
 
                 Vitest
-                    .expect(ipcPayloadBytes (reply Mappings.resumableOpen scanning))
+                    .expect(ipcPayloadBytes (reply (Mappings.resumableOpen diskPolicy) scanning))
                     .toBeLessThanOrEqual (PageLimitBytes + IpcMarginBytes)
         )
 )
@@ -641,18 +651,22 @@ Vitest.describe (
                 |]
 
                 Vitest
-                    .expect(Mappings.diffBlocker (DiffBlocker.Binary(DiffSide.Previous, "NUL at 12")))
+                    .expect(Mappings.diffBlocker diskPolicy (DiffBlocker.Binary(DiffSide.Previous, "NUL at 12")))
                     .toEqual (DiffBlockerDto.Binary(DiffSideDto.Previous, "NUL at 12"))
 
                 Vitest
-                    .expect(Mappings.diffBlocker (DiffBlocker.LocalContentUnavailable(DiffSide.Current, Some "oid")))
+                    .expect(
+                        Mappings.diffBlocker
+                            diskPolicy
+                            (DiffBlocker.LocalContentUnavailable(DiffSide.Current, Some "oid"))
+                    )
                     .toEqual (DiffBlockerDto.LocalContentUnavailable(DiffSideDto.Current, Some "oid"))
 
                 Vitest
                     .expect(
-                        Mappings.diffBlocker (
-                            DiffBlocker.EncodingRequired(DiffSide.Current, { Id = "token-1" }, candidates)
-                        )
+                        Mappings.diffBlocker
+                            diskPolicy
+                            (DiffBlocker.EncodingRequired(DiffSide.Current, { Id = "token-1" }, candidates))
                     )
                     .toEqual (
                         DiffBlockerDto.EncodingRequired(
@@ -668,11 +682,82 @@ Vitest.describe (
                     )
 
                 Vitest
-                    .expect(Mappings.diffBlocker (DiffBlocker.NotRegularFile DiffSide.Previous))
+                    .expect(Mappings.diffBlocker diskPolicy (DiffBlocker.NotRegularFile DiffSide.Previous))
                     .toEqual (DiffBlockerDto.NotRegularFile DiffSideDto.Previous)
 
-                Vitest.expect(Mappings.diffBlocker DiffBlocker.ProviderUnsupported).toEqual
+                Vitest.expect(Mappings.diffBlocker diskPolicy DiffBlocker.ProviderUnsupported).toEqual
                     DiffBlockerDto.ProviderUnsupported
+        )
+
+        Vitest.test (
+            "the storage of an opened diff and the memory blocker map with the cause of the storage policy",
+            fun () ->
+                let storageOf (policy: DiffStoragePolicy) (storage: DiffStorage) = Mappings.diffStorage policy storage
+
+                Vitest.expect(storageOf diskPolicy DiffStorage.OnDisk).toEqual DiffStorageDto.OnDisk
+
+                Vitest
+                    .expect(storageOf memoryPolicy (DiffStorage.InMemory 5242880L))
+                    .toEqual (DiffStorageDto.InMemory("5242880", MemoryCauseDto.BySetting))
+
+                Vitest
+                    .expect(storageOf diskPolicy (DiffStorage.InMemory 67108864L))
+                    .toEqual (DiffStorageDto.InMemory("67108864", MemoryCauseDto.ByLowSpace))
+
+                let blocker =
+                    DiffBlocker.BlobTooLargeForMemory(DiffSide.Current, 9000000000L, 3932160L)
+
+                Vitest
+                    .expect(Mappings.diffBlocker memoryPolicy blocker)
+                    .toEqual (
+                        DiffBlockerDto.BlobTooLargeForMemory(
+                            DiffSideDto.Current,
+                            "9000000000",
+                            "3932160",
+                            MemoryCauseDto.BySetting
+                        )
+                    )
+
+                Vitest
+                    .expect(Mappings.diffBlocker diskPolicy blocker)
+                    .toEqual (
+                        DiffBlockerDto.BlobTooLargeForMemory(
+                            DiffSideDto.Current,
+                            "9000000000",
+                            "3932160",
+                            MemoryCauseDto.ByLowSpace
+                        )
+                    )
+
+                match
+                    Mappings.openDiffResult
+                        memoryPolicy
+                        (openedDiffWith (DiffStorage.InMemory 5242880L) "h" "data/a.txt")
+                with
+                | OpenDiffResultDto.Opened(_, _, _, _, storage) ->
+                    Vitest.expect(storage).toEqual (DiffStorageDto.InMemory("5242880", MemoryCauseDto.BySetting))
+                | other -> failwith $"Expected an opened diff, got {other}"
+        )
+
+        Vitest.test (
+            "a page request carries the background flag of the renderer, and an open request the policy it is given",
+            fun () ->
+                let readPage background : ReadTextDiffPageRequestDto = {
+                    OperationId = "op"
+                    HandleId = "handle"
+                    HandleVersion = "v1"
+                    Cursor = "cursor"
+                    Background = background
+                }
+
+                for background in [ true; false ] do
+                    match Mappings.tryReadPageRequest (readPage background) with
+                    | Ok request -> Vitest.expect(request.Background).toBe background
+                    | Error failure -> failwith failure.Message
+
+                match Mappings.tryOpenDiffRequest memoryPolicy (openRequest "op" "data/a.txt") with
+                | Ok request -> Vitest.expect(request.Storage).toEqual memoryPolicy
+                | Error failure -> failwith failure.Message
         )
 
         Vitest.test (
@@ -704,25 +789,28 @@ Vitest.describe (
 
                 Vitest
                     .expect(
-                        Mappings.resumableOpen (
-                            Resumable.Ready(OpenDiffResult.NotDiffable DiffBlocker.ProviderUnsupported)
-                        )
+                        Mappings.resumableOpen
+                            diskPolicy
+                            (Resumable.Ready(OpenDiffResult.NotDiffable DiffBlocker.ProviderUnsupported))
                     )
                     .toEqual (ResumableOpenDto.Ready(OpenDiffResultDto.NotDiffable DiffBlockerDto.ProviderUnsupported))
 
                 match
-                    Mappings.resumableOpen (
-                        Resumable.Ready(
+                    Mappings.resumableOpen
+                        diskPolicy
+                        (Resumable.Ready(
                             OpenDiffResult.Opened(
                                 { Id = "h"; Version = "v" },
                                 info (Some "abc"),
                                 info None,
-                                Resumable.Ready page
+                                Resumable.Ready page,
+                                DiffStorage.OnDisk
                             )
-                        )
-                    )
+                        ))
                 with
-                | ResumableOpenDto.Ready(OpenDiffResultDto.Opened(handle, previous, current, first)) ->
+                | ResumableOpenDto.Ready(OpenDiffResultDto.Opened(handle, previous, current, first, storage)) ->
+                    Vitest.expect(storage).toEqual DiffStorageDto.OnDisk
+
                     Vitest.expect(handle).toEqual {
                         DiffHandleDto.Id = "h"
                         Version = "v"
@@ -736,7 +824,9 @@ Vitest.describe (
                 | other -> failwith $"Expected an opened diff, got {other}"
 
                 Vitest
-                    .expect(Mappings.resumableOpen (Resumable.Scanning(progress, "c-open", Some maximumPreview)))
+                    .expect(
+                        Mappings.resumableOpen diskPolicy (Resumable.Scanning(progress, "c-open", Some maximumPreview))
+                    )
                     .toEqual (ResumableOpenDto.Scanning(progressDto, "c-open", Some previewDto))
 
                 Vitest
@@ -968,6 +1058,7 @@ Vitest.describe (
                     HandleId = "handle"
                     HandleVersion = version
                     Cursor = cursor
+                    Background = false
                 }
 
                 let replay pageId : ReplayTextDiffPageRequestDto = {
@@ -1004,7 +1095,7 @@ Vitest.describe (
                 | Error failure -> failwith failure.Message
 
                 match
-                    Mappings.tryOpenDiffRequest {
+                    Mappings.tryOpenDiffRequest diskPolicy {
                         opening with
                             PreparationTokenId = Some long
                             PreviousEncoding = Some long
@@ -1055,7 +1146,7 @@ Vitest.describe (
                 )
 
                 expectInvalid (
-                    Mappings.tryOpenDiffRequest {
+                    Mappings.tryOpenDiffRequest diskPolicy {
                         OperationId = overLimit
                         Path = "data/a.txt"
                         PreviousPath = None
@@ -1365,6 +1456,7 @@ Vitest.describe (
                             HandleId = "h-a"
                             HandleVersion = "v1"
                             Cursor = "cursor"
+                            Background = false
                         }
 
                     Vitest.expect(failureCodeOf readFromB).toBe TextDiffFailureCodes.SessionClosed
@@ -1432,6 +1524,91 @@ Vitest.describe (
                     TextDiffHandles.isWindowAlive <- originalIsWindowAlive
                     TextDiffHandles.windowClosed windowA
                     TextDiffHandles.windowClosed windowB
+                    Main.ArcVault.ARC_VAULTS.Vaults.Clear()
+                    TestHelpers.electronMock?reset () |> ignore
+                    WorkspaceSessionHost.resetForTests ()
+
+                do! host.CloseAll() |> Async.StartAsPromise
+                do! TestHelpers.removeDirectoryAsync root
+            }
+        )
+
+        Vitest.test (
+            "the open of a diff sends the storage policy of the session settings and answers where the diff lives",
+            fun () -> promise {
+                let! root = TestHelpers.createTempDirectoryAsync "swate-text-diff-storage-"
+                let window = 93
+                let originalIsWindowAlive = TextDiffHandles.isWindowAlive
+                TextDiffHandles.isWindowAlive <- fun _ -> true
+                let policies = ResizeArray<DiffStoragePolicy>()
+                let mutable answer = DiffStorage.OnDisk
+
+                let service = {
+                    unexpectedService with
+                        Open =
+                            fun request _ -> async {
+                                policies.Add request.Storage
+                                let path = RepositoryPath.value request.Path
+
+                                return
+                                    OperationResult.succeeded (Resumable.Ready(openedDiffWith answer "h-storage" path))
+                            }
+                        Close = fun _ _ -> async { return OperationResult.succeeded () }
+                }
+
+                let host =
+                    WorkspaceSessionHost.WorkspaceSessionHost(textDiffRuntime root (Promise.lift ()) service)
+
+                WorkspaceSessionHost.initialize host
+                registerWindows root [ window ]
+                let api = Main.IPC.IVersionControlApi.api (TestHelpers.ipcEvent window)
+
+                let setSettings (operationId: string) (limitMb: int) (reserveMb: int) =
+                    api.setStoragePolicySettings {
+                        OperationId = operationId
+                        Settings = {
+                            AutoPolicyThresholdMb = None
+                            MaterializeLargeObjects = false
+                            DiffIndexingLimitMb = Some limitMb
+                            DiffFreeSpaceReserveMb = Some reserveMb
+                        }
+                    }
+
+                let storageOf (opened: Result<OperationResultDto<ResumableOpenDto>, exn>) =
+                    match (TestHelpers.expectDtoValue "open" opened).Value with
+                    | ResumableOpenDto.Ready(OpenDiffResultDto.Opened(_, _, _, _, storage)) -> storage
+                    | other -> failwith $"Expected an opened diff, got {other}"
+
+                try
+                    let! settings = setSettings "storage-settings-1" 5 1024
+                    TestHelpers.expectDtoValue "set the limit" settings |> ignore
+                    answer <- DiffStorage.InMemory 5242880L
+                    let! inMemory = api.openTextDiff (openRequest "open-memory" "a.txt")
+
+                    Vitest.expect(policies.[0]).toEqual (DiffStoragePolicy.MemoryOnly 5242880L)
+
+                    Vitest
+                        .expect(storageOf inMemory)
+                        .toEqual (DiffStorageDto.InMemory("5242880", MemoryCauseDto.BySetting))
+
+                    let! settings = setSettings "storage-settings-2" 2048 512
+                    TestHelpers.expectDtoValue "set the limit again" settings |> ignore
+                    answer <- DiffStorage.OnDisk
+                    let! onDisk = api.openTextDiff (openRequest "open-disk" "a.txt")
+
+                    Vitest.expect(policies.[1]).toEqual (DiffStoragePolicy.PreferDisk(563714458L, 67108864L))
+                    Vitest.expect(storageOf onDisk).toEqual DiffStorageDto.OnDisk
+
+                    // The library chose memory for a policy that preferred disk.
+                    answer <- DiffStorage.InMemory 67108864L
+                    let! lowSpace = api.openTextDiff (openRequest "open-low-space" "a.txt")
+
+                    Vitest
+                        .expect(storageOf lowSpace)
+                        .toEqual (DiffStorageDto.InMemory("67108864", MemoryCauseDto.ByLowSpace))
+                finally
+                    TextDiffHandles.isWindowAlive <- originalIsWindowAlive
+                    TextDiffHandles.windowClosed window
                     Main.ArcVault.ARC_VAULTS.Vaults.Clear()
                     TestHelpers.electronMock?reset () |> ignore
                     WorkspaceSessionHost.resetForTests ()

@@ -452,7 +452,19 @@ let diffSourceInfoPair (previous: DiffSourceInfo, current: DiffSourceInfo) : Dif
     Current = diffSourceInfo current
 }
 
-let diffBlocker (blocker: DiffBlocker) : DiffBlockerDto =
+/// The cause of a memory diff or of a blocker that memory causes. A MemoryOnly policy is the
+/// indexing limit setting. A PreferDisk policy that ended in memory is the low-space fallback.
+let memoryCause (policy: DiffStoragePolicy) : MemoryCauseDto =
+    match policy with
+    | DiffStoragePolicy.MemoryOnly _ -> MemoryCauseDto.BySetting
+    | DiffStoragePolicy.PreferDisk _ -> MemoryCauseDto.ByLowSpace
+
+let diffStorage (policy: DiffStoragePolicy) (storage: DiffStorage) : DiffStorageDto =
+    match storage with
+    | DiffStorage.OnDisk -> DiffStorageDto.OnDisk
+    | DiffStorage.InMemory budgetBytes -> DiffStorageDto.InMemory(int64Text budgetBytes, memoryCause policy)
+
+let diffBlocker (policy: DiffStoragePolicy) (blocker: DiffBlocker) : DiffBlockerDto =
     match blocker with
     | DiffBlocker.Binary(side, evidence) -> DiffBlockerDto.Binary(diffSide side, evidence)
     | DiffBlocker.LocalContentUnavailable(side, objectId) ->
@@ -469,6 +481,13 @@ let diffBlocker (blocker: DiffBlocker) : DiffBlockerDto =
         )
     | DiffBlocker.NotRegularFile side -> DiffBlockerDto.NotRegularFile(diffSide side)
     | DiffBlocker.ProviderUnsupported -> DiffBlockerDto.ProviderUnsupported
+    | DiffBlocker.BlobTooLargeForMemory(side, blobBytes, limitBytes) ->
+        DiffBlockerDto.BlobTooLargeForMemory(
+            diffSide side,
+            int64Text blobBytes,
+            int64Text limitBytes,
+            memoryCause policy
+        )
 
 let resumablePage (resumable: Resumable<DiffPage>) : ResumablePageDto =
     match resumable with
@@ -476,20 +495,21 @@ let resumablePage (resumable: Resumable<DiffPage>) : ResumablePageDto =
     | Resumable.Scanning(progress, continuation, pending) ->
         ResumablePageDto.Scanning(scanProgress progress, continuation, pending |> Option.map pendingPreview)
 
-let openDiffResult (result: OpenDiffResult) : OpenDiffResultDto =
+let openDiffResult (policy: DiffStoragePolicy) (result: OpenDiffResult) : OpenDiffResultDto =
     match result with
-    | OpenDiffResult.NotDiffable blocker -> OpenDiffResultDto.NotDiffable(diffBlocker blocker)
-    | OpenDiffResult.Opened(handle, previous, current, first) ->
+    | OpenDiffResult.NotDiffable blocker -> OpenDiffResultDto.NotDiffable(diffBlocker policy blocker)
+    | OpenDiffResult.Opened(handle, previous, current, first, storage) ->
         OpenDiffResultDto.Opened(
             diffHandle handle,
             diffSourceInfo previous,
             diffSourceInfo current,
-            resumablePage first
+            resumablePage first,
+            diffStorage policy storage
         )
 
-let resumableOpen (resumable: Resumable<OpenDiffResult>) : ResumableOpenDto =
+let resumableOpen (policy: DiffStoragePolicy) (resumable: Resumable<OpenDiffResult>) : ResumableOpenDto =
     match resumable with
-    | Resumable.Ready result -> ResumableOpenDto.Ready(openDiffResult result)
+    | Resumable.Ready result -> ResumableOpenDto.Ready(openDiffResult policy result)
     | Resumable.Scanning(progress, continuation, pending) ->
         ResumableOpenDto.Scanning(scanProgress progress, continuation, pending |> Option.map pendingPreview)
 
@@ -644,7 +664,11 @@ let private tryOptionalRepositoryPath (path: string option) : Result<RepositoryP
     | None -> Ok None
     | Some text -> tryRepositoryPath text |> Result.map Some
 
-let tryOpenDiffRequest (request: OpenTextDiffRequestDto) : Result<OpenDiffRequest, OperationFailure> =
+/// The storage policy comes from the settings of the session, which the validation here does not see.
+let tryOpenDiffRequest
+    (storage: DiffStoragePolicy)
+    (request: OpenTextDiffRequestDto)
+    : Result<OpenDiffRequest, OperationFailure> =
     tryTextDiffId "operation id" request.OperationId
     |> Result.bind (fun _ -> tryOptionalToken "preparation token" request.PreparationTokenId)
     |> Result.bind (fun _ -> tryOptionalToken "previous encoding" request.PreviousEncoding)
@@ -663,6 +687,7 @@ let tryOpenDiffRequest (request: OpenTextDiffRequestDto) : Result<OpenDiffReques
             CurrentEncoding = request.CurrentEncoding
             ContextLines = request.ContextLines
             Continuation = request.Continuation
+            Storage = storage
         })
     )
 
@@ -695,6 +720,7 @@ let tryReadPageRequest (request: ReadTextDiffPageRequestDto) : Result<ReadPageRe
             |> Result.map (fun cursor -> {
                 ReadPageRequest.Handle = handle
                 Cursor = cursor
+                Background = request.Background
             })
         )
 

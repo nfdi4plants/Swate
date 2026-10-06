@@ -88,6 +88,7 @@ let private storagePolicySettingsDto (settings: VersionControlSettings) : Storag
     AutoPolicyThresholdMb = Some settings.AutoTrackThresholdMb
     MaterializeLargeObjects = settings.DownloadLargeFiles
     DiffIndexingLimitMb = Some settings.DiffIndexingLimitMb
+    DiffFreeSpaceReserveMb = Some settings.DiffFreeSpaceReserveMb
 }
 
 /// Registers and announces one operation before any await, and turns exceptions into failures.
@@ -305,6 +306,12 @@ let private withTextDiff
 
             return result |> Result.map Mappings.boundTextDiffResult
     }
+
+/// The storage policy a diff opened now gets, from the settings of the session of the calling window.
+let private diffStoragePolicyOf (event: IpcMainInvokeEvent) : DiffStoragePolicy =
+    match tryGetVaultAndArcPath event with
+    | Ok(_, arcPath) -> VersionControlSettings.diffStoragePolicy (WorkspaceSessionHost.get().GetSettings arcPath)
+    | Error _ -> VersionControlSettings.diffStoragePolicy VersionControlSettings.defaults
 
 /// The window of the IPC call. Electron supplies it, so the renderer cannot choose it.
 let private callingWindowId (event: IpcMainInvokeEvent) : int option =
@@ -1012,6 +1019,9 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                         DiffIndexingLimitMb =
                             request.Settings.DiffIndexingLimitMb
                             |> Option.defaultValue current.DiffIndexingLimitMb
+                        DiffFreeSpaceReserveMb =
+                            request.Settings.DiffFreeSpaceReserveMb
+                            |> Option.defaultValue current.DiffFreeSpaceReserveMb
                     }
 
                     host.SetSettings(hosted.Binding.WorkspaceRoot, settings, context)
@@ -1172,11 +1182,14 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
     // handle that arrives after its window closed is closed at once.
     openTextDiff =
         fun request ->
+            // The settings of the session decide where the diff keeps its data.
+            let policy = diffStoragePolicyOf event
+
             withTextDiff
                 "openTextDiff"
                 event
                 request.OperationId
-                (Mappings.tryOpenDiffRequest request)
+                (Mappings.tryOpenDiffRequest policy request)
                 (fun hosted service openRequest context -> async {
                     let windowId = callingWindowId event
                     let! opened = service.Open openRequest context
@@ -1185,14 +1198,14 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                     | Succeeded outcome
                     | PartiallySucceeded(outcome, _) ->
                         match outcome.Value with
-                        | Resumable.Ready(OpenDiffResult.Opened(handle, _, _, _)) ->
+                        | Resumable.Ready(OpenDiffResult.Opened(handle, _, _, _, _)) ->
                             TextDiffHandles.recordOrClose windowId hosted.Binding.WorkspaceRoot service handle
                         | _ -> ()
                     | Failed _ -> ()
 
                     return opened
                 })
-                Mappings.resumableOpen
+                (Mappings.resumableOpen policy)
     readTextDiffPage =
         fun request ->
             withTextDiff
