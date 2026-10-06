@@ -142,7 +142,8 @@ type ArcVault(window: BrowserWindow) =
         loadedDirectoryWatcherSuspensionDepth > 0
 
     member internal this.HasOwnedLoadedDirectoryWatcher =
-        this.loadedDirectoryWatcher.IsSome || loadedDirectoryWatcherEstablishmentCancellation.IsSome
+        this.loadedDirectoryWatcher.IsSome
+        || loadedDirectoryWatcherEstablishmentCancellation.IsSome
 
     member internal this.BeginLoadedDirectoryWatcherSuspension() =
         loadedDirectoryWatcherSuspensionDepth <- loadedDirectoryWatcherSuspensionDepth + 1
@@ -464,9 +465,11 @@ module ArcVaultExtensions =
                 elif not shouldWatch || this.IsLoadedDirectoryWatcherSuspended then
                     let previous = this.loadedDirectoryWatcher
                     this.loadedDirectoryWatcher <- None
+
                     match previous with
                     | Some watcher -> do! closeWatcher watcher
                     | None -> ()
+
                     this.CompleteLoadedDirectoryWatcherEstablishment generation
                     return None
                 else
@@ -475,9 +478,11 @@ module ArcVaultExtensions =
                         this.loadedFileTreeDirectories.Clear()
                         let previous = this.loadedDirectoryWatcher
                         this.loadedDirectoryWatcher <- None
+
                         match previous with
                         | Some watcher -> do! closeWatcher watcher
                         | None -> ()
+
                         this.CompleteLoadedDirectoryWatcherEstablishment generation
                         return None
                     | Some arcPath ->
@@ -487,14 +492,18 @@ module ArcVaultExtensions =
                         if relativePaths.Length = 0 then
                             let previous = this.loadedDirectoryWatcher
                             this.loadedDirectoryWatcher <- None
+
                             match previous with
                             | Some watcher -> do! closeWatcher watcher
                             | None -> ()
+
                             this.CompleteLoadedDirectoryWatcherEstablishment generation
                             return None
                         else
                             let absolutePaths =
-                                relativePaths |> Array.map (fun relativePath -> join [| arcPath; relativePath |])
+                                relativePaths
+                                |> Array.map (fun relativePath -> join [| arcPath; relativePath |])
+
                             let candidate, ready = createLoadedDirectoryWatcherWithReady arcPath absolutePaths
 
                             candidate.on (
@@ -505,7 +514,10 @@ module ArcVaultExtensions =
                                         && not (WatcherHelpers.eventNameEquals Chokidar.Events.Ready eventName)
                                     then
                                         let absoluteChangedPath =
-                                            if isAbsolute changedPath then changedPath else join [| arcPath; changedPath |]
+                                            if isAbsolute changedPath then
+                                                changedPath
+                                            else
+                                                join [| arcPath; changedPath |]
 
                                         match tryGetRepoRelativePath arcPath (dirname absoluteChangedPath) with
                                         | Some parentPath when this.IsFileTreeDirectoryLoaded parentPath ->
@@ -528,9 +540,11 @@ module ArcVaultExtensions =
                                 let previous = this.loadedDirectoryWatcher
                                 this.loadedDirectoryWatcher <- Some candidate
                                 this.CompleteLoadedDirectoryWatcherEstablishment generation
+
                                 match previous with
                                 | Some watcher -> do! closeWatcher watcher
                                 | None -> ()
+
                                 return Some generation
                             else
                                 do! closeWatcher candidate
@@ -1057,6 +1071,7 @@ module ArcVaultExtensions =
 
                                 if not (System.String.IsNullOrWhiteSpace normalizedRelativePath) then
                                     this.loadedFileTreeDirectories.Add(normalizedRelativePath) |> ignore
+
                                 do! this.RemoveUnavailableLoadedDirectories arcPath
                     with refreshError ->
                         if

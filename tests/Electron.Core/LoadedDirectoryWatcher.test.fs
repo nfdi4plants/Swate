@@ -714,7 +714,8 @@ Vitest.describe (
                             ignore
                             (fun () ->
                                 closeCount <- closeCount + 1
-                                signalFirstClosed ())
+                                signalFirstClosed ()
+                            )
 
                         interceptNextControlledWatch
                             watchMock
@@ -764,13 +765,19 @@ Vitest.describe (
 
                         let changedPath = join [| datasetPath; "changed-during-replacement.txt" |]
                         do! writeFileAsync changedPath "changed" TextEncoding.Utf8
+
                         do!
                             waitUntil
                                 "active watcher event during replacement"
                                 (fun () -> vault.LoadedDirectoryRefreshes.ContainsKey "dataset")
+
                         signalReplacementReady ()
                         do! replacement
-                        do! waitUntil "existing-scope mutation during replacement" (fun () -> containsPath changedPath vault)
+
+                        do!
+                            waitUntil
+                                "existing-scope mutation during replacement"
+                                (fun () -> containsPath changedPath vault)
 
                         Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
                         Vitest.expect(isSameWatcher original vault.loadedDirectoryWatcher.Value).toBe false
