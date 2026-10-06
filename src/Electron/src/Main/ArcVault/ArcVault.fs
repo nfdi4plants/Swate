@@ -25,7 +25,7 @@ open ARCtrl
 
 type internal LoadedDirectoryWatcherState = {
     LifecycleActive: bool
-    SuspensionOwner: obj option
+    MutationActive: bool
     Generation: int
     ActiveGeneration: int option
     EstablishmentCancellation: (int * (unit -> unit)) option
@@ -42,7 +42,7 @@ module private LoadedDirectoryWatcherState =
 
     let initial = {
         LifecycleActive = true
-        SuspensionOwner = None
+        MutationActive = false
         Generation = 0
         ActiveGeneration = None
         EstablishmentCancellation = None
@@ -114,27 +114,11 @@ type internal LoadedDirectoryWatcherController() =
 
         previous
 
-    member this.EnqueueSuspension() =
-        let preceding = state.Value.MutationQueueTail
-        let startsBatch = state.Value.SuspensionOwner.IsNone
-        let owner = obj ()
+    member this.BeginMutation() =
+        this.Update(fun current -> { current with MutationActive = true })
 
-        this.Update(fun current -> {
-            current with
-                SuspensionOwner = Some owner
-        })
-
-        preceding, owner, startsBatch
-
-    member _.IsSuspended = state.Value.SuspensionOwner.IsSome
-
-    member _.OwnsSuspension(owner: obj) =
-        state.Value.SuspensionOwner
-        |> Option.exists (fun current -> System.Object.ReferenceEquals(current, owner))
-
-    member this.CompleteSuspension(owner: obj) =
-        if this.OwnsSuspension owner then
-            this.Update(fun current -> { current with SuspensionOwner = None })
+    member this.EndMutation() =
+        this.Update(fun current -> { current with MutationActive = false })
 
     member this.ActivateLifecycle() =
         this.Update(fun current -> { current with LifecycleActive = true })
@@ -203,7 +187,7 @@ type internal LoadedDirectoryWatcherController() =
                 PendingHandoffs = Set.union current.PendingHandoffs current.LoadedDirectories
         })
 
-    member this.SetSuspensionTail promise =
+    member this.SetMutationQueueTail promise =
         this.Update(fun current -> {
             current with
                 MutationQueueTail = promise
@@ -611,14 +595,14 @@ module ArcVaultExtensions =
         /// The sole owner of loaded-directory watcher creation, readiness, replacement and retirement.
         /// A new request cancels the preceding candidate, while the current watcher remains active until
         /// its ready replacement can take over.
-        member internal this.RequestLoadedDirectoryWatcherCoverage(shouldWatch: bool, ?restoringSuspensionOwner: obj) =
+        member internal this.RequestLoadedDirectoryWatcherCoverage(shouldWatch: bool, ?allowDuringMutation: bool) =
             let controller = this.LoadedDirectoryWatcherController
             let generation, cancelled = controller.BeginEstablishment()
             let precedingLifecycle = controller.Current.WatcherTransitionTail
+            let allowDuringMutation = defaultArg allowDuringMutation false
 
             let suspensionAllowsCoverage () =
-                not controller.IsSuspended
-                || restoringSuspensionOwner |> Option.exists controller.OwnsSuspension
+                not controller.Current.MutationActive || allowDuringMutation
 
             let closeWatcher (watcher: Chokidar.IWatcher) = promise {
                 try
@@ -753,8 +737,8 @@ module ArcVaultExtensions =
                         controller.RemovePendingHandoff relativePath
         }
 
-        member private this.RestoreLoadedDirectoryWatcherAndPendingHandoffs(suspensionOwner: obj) = promise {
-            match! this.RequestLoadedDirectoryWatcherCoverage(true, restoringSuspensionOwner = suspensionOwner) with
+        member private this.RestoreLoadedDirectoryWatcherAndPendingHandoffs() = promise {
+            match! this.RequestLoadedDirectoryWatcherCoverage(true, allowDuringMutation = true) with
             | None -> ()
             | Some generation ->
                 match this.path with
@@ -768,7 +752,7 @@ module ArcVaultExtensions =
 
         member this.WithLoadedDirectoryWatcherSuspended<'T>(operation: unit -> JS.Promise<'T>) =
             let controller = this.LoadedDirectoryWatcherController
-            let preceding, suspensionOwner, startsBatch = controller.EnqueueSuspension()
+            let preceding = controller.Current.MutationQueueTail
 
             let captureOperationOutcome () =
                 try
@@ -776,52 +760,37 @@ module ArcVaultExtensions =
                 with error ->
                     JS.Constructors.Promise.resolve (Error error)
 
-            // Some operations register cancellation synchronously. Preserve that behavior when the
-            // queue starts without watcher work to retire.
-            let immediateOperationOutcome =
-                if
-                    startsBatch
-                    && controller.Current.Watcher.IsNone
-                    && controller.Current.EstablishmentCancellation.IsNone
-                then
-                    Some(captureOperationOutcome ())
-                else
-                    None
-
             let lifecycle = promise {
                 do! preceding
+                controller.BeginMutation()
 
-                if startsBatch then
+                try
                     controller.AddLoadedDirectoriesToPendingHandoffs()
                     do! this.RequestLoadedDirectoryWatcherCoverage false |> Promise.map ignore
 
-                let! operationOutcome = immediateOperationOutcome |> Option.defaultWith captureOperationOutcome
-                let completesBatch = controller.OwnsSuspension suspensionOwner
+                    let! operationOutcome = captureOperationOutcome ()
 
-                let! restorationOutcome =
-                    if completesBatch then
-                        this.RestoreLoadedDirectoryWatcherAndPendingHandoffs suspensionOwner
+                    let! restorationOutcome =
+                        this.RestoreLoadedDirectoryWatcherAndPendingHandoffs()
                         |> Promise.map Ok
                         |> Promise.catch (fun error -> Error error)
-                    else
-                        promise { return Ok() }
 
-                controller.CompleteSuspension suspensionOwner
+                    match operationOutcome, restorationOutcome with
+                    | Ok result, Ok() -> return result
+                    | Error operationError, Ok() -> return raise operationError
+                    | Ok _, Error restorationError -> return raise restorationError
+                    | Error operationError, Error restorationError ->
+                        swatelogfn
+                            this.window.id
+                            "Unable to restore loaded-directory watcher after failed operation: %s"
+                            restorationError.Message
 
-                match operationOutcome, restorationOutcome with
-                | Ok result, Ok() -> return result
-                | Error operationError, Ok() -> return raise operationError
-                | Ok _, Error restorationError -> return raise restorationError
-                | Error operationError, Error restorationError ->
-                    swatelogfn
-                        this.window.id
-                        "Unable to restore loaded-directory watcher after failed operation: %s"
-                        restorationError.Message
-
-                    return raise operationError
+                        return raise operationError
+                finally
+                    controller.EndMutation()
             }
 
-            controller.SetSuspensionTail(lifecycle |> Promise.map ignore |> Promise.catch (fun _ -> ()))
+            controller.SetMutationQueueTail(lifecycle |> Promise.map ignore |> Promise.catch (fun _ -> ()))
             lifecycle
 
         /// Returns the load error to the import caller when loading fails. The import can then report that its in-memory merge did not happen.
@@ -1231,7 +1200,7 @@ module ArcVaultExtensions =
                             if not wasLoaded && not (System.String.IsNullOrWhiteSpace normalizedRelativePath) then
                                 controller.AddLoadedDirectory(normalizedRelativePath, true)
 
-                                if not controller.IsSuspended then
+                                if not controller.Current.MutationActive then
                                     match! this.RequestLoadedDirectoryWatcherCoverage true with
                                     | Some generation when lifecycleIsCurrent () ->
                                         do! this.CatchUpPendingLoadedDirectoryHandoffs(arcPath, generation)
@@ -1264,7 +1233,7 @@ module ArcVaultExtensions =
                             let controller = this.LoadedDirectoryWatcherController
                             controller.RemoveLoadedDirectory normalizedRelativePath
 
-                            if not controller.IsSuspended then
+                            if not controller.Current.MutationActive then
                                 do! this.RequestLoadedDirectoryWatcherCoverage true |> Promise.map ignore
 
                         if lifecycleIsCurrent () then

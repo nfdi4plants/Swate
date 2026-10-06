@@ -599,16 +599,13 @@ Vitest.describe (
                         let secondOperationGate, releaseSecondOperation = TestHelpers.deferred ()
                         let enteredOperations = ResizeArray<int>()
 
-                        let addedPath =
-                            join [|
-                                datasetPath
-                                "added-during-overlapping-suspensions.txt"
-                            |]
+                        let addedPath = join [| datasetPath; "added-by-first-queued-mutation.txt" |]
 
                         let first =
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
                                 enteredOperations.Add 1
                                 Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                                do! writeFileAsync addedPath "queued" TextEncoding.Utf8
                                 do! firstOperationGate
                             })
 
@@ -616,7 +613,7 @@ Vitest.describe (
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
                                 enteredOperations.Add 2
                                 Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
-                                do! writeFileAsync addedPath "overlap" TextEncoding.Utf8
+                                Vitest.expect(containsPath addedPath vault).toBe true
                                 do! secondOperationGate
                             })
 
@@ -625,8 +622,6 @@ Vitest.describe (
 
                         releaseFirstOperation ()
                         do! first
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
-                        Vitest.expect(containsPath addedPath vault).toBe false
 
                         do! waitUntil "second queued mutation" (fun () -> enteredOperations.Count = 2)
                         Vitest.expect(enteredOperations.[1]).toBe 2
@@ -663,6 +658,57 @@ Vitest.describe (
                             .expect(isWatchedPath rootPath "dataset/existing.txt" vault.loadedDirectoryWatcher.Value)
                             .toBe
                             true
+                    })
+            }
+        )
+
+        Vitest.test (
+            "a mutation queued during restoration waits for watcher readiness and catch-up",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
+                        do! vault.RefreshFileTreeDirectory "dataset"
+
+                        let restorationCreated, signalRestorationCreated = TestHelpers.deferred ()
+                        let mutable signalRestorationReady = ignore
+
+                        interceptNextControlledWatch
+                            watchMock
+                            signalRestorationCreated
+                            (fun ready -> signalRestorationReady <- ready)
+                            ignore
+
+                        let firstOperationGate, releaseFirstOperation = TestHelpers.deferred ()
+                        let secondOperationGate, releaseSecondOperation = TestHelpers.deferred ()
+                        let mutable secondEntered = false
+                        let addedPath = join [| datasetPath; "added-before-restoration-finished.txt" |]
+
+                        let first =
+                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                do! writeFileAsync addedPath "queued restoration" TextEncoding.Utf8
+                                do! firstOperationGate
+                            })
+
+                        releaseFirstOperation ()
+                        do! restorationCreated
+
+                        let second =
+                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                secondEntered <- true
+                                Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                                Vitest.expect(containsPath addedPath vault).toBe true
+                                do! secondOperationGate
+                            })
+
+                        Vitest.expect(secondEntered).toBe false
+                        signalRestorationReady ()
+                        do! first
+                        do! waitUntil "mutation queued during restoration" (fun () -> secondEntered)
+
+                        releaseSecondOperation ()
+                        do! second
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
                     })
             }
         )

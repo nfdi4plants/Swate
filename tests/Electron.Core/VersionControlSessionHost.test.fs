@@ -2025,7 +2025,10 @@ Vitest.describe (
                         do!
                             waitUntil
                                 "first restore mutation to start"
-                                (fun () -> fakeHost.RunningMutationIdsForWindow 52 = [| "restore-first" |])
+                                (fun () ->
+                                    fakeHost.RunningMutationIdsForWindow 52 = [| "restore-first" |]
+                                    && vault.loadedDirectoryWatcher.IsNone
+                                )
 
                         Vitest.expect(fakeHost.RunningMutationIdsForWindow 52).toEqual [| "restore-first" |]
                         Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true

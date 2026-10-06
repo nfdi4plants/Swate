@@ -136,6 +136,27 @@ let private runTracked
         return result
     }
 
+let private runSessionOperation
+    (host: WorkspaceSessionHost.WorkspaceSessionHost)
+    (arcPath: string)
+    (operation: WorkspaceSessionHost.HostedSession -> OperationContext -> Async<OperationResult<'T>>)
+    (context: OperationContext)
+    =
+    async {
+        let! opened = host.OpenSession(arcPath, context)
+
+        match opened with
+        | Succeeded outcome -> return! operation outcome.Value context
+        | PartiallySucceeded(outcome, openFailure) ->
+            let! result = operation outcome.Value context
+
+            return
+                match result with
+                | Succeeded valueOutcome -> PartiallySucceeded(valueOutcome, openFailure)
+                | other -> other
+        | Failed failure -> return Failed(sessionUnavailable failure)
+    }
+
 /// Opens the vault session of the calling window and runs the operation in it. The
 /// operation is registered and announced before the first await, so a cancel that
 /// arrives right after the call started is honored even while the session opens.
@@ -163,26 +184,7 @@ let private withSession
                     (Some arcPath)
                     (windowFromIpcEvent event |> Option.map _.id)
                     mutating
-                    (fun context -> async {
-                        let! opened = host.OpenSession(arcPath, context)
-
-                        match opened with
-                        | Succeeded outcome ->
-                            let hosted = outcome.Value
-                            return! operation hosted context
-                        | PartiallySucceeded(outcome, openFailure) ->
-                            // Only a fresh open is partial, a reuse is not, so the failure of
-                            // the open (a rejected settings push, say) reaches the renderer
-                            // once, on the call that opened the session.
-                            let hosted = outcome.Value
-                            let! result = operation hosted context
-
-                            return
-                                match result with
-                                | Succeeded valueOutcome -> PartiallySucceeded(valueOutcome, openFailure)
-                                | other -> other
-                        | Failed failure -> return Failed(sessionUnavailable failure)
-                    })
+                    (runSessionOperation host arcPath operation)
 
             try
                 return Ok(Mappings.result mapValue result)
@@ -222,19 +224,43 @@ let private withMutatingSessionUsingRefreshPredicate
         match tryGetVaultAndArcPath event with
         | Error error -> return Error error
         | Ok(vault, arcPath) ->
+            let host = WorkspaceSessionHost.get ()
+            let bridge = tryBridgeFromEvent event
+
             return!
                 withBusyWritingScope
                     vault
-                    (fun () ->
-                        vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                            let! result = withSession operationName event operationId true operation mapValue
+                    (fun () -> promise {
+                        let! operationResult =
+                            runTracked
+                                host
+                                bridge
+                                operationName
+                                operationId
+                                (Some arcPath)
+                                (windowFromIpcEvent event |> Option.map _.id)
+                                true
+                                (fun context ->
+                                    vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                        let! result =
+                                            runSessionOperation host arcPath operation context
+                                            |> Async.StartAsPromise
 
-                            if shouldRefresh result then
-                                do! vault.ResetFileTreeToRoot()
+                                        let mappedResult = Ok(Mappings.result mapValue result)
 
-                            return result
-                        })
-                    )
+                                        if shouldRefresh mappedResult then
+                                            do! vault.ResetFileTreeToRoot()
+
+                                        return result
+                                    })
+                                    |> Async.AwaitPromise
+                                )
+
+                        try
+                            return Ok(Mappings.result mapValue operationResult)
+                        with error ->
+                            return Ok(failedDto (unexpectedFailure error))
+                    })
     }
 
 /// Same as withSession, with the vault marked busy for the duration and the file tree
