@@ -14,23 +14,34 @@ let mutable private dependencyCheckStarted = false
 /// configuration) and says how to fix it. Its remediation text starts with the cause when a
 /// version check failed.
 let dependencyProblemMessage (statuses: DependencyStatusDto[]) : string option =
+    // The library reports the filter configuration as installed when the filter is set up, whatever
+    // the state of git-lfs itself. A problem of the configuration is only worth a line of its own
+    // while git-lfs works. Otherwise the line of git-lfs says what to do first.
+    let gitLfsWorks =
+        statuses
+        |> Array.tryFind (fun status -> status.Component = "git-lfs")
+        |> Option.forall (fun status -> status.Installed && status.Compatible)
+
     let problems =
         statuses
         |> Array.filter (fun status -> not status.Installed || not status.Compatible)
-        |> Array.map (fun status ->
+        |> Array.choose (fun status ->
             let remediation =
                 status.Remediation
                 |> Option.map (fun text -> $" {text}")
                 |> Option.defaultValue ""
 
-            if not status.Installed then
-                $"{status.Component} was not found or could not be run.{remediation}"
-            elif status.Component = "git-lfs-configuration" then
-                $"Git LFS is installed but not set up.{remediation}"
+            if status.Component = "git-lfs-configuration" then
+                if gitLfsWorks then
+                    Some $"Git LFS is installed but not set up.{remediation}"
+                else
+                    None
+            elif not status.Installed then
+                Some $"{status.Component} was not found or could not be run.{remediation}"
             else
                 match status.Version with
-                | Some version -> $"{version} is not supported.{remediation}"
-                | None -> $"{status.Component} is not supported.{remediation}"
+                | Some version -> Some $"{version} is not supported.{remediation}"
+                | None -> Some $"{status.Component} is not supported.{remediation}"
         )
 
     if problems.Length = 0 then

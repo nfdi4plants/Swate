@@ -2527,6 +2527,269 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "The dependency problem lists the Git LFS setup only while git-lfs itself works",
+            fun () ->
+                let status
+                    (name: string)
+                    (installed: bool)
+                    (compatible: bool)
+                    (version: string option)
+                    (remediation: string option)
+                    : DependencyStatusDto =
+                    {
+                        Component = name
+                        Installed = installed
+                        Version = version
+                        Compatible = compatible
+                        Remediation = remediation
+                    }
+
+                let message =
+                    Renderer.Components.LeftSidebar.Git.GitSidebarPanel.dependencyProblemMessage
+
+                let lineCount (text: string option) =
+                    text |> Option.map (fun value -> value.Split('\n').Length)
+
+                let git = status "git" true true (Some "git version 2.50.0") None
+                let working = status "git-lfs" true true (Some "git-lfs/3.7.0") None
+
+                // The filter is not set up while git-lfs works. The line is about the setup and
+                // carries the remediation, and no line says that a component was not found.
+                let unconfigured =
+                    message [|
+                        git
+                        working
+                        status "git-lfs-configuration" false false None (Some "configure the filter")
+                    |]
+
+                Vitest.expect(lineCount unconfigured).toEqual (Some 1)
+                Vitest.expect(unconfigured.Value.Contains "configure the filter").toBe (true)
+                Vitest.expect(unconfigured.Value.Contains "git-lfs-configuration").toBe (false)
+
+                // A missing git-lfs gets its own line, and the setup adds none.
+                let missing =
+                    message [|
+                        git
+                        status "git-lfs" false false None (Some "install it")
+                        status "git-lfs-configuration" false false None (Some "configure later")
+                    |]
+
+                Vitest.expect(lineCount missing).toEqual (Some 1)
+                Vitest.expect(missing.Value.Contains "install it").toBe (true)
+                Vitest.expect(missing.Value.Contains "configure later").toBe (false)
+
+                // So does a git-lfs that is too old, whatever the state of the filter.
+                let tooOld =
+                    message [|
+                        git
+                        status "git-lfs" true false (Some "git-lfs/3.4.0") (Some "upgrade it")
+                        status "git-lfs-configuration" true false None (Some "configure later")
+                    |]
+
+                Vitest.expect(lineCount tooOld).toEqual (Some 1)
+                Vitest.expect(tooOld.Value.Contains "3.4.0").toBe (true)
+                Vitest.expect(tooOld.Value.Contains "configure later").toBe (false)
+
+                Vitest
+                    .expect(
+                        message [|
+                            git
+                            working
+                            status "git-lfs-configuration" true true None None
+                        |]
+                    )
+                    .toEqual (None)
+        )
+
+        Vitest.test (
+            "Selecting a conflicted change keeps the open diff and its handle until another page replaces it",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let! state = openFirstPage fake (diffPage "p1" None [| hunk "h1" |])
+
+                let dependencies = {
+                    fake.Dependencies with
+                        getStatus = fun _ -> promise { return Error "no status" }
+                }
+
+                let conflicted = {
+                    change "c.txt" with
+                        IsConflicted = true
+                }
+
+                let requested, requestCmd =
+                    update dependencies fake.SetPageState (SelectChangeRequested(conflicted, ignore)) state
+
+                let! messages = collectMessages requestCmd
+
+                // The diff stays while the page loads, so nothing on screen has lost its handle.
+                Vitest.expect(requested.DiffPage.IsSome).toBe (true)
+                Vitest.expect(fake.Closes.Count).toBe (0)
+
+                // A load that fails leaves the diff as it was.
+                let failed, failedCmd = update dependencies fake.SetPageState messages.[0] requested
+                let! _ = collectMessages failedCmd
+                Vitest.expect(failed.DiffPage.IsSome).toBe (true)
+                Vitest.expect(fake.Closes.Count).toBe (0)
+
+                // Once the page state shows another page, the diff leaves and its handle closes.
+                let left, leftCmd =
+                    update
+                        dependencies
+                        fake.SetPageState
+                        (diffMsg (GitDiffMsg.PageStateObserved(Some(PageState.TextPage "other"))))
+                        failed
+
+                let! _ = collectMessages leftCmd
+                Vitest.expect(left.DiffPage).toEqual (None)
+                Vitest.expect(fake.Closes.Count).toBe (1)
+            }
+        )
+
+        Vitest.test (
+            "A page load of a closed ARC stays dropped after a refresh without an ARC and the opening of another ARC",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let shown = ResizeArray<PageState option>()
+
+                let step (message: Msg) (state: GitState) =
+                    update fake.Dependencies shown.Add message state
+
+                let conflicted = {
+                    change "c.txt" with
+                        IsConflicted = true
+                }
+
+                // The first ARC starts loading the page of a conflicted change.
+                let selecting, _ = step (SelectChangeRequested(conflicted, ignore)) runningState
+                let loadId = selecting.PageLoadRequestId
+
+                // That ARC closes, a refresh runs while no ARC is open, and another ARC opens.
+                let closed, _ = step (ArcPathChanged None) selecting
+                let refreshed, _ = step RefreshRequested closed
+                let other, _ = step (ArcPathChanged(Some "C:/other")) refreshed
+
+                // The load of the first ARC finishes late and must not count for the new ARC.
+                let late, lateCmd =
+                    step
+                        (SelectChangeCompleted(
+                            loadId,
+                            "c.txt",
+                            ignore,
+                            Ok(GitPageChange.Set(PageState.TextPage "stale"))
+                        ))
+                        other
+
+                let! _ = collectMessages lateCmd
+                Vitest.expect(shown.Count).toBe (0)
+                Vitest.expect(late.SelectedChangePath).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "A request for the next page on a paused diff reopens it and lands on the last page read, not on the page asked for first",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                // Page n shows the line 10 n. The first session closes when the indexing asks for the fourth page.
+                let pageDto (index: int) =
+                    diffPage $"p{index}" (if index < 6 then Some $"cursor-{index}" else None) [|
+                        hunkAt $"h{index}" (index * 10)
+                    |]
+
+                fake.OpenReply <- fun _ -> openedOn (handleOfOpen fake.Opens.Count) (pageDto 1)
+
+                fake.ReadReply <-
+                    fun request ->
+                        if request.HandleId = "diff-1" && request.Cursor = "cursor-3" then
+                            failedWith "diff_session_closed" None
+                        else
+                            succeeded (
+                                ResumablePageDto.Ready(pageDto (int (request.Cursor.Replace("cursor-", "")) + 1))
+                            )
+
+                let! state = run fake (select "a.txt") runningState
+                let generation = (diffOf state).Generation
+                let! state = run fake (diffMsg (GitDiffMsg.Index generation)) state
+
+                // Three pages are read, and the page the user asked for last is still the first.
+                Vitest.expect((diffOf state).Pages |> Array.map _.PageId).toEqual ([| "p1"; "p2"; "p3" |])
+                Vitest.expect((diffOf state).IndexingPaused).toBe (true)
+                Vitest.expect((diffOf state).RequestedPageIndex).toBe (0)
+
+                // The user scrolls to the end of the pages read, and the viewer asks for the next page.
+                let! state = run fake (diffMsg (GitDiffMsg.LoadNext generation)) state
+                let page = diffOf state
+
+                Vitest.expect(fake.Opens.Count).toBe (2)
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+                Vitest.expect(page.RequestedPageIndex).toBe (2)
+
+                Vitest
+                    .expect(page.ScrollTarget |> Option.map (fun target -> target.Side, target.Line))
+                    .toEqual (Some(Paged.PagedDiffSide.Previous, 30.0))
+            }
+        )
+
+        Vitest.test (
+            "A replay of the last page after the idle close reopens the diff and lands on the first line of that page",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let total = 40
+
+                // Page n shows the line 10 n, so a page reaches a line only when it is at or past it.
+                let pageDto (index: int) =
+                    diffPage $"p{index}" (if index < total then Some $"cursor-{index}" else None) [|
+                        hunkAt $"h{index}" (index * 10)
+                    |]
+
+                fake.OpenReply <- fun _ -> openedOn (handleOfOpen fake.Opens.Count) (pageDto 1)
+
+                fake.ReadReply <-
+                    fun request ->
+                        succeeded (ResumablePageDto.Ready(pageDto (int (request.Cursor.Replace("cursor-", "")) + 1)))
+
+                // The first session is closed for good. A replay on it answers diff_session_closed.
+                fake.ReplayReply <-
+                    fun request ->
+                        if request.HandleId = "diff-1" && request.PageId = $"p{total}" then
+                            failedWith "diff_session_closed" None
+                        else
+                            succeeded (pageDto (int (request.PageId.Replace("p", ""))))
+
+                let! state = run fake (select "a.txt") runningState
+                let generation = (diffOf state).Generation
+
+                // The diff is fully indexed, and the window of loaded pages holds the last eight.
+                let! state = run fake (diffMsg (GitDiffMsg.Index generation)) state
+                Vitest.expect((diffOf state).Pages.Length).toBe (total)
+                Vitest.expect((diffOf state).NextCursor).toEqual (None)
+
+                // The user read near the start, which evicted the last page.
+                let! state = run fake (diffMsg (GitDiffMsg.Replay(generation, "p3", [ "p3" ]))) state
+                Vitest.expect((diffOf state).Pages.[total - 1].IsEvicted).toBe (true)
+                Vitest.expect(fake.Opens.Count).toBe (1)
+
+                // End asks for the last page, and the session behind the handle is gone.
+                let! state = run fake (diffMsg (GitDiffMsg.Replay(generation, $"p{total}", [ $"p{total}" ]))) state
+                let page = diffOf state
+
+                Vitest.expect(fake.Opens.Count).toBe (2)
+                Vitest.expect(page.Handle).toEqual (Some(handleOfOpen 2))
+                Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
+                Vitest.expect(page.Pages.Length).toBe (total)
+                Vitest.expect(page.RequestedPageIndex).toBe (total - 1)
+                Vitest.expect(page.Pages.[total - 1].IsEvicted).toBe (false)
+
+                Vitest
+                    .expect(page.ScrollTarget |> Option.map (fun target -> target.Side, target.Line))
+                    .toEqual (Some(Paged.PagedDiffSide.Previous, float (total * 10)))
+
+                Vitest.expect(state.DiffReopen).toEqual (None)
+            }
+        )
+
+        Vitest.test (
             "An expired session during a line slice reopens the diff up to the page that shows the line",
             fun () -> promise {
                 let fake = FakeDiffClient()

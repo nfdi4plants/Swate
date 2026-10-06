@@ -116,10 +116,11 @@ type GitProvisionedRemote = {
 
 type GitErrorNotification = { Title: string; Message: string }
 
-/// The automatic reopen of a diff page whose worker session expired or whose preparation token
-/// went stale. Page boundaries differ between sessions, so after the open, pages are read
-/// forward until a page reaches TargetLine, the first line the user was reading. Without a
-/// target line the reopen reads until TargetPageIndex is loaded again.
+/// The automatic reopen of a diff page whose worker session ended (it sat idle or a newer diff
+/// took its slot), whose preparation token went stale, or whose side turned out not to be UTF-8
+/// and needs an encoding choice without a token. Page boundaries differ between sessions, so
+/// after the open, pages are read forward until a page reaches TargetLine, the first line the
+/// user was reading. Without a target line the reopen reads until TargetPageIndex is loaded again.
 type GitDiffReopen = {
     Generation: int
     TargetLine: GitDiffLinePosition option
@@ -1372,7 +1373,8 @@ module GitDiffPageLoader =
     [<Literal>]
     let DiffWorkerFailed = "diff_worker_failed"
 
-    /// The worker closed the session behind the handle after it sat idle.
+    /// The worker closed the session behind the handle, after it sat idle or when a newer diff took
+    /// its slot.
     [<Literal>]
     let DiffSessionClosed = "diff_session_closed"
 
@@ -2584,8 +2586,9 @@ module GitDiffPageLoader =
         | _ -> None
 
     /// Where the user was reading when the request behind the answer was sent: the requested
-    /// line, else the first line of the page being replayed or of the requested page. The index
-    /// of that page is the target when the page shows no line.
+    /// line, else the first line of the page being replayed, of the last page for the read of the
+    /// next page, or of the requested page. The index of that page is the target when the page
+    /// shows no line.
     let private reopenTargetOf (msg: GitDiffMsg) (page: GitDiffPageData) : GitDiffReopen =
         let shownPage =
             match msg with
@@ -2594,6 +2597,9 @@ module GitDiffPageLoader =
                 |> Array.tryFindIndex (fun windowPage -> windowPage.PageId = request.PageId)
             | GitDiffMsg.LineCompleted(_, request, _) ->
                 pageIndexOfLine request.Side (Presentation.number request.Line) page
+            // The viewer asks for the next page at the end of the pages read, and the background
+            // indexing leaves the requested page where the user asked for it last.
+            | GitDiffMsg.PageCompleted _ when page.Pages.Length > 0 -> Some(page.Pages.Length - 1)
             | _ -> None
 
         let pageIndex = shownPage |> Option.defaultValue page.RequestedPageIndex
@@ -2753,7 +2759,7 @@ module GitDiffPageLoader =
         | GitDiffPageStatus.EncodingChoice(choiceSide, None, _) -> choiceSide = side
         | _ -> false
 
-    /// Reopens the diff once when its worker session expired or the preparation token of an
+    /// Reopens the diff once when its worker session ended or the preparation token of an
     /// encoding choice went stale. Any failure while that reopen runs settles the page. An
     /// encoding chosen for a side that turned out not to be UTF-8 reopens the diff the same way.
     let private updateWithReopen
@@ -4281,6 +4287,9 @@ let private resetFor (model: GitState) = {
     GitState.Empty with
         SidebarVisible = model.SidebarVisible
         ExternalRefreshGeneration = model.ExternalRefreshGeneration + 1
+        // The page load counter keeps counting. A page load of an ARC that closed could finish after
+        // a counter that started again at 0 has reached its id in a later ARC.
+        PageLoadRequestId = model.PageLoadRequestId
 }
 
 let private missingRepositoryModel (model: GitState) = {
@@ -4732,11 +4741,13 @@ let private updateCore
     | SelectChangeRequested(change, reply) ->
         let requestId = nextPageLoadRequestId model
 
+        // An open diff stays with its handle until the loaded page replaces it on screen. The
+        // page state then leaves the diff, and the handle closes. A load that fails or finds no
+        // conflict leaves the diff as it was, with a handle that still answers.
         let nextModel = {
             model with
                 ErrorNotice = None
                 PageLoadRequestId = requestId
-                DiffPage = None
         }
 
         let cmd =
