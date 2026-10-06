@@ -1,7 +1,6 @@
 module Main.IPC.AuthApi
 
 open Fable.Core
-open Fable.Electron.Remoting.Main
 open Main
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
@@ -14,10 +13,7 @@ let private broadcastAccountsUpdate () =
     ARC_VAULTS.Vaults.Values
     |> Array.ofSeq
     |> Array.iter (fun window ->
-        Remoting.createIpc ()
-        |> Remoting.withWindow window.window
-        |> Remoting.buildProxySender<IAuthAccountsRendererApi>
-        |> fun client -> client.authAccountsUpdate authState
+        WindowSend.send<IAuthAccountsRendererApi> window.window (fun client -> client.authAccountsUpdate authState)
     )
 
 let api: IAuthApi = {

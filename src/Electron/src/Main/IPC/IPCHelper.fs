@@ -4,6 +4,7 @@ open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
 open Main
+open Main.ArcVaultHelper
 
 [<AutoOpen>]
 module IPCHelper =
@@ -28,17 +29,18 @@ module IPCHelper =
         | Some vault ->
             match vault.path with
             | Some arcPath -> Ok(vault, arcPath)
-            | None -> Error(exn "ARC is not loaded.")
+            | None -> Error(arcNotOpenError ())
 
-    let withBusyWriting
+    let withBusyWritingScope (vault: ArcVault) (operation: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+        vault.WithBusyWritingScope operation
+
+    let withExclusiveBusyWriting
         (vault: ArcVault)
         (operation: unit -> JS.Promise<Result<'T, exn>>)
         : JS.Promise<Result<'T, exn>> =
-        promise {
-            vault.isBusyWriting <- true
-
-            try
-                return! operation ()
-            finally
-                vault.isBusyWriting <- false
-        }
+        if vault.isBusyWriting then
+            JS.Constructors.Promise.resolve (
+                Error(exn "Swate is still saving another change. Please wait a moment and try again.")
+            )
+        else
+            withBusyWritingScope vault operation

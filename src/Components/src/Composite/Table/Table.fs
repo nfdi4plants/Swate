@@ -78,6 +78,8 @@ swt:p-0"""
             ?debug: bool
         ) =
 
+        let WhiteSpacePX = 800
+
         // check for navigator agent if it is safari
         let isSafari =
             let userAgent = Browser.Dom.window?navigator?userAgent |> string
@@ -98,6 +100,7 @@ swt:p-0"""
                 gap = 0,
                 scrollPaddingStart = 1.5 * float Constants.Table.DefaultRowHeight,
                 scrollPaddingEnd = 1.5 * float Constants.Table.DefaultRowHeight,
+                paddingEnd = WhiteSpacePX, // extra space to improve UX with rightmost columns
                 rangeExtractor =
                     (fun range ->
                         let next = set [ 0; yield! Virtual.defaultRangeExtractor range ]
@@ -112,7 +115,7 @@ swt:p-0"""
                 estimateSize = (fun _ -> Constants.Table.DefaultColumnWidth),
                 overscan = 2,
                 gap = 0,
-                scrollPaddingEnd = 1.5 * float Constants.Table.DefaultColumnWidth,
+                paddingEnd = WhiteSpacePX, // extra space to improve UX with rightmost columns
                 horizontal = true,
                 rangeExtractor =
                     (fun range ->
@@ -121,11 +124,21 @@ swt:p-0"""
                     )
             )
 
-
+        /// ⚠️ There is bug with the ``scrollToIndex`` function and the ``paddingEnd`` option for ``useVirtualizer``.
+        /// It seems like ``scrollToIndex(lastIndex)`` does not actually scroll to the element, but instead scrolls to the end of the scroll container.
+        /// Using ``align = center`` is a workaround for this issue, but it is not ideal.
+        /// This is a issue with the library and is being tracked here: https://github.com/TanStack/virtual/issues/1257
         let scrollTo =
             fun (coordinate: CellCoordinate) ->
-                rowVirtualizer.scrollToIndex (coordinate.y)
-                columnVirtualizer.scrollToIndex (coordinate.x)
+                if coordinate.y = rowCount - 1 then
+                    rowVirtualizer.scrollToIndex (coordinate.y, align = Virtual.AlignOption.Center)
+                else
+                    rowVirtualizer.scrollToIndex (coordinate.y)
+
+                if coordinate.x = columnCount - 1 then
+                    columnVirtualizer.scrollToIndex (coordinate.x, align = Virtual.AlignOption.Center)
+                else
+                    columnVirtualizer.scrollToIndex (coordinate.x)
 
         let onSelect =
             fun cell newCellRange ->
@@ -278,11 +291,11 @@ swt:p-0"""
                                 if isSafari then
                                     style.custom ("willChange", "transform")
                                     style.custom ("minHeight", $"{rowVirtualizer.getTotalSize ()}px")
-                                    style.minWidth (columnVirtualizer.getTotalSize () + 800)
+                                    style.minWidth (columnVirtualizer.getTotalSize ())
                                     style.custom ("contain", "size layout paint")
                                 else
                                     style.height (rowVirtualizer.getTotalSize ())
-                                    style.width (columnVirtualizer.getTotalSize () + 800) // extra space to improve UX with rightmost columns
+                                    style.width (columnVirtualizer.getTotalSize ())
 
                                 style.position.relative
                             ]
@@ -504,6 +517,14 @@ swt:p-0"""
                     prop.onClick (fun _ ->
                         TableHandler.current.SelectHandle.selectAt ({| x = 500; y = 500 |}, false)
                         TableHandler.current.scrollTo ({| x = 500; y = 500 |})
+                    )
+                ]
+                Html.button [
+                    prop.className "swt:btn swt:btn-primary"
+                    prop.text "scroll to 999, 999"
+                    prop.onClick (fun _ ->
+                        TableHandler.current.SelectHandle.selectAt ({| x = 999; y = 999 |}, false)
+                        TableHandler.current.scrollTo ({| x = 999; y = 999 |})
                     )
                 ]
                 Table.Table(

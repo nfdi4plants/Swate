@@ -9,6 +9,7 @@ type ContextMenuItem
     (
         ?text: ReactElement,
         ?icon: ReactElement,
+        ?label: string,
         ?kbdbutton:
             {|
                 element: ReactElement
@@ -23,6 +24,7 @@ type ContextMenuItem
                 -> unit
     ) =
     member val text = text with get, set
+    member val label = label with get, set
     member val icon = icon with get, set
     member val kbdbutton = kbdbutton with get, set
     member val isDivider: bool = defaultArg isDivider false with get, set

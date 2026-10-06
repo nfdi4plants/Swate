@@ -95,12 +95,14 @@ let lfsPillAction (item: FileItem) onDownloadLfsFile onFreeLocalLfsCopy =
         lfsAction label icon item enabled action
         |> Option.defaultValue (ContextMenuItem.disabled label icon)
 
+    let isIdle = item.LfsActivity.IsNone
+
     if item.IsDirectory || not (FileItemHelper.isLfs item) then
         None
     elif FileItemHelper.needsLfsDownload item then
-        withFallback downloadLabel downloadIcon true onDownloadLfsFile |> Some
+        withFallback downloadLabel downloadIcon isIdle onDownloadLfsFile |> Some
     elif FileItemHelper.hasLocalLfsCopy item then
-        withFallback freeCopyLabel freeCopyIcon true onFreeLocalLfsCopy |> Some
+        withFallback freeCopyLabel freeCopyIcon isIdle onFreeLocalLfsCopy |> Some
     else
         ContextMenuItem.disabled downloadLabel downloadIcon |> Some
 
@@ -114,6 +116,7 @@ let contextMenuItems
         []
     else
         let isMarked = FileItemHelper.isLfs item
+        let isBusy = item.LfsActivity.IsSome
         let needsDownload = FileItemHelper.needsLfsDownload item
         let hasLocalCopy = FileItemHelper.hasLocalLfsCopy item
 
@@ -131,25 +134,36 @@ let contextMenuItems
             else
                 "swt:fluent--document-add-24-regular"
 
-        [
-            if toggleBlockedReason.IsSome then
-                ContextMenuItem.disabled toggleLabel toggleIcon
-            else
-                ContextMenuItem.create toggleLabel toggleIcon (fun () -> onToggleLfsMark item (not isMarked))
-
-            if isMarked then
-                yield!
-                    lfsAction downloadLabel downloadIcon item needsDownload onDownloadLfsFile
-                    |> Option.toList
-
-                yield!
-                    lfsAction freeCopyLabel freeCopyIcon item hasLocalCopy onFreeLocalLfsCopy
-                    |> Option.toList
-
+        let statusItem =
             ContextMenuItem.disabled
                 (if isMarked then
                      "Git LFS: marked"
                  else
                      "Git LFS: not marked")
                 "swt:fluent--tag-24-regular"
-        ]
+
+        if isBusy then
+            [
+                ContextMenuItem.disabled toggleLabel toggleIcon
+                ContextMenuItem.disabled downloadLabel downloadIcon
+                ContextMenuItem.disabled freeCopyLabel freeCopyIcon
+                statusItem
+            ]
+        else
+            [
+                if toggleBlockedReason.IsSome then
+                    ContextMenuItem.disabled toggleLabel toggleIcon
+                else
+                    ContextMenuItem.create toggleLabel toggleIcon (fun () -> onToggleLfsMark item (not isMarked))
+
+                if isMarked then
+                    yield!
+                        lfsAction downloadLabel downloadIcon item needsDownload onDownloadLfsFile
+                        |> Option.toList
+
+                    yield!
+                        lfsAction freeCopyLabel freeCopyIcon item hasLocalCopy onFreeLocalLfsCopy
+                        |> Option.toList
+
+                statusItem
+            ]

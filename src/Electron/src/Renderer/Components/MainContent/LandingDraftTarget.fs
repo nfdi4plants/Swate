@@ -6,6 +6,7 @@ open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
 open Renderer
+open Renderer.Components.Helper
 
 [<ReactComponent>]
 let LandingDraftTarget () =
@@ -36,7 +37,7 @@ let LandingDraftTarget () =
                         Error = None
                 }
 
-                let! saveResult = Helper.saveArcFileAndOpen payload.ArcFile
+                let! saveResult = ArcFileApiHelper.addArcFileAndOpen payload.ArcFile
 
                 match saveResult with
                 | Result.Error message ->

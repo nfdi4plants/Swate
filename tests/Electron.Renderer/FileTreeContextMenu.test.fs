@@ -12,6 +12,7 @@ open Renderer.Components.LeftSidebar.FileExplorer.Types
 let private createConfig () : PathActionConfig = {
     openPathInFileExplorer = fun _ -> promise { return Ok() }
     openPathWithDefaultApplication = fun _ -> promise { return Ok() }
+    importExternalFiles = fun _ -> promise { return Ok() }
     enqueueError = ignore
 }
 
@@ -19,6 +20,9 @@ let private createContextMenuConfig () : ContextMenuConfig = {
     openItem = ignore
     arcRootPath = Some "C:\\arc-root"
     openCreateModal = ignore
+    openNoteDraft = ignore
+    createDataMap = ignore
+    tryFindDataMapItemByPath = fun _ -> None
     openFileSystemCreateModal = fun _ _ -> ()
     requestRenameItem = ignore
     requestDeleteItem = ignore
@@ -27,6 +31,7 @@ let private createContextMenuConfig () : ContextMenuConfig = {
     runToggleLfsMark = fun _ _ -> promise { return Ok() }
     runDownloadLfsFile = fun _ -> promise { return Ok() }
     runFreeLocalLfsCopy = fun _ -> promise { return Ok() }
+    lfsActivePaths = []
 }
 
 let private createComposedContextMenuItems config item = createContextMenuItems config None item
@@ -41,6 +46,7 @@ let private createLfsFileItem (name: string) (path: string) (downloaded: bool) (
         IsLFS = Some true
         Downloaded = Some downloaded
         IsLFSPointer = Some isPointer
+        LfsActivity = None
         SizeFormatted = Some "42 MB"
 }
 
@@ -49,7 +55,7 @@ let private createFolderItem (name: string) (path: string option) = {
         Id = defaultArg path name
 }
 
-let private labels items =
+let private labels (items: ContextMenuItem list) =
     items |> List.map _.Label |> List.toArray
 
 let private groupedLabels items =
@@ -72,39 +78,67 @@ Vitest.describe (
             "ARC create drafts include a basic identifier-named annotation table when supported",
             fun () ->
                 let tableCapableKinds = [|
-                    ArcExplorerNodeKind.Study
-                    ArcExplorerNodeKind.Assay
-                    ArcExplorerNodeKind.Run
+                    ArcFilesDiscriminate.Study
+                    ArcFilesDiscriminate.Assay
+                    ArcFilesDiscriminate.Run
                 |]
 
                 for kind in tableCapableKinds do
-                    let identifier = $"Default {ArcExplorerNodeKind.label kind}"
+                    let config = arcCreateKinds |> List.find (fun config -> config.Kind = kind)
+                    let identifier = $"Default {config.Label}"
 
-                    match tryCreateArcFile kind identifier with
-                    | Ok arcFile ->
-                        let tables = arcFile.Tables()
-                        Vitest.expect(tables.Count).toBe (1)
-                        let table = tables.[0]
-                        Vitest.expect(table.Name).toBe ($"{identifier} Table")
-                        Vitest.expect(table.ColumnCount).toBe (3)
-                        Vitest.expect(table.RowCount).toBe (ARCtrlHelper.ArcFileDefaults.BasicAnnotationTableRowCount)
-                        Vitest.expect(table.Headers.[0].ToString()).toBe ("Input [Source Name]")
-                        Vitest.expect(table.Headers.[1].ToString()).toBe ("Protocol Uri")
-                        Vitest.expect(table.Headers.[2].ToString()).toBe ("Output [Sample Name]")
-                    | Error error -> failwith error
+                    let arcFile = ARCtrlHelper.ArcFileDefaults.createDefaultArcFile kind identifier
+                    let tables = arcFile.Tables()
+                    Vitest.expect(tables.Count).toBe (1)
+                    let table = tables.[0]
+                    Vitest.expect(table.Name).toBe ($"{identifier} Table")
+                    Vitest.expect(table.ColumnCount).toBe (3)
+                    Vitest.expect(table.RowCount).toBe (ARCtrlHelper.ArcFileDefaults.BasicAnnotationTableRowCount)
+                    Vitest.expect(table.Headers.[0].ToString()).toBe ("Input [Source Name]")
+                    Vitest.expect(table.Headers.[1].ToString()).toBe ("Protocol Uri")
+                    Vitest.expect(table.Headers.[2].ToString()).toBe ("Output [Sample Name]")
 
-                match tryCreateArcFile ArcExplorerNodeKind.Workflow "Default Workflow" with
-                | Ok arcFile -> Vitest.expect(arcFile.Tables().Count).toBe (0)
-                | Error error -> failwith error
+                let workflow =
+                    ARCtrlHelper.ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Workflow "Default Workflow"
+
+                Vitest.expect(workflow.Tables().Count).toBe (0)
         )
 
         Vitest.test (
-            "folder path actions reveal the folder location only",
+            "folder path actions import files into and reveal the folder",
             fun () ->
                 let item = createFolderItem "AssayA" (Some "assays/AssayA")
                 let menuItems = pathActionContextMenuItems (createConfig ()) item
 
-                Vitest.expect(labels menuItems).toEqual ([| "Open Folder Location" |])
+                Vitest.expect(labels menuItems).toEqual ([| "Import files"; "Open Folder Location" |])
+        )
+
+        Vitest.test (
+            "import files action targets the selected folder",
+            fun () -> promise {
+                let item = createFolderItem "AssayA" (Some "assays/AssayA")
+                let mutable importedInto = None
+
+                let config = {
+                    createConfig () with
+                        importExternalFiles =
+                            fun path -> promise {
+                                importedInto <- Some path
+                                return Ok()
+                            }
+                }
+
+                let menuItems = pathActionContextMenuItems config item
+
+                let importItem =
+                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Import files")
+
+                Vitest.expect(importItem.Icon).toContain ("swt:rotate-180")
+                importItem.OnClick()
+                do! Promise.sleep 0
+
+                Vitest.expect(importedInto).toEqual (Some "assays/AssayA")
+            }
         )
 
         Vitest.test (
@@ -169,6 +203,7 @@ Vitest.describe (
                     .toEqual (
                         [|
                             "Open"
+                            "Import files"
                             "Open Folder Location"
                             "<divider>"
                             "Copy Path"
@@ -176,6 +211,8 @@ Vitest.describe (
                             "<divider>"
                             "New File"
                             "New Folder"
+                            "<divider>"
+                            "Add DataMap"
                             "<divider>"
                             "Add Study"
                             "Add Assay"
@@ -212,7 +249,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "root ARC name context menu exposes generic root creation and ARC add actions",
+            "root ARC name context menu exposes import, generic creation, and ARC add actions",
             fun () ->
                 let item = createFolderItem "MyArc" (Some "")
                 let menuItems = rootContextMenuItems (createContextMenuConfig ()) item
@@ -221,6 +258,8 @@ Vitest.describe (
                     .expect(groupedLabels menuItems)
                     .toEqual (
                         [|
+                            "Import files"
+                            "<divider>"
                             "New File"
                             "New Folder"
                             "<divider>"
@@ -234,14 +273,43 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "add note action requests note creation",
-            fun () ->
-                let item = createFolderItem "AssayA" (Some "assays/AssayA")
-                let mutable requestedCreateKind = None
+            "root import action targets the empty ARC-relative path",
+            fun () -> promise {
+                let item = createFolderItem "MyArc" (Some "")
+                let mutable importedInto = None
 
                 let config = {
                     createContextMenuConfig () with
-                        openCreateModal = fun kind -> requestedCreateKind <- Some kind
+                        pathActionConfig = {
+                            createConfig () with
+                                importExternalFiles =
+                                    fun path -> promise {
+                                        importedInto <- Some path
+                                        return Ok()
+                                    }
+                        }
+                }
+
+                let importItem =
+                    rootContextMenuItems config item
+                    |> List.find (fun menuItem -> menuItem.Label = "Import files")
+
+                importItem.OnClick()
+                do! Promise.sleep 0
+
+                Vitest.expect(importedInto).toEqual (Some "")
+            }
+        )
+
+        Vitest.test (
+            "add note action requests note creation",
+            fun () ->
+                let item = createFolderItem "AssayA" (Some "assays/AssayA")
+                let mutable didRequestNote = false
+
+                let config = {
+                    createContextMenuConfig () with
+                        openNoteDraft = fun () -> didRequestNote <- true
                 }
 
                 let menuItems = createComposedContextMenuItems config item
@@ -251,7 +319,85 @@ Vitest.describe (
 
                 addNoteItem.OnClick()
 
-                Vitest.expect(requestedCreateKind).toEqual (Some ArcExplorerNodeKind.Note)
+                Vitest.expect(didRequestNote).toBeTruthy ()
+        )
+
+        Vitest.test (
+            "supported ARC owner folders expose Add or Delete DataMap based on current content",
+            fun () ->
+                let owner = createFolderItem "AssayA" (Some "assays/AssayA")
+                let mutable requestedParentInfo = None
+                let mutable requestedDeleteItem = None
+
+                let config = {
+                    createContextMenuConfig () with
+                        createDataMap = fun parentInfo -> requestedParentInfo <- Some parentInfo
+                        requestDeleteItem = fun item -> requestedDeleteItem <- Some item
+                }
+
+                let addDataMap =
+                    createComposedContextMenuItems config owner
+                    |> List.find (fun item -> item.Label = "Add DataMap")
+
+                addDataMap.OnClick()
+                Vitest.expect(requestedParentInfo).toEqual (Some(DatamapParentInfo.create "AssayA" DataMapParent.Assay))
+
+                let dataMapItem =
+                    createFileItem DatamapParentInfo.DatamapFileName (Some "assays/AssayA/isa.datamap.xlsx")
+
+                let ownerWithDataMap = {
+                    owner with
+                        Children = Some [ dataMapItem ]
+                }
+
+                let menuItemsWithDataMap = createComposedContextMenuItems config ownerWithDataMap
+                let labelsWithDataMap = labels menuItemsWithDataMap
+
+                Vitest.expect(labelsWithDataMap).not.toContain ("Add DataMap")
+                Vitest.expect(labelsWithDataMap).toContain ("Delete DataMap")
+
+                menuItemsWithDataMap
+                |> List.find (fun item -> item.Label = "Delete DataMap")
+                |> fun item -> item.OnClick()
+
+                Vitest.expect(requestedDeleteItem |> Option.map _.Path).toEqual (Some dataMapItem.Path)
+        )
+
+        Vitest.test (
+            "collapsed ARC owner folders use the full file tree to expose Delete DataMap",
+            fun () ->
+                let owner = {
+                    createFolderItem "AssayA" (Some "assays/AssayA") with
+                        Children = None
+                }
+
+                let dataMapItem =
+                    createFileItem DatamapParentInfo.DatamapFileName (Some "assays/AssayA/isa.datamap.xlsx")
+
+                let mutable requestedDeleteItem = None
+
+                let config = {
+                    createContextMenuConfig () with
+                        tryFindDataMapItemByPath =
+                            fun path ->
+                                if PathHelpers.pathsEqual path dataMapItem.Path.Value then
+                                    Some dataMapItem
+                                else
+                                    None
+                        requestDeleteItem = fun item -> requestedDeleteItem <- Some item
+                }
+
+                let menuItems = createComposedContextMenuItems config owner
+                let menuLabels = labels menuItems
+
+                Vitest.expect(menuLabels).not.toContain ("Add DataMap")
+                Vitest.expect(menuLabels).toContain ("Delete DataMap")
+
+                menuItems
+                |> List.find (fun item -> item.Label = "Delete DataMap")
+                |> fun item -> item.OnClick()
+
+                Vitest.expect(requestedDeleteItem |> Option.map _.Path).toEqual (Some dataMapItem.Path)
         )
 
         Vitest.test (
@@ -524,6 +670,117 @@ Vitest.describe (
                     menuItems |> List.find (fun menuItem -> menuItem.Label = "Unmark Git LFS")
 
                 Vitest.expect(unmarkItem.Disabled).toEqual (None)
+        )
+
+        Vitest.test (
+            "rename and delete are disabled while an LFS action runs on the file",
+            fun () ->
+                let item = {
+                    createLfsFileItem "busy.bin" "data/busy.bin" true false with
+                        LfsActivity = Some "Freeing"
+                }
+
+                let menuItems = createComposedContextMenuItems (createContextMenuConfig ()) item
+                let renameItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Rename")
+                let deleteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Delete")
+
+                Vitest.expect(renameItem.Disabled).toEqual (Some true)
+                Vitest.expect(deleteItem.Disabled).toEqual (Some true)
+        )
+
+        Vitest.test (
+            "rename and delete stay enabled for an idle LFS file",
+            fun () ->
+                let item = createLfsFileItem "idle.bin" "data/idle.bin" true false
+                let menuItems = createComposedContextMenuItems (createContextMenuConfig ()) item
+                let renameItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Rename")
+                let deleteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Delete")
+
+                Vitest.expect(renameItem.Disabled).toEqual (None)
+                Vitest.expect(deleteItem.Disabled).toEqual (None)
+        )
+
+        Vitest.test (
+            "rename and delete are disabled on every folder above a file with a running LFS action",
+            fun () ->
+                let config = {
+                    createContextMenuConfig () with
+                        lfsActivePaths = [ "Data/raw/busy.bin" ]
+                }
+
+                for folder in
+                    [
+                        createFolderItem "data" (Some "data")
+                        createFolderItem "raw" (Some "data/raw")
+                    ] do
+                    let menuItems = createComposedContextMenuItems config folder
+                    let renameItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Rename")
+                    let deleteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Delete")
+
+                    Vitest.expect(renameItem.Disabled).toEqual (Some true)
+                    Vitest.expect(deleteItem.Disabled).toEqual (Some true)
+                    Vitest.expect(isLockedByLfsActivity config.lfsActivePaths folder).toBe (true)
+        )
+
+        Vitest.test (
+            "rename and delete stay enabled on sibling and unrelated folders of a file with a running LFS action",
+            fun () ->
+                let config = {
+                    createContextMenuConfig () with
+                        lfsActivePaths = [ "data/raw/busy.bin" ]
+                }
+
+                let folders = [
+                    createFolderItem "other" (Some "data/other")
+                    createFolderItem "raw-copy" (Some "data/raw-copy")
+                    createFolderItem "results" (Some "results")
+                ]
+
+                for folder in folders do
+                    let menuItems = createComposedContextMenuItems config folder
+                    let renameItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Rename")
+                    let deleteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Delete")
+
+                    Vitest.expect(renameItem.Disabled).toEqual (None)
+                    Vitest.expect(deleteItem.Disabled).toEqual (None)
+                    Vitest.expect(isLockedByLfsActivity config.lfsActivePaths folder).toBe (false)
+        )
+
+        Vitest.test (
+            "delete is disabled on a canonical entity workbook while an LFS action runs inside its entity folder",
+            fun () ->
+                let cases = [
+                    createFileItem "isa.assay.xlsx" (Some "assays/A/isa.assay.xlsx"), "assays/A/dataset/big.bin"
+                    createFileItem "isa.study.xlsx" (Some "studies/S/isa.study.xlsx"), "Studies/S/resources/big.bin"
+                ]
+
+                for workbook, busyPath in cases do
+                    let config = {
+                        createContextMenuConfig () with
+                            lfsActivePaths = [ busyPath ]
+                    }
+
+                    let menuItems = createComposedContextMenuItems config workbook
+                    let deleteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Delete")
+
+                    Vitest.expect(deleteItem.Disabled).toEqual (Some true)
+                    Vitest.expect(isLockedByLfsActivity config.lfsActivePaths workbook).toBe (true)
+        )
+
+        Vitest.test (
+            "delete stays enabled on a canonical entity workbook while an LFS action runs in another entity folder",
+            fun () ->
+                let config = {
+                    createContextMenuConfig () with
+                        lfsActivePaths = [ "assays/B/dataset/big.bin"; "assays/A2/dataset/big.bin" ]
+                }
+
+                let workbook = createFileItem "isa.assay.xlsx" (Some "assays/A/isa.assay.xlsx")
+                let menuItems = createComposedContextMenuItems config workbook
+                let deleteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Delete")
+
+                Vitest.expect(deleteItem.Disabled).toEqual (None)
+                Vitest.expect(isLockedByLfsActivity config.lfsActivePaths workbook).toBe (false)
         )
 
         Vitest.test (

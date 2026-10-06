@@ -177,43 +177,6 @@ module Spreadsheet =
             | MoveColumn(current, next) ->
                 let nextState = Controller.Table.moveColumn current next state
                 nextState, model, Cmd.none
-            | CopyCell index ->
-                let cmd =
-                    Cmd.OfPromise.attempt
-                        (Controller.Clipboard.copyCellByIndex index)
-                        state
-                        (curry GenericError Cmd.none >> DevMsg)
-
-                state, model, cmd
-            | CopyCells indices ->
-                let cmd =
-                    Cmd.OfPromise.attempt
-                        (Controller.Clipboard.copyCellsByIndex indices)
-                        state
-                        (curry GenericError Cmd.none >> DevMsg)
-
-                state, model, cmd
-            | CutCell index ->
-                let nextState = Controller.Clipboard.cutCellByIndex index state
-                nextState, model, Cmd.none
-            | PasteCell index ->
-                let cmd =
-                    Cmd.OfPromise.either
-                        (Controller.Clipboard.pasteCellByIndex index)
-                        state
-                        (UpdateState >> SpreadsheetMsg)
-                        (curry GenericError Cmd.none >> DevMsg)
-
-                state, model, cmd
-            | PasteCellsExtend index ->
-                let cmd =
-                    Cmd.OfPromise.either
-                        (Controller.Clipboard.pasteCellsByIndexExtend index)
-                        state
-                        (UpdateState >> SpreadsheetMsg)
-                        (curry GenericError Cmd.none >> DevMsg)
-
-                state, model, cmd
             | Clear indices ->
                 let nextState = Controller.Table.clearCells indices state
                 nextState, model, Cmd.none

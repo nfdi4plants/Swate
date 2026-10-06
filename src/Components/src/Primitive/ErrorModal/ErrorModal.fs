@@ -34,7 +34,7 @@ type ErrorModal =
         Html.div [
             prop.className "swt:whitespace-pre-wrap"
             prop.children (
-                message.Split('\n')
+                message.Split(Swate.Components.ClipboardContract.Contract.LineBreaks, System.StringSplitOptions.None)
                 |> Array.collect (fun line -> [| Html.text line; Html.br [] |])
             )
         ]

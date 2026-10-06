@@ -4,7 +4,9 @@ open ARCtrl
 open Fable.Core
 open Feliz
 open Swate.Components
-open Swate.Components.JsBindings
+open Swate.Components.Composite.DataMapTable.ClipboardTarget
+open Swate.Components.Composite.SortableList
+open Swate.Components.Composite.SortableList.Types
 open Swate.Components.Shared
 open Swate.Components.Primitive
 open Swate.Components.Primitive.Buttons
@@ -21,29 +23,6 @@ module private FilePickerWidgetContext =
 
     [<Hook>]
     let useSelectedPathsCtx () = React.useContext SelectedPathsCtx
-
-    [<Hook>]
-    let useSelectedPathCtx (path: string) =
-        let ctx = useSelectedPathsCtx ()
-        let isSelected = List.contains path ctx.state
-
-        let toggle =
-            React.useCallback (
-                (fun () ->
-                    ctx.setStateUpdater (fun current ->
-                        if isSelected then
-                            List.filter ((<>) path) current
-                        else
-                            path :: current
-                    )
-                ),
-                [| box ctx; box path |]
-            )
-
-        {|
-            isSelected = isSelected
-            toggle = toggle
-        |}
 
 module private FilePickerWidgetTypes =
     [<RequireQualifiedAccess>]
@@ -62,25 +41,6 @@ module private FilePickerWidgetHelper =
                     Array.append existingPaths paths |> Array.distinct
                 )
 
-    let movePathByIndex (setPaths: (string[] -> string[]) -> unit) =
-        fun (oldIndex: int) (newIndex: int) ->
-            setPaths (fun current -> DndKit.arrayMove (ResizeArray current, oldIndex, newIndex) |> Seq.toArray)
-
-    let removePathAt (setPaths: (string[] -> string[]) -> unit) =
-        fun (index: int) -> setPaths (fun current -> current |> Array.removeAt index)
-
-    let movePathById (setPaths: (string[] -> string[]) -> unit) =
-        fun (activeId: string) (overId: string) ->
-            setPaths (fun current ->
-                let oldIndex = current |> Array.tryFindIndex ((=) activeId)
-                let newIndex = current |> Array.tryFindIndex ((=) overId)
-
-                match oldIndex, newIndex with
-                | Some oldIndex, Some newIndex when oldIndex <> newIndex ->
-                    DndKit.arrayMove (ResizeArray current, oldIndex, newIndex) |> Seq.toArray
-                | _ -> current
-            )
-
     let insertPathsIntoSelectedCells (arcFile: ArcFiles) setArcFile (paths: string[]) (target: InsertTarget option) =
         let paths = paths |> Array.map (toArcRootRelativeFilePath arcFile)
         let nextArcFile = ArcFiles.refreshRef arcFile
@@ -91,15 +51,16 @@ module private FilePickerWidgetHelper =
             let columnIndex = selection.xStart
             let mutable rowIndex = selection.yStart
 
+            // GetCellAt also resolves cells that were never stored, for example the Input and
+            // Output cells of a freshly imported template row, which TryGetCellAt reports as missing.
             let cellsToInsert = [|
                 for path in paths do
-                    match nextTable.TryGetCellAt(columnIndex, rowIndex) with
-                    | Some cell ->
+                    if columnIndex < nextTable.ColumnCount && rowIndex < nextTable.RowCount then
+                        let cell = nextTable.GetCellAt(columnIndex, rowIndex)
                         let nextCell = cell.UpdateMainField path
                         let coordinate: CellCoordinate = {| x = columnIndex; y = rowIndex |}
                         coordinate, nextCell
                         rowIndex <- rowIndex + 1
-                    | None -> ()
             |]
 
             if cellsToInsert.Length = 0 then
@@ -110,13 +71,12 @@ module private FilePickerWidgetHelper =
         | Some(InsertTarget.DataMap selection) ->
             match nextArcFile.TryGetDataMap() with
             | Some dataMap ->
-                dataMap.PasteTabText(
-                    {|
-                        x = selection.xStart
-                        y = selection.yStart
-                    |},
-                    String.concat System.Environment.NewLine paths
-                )
+                let anchor: CellCoordinate = {|
+                    x = selection.xStart
+                    y = selection.yStart
+                |}
+
+                dataMap.PasteTabText(anchor, [| anchor |], String.concat System.Environment.NewLine paths)
 
                 setArcFile nextArcFile
             | None -> ()
@@ -128,135 +88,55 @@ type FilePickerWidget =
 
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
-    static member private SortableTableRow
-        (
-            index: int,
-            path: string,
-            movePath: int -> int -> unit,
-            removePath: int -> unit,
-            ?key: string,
-            ?isLastItem: bool
-        ) =
-        let sortable = DndKit.useSortable ({| id = path |})
-        let filerPickerItemCtx = FilePickerWidgetContext.useSelectedPathCtx path
-
-        let style = [
-            style.custom ("transform", DndKit.CSS.Transform.toString sortable.transform)
-            style.custom ("transition", sortable.transition)
-        ]
-
-        Html.tr [
-            prop.key path
-            prop.ref sortable.setNodeRef
-            prop.style style
-            prop.onClick (fun _ -> filerPickerItemCtx.toggle ())
-            prop.className [
-                "swt:cursor-pointer swt:table-auto"
-                if filerPickerItemCtx.isSelected then
-                    "swt:bg-base-300"
-            ]
-            prop.children [
-                Html.td [
-                    prop.className "swt:w-10"
-                    prop.children [
-                        Html.button [
-                            prop.onClick (fun e -> e.stopPropagation ())
-                            prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:cursor-grab"
-                            prop.type'.button
-                            yield! prop.spread sortable.attributes
-                            yield! prop.spread sortable.listeners
-                            prop.children [ Icons.ArrowUpDown() ]
-                        ]
-                    ]
-                ]
-                Html.td [
-                    prop.className "swt:max-w-md swt:truncate swt:font-mono"
-                    prop.title path
-                    prop.text path
-                ]
-                Html.td [
-                    prop.className "swt:w-20"
-                    prop.children [
-                        Html.div [
-                            prop.className "swt:join"
-                            prop.children [
-                                Html.button [
-                                    prop.className "swt:btn swt:btn-xs swt:join-item"
-                                    prop.type'.button
-                                    prop.disabled ((index = 0))
-                                    prop.onClick (fun e ->
-                                        e.stopPropagation ()
-                                        movePath index (index - 1)
-                                    )
-                                    prop.children [ Icons.ArrowUp() ]
-                                ]
-                                Html.button [
-                                    prop.className "swt:btn swt:btn-xs swt:join-item"
-                                    prop.type'.button
-                                    prop.disabled ((isLastItem.IsSome && isLastItem.Value))
-                                    prop.onClick (fun e ->
-                                        e.stopPropagation ()
-                                        movePath index (index + 1)
-                                    )
-                                    prop.children [ Icons.ArrowDown() ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-                Html.td [
-                    prop.className "swt:text-right swt:w-14"
-                    prop.children [
-                        Html.button [
-                            prop.className "swt:btn swt:btn-xs swt:btn-error swt:btn-outline"
-                            prop.onClick (fun e ->
-                                e.stopPropagation ()
-                                removePath index
-                            )
-                            prop.children [ Icons.Delete() ]
-                        ]
-                    ]
-                ]
-            ]
-        ]
-
-    /// TODO: Virtualize paths
-    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private Table(paths: string[], setPaths: (string[] -> string[]) -> unit) =
+        let selectedPathsCtx = FilePickerWidgetContext.useSelectedPathsCtx ()
 
-        let movePath =
-            React.useCallback (
-                (fun current next -> FilePickerWidgetHelper.movePathByIndex setPaths current next),
-                [| box setPaths |]
+        let items: SortableListItem<unit>[] =
+            React.useMemo (
+                (fun () ->
+                    paths
+                    |> Array.map (fun path -> {|
+                        id = path
+                        label = path
+                        data = None
+                    |})
+                ),
+                [| box paths |]
             )
 
-        let removePath =
-            React.useCallback ((fun id -> FilePickerWidgetHelper.removePathAt setPaths id), [| box setPaths |])
-
         Html.div [
-            prop.className
-                "swt:overflow-y-auto swt:overflow-x-auto swt:max-h-[45vh] swt:border swt:border-base-300 swt:rounded-box"
+            prop.className "swt:max-h-[45vh] swt:overflow-auto"
             prop.children [
-                Html.table [
-                    prop.className "swt:table swt:table-xs swt:table-fixed swt:min-w-full"
-                    prop.children [
-                        Html.tbody [
-                            for index in 0 .. paths.Length - 1 do
-                                let path = paths.[index]
-                                let isLast = if index = paths.Length - 1 then Some true else None
-
-                                FilePickerWidget.SortableTableRow(
-                                    index,
-                                    path,
-                                    movePath,
-                                    removePath,
-                                    key = path,
-                                    ?isLastItem = isLast
+                SortableList.SortableList(
+                    items,
+                    (fun nextItems -> setPaths (fun _ -> nextItems |> Array.map _.label)),
+                    className = "swt:max-h-[45vh]",
+                    rowProps =
+                        (fun item -> [
+                            prop.className [
+                                "swt:cursor-pointer swt:table-auto"
+                                if List.contains item.id selectedPathsCtx.state then
+                                    "swt:bg-base-300"
+                            ]
+                            prop.onClick (fun _ ->
+                                selectedPathsCtx.setStateUpdater (fun current ->
+                                    if List.contains item.id current then
+                                        current |> List.filter ((<>) item.id)
+                                    else
+                                        item.id :: current
                                 )
-                        ]
-                    ]
-                ]
+                            )
+                        ]),
+                    renderRow =
+                        (fun row ->
+                            RowComponents.DefaultRow(
+                                row,
+                                label = Html.span [ prop.className "swt:font-mono"; prop.text row.item.label ]
+                            )
+                        )
+                )
             ]
+
         ]
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
@@ -282,53 +162,6 @@ type FilePickerWidget =
                 ]
             ]
         ]
-
-    [<ReactComponent>]
-    static member private VerticalPathDragAndDropContext
-        (paths: string[], setPaths: (string[] -> string[]) -> unit, children: ReactElement)
-        =
-
-        let movePathById =
-            React.useCallback (
-                (fun current next -> FilePickerWidgetHelper.movePathById setPaths current next),
-                [| box setPaths |]
-            )
-
-        let pointerSensor =
-            DndKit.useSensor (
-                DndKit.PointerSensor,
-                {|
-                    activationConstraint = {| distance = 6 |}
-                |}
-            )
-
-        let sensors = DndKit.useSensors [| pointerSensor |]
-
-        let handleDragEnd (event: DndKit.IDndKitEvent) =
-
-            let active = event.active
-            let over = event.over
-
-            if isNull over |> not then
-                let activeId = string active.id
-                let overId = string over.id
-
-                if activeId <> overId then
-                    movePathById activeId overId
-
-        let itemIds = React.useMemo ((fun () -> ResizeArray paths), [| box paths |])
-
-        DndKit.DndContext(
-            sensors = sensors,
-            onDragEnd = handleDragEnd,
-            collisionDetection = DndKit.pointerWithin,
-            children =
-                DndKit.SortableContext(
-                    items = itemIds,
-                    strategy = DndKit.verticalListSortingStrategy,
-                    children = children
-                )
-        )
 
     [<ReactComponent>]
     static member private ActionButtons
@@ -482,11 +315,7 @@ type FilePickerWidget =
                         React.Fragment [
                             FilePickerWidget.SortPathsButtons(setPaths)
 
-                            FilePickerWidget.VerticalPathDragAndDropContext(
-                                paths,
-                                setPaths,
-                                FilePickerWidget.Table(paths, setPaths)
-                            )
+                            FilePickerWidget.Table(paths, setPaths)
 
                             FilePickerWidget.ActionButtons(setPaths, pickPaths, insertPaths, canInsert)
                         ]

@@ -214,7 +214,8 @@ type ArcFileFooterTabs =
         (
             elementRef: IRefValue<option<Browser.Types.HTMLElement>>,
             setEditorMode: int option -> unit,
-            deleteTable: int -> unit
+            deleteTable: int -> unit,
+            onDeleteDataMap: (unit -> unit) option
         ) =
 
 
@@ -246,6 +247,19 @@ type ArcFileFooterTabs =
                         onClick = delete index
                     )
                   ]
+                | Some ActiveView.DataMap ->
+                    match onDeleteDataMap with
+                    | Some deleteDataMap -> [
+                        ContextMenuItem(
+                            Html.span "Delete DataMap",
+                            icon =
+                                Html.i [
+                                    prop.className "swt:iconify swt:fluent--delete-20-filled swt:size-4"
+                                ],
+                            onClick = (fun _ -> deleteDataMap ())
+                        )
+                      ]
+                    | None -> []
                 | _ -> []
 
 
@@ -282,8 +296,13 @@ type ArcFileFooterTabs =
 
     [<ReactComponent>]
     static member Main
-        (arcFile: ArcFiles, activeView: ActiveView, setActiveView: ActiveView -> unit, setArcFile: ArcFiles -> unit)
-        =
+        (
+            arcFile: ArcFiles,
+            activeView: ActiveView,
+            setActiveView: ActiveView -> unit,
+            setArcFile: ArcFiles -> unit,
+            onDeleteDataMap: (unit -> unit) option
+        ) =
         let tables = arcFile.ArcTables()
         let canAddTable = arcFile.CanCreateTables()
         let canRenderDataMap = arcFile.CanRenderDataMapView()
@@ -439,7 +458,7 @@ type ArcFileFooterTabs =
             )
 
         React.Fragment [
-            ArcFileFooterTabs.ContextMenu(tabsRef, setEditorMode, deleteTable)
+            ArcFileFooterTabs.ContextMenu(tabsRef, setEditorMode, deleteTable, onDeleteDataMap)
             Html.div [
                 prop.className "swt:bg-base-300"
                 prop.children [

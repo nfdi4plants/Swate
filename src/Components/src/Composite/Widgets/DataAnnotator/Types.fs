@@ -108,11 +108,13 @@ type ParsedDataFile = {
             | "\\v" -> "\v"
             | _ -> separator
 
-        let rows = file.DataContent.Split([| '\n' |], StringSplitOptions.RemoveEmptyEntries)
+        let rows =
+            file.DataContent.Split(
+                Swate.Components.ClipboardContract.Contract.LineBreaks,
+                StringSplitOptions.RemoveEmptyEntries
+            )
 
-        let splitRows =
-            rows
-            |> Array.map (fun row -> row.TrimEnd '\r' |> fun value -> splitRow value sanitizedSeparator)
+        let splitRows = rows |> Array.map (fun row -> splitRow row sanitizedSeparator)
 
         if splitRows.Length > 1 then
             {

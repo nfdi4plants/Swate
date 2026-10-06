@@ -9,6 +9,7 @@ type Theme =
     | Finster
     | Planti
     | Viola
+    | Amaze
 
 module Theme =
     let toString (theme: Theme) =
@@ -18,6 +19,7 @@ module Theme =
         | Finster -> "dark"
         | Planti -> "planti"
         | Viola -> "viola"
+        | Amaze -> "amaze"
 
     let fromString (theme: string) =
         match theme with
@@ -26,4 +28,5 @@ module Theme =
         | "dark" -> Finster
         | "planti" -> Planti
         | "viola" -> Viola
+        | "amaze" -> Amaze
         | _ -> Auto // Default to Auto if the string does not match any known theme

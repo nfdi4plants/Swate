@@ -1,10 +1,13 @@
 import '../tailwind.css';
+import type { SortableList as SortableListComponent } from './dist/Composite/SortableList/SortableList.fs';
+
+export type SortableListItem<A> = Parameters<typeof SortableListComponent<A>>[0]['items'][number];
+export type SortableListRowRender<A> = Parameters<NonNullable<Parameters<typeof SortableListComponent<A>>[0]['renderRow']>>[0];
 
 // ---------------------------------------------------------------------------
 // Primitive
 // ---------------------------------------------------------------------------
 
-export { default as Actionbar } from './dist/Primitive/Actionbar/Actionbar.fs';
 export { default as BaseModal } from './dist/Primitive/BaseModal/BaseModal.fs';
 export { default as Blankslate } from './dist/Primitive/Blankslate/Blankslate.fs';
 export { default as CardGrid } from './dist/Primitive/CardGrid/CardGrid.fs';
@@ -16,7 +19,8 @@ export { default as ErrorModalProvider } from './dist/Primitive/ErrorModal/Provi
 export { default as LoadingSpinner } from './dist/Primitive/LoadingSpinner/LoadingSpinner.fs';
 export { default as Navbar } from './dist/Primitive/Navbar/Navbar.fs';
 export { default as Popover } from './dist/Primitive/Popover/Popover.fs';
-export { default as Select } from './dist/Primitive/Select/Select.fs';
+export { default as MultiSelect } from './dist/Primitive/Select/MultiSelect.fs';
+export { default as SingleSelect } from './dist/Primitive/Select/SingleSelect.fs';
 export * as Icons from './dist/Primitive/Icons.fs';
 
 export { DeleteButton, CircularExitButton, CollapseButton, QuickAccessButton } from './dist/Primitive/Buttons/Buttons.fs';
@@ -26,6 +30,8 @@ export { Dialog, StringSubmissionDialog } from './dist/Primitive/Dialog/Dialog.f
 // ---------------------------------------------------------------------------
 // Composite
 // ---------------------------------------------------------------------------
+
+export { default as Actionbar } from './dist/Composite/Actionbar/Actionbar.fs';
 
 export { default as AccountManager } from './dist/Composite/Authentication/AccountManager.fs';
 export { default as AnnotationTable } from './dist/Composite/AnnotationTable/AnnotationTable.fs';
@@ -41,6 +47,8 @@ export { default as JsonImport } from './dist/Composite/Widgets/JsonImport/JsonI
 export { default as Layout } from './dist/Composite/Layout/Layout.fs';
 export { default as MarkdownTextInput } from './dist/Composite/MarkdownText/TextInputWithMarkdown.fs';
 export { default as Notes } from './dist/Composite/Notes/Editor/Notes.fs';
+export { default as SortableList } from './dist/Composite/SortableList/SortableList.fs';
+export { DragHandle, MoveUpButton, MoveDownButton, RemoveButton, DefaultRow } from './dist/Composite/SortableList/RowComponents.fs';
 export { default as Table } from './dist/Composite/Table/Table.fs';
 export { default as TemplateBrowser } from './dist/Composite/TemplateBrowser/TemplateBrowser.fs';
 export { default as TemplateCacheProvider } from './dist/Composite/TemplateBrowser/TemplateCacheProvider.fs';
@@ -71,6 +79,7 @@ export { default as GitSidebar } from './dist/Page/GitSidebar/GitSidebar.fs';
 export { default as Landing } from './dist/Page/Landing/Landing.fs';
 export { default as SettingsPage } from './dist/Page/SettingsPage/SettingsPage.fs';
 export { default as ProvenanceGrouping } from './dist/Page/ProvenanceGrouping/ProvenanceGrouping.fs';
+export { default as ValidationPackageBrowser } from './dist/Page/ValidationPackageBrowser/ValidationPackageBrowser.fs';
 
 export { Viewer as GitMergeConflictViewer } from './dist/Page/GitComparison/GitMergeConflictViewer.fs';
 export { TitleStack, HeaderRow, PanelShell, SectionCard } from './dist/Page/GitComparison/GitComparisonView.fs';

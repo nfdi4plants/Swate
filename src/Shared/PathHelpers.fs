@@ -29,6 +29,11 @@ module PathHelpers =
         normalizeSeparators path
         |> fun normalized -> normalized.Trim().TrimEnd('/').ToLowerInvariant()
 
+    let normalizeForUnicodeComparison (path: string) =
+        normalizeSeparators path
+        |> fun normalized -> normalized.Normalize(System.Text.NormalizationForm.FormC)
+        |> fun normalized -> normalized.ToLowerInvariant()
+
     /// Produces a normalized, case-insensitive path suitable for filesystem comparisons.
     let normalizePathForFsComparison (path: string) =
         path |> normalizePath |> normalizeForComparison
@@ -49,6 +54,18 @@ module PathHelpers =
         && not (String.IsNullOrWhiteSpace normalizedAncestorPath)
         && (normalizedPath = normalizedAncestorPath
             || normalizedPath.StartsWith(normalizedAncestorPath + "/"))
+
+    let tryRemapPathPrefix (sourcePath: string) (targetPath: string) (path: string) =
+        let normalizedSourcePath = normalizeCanonicalRelativePath sourcePath
+        let normalizedTargetPath = normalizeCanonicalRelativePath targetPath
+        let normalizedPath = normalizeCanonicalRelativePath path
+
+        if normalizeForComparison normalizedPath = normalizeForComparison normalizedSourcePath then
+            Some normalizedTargetPath
+        elif isSameOrDescendantPath normalizedPath normalizedSourcePath then
+            Some(normalizedTargetPath + normalizedPath.Substring(normalizedSourcePath.Length))
+        else
+            None
 
     let containsPathTraversalSegments (path: string) =
         normalizeSeparators path
@@ -366,6 +383,15 @@ module ArcEntityPathRules =
         | DeletePathClassification.AddZoneDescendantTarget(_, normalizedRelativePath) ->
             isGenericFileSystemTargetAllowed normalizedRelativePath
         | _ -> false
+
+    /// The path that a delete of `relativePath` removes from disk. Deleting a canonical entity
+    /// workbook removes the whole entity folder, so the scope of the workbook is its parent folder.
+    let deleteScopePath (relativePath: string) =
+        match classifyDeleteTarget relativePath with
+        | DeletePathClassification.CanonicalFileTarget(CanonicalArcFileTarget.EntityFile _, normalizedRelativePath) ->
+            PathHelpers.tryGetParentPath normalizedRelativePath
+            |> Option.defaultValue normalizedRelativePath
+        | _ -> normalizeRelativePath relativePath
 
     let private canonicalEntityFilePath zone identifier =
         let zoneFolder = zoneFolderName zone

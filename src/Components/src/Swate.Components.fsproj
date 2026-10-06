@@ -4,7 +4,8 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <DefineConstants>FABLE_COMPILER</DefineConstants>
-    <!-- DefineConstants is required to hotfix an ARCtrl issue, remove if the issue below is resolved and ARCtrl is updated to a version that fixes it -->
+    <!-- DefineConstants is required to hotfix an ARCtrl issue, remove if the issue below is
+    resolved and ARCtrl is updated to a version that fixes it -->
     <!-- https://github.com/nfdi4plants/ARCtrl/issues/603 -->
     <DefineConstants>FABLE_COMPILER_JAVASCRIPT</DefineConstants>
   </PropertyGroup>
@@ -34,6 +35,8 @@
     <PackageReference Include="Feliz" />
     <PackageReference Include="Feliz.UseElmish" />
     <PackageReference Include="Fable.Browser.Dom" />
+    <PackageReference Include="Vitest" />
+    <PackageReference Include="Vitest.ReactTestingLibrary" />
   </ItemGroup>
 
   <ItemGroup>
@@ -64,19 +67,24 @@
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="swate-components.css" Pack="true" PackagePath="fable/" />
+    <Compile Include="Types\KeyedState.fs" />
     <Compile Include="Types\StateContext.fs" />
     <Compile Include="Types\CellCoordinate.fs" />
     <Compile Include="Util\Download.fs" />
     <Compile Include="Util\DateTimeExtensions.fs" />
     <Compile Include="Util\Extensions.fs" />
     <Compile Include="Util\ReactHooks.fs" />
+    <Compile Include="JsBindings\Clipboard.fs" />
+    <Compile Include="JsBindings\Navigator.fs" />
     <Compile Include="JsBindings\Virtual.fs" />
     <Compile Include="JsBindings\FloatingUI.fs" />
     <Compile Include="JsBindings\DndKit.fs" />
     <Compile Include="ARCtrl\TermCollection.fs" />
     <Compile Include="ARCtrl\Helper.fs" />
     <Compile Include="ARCtrl\ArcIO.fs" />
+    <Compile Include="ARCtrl\EmptyColumnJson.fs" />
     <Compile Include="ARCtrl\Json.fs" />
+    <Compile Include="ARCtrl\EmptyColumnJson.test.fs" />
     <Compile Include="ARCtrl\Types\CompositeCellDiscriminate.fs" />
     <Compile Include="ARCtrl\Types\CompositeHeaderDiscriminate.fs" />
     <Compile Include="ARCtrl\ArcTable.fs" />
@@ -84,6 +92,10 @@
     <Compile Include="ARCtrl\Extensions\OntologyAnnotation.fs" />
     <Compile Include="ARCtrl\Extensions\CompositeHeader.fs" />
     <Compile Include="ARCtrl\Extensions\CompositeCell.fs" />
+    <Compile Include="ClipboardContract\Types.fs" />
+    <Compile Include="ClipboardContract\Contract.fs" />
+    <Compile Include="ARCtrl\ClipboardCodec.fs" />
+    <Compile Include="ClipboardContract\Actions.fs" />
     <Compile Include="ARCtrl\Extensions\ArcTable.fs" />
     <Compile Include="ARCtrl\Extensions\DataFile.fs" />
     <Compile Include="ARCtrl\Extensions\DataMap.fs" />
@@ -92,7 +104,7 @@
     <Compile Include="Api\SwateApi.fs" />
     <Compile Include="Api\GitLabApi.fs" />
     <Compile Include="Api\TIBApi.fs" />
-   
+
     <Compile Include="Primitive\Types.fs" />
     <Compile Include="Primitive\Icons.fs" />
     <Compile Include="Primitive\Buttons\Buttons.fs" />
@@ -103,7 +115,10 @@
     <Compile Include="Primitive\Popover\Popover.fs" />
     <Compile Include="Primitive\Select\Types.fs" />
     <Compile Include="Primitive\Select\Context.fs" />
-    <Compile Include="Primitive\Select\Select.fs" />
+    <Compile Include="Primitive\Select\GenericSelect.fs" />
+    <Compile Include="Primitive\Select\SingleSelect.fs" />
+    <Compile Include="Primitive\Select\MultiSelect.fs" />
+    <Compile Include="Primitive\Select\MultiSelect.sample.fs" />
     <Compile Include="Primitive\BaseModal\Context.fs" />
     <Compile Include="Primitive\BaseModal\BaseModal.fs" />
     <Compile Include="Primitive\Dialog\Dialog.fs" />
@@ -111,8 +126,6 @@
     <Compile Include="Primitive\CardGrid\CardGrid.fs" />
     <Compile Include="Primitive\ContextMenu\Types.fs" />
     <Compile Include="Primitive\ContextMenu\ContextMenu.fs" />
-    <Compile Include="Primitive\Actionbar\Types.fs" />
-    <Compile Include="Primitive\Actionbar\Actionbar.fs" />
     <Compile Include="Primitive\ComboBox\Types.fs" />
     <Compile Include="Primitive\ComboBox\ComboBox.fs" />
     <Compile Include="Primitive\Dropdown\Dropdown.fs" />
@@ -123,10 +136,17 @@
     <Compile Include="Primitive\ErrorModal\Provider.fs" />
     <Compile Include="Primitive\Navbar\Navbar.fs" />
 
+    <Compile Include="Composite\Actionbar\Types.fs" />
+    <Compile Include="Composite\Actionbar\Actionbar.fs" />
     <Compile Include="Composite\ThemeSelector\Types.fs" />
     <Compile Include="Composite\ThemeSelector\Context.fs" />
     <Compile Include="Composite\ThemeSelector\ThemeProvider.fs" />
     <Compile Include="Composite\ThemeSelector\ThemeSelector.fs" />
+    <Compile Include="Composite\SortableList\Types.fs" />
+    <Compile Include="Composite\SortableList\RowComponents.fs" />
+    <Compile Include="Composite\SortableList\SortableList.fs" />
+    <Compile Include="Composite\SortableList\SortableList.sample.fs" />
+    <Compile Include="Composite\SortableList\SortableList.test.rtl.fs" />
     <Compile Include="Composite\FolderedDraggableList\Types.fs" />
     <Compile Include="Composite\FolderedDraggableList\FolderedDraggableList.fs" />
     <Compile Include="Composite\TutorialOverlay\Types.fs" />
@@ -153,6 +173,7 @@
     <Compile Include="Composite\AnnotationTable\AnnotationTable.fs" />
     <Compile Include="Composite\AnnotationTable\ResetTableConfirmationModal.fs" />
     <Compile Include="Composite\DataMapTable\Types.fs" />
+    <Compile Include="Composite\DataMapTable\ClipboardTarget.fs" />
     <Compile Include="Composite\DataMapTable\Helper.fs" />
     <Compile Include="Composite\DataMapTable\DataMapContextMenu.fs" />
     <Compile Include="Composite\DataMapTable\DataMapTable.fs" />
@@ -211,6 +232,7 @@
     <Compile Include="Composite\Widgets\BuildingBlockWidget\Dropdown.fs" />
     <Compile Include="Composite\Widgets\BuildingBlockWidget\BuildingBlockWidget.fs" />
     <Compile Include="Composite\Widgets\FilePickerWidget.fs" />
+    <Compile Include="Composite\Widgets\FilePickerWidget.test.rtl.fs" />
     <Compile Include="Composite\Widgets\DataAnnotator\Types.fs" />
     <Compile Include="Composite\Widgets\DataAnnotator\Helper.fs" />
     <Compile Include="Composite\Widgets\DataAnnotator\DataAnnotator.fs" />
@@ -228,7 +250,6 @@
     <Compile Include="Composite\Workspace\DropOverlay.fs" />
     <Compile Include="Composite\Workspace\Workspace.fs" />
     <Compile Include="Composite\Workspace\Workspace.fixture.fs" />
-    
     <Compile Include="Page\ProvenanceGrouping\Types.fs" />
     <Compile Include="Page\ProvenanceGrouping\State.fs" />
     <Compile Include="Page\ProvenanceGrouping\ViewSupport.fs" />
@@ -294,7 +315,21 @@
     <Compile Include="Page\DataHubBrowser\Types.fs" />
     <Compile Include="Page\DataHubBrowser\MockData.fs" />
     <Compile Include="Page\DataHubBrowser\Model.fs" />
+    <Compile Include="Page\DataHubBrowser\sub\RepoListRow.fs" />
     <Compile Include="Page\DataHubBrowser\DataHubBrowser.fs" />
+    <Compile Include="Page\DataHubBrowser\sub\RepoListRow.test.rtl.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\Types.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\Helper.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\Helper.test.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\ValidationPackagesYaml.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\ValidationPackagesYaml.test.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\Context.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\SearchField.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\PackageRow.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\PackagePagination.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\PackageTable.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\ValidationPackageBrowser.fs" />
+    <Compile Include="Page\ValidationPackageBrowser\ValidationPackageBrowser.sample.fs" />
     <Compile Include="Page\ArcFileEditor\Types.fs" />
     <Compile Include="Page\ArcFileEditor\Helper.fs" />
     <Compile Include="Page\ArcFileEditor\EmptyTableView\Helper.fs" />
@@ -314,11 +349,13 @@
       <NpmPackage Name="@dnd-kit/sortable" Version="gte 10.0.0 lt 11.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="@dnd-kit/utilities" Version="gte 3.2.0 lt 4.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="@uiw/react-md-editor" Version="gte 4.0.0 lt 5.0.0" ResolutionStrategy="Max" />
-      <NpmPackage Name="@uiw/react-markdown-preview" Version="gte 5.0.0 lt 6.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="@uiw/react-markdown-preview" Version="gte 5.0.0 lt 6.0.0"
+        ResolutionStrategy="Max" />
       <NpmPackage Name="mermaid" Version="gte 11.0.0 lt 12.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="rehype-rewrite" Version="gte 4.0.0 lt 5.0.0" ResolutionStrategy="Max" />
       <NpmPackage Name="rehype-sanitize" Version="gte 6.0.0 lt 7.0.0" ResolutionStrategy="Max" />
-      <NpmPackage Name="@tanstack/react-virtual" Version="gte 3.0.0 lt 4.0.0" ResolutionStrategy="Max" />
+      <NpmPackage Name="@tanstack/react-virtual" Version="gte 3.0.0 lt 4.0.0"
+        ResolutionStrategy="Max" />
       <NpmPackage Name="@uidotdev/usehooks" Version="gte 2.0.0 lt 3.0.0" ResolutionStrategy="Max" />
     </NpmDependencies>
   </PropertyGroup>

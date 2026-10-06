@@ -347,18 +347,17 @@ type DataMapTable =
                                 | Some GridSelect.KeyboardShortcut.Paste ->
                                     e.preventDefault ()
 
-                                    pasteCells datamap selectedCells.selectedCellsReducedSet.MinimumElement setDatamap
+                                    pasteFromClipboard
+                                        datamap
+                                        selectedCells.selectedCellsReducedSet.MinimumElement
+                                        (tableRef.current.SelectHandle.getSelectedCells () |> Seq.toArray)
+                                        setDatamap
                                     |> Promise.start
                                 | Some GridSelect.KeyboardShortcut.Cut ->
                                     e.preventDefault ()
                                     let coordinates = tableRef.current.SelectHandle.getSelectedCells () |> Seq.toArray
 
-                                    promise {
-                                        do! copyCells datamap coordinates
-
-                                        updateDataMap datamap setDatamap _.ClearCells(coordinates)
-                                    }
-                                    |> Promise.start
+                                    cutCells datamap coordinates setDatamap |> Promise.start
                                 | None -> ()
                             )
                     )

@@ -8,6 +8,7 @@ open Renderer.Components.MainContent.DataHubBrowserTarget
 open Renderer.Components.MainContent.EmptySelectionTarget
 open Renderer.Components.MainContent.ErrorViewTarget
 open Renderer.Components.MainContent.GitDiffTarget
+open Renderer.Components.MainContent.GitFileChoiceConflictTarget
 open Renderer.Components.MainContent.GitMergeConflictTarget
 open Renderer.Components.MainContent.GitUnsupportedTarget
 open Renderer.Components.MainContent.LandingDraftTarget
@@ -17,6 +18,7 @@ open Renderer.Components.MainContent.ProvenanceGroupingTarget
 open Renderer.Components.MainContent.TextPreviewTarget
 open Renderer.Components.MainContent.UnknownPreviewTarget
 open Renderer.Components.MainContent.SettingsPageTarget
+open Renderer.Components.MainContent.ValidationPackageBrowserTarget
 
 module private MainHelper =
 
@@ -83,6 +85,7 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                 prop.children [
                     match appRootPath, pageState with
                     | _, Some PageState.DataHubBrowser -> DataHubBrowserTarget()
+                    | Some _, Some PageState.ValidationPackageBrowser -> ValidationPackageBrowserTarget()
                     | _, Some PageState.SettingsPage ->
                         React.Suspense(
                             [ LazyComponents.LazySettingPage() ],
@@ -119,6 +122,8 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                         )
                     | Some _, Some(PageState.GitDiffPage diffData) -> GitDiffTarget.Main diffData
                     | Some _, Some(PageState.GitMergeConflictPage mergeData) -> GitMergeConflictTarget.Main mergeData
+                    | Some _, Some(PageState.GitFileChoiceConflictPage choiceData) ->
+                        GitFileChoiceConflictTarget.Main choiceData
                     | Some _, Some(PageState.GitUnsupportedPage unsupportedPage) ->
                         GitUnsupportedTarget.Main unsupportedPage
                     | Some _, None -> EmptySelectionTarget()

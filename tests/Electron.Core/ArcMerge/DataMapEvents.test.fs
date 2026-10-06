@@ -44,12 +44,15 @@ Vitest.describe (
             fun () ->
                 let arcLocal, arcRemote = MockData.createTwoCleanCopies ()
                 arcLocal.Title <- Some "User Title"
-                arcRemote.Assays.[0].DataMap <- Some(DataMap.init ())
+                let dataMap = DataMap.init ()
+                dataMap.DataContexts.Add(DataContext(Label = Some "Disc label"))
+                arcRemote.Assays.[0].DataMap <- Some dataMap
 
                 let merged =
                     ARC.merge arcLocal arcRemote [ datamapEvent EventName.Add "assays" "My Assay" ]
 
                 Vitest.expect(merged.Assays.[0].DataMap.IsSome).toBe (true)
+                Vitest.expect(merged.Assays.[0].DataMap.Value.DataContexts.[0].Label).toEqual (Some "Disc label")
         )
 
         Vitest.test (

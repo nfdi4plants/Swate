@@ -2,34 +2,34 @@ module Renderer.Components.MainContent.GitMergeConflictTarget
 
 open Fable.Core
 open Feliz
-open Swate.Electron.Shared.GitTypes
+open Renderer.Types
+open Swate.Electron.Shared.VersionControlTypes
 
 [<ReactComponent>]
-let Main (mergeData: GitMergeConflictViewDataDto) =
+let Main (mergeData: VersionControlConflictPage) =
 
     let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
 
     let isConfirmingCurrentPath =
         gitStateCtx.state.MergeResolutionPendingPath = Some mergeData.Path
 
-    let isMergeResolutionBusy =
-        match gitStateCtx.state.BusyOperation with
-        | Some(Renderer.Context.GitWorkflow.GitBusyOperation.ConfirmingMergeResolution _) -> true
-        | _ -> false
+    let isBusy = gitStateCtx.state.BusyOperation.IsSome
 
+    // The request carries the handle and the workspace token the page was loaded with,
+    // so the main process refuses the resolution when either moved on since.
     let confirmMergeResolution resolvedContent =
-        if isMergeResolutionBusy then
+        if isBusy then
             ()
         else
             gitStateCtx.confirmMergeResolution {
                 Path = mergeData.Path
-                ExpectedConflictContent = mergeData.MergeConflictContent
-                ResolvedContent = resolvedContent
-                AutoCommit = true
+                Handle = mergeData.Handle
+                WorkspaceVersion = mergeData.WorkspaceVersion
+                Resolution = ConflictResolutionDto.SupplyResolvedContent resolvedContent
             }
 
     Html.div [
-        prop.className "swt:h-full swt:w-full swt:min-h-0"
+        prop.className "swt:relative swt:h-full swt:w-full swt:min-h-0"
         prop.children [
             if isConfirmingCurrentPath then
                 Html.div [
@@ -39,12 +39,22 @@ let Main (mergeData: GitMergeConflictViewDataDto) =
                 ]
 
             Swate.Components.Page.GitMergeConflictViewer.Viewer(
-                mergeConflictContent = mergeData.MergeConflictContent,
+                mergeConflictContent = mergeData.ConflictContent,
                 currentTitle = mergeData.Path,
                 resolvedTitle = mergeData.Path,
                 onConfirmMerge = confirmMergeResolution,
-                confirmDisabled = isMergeResolutionBusy,
+                confirmDisabled = isBusy,
                 testIdPrefix = "renderer-git-merge"
             )
+            Html.div [
+                prop.className "swt:absolute swt:right-4 swt:top-2 swt:z-10"
+                prop.children [
+                    Renderer.Components.Helper.GitMergeAbandonConfirmation.Main(
+                        isBusy,
+                        gitStateCtx.abandonMerge,
+                        "renderer-git-merge"
+                    )
+                ]
+            ]
         ]
     ]

@@ -7,9 +7,11 @@ type MkdirOptions(?recursive: bool) =
     member val recursive: bool option = recursive with get, set
 
 [<JS.PojoAttribute>]
-type RmOptions(?recursive: bool, ?force: bool) =
+type RmOptions(?recursive: bool, ?force: bool, ?maxRetries: int, ?retryDelay: int) =
     member val recursive: bool option = recursive with get, set
     member val force: bool option = force with get, set
+    member val maxRetries: int option = maxRetries with get, set
+    member val retryDelay: int option = retryDelay with get, set
 
 [<JS.PojoAttribute>]
 type ReaddirOptions(?withFileTypes: bool) =
@@ -76,6 +78,17 @@ let renameAsync (oldPath: string) (newPath: string) : JS.Promise<unit> = jsNativ
 
 [<Import("rm", "fs/promises")>]
 let rmAsync (path: string) (options: RmOptions) : JS.Promise<unit> = jsNative
+
+[<Import("copyFile", "fs/promises")>]
+let copyFileAsync (sourcePath: string) (targetPath: string) (mode: int) : JS.Promise<unit> = jsNative
+
+[<Import("constants", "fs")>]
+let private fileSystemConstants: {| COPYFILE_EXCL: int |} = jsNative
+
+let copyFileExclusiveFlag = fileSystemConstants.COPYFILE_EXCL
+
+[<Import("link", "fs/promises")>]
+let linkAsync (existingPath: string) (newPath: string) : JS.Promise<unit> = jsNative
 
 [<Import("stat", "fs/promises")>]
 let statAsync (path: string) : JS.Promise<Stats> = jsNative

@@ -15,6 +15,9 @@ open Main.Bindings
 open Node.Api
 open Swate.Electron.Shared.RenamePathRules
 
+let arcNotOpenError () =
+    exn "No ARC is open. Open an ARC and try again."
+
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"
 
@@ -22,47 +25,18 @@ let private pathDynamic: obj = importAll "path"
 /// It also ensures that the static hash is preserved to avoid unnecessary changes to the ARC when saving a datamap.
 let private setDataMapByParentInfo (arc: ARC) (dmpi: DatamapParentInfo) (dm: DataMap) : Result<unit, exn> =
     try
-        match dmpi.Parent with
-        | DataMapParent.Study ->
-            arc.TryGetStudy dmpi.ParentId
-            |> Option.iter (fun study ->
-                if study.DataMap.IsSome then
-                    dm.StaticHash <- study.DataMap.Value.StaticHash
+        arc.TryGetDataMap dmpi
+        |> Option.iter (fun currentDataMap -> dm.StaticHash <- currentDataMap.StaticHash)
 
-                study.DataMap <- Some dm
-            )
-
+        if arc.TrySetDataMap(dmpi, Some dm) then
             Ok()
-        | DataMapParent.Assay ->
-            arc.TryGetAssay dmpi.ParentId
-            |> Option.iter (fun assay ->
-                if assay.DataMap.IsSome then
-                    dm.StaticHash <- assay.DataMap.Value.StaticHash
+        else
+            let parentPath = DatamapParentInfo.toFolderPath dmpi
 
-                assay.DataMap <- Some dm
+            Error(
+                exn
+                    $"Could not save the DataMap because parent '{parentPath}' was not found in the current ARC. Refresh the File Explorer and try again."
             )
-
-            Ok()
-        | DataMapParent.Workflow ->
-            arc.TryGetWorkflow dmpi.ParentId
-            |> Option.iter (fun workflow ->
-                if workflow.DataMap.IsSome then
-                    dm.StaticHash <- workflow.DataMap.Value.StaticHash
-
-                workflow.DataMap <- Some dm
-            )
-
-            Ok()
-        | DataMapParent.Run ->
-            arc.TryGetRun dmpi.ParentId
-            |> Option.iter (fun run ->
-                if run.DataMap.IsSome then
-                    dm.StaticHash <- run.DataMap.Value.StaticHash
-
-                run.DataMap <- Some dm
-            )
-
-            Ok()
     with e ->
         Error(exn $"Failed to set datamap on ARC: {e.Message}")
 
@@ -82,6 +56,9 @@ let syncAddedArcFileFromPersisted (source: ARC) (target: ARC) (arcFile: ArcFiles
     | ArcFiles.Run run ->
         source.TryGetRun run.Identifier
         |> Option.iter (fun sourceRun -> target.SetRun(run.Identifier, sourceRun))
+    | ArcFiles.DataMap(Some parentInfo, _) ->
+        source.TryGetDataMap parentInfo
+        |> Option.iter (fun persistedDataMap -> target.TrySetDataMap(parentInfo, Some persistedDataMap) |> ignore)
     | _ -> ()
 
 /// This function should only be used for partial updates to an ARC based on a file content DTO.
@@ -163,6 +140,33 @@ let swatelogfn id fmt =
 
 let swatefailfn id fmt =
     Printf.kprintf (fun s -> failwith ("[Swate-" + string id + "] " + s)) fmt
+
+/// Serializes ARC merge operations through a single FIFO owner. Individual operation failures
+/// reject their caller's promise without terminating the queue processor.
+type internal ArcMergeQueue(windowId: int) =
+
+    let mailbox =
+        MailboxProcessor.Start(fun inbox ->
+            let rec processNext () = async {
+                let! operation = inbox.Receive()
+                do! operation () |> Async.AwaitPromise
+                return! processNext ()
+            }
+
+            processNext ()
+        )
+
+    member _.Enqueue<'T>(operation: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+        JS.Constructors.Promise.Create(fun resolve reject ->
+            mailbox.Post(fun () -> promise {
+                try
+                    let! result = operation ()
+                    resolve result
+                with error ->
+                    swatelogfn windowId "Queued ARC merge failed: %s" error.Message
+                    reject error
+            })
+        )
 
 type OpenArcRootRenamePlan = {
     SourcePath: string
@@ -294,7 +298,7 @@ let renameOpenArcRootDirectoryOnDisk arcPath newName : JS.Promise<Result<string,
                     return Error(mapArcRootRenameDiskError plan.SourcePath plan.TargetPath renameError)
 }
 
-let createWindow () = promise {
+let createWindow () =
     printfn "[Swate] Creating new window"
     let screenSize = screen.getPrimaryDisplay().workAreaSize
 
@@ -302,20 +306,15 @@ let createWindow () = promise {
 
     let mainWindowOptions =
         BrowserWindowConstructorOptions(
-            title = "Swate",
+            title = Swate.Electron.Shared.ApplicationVersion.windowTitle None,
             icon = (windowIconPath |> U2.Case2),
             width = int screenSize.width,
             height = int screenSize.height,
+            show = false,
             webPreferences = WebPreferences(preload = path.join (__dirname, "preload.fs.js"))
         )
 
     let window = BrowserWindow(mainWindowOptions)
-
-    if isNullOrUndefined MAIN_WINDOW_VITE_DEV_SERVER_URL then
-        do! window.loadFile (path.join (__dirname, $"../renderer/{MAIN_WINDOW_VITE_NAME}/index.html"))
-    else
-        window.webContents.openDevTools Enums.WebContents.OpenDevTools.Options.Mode.Right
-        do! window.loadURL MAIN_WINDOW_VITE_DEV_SERVER_URL
 
     // Prevent links from opening new Electron windows
     window.webContents.setWindowOpenHandler (fun details ->
@@ -332,7 +331,16 @@ let createWindow () = promise {
             Fable.Electron.Main.shell.openExternal url |> Promise.start
     )
 
-    return window
+    window
+
+let loadWindow (window: BrowserWindow) = promise {
+    if isNullOrUndefined MAIN_WINDOW_VITE_DEV_SERVER_URL then
+        do! window.loadFile (path.join (__dirname, $"../renderer/{MAIN_WINDOW_VITE_NAME}/index.html"))
+    else
+        window.webContents.openDevTools Enums.WebContents.OpenDevTools.Options.Mode.Right
+        do! window.loadURL MAIN_WINDOW_VITE_DEV_SERVER_URL
+
+    window.show ()
 }
 
 let shouldUsePollingByDefault (platform: string) =
@@ -341,16 +349,19 @@ let shouldUsePollingByDefault (platform: string) =
 let private currentNodePlatform () : string =
     emitJsExpr () "process.platform" |> unbox<string>
 
+let isFileWatcherPathIgnored (path: string) =
+    let normalizedPath = PathHelpers.normalizeSeparators path
+    let tempXlsxPattern = """\.~\$.*\.xlsx$"""
+    let temporaryImportPattern = """(^|/)\.swate-import-[0-9a-fA-F]{32}(/|$)"""
+    let temporaryLfsBackupPattern = """\.vcs-lfs-backup-[0-9a-fA-F]{32}$"""
+
+    System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
+    || isGitMetadataPath normalizedPath
+    || isLegacyDataMapPath normalizedPath
+    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryImportPattern)
+    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
+
 let createFileWatcher (path: string) (usePolling: bool option) =
-
-    let ignoreFn =
-        fun (path: string) ->
-            let normalizedPath = PathHelpers.normalizeSeparators path
-            let tempXlsxPattern = """\.~\$.*\.xlsx$"""
-
-            System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
-            || isGitMetadataPath normalizedPath
-            || isLegacyDataMapPath normalizedPath
 
     // Native Windows file events can keep handles that block app-initiated folder renames.
     let usePolling =
@@ -361,25 +372,25 @@ let createFileWatcher (path: string) (usePolling: bool option) =
             Chokidar.WatchOptions(
                 cwd = path,
                 awaitWriteFinish = true,
-                ignored = !^ignoreFn,
+                ignored = !^isFileWatcherPathIgnored,
                 ignoreInitial = true,
                 usePolling = true,
                 interval = 200,
                 binaryInterval = 400
             )
         else
-            Chokidar.WatchOptions(cwd = path, awaitWriteFinish = true, ignored = !^ignoreFn, ignoreInitial = true)
+            Chokidar.WatchOptions(
+                cwd = path,
+                awaitWriteFinish = true,
+                ignored = !^isFileWatcherPathIgnored,
+                ignoreInitial = true
+            )
 
     let watcher = Chokidar.Chokidar.watch (path, watcherOptions)
 
     watcher
 
-open Fable.Electron.Remoting.Main
-
 let sendArcHasUnsavedChangesUpdate (hasUnsavedChanges: bool) (window: BrowserWindow) =
-    let sendMsg =
-        Remoting.createIpc ()
-        |> Remoting.withWindow window
-        |> Remoting.buildProxySender<Swate.Electron.Shared.IPCTypes.MainToRendererIpc.IHasUnsavedArcChangesRendererApi>
-
-    sendMsg.arcUnsavedChangesUpdate hasUnsavedChanges
+    WindowSend.send<Swate.Electron.Shared.IPCTypes.MainToRendererIpc.IHasUnsavedArcChangesRendererApi>
+        window
+        (fun api -> api.arcUnsavedChangesUpdate hasUnsavedChanges)

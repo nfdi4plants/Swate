@@ -152,6 +152,74 @@ export const AppendTemplateToEmptyTable: Story = {
   },
 };
 
+// Cells are addressed through the grid's data attributes because the editor does not
+// forward debug test ids to the annotation table.
+const cellContentAt = (root: HTMLElement, row: number, column: number) => {
+  const td = root.querySelector(`[data-row="${row}"][data-column="${column}"]`) as HTMLElement | null;
+  return (td?.firstElementChild as HTMLElement | null) ?? td;
+};
+
+const findCellContentAt = (root: HTMLElement, row: number, column: number) =>
+  waitFor(() => {
+    const cell = cellContentAt(root, row, column);
+    if (!cell) throw new Error(`Cell ${row},${column} is not rendered`);
+    return cell;
+  });
+
+export const TemplateImportedWithUnitsStaysEditable: Story = {
+  parameters: { isolated: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const portal = within(canvasElement.ownerDocument.body);
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Table 1' }));
+    await userEvent.click(canvas.getByText('Start with template!'));
+    await userEvent.click(await portal.findByText(STORY_TEMPLATE_NAME));
+    await userEvent.click(await portal.findByRole('button', { name: /^Import$/i }));
+
+    const importDialog = await portal.findByRole('dialog', { name: /Import templates/i });
+    await userEvent.click(within(importDialog).getByLabelText(/With Units/i));
+    await userEvent.click(within(importDialog).getByLabelText(/Import \(new table\)/i));
+    await userEvent.click(within(importDialog).getByRole('button', { name: /^Import$/i }));
+
+    await userEvent.click(await canvas.findByRole('button', { name: STORY_TEMPLATE_NAME }));
+
+    // Column 2 is Output, column 4 is the unitized Temperature parameter.
+    const outputCell = await findCellContentAt(canvasElement, 1, 2);
+    expect((await findCellContentAt(canvasElement, 1, 4)).textContent).toMatch(/degree celsius/);
+
+    // The imported row has no stored Output cell, the file picker must still fill it.
+    await userEvent.click(outputCell);
+    await userEvent.click(getWidgetButton(canvas, 'File Picker'));
+    await userEvent.click(await canvas.findByRole('button', { name: /^Pick Files$/i }));
+    const insertButton = await canvas.findByRole('button', { name: /Insert file names/i });
+    await waitFor(() => expect(insertButton).toBeEnabled());
+    await userEvent.click(insertButton);
+
+    await waitFor(() => {
+      expect(cellContentAt(canvasElement, 1, 2)?.textContent).toMatch(/myImage\.png/);
+    });
+
+    // Rows added afterwards keep the template unit, so typing a value is enough.
+    const addRowsButton = canvas.getByTitle('Add Rows').querySelector('button') as HTMLButtonElement;
+    await userEvent.click(addRowsButton);
+
+    const newUnitCell = await findCellContentAt(canvasElement, 2, 4);
+    await userEvent.dblClick(newUnitCell);
+    const activeInput = await waitFor(() => {
+      const input = cellContentAt(canvasElement, 2, 4)?.querySelector('input') as HTMLInputElement | null;
+      if (!input) throw new Error('Unit cell did not activate');
+      return input;
+    });
+    await userEvent.type(activeInput, '5', { delay: 50 });
+    await userEvent.keyboard('{Enter}');
+
+    await waitFor(() => {
+      expect(cellContentAt(canvasElement, 2, 4)?.textContent).toMatch(/5 degree celsius/);
+    });
+  },
+};
+
 export const RenameThenDeleteAndAddTable: Story = {
   parameters: { isolated: true },
   play: async ({ canvasElement }) => {

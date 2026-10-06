@@ -5,7 +5,7 @@ open Browser.Dom
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Renderer.Components.FileExplorerDeleteHelper
+open Renderer.Components.Helper
 open Renderer.Context.FileStateContext
 open Renderer.Types
 open ARCtrl
@@ -46,6 +46,14 @@ let private FileTreeProbe (onFileTree: string[] -> unit) =
 
     Html.none
 
+[<ReactComponent>]
+let private FileImportProbe (onImport: ActiveFileImportState option -> unit) =
+    let fileStateCtx = useFileStateCtx ()
+
+    React.useEffect ((fun () -> onImport fileStateCtx.activeFileImport), [| box fileStateCtx.activeFileImport |])
+
+    Html.none
+
 let private createSnapshot () =
     let snapshot = Dictionary<string, FileEntry>()
     snapshot.Add("", FileEntry.create ("arc", "", true, None))
@@ -58,6 +66,13 @@ let private createSnapshot () =
 
     snapshot
 
+let private fileImportApi loadActiveImport = {
+    loadActiveImport = loadActiveImport
+    pickAbsolutePaths = fun () -> JS.Constructors.Promise.resolve (Ok None)
+    runImport = fun _ -> JS.Constructors.Promise.resolve (Ok ImportExternalFilesResult.Completed)
+    cancelImport = fun _ -> JS.Constructors.Promise.resolve (Ok())
+}
+
 Vitest.describe (
     "FileStateContext reload hydration",
     fun () ->
@@ -65,10 +80,13 @@ Vitest.describe (
             "loads the current file tree snapshot when the provider mounts",
             fun () -> promise {
                 let name = bridgeName "IFileTreeRendererApi"
+                let importBridgeName = bridgeName "IFileImportRendererApi"
                 let observedFileTrees = ResizeArray<string[]>()
                 let mutable listenerRegistered = false
                 let mutable disposeCalled = false
                 let mutable snapshotLoadCalls = 0
+                let mutable importSubscriptionRegistered = false
+                let mutable importDisposeCalled = false
 
                 let container = document.createElement ("div") :?> Browser.Types.HTMLDivElement
                 document.body.appendChild container |> ignore
@@ -86,14 +104,24 @@ Vitest.describe (
                                 fun () -> disposeCalled <- true
                         ])
 
+                    setBridgeProperty
+                        importBridgeName
+                        (createObj [
+                            "fileImportStateUpdate"
+                            ==> fun (_listener: ActiveFileImportState option -> unit) ->
+                                importSubscriptionRegistered <- true
+                                fun () -> importDisposeCalled <- true
+                        ])
+
                     let loadSnapshot () = promise {
                         snapshotLoadCalls <- snapshotLoadCalls + 1
                         return Ok(createSnapshot ())
                     }
 
                     root.render (
-                        FileStateCtxProviderWithFileTreeSnapshot(
+                        FileStateCtxProviderWithSnapshots(
                             loadSnapshot,
+                            fileImportApi (fun () -> JS.Constructors.Promise.resolve (Ok None)),
                             FileTreeProbe(fun paths -> observedFileTrees.Add paths)
                         )
                     )
@@ -117,12 +145,80 @@ Vitest.describe (
 
                     container.remove ()
                     clearBridgeProperty name
+                    clearBridgeProperty importBridgeName
+            }
+        )
+
+        Vitest.test (
+            "keeps an active import visible when the file explorer child is unmounted and remounted",
+            fun () -> promise {
+                let fileTreeBridgeName = bridgeName "IFileTreeRendererApi"
+                let importBridgeName = bridgeName "IFileImportRendererApi"
+                let mutable publishImportState = ignore
+                let mutable importListenerRegistered = false
+                let mutable fileTreeDisposeCalled = false
+                let mutable importDisposeCalled = false
+                let observedImports = ResizeArray<ActiveFileImportState option>()
+                let container = document.createElement ("div") :?> Browser.Types.HTMLDivElement
+                document.body.appendChild container |> ignore
+                let root = ReactDOM.createRoot container
+
+                let render child =
+                    root.render (
+                        FileStateCtxProviderWithSnapshots(
+                            (fun () -> JS.Constructors.Promise.resolve (Ok(createSnapshot ()))),
+                            fileImportApi (fun () -> JS.Constructors.Promise.resolve (Ok None)),
+                            child
+                        )
+                    )
+
+                try
+                    setBridgeProperty
+                        fileTreeBridgeName
+                        (createObj [
+                            "fileTreeUpdate"
+                            ==> fun (_: Dictionary<string, FileEntry> -> unit) ->
+                                fileTreeDisposeCalled <- false
+                                fun () -> fileTreeDisposeCalled <- true
+                        ])
+
+                    setBridgeProperty
+                        importBridgeName
+                        (createObj [
+                            "fileImportStateUpdate"
+                            ==> fun (listener: ActiveFileImportState option -> unit) ->
+                                publishImportState <- listener
+                                importListenerRegistered <- true
+                                fun () -> importDisposeCalled <- true
+                        ])
+
+                    render (FileImportProbe observedImports.Add)
+                    do! waitForEffect (fun () -> importListenerRegistered)
+
+                    let activeImport =
+                        Some {
+                            requestId = "survives-remount"
+                            phase = FileImportPhase.Copying
+                        }
+
+                    publishImportState activeImport
+                    do! waitForEffect (fun () -> observedImports |> Seq.contains activeImport)
+
+                    render Html.none
+                    do! Promise.sleep 0
+                    render (FileImportProbe observedImports.Add)
+                    do! waitForEffect (fun () -> observedImports |> Seq.filter ((=) activeImport) |> Seq.length >= 2)
+                finally
+                    root.unmount ()
+                    container.remove ()
+                    clearBridgeProperty fileTreeBridgeName
+                    clearBridgeProperty importBridgeName
             }
         )
 )
 
 Vitest.describe (
-    "FileExplorer delete helpers",
+    "File explorer state reconciliation",
     fun () ->
         Vitest.test (
             "isSelectionMissing detects removed selections after file-tree updates",
@@ -131,7 +227,7 @@ Vitest.describe (
 
                 Vitest
                     .expect(
-                        FileExplorerDeleteHelper.isSelectionMissing
+                        FileExplorerStateReconciliation.isSelectionMissing
                             remainingPaths
                             (Some "assays/assay-b/isa.assay.xlsx")
                     )
@@ -139,7 +235,7 @@ Vitest.describe (
 
                 Vitest
                     .expect(
-                        FileExplorerDeleteHelper.isSelectionMissing
+                        FileExplorerStateReconciliation.isSelectionMissing
                             remainingPaths
                             (Some "assays/assay-a/isa.assay.xlsx")
                     )
@@ -155,7 +251,7 @@ Vitest.describe (
 
                 Vitest
                     .expect(
-                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
+                        FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval (
                             Some(RendererPageState.ArcFilePage(workflowArcFile, None))
                         )
                     )
@@ -163,7 +259,7 @@ Vitest.describe (
 
                 Vitest
                     .expect(
-                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
+                        FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval (
                             Some(RendererPageState.MarkdownPage "# md")
                         )
                     )
@@ -171,7 +267,7 @@ Vitest.describe (
 
                 Vitest
                     .expect(
-                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
+                        FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval (
                             Some(RendererPageState.TextPage "txt")
                         )
                     )
@@ -179,7 +275,7 @@ Vitest.describe (
 
                 Vitest
                     .expect(
-                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
+                        FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval (
                             Some RendererPageState.UnknownPage
                         )
                     )
@@ -187,7 +283,7 @@ Vitest.describe (
 
                 Vitest
                     .expect(
-                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
+                        FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval (
                             Some(RendererPageState.ErrorPage "err")
                         )
                     )
@@ -195,7 +291,7 @@ Vitest.describe (
 
                 Vitest
                     .expect(
-                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
+                        FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval (
                             Some RendererPageState.NotesDraftPage
                         )
                     )
@@ -203,13 +299,63 @@ Vitest.describe (
 
                 Vitest
                     .expect(
-                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
+                        FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval (
                             Some RendererPageState.ProvenanceGroupingPage
                         )
                     )
                     .toBe (false)
 
-                Vitest.expect(FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval None).toBe (false)
+                Vitest
+                    .expect(FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval None)
+                    .toBe (false)
+        )
+
+        Vitest.test (
+            "DataMap tree changes reload a stale open parent preview",
+            fun () ->
+                let assay = ArcAssay.init "DataMapAssay"
+                assay.DataMap <- Some(DataMap.init ())
+
+                let pageState =
+                    Some(RendererPageState.ArcFilePage(ArcFiles.Assay assay, Some ActiveView.DataMap))
+
+                let fileTreeWithDataMap = [|
+                    FileEntry.create ("isa.datamap.xlsx", "assays/DataMapAssay/isa.datamap.xlsx", false, None)
+                |]
+
+                Vitest
+                    .expect(FileExplorerStateReconciliation.tryGetDataMapMismatchReload fileTreeWithDataMap pageState)
+                    .toEqual (None)
+
+                let fileTree = [|
+                    FileEntry.create ("DataMapAssay", "assays/DataMapAssay", true, None)
+                    FileEntry.create ("isa.assay.xlsx", "assays/DataMapAssay/isa.assay.xlsx", false, None)
+                |]
+
+                Vitest
+                    .expect(FileExplorerStateReconciliation.tryGetDataMapMismatchReload fileTree pageState)
+                    .toEqual (Some("assays/DataMapAssay/isa.assay.xlsx", Some ActiveView.Metadata))
+
+                assay.DataMap <- None
+
+                Vitest
+                    .expect(FileExplorerStateReconciliation.tryGetDataMapMismatchReload fileTreeWithDataMap pageState)
+                    .toEqual (Some("assays/DataMapAssay/isa.assay.xlsx", Some ActiveView.DataMap))
+
+                let standaloneDataMapPage =
+                    Some(
+                        RendererPageState.ArcFilePage(
+                            ArcFiles.DataMap(
+                                Some(DatamapParentInfo.create "DataMapAssay" DataMapParent.Assay),
+                                DataMap.init ()
+                            ),
+                            Some ActiveView.DataMap
+                        )
+                    )
+
+                Vitest
+                    .expect(FileExplorerStateReconciliation.tryGetDataMapMismatchReload fileTree standaloneDataMapPage)
+                    .toEqual (None)
         )
 
         Vitest.test (

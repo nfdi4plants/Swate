@@ -7,9 +7,9 @@ open Swate.Components
 open Swate.Components.Page.DataHub
 open Swate.Components.Page.DataHub.DataHubTypes
 open Swate.Components.Api.GitLabApi
-open Swate.Components.Primitive.Actionbar.Types
+open Swate.Components.Composite.Actionbar.Types
 open Swate.Components.Primitive.ErrorModal.Context
-open Swate.Electron.Shared.GitTypes
+open Swate.Electron.Shared.VersionControlTypes
 
 module DataHubBrowserHelper =
     let isCancelError (error: exn) =
@@ -41,29 +41,14 @@ let DataHubBrowserTarget () =
     let onArcError =
         createErrorModalCallback errorCtx.enqueue "Could not open ARC" appStateCtx
 
-    let loadAllRepos (query: ExploreRepoQuery) = Api.ipcGitLabApi.loadAllRepos query
-
-    let loadMostStarredRepos (query: ExploreMostStarredQuery) =
-        Api.ipcGitLabApi.loadMostStarredRepos query
-
-    let loadUserRepos (query: ExploreRepoQuery) = Api.ipcGitLabApi.loadUserRepos query
-
-    let loadOrganisationGroups (query: ExploreGroupsQuery) =
-        Api.ipcGitLabApi.loadOrganisationGroups query
-
-    let loadOrganisationRepos (query: ExploreGroupProjectsQuery) =
-        Api.ipcGitLabApi.loadOrganisationRepos query
-
     let loaders: ExploreLoaders = {
-        LoadAllRepos = loadAllRepos
-        LoadMostStarredRepos = loadMostStarredRepos
-        LoadUserRepos = loadUserRepos
-        LoadOrganisationGroups = loadOrganisationGroups
-        LoadOrganisationRepos = loadOrganisationRepos
+        LoadAllRepos = Api.ipcGitLabApi.loadAllRepos
+        LoadMostStarredRepos = Api.ipcGitLabApi.loadMostStarredRepos
+        LoadUserRepos = Api.ipcGitLabApi.loadUserRepos
+        LoadOrganisationGroups = Api.ipcGitLabApi.loadOrganisationGroups
+        LoadOrganisationRepos = Api.ipcGitLabApi.loadOrganisationRepos
     }
 
-    let closePage _ = pageCtx.setState None
-    let closeBrowser () = pageCtx.setState None
     let isCloneBusy = gitStateCtx.state.BusyOperation.IsSome
     let runStatus = Renderer.Context.GitWorkflow.currentRunStatus gitStateCtx.state
 
@@ -80,11 +65,13 @@ let DataHubBrowserTarget () =
                         destinationFolder
                         (DataHubBrowserHelper.toRepositoryFolderName projectInfo)
 
-                let cloneRequest: GitCloneRepositoryRequest = {
-                    RemoteUrl = projectInfo.http_url_to_repo
+                let cloneRequest: CloneWorkspaceRequestDto = {
+                    OperationId = Renderer.VersionControlApiClient.newOperationId ()
+                    ProviderLocation = projectInfo.http_url_to_repo
+                    DisplayName = Some projectInfo.name
                     TargetPath = targetPath
-                    Branch = None
-                    DownloadLargeFiles = gitStateCtx.state.DownloadLargeFiles
+                    TargetRef = None
+                    MaterializeAllObjects = gitStateCtx.state.DownloadLargeFiles
                 }
 
                 match! gitStateCtx.cloneRepository cloneRequest with
@@ -93,7 +80,7 @@ let DataHubBrowserTarget () =
                     let! wasOpened = Renderer.Components.Helper.ArcVaultHelper.openArcByPath onArcError clonedPath
 
                     if wasOpened then
-                        closeBrowser ()
+                        pageCtx.setState None
         }
         |> Promise.start
 
@@ -105,14 +92,19 @@ let DataHubBrowserTarget () =
                 ?errorNotice = gitStateCtx.state.ErrorNotice,
                 ?warningNotice = gitStateCtx.state.WarningNotice,
                 busyTestId = "DataHubCloneProgressNotice",
-                errorTestId = "DataHubCloneErrorNotice"
+                errorTestId = "DataHubCloneErrorNotice",
+                ?onCancelOperation =
+                    (match gitStateCtx.state.BusyOperation with
+                     | Some(Renderer.Context.GitWorkflow.GitBusyOperation.CloningRepository _) ->
+                         Some gitStateCtx.cancelOperation
+                     | _ -> None)
             )
             DataHubBrowser.ExplorePanel(
                 accounts = authCtx,
                 loaders = loaders,
                 projectActionBtns = DataHubBrowserHelper.createActionBtns cloneAndOpenRepo,
                 classNames = "swt:grow swt:flex swt:flex-col swt:gap-2 swt:p-2 swt:overflow-hidden",
-                onClose = closePage
+                onClose = (fun _ -> pageCtx.setState None)
             )
         ]
     ]

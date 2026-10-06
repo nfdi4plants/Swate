@@ -142,13 +142,7 @@ type Msg =
     | DeleteRows of int[]
     | DeleteColumn of int
     | SetColumn of index: int * column: CompositeColumn
-    | CopyCell of index: CellCoordinate
-    | CopyCells of indices: CellCoordinate[]
-    | CutCell of index: CellCoordinate
-    | PasteCell of index: CellCoordinate
     | SetCell of CellCoordinate * term: Term option
-    /// This Msg will paste all cell from clipboard into column starting from index. It will extend the table if necessary.
-    | PasteCellsExtend of index: CellCoordinate
     | Clear of index: CellCoordinate[]
     | FillColumnWithTerm of index: CellCoordinate
     // /// Update column of index to new column type defined by given SwateCell.emptyXXX

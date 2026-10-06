@@ -74,6 +74,63 @@ const InMemoryCreateFileExplorer = () => {
   );
 };
 
+const DATA_MAP_PATH = "assays/DataMapAssay/isa.datamap.xlsx";
+
+const DataMapLifecycleFileExplorer = () => {
+  const [hasDataMap, setHasDataMap] = React.useState(false);
+  const [selectedPath, setSelectedPath] = React.useState("none");
+
+  const items = React.useMemo(() => {
+    const children = hasDataMap
+      ? [createStableFile("isa.datamap.xlsx", DATA_MAP_PATH, "datamap-file")]
+      : [];
+    const assayFolder = Object.assign(
+      createStableFolder("DataMapAssay", "assays/DataMapAssay", "datamap-assay", children),
+      { IsExpanded: true },
+    );
+
+    return ofArray([assayFolder]);
+  }, [hasDataMap]);
+
+  return (
+    <div className="swt:p-4 swt:space-y-4">
+      <FileExplorer
+        initialItems={items}
+        onItemClick={(item) => setSelectedPath(item.Path ?? "none")}
+        onContextMenu={(item) => {
+          if (item.Id === "datamap-assay" && !hasDataMap) {
+            return ofArray([
+              new ContextMenuItem(
+                "Add DataMap",
+                "swt:fluent--database-arrow-up-20-regular",
+                () => setHasDataMap(true),
+                undefined,
+              ),
+            ]);
+          }
+
+          if (item.Id === "datamap-file") {
+            return ofArray([
+              new ContextMenuItem(
+                "Delete DataMap",
+                "swt:fluent--delete-24-regular",
+                () => {
+                  setHasDataMap(false);
+                  setSelectedPath("none");
+                },
+                undefined,
+              ),
+            ]);
+          }
+
+          return ofArray([]);
+        }}
+      />
+      <div data-testid="datamap-selected-path">Selected path: {selectedPath}</div>
+    </div>
+  );
+};
+
 const LazyLoadDirectoryFileExplorer = () => {
   const [lazyFolderLoaded, setLazyFolderLoaded] = React.useState(false);
 
@@ -362,6 +419,49 @@ const TruncatedOverflowFileExplorer = () => {
   );
 };
 
+const lfsRowName = "normal.bin";
+
+const createLfsRowItem = (id: string, lfsActivity?: string): FileItem =>
+  Object.assign(createStableFile(lfsRowName, `runs/${id}.bin`, id), {
+    IsLFS: true,
+    Downloaded: true,
+    IsLFSPointer: false,
+    SizeFormatted: "30 MB",
+    LfsActivity: lfsActivity,
+  });
+
+const BusyLfsRowFileExplorer = () => {
+  const items = React.useMemo(
+    () => ofArray([createLfsRowItem("lfs-idle"), createLfsRowItem("lfs-busy", "Freeing")]),
+    [],
+  );
+
+  return (
+    <div data-testid="busy-lfs-viewport" className="swt:p-2" style={{ width: 320, overflow: "hidden" }}>
+      <FileExplorer
+        initialItems={items}
+        getItemActions={() =>
+          ofArray([new ContextMenuItem("Rename", "swt:fluent--edit-24-regular", () => {}, undefined)])
+        }
+        canDeleteItem={() => true}
+        onDeleteItem={() => {}}
+        getItemStatusAction={(item) => fileExplorerGitLfsPillAction(item, () => {}, () => {})}
+        truncateOverflowingItemNames={true}
+      />
+    </div>
+  );
+};
+
+const lfsRowLabel = (canvasElement: HTMLElement, id: string) => {
+  const row = canvasElement.querySelector(`li[data-file-item-id="${id}"]`);
+
+  if (!(row instanceof HTMLElement)) {
+    throw new Error(`Expected file row ${id}.`);
+  }
+
+  return within(row).getByText(lfsRowName);
+};
+
 const installClipboardMock = () => {
   const writeText = fn(async () => undefined);
   Object.defineProperty(navigator, "clipboard", {
@@ -592,6 +692,44 @@ export const ContextMenuCreatesInMemoryUntilSave: StoryObj<typeof InMemoryCreate
   },
 };
 
+export const DataMapAddSelectDeleteLifecycle: StoryObj<typeof DataMapLifecycleFileExplorer> = {
+  render: () => <DataMapLifecycleFileExplorer />,
+  parameters: { isolated: true },
+
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const portal = within(canvasElement.ownerDocument.body);
+    const assayLabel = await canvas.findByText("DataMapAssay");
+    const assayItem = assayLabel.closest("[data-file-item-id]");
+
+    expect(assayItem).toBeTruthy();
+    expect(canvas.queryByText("isa.datamap.xlsx")).not.toBeInTheDocument();
+
+    fireEvent.contextMenu(assayItem!, { clientX: 24, clientY: 24, bubbles: true });
+    await userEvent.click(await portal.findByText("Add DataMap"));
+
+    const dataMapLabel = await canvas.findByText("isa.datamap.xlsx");
+    expect(dataMapLabel).toBeVisible();
+
+    await userEvent.click(dataMapLabel);
+    await waitFor(() => {
+      expect(canvas.getByTestId("datamap-selected-path")).toHaveTextContent(`Selected path: ${DATA_MAP_PATH}`);
+      expect(dataMapLabel).toHaveClass(/swt:font-semibold/);
+      expect(dataMapLabel).toHaveClass(/swt:text-primary/);
+    });
+
+    const dataMapItem = dataMapLabel.closest("[data-file-item-id]");
+    expect(dataMapItem).toBeTruthy();
+    fireEvent.contextMenu(dataMapItem!, { clientX: 24, clientY: 24, bubbles: true });
+    await userEvent.click(await portal.findByText("Delete DataMap"));
+
+    await waitFor(() => {
+      expect(canvas.queryByText("isa.datamap.xlsx")).not.toBeInTheDocument();
+      expect(canvas.getByTestId("datamap-selected-path")).toHaveTextContent("Selected path: none");
+    });
+  },
+};
+
 export const InlineDeleteDispatchesForFileAndDirectory: StoryObj<typeof DeleteActionFileExplorer> = {
   render: () => <DeleteActionFileExplorer />,
 
@@ -720,6 +858,28 @@ export const CopyRelativePathUsesProvidedResolver: StoryObj<typeof CopyPathResol
 
   play: async ({ canvasElement }) => {
     await expectContextMenuCopy(canvasElement, "Absolute File", "Copy Relative Path", "studies/A/file.txt");
+  },
+};
+
+export const BusyLfsRowKeepsNameSpace: StoryObj<typeof BusyLfsRowFileExplorer> = {
+  render: () => <BusyLfsRowFileExplorer />,
+
+  play: async ({ canvasElement }) => {
+    await waitFor(() => {
+      const idleLabel = lfsRowLabel(canvasElement, "lfs-idle");
+      const busyLabel = lfsRowLabel(canvasElement, "lfs-busy");
+
+      const widths = JSON.stringify({
+        idle: [idleLabel.clientWidth, idleLabel.scrollWidth],
+        busy: [busyLabel.clientWidth, busyLabel.scrollWidth],
+      });
+
+      expect(idleLabel.clientWidth, widths).toBeGreaterThanOrEqual(idleLabel.scrollWidth);
+      expect(busyLabel.clientWidth, widths).toBeGreaterThanOrEqual(busyLabel.scrollWidth);
+      expect(busyLabel.getBoundingClientRect().width, widths).toBeGreaterThanOrEqual(
+        idleLabel.getBoundingClientRect().width - 1,
+      );
+    });
   },
 };
 

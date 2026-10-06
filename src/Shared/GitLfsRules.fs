@@ -57,7 +57,9 @@ module GitLfsRules =
 
     /// Explains why a file must stay marked as Git LFS, if a rule forbids unmarking it.
     let tryGetUnmarkAsLfsBlockedReason (relativePath: string) (sizeInBytes: int64 option) =
-        if isInDatasetFolder relativePath then
+        if isIsaMetadataFile relativePath then
+            None
+        elif isInDatasetFolder relativePath then
             let fileName = PathHelpers.getFileName relativePath
             Some $"'{fileName}' is inside a dataset folder and must stay tracked with Git LFS."
         elif exceedsNonLfsSizeLimit sizeInBytes then

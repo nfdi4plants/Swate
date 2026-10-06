@@ -1,6 +1,7 @@
 module ElectronRenderer.FileTreeMaterializationTests
 
 open System.Collections.Generic
+open Renderer.Components.LeftSidebar.FileExplorer.Helper
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeMaterialization
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Electron.Shared.FileIOTypes
@@ -29,6 +30,7 @@ let private toFileItemTree materializedDirectoryPaths node =
         )
         materializedDirectoryPaths
         node
+        true
 
 Vitest.describe (
     "Electron file-tree materialization",
@@ -71,6 +73,57 @@ Vitest.describe (
                 Vitest.expect(item.Children.Value.Length).toBe (1)
                 Vitest.expect(item.Children.Value.Head.Name).toBe ("note.md")
                 Vitest.expect(item.IsExpanded).toBe (false)
+        )
+
+        Vitest.test (
+            "orders recognized ARC items before other root-level items",
+            fun () ->
+                let root =
+                    directoryNode "arc" "arc" [
+                        fileNode "unrelated.txt" "arc/unrelated.txt"
+                        directoryNode "runs" "arc/runs" []
+                        directoryNode "assays" "arc/assays" []
+                        directoryNode "studies" "arc/studies" []
+                        fileNode "isa.investigation.xlsx" "arc/isa.investigation.xlsx"
+                        fileNode "README.md" "arc/README.md"
+                        directoryNode "notes" "arc/notes" []
+                        directoryNode "workflows" "arc/workflows" []
+                    ]
+
+                let item = toFileItemTree (Set.singleton "arc") root
+
+                Vitest.expect(item.Children.Value |> List.map _.Name).toEqual [
+                    "notes"
+                    "README.md"
+                    "isa.investigation.xlsx"
+                    "studies"
+                    "assays"
+                    "workflows"
+                    "runs"
+                    "unrelated.txt"
+                ]
+        )
+
+        Vitest.test (
+            "orders only root-level items",
+            fun () ->
+                let notes =
+                    directoryNode "notes" "arc/notes" [
+                        fileNode "zebra.md" "arc/notes/zebra.md"
+                        fileNode "apple.md" "arc/notes/apple.md"
+                    ]
+
+                let root =
+                    directoryNode "arc" "arc" [
+                        fileNode "another-file.txt" "arc/another-file.txt"
+                        notes
+                    ]
+
+                let item = toFileItemTree (Set.ofList [ "arc"; "arc/notes" ]) root
+                let notesItem = item.Children.Value |> List.find (fun child -> child.Name = "notes")
+
+                Vitest.expect(item.Children.Value |> List.map _.Name).toEqual [ "notes"; "another-file.txt" ]
+                Vitest.expect(notesItem.Children.Value |> List.map _.Name).toEqual [ "zebra.md"; "apple.md" ]
         )
 
         Vitest.test (

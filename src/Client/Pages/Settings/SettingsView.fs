@@ -95,6 +95,17 @@ type Settings =
 	<path fill="currentColor" d="M16 1C7.716 1 1 7.716 1 16s6.716 15 15 15s15-6.716 15-15S24.284 1 16 1m1.5 2.086L3.086 17.5a13 13 0 0 1-.072-2.1L15.4 3.015a13 13 0 0 1 2.1.072m2.338.49q.81.25 1.572.6L4.176 21.41a13 13 0 0 1-.6-1.572zM5.19 23.224L23.224 5.19q.645.433 1.234.938l-18.33 18.33q-.505-.588-.938-1.234m2.352 2.648l18.33-18.33q.506.588.938 1.234L8.776 26.81q-.646-.432-1.234-.938m3.048 1.952L27.824 10.59q.35.761.6 1.572L12.162 28.424a13 13 0 0 1-1.572-.6m3.91 1.09L28.914 14.5a13 13 0 0 1 .072 2.1L16.6 28.985a13 13 0 0 1-2.1-.072m5.561-.56l8.292-8.293a13.03 13.03 0 0 1-8.292 8.292M3.647 11.938a13.03 13.03 0 0 1 8.292-8.292z" />
 </svg>"""
 
+        let amaze =
+            """<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+    <g fill="none" stroke="currentColor" stroke-width="1.3">
+    <ellipse cx="16" cy="16" rx="3.5" ry="13"/>
+    <ellipse cx="16" cy="16" rx="3.5" ry="13" transform="rotate(45 16 16)"/>
+    <ellipse cx="16" cy="16" rx="3.5" ry="13" transform="rotate(90 16 16)"/>
+    <ellipse cx="16" cy="16" rx="3.5" ry="13" transform="rotate(135 16 16)"/>
+    <circle cx="16" cy="16" r="4" fill="white"/>
+    </g>
+</svg>"""
+
         React.useLayoutEffect (
             (fun () ->
                 let icon =
@@ -103,6 +114,7 @@ type Settings =
                     | Theme.Finster -> animatedMoon
                     | Theme.Planti -> planti
                     | Theme.Viola -> viola
+                    | Theme.Amaze -> amaze
                     | Theme.Auto -> browser
 
                 iconRef.current?innerHTML <- icon
@@ -129,7 +141,9 @@ type Settings =
                             mkOption Theme.Finster
                             mkOption Theme.Planti
                             mkOption Theme.Viola
+                            mkOption Theme.Amaze
                             mkOption Theme.Auto
+
                         ]
                     ]
                 ]

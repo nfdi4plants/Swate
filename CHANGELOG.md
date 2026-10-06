@@ -18,14 +18,111 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### ✨ Added
 
--   Add separate FileTree context-menu actions to open a selected folder and reveal a selected file or folder in its parent location #1228.
--   Keep expanded FileTree parent folders visible while scrolling through nested content #1231.
--   Add annotation-table actions for assigning a unit to a cell and removing a unit while retaining its value #1229.
--   Enforce the DataHub Git LFS tracking ruleset: `isa.*.xlsx` metadata files are never tracked with Git LFS (skipped by automatic tracking, exempt from the commit size policy, and blocked from manual marking), while files inside a `dataset` folder or larger than 25 MB can no longer be unmarked #1316.
+-   Conflicts in files without editable text (binary files, `isa.*.xlsx` workbooks, Git LFS files) get a file-choice panel with "Keep my version" and "Use online version". It shows each version's size, object id, whether it is downloaded and the online commit.
+-   The conflict page can abandon the merge, after a confirmation.
+-   A modify/delete conflict can be resolved by accepting the deletion.
+-   A stale `.git/index.lock` opens a dialog with "Remove lock" at Save, Discard, Download Changes and when downloading a Git LFS file. A lock younger than a few seconds is waited for first.
+-   Closing a window while a version control operation runs asks whether to keep the window open or cancel the operation and close.
+-   The Git sidebar follows file changes made outside Swate without pressing Refresh.
+-   The merge confirmation names up to five paths that would conflict.
+-   Discard asks for confirmation.
+-   The cancel button also covers the upload step of a save. Canceling it keeps the saved-locally notice and opens no error dialog.
+-   The main process logs the start and end of every version control operation with its result.
+-   Added a new colour scheme for Swate (@paulineHans GitHub)
+-   Added guidance for generating and using GitLab Personal Access Tokens. #1267 (by @Freymaurer)
 
 ### 🔄 Changed
 
--   Simplify Electron FileTree navigation so ARC editors initialize the requested Metadata, table, or DataMap view directly, and show the DataHub download action only in the sidebar.
+-   All Git operations of the Electron app run through the VersionControlService library (0.1.0 on nuget.org), which offers one provider-neutral interface for Git and lakeFS. Swate uses its Git provider. The old built-in Git implementation is removed.
+-   Save, Download Changes and Upload Changes run one synchronize operation: refresh, update when the online copy is ahead, then publish. It asks first only when the update needs merge resolution, and it refuses an update or a branch switch that would overwrite local changes and names the files.
+-   A push the online copy refuses (a protected branch, a declined hook) shows the remote's reason, and the save stays local.
+-   The Git LFS threshold and the download preference are held in memory for each open ARC. Every ARC starts at 1 MiB and no download, and the `swate.lfs.*` keys of earlier versions are no longer read.
+-   Swate requires Git 2.38 or newer and Git LFS 3.7 or newer, with the Git LFS filter configured.
+-   Merges Swate creates are titled "Merge online changes".
+-   The busy notice shows the operation and git's progress lines. The raw "Git output" log is removed.
+-   The tooltips of Update ARC from Online, Download Changes and Clean LFS Cache list the git commands that run now.
+-   Replace git file status icons with shorthand letters (A, M, D, R, N, C) to reduce confusion with "+" icon. #1199 (by @Freymaurer)
+-   Allow custom input for "Add Rows" input in Annotation Table. You can now completely remove the numbers and just type away. [#1351](https://github.com/nfdi4plants/Swate/issues/1351) (by @Freymaurer)
+
+### 🐛 Fixed
+
+-   Root-level ARC items in the file tree follow the ISA standard order, and the `isa.investigation.xlsx` workbook has a distinctive violet icon.
+-   The diff of a changed, downloaded Git LFS text file shows the changed lines instead of the pointer text, without downloading anything.
+-   Mark and Unmark Git LFS take effect on the next save, so the file's storage changes. Unmark is refused when the file's object is not local.
+-   Discarding a downloaded Git LFS file keeps it downloaded.
+-   Git LFS conflicts are no longer shown as editable pointer text.
+-   The DataHUB storage rules apply to every save: `isa.*.xlsx` workbooks are never stored as Git LFS pointers, and dataset files and files above 25 MB always are.
+-   Saving more than about 1000 files at once works on Windows, and a save starts a fixed number of git processes whatever the file count.
+-   Clean LFS Cache works after a discarded Git LFS edit.
+-   A clone whose Git LFS download fails keeps the clone, opens it and offers to download the large files.
+-   "Open ARC in DataHUB" keeps the remote's port.
+-   The busy notice resets its progress when an operation moves to its next step, and the bar follows the percentage git reports.
+-   On macOS, a file whose name is stored decomposed on disk keeps its Git LFS badge and actions.
+-   Closing a window during an operation no longer crashes the main process with "Object has been destroyed". Every message to a window checks that the window still exists.
+-   The file watcher no longer overwrites the in-memory ARC in the middle of one of Swate's own writes.
+-   A Git operation that fails after it already changed the workspace refreshes the sidebar before it shows the error.
+-   Added fallback support for broken repository image links in DataHUB browser. #1180 (by @Freymaurer)
+-   Show a native error message instead of crashing or silently failing when a selected folder is not a valid ARC.
+
+## 2.3.1 - 2026-09-16
+
+### 🐛 Fixed
+
+-   Let the File Picker insert paths into the Input and Output cells of a table created from a template import, instead of failing silently because those cells were never stored.
+-   Keep the unit of unitized columns when adding rows with **Add Rows**, so values typed into new rows of a template imported **With Units** no longer need the unit set through the Details view.
+
+## 2.3.0 - 2026-09-16
+
+### ✨ Added
+
+-   Add Validation Package Browser for managing and browsing validation packages. It can be opened from the the sidebar (by @Freymaurer)
+
+## 2.2.0 - 2026-09-16
+
+### ✨ Added
+
+-   Add external file importing to the Electron FileTree, including cancellation and cleanup of temporary or partially imported files on cancellation or failure.
+-   Allow canceling in-flight Git network operations (ARC download/clone, fetch, update preview, pull, push, and Git LFS transfers) from the Git sidebar and the DataHUB download view. Cancellation kills the underlying git process and restores a clean repository state: a canceled pull aborts any half-applied merge or rebase, and a canceled ARC download removes the partially cloned folder #1306.
+-   Keep open ARC editors synchronized when DataMaps are added or deleted through the File Explorer or by external filesystem changes.
+-   Show **Delete DataMap**, rather than **Add DataMap**, in the context menu of a collapsed ARC entity folder that already contains a DataMap.
+-   Prevent newly added DataMaps from incorrectly appearing as unsaved after they have been written to disk.
+-   Show the current Swate release version before the active ARC name in the Electron window title.
+
+### 🔄 Changed
+
+-   Rotate the Import JSON icon by 180 degrees in all navbars.
+-   Restore the **Download ARC from DataHUB** action to the Electron ARC selector.
+
+### 🐛 Fixed
+
+-   Keep the ARC selector at a stable width and truncate long ARC names, and close its dropdown only after direct or overflow actions are invoked without dismissing the overflow menu prematurely.
+-   Recognize annotation-table column headers correctly when pasting tabular data.
+-   Paste DataMap values into the selected column instead of shifting them one column to the right.
+-   Keep pasted TSV values in their intended DataMap cells instead of interpreting three- or four-cell rows as ontology metadata.
+-   Preserve ontology term and unit metadata when copying and pasting within Swate in browsers that do not support custom clipboard formats.
+-   Fall back to plain text instead of failing when pasted clipboard data contains invalid Swate metadata.
+-   Preserve the row-and-column layout of multi-cell selections when copying between Swate, Excel, Google Sheets, and LibreOffice, including when applications prefer HTML clipboard content.
+-   Apply multi-cell paste consistently in annotation tables and DataMaps, repeating copied cells across larger selections and growing DataMaps when additional rows are needed.
+-   Preserve ontology metadata when pasting terms and units into supported table or DataMap columns, while preventing unrelated ontology identifiers from carrying over when values are replaced with plain text.
+-   Route annotation-table selections containing column headers through the header-aware paste flow, so pasted headers continue to add or update columns correctly.
+-   Clear cells during Cut only after the clipboard has been updated successfully, preventing data loss when browser clipboard access fails.
+-   Handle Windows, Unix, and legacy Mac line breaks consistently when displaying errors and importing data in the Data Annotator.
+
+## 2.1.0 - 2026-08-19
+
+### ✨ Added
+
+-   Add separate FileTree context-menu actions to open a selected folder and reveal a selected file or folder in its parent location #1228.
+-   Keep expanded FileTree parent folders visible while scrolling through nested content #1231.
+-   Add annotation-table actions for assigning a unit to a cell and removing a unit while retaining its value #1229.
+-   Enforce the DataHUB Git LFS tracking ruleset: `isa.*.xlsx` metadata files are never tracked with Git LFS (skipped by automatic tracking, exempt from the commit size policy, and blocked from manual marking), while files inside a `dataset` folder or larger than 25 MB can no longer be unmarked #1316.
+-   Add an editor button and a File Explorer action for adding DataMaps to assays, studies, runs, and workflows. The button remains visible but disabled when a DataMap cannot be added.
+-   Add the ability to remove DataMaps from their editor-tab context menu or through the File Explorer delete action.
+
+### 🔄 Changed
+
+-   Write DataMap additions and deletions to the ARC on disk immediately. Newly created DataMaps are loaded into the FileTree before their editor tab becomes available, while the currently selected editor tab remains active.
+-   Simplify Electron FileTree navigation so ARC editors initialize the requested Metadata, table, or DataMap view directly, and show the DataHUB download action only in the sidebar.
 -   Consolidate Electron ARC editor page state, safely resolve canonical entity workbooks, and reuse shared path normalization for ARC-root-relative references.
 -   Harden canonical entity path resolution for Electron rename and delete operations, and document the behavior of the shared path-normalization helpers.
 -   Keep table deletion in the existing footer-tab context menu instead of exposing a second, inconsistent navbar action.
@@ -44,10 +141,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Keep table-tab keys unambiguous by rejecting duplicate table names.
 -   Append imported templates to a fresh table model when the active table is empty.
 -   Allow hidden filesystem files such as `.DS_Store` to be deleted from ARC add-zone roots without treating them as ARC entities.
--   Sign commits created in Swate with the stored DataHub account matching the ARC's remote host (using the active account when no remote is configured yet, and leaving the user's own git config untouched for hubs without a stored account) instead of git's OS-derived fallback identity, so commits link to the account on the hub they are pushed to #1304.
+-   Sign commits created in Swate with the stored DataHUB account matching the ARC's remote host (using the active account when no remote is configured yet, and leaving the user's own git config untouched for hubs without a stored account) instead of git's OS-derived fallback identity, so commits link to the account on the hub they are pushed to #1304.
 -   Report a missing git identity as its own failure with setup guidance instead of passing git's raw "Please tell me who you are" output to the user #1305.
 -   Respect GitLab's "use a private email in commits" setting by signing commits with the account's commit email instead of its primary email.
 -   Fix Template bug "You've hit dummy code" #1266, #1264 (by @Freymaurer) 
+-   Fix overscroll issue on last table column on smaller screens (by @Freymaurer)
 
 ## 2.0.7 - 2026-08-06
 

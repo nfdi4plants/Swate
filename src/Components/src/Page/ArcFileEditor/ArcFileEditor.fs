@@ -6,6 +6,7 @@ open Fable.Core.JsInterop
 open Feliz
 open Swate.Components
 open Swate.Components.Primitive
+open Swate.Components.Primitive.Buttons
 open Swate.Components.Primitive.Navbar
 open Swate.Components.Composite.Widgets.Context
 open Swate.Components.Composite.DataMapTable
@@ -14,17 +15,6 @@ open Swate.Components.Shared
 open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Composite.AnnotationTable
 open Swate.Components.Composite.Widgets.DataAnnotator.Types
-
-module private ArcFileEditorTypes =
-    type AddRowsFooterViewProps = {
-        rowsToAdd: int
-        minRowsToAdd: int
-        onRowsToAddChange: int -> unit
-        onAddRows: unit -> unit
-        onAddRowsAndReset: unit -> unit
-    }
-
-open ArcFileEditorTypes
 
 type private LazyComponents =
 
@@ -109,35 +99,6 @@ type Main =
     [<ReactComponent>]
     static member LazyLoaderWithMessage(lazyComponent: ReactElement, message: string) =
         React.Suspense([ lazyComponent ], fallback = Main.LazyFallback(message))
-
-    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
-    static member private AddRowsFooterView(props: AddRowsFooterViewProps) =
-        Html.div [
-            prop.className
-                "swt:w-full swt:flex swt:justify-center swt:items-center swt:shrink-0 swt:p-2 swt:bg-base-200 swt:border-t swt:border-base-300"
-            prop.title "Add Rows"
-            prop.children [
-                Html.div [
-                    prop.className "swt:join"
-                    prop.children [
-                        Html.input [
-                            prop.className "swt:input swt:join-item swt:border-current"
-                            prop.type'.number
-                            prop.min props.minRowsToAdd
-                            prop.value props.rowsToAdd
-                            prop.onChange props.onRowsToAddChange
-                            prop.onKeyDown (key.enter, fun _ -> props.onAddRows ())
-                            prop.style [ style.width 100 ]
-                        ]
-                        Html.button [
-                            prop.className "swt:btn swt:btn-outline swt:join-item"
-                            prop.onClick (fun _ -> props.onAddRowsAndReset ())
-                            prop.children [ Icons.Plus() ]
-                        ]
-                    ]
-                ]
-            ]
-        ]
 
     [<ReactComponent>]
     static member private TableView(table: ArcTable, setTableInArcFile: ArcTable -> unit) =
@@ -235,48 +196,67 @@ type Main =
     static member private AddRowsFooter
         (activeView: ActiveView, arcFileState: ArcFiles, setArcFileState: ArcFiles -> unit)
         =
-        let minRowsToAdd = 1
-        let rowsToAdd, setRowsToAdd = React.useState minRowsToAdd
-
-        let clampRowsToAdd rows = max minRowsToAdd rows
-
-        let tryGetAddRowsTarget () =
-            Helper.tryGetAddRowsTarget (activeView, arcFileState)
-
-        let canAddRows =
-            match tryGetAddRowsTarget () with
-            | Some(AddRowsTarget.Table table) -> table.ColumnCount > 0
-            | Some(AddRowsTarget.DataMap dataMap) -> dataMap.ColumnCount > 0
-            | None -> false
+        // Use inputRef to get the number of rows to add. Parsing directly into React.useState does not allow completly removing the number of rows to add.
+        let inputRef = React.useInputRef ()
 
         let addRowsWithCount rowCount =
-            match tryGetAddRowsTarget () with
+            match Helper.tryGetAddRowsTarget (activeView, arcFileState) with
             | Some(AddRowsTarget.Table table) ->
-                table.AddRowsEmpty rowCount
+                table.AddRowsEmptyKeepingUnits rowCount
                 setArcFileState (ArcFiles.refreshRef arcFileState)
             | Some(AddRowsTarget.DataMap dataMap) ->
                 dataMap.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
                 setArcFileState (ArcFiles.refreshRef arcFileState)
             | None -> ()
 
-        let addRows () =
-            rowsToAdd |> clampRowsToAdd |> addRowsWithCount
+        let addRows =
+            fun () ->
+                match inputRef.current with
+                | Some input ->
+                    match System.Int32.TryParse(input.value) with
+                    | true, value when value > 0 -> addRowsWithCount value
+                    | true, value -> console.error $"Invalid row count {value}"
+                    | false, _ -> console.error $"Invalid row input: {input.value}"
+                | None -> ()
 
-        let addRowsAndReset () =
-            let rowCount = clampRowsToAdd rowsToAdd
-            setRowsToAdd minRowsToAdd
-            addRowsWithCount rowCount
+        let canAddRows =
+            match Helper.tryGetAddRowsTarget (activeView, arcFileState) with
+            | Some(AddRowsTarget.Table table) -> table.ColumnCount > 0
+            | Some(AddRowsTarget.DataMap dataMap) -> dataMap.ColumnCount > 0
+            | None -> false
 
-        if canAddRows then
-            Main.AddRowsFooterView {
-                rowsToAdd = rowsToAdd
-                minRowsToAdd = minRowsToAdd
-                onRowsToAddChange = clampRowsToAdd >> setRowsToAdd
-                onAddRows = addRows
-                onAddRowsAndReset = addRowsAndReset
-            }
-        else
+        if not canAddRows then
             Html.none
+        else
+            Html.div [
+                prop.className
+                    "swt:w-full swt:flex swt:justify-center swt:items-center swt:shrink-0 swt:p-2 swt:bg-base-200 swt:border-t swt:border-base-300"
+                prop.title "Add Rows"
+                prop.children [
+                    Html.div [
+                        prop.className "swt:join"
+                        prop.children [
+                            Html.input [
+                                prop.ref inputRef
+                                prop.className "swt:input swt:join-item swt:border-current swt:validator"
+                                prop.type'.number
+                                prop.min 1
+                                prop.required true
+                                prop.defaultValue 1
+                                prop.onKeyDown (key.enter, fun _ -> addRows ())
+                                prop.style [ style.width 100 ]
+                                prop.title "Must be a positive number"
+                            ]
+                            Html.button [
+                                prop.className "swt:btn swt:btn-outline swt:join-item"
+                                prop.onClick (fun _ -> addRows ())
+                                prop.children [ Icons.Plus() ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+
 
     /// <summary>Renders an editor for an ARC file.</summary>
     /// <param name="startingActiveView">
@@ -289,6 +269,8 @@ type Main =
             arcFile: ArcFiles,
             setArcFile: ArcFiles -> unit,
             pickPaths: unit -> Fable.Core.JS.Promise<string[]>,
+            ?onAddDataMap: unit -> unit,
+            ?onDeleteDataMap: unit -> unit,
             ?trailingNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?startingActiveView: ActiveView,
             ?onImportJson: JsonImportRequest -> JS.Promise<Result<unit, exn>>,
@@ -326,6 +308,11 @@ type Main =
 
         let activeTableIndex = activeView.TryTableIndex
 
+        let canAddDataMap =
+            onAddDataMap.IsSome
+            && arcFile.TryGetDataMapParentInfo().IsSome
+            && not (arcFile.CanRenderDataMapView())
+
         let trailingNavbarElement =
             match trailingNavbarElements with
             | Some renderTrailingNavbarElements -> renderTrailingNavbarElements headerProps
@@ -341,6 +328,15 @@ type Main =
                                 prop.className "swt:flex swt:items-center swt:gap-2"
                                 prop.children [
                                     Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns()
+                                    Buttons.QuickAccessButton(
+                                        Html.i [
+                                            prop.className
+                                                "swt:iconify swt:fluent--database-arrow-up-20-regular swt:size-6"
+                                        ],
+                                        "Add DataMap",
+                                        (fun _ -> onAddDataMap |> Option.iter (fun handler -> handler ())),
+                                        isDisabled = not canAddDataMap
+                                    )
                                 ]
                             ],
                         right = trailingNavbarElement
@@ -407,7 +403,7 @@ type Main =
                         prop.children [ Main.ArcFileContentView(activeView, arcFile, setArcFile) ]
                     ]
                     Main.AddRowsFooter(activeView, arcFile, setArcFile)
-                    ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFile)
+                    ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFile, onDeleteDataMap)
                 ]
             ]
 
@@ -480,6 +476,18 @@ type Main =
                         )
 
                         template.Table.AddRowsEmpty(1)
+
+                        // A unitized parameter lets stories cover the "With Units" import mode.
+                        template.Table.AddColumn(
+                            CompositeHeader.Parameter(OntologyAnnotation("Temperature", "NCIT", "NCIT:C25206")),
+                            ResizeArray [
+                                CompositeCell.createUnitized (
+                                    "21",
+                                    OntologyAnnotation("degree celsius", "UO", "UO:0000027")
+                                )
+                            ]
+                        )
+
                         template.Version <- "1.0.0"
                         template
 

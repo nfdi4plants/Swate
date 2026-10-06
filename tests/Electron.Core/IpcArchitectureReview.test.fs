@@ -1,8 +1,10 @@
 module ElectronCore.IpcArchitectureReviewTests
 
 open Main.Bindings.Path
+open Main.Bindings.Filesystem
 open Main.ArcVault
 open Main.ArcVaultTypes
+open Main.FileImportAuthorization
 open Main.IPC.FileSystemIO
 open Main.IPC.Rename
 open Main.ARCtrlExtensions
@@ -28,6 +30,43 @@ let private renameRequest relativePath newName : RenamePathRequest = {
     relativePath = relativePath
     newName = newName
 }
+
+Vitest.describe (
+    "external file picker authorization",
+    fun () ->
+        Vitest.test (
+            "returns picker-owned paths once to the window that selected them",
+            fun () ->
+                let authorizationId = issue 7101 [| "C:/selected/one.txt"; "C:/selected/two.csv" |]
+
+                match consume 7102 authorizationId with
+                | Ok _ -> failwith "A different renderer window must not consume the selection."
+                | Error _ -> ()
+
+                match consume 7101 authorizationId with
+                | Error error -> failwith error.Message
+                | Ok paths -> Vitest.expect(paths).toEqual ([| "C:/selected/one.txt"; "C:/selected/two.csv" |])
+
+                match consume 7101 authorizationId with
+                | Ok _ -> failwith "A picker authorization must not be reusable."
+                | Error error -> Vitest.expect(error.Message).toContain ("not authorized")
+        )
+
+        Vitest.test (
+            "a new picker result invalidates the window's earlier selection",
+            fun () ->
+                let earlier = issue 7103 [| "C:/selected/earlier.txt" |]
+                let latest = issue 7103 [| "C:/selected/latest.txt" |]
+
+                match consume 7103 earlier with
+                | Ok _ -> failwith "The replaced picker authorization must be rejected."
+                | Error _ -> ()
+
+                match consume 7103 latest with
+                | Error error -> failwith error.Message
+                | Ok paths -> Vitest.expect(paths).toEqual ([| "C:/selected/latest.txt" |])
+        )
+)
 
 Vitest.describe (
     "IPC architecture review fixes",
@@ -86,6 +125,34 @@ Vitest.describe (
                         Vitest.expect(afterDelete.ContainsAssay("ExistingAssay")).toBe (false)
                         Vitest.expect(afterDelete.Title).toEqual (Some "Unsaved local investigation title")
                         Vitest.expect(vault.hasUnsavedArcChanges).toBe (true)
+                    })
+        )
+
+        Vitest.test (
+            "explicit ARC merge reports reload failures and preserves the in-memory ARC",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let! loadedArc = loadArcAsync arcPath
+                        loadedArc.Title <- Some "Unsaved in-memory title"
+
+                        let vault = ArcVault(testWindow ())
+                        vault.path <- Some arcPath
+                        vault.SetArc loadedArc
+
+                        let investigationPath = join [| arcPath; "isa.investigation.xlsx" |]
+                        do! writeFileAsync investigationPath "not an XLSX workbook" TextEncoding.Utf8
+
+                        match!
+                            vault.TryTriggerArcInMemoryMergeOnFileWatcherEvents [
+                                watcherEvent arcPath "change" "isa.investigation.xlsx"
+                            ]
+                        with
+                        | Ok() -> return failwith "Expected malformed ARC content to fail synchronization."
+                        | Error error ->
+                            Vitest.expect(error.Message.Length > 0).toBe (true)
+                            Vitest.expect(vault.arc.Value.Title).toEqual (Some "Unsaved in-memory title")
                     })
         )
 

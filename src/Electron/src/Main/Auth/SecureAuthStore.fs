@@ -181,7 +181,7 @@ let isAvailable () : bool =
 let store (credential: StoredCredential) : Result<unit, string> =
     try
         if not (isAvailable ()) then
-            Error "Electron safe storage is not available on this system."
+            Error "Swate safe storage is not available on this system."
         elif not (isSafeLocalSwateAccountId credential.Metadata.LocalSwateAccountId) then
             Error "Invalid account identifier format."
         else

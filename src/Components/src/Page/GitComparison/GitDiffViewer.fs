@@ -4,6 +4,14 @@ open System
 open Fable.Core
 open Feliz
 
+/// The change a diff shows, when the caller knows it. JavaScript callers pass
+/// "added", "deleted" or "modified".
+[<StringEnum; RequireQualifiedAccess>]
+type GitDiffChangeKind =
+    | Added
+    | Deleted
+    | Modified
+
 [<Erase; Mangle(false)>]
 type GitDiffViewer =
 
@@ -15,9 +23,10 @@ type GitDiffViewer =
             currentContent: string,
             ?previousTitle: string,
             ?currentTitle: string,
-            ?testIdPrefix: string
+            ?testIdPrefix: string,
+            ?changeKind: GitDiffChangeKind
         ) =
-        let previousHeaderLabel, currentHeaderLabel, rows, previousLineCount, currentLineCount =
+        let previousHeaderLabel, currentHeaderLabel, rows, previousLineCount, currentLineCount, changeBadgeText =
             React.useMemo (
                 (fun () ->
                     let metadata = GitTextComparisonCore.Metadata.extractDiffMetadata wordDiffText
@@ -47,12 +56,48 @@ type GitDiffViewer =
                     let currentLineCount =
                         (GitTextComparisonCore.Text.splitContentToLines currentContent).Length
 
-                    previousHeaderLabel, currentHeaderLabel, rows, previousLineCount, currentLineCount
+                    let diffLines =
+                        wordDiffText
+                        |> GitTextComparisonCore.Text.normalizeLineEndings
+                        |> GitTextComparisonCore.Text.splitContentToLines
+
+                    let isAddedFile =
+                        diffLines
+                        |> Array.exists (fun line ->
+                            line.StartsWith("new file mode ", StringComparison.Ordinal)
+                            || line.StartsWith("--- /dev/null", StringComparison.Ordinal)
+                        )
+
+                    let isDeletedFile =
+                        diffLines
+                        |> Array.exists (fun line ->
+                            line.StartsWith("deleted file mode ", StringComparison.Ordinal)
+                            || line.StartsWith("+++ /dev/null", StringComparison.Ordinal)
+                        )
+
+                    let inferredChangeBadgeText =
+                        match isAddedFile, isDeletedFile, metadata.PreviousPath, metadata.CurrentPath with
+                        | true, _, _, _ -> "Added"
+                        | _, true, _, _ -> "Deleted"
+                        | _, _, None, Some _ -> "Added"
+                        | _, _, Some _, None -> "Deleted"
+                        | _ when String.IsNullOrWhiteSpace wordDiffText -> "No changes"
+                        | _ -> "Changed"
+
+                    let changeBadgeText =
+                        match changeKind with
+                        | Some GitDiffChangeKind.Added -> "Added"
+                        | Some GitDiffChangeKind.Deleted -> "Deleted"
+                        | Some GitDiffChangeKind.Modified -> "Changed"
+                        | None -> inferredChangeBadgeText
+
+                    previousHeaderLabel, currentHeaderLabel, rows, previousLineCount, currentLineCount, changeBadgeText
                 ),
                 [|
                     box wordDiffText
                     box previousContent
                     box currentContent
+                    box changeKind
                     box previousTitle
                     box currentTitle
                 |]
@@ -68,12 +113,6 @@ type GitDiffViewer =
 
         let comparisonScrollTestId =
             testIdPrefix |> Option.map (fun prefix -> prefix + "-comparison-scroll")
-
-        let changeBadgeText =
-            if String.IsNullOrWhiteSpace wordDiffText then
-                "No changes"
-            else
-                "Changed"
 
         GitComparisonView.PanelShell
             (React.Fragment [
