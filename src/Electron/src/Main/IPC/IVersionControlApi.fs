@@ -229,8 +229,7 @@ let private withMutatingSessionUsingRefreshPredicate
                         let! result = withSession operationName event operationId true operation mapValue
 
                         if shouldRefresh result then
-                            let! fileTree = getFileTree arcPath
-                            vault.SetFileTree fileTree
+                            do! vault.ResetFileTreeToRoot()
 
                         return result
                     })
@@ -563,8 +562,7 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                 )
 
                             if resultChangedState result then
-                                let! fileTree = getFileTree arcPath
-                                vault.SetFileTree fileTree
+                                do! vault.ResetFileTreeToRoot()
 
                             return result
                         })
