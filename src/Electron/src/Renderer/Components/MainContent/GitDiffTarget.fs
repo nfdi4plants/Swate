@@ -7,6 +7,7 @@ open Renderer.Context.GitWorkflow
 open Swate.Components.Page.GitComparison
 
 module Presentation = Renderer.GitDiffPresentation
+module Paged = Swate.Components.Page.GitComparison.GitPagedDiffTypes
 
 [<AllowNullLiteral>]
 type private IPerformance =
@@ -17,6 +18,37 @@ type private IPerformance =
 let private performance: IPerformance = jsNative
 
 let private clearPerformanceMeasures () : unit = performance.clearMeasures ()
+
+/// What the diff does in the background while the user reads it.
+[<RequireQualifiedAccess>]
+type BackgroundReading =
+    /// The loader reads the remaining pages on its own.
+    | Indexing
+    /// The pages read add up to the indexing limit, so the loader stopped.
+    | LimitReached
+    /// The worker session closed during a background read, and the next request continues.
+    | Paused
+
+/// The background state of the diff, or None when there is nothing to tell: the indexing finished
+/// or never started, the last read failed, or the diff shows no rows.
+let backgroundReadingOf (limitMb: int) (page: GitDiffPageData) : BackgroundReading option =
+    let showsRows =
+        match page.Status with
+        | GitDiffPageStatus.Ready
+        | GitDiffPageStatus.LoadingNext
+        | GitDiffPageStatus.Reopening _ -> true
+        | _ -> false
+
+    if not showsRows || page.NextCursor.IsNone || page.NextFailed then
+        None
+    elif page.IndexingPaused then
+        Some BackgroundReading.Paused
+    elif page.Indexing then
+        Some BackgroundReading.Indexing
+    elif GitDiffPageLoader.indexingLimitReached limitMb page then
+        Some BackgroundReading.LimitReached
+    else
+        None
 
 /// The key the viewer uses to ask for the next page at most once. It is the id of the last
 /// loaded page, which changes when a new page joins or a reopen replaces the pages.
@@ -29,6 +61,7 @@ let Main (page: GitDiffPageData) =
     let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
     let send = gitStateCtx.sendDiffMsg
     let generation = page.Generation
+    let indexingLimitMb = gitStateCtx.state.DiffIndexingLimitMb
 
     // The development build of React records a User Timing measure for every component render
     // whose props changed, with the changed props copied into the measure. The browser keeps
@@ -41,13 +74,14 @@ let Main (page: GitDiffPageData) =
     // Once the first page is ready, the loader reads every other page in the background, so the
     // viewer knows the extent of the whole diff.
     React.useEffect (
-        (fun () -> GitDiffPageLoader.indexingRequest page |> Option.iter send),
+        (fun () -> GitDiffPageLoader.indexingRequest indexingLimitMb page |> Option.iter send),
         [|
             box generation
             box page.Indexing
             box page.NextFailed
             box page.NextCursor
             box page.Status
+            box indexingLimitMb
         |]
     )
 
@@ -76,16 +110,58 @@ let Main (page: GitDiffPageData) =
         | Some infos -> Presentation.sourceTitle infos.Previous, Presentation.sourceTitle infos.Current
         | None -> page.PreviousPath |> Option.defaultValue page.Path, page.Path
 
+    // The bar shows the background state on the left, so the viewer leaves it out of its rows.
+    let backgroundNote =
+        match backgroundReadingOf indexingLimitMb page with
+        | None -> Html.none
+        | Some reading ->
+            let state, icon, text =
+                match reading with
+                | BackgroundReading.Indexing ->
+                    let progress =
+                        match page.Progress |> Option.map Presentation.progress with
+                        | Some value ->
+                            $" {Paged.progressPercentage value}%% ({Paged.formatBytes value.ValidatedBytes} / {Paged.formatBytes value.TotalBytes})"
+                        | None -> ""
+
+                    "indexing",
+                    "swt:loading swt:loading-spinner swt:loading-xs",
+                    $"Indexing the diff in the background{progress}. The scrollbar is not exact yet."
+                | BackgroundReading.LimitReached ->
+                    "limit",
+                    "swt:iconify swt:fluent--info-24-regular swt:size-4",
+                    $"Background indexing stopped at the limit of {indexingLimitMb} MB. The scrollbar covers the part read so far."
+                | BackgroundReading.Paused ->
+                    "paused",
+                    "swt:iconify swt:fluent--pause-24-regular swt:size-4",
+                    "Background indexing paused. The scrollbar covers the part read so far. It continues when you scroll or press Continue."
+
+            Html.div [
+                prop.testId "renderer-git-diff-status"
+                prop.custom ("data-state", state)
+                prop.custom ("data-limit-mb", indexingLimitMb)
+                prop.className "swt:flex swt:min-w-0 swt:items-center swt:gap-2 swt:text-xs swt:text-base-content/70"
+                prop.children [
+                    Html.span [ prop.className [ "swt:shrink-0"; icon ] ]
+                    Html.span [
+                        prop.className "swt:min-w-0 swt:truncate"
+                        prop.text text
+                    ]
+                ]
+            ]
+
     Html.div [
         prop.className "swt:flex swt:h-full swt:w-full swt:min-h-0 swt:min-w-0 swt:flex-col"
         prop.children [
             Html.div [
                 prop.className
-                    "swt:flex swt:items-center swt:justify-end swt:border-b swt:border-base-content/10 swt:bg-base-100 swt:px-4 swt:py-2"
+                    "swt:flex swt:items-center swt:justify-between swt:gap-3 swt:border-b swt:border-base-content/10 swt:bg-base-100 swt:px-4 swt:py-2"
                 prop.children [
+                    backgroundNote
                     Html.button [
                         prop.testId "renderer-git-diff-close"
-                        prop.className "swt:btn swt:btn-ghost swt:btn-sm swt:gap-2 swt:normal-case"
+                        prop.className
+                            "swt:btn swt:btn-ghost swt:btn-sm swt:ml-auto swt:shrink-0 swt:gap-2 swt:normal-case"
                         prop.onClick (fun _ -> pageStateCtx.setState None)
                         prop.children [
                             Html.span [
@@ -105,6 +181,7 @@ let Main (page: GitDiffPageData) =
                         progress = (page.Progress |> Option.map Presentation.progress),
                         hasMore = page.NextCursor.IsSome,
                         indexing = (page.Indexing && not page.NextFailed),
+                        hideIndexingStatus = true,
                         nextFailed = page.NextFailed,
                         outputComplete = page.OutputComplete,
                         ?pending = (page.Pending |> Option.map Presentation.pending),

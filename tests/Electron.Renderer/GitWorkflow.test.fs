@@ -129,6 +129,7 @@ let private staleTokenReply<'T> message : JS.Promise<Result<OperationResultDto<'
 let private lfsSettings n materialize : StoragePolicySettingsDto = {
     AutoPolicyThresholdMb = Some n
     MaterializeLargeObjects = materialize
+    DiffIndexingLimitMb = None
 }
 
 let private sessionInfo: WorkspaceSessionInfoDto = {
@@ -393,6 +394,7 @@ let private noopCallbacks: GitSidebarCallbacks = {
     OnCancelPendingRemoteAction = fun () -> ()
     OnSaveDownloadLargeFiles = fun _ -> ()
     OnSaveLfsAutoTrackThreshold = fun _ -> ()
+    OnSaveDiffIndexingLimit = fun _ -> ()
     OnCreateBranch = fun _ -> ()
     OnSwitchBranch = fun _ -> ()
     OnSelectChange = fun _ -> promise { return Ok() }
@@ -915,20 +917,22 @@ Vitest.describe (
                 }
 
                 Vitest
-                    .expect(buildUpdatedLfsSettings state (Some 4) None)
+                    .expect(buildUpdatedLfsSettings state (Some 4) None None)
                     .toEqual (
                         {
                             AutoPolicyThresholdMb = Some 4
                             MaterializeLargeObjects = true
+                            DiffIndexingLimitMb = Some 1024
                         }
                     )
 
                 Vitest
-                    .expect(buildUpdatedLfsSettings state None (Some false))
+                    .expect(buildUpdatedLfsSettings state None (Some false) None)
                     .toEqual (
                         {
                             AutoPolicyThresholdMb = Some 7
                             MaterializeLargeObjects = false
+                            DiffIndexingLimitMb = Some 1024
                         }
                     )
         )
@@ -1954,6 +1958,7 @@ Vitest.describe (
                         {
                             AutoPolicyThresholdMb = Some 4
                             MaterializeLargeObjects = false
+                            DiffIndexingLimitMb = Some 1024
                         }
                     )
             }
@@ -9052,6 +9057,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9060,7 +9066,8 @@ Vitest.describe (
                                 OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -9133,6 +9140,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9142,6 +9150,7 @@ Vitest.describe (
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024,
                             remoteActionsEnabled = false,
                             remoteActionsWarning = "Sign in to a DataHUB account to use fetch, pull, push, or update."
                         )
@@ -9188,6 +9197,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9196,7 +9206,8 @@ Vitest.describe (
                                 OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -9241,6 +9252,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9249,7 +9261,8 @@ Vitest.describe (
                                 OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -9294,6 +9307,7 @@ Vitest.describe (
                                         OnCancelPendingRemoteAction = fun () -> ()
                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                        OnSaveDiffIndexingLimit = fun _ -> ()
                                         OnCreateBranch = fun _ -> ()
                                         OnSwitchBranch = fun _ -> ()
                                         OnSelectChange = fun _ -> promise { return Ok() }
@@ -9302,7 +9316,8 @@ Vitest.describe (
                                         OnCancelOperation = fun () -> ()
                                     },
                                     downloadLargeFiles = true,
-                                    lfsAutoTrackThresholdMb = 5
+                                    lfsAutoTrackThresholdMb = 5,
+                                    diffIndexingLimitMb = 1024
                                 )
                             ]
                         ]
@@ -9386,6 +9401,7 @@ Vitest.describe (
                                         OnCancelPendingRemoteAction = fun () -> ()
                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                        OnSaveDiffIndexingLimit = fun _ -> ()
                                         OnCreateBranch = fun _ -> ()
                                         OnSwitchBranch = fun _ -> ()
                                         OnSelectChange = fun _ -> promise { return Ok() }
@@ -9394,7 +9410,8 @@ Vitest.describe (
                                         OnCancelOperation = fun () -> ()
                                     },
                                     downloadLargeFiles = true,
-                                    lfsAutoTrackThresholdMb = 5
+                                    lfsAutoTrackThresholdMb = 5,
+                                    diffIndexingLimitMb = 1024
                                 )
                             ]
                         ]
@@ -9474,6 +9491,7 @@ Vitest.describe (
                                                         OnCancelPendingRemoteAction = fun () -> ()
                                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                                        OnSaveDiffIndexingLimit = fun _ -> ()
                                                         OnCreateBranch = fun _ -> ()
                                                         OnSwitchBranch = fun _ -> ()
                                                         OnSelectChange = fun _ -> promise { return Ok() }
@@ -9482,7 +9500,8 @@ Vitest.describe (
                                                         OnCancelOperation = fun () -> ()
                                                     },
                                                     downloadLargeFiles = true,
-                                                    lfsAutoTrackThresholdMb = 5
+                                                    lfsAutoTrackThresholdMb = 5,
+                                                    diffIndexingLimitMb = 1024
                                                 )
                                             ]
                                         ]
@@ -9544,6 +9563,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9552,7 +9572,8 @@ Vitest.describe (
                                 OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -9604,6 +9625,7 @@ Vitest.describe (
                                         OnCancelPendingRemoteAction = fun () -> ()
                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                        OnSaveDiffIndexingLimit = fun _ -> ()
                                         OnCreateBranch = fun _ -> ()
                                         OnSwitchBranch = fun _ -> ()
                                         OnSelectChange = fun _ -> promise { return Ok() }
@@ -9612,7 +9634,8 @@ Vitest.describe (
                                         OnCancelOperation = fun () -> ()
                                     },
                                     downloadLargeFiles = true,
-                                    lfsAutoTrackThresholdMb = 5
+                                    lfsAutoTrackThresholdMb = 5,
+                                    diffIndexingLimitMb = 1024
                                 )
                             ]
                         ]
@@ -9659,6 +9682,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9667,7 +9691,8 @@ Vitest.describe (
                                 OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -9720,7 +9745,8 @@ Vitest.describe (
                                     OnDiscardSelection = fun paths -> discardedPaths <- Some paths
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -9789,6 +9815,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9797,7 +9824,8 @@ Vitest.describe (
                                 OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -9876,6 +9904,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9884,7 +9913,8 @@ Vitest.describe (
                                 OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -9971,6 +10001,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Error "Diff failed to load." }
@@ -9979,7 +10010,8 @@ Vitest.describe (
                                 OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -10018,6 +10050,7 @@ Vitest.describe (
                             callbacks = noopCallbacks,
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024,
                             publishRenamePrompt = {
                                 CurrentName = "Existing ARC"
                                 Message = "A DataHUB repository named 'Existing ARC' already exists."
@@ -10082,6 +10115,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -10090,7 +10124,8 @@ Vitest.describe (
                                 OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -10143,7 +10178,8 @@ Vitest.describe (
                                             promise { return Ok() }
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -10179,7 +10215,8 @@ Vitest.describe (
                             branchOptions = [| sidebarLocalBranch "main" true true |],
                             callbacks = noopCallbacks,
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 

@@ -1003,7 +1003,7 @@ Vitest.describe (
                 Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
                 Vitest.expect(page.NextFailed).toBe (true)
                 Vitest.expect(page.Pages.Length).toBe (2)
-                Vitest.expect(GitDiffPageLoader.indexingRequest page).toEqual (None)
+                Vitest.expect(GitDiffPageLoader.indexingRequest DefaultDiffIndexingLimitMb page).toEqual (None)
 
                 // Asking for the next page again reads it, and the indexing goes on to the end.
                 failing.Value <- false
@@ -1035,13 +1035,18 @@ Vitest.describe (
             fun () -> promise {
                 let fake = FakeDiffClient()
                 let! single = openFirstPage fake (diffPage "p1" None [| hunk "h1" |])
-                Vitest.expect(GitDiffPageLoader.indexingRequest (diffOf single)).toEqual (None)
+
+                Vitest
+                    .expect(GitDiffPageLoader.indexingRequest DefaultDiffIndexingLimitMb (diffOf single))
+                    .toEqual (None)
 
                 let fake = FakeDiffClient()
                 let! state = openFirstPage fake (diffPage "p1" (Some "cursor-1") [| hunk "h1" |])
                 let page = diffOf state
 
-                Vitest.expect(GitDiffPageLoader.indexingRequest page).toEqual (Some(GitDiffMsg.Index page.Generation))
+                Vitest
+                    .expect(GitDiffPageLoader.indexingRequest DefaultDiffIndexingLimitMb page)
+                    .toEqual (Some(GitDiffMsg.Index page.Generation))
 
                 // Once the indexing runs, or while a page loads, the loader asks for nothing.
                 fake.ReadReply <-
@@ -1051,13 +1056,285 @@ Vitest.describe (
                     update fake.Dependencies fake.SetPageState (diffMsg (GitDiffMsg.Index page.Generation)) state
 
                 let! _ = collectMessages indexCmd
-                Vitest.expect(GitDiffPageLoader.indexingRequest (diffOf indexing)).toEqual (None)
+
+                Vitest
+                    .expect(GitDiffPageLoader.indexingRequest DefaultDiffIndexingLimitMb (diffOf indexing))
+                    .toEqual (None)
 
                 Vitest
                     .expect(
-                        GitDiffPageLoader.indexingRequest {
+                        GitDiffPageLoader.indexingRequest DefaultDiffIndexingLimitMb {
                             page with
                                 Status = GitDiffPageStatus.LoadingNext
+                        }
+                    )
+                    .toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "The journal estimate adds the UTF-8 size of the JSON of every page, and a reopen starts it again",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                // Characters of 2 and 3 bytes in UTF-8 make the size differ from the length of the JSON text.
+                let pageWith (index: int) (text: string) (nextCursor: string option) =
+                    diffPage $"p{index}" nextCursor [|
+                        hunkWith $"h{index}" [|
+                            {
+                                changedRow $"h{index}-row" with
+                                    Current = Some(textLine index text)
+                            }
+                        |]
+                    |]
+
+                let first = pageWith 1 "é€é" (Some "cursor-1")
+                let second = pageWith 2 "ü€ü€" (Some "cursor-2")
+                let third = pageWith 3 "x" None
+
+                // Counts the bytes per character, so the check shares no code with the loader.
+                let utf8Bytes (dto: DiffPageDto) =
+                    JS.JSON.stringify dto
+                    |> Seq.sumBy (fun character ->
+                        if int character < 0x80 then 1.0
+                        elif int character < 0x800 then 2.0
+                        else 3.0
+                    )
+
+                Vitest.expect(utf8Bytes first).toBeGreaterThan (float (JS.JSON.stringify first).Length)
+
+                // The first session answers two pages and then closes. The second session answers them all.
+                fake.OpenReply <- fun _ -> openedOn (handleOfOpen fake.Opens.Count) first
+
+                let answerOf (cursor: string) =
+                    if cursor = "cursor-1" then second else third
+
+                fake.ReadReply <-
+                    fun request ->
+                        if request.HandleId = "diff-1" && request.Cursor <> "cursor-1" then
+                            failedWith "diff_session_closed" None
+                        else
+                            succeeded (ResumablePageDto.Ready(answerOf request.Cursor))
+
+                let! state = run fake (select "a.txt") runningState
+                let generation = (diffOf state).Generation
+                Vitest.expect((diffOf state).JournalBytes).toBe (utf8Bytes first)
+
+                let! state = run fake (diffMsg (GitDiffMsg.Index generation)) state
+                Vitest.expect((diffOf state).JournalBytes).toBe (utf8Bytes first + utf8Bytes second)
+                Vitest.expect((diffOf state).IndexingPaused).toBe (true)
+
+                // The user request reopens the diff. The estimate then counts the pages of the new session only.
+                let! state = run fake (diffMsg (GitDiffMsg.LoadNext generation)) state
+                Vitest.expect(fake.Opens.Count).toBe (2)
+
+                let newSessionBytes =
+                    fake.Reads
+                    |> Seq.filter (fun read -> read.HandleId = "diff-2")
+                    |> Seq.sumBy (fun read -> utf8Bytes (answerOf read.Cursor))
+
+                Vitest.expect((diffOf state).JournalBytes).toBe (utf8Bytes first + newSessionBytes)
+                Vitest.expect((diffOf state).JournalBytes).toBeLessThan (utf8Bytes first + utf8Bytes second)
+            }
+        )
+
+        Vitest.test (
+            "The background indexing stops once the pages read reach the limit, and a user read still reads on",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                // Every page is a bit above 1 MiB of JSON, and the limit is 2 MiB.
+                let pageOf (index: int) =
+                    diffPage $"p{index}" (Some $"cursor-{index}") [|
+                        hunkWith $"h{index}" [|
+                            {
+                                changedRow $"h{index}-row" with
+                                    Current = Some(textLine index (String.replicate 1100000 "x"))
+                            }
+                        |]
+                    |]
+
+                fake.OpenReply <- fun _ -> openedPage (pageOf 1)
+
+                fake.ReadReply <-
+                    fun request ->
+                        succeeded (ResumablePageDto.Ready(pageOf (int (request.Cursor.Replace("cursor-", "")) + 1)))
+
+                let limited = {
+                    runningState with
+                        DiffIndexingLimitMb = 2
+                }
+
+                let! state = run fake (select "a.txt") limited
+                let generation = (diffOf state).Generation
+                Vitest.expect(GitDiffPageLoader.indexingLimitReached 2 (diffOf state)).toBe (false)
+
+                // The second page brings the estimate to the limit. Its read was the last background read.
+                let! state = run fake (diffMsg (GitDiffMsg.Index generation)) state
+                let page = diffOf state
+                Vitest.expect(fake.Reads.Count).toBe (1)
+                Vitest.expect(page.Pages |> Array.map _.PageId).toEqual ([| "p1"; "p2" |])
+                Vitest.expect(GitDiffPageLoader.indexingLimitReached 2 page).toBe (true)
+                Vitest.expect(page.Indexing).toBe (false)
+                Vitest.expect(GitDiffPageLoader.indexingRequest 2 page).toEqual (None)
+
+                // The user asks for the next page, and the read is not held back by the limit.
+                let! state = run fake (diffMsg (GitDiffMsg.LoadNext generation)) state
+                Vitest.expect(fake.Reads.Count).toBe (2)
+                Vitest.expect((diffOf state).Pages |> Array.map _.PageId).toEqual ([| "p1"; "p2"; "p3" |])
+                Vitest.expect((diffOf state).Indexing).toBe (false)
+
+                // A higher limit asks for the indexing again, and it stops at the new limit.
+                Vitest.expect(GitDiffPageLoader.indexingRequest 2 (diffOf state)).toEqual (None)
+
+                Vitest
+                    .expect(GitDiffPageLoader.indexingRequest 4 (diffOf state))
+                    .toEqual (Some(GitDiffMsg.Index generation))
+
+                let! state = run fake (diffMsg (GitDiffMsg.Index generation)) { state with DiffIndexingLimitMb = 4 }
+                Vitest.expect(fake.Reads.Count).toBe (3)
+                Vitest.expect((diffOf state).Pages |> Array.map _.PageId).toEqual ([| "p1"; "p2"; "p3"; "p4" |])
+                Vitest.expect((diffOf state).Indexing).toBe (false)
+            }
+        )
+
+        Vitest.test (
+            "Lowering the limit stops the indexing after the read in flight",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+
+                let pageOf (index: int) =
+                    diffPage $"p{index}" (Some $"cursor-{index}") [|
+                        hunkWith $"h{index}" [|
+                            {
+                                changedRow $"h{index}-row" with
+                                    Current = Some(textLine index (String.replicate 1100000 "x"))
+                            }
+                        |]
+                    |]
+
+                fake.OpenReply <- fun _ -> openedPage (pageOf 1)
+
+                // The test answers the read itself, so the reply of the client goes nowhere.
+                fake.ReadReply <- fun _ -> succeeded (ResumablePageDto.Ready(pageOf 99))
+                let! opened = run fake (select "a.txt") runningState
+                let generation = (diffOf opened).Generation
+                let deps = fake.Dependencies
+
+                let dispatchNothing (cmd: Cmd<Msg>) =
+                    cmd |> List.iter (fun sub -> sub ignore)
+
+                // Starts the indexing, which leaves one background read in flight.
+                let indexing, indexCmd =
+                    update deps fake.SetPageState (diffMsg (GitDiffMsg.Index generation)) opened
+
+                dispatchNothing indexCmd
+                Vitest.expect((diffOf indexing).NextRequest.IsSome).toBe (true)
+
+                // Answers the read in flight with the next page and returns the state after it.
+                let answer (state: GitState) =
+                    let page = diffOf state
+                    let running = page.NextRequest.Value
+
+                    let request: ReadTextDiffPageRequestDto = {
+                        OperationId = running.OperationId
+                        HandleId = page.Handle.Value.Id
+                        HandleVersion = page.Handle.Value.Version
+                        Cursor = running.Cursor
+                    }
+
+                    let reply = Ok(succeeded (ResumablePageDto.Ready(pageOf 2)))
+
+                    update deps fake.SetPageState (diffMsg (GitDiffMsg.PageCompleted(generation, request, reply))) state
+                    |> fst
+
+                // With the default limit the arriving page starts the next read.
+                let continued = answer indexing
+                Vitest.expect((diffOf continued).Indexing).toBe (true)
+                Vitest.expect((diffOf continued).NextRequest.IsSome).toBe (true)
+
+                // With a lower limit the same page ends the indexing, and no further read starts.
+                let stopped =
+                    answer {
+                        indexing with
+                            DiffIndexingLimitMb = 1
+                    }
+
+                Vitest.expect((diffOf stopped).Pages |> Array.map _.PageId).toEqual ([| "p1"; "p2" |])
+                Vitest.expect((diffOf stopped).Indexing).toBe (false)
+                Vitest.expect((diffOf stopped).NextRequest).toEqual (None)
+                Vitest.expect(GitDiffPageLoader.indexingRequest 1 (diffOf stopped)).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "The bar above the diff names the background state of the diff",
+            fun () -> promise {
+                let fake = FakeDiffClient()
+                let! state = openFirstPage fake (diffPage "p1" (Some "cursor-1") [| hunk "h1" |])
+                let page = diffOf state
+
+                let statusOf (shown: GitDiffPageData) =
+                    let status =
+                        (renderTarget shown).querySelector "[data-testid=\"renderer-git-diff-status\"]"
+
+                    if isNull status then
+                        None
+                    else
+                        Some(status.getAttribute "data-state", status.getAttribute "data-limit-mb")
+
+                // Nothing runs before the indexing starts.
+                Vitest.expect(statusOf page).toEqual (None)
+
+                Vitest.expect(statusOf { page with Indexing = true }).toEqual (Some("indexing", "1024"))
+                Vitest.expect(statusOf { page with IndexingPaused = true }).toEqual (Some("paused", "1024"))
+
+                // The pages read add up to the limit of the context, which is 1024 MiB here.
+                Vitest
+                    .expect(
+                        statusOf {
+                            page with
+                                JournalBytes = 1024.0 * 1024.0 * 1024.0
+                        }
+                    )
+                    .toEqual (Some("limit", "1024"))
+
+                Vitest
+                    .expect(
+                        statusOf {
+                            page with
+                                JournalBytes = 1024.0 * 1024.0 * 1024.0 - 1.0
+                        }
+                    )
+                    .toEqual (None)
+
+                // A finished indexing, a failed read and a settled diff show no state.
+                Vitest
+                    .expect(
+                        statusOf {
+                            page with
+                                Indexing = true
+                                NextCursor = None
+                        }
+                    )
+                    .toEqual (None)
+
+                Vitest
+                    .expect(
+                        statusOf {
+                            page with
+                                Indexing = true
+                                NextFailed = true
+                        }
+                    )
+                    .toEqual (None)
+
+                Vitest
+                    .expect(
+                        statusOf {
+                            page with
+                                Indexing = true
+                                Status = GitDiffPageStatus.SourceChanged
                         }
                     )
                     .toEqual (None)
@@ -1173,7 +1450,7 @@ Vitest.describe (
                 Vitest.expect(page.IndexingPaused).toBe (true)
                 Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
                 Vitest.expect(state.DiffReopen).toEqual (None)
-                Vitest.expect(GitDiffPageLoader.indexingRequest page).toEqual (None)
+                Vitest.expect(GitDiffPageLoader.indexingRequest DefaultDiffIndexingLimitMb page).toEqual (None)
             }
         )
 
@@ -1225,7 +1502,7 @@ Vitest.describe (
                 Vitest.expect(page.IndexingPaused).toBe (true)
                 Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
                 Vitest.expect(state.DiffReopen).toEqual (None)
-                Vitest.expect(GitDiffPageLoader.indexingRequest page).toEqual (None)
+                Vitest.expect(GitDiffPageLoader.indexingRequest DefaultDiffIndexingLimitMb page).toEqual (None)
             }
         )
 
@@ -1249,7 +1526,10 @@ Vitest.describe (
                 Vitest.expect(page.Status).toEqual (GitDiffPageStatus.Ready)
                 Vitest.expect(page.IndexingPaused).toBe (false)
                 Vitest.expect(state.DiffReopen).toEqual (None)
-                Vitest.expect(GitDiffPageLoader.indexingRequest page).toEqual (Some(GitDiffMsg.Index generation))
+
+                Vitest
+                    .expect(GitDiffPageLoader.indexingRequest DefaultDiffIndexingLimitMb page)
+                    .toEqual (Some(GitDiffMsg.Index generation))
 
                 let! state = run fake (diffMsg (GitDiffMsg.Index generation)) state
                 let page = diffOf state

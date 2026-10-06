@@ -34,6 +34,7 @@ const baseCallbacks = {
   OnCancelPendingRemoteAction: noop,
   OnSaveDownloadLargeFiles: noopWithDownloadPreference,
   OnSaveLfsAutoTrackThreshold: noopWithThreshold,
+  OnSaveDiffIndexingLimit: noopWithThreshold,
   OnCreateBranch: noopWithArg,
   OnSwitchBranch: noopWithBranch,
   OnSelectChange: noopSelectChange,
@@ -197,6 +198,7 @@ export const CleanRepo: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -220,6 +222,7 @@ export const CleanRepoWithoutUpstream: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -246,6 +249,7 @@ export const NotPublishedYet: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
     hasRemote: false,
   },
   play: async ({ canvasElement }) => {
@@ -265,6 +269,7 @@ export const ChangedFiles: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -290,6 +295,7 @@ export const MarkedSelectionWithoutLastClickedHighlight: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -321,6 +327,7 @@ export const SlowOpenDoesNotGreyRows: Story = {
     }),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -339,6 +346,7 @@ export const AdvancedActions: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
     canOpenRemoteRepository: true,
     onOpenRemoteRepository: noopOpenRemoteRepository,
   },
@@ -377,6 +385,7 @@ export const ResponsiveActionLabels: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -411,6 +420,7 @@ export const ConflictsPresent: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -437,6 +447,7 @@ export const LargeChangedSet: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -477,6 +488,7 @@ export const DeletedFile: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -520,6 +532,7 @@ export const ChangeStatusIconColors: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -546,6 +559,7 @@ export const LongWrappedFile: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -567,6 +581,7 @@ export const HoverDiscardChange: Story = {
     }),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     discardSelectionSpy.mockClear();
@@ -602,6 +617,7 @@ export const BusyProgressState: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -649,6 +665,7 @@ export const CancelableUploadProgressState: Story = {
     canCancelOperation: true,
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     cancelOperationSpy.mockClear();
@@ -673,6 +690,7 @@ export const ClonePhaseProgressState: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -692,6 +710,7 @@ export const BusyNoticeState: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -709,6 +728,7 @@ export const CreateBranchModal: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -736,6 +756,7 @@ export const SwitchBranchModal: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -760,6 +781,7 @@ export const CommitComposer: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -804,6 +826,7 @@ export const RemoteActionsDisabled: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
     remoteActionsEnabled: false,
     remoteActionsWarning:
       "Sign in to a DataHub account to use fetch, pull, push, or update.",
@@ -830,6 +853,7 @@ export const OpenRemoteRepositoryButton: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
     canOpenRemoteRepository: true,
     onOpenRemoteRepository: openRemoteRepositorySpy,
   },
@@ -852,5 +876,6 @@ export const GlobalErrorState: Story = {
     errorNotice: "Fetch failed because the remote rejected the request.",
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    diffIndexingLimitMb: 1024,
   },
 };

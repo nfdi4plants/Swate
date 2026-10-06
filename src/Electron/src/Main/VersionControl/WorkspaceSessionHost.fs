@@ -217,8 +217,7 @@ type WorkspaceSessionHost(runtime: VersionControlRuntime.VersionControlRuntime) 
         : Async<OperationResult<unit>> =
         async {
             match VersionControlSettings.validate settings with
-            | Error reason ->
-                return Failed(OperationFailure.create Validation VersionControlCodes.InvalidLfsThreshold reason)
+            | Error(code, reason) -> return Failed(OperationFailure.create Validation code reason)
             | Ok settings ->
                 match tryFindSession workspaceRoot with
                 | None ->

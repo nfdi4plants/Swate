@@ -203,6 +203,7 @@ let Main () =
                 OnCancelPendingRemoteAction = gitStateCtx.cancelPendingRemoteAction
                 OnSaveDownloadLargeFiles = gitStateCtx.saveDownloadLargeFiles
                 OnSaveLfsAutoTrackThreshold = gitStateCtx.saveLfsAutoTrackThreshold
+                OnSaveDiffIndexingLimit = gitStateCtx.saveDiffIndexingLimit
                 OnCreateBranch = gitStateCtx.createBranch
                 OnSwitchBranch = gitStateCtx.switchBranch
                 OnSelectChange = gitStateCtx.selectChange
@@ -212,6 +213,7 @@ let Main () =
             },
             downloadLargeFiles = gitStateCtx.state.DownloadLargeFiles,
             lfsAutoTrackThresholdMb = gitStateCtx.state.LfsAutoTrackThresholdMb,
+            diffIndexingLimitMb = gitStateCtx.state.DiffIndexingLimitMb,
             remoteActionsEnabled = remoteActionsEnabled,
             canCancelOperation = canCancelOperation,
             canOpenRemoteRepository = gitStateCtx.state.OriginRemoteRepositoryWebUrl.IsSome,

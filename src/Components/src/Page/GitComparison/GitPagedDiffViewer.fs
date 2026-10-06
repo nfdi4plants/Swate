@@ -490,24 +490,6 @@ module internal GitPagedDiffDisplay =
         else
             theme.RightChanged.ChangedSegmentClass
 
-    let formatBytes bytes =
-        if bytes >= 1099511627776.0 then
-            $"{Math.Round(bytes / 1099511627776.0, 1)} TiB"
-        elif bytes >= 1073741824.0 then
-            $"{Math.Round(bytes / 1073741824.0, 1)} GiB"
-        elif bytes >= 1048576.0 then
-            $"{Math.Round(bytes / 1048576.0, 1)} MiB"
-        elif bytes >= 1024.0 then
-            $"{Math.Round(bytes / 1024.0, 1)} KiB"
-        else
-            $"{numberText bytes} B"
-
-    let progressPercentage (progress: PagedProgress) =
-        if progress.TotalBytes <= 0.0 then
-            if progress.ScanComplete then 100 else 0
-        else
-            clamp 0 100 (int (Math.Round(progress.ValidatedBytes / progress.TotalBytes * 100.0)))
-
     /// An evicted page with display rows counts as content, since its rows come back when it is
     /// replayed. A page of hidden gaps only counts as well.
     let hasChanges (parts: PagedPart[]) =
@@ -1048,7 +1030,7 @@ type GitPagedDiffViewer =
                                             prop.testId $"{props.Prefix}-continue-progress"
                                             prop.className "swt:text-xs swt:text-base-content/60"
                                             prop.text
-                                                $"{GitPagedDiffDisplay.progressPercentage value}%% ({GitPagedDiffDisplay.formatBytes value.ValidatedBytes} / {GitPagedDiffDisplay.formatBytes value.TotalBytes})"
+                                                $"{progressPercentage value}%% ({formatBytes value.ValidatedBytes} / {formatBytes value.TotalBytes})"
                                         ]
                                     | _ -> ()
                                     if props.Indexing then
@@ -2145,12 +2127,9 @@ type GitPagedDiffViewer =
                             prop.className
                                 "swt:flex swt:items-center swt:justify-between swt:gap-3 swt:text-xs swt:text-base-content/70"
                             prop.children [
+                                Html.span [ prop.text $"{progressPercentage value}%%" ]
                                 Html.span [
-                                    prop.text $"{GitPagedDiffDisplay.progressPercentage value}%%"
-                                ]
-                                Html.span [
-                                    prop.text
-                                        $"{GitPagedDiffDisplay.formatBytes value.ValidatedBytes} / {GitPagedDiffDisplay.formatBytes value.TotalBytes}"
+                                    prop.text $"{formatBytes value.ValidatedBytes} / {formatBytes value.TotalBytes}"
                                 ]
                             ]
                         ]
@@ -2159,9 +2138,7 @@ type GitPagedDiffViewer =
                             prop.children [
                                 Html.div [
                                     prop.className "swt:h-full swt:bg-primary"
-                                    prop.style [
-                                        style.width (length.percent (GitPagedDiffDisplay.progressPercentage value))
-                                    ]
+                                    prop.style [ style.width (length.percent (progressPercentage value)) ]
                                 ]
                             ]
                         ]
@@ -2269,10 +2246,7 @@ type GitPagedDiffViewer =
 
     [<ReactComponent>]
     static member private ReopeningBar(prefix: string, progress: PagedProgress option) =
-        let percentage =
-            progress
-            |> Option.map GitPagedDiffDisplay.progressPercentage
-            |> Option.defaultValue 0
+        let percentage = progress |> Option.map progressPercentage |> Option.defaultValue 0
 
         Html.div [
             prop.testId $"{prefix}-reopening"

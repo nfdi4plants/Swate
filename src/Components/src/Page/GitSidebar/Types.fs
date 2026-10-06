@@ -77,6 +77,7 @@ type GitSidebarCallbacks = {
     OnCancelPendingRemoteAction: unit -> unit
     OnSaveDownloadLargeFiles: bool -> unit
     OnSaveLfsAutoTrackThreshold: int -> unit
+    OnSaveDiffIndexingLimit: int -> unit
     OnCreateBranch: GitSidebarCreateBranchRequest -> unit
     OnSwitchBranch: string -> unit
     OnSelectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>

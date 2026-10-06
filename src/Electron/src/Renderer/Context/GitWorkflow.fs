@@ -15,6 +15,10 @@ open Swate.Electron.Shared.VersionControlTypes
 /// Large copies need time to settle before Git hashes their contents again.
 let private externalChangesRefreshDelayMs = 1500
 
+/// The background indexing limit of a session, in MiB, until the main process answers with its own.
+[<Literal>]
+let DefaultDiffIndexingLimitMb = 1024
+
 [<RequireQualifiedAccess>]
 type GitRefreshState =
     | Idle
@@ -32,6 +36,7 @@ type GitBusyOperation =
     | CommittingAllChanges
     | DiscardingSelectedChanges
     | SavingGitLfsThreshold
+    | SavingDiffIndexingLimit
     | SavingGitLfsDownloadPreference
     | CreatingBranch
     | SwitchingBranch
@@ -140,6 +145,8 @@ type GitState = {
     PendingPublishAfterRefresh: bool
     PendingPublishForPath: string option
     LfsAutoTrackThresholdMb: int
+    /// Whole MiB. The background indexing of an open diff stops once the pages it read add up to this size.
+    DiffIndexingLimitMb: int
     DownloadLargeFiles: bool
     RepositoryAvailability: GitRepositoryAvailability
     RefreshState: GitRefreshState
@@ -200,6 +207,7 @@ type GitState = {
         PendingPublishAfterRefresh = false
         PendingPublishForPath = None
         LfsAutoTrackThresholdMb = 1
+        DiffIndexingLimitMb = DefaultDiffIndexingLimitMb
         DownloadLargeFiles = false
         RepositoryAvailability = GitRepositoryAvailability.Ready
         RefreshState = GitRefreshState.Idle
@@ -572,6 +580,7 @@ type Msg =
         sessionId: int *
         result: Result<ConfirmMergeResolutionOutcome, ConfirmMergeResolutionError>
     | SaveLfsAutoTrackThresholdRequested of int
+    | SaveDiffIndexingLimitRequested of int
     | SaveDownloadLargeFilesRequested of bool
     | FetchRequested
     | PullRequested
@@ -684,6 +693,7 @@ let busyNoticeFromOperation =
     | GitBusyOperation.CommittingAllChanges -> Some "Committing all changes"
     | GitBusyOperation.DiscardingSelectedChanges -> Some "Discarding selected changes"
     | GitBusyOperation.SavingGitLfsThreshold -> Some "Saving Git LFS threshold"
+    | GitBusyOperation.SavingDiffIndexingLimit -> Some "Saving background indexing limit"
     | GitBusyOperation.SavingGitLfsDownloadPreference -> Some "Saving Git LFS download preference"
     | GitBusyOperation.CreatingBranch -> Some "Creating branch"
     | GitBusyOperation.SwitchingBranch -> Some "Switching branch"
@@ -1056,6 +1066,9 @@ let private applyRefreshResult (refreshResult: GitRefreshResult) (model: GitStat
                 LfsAutoTrackThresholdMb =
                     settings.AutoPolicyThresholdMb
                     |> Option.defaultValue GitState.Empty.LfsAutoTrackThresholdMb
+                DiffIndexingLimitMb =
+                    settings.DiffIndexingLimitMb
+                    |> Option.defaultValue GitState.Empty.DiffIndexingLimitMb
                 DownloadLargeFiles = settings.MaterializeLargeObjects
           }
         | Error _ -> modelWithBranches
@@ -1118,10 +1131,12 @@ let buildUpdatedLfsSettings
     (state: GitState)
     (thresholdMb: int option)
     (downloadLargeFiles: bool option)
+    (diffIndexingLimitMb: int option)
     : StoragePolicySettingsDto =
     {
         AutoPolicyThresholdMb = Some(thresholdMb |> Option.defaultValue state.LfsAutoTrackThresholdMb)
         MaterializeLargeObjects = downloadLargeFiles |> Option.defaultValue state.DownloadLargeFiles
+        DiffIndexingLimitMb = Some(diffIndexingLimitMb |> Option.defaultValue state.DiffIndexingLimitMb)
     }
 
 /// Resolves a caller-provided reply callback synchronously when the command runs.
@@ -1581,6 +1596,7 @@ module GitDiffPageLoader =
             KeepRequestedPage = false
             Indexing = false
             IndexingPaused = false
+            JournalBytes = 0.0
             NextFailed = false
             FailedGaps = []
             FailedLineSlices = []
@@ -1812,18 +1828,30 @@ module GitDiffPageLoader =
 
         last |> Option.exists (fun number -> number >= line.Number)
 
-    let private windowPage (dto: DiffPageDto) : GitDiffWindowPage =
+    /// The page of the DTO. The JSON of the DTO is passed in, since the caller may need it too.
+    let private windowPageOfJson (dto: DiffPageDto) (json: string) : GitDiffWindowPage =
         let parts = dto.Parts |> Array.map Presentation.part
 
         {
             PageId = dto.PageId
             Parts = parts
             RowCount = Paged.displayRowCount parts
-            PayloadBytes = payloadBytes dto
+            PayloadBytes = float json.Length
             IsEvicted = false
             ExpandedGaps = []
             Span = spanOf parts
         }
+
+    let private windowPage (dto: DiffPageDto) : GitDiffWindowPage =
+        windowPageOfJson dto (JS.JSON.stringify dto)
+
+    /// The size of the JSON in UTF-8 bytes. The encoding runs through the TextEncoder of the runtime.
+    let private utf8Bytes (json: string) =
+        float (System.Text.Encoding.UTF8.GetBytes json).Length
+
+    /// Whether the pages the session answered add up to the limit of the background indexing.
+    let indexingLimitReached (limitMb: int) (page: GitDiffPageData) =
+        page.JournalBytes >= float limitMb * 1024.0 * 1024.0
 
     /// Requests the page at the cursor, unless that cursor is already being read. The request
     /// remembers whether the background indexing sent it.
@@ -1879,7 +1907,9 @@ module GitDiffPageLoader =
 
             { page with Status = status }, Cmd.none
         | ResumablePageDto.Ready dto ->
-            let arrived = windowPage dto
+            // The JSON is made once and gives both sizes of the page.
+            let json = JS.JSON.stringify dto
+            let arrived = windowPageOfJson dto json
 
             let pages, requestedPageIndex, status =
                 match page.Status with
@@ -1909,6 +1939,7 @@ module GitDiffPageLoader =
                     Pages = pages
                     RequestedPageIndex = requestedPageIndex
                     KeepRequestedPage = false
+                    JournalBytes = page.JournalBytes + utf8Bytes json
                     NextCursor = dto.NextCursor
                     NextFailed = false
                     Progress = Some dto.Progress
@@ -2599,6 +2630,8 @@ module GitDiffPageLoader =
                         VisiblePages = []
                         KeepRequestedPage = false
                         IndexingPaused = false
+                        // The new session has read nothing yet.
+                        JournalBytes = 0.0
                         NextFailed = false
                         FailedGaps = []
                         FailedLineSlices = []
@@ -2688,21 +2721,29 @@ module GitDiffPageLoader =
     /// whose output is exhausted ends the indexing. Only a ready page reads on, so a failed or
     /// settled diff, a reopen and a user request for the next page all hold it back. The one
     /// pending read stays the only read, and the answer of a closed diff finds no page to continue.
-    let private continueIndexing (deps: GitDependencies) (page: GitDiffPageData) =
+    /// Once the pages read add up to the limit, the read that just ended is the last one. The
+    /// indexing ends, and indexingRequest asks for it again when the limit rises.
+    let private continueIndexing (deps: GitDependencies) (limitMb: int) (page: GitDiffPageData) =
         match page.Status, page.NextCursor, page.Handle with
         | GitDiffPageStatus.Ready, Some cursor, Some _ when
             page.Indexing && not page.NextFailed && page.NextRequest.IsNone
             ->
-            readPage deps { page with KeepRequestedPage = true } cursor true
+            if indexingLimitReached limitMb page then
+                { page with Indexing = false }, Cmd.none
+            else
+                readPage deps { page with KeepRequestedPage = true } cursor true
         | GitDiffPageStatus.Ready, None, _ when page.Indexing -> { page with Indexing = false }, Cmd.none
         | _ -> page, Cmd.none
 
     /// The message that starts the indexing, once the first page is ready and more pages follow.
-    /// None while the indexing runs, waits for a retry or is paused.
-    let indexingRequest (page: GitDiffPageData) : GitDiffMsg option =
+    /// None while the indexing runs, waits for a retry, is paused or has read up to the limit.
+    let indexingRequest (limitMb: int) (page: GitDiffPageData) : GitDiffMsg option =
         match page.Status, page.NextCursor, page.Handle with
         | GitDiffPageStatus.Ready, Some _, Some _ when
-            not page.Indexing && not page.NextFailed && not page.IndexingPaused
+            not page.Indexing
+            && not page.NextFailed
+            && not page.IndexingPaused
+            && not (indexingLimitReached limitMb page)
             ->
             Some(GitDiffMsg.Index page.Generation)
         | _ -> None
@@ -2717,6 +2758,7 @@ module GitDiffPageLoader =
     /// encoding chosen for a side that turned out not to be UTF-8 reopens the diff the same way.
     let private updateWithReopen
         (deps: GitDependencies)
+        (limitMb: int)
         (msg: GitDiffMsg)
         (reopening: GitDiffReopen option)
         (page: GitDiffPageData)
@@ -2799,7 +2841,7 @@ module GitDiffPageLoader =
             if reopening.IsSome then
                 next, reopening, cmd
             else
-                let next, indexCmd = continueIndexing deps next
+                let next, indexCmd = continueIndexing deps limitMb next
                 next, reopening, Cmd.batch [ cmd; indexCmd ]
 
     /// Leaving the diff only drops the page here. The workflow's update closes the handle of
@@ -2813,7 +2855,8 @@ module GitDiffPageLoader =
                 model.DiffReopen
                 |> Option.filter (fun reopen -> reopen.Generation = page.Generation)
 
-            let next, reopening, cmd = updateWithReopen deps msg reopening page
+            let next, reopening, cmd =
+                updateWithReopen deps model.DiffIndexingLimitMb msg reopening page
 
             // The answer of a background read that leaves the indexing running shows after a
             // short delay. Every other message shows its page at once, so a page the user asked
@@ -4927,7 +4970,7 @@ let private updateCore
             WriteRequested(
                 SaveLfsSettings(
                     GitBusyOperation.SavingGitLfsDownloadPreference,
-                    buildUpdatedLfsSettings model None (Some downloadLargeFiles)
+                    buildUpdatedLfsSettings model None (Some downloadLargeFiles) None
                 )
             )
         )
@@ -4937,7 +4980,17 @@ let private updateCore
             WriteRequested(
                 SaveLfsSettings(
                     GitBusyOperation.SavingGitLfsThreshold,
-                    buildUpdatedLfsSettings model (Some thresholdMb) None
+                    buildUpdatedLfsSettings model (Some thresholdMb) None None
+                )
+            )
+        )
+    | SaveDiffIndexingLimitRequested limitMb ->
+        model,
+        Cmd.ofMsg (
+            WriteRequested(
+                SaveLfsSettings(
+                    GitBusyOperation.SavingDiffIndexingLimit,
+                    buildUpdatedLfsSettings model None None (Some limitMb)
                 )
             )
         )

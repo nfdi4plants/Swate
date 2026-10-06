@@ -87,6 +87,7 @@ let private validationFailed (code: string) (message: string) : OperationResult<
 let private storagePolicySettingsDto (settings: VersionControlSettings) : StoragePolicySettingsDto = {
     AutoPolicyThresholdMb = Some settings.AutoTrackThresholdMb
     MaterializeLargeObjects = settings.DownloadLargeFiles
+    DiffIndexingLimitMb = Some settings.DiffIndexingLimitMb
 }
 
 /// Registers and announces one operation before any await, and turns exceptions into failures.
@@ -1008,6 +1009,9 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                             request.Settings.AutoPolicyThresholdMb
                             |> Option.defaultValue current.AutoTrackThresholdMb
                         DownloadLargeFiles = request.Settings.MaterializeLargeObjects
+                        DiffIndexingLimitMb =
+                            request.Settings.DiffIndexingLimitMb
+                            |> Option.defaultValue current.DiffIndexingLimitMb
                     }
 
                     host.SetSettings(hosted.Binding.WorkspaceRoot, settings, context)

@@ -395,6 +395,10 @@ module VersionControlCodes =
     [<Literal>]
     let InvalidLfsThreshold = "invalid_lfs_threshold"
 
+    /// Produced by the Swate main process when the background indexing limit is out of range.
+    [<Literal>]
+    let InvalidDiffIndexingLimit = "invalid_diff_indexing_limit"
+
     // Produced by the Swate main process (session host and IPC handler).
     [<Literal>]
     let ServiceUnavailable = "service_unavailable"
@@ -607,6 +611,9 @@ type ObjectStateDto = {
 type StoragePolicySettingsDto = {
     AutoPolicyThresholdMb: int option
     MaterializeLargeObjects: bool
+    /// Whole MiB. The background indexing of a diff stops when the pages it read add up to this
+    /// size. None keeps the value the session has.
+    DiffIndexingLimitMb: int option
 }
 
 type DependencyStatusDto = {

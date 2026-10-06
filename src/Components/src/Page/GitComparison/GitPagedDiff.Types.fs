@@ -92,6 +92,26 @@ type PagedProgress = {
     ScanComplete: bool
 }
 
+/// A size in bytes as a short text with a binary unit, such as 1.5 MiB.
+let formatBytes (bytes: float) =
+    if bytes >= 1099511627776.0 then
+        $"{System.Math.Round(bytes / 1099511627776.0, 1)} TiB"
+    elif bytes >= 1073741824.0 then
+        $"{System.Math.Round(bytes / 1073741824.0, 1)} GiB"
+    elif bytes >= 1048576.0 then
+        $"{System.Math.Round(bytes / 1048576.0, 1)} MiB"
+    elif bytes >= 1024.0 then
+        $"{System.Math.Round(bytes / 1024.0, 1)} KiB"
+    else
+        sprintf "%.0f B" bytes
+
+/// The share of the bytes the scan has validated, as a whole number between 0 and 100.
+let progressPercentage (progress: PagedProgress) =
+    if progress.TotalBytes <= 0.0 then
+        if progress.ScanComplete then 100 else 0
+    else
+        min 100 (max 0 (int (System.Math.Round(progress.ValidatedBytes / progress.TotalBytes * 100.0))))
+
 [<StringEnum; RequireQualifiedAccess>]
 type PagedSnippetEnd =
     | Truncated

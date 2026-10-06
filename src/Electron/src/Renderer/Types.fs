@@ -155,6 +155,10 @@ type GitDiffPageData = {
     /// The indexing stopped because the worker session of a background read closed. The rows
     /// stay and the indexing waits. A user request reopens the diff and lifts the pause.
     IndexingPaused: bool
+    /// The size of the pages the session answered, as the length of their JSON in UTF-8 bytes. It
+    /// is an upper bound of what the session keeps for them. The background indexing stops when
+    /// it reaches the indexing limit. A reopen starts a new session and starts it again at 0.
+    JournalBytes: float
     /// The last read of the next page failed with an error that leaves the rows usable. The rows
     /// stay, the indexing waits, and the continue button of the viewer asks again.
     NextFailed: bool

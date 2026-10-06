@@ -35,6 +35,7 @@ type GitStateController = {
     submitPublishRename: string -> unit
     cancelPublishRename: unit -> unit
     saveLfsAutoTrackThreshold: int -> unit
+    saveDiffIndexingLimit: int -> unit
     saveDownloadLargeFiles: bool -> unit
     createBranch: GitSidebarCreateBranchRequest -> unit
     switchBranch: string -> unit
@@ -137,6 +138,7 @@ let GitStateCtx =
             submitPublishRename = fun _ -> ()
             cancelPublishRename = fun () -> ()
             saveLfsAutoTrackThreshold = fun _ -> ()
+            saveDiffIndexingLimit = fun _ -> ()
             saveDownloadLargeFiles = fun _ -> ()
             createBranch = fun _ -> ()
             switchBranch = fun _ -> ()
@@ -239,6 +241,9 @@ let GitStateCtxProvider (children: ReactElement) =
     let saveLfsAutoTrackThreshold (thresholdMb: int) =
         dispatch (SaveLfsAutoTrackThresholdRequested thresholdMb)
 
+    let saveDiffIndexingLimit (limitMb: int) =
+        dispatch (SaveDiffIndexingLimitRequested limitMb)
+
     let saveDownloadLargeFiles (downloadLargeFiles: bool) =
         dispatch (SaveDownloadLargeFilesRequested downloadLargeFiles)
 
@@ -294,6 +299,7 @@ let GitStateCtxProvider (children: ReactElement) =
                 submitPublishRename = submitPublishRename
                 cancelPublishRename = cancelPublishRename
                 saveLfsAutoTrackThreshold = saveLfsAutoTrackThreshold
+                saveDiffIndexingLimit = saveDiffIndexingLimit
                 saveDownloadLargeFiles = saveDownloadLargeFiles
                 createBranch = createBranchFrom
                 switchBranch = switchBranchTo

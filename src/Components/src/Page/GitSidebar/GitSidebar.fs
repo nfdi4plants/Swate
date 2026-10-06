@@ -118,6 +118,13 @@ module private GitSidebarInternal =
 
     let formatThresholdInput (thresholdMb: int) = string thresholdMb
 
+    /// The range of the background indexing limit in MB, the same as the main process allows.
+    [<Literal>]
+    let MinDiffIndexingLimitMb = 64
+
+    [<Literal>]
+    let MaxDiffIndexingLimitMb = 1048576
+
     let tryRangeBetween (orderedPaths: string[]) (anchorPath: string) (clickedPath: string) =
         match
             orderedPaths
@@ -156,6 +163,14 @@ type private LfsSettingsSectionProps = {
     SubmitLfsThreshold: unit -> unit
 }
 
+type private DiffIndexingLimitSectionProps = {
+    IsBusy: bool
+    DiffIndexingLimitInput: string
+    SetDiffIndexingLimitInput: string -> unit
+    CanSaveDiffIndexingLimit: bool
+    SubmitDiffIndexingLimit: unit -> unit
+}
+
 type private AdvancedActionsProps = {
     DownloadLargeFilesInput: bool
     IsBusy: bool
@@ -174,6 +189,7 @@ type private AdvancedActionsProps = {
     OpenSwitchBranchModal: unit -> unit
     CanSwitchBranch: bool
     LfsSettings: LfsSettingsSectionProps
+    DiffIndexingLimit: DiffIndexingLimitSectionProps
     SubmitPruneLfsCache: unit -> unit
     SubmitDedupLfsStorage: unit -> unit
 }
@@ -795,6 +811,79 @@ type GitSidebar =
         ]
 
     [<ReactComponent>]
+    static member private DiffIndexingLimitSection(props: DiffIndexingLimitSectionProps) =
+        Html.div [
+            prop.className
+                "swt:mt-3 swt:min-w-0 swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-100 swt:p-3 swt:@max-xs:p-2"
+            prop.children [
+                Html.div [
+                    prop.className "swt:flex swt:min-w-0 swt:items-center swt:gap-2"
+                    prop.children [
+                        Html.span [
+                            prop.className "swt:iconify swt:fluent--data-usage-24-regular swt:size-4 swt:shrink-0"
+                        ]
+                        Html.span [
+                            prop.className "swt:min-w-0 swt:truncate swt:text-sm swt:font-medium"
+                            prop.text "Background indexing limit"
+                        ]
+                    ]
+                ]
+                Html.p [
+                    prop.className "swt:mt-2 swt:wrap-break-word swt:text-xs swt:text-base-content/70"
+                    prop.text
+                        "An open diff reads its remaining pages in the background until they add up to this size. Scrolling to the end of the pages read so far reads on."
+                ]
+                Html.div [
+                    prop.className "swt:mt-3 swt:flex swt:flex-wrap swt:items-end swt:gap-2"
+                    prop.children [
+                        Html.label [
+                            prop.className "swt:flex swt:min-w-40 swt:flex-1 swt:flex-col swt:gap-2 swt:@max-xs:min-w-0"
+                            prop.children [
+                                Html.span [
+                                    prop.className "swt:text-xs swt:font-medium swt:text-base-content/70"
+                                    prop.text "Limit (MB)"
+                                ]
+                                Html.input [
+                                    prop.testId "GitSidebarDiffIndexingLimitInput"
+                                    prop.className "swt:input swt:input-bordered swt:w-full swt:min-w-0"
+                                    prop.type'.number
+                                    prop.custom ("step", "1")
+                                    prop.custom ("min", string GitSidebarInternal.MinDiffIndexingLimitMb)
+                                    prop.custom ("max", string GitSidebarInternal.MaxDiffIndexingLimitMb)
+                                    prop.disabled props.IsBusy
+                                    prop.value props.DiffIndexingLimitInput
+                                    prop.onChange props.SetDiffIndexingLimitInput
+                                ]
+                            ]
+                        ]
+                        Html.button [
+                            prop.testId "GitSidebarDiffIndexingLimitSaveButton"
+                            prop.className
+                                "swt:btn swt:btn-sm swt:btn-outline swt:min-w-0 swt:gap-2 swt:overflow-hidden swt:px-2 swt:normal-case swt:@max-xs:justify-center swt:@max-xs:gap-0"
+                            prop.disabled (not props.CanSaveDiffIndexingLimit)
+                            prop.title "Save Limit"
+                            prop.onClick (fun _ -> props.SubmitDiffIndexingLimit())
+                            prop.children [
+                                Html.span [
+                                    prop.className "swt:iconify swt:fluent--save-24-regular swt:size-4 swt:shrink-0"
+                                ]
+                                Html.span [
+                                    prop.className "swt:min-w-0 swt:truncate swt:@max-xs:sr-only"
+                                    prop.text "Save Limit"
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+                Html.div [
+                    prop.className "swt:mt-2 swt:wrap-break-word swt:text-xs swt:text-base-content/60"
+                    prop.text
+                        $"Limit setting: {GitSidebarInternal.MinDiffIndexingLimitMb}-{GitSidebarInternal.MaxDiffIndexingLimitMb} MB. The diff stays readable past the limit."
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
     static member private AdvancedActions(props: AdvancedActionsProps) =
         React.Fragment [
             GitSidebar.SectionHeader("Actions", None)
@@ -932,6 +1021,7 @@ type GitSidebar =
                             ]
                         ]
                         GitSidebar.LfsSettingsSection(props.LfsSettings)
+                        GitSidebar.DiffIndexingLimitSection(props.DiffIndexingLimit)
                     ]
                 ]
             else
@@ -1649,6 +1739,7 @@ type GitSidebar =
             callbacks: GitSidebarCallbacks,
             downloadLargeFiles: bool,
             lfsAutoTrackThresholdMb: int,
+            diffIndexingLimitMb: int,
             ?runStatus: GitSidebarRunStatus,
             ?selectedFile: string,
             ?errorNotice: string,
@@ -1693,6 +1784,7 @@ type GitSidebar =
         let onCancelPendingRemoteAction = callbacks.OnCancelPendingRemoteAction
         let onSaveDownloadLargeFiles = callbacks.OnSaveDownloadLargeFiles
         let onSaveLfsAutoTrackThreshold = callbacks.OnSaveLfsAutoTrackThreshold
+        let onSaveDiffIndexingLimit = callbacks.OnSaveDiffIndexingLimit
         let onCreateBranch = callbacks.OnCreateBranch
         let onSwitchBranch = callbacks.OnSwitchBranch
         let onSelectChange = callbacks.OnSelectChange
@@ -1712,6 +1804,9 @@ type GitSidebar =
 
         let lfsThresholdInput, setLfsThresholdInput =
             React.useState (GitSidebarInternal.formatThresholdInput lfsAutoTrackThresholdMb)
+
+        let diffIndexingLimitInput, setDiffIndexingLimitInput =
+            React.useState (GitSidebarInternal.formatThresholdInput diffIndexingLimitMb)
 
         let markedPaths, setMarkedPaths = React.useStateWithUpdater Set.empty<string>
 
@@ -1775,6 +1870,12 @@ type GitSidebar =
         React.useEffect (
             (fun () -> setLfsThresholdInput (GitSidebarInternal.formatThresholdInput lfsAutoTrackThresholdMb)),
             [| box lfsAutoTrackThresholdMb |]
+        )
+
+        // The same sync pattern for the background indexing limit.
+        React.useEffect (
+            (fun () -> setDiffIndexingLimitInput (GitSidebarInternal.formatThresholdInput diffIndexingLimitMb)),
+            [| box diffIndexingLimitMb |]
         )
 
         React.useEffect (
@@ -1943,6 +2044,24 @@ type GitSidebar =
                 onSaveLfsAutoTrackThreshold parsedThresholdMb
                 setLfsThresholdInput (GitSidebarInternal.formatThresholdInput parsedThresholdMb)
 
+        let submitDiffIndexingLimit () =
+            let success, parsedLimitMb = Int32.TryParse(diffIndexingLimitInput.Trim())
+
+            if not success then
+                setLocalError (Some "Background indexing limit must be a whole number.")
+            elif parsedLimitMb < GitSidebarInternal.MinDiffIndexingLimitMb then
+                setLocalError (
+                    Some $"Background indexing limit must be at least {GitSidebarInternal.MinDiffIndexingLimitMb} MB."
+                )
+            elif parsedLimitMb > GitSidebarInternal.MaxDiffIndexingLimitMb then
+                setLocalError (
+                    Some $"Background indexing limit must not exceed {GitSidebarInternal.MaxDiffIndexingLimitMb} MB."
+                )
+            else
+                setLocalError None
+                onSaveDiffIndexingLimit parsedLimitMb
+                setDiffIndexingLimitInput (GitSidebarInternal.formatThresholdInput parsedLimitMb)
+
         let submitDownloadLargeFiles (nextValue: bool) =
             if nextValue = downloadLargeFilesInput then
                 ()
@@ -2007,6 +2126,19 @@ type GitSidebar =
                 String.Equals(
                     normalizedLfsThresholdInput,
                     GitSidebarInternal.formatThresholdInput lfsAutoTrackThresholdMb,
+                    StringComparison.Ordinal
+                )
+            )
+
+        let normalizedDiffIndexingLimitInput = diffIndexingLimitInput.Trim()
+
+        let canSaveDiffIndexingLimit =
+            not isBusy
+            && not (String.IsNullOrWhiteSpace normalizedDiffIndexingLimitInput)
+            && not (
+                String.Equals(
+                    normalizedDiffIndexingLimitInput,
+                    GitSidebarInternal.formatThresholdInput diffIndexingLimitMb,
                     StringComparison.Ordinal
                 )
             )
@@ -2091,6 +2223,13 @@ type GitSidebar =
                             SetLfsThresholdInput = setLfsThresholdInput
                             CanSaveLfsThreshold = canSaveLfsThreshold
                             SubmitLfsThreshold = submitLfsThreshold
+                        }
+                        DiffIndexingLimit = {
+                            IsBusy = isBusy
+                            DiffIndexingLimitInput = diffIndexingLimitInput
+                            SetDiffIndexingLimitInput = setDiffIndexingLimitInput
+                            CanSaveDiffIndexingLimit = canSaveDiffIndexingLimit
+                            SubmitDiffIndexingLimit = submitDiffIndexingLimit
                         }
                     }
                 )

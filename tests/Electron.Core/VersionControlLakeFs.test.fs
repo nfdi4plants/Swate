@@ -486,6 +486,7 @@ Vitest.describe (
                                 Settings = {
                                     AutoPolicyThresholdMb = Some 2
                                     MaterializeLargeObjects = false
+                                    DiffIndexingLimitMb = None
                                 }
                             }
 

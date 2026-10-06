@@ -1083,6 +1083,7 @@ Vitest.describe (
                                 {
                                     AutoTrackThresholdMb = 9
                                     DownloadLargeFiles = true
+                                    DiffIndexingLimitMb = 2048
                                 },
                                 detached "settings-during-close"
                             )
@@ -1363,6 +1364,7 @@ Vitest.describe (
                             Settings = {
                                 AutoPolicyThresholdMb = Some 9
                                 MaterializeLargeObjects = true
+                                DiffIndexingLimitMb = None
                             }
                         }
 
@@ -1414,6 +1416,7 @@ Vitest.describe (
                             Settings = {
                                 AutoPolicyThresholdMb = Some 9
                                 MaterializeLargeObjects = true
+                                DiffIndexingLimitMb = None
                             }
                         }
 
@@ -1426,6 +1429,7 @@ Vitest.describe (
                                 Settings = {
                                     AutoPolicyThresholdMb = Some threshold
                                     MaterializeLargeObjects = false
+                                    DiffIndexingLimitMb = None
                                 }
                             }
 
@@ -1470,6 +1474,60 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "a background indexing limit outside the allowed range is refused, and a session starts from the default again",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    registerVault 91 fixture.RepoRoot |> ignore
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 91)
+
+                    let setLimit (operationId: string) (limitMb: int) =
+                        api.setStoragePolicySettings {
+                            OperationId = operationId
+                            Settings = {
+                                AutoPolicyThresholdMb = None
+                                MaterializeLargeObjects = false
+                                DiffIndexingLimitMb = Some limitMb
+                            }
+                        }
+
+                    let limitOfSession (operationId: string) = promise {
+                        let! current = api.getStoragePolicySettings (request operationId)
+                        let settings = expectDtoValue "get storage policy" current
+                        return settings.Value.DiffIndexingLimitMb
+                    }
+
+                    let! initial = limitOfSession "get-default-limit"
+                    Vitest.expect(initial).toEqual (Some 1024)
+
+                    // The bounds themselves are allowed.
+                    for limit in [ 64; 1048576 ] do
+                        let! accepted = setLimit $"set-limit-{limit}" limit
+                        expectDtoValue $"set limit {limit}" accepted |> ignore
+                        let! kept = limitOfSession $"get-limit-{limit}"
+                        Vitest.expect(kept).toEqual (Some limit)
+
+                    // Values outside the bounds are refused and change nothing.
+                    for limit in [ 63; 0; -5; 1048577 ] do
+                        let! refused = setLimit $"set-invalid-limit-{limit}" limit
+                        let failure = expectDtoFailure $"set invalid limit {limit}" refused
+                        Vitest.expect(failure.Code).toBe VersionControlCodes.InvalidDiffIndexingLimit
+                        let! kept = limitOfSession $"get-after-invalid-limit-{limit}"
+                        Vitest.expect(kept).toEqual (Some 1048576)
+
+                    // A new session starts from the default again.
+                    do! fixture.Host.CloseSession fixture.RepoRoot |> Async.StartAsPromise
+
+                    let! reopened =
+                        fixture.Host.OpenSession(fixture.RepoRoot, detached "open-after-limit")
+                        |> Async.StartAsPromise
+
+                    expectValue "reopen" reopened |> ignore
+                    let! afterReopen = limitOfSession "get-limit-after-reopen"
+                    Vitest.expect(afterReopen).toEqual (Some 1024)
+                })
+        )
+
+        Vitest.test (
             "a closed and reopened session starts from the defaults again",
             fun () ->
                 withFixture (fun fixture -> promise {
@@ -1482,6 +1540,7 @@ Vitest.describe (
                             Settings = {
                                 AutoPolicyThresholdMb = Some 9
                                 MaterializeLargeObjects = true
+                                DiffIndexingLimitMb = None
                             }
                         }
 
@@ -1733,6 +1792,7 @@ Vitest.describe (
                             Settings = {
                                 AutoPolicyThresholdMb = Some 9
                                 MaterializeLargeObjects = true
+                                DiffIndexingLimitMb = None
                             }
                         }
 
@@ -1922,6 +1982,7 @@ Vitest.describe (
                                 Settings = {
                                     AutoPolicyThresholdMb = Some 4
                                     MaterializeLargeObjects = false
+                                    DiffIndexingLimitMb = None
                                 }
                             }
 
