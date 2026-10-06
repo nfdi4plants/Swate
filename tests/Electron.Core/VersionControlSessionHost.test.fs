@@ -14,13 +14,21 @@ open VersionControlService.Abstractions
 open Vitest
 open ElectronCore.TestHelpers
 
+Vitest.vi.mock ("chokidar", createObj [ "spy" ==> true ]) |> ignore
+
 let private electron: obj = importAll "electron"
+
+[<Import("watch", "chokidar")>]
+let private watchMock: obj = jsNative
 
 [<Emit("$0.mockResolvedValue($1)")>]
 let private mockResolvedValue (mock: obj) (value: obj) : unit = jsNative
 
 [<Emit("$0.mock.calls.length")>]
 let private mockCallCount (mock: obj) : int = jsNative
+
+[<Emit("$0.mockClear()")>]
+let private clearMock (mock: obj) : unit = jsNative
 
 let private waitUntil description predicate =
     let rec loop remaining = promise {
@@ -484,6 +492,8 @@ let private restoreInvocations = System.Collections.Generic.HashSet<string>()
 
 let private bindInvocations = System.Collections.Generic.HashSet<string>()
 
+let private providerEvents = ResizeArray<string>()
+
 let private openGates =
     System.Collections.Generic.Dictionary<string, JS.Promise<unit>>()
 
@@ -577,6 +587,7 @@ let private fakeProviderRuntimeWithStoragePolicy
                 }
             Bind =
                 fun bindRequest _ -> async {
+                    providerEvents.Add "bind"
                     bindInvocations.Add bindRequest.Location.ProviderLocation |> ignore
 
                     // A partial bind: the location is retargeted, but the provider reports a
@@ -597,6 +608,7 @@ let private fakeProviderRuntimeWithStoragePolicy
                 }
             Open =
                 fun binding _ -> async {
+                    providerEvents.Add "open"
                     let rootKey = ProviderResolver.normalizePath binding.WorkspaceRoot
 
                     match openStartResolvers.TryGetValue rootKey with
@@ -1984,6 +1996,66 @@ Vitest.describe (
                             )
                             .toEqual (Some "https://example.invalid/partial.git")
                     finally
+                        WorkspaceSessionHost.initialize fixture.Host
+                })
+        )
+
+        Vitest.test (
+            "an explicit bind persists before opening and resets the tree before watcher restoration",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    let workspace = join [| fixture.Root; "explicit-unbound-bind" |]
+                    let unusedRoot = join [| fixture.Root; "unused-explicit-bind" |]
+
+                    Main.Bindings.Filesystem.mkdirSync
+                        (join [| workspace; "dataset" |])
+                        (Main.Bindings.Filesystem.MkdirOptions(recursive = true))
+
+                    let fakeRuntime = fakeProviderRuntime workspace unusedRoot
+                    let fakeHost = WorkspaceSessionHost.WorkspaceSessionHost(fakeRuntime)
+                    WorkspaceSessionHost.initialize fakeHost
+                    providerEvents.Clear()
+
+                    try
+                        let vault = registerVault 93 workspace
+                        let! initialTree = Main.FileTreeCreator.getFileTree workspace
+                        vault.fileTree <- initialTree
+                        do! vault.RefreshFileTreeDirectory "dataset"
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+
+                        clearMock watchMock
+                        let targetLocation = "https://example.invalid/explicit-bind.git"
+                        let api = Main.IPC.IVersionControlApi.api (ipcEvent 93)
+                        providerEvents.Clear()
+
+                        let! result =
+                            api.bindWorkspace {
+                                OperationId = "explicit-unbound-bind"
+                                ProviderLocation = targetLocation
+                                DisplayName = None
+                            }
+
+                        match result with
+                        | Ok(OperationResultDto.PartiallySucceeded _) -> ()
+                        | other -> failwith $"Expected a partial explicit bind, got {other}"
+
+                        Vitest.expect(providerEvents |> Seq.toArray).toEqual [| "bind"; "open" |]
+
+                        Vitest
+                            .expect(
+                                fakeRuntime.Bindings.TryFind workspace
+                                |> Option.map (fun binding -> binding.Location.ProviderLocation)
+                            )
+                            .toEqual (Some targetLocation)
+
+                        // Resetting while the mutation is active clears loaded-directory coverage,
+                        // so restoration has no directories for which to create a replacement watcher.
+                        Vitest.expect(mockCallCount watchMock).toBe 0
+                        Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                    finally
+                        providerEvents.Clear()
+                        bindInvocations.Clear()
                         WorkspaceSessionHost.initialize fixture.Host
                 })
         )

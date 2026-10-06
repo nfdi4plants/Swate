@@ -555,15 +555,13 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                     true
                                     (fun context ->
                                         vault.WithLoadedDirectoryWatcherSuspended(fun () ->
-                                            if context.Cancellation.IsCancellationRequested() then
-                                                JS.Constructors.Promise.resolve (
-                                                    OperationResult.canceled "The bind was canceled."
-                                                )
-                                            else
-                                                runSessionOperation
-                                                    host
-                                                    arcPath
-                                                    (fun _ context -> async {
+                                            let bindResultPromise =
+                                                if context.Cancellation.IsCancellationRequested() then
+                                                    JS.Constructors.Promise.resolve (
+                                                        OperationResult.canceled "The bind was canceled."
+                                                    )
+                                                else
+                                                    async {
                                                         match
                                                             locationFor
                                                                 host
@@ -599,14 +597,29 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                                                         PartiallySucceeded(outcome, failure)
                                                                     | other -> other
                                                             | Failed failure -> return Failed failure
-                                                    })
-                                                    context
-                                                |> Async.StartAsPromise
-                                        )
+                                                    }
+                                                    |> Async.StartAsPromise
+
+                                            bindResultPromise
+                                            |> Promise.bind (fun bound -> promise {
+                                                let result =
+                                                    Ok(
+                                                        Mappings.result
+                                                            (fun (hosted: WorkspaceSessionHost.HostedSession) ->
+                                                                Mappings.sessionInfo hosted.SessionId hosted.Session
+                                                            )
+                                                            bound
+                                                    )
+
+                                                if resultChangedState result then
+                                                    do! vault.ResetFileTreeToRoot()
+
+                                                return bound
+                                            }))
                                         |> Async.AwaitPromise
                                     )
 
-                            let result =
+                            return
                                 Ok(
                                     Mappings.result
                                         (fun (hosted: WorkspaceSessionHost.HostedSession) ->
@@ -614,11 +627,6 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                                         )
                                         bound
                                 )
-
-                            if resultChangedState result then
-                                do! vault.ResetFileTreeToRoot()
-
-                            return result
                         })
         }
     cancelOperation =
