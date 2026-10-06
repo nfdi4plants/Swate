@@ -31,6 +31,8 @@ type BackgroundReading =
     | Paused
     /// A memory diff reads the remaining pages on its own.
     | MemoryIndexing
+    /// A memory diff has nothing running and no stop to report. The bar names where the diff lives.
+    | MemoryIdle
     /// A memory diff stopped its background reading at most of its budget. The rest is kept for
     /// the actions of the user.
     | MemoryShareKept
@@ -41,9 +43,9 @@ type BackgroundReading =
     /// The last read of the next page failed, and the continue button asks again.
     | ReadFailed of message: string
 
-/// The background state of the diff, or None when there is nothing to tell: the indexing finished
-/// or never started, or the diff shows no rows. A failed read shows its message only when the
-/// loader kept one.
+/// The background state of the diff, or None when there is nothing to tell: a disk diff whose
+/// indexing finished or never started, or a diff that shows no rows. A memory diff always has a
+/// state. A failed read shows its message only when the loader kept one.
 let backgroundReadingOf (limitMb: int) (page: GitDiffPageData) : BackgroundReading option =
     let showsRows =
         match page.Status with
@@ -57,31 +59,31 @@ let backgroundReadingOf (limitMb: int) (page: GitDiffPageData) : BackgroundReadi
         | Some(DiffStorageDto.InMemory _) -> true
         | _ -> false
 
+    // A memory diff always names its storage when nothing more specific applies.
+    let idle = if inMemory then Some BackgroundReading.MemoryIdle else None
+
     if not showsRows then
         None
     else
         match page.Stop with
-        | Some GitDiffStop.MemoryShareUsed -> Some BackgroundReading.MemoryShareKept
         | Some GitDiffStop.MemoryBudget -> Some BackgroundReading.MemoryBudgetStopped
         | Some GitDiffStop.TempSpaceLow -> Some BackgroundReading.TempSpaceStopped
-        | None ->
-            if page.NextCursor.IsNone then
-                None
-            elif page.NextFailed then
-                page.NextFailure |> Option.map BackgroundReading.ReadFailed
-            elif page.IndexingPaused then
-                Some BackgroundReading.Paused
-            elif page.Indexing then
-                Some(
-                    if inMemory then
-                        BackgroundReading.MemoryIndexing
-                    else
-                        BackgroundReading.Indexing
-                )
-            elif GitDiffPageLoader.indexingLimitReached limitMb page then
-                Some BackgroundReading.LimitReached
-            else
-                None
+        | _ when page.NextCursor.IsNone -> idle
+        | Some GitDiffStop.MemoryShareUsed -> Some BackgroundReading.MemoryShareKept
+        | _ when page.NextFailed ->
+            match page.NextFailure with
+            | Some message -> Some(BackgroundReading.ReadFailed message)
+            | None -> idle
+        | _ when page.IndexingPaused -> Some BackgroundReading.Paused
+        | _ when page.Indexing ->
+            Some(
+                if inMemory then
+                    BackgroundReading.MemoryIndexing
+                else
+                    BackgroundReading.Indexing
+            )
+        | _ when GitDiffPageLoader.indexingLimitReached limitMb page -> Some BackgroundReading.LimitReached
+        | _ -> idle
 
 /// The note at the end of the pages read when a stop ends the reading, and whether the continue
 /// button stays. A low-space stop can be retried. The full memory budget cannot.
@@ -195,6 +197,7 @@ let Main (page: GitDiffPageData) =
                     "memory",
                     "swt:loading swt:loading-spinner swt:loading-xs",
                     $"{memory} Indexing the diff in the background{progress}. The scrollbar is not exact yet."
+                | BackgroundReading.MemoryIdle -> "memory", "swt:iconify swt:fluent--info-24-regular swt:size-4", memory
                 | BackgroundReading.MemoryShareKept ->
                     "memory",
                     "swt:iconify swt:fluent--info-24-regular swt:size-4",

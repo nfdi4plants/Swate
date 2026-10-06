@@ -891,13 +891,13 @@ type GitSidebar =
                 Html.div [
                     prop.className "swt:mt-2 swt:wrap-break-word swt:text-xs swt:text-base-content/60"
                     prop.text
-                        $"Limit setting: {GitSidebarInternal.MinDiffIndexingLimitMb}-{GitSidebarInternal.MaxDiffIndexingLimitMb} MB. The diff stays readable past the limit."
+                        $"Limit setting: {GitSidebarInternal.MinDiffIndexingLimitMb}-{GitSidebarInternal.MaxDiffIndexingLimitMb} MB. From 64 on, the limit only stops the background reading, and the diff stays readable past it. Below 64, the limit is the memory budget, and the diff stops there."
                 ]
                 Html.p [
                     prop.className "swt:mt-4 swt:wrap-break-word swt:text-xs swt:text-base-content/70"
                     prop.testId "GitSidebarDiffFreeSpaceReserveHelp"
                     prop.text
-                        "The diff keeps its data in memory with a 64 MB budget when the temp drive has less free space than the reserve plus 5 %."
+                        "With a limit of 64 or more, a diff keeps its data in memory with a 64 MB budget when the temp drive has less free space than the reserve plus 5 % as the diff opens. An open diff keeps its mode."
                 ]
                 Html.div [
                     prop.className "swt:mt-3 swt:flex swt:flex-wrap swt:items-end swt:gap-2"

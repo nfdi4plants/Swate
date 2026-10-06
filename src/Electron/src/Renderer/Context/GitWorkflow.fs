@@ -1918,9 +1918,10 @@ module GitDiffPageLoader =
         | GitDiffStop.TempSpaceLow -> GitDiffPageStatus.Blocked(None, GitDiffBlockReason.TempSpaceLow)
         | _ -> GitDiffPageStatus.Blocked(None, GitDiffBlockReason.MemoryBudgetReached)
 
-    /// Records the refusal of a read and ends the indexing. The rows and the cursor stay, so the
-    /// continue button can ask again. A memory diff refuses a background read once it holds most
-    /// of its budget, which leaves the rest for the user. A refusal at the full budget stays.
+    /// Records the refusal of a read and ends the indexing. The rows and the cursor stay. The
+    /// continue button can ask again after a low-space stop and after the 3/4 background stop of a
+    /// memory diff, which leaves the rest of the budget for the user. It cannot ask again at the
+    /// full budget, and that stop stays.
     let private stopReading (background: bool) (refusal: GitDiffStop) (page: GitDiffPageData) =
         let stop =
             match refusal, page.Stop with
@@ -2353,7 +2354,8 @@ module GitDiffPageLoader =
         | GitDiffMsg.Index _ -> { page with Indexing = true }, Cmd.none
         | GitDiffMsg.LoadNext _ ->
             match page.Status, page.NextCursor, page.NextRequest with
-            // A diff at its full memory budget refuses every read, so none is sent.
+            // A diff at its full memory budget refuses every read of a new page, so none is sent.
+            // Replays and recorded answers still work.
             | GitDiffPageStatus.Ready, Some _, None when page.Stop = Some GitDiffStop.MemoryBudget -> page, Cmd.none
             | GitDiffPageStatus.Ready, Some cursor, None ->
                 // The viewer asks for the next page from the end of the diff, where the pages of
