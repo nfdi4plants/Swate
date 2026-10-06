@@ -22,6 +22,7 @@ module FileExplorerDeleteHelper =
         function
         | PageState.ArcFilePage _
         | PageState.MarkdownPage _
+        | PageState.PDFPage _
         | PageState.TextPage _
         | PageState.UnknownPage
         | PageState.ErrorPage _ -> true
@@ -33,6 +34,7 @@ module FileExplorerDeleteHelper =
     let private reloadsWhenSelectedFileChanges =
         function
         | PageState.MarkdownPage _
+        | PageState.PDFPage _
         | PageState.TextPage _
         | PageState.UnknownPage
         | PageState.ErrorPage _ -> true
