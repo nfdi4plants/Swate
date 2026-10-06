@@ -222,6 +222,12 @@ module ArcVaultExtensions =
 
     type ArcVault with
 
+        /// Serializes FileTree mutations while keeping the tail usable after a rejected update.
+        member private this.EnqueueFileTreeUpdate<'T>(operation: unit -> JS.Promise<'T>) : JS.Promise<'T> =
+            let queuedUpdate = this.FileTreeUpdateTail |> Promise.bind operation
+            this.FileTreeUpdateTail <- queuedUpdate |> Promise.map (fun _ -> ()) |> Promise.catch (fun _ -> ())
+            queuedUpdate
+
         member private this.LoadWatcherSnapshot() : Fable.Core.JS.Promise<Result<ARC, exn>> = promise {
             try
                 match this.path, this.arc with
@@ -272,53 +278,48 @@ module ArcVaultExtensions =
             // Capture the epoch at the call so an update queued before a pending-state reset cannot publish the old root.
             let capturedWatcherEpoch = this.WatcherEpoch
 
-            let queuedUpdate =
-                this.FileTreeUpdateTail
-                |> Promise.bind (fun () -> promise {
-                    match this.path with
-                    | None -> ()
-                    | Some _ when capturedWatcherEpoch <> this.WatcherEpoch -> ()
-                    | Some arcPath ->
-                        let normalizedEvents = WatcherHelpers.normalizeAgainstDisk events
-                        let mutable nextFileTree = this.fileTree
-                        let mutable hasFileTreeChanges = false
+            this.EnqueueFileTreeUpdate(fun () -> promise {
+                match this.path with
+                | None -> ()
+                | Some _ when capturedWatcherEpoch <> this.WatcherEpoch -> ()
+                | Some arcPath ->
+                    let normalizedEvents = WatcherHelpers.normalizeAgainstDisk events
+                    let mutable nextFileTree = this.fileTree
+                    let mutable hasFileTreeChanges = false
 
-                        for event in normalizedEvents do
-                            try
-                                if
-                                    WatcherHelpers.eventNameEquals Chokidar.Events.Add event.EventName
-                                    || WatcherHelpers.eventNameEquals Chokidar.Events.Change event.EventName
-                                then
-                                    let! changedFile = getFileEntryWithLfsMetadata arcPath event.AbsolutePath
-                                    nextFileTree <- upsertFileEntry changedFile nextFileTree
-                                    hasFileTreeChanges <- true
-                                elif WatcherHelpers.eventNameEquals Chokidar.Events.AddDir event.EventName then
-                                    let! addedDirectory = getFileEntry event.AbsolutePath
-                                    nextFileTree <- upsertFileEntry addedDirectory nextFileTree
-                                    hasFileTreeChanges <- true
-                                elif
-                                    WatcherHelpers.eventNameEquals Chokidar.Events.Unlink event.EventName
-                                    || (WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName
-                                        && not (WatcherHelpers.existsSyncWithExactName event.AbsolutePath))
-                                then
-                                    // Normalization above already turned the unlink of an existing file into a change. Directory unlinks
-                                    // stay admitted, so they still need this check.
-                                    nextFileTree <- removePathAndDescendants event.AbsolutePath nextFileTree
-                                    hasFileTreeChanges <- true
-                            with fileTreeError ->
-                                swatelogfn
-                                    this.window.id
-                                    "Unable to update file tree for watcher event '%s' on '%s': %s"
-                                    event.EventName
-                                    event.RelativePath
-                                    fileTreeError.Message
+                    for event in normalizedEvents do
+                        try
+                            if
+                                WatcherHelpers.eventNameEquals Chokidar.Events.Add event.EventName
+                                || WatcherHelpers.eventNameEquals Chokidar.Events.Change event.EventName
+                            then
+                                let! changedFile = getFileEntryWithLfsMetadata arcPath event.AbsolutePath
+                                nextFileTree <- upsertFileEntry changedFile nextFileTree
+                                hasFileTreeChanges <- true
+                            elif WatcherHelpers.eventNameEquals Chokidar.Events.AddDir event.EventName then
+                                let! addedDirectory = getFileEntry event.AbsolutePath
+                                nextFileTree <- upsertFileEntry addedDirectory nextFileTree
+                                hasFileTreeChanges <- true
+                            elif
+                                WatcherHelpers.eventNameEquals Chokidar.Events.Unlink event.EventName
+                                || (WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName
+                                    && not (WatcherHelpers.existsSyncWithExactName event.AbsolutePath))
+                            then
+                                // Normalization above already turned the unlink of an existing file into a change. Directory unlinks
+                                // stay admitted, so they still need this check.
+                                nextFileTree <- removePathAndDescendants event.AbsolutePath nextFileTree
+                                hasFileTreeChanges <- true
+                        with fileTreeError ->
+                            swatelogfn
+                                this.window.id
+                                "Unable to update file tree for watcher event '%s' on '%s': %s"
+                                event.EventName
+                                event.RelativePath
+                                fileTreeError.Message
 
-                        if hasFileTreeChanges && capturedWatcherEpoch = this.WatcherEpoch then
-                            this.SetFileTree(nextFileTree)
-                })
-
-            this.FileTreeUpdateTail <- queuedUpdate |> Promise.catch (fun _ -> ())
-            queuedUpdate
+                    if hasFileTreeChanges && capturedWatcherEpoch = this.WatcherEpoch then
+                        this.SetFileTree(nextFileTree)
+            })
 
         member private this.NormalizeLoadedDirectoryPath(relativeDirectoryPath: string) =
             PathHelpers.normalizeCanonicalRelativePath relativeDirectoryPath
@@ -431,8 +432,6 @@ module ArcVaultExtensions =
         }
 
         member private this.RebuildLoadedDirectoryWatcher() = promise {
-            do! this.CloseLoadedDirectoryWatcher()
-
             match this.path with
             | None -> this.loadedFileTreeDirectories.Clear()
             | Some arcPath ->
@@ -449,12 +448,23 @@ module ArcVaultExtensions =
                 |> Promise.bind (fun () -> promise {
                     do! this.CloseLoadedDirectoryWatcher()
 
-                    try
-                        let! result = operation ()
-                        do! this.RebuildLoadedDirectoryWatcher()
-                        return result
-                    with operationError ->
-                        do! this.RebuildLoadedDirectoryWatcher()
+                    let! operationOutcome = operation () |> Promise.map Ok |> Promise.catch (fun error -> Error error)
+
+                    let! restorationOutcome =
+                        this.RebuildLoadedDirectoryWatcher()
+                        |> Promise.map Ok
+                        |> Promise.catch (fun error -> Error error)
+
+                    match operationOutcome, restorationOutcome with
+                    | Ok result, Ok() -> return result
+                    | Error operationError, Ok() -> return raise operationError
+                    | Ok _, Error restorationError -> return raise restorationError
+                    | Error operationError, Error restorationError ->
+                        swatelogfn
+                            this.window.id
+                            "Unable to restore loaded-directory watcher after failed operation: %s"
+                            restorationError.Message
+
                         return raise operationError
                 })
 
@@ -842,39 +852,34 @@ module ArcVaultExtensions =
             let normalizedRelativePath = this.NormalizeLoadedDirectoryPath relativeDirectoryPath
             let capturedWatcherEpoch = this.WatcherEpoch
 
-            let queuedUpdate =
-                this.FileTreeUpdateTail
-                |> Promise.bind (fun () -> promise {
-                    match this.path with
-                    | None -> return raise (arcNotOpenError ())
-                    | Some _ when capturedWatcherEpoch <> this.WatcherEpoch -> ()
-                    | Some arcPath ->
-                        try
-                            let! children = readFileTreeDirectory arcPath normalizedRelativePath
+            this.EnqueueFileTreeUpdate(fun () -> promise {
+                match this.path with
+                | None -> return raise (arcNotOpenError ())
+                | Some _ when capturedWatcherEpoch <> this.WatcherEpoch -> ()
+                | Some arcPath ->
+                    try
+                        let! children = readFileTreeDirectory arcPath normalizedRelativePath
 
-                            let nextFileTree =
-                                reconcileFileTreeDirectory arcPath normalizedRelativePath children this.fileTree
+                        let nextFileTree =
+                            reconcileFileTreeDirectory arcPath normalizedRelativePath children this.fileTree
 
-                            this.SetFileTree nextFileTree
+                        this.SetFileTree nextFileTree
 
-                            if not (System.String.IsNullOrWhiteSpace normalizedRelativePath) then
-                                this.loadedFileTreeDirectories.Add(normalizedRelativePath) |> ignore
-                                this.EnsureLoadedDirectoryWatcher normalizedRelativePath
+                        if not (System.String.IsNullOrWhiteSpace normalizedRelativePath) then
+                            this.loadedFileTreeDirectories.Add(normalizedRelativePath) |> ignore
+                            this.EnsureLoadedDirectoryWatcher normalizedRelativePath
 
-                            do! this.RemoveUnavailableLoadedDirectories arcPath
-                        with refreshError ->
-                            if not (System.String.IsNullOrWhiteSpace normalizedRelativePath) then
-                                this.loadedFileTreeDirectories.Remove(normalizedRelativePath) |> ignore
+                        do! this.RemoveUnavailableLoadedDirectories arcPath
+                    with refreshError ->
+                        if not (System.String.IsNullOrWhiteSpace normalizedRelativePath) then
+                            this.loadedFileTreeDirectories.Remove(normalizedRelativePath) |> ignore
 
-                                match this.loadedDirectoryWatcher with
-                                | Some watcher -> do! watcher.unwatch (join [| arcPath; normalizedRelativePath |])
-                                | None -> ()
+                            match this.loadedDirectoryWatcher with
+                            | Some watcher -> do! watcher.unwatch (join [| arcPath; normalizedRelativePath |])
+                            | None -> ()
 
-                            return raise refreshError
-                })
-
-            this.FileTreeUpdateTail <- queuedUpdate |> Promise.catch (fun _ -> ())
-            queuedUpdate
+                        return raise refreshError
+            })
 
         member this.ResetFileTreeToRoot() =
             match this.path with
@@ -893,8 +898,7 @@ module ArcVaultExtensions =
                     this.LoadedDirectoryRefreshes <- Map.empty
 
                     let queuedReset =
-                        this.FileTreeUpdateTail
-                        |> Promise.bind (fun () -> promise {
+                        this.EnqueueFileTreeUpdate(fun () -> promise {
                             try
                                 match this.path with
                                 | Some currentArcPath when PathHelpers.pathsEqual currentArcPath requestedArcPath ->
@@ -908,7 +912,6 @@ module ArcVaultExtensions =
                         })
 
                     this.PendingFileTreeReset <- Some(requestedArcPath, queuedReset)
-                    this.FileTreeUpdateTail <- queuedReset |> Promise.catch (fun _ -> ())
                     queuedReset
 
         /// Refreshes a directory only when File Explorer already knows its contents.

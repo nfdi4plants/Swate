@@ -24,12 +24,6 @@ open Main.IPC.FileSystemIO
 open Main.VersionControl
 open VersionControlService.Abstractions
 
-let private refreshVaultFileTree (vault: ArcVault) = promise {
-    match vault.path with
-    | Some _ -> do! vault.ResetFileTreeToRoot()
-    | None -> ()
-}
-
 let private withLoadedArcVault<'T>
     (event: IpcMainInvokeEvent)
     (operation: ArcVault -> JS.Promise<Result<'T, exn>>)
@@ -755,11 +749,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             match! vault.WriteArc() with
                             | Error saveError -> return Error saveError
                             | Ok() ->
-                                match vault.path with
-                                | None -> return Error(arcNotOpenError ())
-                                | Some _ ->
-                                    do! refreshVaultFileTree vault
-                                    return Ok()
+                                do! vault.ResetFileTreeToRoot()
+                                return Ok()
                         })
             with e ->
                 return Error e

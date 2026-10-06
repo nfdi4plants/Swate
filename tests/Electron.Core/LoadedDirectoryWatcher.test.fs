@@ -9,6 +9,14 @@ open Main.Bindings.Path
 open Swate.Components.Shared
 open Vitest
 
+Vitest.vi.mock ("chokidar", createObj [ "spy" ==> true ]) |> ignore
+
+[<Import("watch", "chokidar")>]
+let private watchMock: obj = jsNative
+
+[<Emit("$0.mock.calls.length")>]
+let private invocationCount (_spy: obj) : int = jsNative
+
 let private waitUntil description predicate =
     let rec loop remaining = promise {
         if predicate () then
@@ -469,6 +477,39 @@ Vitest.describe (
                         Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
                         Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
                         Vitest.expect(containsPath (join [| datasetPath; "existing.txt" |]) vault).toBe false
+                    })
+            }
+        )
+
+        Vitest.test (
+            "watcher suspension restores exactly once and preserves operation outcomes",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                Vitest.vi.clearAllMocks ()
+
+                do!
+                    withLoadedDirectoryFixture (fun vault _ _ _ -> promise {
+                        do! vault.RefreshFileTreeDirectory "dataset"
+
+                        let successWatcherCount = invocationCount watchMock
+                        let! result = vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise { return 42 })
+                        Vitest.expect(result).toBe 42
+                        Vitest.expect(invocationCount watchMock).toBe (successWatcherCount + 1)
+
+                        let operationError = exn "Expected operation failure."
+                        let operationFailureWatcherCount = invocationCount watchMock
+                        let mutable capturedOperationError: exn option = None
+
+                        try
+                            do!
+                                vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                    return raise operationError
+                                })
+                        with error ->
+                            capturedOperationError <- Some error
+
+                        Vitest.expect(capturedOperationError.Value).toBe operationError
+                        Vitest.expect(invocationCount watchMock).toBe (operationFailureWatcherCount + 1)
                     })
             }
         )
