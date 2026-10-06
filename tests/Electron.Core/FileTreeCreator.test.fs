@@ -476,34 +476,37 @@ Vitest.describe (
         Vitest.test (
             "directory reconciliation adds and removes direct children while preserving surviving descendants",
             fun () ->
-                let rootPath = "C:/arc"
-                let studiesPath = $"{rootPath}/studies"
-                let removedPath = $"{studiesPath}/removed"
-                let survivingPath = $"{studiesPath}/surviving"
+                let rootPath = resolve [| "arc" |]
+                let studiesPath = join [| rootPath; "studies" |]
+                let removedPath = join [| studiesPath; "removed" |]
+                let removedChildPath = join [| removedPath; "old.txt" |]
+                let survivingPath = join [| studiesPath; "surviving" |]
+                let survivingChildPath = join [| survivingPath; "known.txt" |]
+                let newChildPath = join [| studiesPath; "new.txt" |]
 
                 let initial =
                     [|
                         FileEntry.create ("arc", rootPath, true)
                         FileEntry.create ("studies", studiesPath, true)
                         FileEntry.create ("removed", removedPath, true)
-                        FileEntry.create ("old.txt", $"{removedPath}/old.txt", false)
+                        FileEntry.create ("old.txt", removedChildPath, false)
                         FileEntry.create ("surviving", survivingPath, true)
-                        FileEntry.create ("known.txt", $"{survivingPath}/known.txt", false)
+                        FileEntry.create ("known.txt", survivingChildPath, false)
                     |]
                     |> createFileEntryTree
 
                 let currentChildren = [|
                     FileEntry.create ("surviving", survivingPath, true)
-                    FileEntry.create ("new.txt", $"{studiesPath}/new.txt", false)
+                    FileEntry.create ("new.txt", newChildPath, false)
                 |]
 
                 let reconciled =
                     FileTreeCreator.reconcileFileTreeDirectory rootPath "studies" currentChildren initial
 
                 Vitest.expect(reconciled.ContainsKey(removedPath)).toBe (false)
-                Vitest.expect(reconciled.ContainsKey($"{removedPath}/old.txt")).toBe (false)
-                Vitest.expect(reconciled.ContainsKey($"{survivingPath}/known.txt")).toBe (true)
-                Vitest.expect(reconciled.ContainsKey($"{studiesPath}/new.txt")).toBe (true)
+                Vitest.expect(reconciled.ContainsKey(removedChildPath)).toBe (false)
+                Vitest.expect(reconciled.ContainsKey(survivingChildPath)).toBe (true)
+                Vitest.expect(reconciled.ContainsKey(newChildPath)).toBe (true)
         )
 
         Vitest.test (
