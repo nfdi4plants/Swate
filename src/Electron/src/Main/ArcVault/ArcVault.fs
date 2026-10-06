@@ -63,8 +63,10 @@ type ArcVault(window: BrowserWindow) =
     let mutable writeGeneration = 0
     let mutable watcherDeferralCount = 0
     let mutable watcherEpoch = 0
+    let mutable loadedDirectoryWatcherLifecycleActive = true
     let mutable loadedDirectoryWatcherSuspensionDepth = 0
     let mutable loadedDirectoryWatcherGeneration = 0
+    let mutable loadedDirectoryWatcherActiveGeneration: int option = None
 
     let mutable loadedDirectoryWatcherEstablishmentCancellation: (int * (unit -> unit)) option =
         None
@@ -106,6 +108,10 @@ type ArcVault(window: BrowserWindow) =
     member val fileWatcherPendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
     /// The barrier stays None outside tests. The watcher path awaits it between snapshot loading and the final eligibility check.
     member val internal WatcherMergeBarrier: (unit -> Fable.Core.JS.Promise<unit>) option = None with get, set
+    /// Test seam for holding a loaded-directory filesystem read at its real asynchronous boundary.
+    member val internal LoadedDirectoryReadOverride:
+        (string -> string -> Fable.Core.JS.Promise<FileEntry[]>) option =
+        None with get, set
     /// Imported paths awaiting their delayed Chokidar events. These events update the tree but must not re-merge the import.
     member val importedFileWatcherPaths: HashSet<string> = HashSet() with get
     member val private isBusyWritingValue: bool = false with get, set
@@ -173,6 +179,21 @@ type ArcVault(window: BrowserWindow) =
 
     member internal this.IsLoadedDirectoryWatcherGenerationCurrent(generation: int) =
         generation = loadedDirectoryWatcherGeneration
+
+    member internal this.IsLoadedDirectoryWatcherGenerationActive(generation: int) =
+        loadedDirectoryWatcherActiveGeneration = Some generation
+
+    member internal this.SetLoadedDirectoryWatcherActiveGeneration(generation: int option) =
+        loadedDirectoryWatcherActiveGeneration <- generation
+
+    member internal this.IsLoadedDirectoryWatcherLifecycleActive =
+        loadedDirectoryWatcherLifecycleActive
+
+    member internal this.ActivateLoadedDirectoryWatcherLifecycle() =
+        loadedDirectoryWatcherLifecycleActive <- true
+
+    member internal this.DeactivateLoadedDirectoryWatcherLifecycle() =
+        loadedDirectoryWatcherLifecycleActive <- false
 
     member internal this.PendingLoadedDirectoryHandoffs = pendingLoadedDirectoryHandoffs
 
@@ -398,10 +419,15 @@ module ArcVaultExtensions =
             )
         }
 
-        member internal this.QueueLoadedDirectoryRefresh(relativeDirectoryPath: string) =
+        member internal this.QueueLoadedDirectoryRefresh(relativeDirectoryPath: string, ?watcherGeneration: int) =
             let normalizedRelativePath = this.NormalizeLoadedDirectoryPath relativeDirectoryPath
             let capturedWatcherEpoch = this.WatcherEpoch
             let capturedArcPath = this.path
+
+            let watcherOwnsActiveLifecycle () =
+                this.IsLoadedDirectoryWatcherLifecycleActive
+                && watcherGeneration
+                   |> Option.forall this.IsLoadedDirectoryWatcherGenerationActive
 
             let lifecycleIsCurrent () =
                 capturedWatcherEpoch = this.WatcherEpoch
@@ -410,7 +436,7 @@ module ArcVaultExtensions =
                    | None, None -> true
                    | _ -> false
 
-            if this.PendingFileTreeReset.IsNone then
+            if watcherOwnsActiveLifecycle () && this.PendingFileTreeReset.IsNone then
                 match this.LoadedDirectoryRefreshes.TryFind normalizedRelativePath with
                 | Some _ ->
                     this.LoadedDirectoryRefreshes <- this.LoadedDirectoryRefreshes.Add(normalizedRelativePath, true)
@@ -462,9 +488,14 @@ module ArcVaultExtensions =
 
                 if not (this.IsLoadedDirectoryWatcherGenerationCurrent generation) then
                     return None
-                elif not shouldWatch || this.IsLoadedDirectoryWatcherSuspended then
+                elif
+                    not shouldWatch
+                    || not this.IsLoadedDirectoryWatcherLifecycleActive
+                    || this.IsLoadedDirectoryWatcherSuspended
+                then
                     let previous = this.loadedDirectoryWatcher
                     this.loadedDirectoryWatcher <- None
+                    this.SetLoadedDirectoryWatcherActiveGeneration None
 
                     match previous with
                     | Some watcher -> do! closeWatcher watcher
@@ -478,6 +509,7 @@ module ArcVaultExtensions =
                         this.loadedFileTreeDirectories.Clear()
                         let previous = this.loadedDirectoryWatcher
                         this.loadedDirectoryWatcher <- None
+                        this.SetLoadedDirectoryWatcherActiveGeneration None
 
                         match previous with
                         | Some watcher -> do! closeWatcher watcher
@@ -492,6 +524,7 @@ module ArcVaultExtensions =
                         if relativePaths.Length = 0 then
                             let previous = this.loadedDirectoryWatcher
                             this.loadedDirectoryWatcher <- None
+                            this.SetLoadedDirectoryWatcherActiveGeneration None
 
                             match previous with
                             | Some watcher -> do! closeWatcher watcher
@@ -520,8 +553,11 @@ module ArcVaultExtensions =
                                                 join [| arcPath; changedPath |]
 
                                         match tryGetRepoRelativePath arcPath (dirname absoluteChangedPath) with
-                                        | Some parentPath when this.IsFileTreeDirectoryLoaded parentPath ->
-                                            this.QueueLoadedDirectoryRefresh parentPath
+                                        | Some parentPath
+                                            when this.IsLoadedDirectoryWatcherLifecycleActive
+                                                 && this.IsLoadedDirectoryWatcherGenerationActive generation
+                                                 && this.IsFileTreeDirectoryLoaded parentPath ->
+                                            this.QueueLoadedDirectoryRefresh(parentPath, generation)
                                         | _ -> ()
                             )
                             |> ignore
@@ -535,10 +571,12 @@ module ArcVaultExtensions =
                             if
                                 becameReady
                                 && this.IsLoadedDirectoryWatcherGenerationCurrent generation
+                                && this.IsLoadedDirectoryWatcherLifecycleActive
                                 && not this.IsLoadedDirectoryWatcherSuspended
                             then
                                 let previous = this.loadedDirectoryWatcher
                                 this.loadedDirectoryWatcher <- Some candidate
+                                this.SetLoadedDirectoryWatcherActiveGeneration(Some generation)
                                 this.CompleteLoadedDirectoryWatcherEstablishment generation
 
                                 match previous with
@@ -1044,7 +1082,10 @@ module ArcVaultExtensions =
                 | Some arcPath ->
                     try
                         let wasLoaded = this.IsFileTreeDirectoryLoaded normalizedRelativePath
-                        let! children = readFileTreeDirectory arcPath normalizedRelativePath
+                        let! children =
+                            match this.LoadedDirectoryReadOverride with
+                            | Some readDirectory -> readDirectory arcPath normalizedRelativePath
+                            | None -> readFileTreeDirectory arcPath normalizedRelativePath
 
                         if lifecycleIsCurrent () then
                             let currentChildren = children
@@ -1170,6 +1211,8 @@ module ArcVaultExtensions =
 
         member this.StartFileWatcher(?usePolling: bool) =
             if this.path.IsSome then
+                this.ActivateLoadedDirectoryWatcherLifecycle()
+
                 match this.watcher with
                 | Some _ -> ()
                 | None ->
@@ -1198,8 +1241,16 @@ module ArcVaultExtensions =
 
         member this.StopFileWatcher() = promise {
             this.ClearPendingFileWatcherState()
+            // Reject callbacks synchronously. Requesting retirement below also advances the watcher
+            // generation before either close is awaited, so callbacks owned by the retiring watcher
+            // cannot join a later restarted lifecycle.
+            this.DeactivateLoadedDirectoryWatcherLifecycle()
             this.LoadedDirectoryRefreshes <- Map.empty
             this.PendingLoadedDirectoryHandoffs.Clear()
+            this.loadedFileTreeDirectories.Clear()
+
+            let loadedDirectoryWatcherClose =
+                this.RequestLoadedDirectoryWatcherCoverage false |> Promise.map ignore
 
             match this.watcher with
             | None -> ()
@@ -1211,7 +1262,11 @@ module ArcVaultExtensions =
 
             this.watcher <- None
 
-            do! this.RequestLoadedDirectoryWatcherCoverage false |> Promise.map ignore
+            do! loadedDirectoryWatcherClose
+            // A lifecycle queued ahead of retirement may have touched these collections before it
+            // observed cancellation. Reassert the completed-stop invariants after it drains.
+            this.LoadedDirectoryRefreshes <- Map.empty
+            this.PendingLoadedDirectoryHandoffs.Clear()
             this.loadedFileTreeDirectories.Clear()
 
         }

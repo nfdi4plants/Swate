@@ -29,6 +29,14 @@ let private interceptNextControlledWatch
     : unit =
     jsNative
 
+[<Emit("$0.close = () => { $1(); return $2; }")>]
+let private replaceWatcherClose
+    (_watcher: Main.Bindings.Chokidar.IWatcher)
+    (_onClose: unit -> unit)
+    (_close: JS.Promise<unit>)
+    : unit =
+    jsNative
+
 let private waitUntil description predicate =
     let rec loop remaining = promise {
         if predicate () then
@@ -679,6 +687,100 @@ Vitest.describe (
                         Vitest.expect(containsPath stalePath vault).toBe false
                         Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
                         Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                    })
+            }
+        )
+
+        Vitest.test (
+            "loaded watcher event during permanent watcher close is rejected by stop teardown",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
+                        let permanentCloseGate, releasePermanentClose = TestHelpers.deferred ()
+                        let permanentCloseStarted, signalPermanentCloseStarted = TestHelpers.deferred ()
+                        vault.StartFileWatcher()
+                        replaceWatcherClose vault.watcher.Value signalPermanentCloseStarted permanentCloseGate
+                        do! vault.RefreshFileTreeDirectory "dataset"
+
+                        let latePath = join [| datasetPath; "late-during-stop.txt" |]
+                        do! writeFileAsync latePath "late" TextEncoding.Utf8
+
+                        let stopping = vault.StopFileWatcher()
+                        do! permanentCloseStarted
+
+                        // Execute the same admission method used by the loaded watcher callback while
+                        // the permanent watcher close is still pending.
+                        vault.QueueLoadedDirectoryRefresh "dataset"
+
+                        Vitest.expect(vault.LoadedDirectoryRefreshes.IsEmpty).toBe true
+                        Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
+
+                        releasePermanentClose ()
+                        do! stopping
+                        do! Promise.sleep 25
+
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                        Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
+                        Vitest.expect(vault.PendingLoadedDirectoryHandoffs.Count).toBe 0
+                        Vitest.expect(vault.LoadedDirectoryRefreshes.IsEmpty).toBe true
+                        Vitest.expect(containsPath latePath vault).toBe false
+                    })
+            }
+        )
+
+        Vitest.test (
+            "loaded-directory read already in flight cannot publish after stop",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault rootPath datasetPath _ -> promise {
+                        do! vault.RefreshFileTreeDirectory "dataset"
+                        let stalePath = join [| datasetPath; "stale-read-after-stop.txt" |]
+                        do! writeFileAsync stalePath "stale" TextEncoding.Utf8
+
+                        let readStarted, signalReadStarted = TestHelpers.deferred ()
+                        let readGate, releaseRead = TestHelpers.deferred ()
+
+                        vault.LoadedDirectoryReadOverride <-
+                            Some(fun arcPath relativePath -> promise {
+                                signalReadStarted ()
+                                do! readGate
+                                return! Main.FileTreeCreator.readFileTreeDirectory arcPath relativePath
+                            })
+
+                        vault.QueueLoadedDirectoryRefresh "dataset"
+                        do! readStarted
+                        do! vault.StopFileWatcher()
+
+                        releaseRead ()
+                        do! Promise.sleep 25
+
+                        Vitest.expect(containsPath stalePath vault).toBe false
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                        Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
+                        Vitest.expect(vault.PendingLoadedDirectoryHandoffs.Count).toBe 0
+                        Vitest.expect(vault.LoadedDirectoryRefreshes.IsEmpty).toBe true
+                    })
+            }
+        )
+
+        Vitest.test (
+            "start after stop creates a fresh loaded-directory watcher lifecycle",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
+                        vault.StartFileWatcher()
+                        do! vault.StopFileWatcher()
+                        vault.StartFileWatcher()
+                        do! vault.RefreshFileTreeDirectory "dataset"
+
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+
+                        let restartedPath = join [| datasetPath; "after-restart.txt" |]
+                        do! writeFileAsync restartedPath "restart" TextEncoding.Utf8
+                        do! waitUntil "loaded-directory event after restart" (fun () -> containsPath restartedPath vault)
                     })
             }
         )
