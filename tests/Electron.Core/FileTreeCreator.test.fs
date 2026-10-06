@@ -22,8 +22,6 @@ let private childProcessDynamic: obj = importAll "node:child_process"
 
 let private fileTreeCreatorTestOptions = TestOptions(timeout = 20000)
 
-let private normalizeSlashes (path: string) = path.Replace("\\", "/")
-
 let private createFileEntry name path =
     ({
         name = name
