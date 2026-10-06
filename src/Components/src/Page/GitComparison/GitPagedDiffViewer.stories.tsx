@@ -2452,8 +2452,9 @@ export const ExpandingAGapKeepsTheScrollKeysWorking: Story = {
   },
 };
 
-// Three viewers with a continue row. The first shows the indexing status itself, the second leaves
-// it to the host while the indexing runs, and the third leaves it to the host with a failed read.
+// Four viewers with a continue row. The first shows the indexing status itself, the second leaves
+// it to the host while the indexing runs, the third leaves it to the host with a failed read, and
+// the fourth shows the row of a diff that is not indexed.
 function StatusOptionHarness() {
   const parts = React.useMemo(
     () => [PagedPart_HunkRows("status-hunk", range(0, 0), range(0, 5), false, false, makeAlignedRows(0, 5))],
@@ -2481,6 +2482,7 @@ function StatusOptionHarness() {
       {viewer("git-paged-status-shown", false, true, false)}
       {viewer("git-paged-status-hidden", true, true, false)}
       {viewer("git-paged-status-failed", true, false, true)}
+      {viewer("git-paged-status-idle", false, false, false)}
     </div>
   );
 }
@@ -2499,10 +2501,128 @@ export const HostStatusOptionHidesTheIndexingNoteAndTheProgress: Story = {
     await expect(canvas.queryByTestId("git-paged-status-hidden-indexing")).toBeNull();
     await expect(canvas.queryByTestId("git-paged-status-hidden-continue-progress")).toBeNull();
 
-    // The button and its failure state stay.
+    // The button and its failure state stay, and the label of the row is left out.
     const button = await canvas.findByTestId("git-paged-status-failed-continue-button");
     await expect(button).toHaveAttribute("data-failed", "true");
     await expect(canvas.queryByTestId("git-paged-status-failed-continue-progress")).toBeNull();
+    await expect(canvas.queryByTestId("git-paged-status-failed-continue-label")).toBeNull();
+
+    // Without the option the same row names the content that is available and offers the button.
+    await expect(await canvas.findByTestId("git-paged-status-idle-continue-label")).toBeInTheDocument();
+    await expect(canvas.getByTestId("git-paged-status-idle-continue-button")).toBeInTheDocument();
+  },
+};
+
+const LARGE_NUMBER_START = 2168270;
+
+// Rows with line numbers of seven digits, context rows and changed rows, next to rows with small
+// numbers, in two viewers.
+function LineNumberHarness() {
+  const parts = (start: number, prefix: string) => [
+    PagedPart_HunkRows(
+      `${prefix}-hunk`,
+      range(start, 8),
+      range(start, 8),
+      false,
+      false,
+      Array.from({ length: 8 }, (_, offset) => {
+        const number = start + offset;
+        return new PagedRow(
+          `${prefix}-${number}`,
+          offset % 2 === 0 ? "context" : "replaced",
+          makeLine(number, `Previous ${number}`),
+          makeLine(number, `Current ${number}`),
+        );
+      }),
+    ),
+  ];
+  const viewer = (start: number, prefix: string) => (
+    <div style={{ height: "18rem" }}>
+      <GitPagedDiffViewerComponent
+        parts={parts(start, prefix)}
+        status={PagedDiffStatus_Ready()}
+        progress={new PagedProgress(100, 100, true)}
+        hasMore={false}
+        outputComplete={true}
+        testIdPrefix={`git-paged-${prefix}`}
+      />
+    </div>
+  );
+  return (
+    <div>
+      {viewer(LARGE_NUMBER_START, "large")}
+      {viewer(10, "small")}
+    </div>
+  );
+}
+
+export const LineNumbersOfSevenDigitsFitTheirColumn: Story = {
+  render: () => <LineNumberHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByTestId(`git-paged-large-line-previous-${LARGE_NUMBER_START}`);
+
+    // The cell of a number is the first child of the cell of its line.
+    const numberCells = (prefix: string, start: number) =>
+      ["previous", "current"].flatMap((side) =>
+        Array.from({ length: 8 }, (_, offset) => {
+          const line = canvas.getByTestId(`git-paged-${prefix}-line-${side}-${start + offset}`);
+          return line.firstElementChild as HTMLElement;
+        }),
+      );
+
+    // No number loses a digit, and the column has one width for both sides and every row.
+    const large = numberCells("large", LARGE_NUMBER_START);
+    for (const cell of large) await expect(cell.scrollWidth).toBeLessThanOrEqual(cell.clientWidth);
+    await expect(new Set(large.map((cell) => Math.round(cell.getBoundingClientRect().width))).size).toBe(1);
+
+    // Small numbers keep the minimum width of 3.5rem, which is narrower than the large column.
+    const remPixels = parseFloat(getComputedStyle(document.documentElement).fontSize);
+    const small = numberCells("small", 10);
+    await expect(new Set(small.map((cell) => Math.round(cell.getBoundingClientRect().width))).size).toBe(1);
+    await expect(Math.abs(small[0].getBoundingClientRect().width - 3.5 * remPixels)).toBeLessThan(1);
+    await expect(large[0].getBoundingClientRect().width).toBeGreaterThan(small[0].getBoundingClientRect().width);
+  },
+};
+
+export const HomeAndEndJumpAtOnceInAnUncappedDiff: Story = {
+  render: () => <DirectoryHarness fromStart onReplay={onDirectoryReplay} />,
+  play: async ({ canvasElement }) => {
+    const scroll = scrollElementFor(canvasElement, "git-paged-directory-grid");
+    const press = (key: string, modifiers: KeyboardEventInit = {}) => {
+      const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...modifiers });
+      scroll.dispatchEvent(event);
+      return event;
+    };
+
+    // The diff is not capped, so the native scroll height is the height of all rows.
+    await expect(Math.abs(scroll.scrollHeight - DIRECTORY_TOTAL_ROWS * DIRECTORY_ROW_HEIGHT)).toBeLessThan(2);
+    await new Promise((resolve) => window.setTimeout(resolve, 100));
+    await expect(onDirectoryReplay).not.toHaveBeenCalled();
+
+    // A key with a modifier keeps its default. Shift+End selects, and Ctrl+End belongs to the browser.
+    await expect(press("End", { shiftKey: true }).defaultPrevented).toBe(false);
+    await expect(press("End", { ctrlKey: true }).defaultPrevented).toBe(false);
+
+    // End jumps to the end in the same task. A smooth scroll would pass the pages in between, and
+    // each of them would be replayed.
+    const end = press("End");
+    await expect(end.defaultPrevented).toBe(true);
+    await expect(Math.abs(scroll.scrollTop - (scroll.scrollHeight - scroll.clientHeight))).toBeLessThan(1);
+    await waitFor(() => expect(onDirectoryReplay).toHaveBeenCalledWith(`page-${DIRECTORY_PAGE_COUNT - 1}`));
+    await new Promise((resolve) => window.setTimeout(resolve, 300));
+    await expect(onDirectoryReplay.mock.calls.map((call) => call[0])).toEqual([`page-${DIRECTORY_PAGE_COUNT - 1}`]);
+
+    // Home does the same at the top. Only the first page is replayed, since the window moved to the end.
+    const home = press("Home");
+    await expect(home.defaultPrevented).toBe(true);
+    await expect(scroll.scrollTop).toBe(0);
+    await waitFor(() => expect(onDirectoryReplay).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => window.setTimeout(resolve, 300));
+    await expect(onDirectoryReplay.mock.calls.map((call) => call[0])).toEqual([
+      `page-${DIRECTORY_PAGE_COUNT - 1}`,
+      "page-0",
+    ]);
   },
 };
 

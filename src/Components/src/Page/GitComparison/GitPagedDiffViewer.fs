@@ -411,19 +411,34 @@ module internal GitPagedDiffDisplay =
             | _ -> false
         )
 
+    let lineNumberText number = numberText (number + 1.0)
+
+    /// The lines the rows show on both sides.
+    let private rowLines (rows: Row[]) =
+        rows
+        |> Array.collect (fun row ->
+            match row.Content with
+            | AlignedRow(aligned, _) -> [| aligned.Previous; aligned.Current |]
+            | UnalignedLines(previous, current) -> [| previous; current |]
+            | _ -> [||]
+        )
+        |> Array.choose id
+
+    /// The width of the line number column as a CSS length, wide enough for the longest line
+    /// number of the rows and never narrower than 3.5rem. The cell has 0.75rem of padding on each
+    /// side and a 1px border. Every row and both sides use the same width, so the columns line up.
+    let numberColumnWidth (rows: Row[]) =
+        let digits =
+            rowLines rows
+            |> Array.fold (fun widest line -> max widest (lineNumberText line.Number).Length) 0
+
+        $"max(3.5rem, calc({digits}ch + 1.5rem + 1px))"
+
     /// The minimum width of one column as a CSS length, wide enough for the longest line of the
     /// rows. The rows use a monospace font, so the width counts characters. Controls beside a line
     /// need room of their own. Every row uses the same width, so the columns line up.
     let columnMinWidth (rows: Row[]) =
-        let lines =
-            rows
-            |> Array.collect (fun row ->
-                match row.Content with
-                | AlignedRow(aligned, _) -> [| aligned.Previous; aligned.Current |]
-                | UnalignedLines(previous, current) -> [| previous; current |]
-                | _ -> [||]
-            )
-            |> Array.choose id
+        let lines = rowLines rows
 
         let characters =
             lines |> Array.fold (fun widest line -> max widest line.Text.Length) 0
@@ -437,7 +452,7 @@ module internal GitPagedDiffDisplay =
             )
 
         let controls = if hasControls then " + 14rem" else ""
-        $"max(29rem, calc(5rem + {characters + 2}ch{controls}))"
+        $"max(29rem, calc(1.5rem + {numberColumnWidth rows} + {characters + 2}ch{controls}))"
 
     let endingText ending =
         match ending with
@@ -445,8 +460,6 @@ module internal GitPagedDiffDisplay =
         | PagedLineEnding.LF -> "LF"
         | PagedLineEnding.CRLF -> "CRLF"
         | PagedLineEnding.CR -> "CR"
-
-    let lineNumberText number = numberText (number + 1.0)
 
     let private changedSide side kind =
         match kind, side with
@@ -579,7 +592,8 @@ type GitPagedDiffViewer =
             Html.div [
                 prop.custom ("data-side", GitPagedDiffDisplay.sideName props.Side)
                 prop.custom ("data-kind", GitPagedDiffDisplay.kindName kind)
-                prop.className "swt:grid swt:grid-cols-[3.5rem_minmax(0,1fr)] swt:min-w-0 swt:overflow-hidden"
+                prop.className
+                    "swt:grid swt:grid-cols-[var(--paged-number-column,3.5rem)_minmax(0,1fr)] swt:min-w-0 swt:overflow-hidden"
             ]
         | Some line ->
             let textLength = line.Text.Length
@@ -633,7 +647,8 @@ type GitPagedDiffViewer =
                 prop.testId $"{props.Prefix}-line-{side}-{lineNumber}"
                 prop.custom ("data-side", side)
                 prop.custom ("data-kind", GitPagedDiffDisplay.kindName kind)
-                prop.className "swt:grid swt:grid-cols-[3.5rem_minmax(0,1fr)] swt:min-w-0 swt:overflow-hidden"
+                prop.className
+                    "swt:grid swt:grid-cols-[var(--paged-number-column,3.5rem)_minmax(0,1fr)] swt:min-w-0 swt:overflow-hidden"
                 prop.children [
                     Html.div [
                         prop.className [
@@ -1049,10 +1064,14 @@ type GitPagedDiffViewer =
                                                 ]
                                             ]
                                     else
-                                        Html.span [
-                                            prop.className "swt:text-xs swt:text-base-content/65"
-                                            prop.text "More diff content is available"
-                                        ]
+                                        // The host that shows the status itself leaves the label out, and the
+                                        // row keeps the button.
+                                        if not props.HideIndexingStatus then
+                                            Html.span [
+                                                prop.testId $"{props.Prefix}-continue-label"
+                                                prop.className "swt:text-xs swt:text-base-content/65"
+                                                prop.text "More diff content is available"
+                                            ]
 
                                         Html.button [
                                             prop.testId $"{props.Prefix}-continue-button"
@@ -1102,6 +1121,7 @@ type GitPagedDiffViewer =
             rowParts: int[],
             evictedIds: Lazy<JS.Set<string>>,
             columnMin: string,
+            numberColumn: string,
             previousTitle: string,
             currentTitle: string,
             prefix: string,
@@ -1320,6 +1340,20 @@ type GitPagedDiffViewer =
                                 syncRef.current ()
                                 anchorRef.current ()
                             | None -> ()
+                        elif
+                            onScroller
+                            && not (keyboard.ctrlKey || keyboard.altKey || keyboard.metaKey || keyboard.shiftKey)
+                        then
+                            // Chromium scrolls to the end of a long diff smoothly, and the pages it passes
+                            // on the way would each be replayed. The jump goes to the target at once.
+                            match keyboard.key with
+                            | "Home" ->
+                                event.preventDefault ()
+                                bodyScroll.scrollTop <- 0.0
+                            | "End" ->
+                                event.preventDefault ()
+                                bodyScroll.scrollTop <- float bodyScroll.scrollHeight - view
+                            | _ -> ()
 
                     let onFocusIn (event: Event) =
                         let target = unbox<HTMLElement> event.target
@@ -2056,6 +2090,7 @@ type GitPagedDiffViewer =
                             prop.style [
                                 style.height (int (GitPagedDiffDisplay.physicalHeight cap totalRef.current))
                                 style.custom ("minWidth", $"calc(2 * {columnMin})")
+                                style.custom ("--paged-number-column", numberColumn)
                                 // Rows laid out past the content height must not add to the scroll
                                 // range. That happens above the cap and while the scrollbar is held.
                                 if isCapped () || pinnedTotal.current.IsSome then
@@ -2314,7 +2349,7 @@ type GitPagedDiffViewer =
         let currentTitle = defaultArg currentTitle "Current version"
         // The rows of the parts are built once for each change of the parts array. The key of the
         // last row of the last part stands in for the next page when the caller names none.
-        let partRowsOnly, partRowParts, lastRowKey, columnMin, evictedIds =
+        let partRowsOnly, partRowParts, lastRowKey, columnMin, numberColumn, evictedIds =
             React.useMemo (
                 (fun () ->
                     let rows = ResizeArray<GitPagedDiffDisplay.Row>()
@@ -2371,7 +2406,13 @@ type GitPagedDiffViewer =
                             partIndex <- partIndex + 1
 
                     let rows = rows.ToArray()
-                    rows, rowParts.ToArray(), lastRowKey, GitPagedDiffDisplay.columnMinWidth rows, evictedIds
+
+                    rows,
+                    rowParts.ToArray(),
+                    lastRowKey,
+                    GitPagedDiffDisplay.columnMinWidth rows,
+                    GitPagedDiffDisplay.numberColumnWidth rows,
+                    evictedIds
                 ),
                 [| box parts |]
             )
@@ -2469,6 +2510,7 @@ type GitPagedDiffViewer =
                             rowParts,
                             evictedIds,
                             columnMin,
+                            numberColumn,
                             previousTitle,
                             currentTitle,
                             prefix,
