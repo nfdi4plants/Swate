@@ -349,7 +349,8 @@ type Main =
         let navbar =
             Navbar.Main(
                 left = Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns(),
-                right = trailingNavbarElement
+                right = trailingNavbarElement,
+                className = "swt:border swt:border-base-300"
             )
 
 
