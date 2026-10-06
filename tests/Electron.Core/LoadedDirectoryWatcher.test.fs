@@ -64,6 +64,10 @@ let private isWatchedPath arcPath relativePath watcher =
         PathHelpers.pathsEqual (PathHelpers.normalizeCanonicalRelativePath relativeWatchedPath) expectedRelativePath
     )
 
+[<Emit("$0 === $1")>]
+let private isSameWatcher (_left: Main.Bindings.Chokidar.IWatcher) (_right: Main.Bindings.Chokidar.IWatcher) : bool =
+    jsNative
+
 let private recordingWindow onSend =
     let send: obj = emitJsExpr onSend "((...args) => $0(args))"
 
@@ -688,6 +692,88 @@ Vitest.describe (
 
                         Vitest.expect(containsPath handoffPath vault).toBe true
                         Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                    })
+            }
+        )
+
+        Vitest.test (
+            "overlapping establishments close the superseded candidate and retain only the final generation",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault _ _ _ -> promise {
+                        let firstCreated, signalFirstCreated = TestHelpers.deferred ()
+                        let firstClosed, signalFirstClosed = TestHelpers.deferred ()
+                        let secondCreated, signalSecondCreated = TestHelpers.deferred ()
+                        let mutable signalSecondReady = ignore
+                        let mutable closeCount = 0
+
+                        interceptNextControlledWatch
+                            watchMock
+                            signalFirstCreated
+                            ignore
+                            (fun () ->
+                                closeCount <- closeCount + 1
+                                signalFirstClosed ())
+
+                        interceptNextControlledWatch
+                            watchMock
+                            signalSecondCreated
+                            (fun ready -> signalSecondReady <- ready)
+                            (fun () -> closeCount <- closeCount + 1)
+
+                        vault.loadedFileTreeDirectories.Add("dataset") |> ignore
+                        let first = vault.RequestLoadedDirectoryWatcherCoverage true
+                        do! firstCreated
+
+                        let second = vault.RequestLoadedDirectoryWatcherCoverage true
+                        do! firstClosed
+                        do! secondCreated
+                        signalSecondReady ()
+
+                        let! firstGeneration = first
+                        let! secondGeneration = second
+                        Vitest.expect(firstGeneration.IsNone).toBe true
+                        Vitest.expect(secondGeneration.IsSome).toBe true
+                        Vitest.expect(closeCount).toBe 1
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                    })
+            }
+        )
+
+        Vitest.test (
+            "existing scopes stay active while replacement coverage becomes ready",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
+                        do! vault.RefreshFileTreeDirectory "dataset"
+                        let original = vault.loadedDirectoryWatcher.Value
+                        let replacementCreated, signalReplacementCreated = TestHelpers.deferred ()
+                        let mutable signalReplacementReady = ignore
+
+                        interceptNextControlledWatch
+                            watchMock
+                            signalReplacementCreated
+                            (fun ready -> signalReplacementReady <- ready)
+                            ignore
+
+                        let replacement = vault.RefreshFileTreeDirectory "dataset/nested"
+                        do! replacementCreated
+                        Vitest.expect(isSameWatcher original vault.loadedDirectoryWatcher.Value).toBe true
+
+                        let changedPath = join [| datasetPath; "changed-during-replacement.txt" |]
+                        do! writeFileAsync changedPath "changed" TextEncoding.Utf8
+                        do!
+                            waitUntil
+                                "active watcher event during replacement"
+                                (fun () -> vault.LoadedDirectoryRefreshes.ContainsKey "dataset")
+                        signalReplacementReady ()
+                        do! replacement
+                        do! waitUntil "existing-scope mutation during replacement" (fun () -> containsPath changedPath vault)
+
+                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                        Vitest.expect(isSameWatcher original vault.loadedDirectoryWatcher.Value).toBe false
                     })
             }
         )
