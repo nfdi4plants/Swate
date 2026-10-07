@@ -60,7 +60,7 @@ open WidgetsHelper
 [<Erase; Mangle(false)>]
 type Main =
 
-    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
+    [<ReactComponent>]
     static member private WidgetToggleBtn(widgetType: WidgetType, isOpen: bool, toggle: unit -> unit) =
 
         let label, icon = widgetInfo widgetType
@@ -69,7 +69,8 @@ type Main =
             icon,
             label,
             (fun _ -> toggle ()),
-            classes = (if isOpen then "swt:!text-primary" else "")
+            classes = (if isOpen then "swt:!text-primary" else ""),
+            tooltipPosition = "swt:tooltip-start swt:tooltip-bottom"
         )
 
     [<ReactComponent>]
@@ -77,14 +78,11 @@ type Main =
 
         let context = useWidgetControllerCtx ()
 
-        Html.div [
-            prop.className "swt:flex swt:flex-wrap swt:gap-2 swt:justify-center"
-            prop.children [
-                for widgetType in widgetTypes do
-                    let isOpen = context.isActive widgetType
-                    let toggle = fun () -> context.toggleWidget widgetType
-                    Main.WidgetToggleBtn(widgetType, isOpen, toggle)
-            ]
+        React.Fragment [
+            for widgetType in widgetTypes do
+                let isOpen = context.isActive widgetType
+                let toggle = fun () -> context.toggleWidget widgetType
+                Main.WidgetToggleBtn(widgetType, isOpen, toggle)
         ]
 
     [<ReactComponent>]

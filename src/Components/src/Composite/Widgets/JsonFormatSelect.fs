@@ -35,7 +35,7 @@ type JsonFormatSelect =
             prop.className "swt:select swt:join-item swt:shrink-0"
             prop.style [
                 style.custom ("width", selectWidth)
-                style.custom ("min-width", selectWidth)
+                style.custom ("minWidth", selectWidth)
             ]
             prop.onChange (JsonExportFormat.fromString >> onFormatChange)
             prop.value (string selectedFormat)

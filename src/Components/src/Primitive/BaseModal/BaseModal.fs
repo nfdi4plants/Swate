@@ -108,7 +108,7 @@ type BaseModal =
                 FloatingUI.FloatingPortal(
                     FloatingUI.FloatingOverlay(
                         lockScroll = true,
-                        className = "swt:modal swt:modal-open",
+                        className = "swt:modal swt:modal-open swt:z-9999",
                         children =
                             FloatingUI.FloatingFocusManager(
                                 flui.context,

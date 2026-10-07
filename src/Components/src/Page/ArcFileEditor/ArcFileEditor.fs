@@ -76,8 +76,14 @@ type private LazyComponents =
         Swate.Components.Composite.Widgets.JsonExport.JsonExport.JsonExport(arcFile = arcFile, onError = onError)
 
     [<ReactLazyComponent>]
-    static member LazyDataAnnotator(destination: AnnotationDestination, setAnnotationInput, onError) =
-        Swate.Components.Composite.Widgets.DataAnnotator.DataAnnotator.Main(destination, setAnnotationInput, onError)
+    static member LazyDataAnnotator
+        (?onInsert: AnnotationInput -> Result<int, string>, ?canInsert: bool, ?onError: string -> unit)
+        =
+        Composite.Widgets.DataAnnotator.DataAnnotator.Main(
+            ?onInsert = onInsert,
+            ?canInsert = canInsert,
+            ?onError = onError
+        )
 
     [<ReactLazyComponent>]
     static member LazyArcFileMetadata(arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
@@ -99,6 +105,28 @@ type Main =
     [<ReactComponent>]
     static member LazyLoaderWithMessage(lazyComponent: ReactElement, message: string) =
         React.Suspense([ lazyComponent ], fallback = Main.LazyFallback(message))
+
+    [<ReactComponent>]
+    static member internal DataAnnotatorWidget
+        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit, onError: string -> unit)
+        =
+        let annotationCtx = Context.useAnnotationTableStateCtx ()
+
+        let target =
+            Composite.Widgets.CellInsertion.tryGetTarget arcFile activeTableIndex annotationCtx.state
+
+        LazyComponents.LazyDataAnnotator(
+            onInsert =
+                (fun input ->
+                    Composite.Widgets.DataAnnotator.Helper.insertAnnotationIntoSelectedCells
+                        arcFile
+                        setArcFile
+                        input
+                        target
+                ),
+            canInsert = target.IsSome,
+            onError = onError
+        )
 
     [<ReactComponent>]
     static member private TableView(table: ArcTable, setTableInArcFile: ArcTable -> unit) =
@@ -319,30 +347,12 @@ type Main =
             | None -> Html.none
 
         let navbar =
-            Html.div [
-                prop.className "swt:shrink-0 swt:border-b swt:border-base-300"
-                prop.children [
-                    Navbar.Main(
-                        left =
-                            Html.div [
-                                prop.className "swt:flex swt:items-center swt:gap-2"
-                                prop.children [
-                                    Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns()
-                                    Buttons.QuickAccessButton(
-                                        Html.i [
-                                            prop.className
-                                                "swt:iconify swt:fluent--database-arrow-up-20-regular swt:size-6"
-                                        ],
-                                        "Add DataMap",
-                                        (fun _ -> onAddDataMap |> Option.iter (fun handler -> handler ())),
-                                        isDisabled = not canAddDataMap
-                                    )
-                                ]
-                            ],
-                        right = trailingNavbarElement
-                    )
-                ]
-            ]
+            Navbar.Main(
+                left = Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns(),
+                right = trailingNavbarElement,
+                className = "swt:border swt:border-base-300"
+            )
+
 
         let widgetElements = {|
             buildingBlock =
@@ -361,20 +371,17 @@ type Main =
                     "Loading File Picker Widget..."
                 )
             dataAnnotator =
-                match Helper.tryGetDataAnnotatorDestination (activeView, arcFile) with
-                | Ok destination ->
+                match activeView with
+                | ActiveView.Table _
+                | ActiveView.DataMap ->
                     Main.LazyLoaderWithMessage(
-                        LazyComponents.LazyDataAnnotator(
-                            destination,
-                            Helper.applyDataAnnotatorInputToArcFile (destination, arcFile, setArcFile),
-                            onError = onError
-                        ),
+                        Main.DataAnnotatorWidget(arcFile, activeTableIndex, setArcFile, onError),
                         "Loading Data Annotator Widget..."
                     )
-                | Error message ->
+                | _ ->
                     Html.div [
                         prop.className "swt:p-3 swt:text-sm swt:opacity-70"
-                        prop.text message
+                        prop.text "Open a table or DataMap to use the Data Annotator."
                     ]
             jsonImport =
                 Main.LazyLoaderWithMessage(
