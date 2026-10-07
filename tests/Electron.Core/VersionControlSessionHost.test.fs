@@ -1767,7 +1767,7 @@ Vitest.describe (
                     do! vault.RefreshFileTreeDirectory "dataset"
                     let api = Main.IPC.IVersionControlApi.api (ipcEvent 48)
                     Vitest.expect(vault.isBusyWriting).toBe false
-                    Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                    Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watcher.IsSome).toBe true
 
                     let running =
                         api.restorePaths {
@@ -1781,7 +1781,7 @@ Vitest.describe (
                     expectDtoFailure "stale restore" result |> ignore
                     Vitest.expect(vault.isBusyWriting).toBe false
                     Vitest.expect(vault.loadedFileTreeDirectories.Contains "dataset").toBe true
-                    Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                    Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watcher.IsSome).toBe true
                 })
         )
 
@@ -2021,7 +2021,7 @@ Vitest.describe (
                         let! initialTree = Main.FileTreeCreator.getFileTree workspace
                         vault.fileTree <- initialTree
                         do! vault.RefreshFileTreeDirectory "dataset"
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                        Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watcher.IsSome).toBe true
 
                         clearMock watchMock
                         let targetLocation = "https://example.invalid/explicit-bind.git"
@@ -2052,7 +2052,7 @@ Vitest.describe (
                         // so restoration has no directories for which to create a replacement watcher.
                         Vitest.expect(mockCallCount watchMock).toBe 0
                         Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                        Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watcher.IsNone).toBe true
                     finally
                         providerEvents.Clear()
                         bindInvocations.Clear()
@@ -2108,11 +2108,11 @@ Vitest.describe (
                                 "first restore mutation to start"
                                 (fun () ->
                                     fakeHost.RunningMutationIdsForWindow 52 = [| "restore-first" |]
-                                    && vault.loadedDirectoryWatcher.IsNone
+                                    && vault.LoadedDirectoryWatcherController.Current.Watcher.IsNone
                                 )
 
                         Vitest.expect(fakeHost.RunningMutationIdsForWindow 52).toEqual [| "restore-first" |]
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                        Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watcher.IsNone).toBe true
 
                         let second =
                             api.restorePaths {
@@ -2142,7 +2142,7 @@ Vitest.describe (
                         Vitest.expect(restoreInvocations.Contains "second.txt").toBe false
                         Vitest.expect(vault.isBusyWriting).toBe false
                         Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                        Vitest.expect(vault.LoadedDirectoryWatcherController.Current.Watcher.IsNone).toBe true
                     finally
                         restoreGates.Clear()
                         restoreInvocations.Clear()
@@ -2186,7 +2186,7 @@ Vitest.describe (
                                 "first mutation before bind to start"
                                 (fun () ->
                                     fakeHost.RunningMutationIdsForWindow 92 = [| "restore-before-bind" |]
-                                    && vault.loadedDirectoryWatcher.IsNone
+                                    && vault.LoadedDirectoryWatcherController.Current.Watcher.IsNone
                                 )
 
                         let bind =

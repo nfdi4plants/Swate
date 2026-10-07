@@ -269,7 +269,6 @@ type ArcVault(window: BrowserWindow) =
     member val hasUnsavedArcChanges: bool = false with get, private set
     member val fileTree: Dictionary<string, FileEntry> = Dictionary<string, FileEntry>() with get, set
     member val watcher: Chokidar.IWatcher option = None with get, set
-    member _.loadedDirectoryWatcher = loadedDirectoryWatcherController.Current.Watcher
 
     member _.loadedFileTreeDirectories =
         loadedDirectoryWatcherController.Current.LoadedDirectories
@@ -326,12 +325,6 @@ type ArcVault(window: BrowserWindow) =
 
     member internal _.LoadedDirectoryRefreshes =
         loadedDirectoryWatcherController.Current.Refreshes
-
-    member internal _.AddLoadedDirectoryForTesting(relativePath: string) =
-        loadedDirectoryWatcherController.AddLoadedDirectory(relativePath, false)
-
-    member internal _.ForgetLoadedDirectoryWatcherForTesting() =
-        loadedDirectoryWatcherController.RetireWatcher() |> ignore
 
     member internal this.FileTreeUpdateTail
         with get () = fileTreeUpdateTail

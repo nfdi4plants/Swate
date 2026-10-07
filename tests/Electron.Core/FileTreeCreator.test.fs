@@ -328,13 +328,8 @@ Vitest.describe (
 )
 
 Vitest.describe (
-    "FileTreeCreator.removePathAndDescendants",
+    "FileTreeCreator.removePathAndDescendantsInPlace",
     fun () ->
-        let removePathAndDescendants targetPath (fileTree: Dictionary<string, FileEntry>) =
-            let nextTree = Dictionary<string, FileEntry>(fileTree)
-            FileTreeCreator.removePathAndDescendantsInPlace targetPath nextTree
-            nextTree
-
         let createTreeEntry path isDirectory = {
             name = path |> PathHelpers.normalizePath |> PathHelpers.getFileName
             isDirectory = isDirectory
@@ -343,7 +338,7 @@ Vitest.describe (
         }
 
         Vitest.test (
-            "removes only the target path and descendants without mutating the input",
+            "removes only the target path and descendants",
             fun () ->
                 let tree = Dictionary<string, FileEntry>()
                 tree.Add("C:/arc", createTreeEntry "C:/arc" true)
@@ -353,68 +348,14 @@ Vitest.describe (
                 tree.Add("C:/arc/assays/AB", createTreeEntry "C:/arc/assays/AB" true)
                 tree.Add("C:/arc/assays/AB/isa.assay.xlsx", createTreeEntry "C:/arc/assays/AB/isa.assay.xlsx" false)
 
-                let returnedTree = removePathAndDescendants "C:/arc/assays/A" tree
+                FileTreeCreator.removePathAndDescendantsInPlace "C:/arc/assays/A" tree
 
-                Vitest.expect(returnedTree.ContainsKey("C:/arc/assays/A")).toBe (false)
-                Vitest.expect(returnedTree.ContainsKey("C:/arc/assays/A/isa.assay.xlsx")).toBe (false)
-                Vitest.expect(returnedTree.ContainsKey("C:/arc/assays/AB")).toBe (true)
-                Vitest.expect(returnedTree.ContainsKey("C:/arc/assays/AB/isa.assay.xlsx")).toBe (true)
-                Vitest.expect(tree.ContainsKey("C:/arc/assays/A")).toBe (true)
-                Vitest.expect(tree.ContainsKey("C:/arc/assays/A/isa.assay.xlsx")).toBe (true)
+                Vitest.expect(tree.ContainsKey("C:/arc/assays/A")).toBe (false)
+                Vitest.expect(tree.ContainsKey("C:/arc/assays/A/isa.assay.xlsx")).toBe (false)
+                Vitest.expect(tree.ContainsKey("C:/arc")).toBe (true)
+                Vitest.expect(tree.ContainsKey("C:/arc/assays")).toBe (true)
                 Vitest.expect(tree.ContainsKey("C:/arc/assays/AB")).toBe (true)
                 Vitest.expect(tree.ContainsKey("C:/arc/assays/AB/isa.assay.xlsx")).toBe (true)
-        )
-)
-
-Vitest.describe (
-    "FileTreeCreator.upsertFileEntry",
-    fun () ->
-        let createTreeEntry path largeObject = {
-            name = path |> PathHelpers.normalizePath |> PathHelpers.getFileName
-            isDirectory = false
-            path = path
-            largeObject = largeObject
-        }
-
-        let pointerInfo: ObjectStateDto = {
-            Path = "data.bin"
-            SizeBytes = Some 128.0
-            IsMaterialized = false
-            IsLocallyAvailable = false
-            ObjectId = Some "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        }
-
-        Vitest.test (
-            "adds exactly one entry while preserving existing entries",
-            fun () ->
-                let tree = Dictionary<string, FileEntry>()
-                tree.Add("C:/arc/other.bin", createTreeEntry "C:/arc/other.bin" None)
-
-                let updatedTree =
-                    FileTreeCreator.upsertFileEntry (createTreeEntry "C:/arc/data.bin" (Some pointerInfo)) tree
-
-                Vitest.expect(updatedTree.Count).toBe (2)
-                Vitest.expect(updatedTree.ContainsKey("C:/arc/other.bin")).toBe (true)
-                Vitest.expect(updatedTree.["C:/arc/data.bin"].largeObject).toEqual (Some pointerInfo)
-                Vitest.expect(tree.Count).toBe (1)
-                Vitest.expect(tree.ContainsKey("C:/arc/data.bin")).toBe (false)
-        )
-
-        Vitest.test (
-            "replaces an entry without mutating the current file tree",
-            fun () ->
-                let tree = Dictionary<string, FileEntry>()
-                tree.Add("C:/arc/data.bin", createTreeEntry "C:/arc/data.bin" None)
-                tree.Add("C:/arc/other.bin", createTreeEntry "C:/arc/other.bin" None)
-
-                let updatedTree =
-                    FileTreeCreator.upsertFileEntry (createTreeEntry "C:/arc/data.bin" (Some pointerInfo)) tree
-
-                Vitest.expect(updatedTree.Count).toBe (2)
-                Vitest.expect(updatedTree.["C:/arc/data.bin"].largeObject).toEqual (Some pointerInfo)
-                Vitest.expect(updatedTree.ContainsKey("C:/arc/other.bin")).toBe (true)
-                Vitest.expect(tree.["C:/arc/data.bin"].largeObject).toEqual (None)
-                Vitest.expect(tree.ContainsKey("C:/arc/other.bin")).toBe (true)
         )
 )
 

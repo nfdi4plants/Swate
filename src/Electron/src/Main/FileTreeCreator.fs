@@ -145,12 +145,6 @@ let internal removePathAndDescendantsInPlace (targetPath: string) (fileTree: Dic
 
         keysToRemove |> Array.iter (fun path -> fileTree.Remove(path) |> ignore)
 
-/// Adds or replaces one entry without mutating the current file-tree snapshot.
-let upsertFileEntry (entry: FileEntry) (fileTree: Dictionary<string, FileEntry>) : Dictionary<string, FileEntry> =
-    let nextTree = Dictionary<string, FileEntry>(fileTree)
-    nextTree.[entry.path] <- entry
-    nextTree
-
 let getFileEntry (path: string) = promise {
     let! stats = statAsync path
     return FileEntry.create (basename path, path, stats.isDirectory (), None)

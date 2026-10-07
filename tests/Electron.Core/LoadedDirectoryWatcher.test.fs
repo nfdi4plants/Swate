@@ -59,6 +59,9 @@ let private containsPath path (vault: ArcVault) =
     vault.fileTree.Values
     |> Seq.exists (fun entry -> PathHelpers.pathsEqual entry.path path)
 
+let private loadedDirectoryWatcher (vault: ArcVault) =
+    vault.LoadedDirectoryWatcherController.Current.Watcher
+
 [<Emit("Object.entries($0.getWatched()).flatMap(([directory, names]) => names.map(name => `${directory}/${name}`))")>]
 let private watchedPaths (_watcher: Main.Bindings.Chokidar.IWatcher) : string[] = jsNative
 
@@ -139,7 +142,7 @@ Vitest.describe (
 
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset/nested").toBe false
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
                         Vitest.expect(containsPath (join [| datasetPath; "existing.txt" |]) vault).toBe true
                         Vitest.expect(containsPath (join [| nestedPath; "deep.txt" |]) vault).toBe false
 
@@ -147,12 +150,12 @@ Vitest.describe (
                             waitUntil
                                 "dataset watcher readiness"
                                 (fun () ->
-                                    isWatchedPath rootPath "dataset/existing.txt" vault.loadedDirectoryWatcher.Value
+                                    isWatchedPath rootPath "dataset/existing.txt" (loadedDirectoryWatcher vault).Value
                                 )
 
                         Vitest
                             .expect(
-                                isWatchedPath rootPath "dataset/nested/deep.txt" vault.loadedDirectoryWatcher.Value
+                                isWatchedPath rootPath "dataset/nested/deep.txt" (loadedDirectoryWatcher vault).Value
                             )
                             .toBe
                             false
@@ -171,7 +174,7 @@ Vitest.describe (
                                     isWatchedPath
                                         rootPath
                                         "dataset/nested/deep.txt"
-                                        vault.loadedDirectoryWatcher.Value
+                                        (loadedDirectoryWatcher vault).Value
                                 )
                     })
             }
@@ -271,7 +274,7 @@ Vitest.describe (
 
                         do! vault.ResetFileTreeToRoot()
                         Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
                         Vitest.expect(containsPath (join [| datasetPath; "existing.txt" |]) vault).toBe false
                     })
             }
@@ -303,7 +306,7 @@ Vitest.describe (
 
                             Vitest.expect(publications).toBe 1
                             Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
-                            Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                            Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
                         })
             }
         )
@@ -328,7 +331,7 @@ Vitest.describe (
                                         isWatchedPath
                                             rootPath
                                             "dataset/existing.txt"
-                                            vault.loadedDirectoryWatcher.Value
+                                            (loadedDirectoryWatcher vault).Value
                                     )
 
                             publications <- 0
@@ -369,7 +372,7 @@ Vitest.describe (
                                     isWatchedPath
                                         rootPath
                                         "dataset/nested/deep.txt"
-                                        vault.loadedDirectoryWatcher.Value
+                                        (loadedDirectoryWatcher vault).Value
                                 )
 
                         let datasetFile = join [| datasetPath; "dataset-event.txt" |]
@@ -401,8 +404,8 @@ Vitest.describe (
                         window
                         (fun vault _ _ _ -> promise {
                             do! vault.RefreshFileTreeDirectory "dataset"
-                            do! vault.loadedDirectoryWatcher.Value.close ()
-                            vault.ForgetLoadedDirectoryWatcherForTesting()
+                            do! (loadedDirectoryWatcher vault).Value.close ()
+                            vault.LoadedDirectoryWatcherController.RetireWatcher() |> ignore
                             publications <- 0
 
                             let firstRefreshGate, releaseFirstRefresh = TestHelpers.deferred ()
@@ -459,8 +462,8 @@ Vitest.describe (
                         (fun vault _ datasetPath _ -> promise {
                             vaultUnderTest <- Some vault
                             do! vault.RefreshFileTreeDirectory "dataset"
-                            do! vault.loadedDirectoryWatcher.Value.close ()
-                            vault.ForgetLoadedDirectoryWatcherForTesting()
+                            do! (loadedDirectoryWatcher vault).Value.close ()
+                            vault.LoadedDirectoryWatcherController.RetireWatcher() |> ignore
 
                             firstPath <- join [| datasetPath; "race-first.txt" |]
                             intermediatePath <- join [| datasetPath; "race-intermediate.txt" |]
@@ -499,7 +502,7 @@ Vitest.describe (
                         do! reset
 
                         Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
                         Vitest.expect(containsPath (join [| datasetPath; "existing.txt" |]) vault).toBe false
                     })
             }
@@ -559,7 +562,7 @@ Vitest.describe (
 
                         Vitest.expect(capturedOperationError.Value).toBe operationError
                         Vitest.expect(invocationCount watchMock).toBe (watcherCount + 1)
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
                     })
             }
         )
@@ -575,13 +578,13 @@ Vitest.describe (
 
                         do!
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                                Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
                                 do! writeFileAsync addedPath "suspended" TextEncoding.Utf8
                                 Vitest.expect(containsPath addedPath vault).toBe false
                             })
 
                         Vitest.expect(containsPath addedPath vault).toBe true
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
                     })
             }
@@ -604,7 +607,7 @@ Vitest.describe (
                         let first =
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
                                 enteredOperations.Add 1
-                                Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                                Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
                                 do! writeFileAsync addedPath "queued" TextEncoding.Utf8
                                 do! firstOperationGate
                             })
@@ -612,7 +615,7 @@ Vitest.describe (
                         let second =
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
                                 enteredOperations.Add 2
-                                Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                                Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
                                 Vitest.expect(containsPath addedPath vault).toBe true
                                 do! secondOperationGate
                             })
@@ -629,7 +632,7 @@ Vitest.describe (
                         releaseSecondOperation ()
                         do! second
 
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
                         Vitest.expect(containsPath addedPath vault).toBe true
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
                     })
@@ -646,16 +649,16 @@ Vitest.describe (
 
                         let suspension =
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                                Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
                                 do! vault.RefreshFileTreeDirectory "dataset"
-                                Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                                Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
                             })
 
                         do! suspension
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
 
                         Vitest
-                            .expect(isWatchedPath rootPath "dataset/existing.txt" vault.loadedDirectoryWatcher.Value)
+                            .expect(isWatchedPath rootPath "dataset/existing.txt" (loadedDirectoryWatcher vault).Value)
                             .toBe
                             true
                     })
@@ -696,7 +699,7 @@ Vitest.describe (
                         let second =
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
                                 secondEntered <- true
-                                Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                                Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
                                 Vitest.expect(containsPath addedPath vault).toBe true
                                 do! secondOperationGate
                             })
@@ -708,7 +711,7 @@ Vitest.describe (
 
                         releaseSecondOperation ()
                         do! second
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
                     })
             }
         )
@@ -733,7 +736,7 @@ Vitest.describe (
 
                         Vitest.expect(containsPath stalePath vault).toBe false
                         Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
                     })
             }
         )
@@ -767,7 +770,7 @@ Vitest.describe (
                         do! stopping
                         do! Promise.sleep 25
 
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
                         Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
                         Vitest.expect(vault.PendingLoadedDirectoryHandoffs.Count).toBe 0
                         Vitest.expect(vault.LoadedDirectoryRefreshes.IsEmpty).toBe true
@@ -804,7 +807,7 @@ Vitest.describe (
                         do! Promise.sleep 25
 
                         Vitest.expect(containsPath stalePath vault).toBe false
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
                         Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
                         Vitest.expect(vault.PendingLoadedDirectoryHandoffs.Count).toBe 0
                         Vitest.expect(vault.LoadedDirectoryRefreshes.IsEmpty).toBe true
@@ -823,7 +826,7 @@ Vitest.describe (
                         vault.StartFileWatcher()
                         do! vault.RefreshFileTreeDirectory "dataset"
 
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
 
                         let restartedPath = join [| datasetPath; "after-restart.txt" |]
                         do! writeFileAsync restartedPath "restart" TextEncoding.Utf8
@@ -857,7 +860,7 @@ Vitest.describe (
 
                         Vitest.expect(containsPath stalePath vault).toBe false
                         Vitest.expect(vault.loadedFileTreeDirectories.Count).toBe 0
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
                     })
             }
         )
@@ -877,7 +880,7 @@ Vitest.describe (
                         do! vault.RefreshFileTreeDirectory "dataset"
 
                         Vitest.expect(containsPath handoffPath vault).toBe true
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
                     })
             }
         )
@@ -909,7 +912,7 @@ Vitest.describe (
                             (fun ready -> signalSecondReady <- ready)
                             (fun () -> closeCount <- closeCount + 1)
 
-                        vault.AddLoadedDirectoryForTesting "dataset"
+                        vault.LoadedDirectoryWatcherController.AddLoadedDirectory("dataset", false)
                         let first = vault.RequestLoadedDirectoryWatcherCoverage true
                         do! firstCreated
 
@@ -923,7 +926,7 @@ Vitest.describe (
                         Vitest.expect(firstGeneration.IsNone).toBe true
                         Vitest.expect(secondGeneration.IsSome).toBe true
                         Vitest.expect(closeCount).toBe 1
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
                     })
             }
         )
@@ -935,7 +938,7 @@ Vitest.describe (
                 do!
                     withLoadedDirectoryFixture (fun vault _ datasetPath _ -> promise {
                         do! vault.RefreshFileTreeDirectory "dataset"
-                        let original = vault.loadedDirectoryWatcher.Value
+                        let original = (loadedDirectoryWatcher vault).Value
                         let replacementCreated, signalReplacementCreated = TestHelpers.deferred ()
                         let mutable signalReplacementReady = ignore
 
@@ -947,7 +950,7 @@ Vitest.describe (
 
                         let replacement = vault.RefreshFileTreeDirectory "dataset/nested"
                         do! replacementCreated
-                        Vitest.expect(isSameWatcher original vault.loadedDirectoryWatcher.Value).toBe true
+                        Vitest.expect(isSameWatcher original (loadedDirectoryWatcher vault).Value).toBe true
 
                         let changedPath = join [| datasetPath; "changed-during-replacement.txt" |]
                         do! writeFileAsync changedPath "changed" TextEncoding.Utf8
@@ -965,8 +968,8 @@ Vitest.describe (
                                 "existing-scope mutation during replacement"
                                 (fun () -> containsPath changedPath vault)
 
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
-                        Vitest.expect(isSameWatcher original vault.loadedDirectoryWatcher.Value).toBe false
+                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
+                        Vitest.expect(isSameWatcher original (loadedDirectoryWatcher vault).Value).toBe false
                     })
             }
         )
@@ -989,7 +992,7 @@ Vitest.describe (
 
                         let suspension =
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                                Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
                                 signalOperationEntered ()
                                 do! operationGate
                             })
@@ -997,12 +1000,12 @@ Vitest.describe (
                         do! closed
                         do! operationEntered
                         do! refresh
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
 
                         releaseOperation ()
                         do! suspension
 
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
                     })
             }
         )
@@ -1019,12 +1022,12 @@ Vitest.describe (
                         do!
                             vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
                                 do! vault.RefreshFileTreeDirectory "dataset"
-                                Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                                Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
                                 do! writeFileAsync handoffPath "handoff" TextEncoding.Utf8
                             })
 
                         Vitest.expect(containsPath handoffPath vault).toBe true
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
                     })
             }
         )
@@ -1055,13 +1058,13 @@ Vitest.describe (
                         do! operationEntered
                         do! writeFileAsync handoffPath "handoff" TextEncoding.Utf8
                         do! refresh
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsNone).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsNone).toBe true
 
                         releaseOperation ()
                         do! suspension
 
                         Vitest.expect(containsPath handoffPath vault).toBe true
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
                     })
             }
         )
@@ -1084,7 +1087,7 @@ Vitest.describe (
 
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset/nested").toBe false
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
                         Vitest.expect(containsPath renamedPath vault).toBe true
                     })
             }
@@ -1109,7 +1112,7 @@ Vitest.describe (
 
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset/nested").toBe false
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
+                        Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
                         Vitest.expect(containsPath movedPath vault).toBe true
                     })
             }
