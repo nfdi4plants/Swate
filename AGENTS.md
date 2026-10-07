@@ -14,6 +14,9 @@
 ## Test Convention rules
 
 - You MUST NOT do source file testing to check if certain code is present. This is a brittle testing strategy that will break if the code is refactored, even if the behavior is unchanged. Instead, test the behavior directly by calling the relevant functions and checking their outputs or side effects.
+- Showcases MUST be implemented as native Storybook `.stories.tsx` files.
+- Unit tests MUST be implemented in `.test.fs` files.
+- React Testing Library tests MUST be implemented in `.test.rtl.fs` files.
 
 ## Fable Convention rules
 
