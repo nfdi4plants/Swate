@@ -111,15 +111,14 @@ let withFileEntriesLfsMetadata
 
 /// Enriches an already-read batch of entries from one large-object metadata snapshot.
 /// Directory-only batches avoid querying the repository entirely.
-let getFileEntriesWithLfsMetadata (repoRoot: string) (entries: FileEntry[]) =
-    promise {
-        if entries |> Array.exists (fun entry -> not entry.isDirectory) then
-            let normalizedRepoRoot = normalizeRootPath repoRoot
-            let! largeObjectsByRelativePath = tryListLargeObjects normalizedRepoRoot
-            return withFileEntriesLfsMetadata normalizedRepoRoot largeObjectsByRelativePath entries
-        else
-            return entries
-    }
+let getFileEntriesWithLfsMetadata (repoRoot: string) (entries: FileEntry[]) = promise {
+    if entries |> Array.exists (fun entry -> not entry.isDirectory) then
+        let normalizedRepoRoot = normalizeRootPath repoRoot
+        let! largeObjectsByRelativePath = tryListLargeObjects normalizedRepoRoot
+        return withFileEntriesLfsMetadata normalizedRepoRoot largeObjectsByRelativePath entries
+    else
+        return entries
+}
 
 /// Build the renderer snapshot using ARC-relative dictionary keys and FileEntry paths.
 let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary<string, FileEntry> =
