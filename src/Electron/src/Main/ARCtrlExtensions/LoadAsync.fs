@@ -1,6 +1,5 @@
 namespace Main.ARCtrlExtensions
 
-open System
 open ARCtrl
 open ARCtrl.Contract
 open Main.Bindings.Path
@@ -11,37 +10,42 @@ open Swate.Electron.Shared.FileIOHelper
 [<AutoOpen>]
 module ArcLoadExtensions =
 
-    /// Returns true when a path addresses Git's private repository metadata.
-    /// `.gitignore`, `.gitattributes`, and similarly named files remain ordinary ARC payload.
-    let isGitMetadataPath (pathValue: string) =
-        pathValue
-        |> getNonEmptyPathParts
-        |> Array.exists (fun segment -> String.Equals(segment, ".git", StringComparison.OrdinalIgnoreCase))
+    let private tryReadDirectoryWithTypesAsync (directoryPath: string) = promise {
+        try
+            return! readdirWithTypesAsync directoryPath (ReaddirOptions(withFileTypes = true))
+        with _ ->
+            return [||]
+    }
 
-    let private getAllArcFilePathsAsync (arcPath: string) =
-        let rec collectFiles (absoluteDirectoryPath: string) (relativeDirectoryPath: string) = promise {
-            let! entries = readdirWithTypesAsync absoluteDirectoryPath (ReaddirOptions(withFileTypes = true))
-            let files = ResizeArray<string>()
+    let private discoverStructuralArcFilePathsAsync (arcPath: string) = promise {
+        let paths = ResizeArray<string>()
+
+        let investigationPath = ArcPathHelper.InvestigationFileName
+
+        if existsSync (join [| arcPath; investigationPath |]) then
+            paths.Add investigationPath
+
+        for zone in ArcEntityPathRules.allAddZones do
+            let zoneFolder = ArcEntityPathRules.zoneFolderName zone
+            let zonePath = join [| arcPath; zoneFolder |]
+            let! entries = tryReadDirectoryWithTypesAsync zonePath
 
             for entry in entries do
-                let relativePath =
-                    if relativeDirectoryPath = "" then
-                        entry.name
-                    else
-                        $"{relativeDirectoryPath}/{entry.name}"
+                if entry.isDirectory () then
+                    let entityFolder = $"{zoneFolder}/{entry.name}"
+                    let entityPath = join [| zonePath; entry.name |]
 
-                if not (isGitMetadataPath relativePath) then
-                    if entry.isDirectory () then
-                        let absolutePath = join [| absoluteDirectoryPath; entry.name |]
-                        let! nestedFiles = collectFiles absolutePath relativePath
-                        files.AddRange nestedFiles
-                    elif entry.isFile () then
-                        files.Add relativePath
+                    for fileName in
+                        [|
+                            ArcEntityPathRules.zoneEntityFileName zone
+                            ArcPathHelper.DataMapFileName
+                            LegacyDataMapFileName
+                        |] do
+                        if existsSync (join [| entityPath; fileName |]) then
+                            paths.Add $"{entityFolder}/{fileName}"
 
-            return files.ToArray()
-        }
-
-        collectFiles arcPath ""
+        return paths.ToArray()
+    }
 
     let migrateLegacyDataMapPathsAsync (arcPath: string) (paths: string[]) = promise {
         let migratedPaths = ResizeArray<string>()
@@ -175,10 +179,9 @@ module ArcLoadExtensions =
 
     type ARC with
 
-        /// Hotfix for #619, not fixed in the consumed ARCtrl 3.0.0-beta.12.
-        /// Mirrors ARC.tryLoadAsync, changing only filesystem traversal so `.git` directories are never enumerated.
+        /// Loads canonical ARC metadata through a bounded traversal of zone roots and immediate entity folders.
         static member LoadAsyncSwate(arcPath: string) = promise {
-            let! discoveredPaths = getAllArcFilePathsAsync arcPath
+            let! discoveredPaths = discoverStructuralArcFilePathsAsync arcPath
             let! paths = migrateLegacyDataMapPathsAsync arcPath discoveredPaths
             let arc = ARC.fromFilePaths paths
             let contracts = arc.GetReadContracts()

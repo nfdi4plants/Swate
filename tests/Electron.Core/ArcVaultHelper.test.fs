@@ -4196,17 +4196,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "Git metadata path detection excludes only exact .git path segments",
-            fun () ->
-                Vitest.expect(isGitMetadataPath ".git").toBe (true)
-                Vitest.expect(isGitMetadataPath ".git/objects/ab/object").toBe (true)
-                Vitest.expect(isGitMetadataPath "notes\\.GIT\\config").toBe (true)
-                Vitest.expect(isGitMetadataPath ".gitignore").toBe (false)
-                Vitest.expect(isGitMetadataPath ".gitattributes").toBe (false)
-                Vitest.expect(isGitMetadataPath "notes/my.git/file.txt").toBe (false)
-        )
-
-        Vitest.test (
             "legacy isa_datamap paths are ignored in favor of the canonical workbook",
             fun () ->
                 Vitest.expect(isLegacyDataMapPath "assays/assay_1/isa_datamap").toBe (true)
@@ -4271,6 +4260,75 @@ Vitest.describe (
                     do! TestHelpers.removeDirectoryAsync rootPath
                     return raise error
             }
+        )
+
+        Vitest.test (
+            "bounded ARC loading reconstructs every entity type and ignores deeply nested payload",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-bounded-arc-load-"
+                    "BoundedArc"
+                    addDataMapToAllEntityTypes
+                    (fun arcPath -> promise {
+                        let payloadRoot =
+                            join [|
+                                arcPath
+                                ArcPathHelper.AssaysFolderName
+                                "Assay With DataMap"
+                                ArcPathHelper.AssayDatasetFolderName
+                                "raw"
+                                "nested"
+                            |]
+
+                        do! mkdirRecursiveAsync payloadRoot
+
+                        for index in 1..128 do
+                            do! writeTextFileAsync (join [| payloadRoot; $"payload-{index}.txt" |]) $"payload-{index}"
+
+                        let! loadResult = ARC.LoadAsyncSwate arcPath
+                        let loadedArc = TestHelpers.expectLoadedArc loadResult
+                        let loadedPaths = loadedArc.FileSystem.Tree.ToFilePaths()
+
+                        Vitest.expect(loadedArc.Identifier).toBe ("BoundedArc")
+                        Vitest.expect(loadedArc.GetStudy("Study With DataMap").DataMap.IsSome).toBe (true)
+                        Vitest.expect(loadedArc.GetAssay("Assay With DataMap").DataMap.IsSome).toBe (true)
+                        Vitest.expect(loadedArc.GetWorkflow("Workflow With DataMap").DataMap.IsSome).toBe (true)
+                        Vitest.expect(loadedArc.GetRun("Run With DataMap").DataMap.IsSome).toBe (true)
+
+                        Vitest.expect(loadedPaths |> Array.exists (fun path -> path.Contains("payload-"))).toBe (false)
+                    })
+        )
+
+        Vitest.test (
+            "bounded ARC loading migrates a legacy entity DataMap",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-bounded-legacy-datamap-"
+                    "LegacyDataMapArc"
+                    (fun arc ->
+                        let assay = ArcAssay("Legacy Assay")
+                        assay.DataMap <- Some(DataMap.init ())
+                        arc.AddAssay assay
+                    )
+                    (fun arcPath -> promise {
+                        let assayFolder =
+                            join [|
+                                arcPath
+                                ArcPathHelper.AssaysFolderName
+                                "Legacy Assay"
+                            |]
+
+                        let canonicalPath = join [| assayFolder; ArcPathHelper.DataMapFileName |]
+                        let legacyPath = join [| assayFolder; LegacyDataMapFileName |]
+                        do! renameAsync canonicalPath legacyPath
+
+                        let! loadResult = ARC.LoadAsyncSwate arcPath
+                        let loadedArc = TestHelpers.expectLoadedArc loadResult
+
+                        Vitest.expect(loadedArc.GetAssay("Legacy Assay").DataMap.IsSome).toBe (true)
+                        Vitest.expect(existsSync legacyPath).toBe (false)
+                        Vitest.expect(existsSync canonicalPath).toBe (true)
+                    })
         )
 
         Vitest.test (
@@ -4444,7 +4502,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "ARC loading and writing ignore Git metadata and preserve payload",
+            "ARC loading excludes payload while writing preserves it",
             fun () ->
                 TestHelpers.withTempArcWith
                     "swate-load-arc-ignore-git-"
@@ -4465,7 +4523,7 @@ Vitest.describe (
                         let loadedArc = TestHelpers.expectLoadedArc loadResult
                         let paths = loadedArc.FileSystem.Tree.ToFilePaths()
 
-                        Vitest.expect(paths |> Array.exists isGitMetadataPath).toBe (false)
+                        Vitest.expect(paths |> Array.contains "payload.txt").toBe (false)
 
                         loadedArc.SetFilePaths(Array.append paths [| ".git/objects/ab/object" |])
                         loadedArc.Title <- Some "Saved title"
@@ -4492,7 +4550,14 @@ Vitest.describe (
 
                         let! loadResult = ARC.LoadAsyncSwate arcPath
                         let loadedArc = TestHelpers.expectLoadedArc loadResult
-                        let stalePaths = loadedArc.FileSystem.Tree.ToFilePaths()
+
+                        let stalePaths =
+                            Array.append (loadedArc.FileSystem.Tree.ToFilePaths()) [|
+                                "payload.txt"
+                                "assays/.gitkeep"
+                            |]
+
+                        loadedArc.SetFilePaths stalePaths
 
                         Vitest.expect(stalePaths |> Array.contains "payload.txt").toBe (true)
                         Vitest.expect(stalePaths |> Array.contains "assays/.gitkeep").toBe (true)
