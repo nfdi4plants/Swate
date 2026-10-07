@@ -8,6 +8,7 @@ open Swate.Components.Primitive.LayoutComponents
 open Swate.Components.Composite.ThemeSelector
 open Swate.Components.Composite.ThemeSelector.Context
 open Swate.Components.Composite.TermSearch
+open Swate.Components.Util.UserOS
 
 module SettingsPageDefaults =
     [<Literal>]
@@ -74,6 +75,12 @@ type SettingsPage =
 
         React.useEffect ((fun () -> setScalingDraft uiScaling), [| box uiScaling |])
 
+        let modifierKey =
+            match getUserOS () with
+            | MacOS
+            | IOS -> "⌘"
+            | _ -> "Ctrl"
+
         SettingsPage.SettingColumnElement(
             "UI Scaling",
             Html.div [
@@ -100,9 +107,32 @@ type SettingsPage =
                 ]
             ],
             description =
-                Html.p [
-                    prop.className "swt:mt-1 swt:text-sm swt:text-base-content/70"
-                    prop.text "Allows adjusting the scaling of the user interface. 100% represents the default size."
+                Html.div [
+                    Html.p [
+                        prop.className "swt:mt-1 swt:text-sm swt:text-base-content/70"
+                        prop.text
+                            "Allows adjusting the scaling of the user interface. 100% represents the default size."
+                    ]
+                    Html.p [
+                        prop.className "swt:text-sm swt:text-base-content/70"
+                        prop.children [
+                            Html.text "Scale the UI globally with "
+                            Html.kbd [
+                                prop.className "swt:kbd swt:kbd-sm"
+                                prop.text modifierKey
+                            ]
+                            Html.text " + "
+                            Html.kbd [ prop.className "swt:kbd swt:kbd-sm"; prop.text "+" ]
+                            Html.text " or "
+                            Html.kbd [
+                                prop.className "swt:kbd swt:kbd-sm"
+                                prop.text modifierKey
+                            ]
+                            Html.text " + "
+                            Html.kbd [ prop.className "swt:kbd swt:kbd-sm"; prop.text "-" ]
+                            Html.text "."
+                        ]
+                    ]
                 ]
         )
 
