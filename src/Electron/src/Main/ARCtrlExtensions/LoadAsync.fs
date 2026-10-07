@@ -10,39 +10,46 @@ open Swate.Electron.Shared.FileIOHelper
 [<AutoOpen>]
 module ArcLoadExtensions =
 
-    let private tryReadDirectoryWithTypesAsync (directoryPath: string) = promise {
-        try
-            return! readdirWithTypesAsync directoryPath (ReaddirOptions(withFileTypes = true))
-        with _ ->
-            return [||]
-    }
-
     let private discoverStructuralArcFilePathsAsync (arcPath: string) = promise {
         let paths = ResizeArray<string>()
+        let! rootEntries = readdirWithTypesAsync arcPath (ReaddirOptions(withFileTypes = true))
 
-        let investigationPath = ArcPathHelper.InvestigationFileName
-
-        if existsSync (join [| arcPath; investigationPath |]) then
-            paths.Add investigationPath
+        rootEntries
+        |> Array.tryFind (fun entry ->
+            entry.isFile ()
+            && PathHelpers.pathsEqual entry.name ArcPathHelper.InvestigationFileName
+        )
+        |> Option.iter (fun entry -> paths.Add entry.name)
 
         for zone in ArcEntityPathRules.allAddZones do
             let zoneFolder = ArcEntityPathRules.zoneFolderName zone
-            let zonePath = join [| arcPath; zoneFolder |]
-            let! entries = tryReadDirectoryWithTypesAsync zonePath
 
-            for entry in entries do
-                if entry.isDirectory () then
-                    let entityFolder = $"{zoneFolder}/{entry.name}"
-                    let entityPath = join [| zonePath; entry.name |]
+            match
+                rootEntries
+                |> Array.tryFind (fun entry -> entry.isDirectory () && PathHelpers.pathsEqual entry.name zoneFolder)
+            with
+            | None -> ()
+            | Some zoneEntry ->
+                let zonePath = join [| arcPath; zoneEntry.name |]
+                let! entityEntries = readdirWithTypesAsync zonePath (ReaddirOptions(withFileTypes = true))
 
-                    for fileName in
-                        [|
-                            ArcEntityPathRules.zoneEntityFileName zone
-                            ArcPathHelper.DataMapFileName
-                            LegacyDataMapFileName
-                        |] do
-                        if existsSync (join [| entityPath; fileName |]) then
-                            paths.Add $"{entityFolder}/{fileName}"
+                for entityEntry in entityEntries do
+                    if entityEntry.isDirectory () then
+                        let entityPath = join [| zonePath; entityEntry.name |]
+
+                        let! metadataEntries = readdirWithTypesAsync entityPath (ReaddirOptions(withFileTypes = true))
+
+                        for metadataEntry in metadataEntries do
+                            if
+                                metadataEntry.isFile ()
+                                && [|
+                                    ArcEntityPathRules.zoneEntityFileName zone
+                                    ArcPathHelper.DataMapFileName
+                                    LegacyDataMapFileName
+                                   |]
+                                   |> Array.exists (PathHelpers.pathsEqual metadataEntry.name)
+                            then
+                                paths.Add $"{zoneEntry.name}/{entityEntry.name}/{metadataEntry.name}"
 
         return paths.ToArray()
     }

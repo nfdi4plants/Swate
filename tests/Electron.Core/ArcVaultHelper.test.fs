@@ -4300,6 +4300,56 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "bounded ARC loading allows missing optional structural zones",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-bounded-missing-zones-"
+                    "MissingZonesArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        for zone in ArcEntityPathRules.allAddZones do
+                            let zonePath = join [| arcPath; ArcEntityPathRules.zoneFolderName zone |]
+                            do! rmAsync zonePath (RmOptions(recursive = true, force = true))
+
+                        let! loadResult = ARC.LoadAsyncSwate arcPath
+                        let loadedArc = TestHelpers.expectLoadedArc loadResult
+
+                        Vitest.expect(loadedArc.Identifier).toBe ("MissingZonesArc")
+                    })
+        )
+
+        Vitest.test (
+            "metadata-shaped directories are neither loaded nor migrated",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-bounded-metadata-directories-"
+                    "MetadataDirectoriesArc"
+                    (fun arc -> arc.AddAssay(ArcAssay("Directory Assay")))
+                    (fun arcPath -> promise {
+                        let assayFolder =
+                            join [|
+                                arcPath
+                                ArcPathHelper.AssaysFolderName
+                                "Directory Assay"
+                            |]
+
+                        let canonicalDataMapDirectory =
+                            join [| assayFolder; ArcPathHelper.DataMapFileName |]
+
+                        let legacyDataMapDirectory = join [| assayFolder; LegacyDataMapFileName |]
+                        do! mkdirRecursiveAsync canonicalDataMapDirectory
+                        do! mkdirRecursiveAsync legacyDataMapDirectory
+
+                        let! loadResult = ARC.LoadAsyncSwate arcPath
+                        let loadedArc = TestHelpers.expectLoadedArc loadResult
+
+                        Vitest.expect(loadedArc.GetAssay("Directory Assay").DataMap.IsNone).toBe (true)
+                        Vitest.expect(existsSync canonicalDataMapDirectory).toBe (true)
+                        Vitest.expect(existsSync legacyDataMapDirectory).toBe (true)
+                    })
+        )
+
+        Vitest.test (
             "bounded ARC loading migrates a legacy entity DataMap",
             fun () ->
                 TestHelpers.withTempArcWith
