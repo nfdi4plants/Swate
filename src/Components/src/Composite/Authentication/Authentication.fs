@@ -373,7 +373,7 @@ type Authentication =
                 isOpen,
                 setIsOpen,
                 Html.div [
-                    prop.className "swt:indicator swt:indicator-bottom"
+                    prop.className "swt:indicator"
                     prop.children [
                         match activeUser, accounts.ActiveAccount with
                         | Some _, Some activeAccount ->
@@ -381,7 +381,7 @@ type Authentication =
                             | TokenStatus.Invalid ->
                                 Html.span [
                                     prop.testId "TokenInvalidIndicator"
-                                    prop.className "swt:indicator-item"
+                                    prop.className "swt:indicator-item swt:indicator-bottom"
                                     prop.ariaLabel
                                         "Your token is invalid. Please update your token or remove the account."
                                     prop.title "Your token is invalid. Please update your token or remove the account."
@@ -395,7 +395,7 @@ type Authentication =
                             | TokenStatus.Expiring ->
                                 Html.span [
                                     prop.testId "TokenExpiringIndicator"
-                                    prop.className "swt:indicator-item"
+                                    prop.className "swt:indicator-item swt:indicator-bottom"
                                     prop.ariaLabel "Your token is expiring soon. Rotate it to avoid interruption."
                                     prop.title (
                                         activeAccount.TokenExpiresOn
@@ -412,8 +412,8 @@ type Authentication =
                                         ]
                                     ]
                                 ]
-                            | TokenStatus.Ok -> ()
-                        | _ -> ()
+                            | TokenStatus.Ok -> Html.none
+                        | _ -> Html.none
                         Html.button [
                             prop.testId "UserButtonToggle"
                             prop.onClick (fun _ -> setIsOpen (not isOpen))

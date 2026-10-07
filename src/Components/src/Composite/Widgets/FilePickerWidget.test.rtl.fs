@@ -49,3 +49,28 @@ Vitest.test (
         |> ignore
     }
 )
+
+Vitest.test (
+    "file picker uses SortableList shift-range selection",
+    fun () -> promise {
+        RTL.render (
+            FilePickerWidget.Main(
+                ArcFiles.Assay(ArcAssay.init "shift-select-file-picker"),
+                None,
+                ignore,
+                fun () -> promise { return [| "alpha.txt"; "beta.txt"; "gamma.txt" |] }
+            )
+        )
+        |> ignore
+
+        RTL.fireEvent.click (RTL.screen.getByRole ("button", ByRoleOptions(name = Text "Pick Files")))
+        let! _ = RTL.screen.findByTestId "sortable-list-row-alpha.txt"
+
+        RTL.fireEvent.click (RTL.screen.getByTestId "sortable-list-row-alpha.txt")
+
+        RTL.fireEvent.click (RTL.screen.getByTestId "sortable-list-row-gamma.txt", {| shiftKey = true |})
+
+        Vitest.expect((RTL.screen.getByTestId "sortable-list-row-beta.txt").classList.contains "swt:bg-base-300").toBe
+            true
+    }
+)

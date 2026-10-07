@@ -15,11 +15,16 @@ open Swate.Components.Primitive
 open Swate.Components.Primitive.BaseModal
 open System
 open Components
+open Swate.Components.Composite.AnnotationTable.Context
+open Swate.Components.Composite.Widgets
+open Swate.Components.Composite.Widgets.DataAnnotator.Helper
 
 type DataAnnotator =
 
     [<ReactComponent>]
     static member Main(model: Model, dispatch: Msg -> unit) =
+
+        let annotationCtx = useAnnotationTableStateCtx ()
 
         let setArcFile nextArcFile =
             nextArcFile |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
@@ -31,16 +36,24 @@ type DataAnnotator =
                 prop.text "Load an ArcFile to use the Data Annotator."
             ]
         | Some arcFile ->
-            match tryGetDataAnnotatorDestination (model.SpreadsheetModel.ActiveView, arcFile) with
-            | Result.Ok destination ->
+            match model.SpreadsheetModel.ActiveView with
+            | ActiveView.Table _
+            | ActiveView.DataMap ->
+                let tableIndex =
+                    match model.SpreadsheetModel.ActiveView with
+                    | ActiveView.Table index -> Some index
+                    | _ -> None
+
+                let target = CellInsertion.tryGetTarget arcFile tableIndex annotationCtx.state
+
                 Swate.Components.Composite.Widgets.DataAnnotator.DataAnnotator.Main(
-                    destination,
-                    applyDataAnnotatorInputToArcFile (destination, arcFile, setArcFile)
+                    onInsert = (fun input -> insertAnnotationIntoSelectedCells arcFile setArcFile input target),
+                    canInsert = target.IsSome
                 )
-            | Result.Error message ->
+            | _ ->
                 Html.div [
                     prop.className "swt:p-3 swt:text-sm swt:opacity-70"
-                    prop.text message
+                    prop.text "Open a table or DataMap to use the Data Annotator."
                 ]
 
     ///// --------------------------------- /////
