@@ -247,12 +247,12 @@ Vitest.describe (
                 tree.Add("C:/arc/assays/AB", createFileEntry "C:/arc/assays/AB" true)
                 tree.Add("C:/arc/assays/AB/isa.assay.xlsx", createFileEntry "C:/arc/assays/AB/isa.assay.xlsx" false)
 
-                let updatedTree = FileTreeCreator.removePathAndDescendants "C:/arc/assays/A" tree
+                FileTreeCreator.removePathAndDescendants "C:/arc/assays/A" tree
 
-                Vitest.expect(updatedTree.ContainsKey("C:/arc/assays/A")).toBe (false)
-                Vitest.expect(updatedTree.ContainsKey("C:/arc/assays/A/isa.assay.xlsx")).toBe (false)
-                Vitest.expect(updatedTree.ContainsKey("C:/arc/assays/AB")).toBe (true)
-                Vitest.expect(updatedTree.ContainsKey("C:/arc/assays/AB/isa.assay.xlsx")).toBe (true)
+                Vitest.expect(tree.ContainsKey("C:/arc/assays/A")).toBe (false)
+                Vitest.expect(tree.ContainsKey("C:/arc/assays/A/isa.assay.xlsx")).toBe (false)
+                Vitest.expect(tree.ContainsKey("C:/arc/assays/AB")).toBe (true)
+                Vitest.expect(tree.ContainsKey("C:/arc/assays/AB/isa.assay.xlsx")).toBe (true)
         )
 )
 
@@ -276,6 +276,22 @@ Vitest.describe (
             IsLocallyAvailable = false
             ObjectId = Some "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         }
+
+        Vitest.test (
+            "adds exactly one entry while preserving existing entries",
+            fun () ->
+                let tree = Dictionary<string, FileEntry>()
+                tree.Add("C:/arc/other.bin", createFileEntry "C:/arc/other.bin" false None)
+
+                let updatedTree =
+                    FileTreeCreator.upsertFileEntry (createFileEntry "C:/arc/data.bin" false (Some pointerInfo)) tree
+
+                Vitest.expect(updatedTree.Count).toBe (2)
+                Vitest.expect(updatedTree.ContainsKey("C:/arc/other.bin")).toBe (true)
+                Vitest.expect(updatedTree.["C:/arc/data.bin"].largeObject).toEqual (Some pointerInfo)
+                Vitest.expect(tree.Count).toBe (1)
+                Vitest.expect(tree.ContainsKey("C:/arc/data.bin")).toBe (false)
+        )
 
         Vitest.test (
             "replaces an existing file entry without throwing",

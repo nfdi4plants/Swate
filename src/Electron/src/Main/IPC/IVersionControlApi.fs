@@ -228,44 +228,42 @@ let private withMutatingSessionUsingRefreshPredicate
             let bridge = tryBridgeFromEvent event
 
             return!
-                withBusyWritingScope
-                    vault
-                    (fun () -> promise {
-                        let! operationResult =
-                            runTracked
-                                host
-                                bridge
-                                operationName
-                                operationId
-                                (Some arcPath)
-                                (windowFromIpcEvent event |> Option.map _.id)
-                                true
-                                (fun context ->
-                                    vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                        let! result =
-                                            if context.Cancellation.IsCancellationRequested() then
-                                                JS.Constructors.Promise.resolve (
-                                                    OperationResult.canceled "The operation was canceled."
-                                                )
-                                            else
-                                                runSessionOperation host arcPath operation context
-                                                |> Async.StartAsPromise
+                vault.WithBusyWritingScope(fun () -> promise {
+                    let! operationResult =
+                        runTracked
+                            host
+                            bridge
+                            operationName
+                            operationId
+                            (Some arcPath)
+                            (windowFromIpcEvent event |> Option.map _.id)
+                            true
+                            (fun context ->
+                                vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
+                                    let! result =
+                                        if context.Cancellation.IsCancellationRequested() then
+                                            JS.Constructors.Promise.resolve (
+                                                OperationResult.canceled "The operation was canceled."
+                                            )
+                                        else
+                                            runSessionOperation host arcPath operation context
+                                            |> Async.StartAsPromise
 
-                                        let mappedResult = Ok(Mappings.result mapValue result)
+                                    let mappedResult = Ok(Mappings.result mapValue result)
 
-                                        if shouldRefresh mappedResult then
-                                            do! vault.ResetFileTreeToRoot()
+                                    if shouldRefresh mappedResult then
+                                        do! vault.ResetFileTreeToRoot()
 
-                                        return result
-                                    })
-                                    |> Async.AwaitPromise
-                                )
+                                    return result
+                                })
+                                |> Async.AwaitPromise
+                            )
 
-                        try
-                            return Ok(Mappings.result mapValue operationResult)
-                        with error ->
-                            return Ok(failedDto (unexpectedFailure error))
-                    })
+                    try
+                        return Ok(Mappings.result mapValue operationResult)
+                    with error ->
+                        return Ok(failedDto (unexpectedFailure error))
+                })
     }
 
 /// Same as withSession, with the vault marked busy for the duration and the file tree
@@ -541,96 +539,89 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                 }
 
                 return!
-                    withBusyWritingScope
-                        vault
-                        (fun () -> promise {
-                            let! bound =
-                                runTracked
-                                    host
-                                    bridge
-                                    "bindWorkspace"
-                                    request.OperationId
-                                    (Some arcPath)
-                                    (windowFromIpcEvent event |> Option.map _.id)
-                                    true
-                                    (fun context ->
-                                        vault.WithLoadedDirectoryWatcherSuspended(fun () ->
-                                            let bindResultPromise =
-                                                if context.Cancellation.IsCancellationRequested() then
-                                                    JS.Constructors.Promise.resolve (
-                                                        OperationResult.canceled "The bind was canceled."
-                                                    )
-                                                else
-                                                    async {
-                                                        match
-                                                            locationFor
-                                                                host
-                                                                request.ProviderLocation
-                                                                request.DisplayName
-                                                        with
-                                                        | Error failure -> return Failed failure
-                                                        | Ok(location, factory) ->
-                                                            let! bindResult =
-                                                                factory.Bind
-                                                                    {
-                                                                        WorkspaceRoot = arcPath
-                                                                        Location = location
-                                                                    }
-                                                                    context
+                    vault.WithBusyWritingScope(fun () -> promise {
+                        let! bound =
+                            runTracked
+                                host
+                                bridge
+                                "bindWorkspace"
+                                request.OperationId
+                                (Some arcPath)
+                                (windowFromIpcEvent event |> Option.map _.id)
+                                true
+                                (fun context ->
+                                    vault.WithLoadedDirectoryWatcherSuspended(fun () ->
+                                        let bindResultPromise =
+                                            if context.Cancellation.IsCancellationRequested() then
+                                                JS.Constructors.Promise.resolve (
+                                                    OperationResult.canceled "The bind was canceled."
+                                                )
+                                            else
+                                                async {
+                                                    match
+                                                        locationFor host request.ProviderLocation request.DisplayName
+                                                    with
+                                                    | Error failure -> return Failed failure
+                                                    | Ok(location, factory) ->
+                                                        let! bindResult =
+                                                            factory.Bind
+                                                                {
+                                                                    WorkspaceRoot = arcPath
+                                                                    Location = location
+                                                                }
+                                                                context
 
-                                                            match persistProvisionedBinding host bindResult with
-                                                            | Succeeded _ ->
-                                                                // The open session keeps the location it was opened with.
-                                                                return! reopenWithSavedSettings context
-                                                            | PartiallySucceeded(_, failure) when
-                                                                failure.Code = VersionControlCodes.BindingNotPersisted
-                                                                ->
-                                                                return Failed failure
-                                                            | PartiallySucceeded(_, failure) ->
-                                                                // The binding is persisted, so the session is reopened and
-                                                                // the provider's partial failure rides along.
-                                                                let! reopened = reopenWithSavedSettings context
+                                                        match persistProvisionedBinding host bindResult with
+                                                        | Succeeded _ ->
+                                                            // The open session keeps the location it was opened with.
+                                                            return! reopenWithSavedSettings context
+                                                        | PartiallySucceeded(_, failure) when
+                                                            failure.Code = VersionControlCodes.BindingNotPersisted
+                                                            ->
+                                                            return Failed failure
+                                                        | PartiallySucceeded(_, failure) ->
+                                                            // The binding is persisted, so the session is reopened and
+                                                            // the provider's partial failure rides along.
+                                                            let! reopened = reopenWithSavedSettings context
 
-                                                                return
-                                                                    match reopened with
-                                                                    | Succeeded outcome ->
-                                                                        PartiallySucceeded(outcome, failure)
-                                                                    | other -> other
-                                                            | Failed failure -> return Failed failure
-                                                    }
-                                                    |> Async.StartAsPromise
+                                                            return
+                                                                match reopened with
+                                                                | Succeeded outcome ->
+                                                                    PartiallySucceeded(outcome, failure)
+                                                                | other -> other
+                                                        | Failed failure -> return Failed failure
+                                                }
+                                                |> Async.StartAsPromise
 
-                                            bindResultPromise
-                                            |> Promise.bind (fun bound -> promise {
-                                                let result =
-                                                    Ok(
-                                                        Mappings.result
-                                                            (fun (hosted: WorkspaceSessionHost.HostedSession) ->
-                                                                Mappings.sessionInfo
-                                                                    hosted.SessionId
-                                                                    hosted.Session
-                                                            )
-                                                            bound
-                                                    )
+                                        bindResultPromise
+                                        |> Promise.bind (fun bound -> promise {
+                                            let result =
+                                                Ok(
+                                                    Mappings.result
+                                                        (fun (hosted: WorkspaceSessionHost.HostedSession) ->
+                                                            Mappings.sessionInfo hosted.SessionId hosted.Session
+                                                        )
+                                                        bound
+                                                )
 
-                                                if resultChangedState result then
-                                                    do! vault.ResetFileTreeToRoot()
+                                            if resultChangedState result then
+                                                do! vault.ResetFileTreeToRoot()
 
-                                                return bound
-                                            })
-                                        )
-                                        |> Async.AwaitPromise
+                                            return bound
+                                        })
                                     )
-
-                            return
-                                Ok(
-                                    Mappings.result
-                                        (fun (hosted: WorkspaceSessionHost.HostedSession) ->
-                                            Mappings.sessionInfo hosted.SessionId hosted.Session
-                                        )
-                                        bound
+                                    |> Async.AwaitPromise
                                 )
-                        })
+
+                        return
+                            Ok(
+                                Mappings.result
+                                    (fun (hosted: WorkspaceSessionHost.HostedSession) ->
+                                        Mappings.sessionInfo hosted.SessionId hosted.Session
+                                    )
+                                    bound
+                            )
+                    })
         }
     cancelOperation =
         fun key -> promise {

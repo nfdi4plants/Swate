@@ -211,11 +211,17 @@ Vitest.describe (
 
                         do! writeUtf8FileAsync pointerFilePath pointerContents
 
-                        let! pointerEntry =
-                            FileTreeCreator.getFileEntryWithLfsMetadata context.RepoPath pointerFilePath
+                        let! pointerEntry = FileTreeCreator.getFileEntry pointerFilePath
+                        let! downloadedEntry = FileTreeCreator.getFileEntry downloadedFilePath
 
-                        let! downloadedEntry =
-                            FileTreeCreator.getFileEntryWithLfsMetadata context.RepoPath downloadedFilePath
+                        let! enrichedEntries =
+                            FileTreeCreator.getFileEntriesWithLfsMetadata context.RepoPath [|
+                                pointerEntry
+                                downloadedEntry
+                            |]
+
+                        let pointerEntry = enrichedEntries.[0]
+                        let downloadedEntry = enrichedEntries.[1]
 
                         Vitest.expect(pointerEntry.largeObject.IsSome).toBe (true)
                         Vitest.expect(downloadedEntry.largeObject.IsSome).toBe (true)
@@ -292,60 +298,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "batch enrichment queries metadata once and annotates every matching file",
-            fun () -> promise {
-                let repoRoot = FileTreeCreator.normalizeRootPath "/repo"
-                let firstObject = createObjectState "first.bin"
-                let secondObject = createObjectState "second.bin"
-                let mutable queryCount = 0
-
-                let listLargeObjects _ = promise {
-                    queryCount <- queryCount + 1
-
-                    return Map.ofList [ "first.bin", firstObject; "second.bin", secondObject ]
-                }
-
-                let! entries =
-                    FileTreeCreator.getFileEntriesWithLfsMetadataUsing listLargeObjects repoRoot [|
-                        createFileEntry "first.bin" (join [| repoRoot; "first.bin" |])
-                        createFileEntry "second.bin" (join [| repoRoot; "second.bin" |])
-                        createFileEntry "plain.txt" (join [| repoRoot; "plain.txt" |])
-                    |]
-
-                Vitest.expect(queryCount).toBe (1)
-                Vitest.expect(entries.[0].largeObject).toEqual (Some firstObject)
-                Vitest.expect(entries.[1].largeObject).toEqual (Some secondObject)
-                Vitest.expect(entries.[2].largeObject).toEqual (None)
-            }
-        )
-
-        Vitest.test (
-            "directory and removal-only batch enrichment does not query metadata",
-            fun () -> promise {
-                let repoRoot = FileTreeCreator.normalizeRootPath "/repo"
-                let mutable queryCount = 0
-
-                let listLargeObjects _ = promise {
-                    queryCount <- queryCount + 1
-                    return Map.empty
-                }
-
-                let directoryEntry =
-                    FileEntry.create ("dataset", join [| repoRoot; "dataset" |], true, None)
-
-                let! entries =
-                    FileTreeCreator.getFileEntriesWithLfsMetadataUsing listLargeObjects repoRoot [| directoryEntry |]
-
-                let! removedEntries = FileTreeCreator.getFileEntriesWithLfsMetadataUsing listLargeObjects repoRoot [||]
-
-                Vitest.expect(queryCount).toBe (0)
-                Vitest.expect(entries).toEqual ([| directoryEntry |])
-                Vitest.expect(removedEntries).toEqual ([||])
-            }
-        )
-
-        Vitest.test (
-            "getFileEntryWithLfsMetadata enriches a single staged LFS file",
+            "batch enrichment enriches a single staged LFS file",
             fileTreeCreatorTestOptions,
             fun () -> promise {
                 do!
@@ -358,8 +311,12 @@ Vitest.describe (
                         let! _ = runGitAsync context.RepoPath [| "add"; ".gitattributes"; "single-pointer.psd" |]
                         ()
 
-                        let! enrichedEntry =
-                            FileTreeCreator.getFileEntryWithLfsMetadata context.RepoPath pointerFilePath
+                        let! entry = FileTreeCreator.getFileEntry pointerFilePath
+
+                        let! enrichedEntries =
+                            FileTreeCreator.getFileEntriesWithLfsMetadata context.RepoPath [| entry |]
+
+                        let enrichedEntry = enrichedEntries.[0]
 
                         Vitest.expect(enrichedEntry.largeObject.IsSome).toBe (true)
                         let largeObject = enrichedEntry.largeObject |> Option.get
@@ -387,8 +344,12 @@ Vitest.describe (
                         let! _ = runGitAsync context.RepoPath [| "add"; ".gitattributes" |]
                         ()
 
-                        let! enrichedEntry =
-                            FileTreeCreator.getFileEntryWithLfsMetadata context.RepoPath untrackedLfsPath
+                        let! entry = FileTreeCreator.getFileEntry untrackedLfsPath
+
+                        let! enrichedEntries =
+                            FileTreeCreator.getFileEntriesWithLfsMetadata context.RepoPath [| entry |]
+
+                        let enrichedEntry = enrichedEntries.[0]
 
                         Vitest.expect(enrichedEntry.largeObject).toEqual (None)
                     })
@@ -404,7 +365,12 @@ Vitest.describe (
                         let plainFilePath = join [| context.RepoPath; "plain.txt" |]
                         do! writeUtf8FileAsync plainFilePath "Plain text.\n"
 
-                        let! plainEntry = FileTreeCreator.getFileEntryWithLfsMetadata context.RepoPath plainFilePath
+                        let! entry = FileTreeCreator.getFileEntry plainFilePath
+
+                        let! enrichedEntries =
+                            FileTreeCreator.getFileEntriesWithLfsMetadata context.RepoPath [| entry |]
+
+                        let plainEntry = enrichedEntries.[0]
 
                         Vitest.expect(plainEntry.largeObject).toEqual (None)
                     })

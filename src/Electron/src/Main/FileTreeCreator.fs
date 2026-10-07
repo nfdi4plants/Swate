@@ -27,51 +27,41 @@ let private shouldIgnorePath (path: string) =
     || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
     || isLegacyDataMapPath normalizedPath
 
-let private tryListLargeObjects
-    (repoRoot: string)
-    (openSession: bool)
-    : Fable.Core.JS.Promise<Map<string, ObjectStateDto>> =
-    promise {
-        try
-            let context = OperationContext.detached "file-tree-objects"
-            let host = WorkspaceSessionHost.get ()
+let private tryListLargeObjects (repoRoot: string) : Fable.Core.JS.Promise<Map<string, ObjectStateDto>> = promise {
+    try
+        let context = OperationContext.detached "file-tree-objects"
+        let host = WorkspaceSessionHost.get ()
 
-            let! hostedSession =
-                if openSession then
-                    promise {
-                        let! opened = host.OpenSession(repoRoot, context) |> Async.StartAsPromise
+        let! opened = host.OpenSession(repoRoot, context) |> Async.StartAsPromise
 
-                        return
-                            match opened with
-                            | Succeeded outcome
-                            | PartiallySucceeded(outcome, _) -> Some outcome.Value
-                            | Failed _ -> None
-                    }
-                else
-                    promise { return host.TryGetSession repoRoot }
+        let hostedSession =
+            match opened with
+            | Succeeded outcome
+            | PartiallySucceeded(outcome, _) -> Some outcome.Value
+            | Failed _ -> None
 
-            match hostedSession with
+        match hostedSession with
+        | None -> return Map.empty
+        | Some hosted ->
+            match hosted.Session.ObjectMaterialization with
             | None -> return Map.empty
-            | Some hosted ->
-                match hosted.Session.ObjectMaterialization with
-                | None -> return Map.empty
-                | Some materialization ->
-                    let! listed = materialization.ListObjects context |> Async.StartAsPromise
+            | Some materialization ->
+                let! listed = materialization.ListObjects context |> Async.StartAsPromise
 
-                    match listed with
-                    | Succeeded outcome
-                    | PartiallySucceeded(outcome, _) ->
-                        return
-                            outcome.Value
-                            |> Array.map (fun (objectState: ObjectState) ->
-                                let dto = Mappings.objectState objectState
-                                dto.Path, dto
-                            )
-                            |> Map.ofArray
-                    | Failed _ -> return Map.empty
-        with _ ->
-            return Map.empty
-    }
+                match listed with
+                | Succeeded outcome
+                | PartiallySucceeded(outcome, _) ->
+                    return
+                        outcome.Value
+                        |> Array.map (fun (objectState: ObjectState) ->
+                            let dto = Mappings.objectState objectState
+                            dto.Path, dto
+                        )
+                        |> Map.ofArray
+                | Failed _ -> return Map.empty
+    with _ ->
+        return Map.empty
+}
 
 let private withFileEntryLfsMetadata
     (repoRoot: string)
@@ -119,27 +109,17 @@ let withFileEntriesLfsMetadata
     entries
     |> Array.map (withFileEntryLfsMetadata repoRoot largeObjectsByRelativePath largeObjectsByComparisonKey)
 
-let internal getFileEntriesWithLfsMetadataUsing
-    (listLargeObjects: string -> Fable.Core.JS.Promise<Map<string, ObjectStateDto>>)
-    (repoRoot: string)
-    (entries: FileEntry[])
-    =
+/// Enriches an already-read batch of entries from one large-object metadata snapshot.
+/// Directory-only batches avoid querying the repository entirely.
+let getFileEntriesWithLfsMetadata (repoRoot: string) (entries: FileEntry[]) =
     promise {
         if entries |> Array.exists (fun entry -> not entry.isDirectory) then
             let normalizedRepoRoot = normalizeRootPath repoRoot
-            let! largeObjectsByRelativePath = listLargeObjects normalizedRepoRoot
+            let! largeObjectsByRelativePath = tryListLargeObjects normalizedRepoRoot
             return withFileEntriesLfsMetadata normalizedRepoRoot largeObjectsByRelativePath entries
         else
             return entries
     }
-
-/// Enriches an already-read batch of entries from one large-object metadata snapshot.
-/// Directory-only batches avoid querying the repository entirely.
-let getFileEntriesWithLfsMetadata (repoRoot: string) (entries: FileEntry[]) =
-    getFileEntriesWithLfsMetadataUsing
-        (fun normalizedRepoRoot -> tryListLargeObjects normalizedRepoRoot true)
-        repoRoot
-        entries
 
 /// Build the renderer snapshot using ARC-relative dictionary keys and FileEntry paths.
 let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary<string, FileEntry> =
@@ -154,26 +134,19 @@ let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary
 
     rendererFileTree
 
-/// Remove a path and all descendants from a file tree dictionary using normalized ancestor checks.
-let removePathAndDescendants
-    (targetPath: string)
-    (fileTree: Dictionary<string, FileEntry>)
-    : Dictionary<string, FileEntry> =
+/// Removes a path and all descendants from a mutable file tree.
+let internal removePathAndDescendants (targetPath: string) (fileTree: Dictionary<string, FileEntry>) : unit =
     let normalizedTargetPath = PathHelpers.normalizePath targetPath
-    let nextTree = Dictionary<string, FileEntry>(fileTree)
 
-    if String.IsNullOrWhiteSpace normalizedTargetPath then
-        nextTree
-    else
+    if not (String.IsNullOrWhiteSpace normalizedTargetPath) then
         let keysToRemove =
-            nextTree.Keys
+            fileTree.Keys
             |> Seq.filter (fun path -> PathHelpers.isSameOrDescendantPath path normalizedTargetPath)
             |> Seq.toArray
 
-        keysToRemove |> Array.iter (fun path -> nextTree.Remove(path) |> ignore)
-        nextTree
+        keysToRemove |> Array.iter (fun path -> fileTree.Remove(path) |> ignore)
 
-/// Add or replace a single file tree entry without mutating the current snapshot.
+/// Adds or replaces one entry without mutating the current file-tree snapshot.
 let upsertFileEntry (entry: FileEntry) (fileTree: Dictionary<string, FileEntry>) : Dictionary<string, FileEntry> =
     let nextTree = Dictionary<string, FileEntry>(fileTree)
     nextTree.[entry.path] <- entry
@@ -224,8 +197,7 @@ let readFileTreeDirectory (arcPath: string) (relativeDirectoryPath: string) : Fa
                 Some(FileEntry.create (name, fullPath, isDirectory, None))
         )
 
-    let! largeObjectsByRelativePath = tryListLargeObjects normalizedArcPath true
-    return withFileEntriesLfsMetadata normalizedArcPath largeObjectsByRelativePath entries
+    return! getFileEntriesWithLfsMetadata normalizedArcPath entries
 }
 
 /// Builds the bounded startup snapshot: the ARC root and its immediate children.
@@ -267,31 +239,8 @@ let reconcileFileTreeDirectory
         let normalizedChildPath = PathHelpers.normalizePath knownChild.path
 
         if not (currentByPath.ContainsKey normalizedChildPath) then
-            let keysToRemove =
-                nextTree.Keys
-                |> Seq.filter (fun path -> PathHelpers.isSameOrDescendantPath path normalizedChildPath)
-                |> Seq.toArray
-
-            keysToRemove |> Array.iter (fun path -> nextTree.Remove(path) |> ignore)
+            removePathAndDescendants normalizedChildPath nextTree
     )
 
     currentChildren |> Array.iter (fun entry -> nextTree.[entry.path] <- entry)
     nextTree
-
-/// Refreshes one known relative path without rescanning the ARC directory.
-let refreshFileTreeEntry
-    (arcPath: string)
-    (relativePath: string)
-    (fileTree: Dictionary<string, FileEntry>)
-    : Fable.Core.JS.Promise<Dictionary<string, FileEntry>> =
-    promise {
-        let absolutePath = join [| arcPath; relativePath |]
-        let! entry = getFileEntry absolutePath
-        return upsertFileEntry entry fileTree
-    }
-
-let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
-    let! entry = getFileEntry path
-    let! enrichedEntries = getFileEntriesWithLfsMetadata repoRoot [| entry |]
-    return enrichedEntries.[0]
-}

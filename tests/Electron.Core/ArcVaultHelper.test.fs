@@ -23,6 +23,21 @@ module FileImportCoordinator = Main.FileImportCoordinator
 module WatcherHelpers = Main.WatcherHelpers
 module Abort = Main.Bindings.Abort
 
+Vitest.vi.mock ("chokidar", createObj [ "spy" ==> true ]) |> ignore
+
+[<Import("watch", "chokidar")>]
+let private watchMock: obj = jsNative
+
+[<Emit("$0.mockImplementationOnce(() => { let ready; let all; const watcher = { on(event, callback) { if (event === 'ready') { ready = callback; } if (event === 'all') { all = callback; } return watcher; }, close() { $4(); return Promise.resolve(); }, add() { return watcher; }, unwatch() { return watcher; }, getWatched() { return {}; } }; $1(); $2(() => ready?.()); $3(eventName => path => all?.(eventName, path)); return watcher; })")>]
+let private interceptNextControlledPermanentWatch
+    (_spy: obj)
+    (_onCreated: unit -> unit)
+    (_captureReady: (unit -> unit) -> unit)
+    (_captureAll: ((string -> string -> unit) -> unit))
+    (_onClosed: unit -> unit)
+    : unit =
+    jsNative
+
 let private electronMock: obj = import "__electronMock" "electron"
 
 let private resetElectronMock () = electronMock?reset () |> ignore
@@ -166,18 +181,16 @@ Vitest.describe (
                 let vault = ArcVault(TestHelpers.testWindow ())
 
                 do!
-                    Main.IPC.IPCHelper.withBusyWritingScope
-                        vault
-                        (fun () -> promise {
-                            Vitest.expect(vault.isBusyWriting).toBe true
+                    vault.WithBusyWritingScope(fun () -> promise {
+                        Vitest.expect(vault.isBusyWriting).toBe true
 
-                            do!
-                                vault.WithBusyWritingScope(fun () -> promise {
-                                    Vitest.expect(vault.isBusyWriting).toBe true
-                                })
+                        do!
+                            vault.WithBusyWritingScope(fun () -> promise {
+                                Vitest.expect(vault.isBusyWriting).toBe true
+                            })
 
-                            Vitest.expect(vault.isBusyWriting).toBe true
-                        })
+                        Vitest.expect(vault.isBusyWriting).toBe true
+                    })
 
                 Vitest.expect(vault.isBusyWriting).toBe false
             }
@@ -963,6 +976,7 @@ Vitest.describe (
 
                         vault.fileTree.[removedPath] <- FileEntry.create ("removed", removedPath, true)
                         vault.fileTree.[removedChildPath] <- FileEntry.create ("child.txt", removedChildPath, false)
+                        let originalFileTree = vault.fileTree
 
                         do!
                             vault.ApplyWatcherFileTreeEvents [
@@ -977,6 +991,8 @@ Vitest.describe (
                         Vitest.expect(vault.fileTree.ContainsKey(directoryPath)).toBe (true)
                         Vitest.expect(vault.fileTree.ContainsKey(removedPath)).toBe (false)
                         Vitest.expect(vault.fileTree.ContainsKey(removedChildPath)).toBe (false)
+                        Vitest.expect(originalFileTree.ContainsKey(removedPath)).toBe (true)
+                        Vitest.expect(originalFileTree.ContainsKey(removedChildPath)).toBe (true)
                         Vitest.expect(publicationCount).toBe (1)
                     })
         )
@@ -2259,6 +2275,114 @@ Vitest.describe (
                         }
 
                         return! withAsyncCleanup cleanup operation
+                    })
+        )
+
+        Vitest.test (
+            "CreateARC merges a canonical edit buffered during own-write suppression",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-create-watcher-handoff-"
+                let arcPath = join [| rootPath; "new-arc" |]
+                let vault = ArcVault(TestHelpers.testWindow ())
+                let watcherCreated, signalWatcherCreated = TestHelpers.deferred ()
+                let mutable signalReady = ignore
+                let mutable emitWatcherEvent: string -> string -> unit = fun _ _ -> ()
+
+                interceptNextControlledPermanentWatch
+                    watchMock
+                    signalWatcherCreated
+                    (fun ready -> signalReady <- ready)
+                    (fun emitAll -> emitWatcherEvent <- emitAll)
+                    ignore
+
+                let cleanup () = promise {
+                    do! vault.StopFileWatcher()
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                }
+
+                let operation () = promise {
+                    let creation = vault.CreateARC(arcPath, "Initial title")
+                    do! watcherCreated
+                    signalReady ()
+                    do! creation
+
+                    Vitest.expect(vault.isInitializingArc).toBe (true)
+                    Vitest.expect(vault.IsFileWatcherArcMergeEligible).toBe (false)
+
+                    let! diskArc = TestHelpers.loadArcAsync arcPath
+                    diskArc.Title <- Some "Changed during initialization"
+                    do! diskArc.UpdateAsync arcPath
+
+                    let investigationPath =
+                        ARCtrl.ArcPathHelper.combine arcPath ARCtrl.ArcPathHelper.InvestigationFileName
+
+                    emitWatcherEvent "change" investigationPath
+
+                    do!
+                        waitUntil
+                            "canonical ARC event buffered during initialization"
+                            (fun () -> vault.fileWatcherPendingArcMergeEvents.Count > 0)
+
+                    let! initialTree = Main.FileTreeCreator.getFileTree arcPath
+                    vault.FinalizeArcInitialization initialTree
+
+                    let titleMatches () =
+                        vault.arc
+                        |> Option.exists (fun arc -> arc.Title = Some "Changed during initialization")
+
+                    do! waitUntil "buffered CreateARC metadata merge" titleMatches
+                    Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (0)
+                }
+
+                return! withAsyncCleanup cleanup operation
+            }
+        )
+
+        Vitest.test (
+            "cancelling permanent watcher readiness stops initialization before LoadArc",
+            TestOptions(timeout = 15000),
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        let watcherCreated, signalWatcherCreated = TestHelpers.deferred ()
+                        let mutable closeCount = 0
+
+                        interceptNextControlledPermanentWatch
+                            watchMock
+                            signalWatcherCreated
+                            ignore
+                            ignore
+                            (fun () -> closeCount <- closeCount + 1)
+
+                        let opening = vault.OpenARC arcPath |> Promise.result
+                        do! watcherCreated
+
+                        vault.fileWatcherPendingEvents.Add(watcherEvent arcPath "add" "pending.txt")
+
+                        vault.fileWatcherPendingArcMergeEvents.Add(
+                            watcherEvent arcPath "change" "isa.investigation.xlsx"
+                        )
+
+                        do! vault.StopFileWatcher()
+
+                        match! opening with
+                        | Ok() ->
+                            return failwith "Expected watcher readiness cancellation to cancel ARC initialization."
+                        | Error(ArcLoadCancelledException _) -> ()
+                        | Error error -> return raise error
+
+                        Vitest.expect(closeCount).toBe (1)
+                        Vitest.expect(vault.watcher).toEqual (None)
+                        Vitest.expect(vault.FileWatcherReady).toEqual (None)
+                        Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (0)
+                        Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (0)
+                        Vitest.expect(vault.path).toEqual (None)
+                        Vitest.expect(vault.arc).toEqual (None)
+                        Vitest.expect(vault.fileTree.Count).toBe (0)
+                        Vitest.expect(vault.isInitializingArc).toBe (false)
                     })
         )
 

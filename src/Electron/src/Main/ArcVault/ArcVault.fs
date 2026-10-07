@@ -23,6 +23,10 @@ open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
 
+type internal FileWatcherReadyOutcome =
+    | Ready
+    | Cancelled
+
 type internal LoadedDirectoryWatcherState = {
     LifecycleActive: bool
     MutationActive: bool
@@ -290,7 +294,7 @@ type ArcVault(window: BrowserWindow) =
     member val isInitializingArc = false with get, set
     member val isWaitingForOperationsOnClose = false with get, set
     member val isOperationCloseApproved = false with get, set
-    member val internal FileWatcherReady: Fable.Core.JS.Promise<unit> option = None with get, set
+    member val internal FileWatcherReady: Fable.Core.JS.Promise<FileWatcherReadyOutcome> option = None with get, set
     member val internal CancelFileWatcherReadyWait: (unit -> unit) option = None with get, set
     member val internal SchedulePendingFileWatcherEvents: (unit -> unit) option = None with get, set
 
@@ -551,14 +555,7 @@ module ArcVaultExtensions =
                             then
                                 // Normalization above already turned the unlink of an existing file into a change. Directory unlinks
                                 // stay admitted, so they still need this check.
-                                let keysToRemove =
-                                    nextFileTree.Keys
-                                    |> Seq.filter (fun path ->
-                                        PathHelpers.isSameOrDescendantPath path event.AbsolutePath
-                                    )
-                                    |> Seq.toArray
-
-                                keysToRemove |> Array.iter (fun path -> nextFileTree.Remove(path) |> ignore)
+                                removePathAndDescendants event.AbsolutePath nextFileTree
                                 hasFileTreeChanges <- true
                         with fileTreeError ->
                             swatelogfn
@@ -671,6 +668,12 @@ module ArcVaultExtensions =
                     ()
             }
 
+            let retireWatcher () = promise {
+                match controller.RetireWatcher() with
+                | Some watcher -> do! closeWatcher watcher
+                | None -> ()
+            }
+
             let lifecycle = promise {
                 do! precedingLifecycle
 
@@ -681,11 +684,7 @@ module ArcVaultExtensions =
                     || not controller.Current.LifecycleActive
                     || not (suspensionAllowsCoverage ())
                 then
-                    let previous = controller.RetireWatcher()
-
-                    match previous with
-                    | Some watcher -> do! closeWatcher watcher
-                    | None -> ()
+                    do! retireWatcher ()
 
                     controller.CompleteEstablishment generation
                     return None
@@ -693,11 +692,7 @@ module ArcVaultExtensions =
                     match this.path with
                     | None ->
                         controller.ClearLoadedDirectories()
-                        let previous = controller.RetireWatcher()
-
-                        match previous with
-                        | Some watcher -> do! closeWatcher watcher
-                        | None -> ()
+                        do! retireWatcher ()
 
                         controller.CompleteEstablishment generation
                         return None
@@ -706,11 +701,7 @@ module ArcVaultExtensions =
                         let relativePaths = this.loadedFileTreeDirectories |> Seq.toArray
 
                         if relativePaths.Length = 0 then
-                            let previous = controller.RetireWatcher()
-
-                            match previous with
-                            | Some watcher -> do! closeWatcher watcher
-                            | None -> ()
+                            do! retireWatcher ()
 
                             controller.CompleteEstablishment generation
                             return None
@@ -930,13 +921,6 @@ module ArcVaultExtensions =
                                 | Error mergeError -> return WatcherMergeOutcome.Failed mergeError
             })
 
-        member this.TriggerArcInMemoryMergeOnFileWatcherEvents(events: ArcVaultFileSystemEvent list) = promise {
-            match! this.TryTriggerArcInMemoryMergeOnFileWatcherEvents events with
-            | Ok() -> ()
-            | Error mergeError ->
-                swatelogfn this.window.id "Unable to merge ARC after file watcher event: %s" mergeError.Message
-        }
-
         member internal this._FileEventController(sendMsgApi: IArcFileWatcherApi) =
             // A long write retries every 500 ms, so only the first deferral and the limit crossing are logged.
             let logWatcherDeferral deferralCount =
@@ -1119,7 +1103,9 @@ module ArcVaultExtensions =
                             )
 
                         not isImportedPath
-                        && (this.activeFileImport.IsSome || this.IsFileWatcherArcMergeEligible)
+                        && (this.isInitializingArc
+                            || this.activeFileImport.IsSome
+                            || this.IsFileWatcherArcMergeEligible)
                     )
                     this.path
                     this.fileWatcherPendingEvents
@@ -1390,7 +1376,9 @@ module ArcVaultExtensions =
                     let mutable cancelReadyWait = ignore
 
                     let cancelled =
-                        JS.Constructors.Promise.Create(fun resolve _ -> cancelReadyWait <- fun () -> resolve ())
+                        JS.Constructors.Promise.Create(fun resolve _ ->
+                            cancelReadyWait <- fun () -> resolve FileWatcherReadyOutcome.Cancelled
+                        )
 
                     let sendWatcherMessage = WindowSend.sender<IArcFileWatcherApi> this.window
 
@@ -1401,7 +1389,15 @@ module ArcVaultExtensions =
 
                     watcher.on (Chokidar.Events.All, this._FileEventController sendMsgApi) |> ignore
                     this.watcher <- Some watcher
-                    this.FileWatcherReady <- Some(race [| ready; cancelled |])
+
+                    this.FileWatcherReady <-
+                        Some(
+                            race [|
+                                ready |> Promise.map (fun () -> FileWatcherReadyOutcome.Ready)
+                                cancelled
+                            |]
+                        )
+
                     this.CancelFileWatcherReadyWait <- Some cancelReadyWait
             else
                 swatefailfn this.window.id "No path set for StartFileWatcher."
@@ -1410,7 +1406,10 @@ module ArcVaultExtensions =
             this.StartFileWatcher(?usePolling = usePolling)
 
             match this.FileWatcherReady with
-            | Some ready -> do! ready
+            | Some ready ->
+                match! ready with
+                | FileWatcherReadyOutcome.Ready -> ()
+                | FileWatcherReadyOutcome.Cancelled -> return raise (ArcLoadCancelledException this.window.id)
             | None -> ()
         }
 

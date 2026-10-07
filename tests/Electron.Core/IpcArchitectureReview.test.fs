@@ -90,10 +90,13 @@ Vitest.describe (
                         diskArcForAdd.AddAssay(ArcAssay("DiskAssay", title = "Added on disk"))
                         do! diskArcForAdd.UpdateAsync arcPath
 
-                        do!
-                            vault.TriggerArcInMemoryMergeOnFileWatcherEvents [
+                        match!
+                            vault.TryTriggerArcInMemoryMergeOnFileWatcherEvents [
                                 watcherEvent arcPath "add" "assays/DiskAssay/isa.assay.xlsx"
                             ]
+                        with
+                        | Ok() -> ()
+                        | Error error -> return raise error
 
                         let afterAdd = vault.arc.Value
                         Vitest.expect(afterAdd.ContainsAssay("DiskAssay")).toBe (true)
@@ -103,10 +106,13 @@ Vitest.describe (
                         diskArcForChange.GetAssay("DiskAssay").Title <- Some "Changed on disk"
                         do! diskArcForChange.UpdateAsync arcPath
 
-                        do!
-                            vault.TriggerArcInMemoryMergeOnFileWatcherEvents [
+                        match!
+                            vault.TryTriggerArcInMemoryMergeOnFileWatcherEvents [
                                 watcherEvent arcPath "change" "assays/DiskAssay/isa.assay.xlsx"
                             ]
+                        with
+                        | Ok() -> ()
+                        | Error error -> return raise error
 
                         let afterChange = vault.arc.Value
                         Vitest.expect(afterChange.GetAssay("DiskAssay").Title).toEqual (Some "Changed on disk")
@@ -116,10 +122,13 @@ Vitest.describe (
                         diskArcForDelete.RemoveAssay("ExistingAssay")
                         do! diskArcForDelete.UpdateAsync arcPath
 
-                        do!
-                            vault.TriggerArcInMemoryMergeOnFileWatcherEvents [
+                        match!
+                            vault.TryTriggerArcInMemoryMergeOnFileWatcherEvents [
                                 watcherEvent arcPath "unlink" "assays/ExistingAssay/isa.assay.xlsx"
                             ]
+                        with
+                        | Ok() -> ()
+                        | Error error -> return raise error
 
                         let afterDelete = vault.arc.Value
                         Vitest.expect(afterDelete.ContainsAssay("ExistingAssay")).toBe (false)

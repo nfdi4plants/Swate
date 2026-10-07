@@ -822,21 +822,19 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                     return!
                                         vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
                                             let! result =
-                                                IPCHelper.withBusyWritingScope
-                                                    vault
-                                                    (fun () -> promise {
-                                                        match!
-                                                            ArcDeleteHelper.deleteArcEntityAsync
-                                                                arcPath
-                                                                normalizedRelativePath
-                                                                arcLocal
-                                                        with
-                                                        | Error deleteError -> return Error deleteError
-                                                        | Ok deletedArc ->
-                                                            vault.SetArc deletedArc
-                                                            vault.RefreshHasUnsavedArcChangesFlag()
-                                                            return Ok()
-                                                    })
+                                                vault.WithBusyWritingScope(fun () -> promise {
+                                                    match!
+                                                        ArcDeleteHelper.deleteArcEntityAsync
+                                                            arcPath
+                                                            normalizedRelativePath
+                                                            arcLocal
+                                                    with
+                                                    | Error deleteError -> return Error deleteError
+                                                    | Ok deletedArc ->
+                                                        vault.SetArc deletedArc
+                                                        vault.RefreshHasUnsavedArcChangesFlag()
+                                                        return Ok()
+                                                })
 
                                             match result with
                                             | Ok() ->
@@ -861,22 +859,20 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                         )
                                 | Some arc, Some parentInfo ->
                                     return!
-                                        IPCHelper.withBusyWritingScope
-                                            vault
-                                            (fun () -> promise {
-                                                match! arc.TryDeleteDataMapAsync(arcPath, parentInfo) with
-                                                | Error deleteError -> return Error deleteError
-                                                | Ok() ->
-                                                    vault.RefreshHasUnsavedArcChangesFlag()
+                                        vault.WithBusyWritingScope(fun () -> promise {
+                                            match! arc.TryDeleteDataMapAsync(arcPath, parentInfo) with
+                                            | Error deleteError -> return Error deleteError
+                                            | Ok() ->
+                                                vault.RefreshHasUnsavedArcChangesFlag()
 
-                                                    let parentPath =
-                                                        PathHelpers.tryGetParentPath normalizedDataMapPath
-                                                        |> Option.defaultValue ""
+                                                let parentPath =
+                                                    PathHelpers.tryGetParentPath normalizedDataMapPath
+                                                    |> Option.defaultValue ""
 
-                                                    do! vault.RefreshFileTreeDirectory parentPath
+                                                do! vault.RefreshFileTreeDirectory parentPath
 
-                                                    return Ok()
-                                            })
+                                                return Ok()
+                                        })
                             | ArcEntityPathRules.DeletePathClassification.GenericTarget normalizedGenericPath
                             | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget(_,
                                                                                                   normalizedGenericPath) ->
@@ -958,21 +954,16 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                     return!
                                         vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
                                             let! result =
-                                                IPCHelper.withBusyWritingScope
-                                                    vault
-                                                    (fun () -> promise {
-                                                        match!
-                                                            ArcRenameHelper.renameArcEntityAsync
-                                                                arcPath
-                                                                request
-                                                                arcLocal
-                                                        with
-                                                        | Error renameError -> return Error renameError
-                                                        | Ok renamedArc ->
-                                                            vault.SetArc renamedArc
-                                                            vault.RefreshHasUnsavedArcChangesFlag()
-                                                            return Ok()
-                                                    })
+                                                vault.WithBusyWritingScope(fun () -> promise {
+                                                    match!
+                                                        ArcRenameHelper.renameArcEntityAsync arcPath request arcLocal
+                                                    with
+                                                    | Error renameError -> return Error renameError
+                                                    | Ok renamedArc ->
+                                                        vault.SetArc renamedArc
+                                                        vault.RefreshHasUnsavedArcChangesFlag()
+                                                        return Ok()
+                                                })
 
                                             match result with
                                             | Ok() ->
@@ -990,18 +981,14 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 | None -> return Error(arcNotOpenError ())
                                 | Some arcLocal ->
                                     return!
-                                        IPCHelper.withBusyWritingScope
-                                            vault
-                                            (fun () -> promise {
-                                                match!
-                                                    ArcRenameHelper.renameArcEntityAsync arcPath request arcLocal
-                                                with
-                                                | Error renameError -> return Error renameError
-                                                | Ok renamedArc ->
-                                                    vault.SetArc renamedArc
-                                                    vault.RefreshHasUnsavedArcChangesFlag()
-                                                    return Ok()
-                                            })
+                                        vault.WithBusyWritingScope(fun () -> promise {
+                                            match! ArcRenameHelper.renameArcEntityAsync arcPath request arcLocal with
+                                            | Error renameError -> return Error renameError
+                                            | Ok renamedArc ->
+                                                vault.SetArc renamedArc
+                                                vault.RefreshHasUnsavedArcChangesFlag()
+                                                return Ok()
+                                        })
                         })
             with e ->
                 return Error e
@@ -1078,36 +1065,31 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             // The shared scope counts nesting, so a write that overlaps a
                             // version control operation does not clear the busy flag under it.
                             return!
-                                IPCHelper.withBusyWritingScope
-                                    vault
-                                    (fun () -> promise {
-                                        match request.fileType with
-                                        | FileContentType.FileContentTypeIsPlainTextVariant ->
-                                            let directoryPath = path.dirname absolutePath
-                                            do! ARCtrl.FileSystemHelper.createDirectoryAsync directoryPath
+                                vault.WithBusyWritingScope(fun () -> promise {
+                                    match request.fileType with
+                                    | FileContentType.FileContentTypeIsPlainTextVariant ->
+                                        let directoryPath = path.dirname absolutePath
+                                        do! ARCtrl.FileSystemHelper.createDirectoryAsync directoryPath
 
-                                            do! ARCtrl.FileSystemHelper.writeFileTextAsync absolutePath request.content
+                                        do! ARCtrl.FileSystemHelper.writeFileTextAsync absolutePath request.content
 
-                                            match tryGetArcRelativePath arcPath directoryPath with
-                                            | Ok relativeParentPath ->
-                                                do! vault.RefreshFileTreeDirectory relativeParentPath
-                                                return Ok()
-                                            | Error pathError -> return Error pathError
-                                        | FileContentType.CLI ->
-                                            return Error(exn "Direct writing of CLI files is not supported.")
-                                        | FileContentType.FileContentTypeIsISAFileVariant ->
-                                            return
-                                                Error(
-                                                    exn
-                                                        "Direct writing of ARC content files is not supported. Use saveArcFile for these file types to ensure ARC integrity."
-                                                )
-                                        | _ ->
-                                            return
-                                                Error(
-                                                    exn
-                                                        $"Unsupported file content type for writing: {request.fileType}"
-                                                )
-                                    })
+                                        match tryGetArcRelativePath arcPath directoryPath with
+                                        | Ok relativeParentPath ->
+                                            do! vault.RefreshFileTreeDirectory relativeParentPath
+                                            return Ok()
+                                        | Error pathError -> return Error pathError
+                                    | FileContentType.CLI ->
+                                        return Error(exn "Direct writing of CLI files is not supported.")
+                                    | FileContentType.FileContentTypeIsISAFileVariant ->
+                                        return
+                                            Error(
+                                                exn
+                                                    "Direct writing of ARC content files is not supported. Use saveArcFile for these file types to ensure ARC integrity."
+                                            )
+                                    | _ ->
+                                        return
+                                            Error(exn $"Unsupported file content type for writing: {request.fileType}")
+                                })
             with e ->
                 return Error e
         }
