@@ -25,6 +25,7 @@ open ARCtrl
 
 type internal FileWatcherReadyOutcome =
     | Ready
+    | WatcherError of exn
     | Cancelled
 
 type internal LoadedDirectoryWatcherState = {
@@ -703,7 +704,13 @@ module ArcVaultExtensions =
                                 relativePaths
                                 |> Array.map (fun relativePath -> join [| arcPath; relativePath |])
 
-                            let candidate, ready = createLoadedDirectoryWatcherWithReady arcPath absolutePaths
+                            let candidate, ready =
+                                createLoadedDirectoryWatcherWithReady
+                                    arcPath
+                                    absolutePaths
+                                    (fun error ->
+                                        swatelogfn this.window.id "Loaded-directory watcher error: %s" error.Message
+                                    )
 
                             candidate.on (
                                 Chokidar.Events.All,
@@ -729,14 +736,19 @@ module ArcVaultExtensions =
                             )
                             |> ignore
 
-                            let! becameReady =
+                            let! readyOutcome =
                                 race [|
-                                    ready |> Promise.map (fun () -> true)
-                                    cancelled |> Promise.map (fun () -> false)
+                                    ready |> Promise.map Some
+                                    cancelled |> Promise.map (fun () -> None)
                                 |]
 
+                            let candidateBecameReady =
+                                match readyOutcome with
+                                | Some(Ok()) -> true
+                                | _ -> false
+
                             if
-                                becameReady
+                                candidateBecameReady
                                 && controller.Current.Generation = generation
                                 && controller.Current.LifecycleActive
                                 && suspensionAllowsCoverage ()
@@ -752,6 +764,7 @@ module ArcVaultExtensions =
                                 return Some generation
                             else
                                 do! closeWatcher candidate
+                                controller.CompleteEstablishment generation
                                 return None
             }
 
@@ -1084,6 +1097,9 @@ module ArcVaultExtensions =
 
             this.SchedulePendingFileWatcherEvents <- Some scheduleReload
 
+            let isArcMergeRelevantEvent event =
+                WatcherHelpers.filterArcMergeRelevantEvents [| event |] |> Array.isEmpty |> not
+
             fun (eventName: string) (path: string) ->
 
                 swatelogfn this.window.id "File change detected: %s on %s" eventName path
@@ -1095,7 +1111,8 @@ module ArcVaultExtensions =
                                 PathHelpers.normalizePath (event.AbsolutePath.ToLowerInvariant())
                             )
 
-                        not isImportedPath
+                        isArcMergeRelevantEvent event
+                        && not isImportedPath
                         && (this.isInitializingArc
                             || this.activeFileImport.IsSome
                             || this.IsFileWatcherArcMergeEligible)
@@ -1365,7 +1382,12 @@ module ArcVaultExtensions =
                 match this.watcher with
                 | Some _ -> ()
                 | None ->
-                    let watcher, ready = createFileWatcherWithReady this.path.Value usePolling
+                    let watcher, ready =
+                        createFileWatcherWithReady
+                            this.path.Value
+                            usePolling
+                            (fun error -> swatelogfn this.window.id "Permanent ARC watcher error: %s" error.Message)
+
                     let mutable cancelReadyWait = ignore
 
                     let cancelled =
@@ -1386,7 +1408,12 @@ module ArcVaultExtensions =
                     this.FileWatcherReady <-
                         Some(
                             race [|
-                                ready |> Promise.map (fun () -> FileWatcherReadyOutcome.Ready)
+                                ready
+                                |> Promise.map (
+                                    function
+                                    | Ok() -> FileWatcherReadyOutcome.Ready
+                                    | Error error -> FileWatcherReadyOutcome.WatcherError error
+                                )
                                 cancelled
                             |]
                         )
@@ -1402,6 +1429,7 @@ module ArcVaultExtensions =
             | Some ready ->
                 match! ready with
                 | FileWatcherReadyOutcome.Ready -> ()
+                | FileWatcherReadyOutcome.WatcherError error -> return raise error
                 | FileWatcherReadyOutcome.Cancelled -> return raise (ArcLoadCancelledException this.window.id)
             | None -> ()
         }

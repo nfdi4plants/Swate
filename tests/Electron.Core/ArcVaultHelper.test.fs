@@ -43,6 +43,15 @@ let private interceptNextControlledPermanentWatch
     : unit =
     jsNative
 
+[<Emit("$0.mockImplementationOnce(() => { let error; const watcher = { on(event, callback) { if (event === 'error') { error = callback; } return watcher; }, close() { $3(); return Promise.resolve(); }, add() { return watcher; }, unwatch() { return watcher; }, getWatched() { return {}; } }; $1(); $2(value => error?.(value)); return watcher; })")>]
+let private interceptNextFailingPermanentWatch
+    (_spy: obj)
+    (_onCreated: unit -> unit)
+    (_captureError: (exn -> unit) -> unit)
+    (_onClosed: unit -> unit)
+    : unit =
+    jsNative
+
 let private electronMock: obj = import "__electronMock" "electron"
 
 let private resetElectronMock () = electronMock?reset () |> ignore
@@ -585,7 +594,8 @@ let private createTestWindow options =
         SentMessages = sentMessages
     }
 
-let private waitUntilAttemptLimit = 250
+let private waitUntilAttemptLimit = 15000
+let private waitUntilPollingIntervalMs = 1
 
 let rec private waitUntilWithin phase predicate remaining = promise {
     if predicate () then
@@ -593,7 +603,7 @@ let rec private waitUntilWithin phase predicate remaining = promise {
     elif remaining <= 0 then
         return failwithf "Timed out waiting for expected ARC lifecycle phase: %s." phase
     else
-        do! Promise.sleep 0
+        do! Promise.sleep waitUntilPollingIntervalMs
         return! waitUntilWithin phase predicate (remaining - 1)
 }
 
@@ -2387,6 +2397,72 @@ Vitest.describe (
                         Vitest.expect(vault.path).toEqual (None)
                         Vitest.expect(vault.arc).toEqual (None)
                         Vitest.expect(vault.fileTree.Count).toBe (0)
+                        Vitest.expect(vault.isInitializingArc).toBe (false)
+                    })
+        )
+
+        Vitest.test (
+            "permanent watcher separates FileTree events from ARC merge events",
+            fun () -> promise {
+                let vault = ArcVault(TestHelpers.testWindow ())
+                let arcPath = "C:/arc"
+                vault.path <- Some arcPath
+                vault.isInitializingArc <- true
+
+                let handleFileEvent =
+                    vault._FileEventController (recordingWatcherApi (ResizeArray()))
+
+                handleFileEvent "change" (join [| arcPath; "isa.investigation.xlsx" |])
+                handleFileEvent "unlinkDir" (join [| arcPath; "assays/RemovedAssay" |])
+                handleFileEvent "change" (join [| arcPath; "README.md" |])
+                handleFileEvent "add" (join [| arcPath; ".gitattributes" |])
+                handleFileEvent "addDir" (join [| arcPath; "dataset" |])
+
+                let mergePaths =
+                    vault.fileWatcherPendingArcMergeEvents |> Seq.map _.RelativePath |> Set.ofSeq
+
+                Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (5)
+                Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (2)
+                Vitest.expect(mergePaths.Contains "isa.investigation.xlsx").toBe (true)
+                Vitest.expect(mergePaths.Contains "assays/RemovedAssay").toBe (true)
+                Vitest.expect(mergePaths.Contains "README.md").toBe (false)
+                Vitest.expect(mergePaths.Contains ".gitattributes").toBe (false)
+                Vitest.expect(mergePaths.Contains "dataset").toBe (false)
+            }
+        )
+
+        Vitest.test (
+            "permanent watcher error before ready fails and cleans up initialization",
+            TestOptions(timeout = 15000),
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        let watcherCreated, signalWatcherCreated = TestHelpers.deferred ()
+                        let mutable signalError: exn -> unit = ignore
+                        let mutable closeCount = 0
+
+                        interceptNextFailingPermanentWatch
+                            watchMock
+                            signalWatcherCreated
+                            (fun emitError -> signalError <- emitError)
+                            (fun () -> closeCount <- closeCount + 1)
+
+                        let opening = vault.OpenARC arcPath |> Promise.result
+                        do! watcherCreated
+                        let watcherError = exn "permanent watcher failed before ready"
+                        signalError watcherError
+
+                        match! opening with
+                        | Ok() -> return failwith "Expected pre-ready watcher error to fail ARC initialization."
+                        | Error error -> Vitest.expect(error.Message).toBe (watcherError.Message)
+
+                        Vitest.expect(closeCount).toBe (1)
+                        Vitest.expect(vault.watcher).toEqual (None)
+                        Vitest.expect(vault.FileWatcherReady).toEqual (None)
+                        Vitest.expect(vault.path).toEqual (None)
+                        Vitest.expect(vault.arc).toEqual (None)
                         Vitest.expect(vault.isInitializingArc).toBe (false)
                     })
         )

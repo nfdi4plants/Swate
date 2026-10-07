@@ -39,6 +39,14 @@ let private withLoadedArcVault<'T>
             | _ -> return Error(arcNotOpenError ())
     }
 
+let ensureNotesFolderAndRefreshFileTree (vault: ArcVault) (arcPath: string) = promise {
+    match! Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath arcPath with
+    | Error error -> return Error error
+    | Ok() ->
+        do! vault.RefreshFileTreeDirectory ""
+        return Ok()
+}
+
 let private tryResolveExistingArcRelativePath
     (arcPath: string)
     (relativePath: string)
@@ -312,7 +320,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             try
                 match tryGetVaultAndArcPath event with
                 | Error error -> return Error error
-                | Ok(_, arcPath) -> return! Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath arcPath
+                | Ok(vault, arcPath) -> return! ensureNotesFolderAndRefreshFileTree vault arcPath
             with error ->
                 return Error error
         }

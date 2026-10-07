@@ -73,8 +73,20 @@ let createImportedFileWatcherEvents arcPath targetRelativePath sourceAbsolutePat
 let filterArcMergeRelevantEvents (events: ArcVaultFileSystemEvent[]) =
     events
     |> Array.filter (fun event ->
-        ArcEntityPathRules.tryParseCanonicalArcFileTarget event.RelativePath
-        |> Option.isSome
+        let isCanonicalFileEvent =
+            (eventNameEquals Chokidar.Events.Add event.EventName
+             || eventNameEquals Chokidar.Events.Change event.EventName
+             || eventNameEquals Chokidar.Events.Unlink event.EventName)
+            && (ArcEntityPathRules.tryParseCanonicalArcFileTarget event.RelativePath
+                |> Option.isSome)
+
+        let isEntityDirectoryUnlink =
+            eventNameEquals Chokidar.Events.UnlinkDir event.EventName
+            && (ArcEntityPathRules.buildFallbackUnlinkPaths event.RelativePath
+                |> List.isEmpty
+                |> not)
+
+        isCanonicalFileEvent || isEntityDirectoryUnlink
     )
 
 let filterImportedFileWatcherOwnershipEvents arcPath (events: ArcVaultFileSystemEvent[]) =

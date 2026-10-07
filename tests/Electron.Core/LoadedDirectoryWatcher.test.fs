@@ -34,6 +34,15 @@ let private interceptNextControlledWatch
     : unit =
     jsNative
 
+[<Emit("$0.mockImplementationOnce(() => { let error; const watcher = { on(event, callback) { if (event === 'error') { error = callback; } return watcher; }, close() { $3(); return Promise.resolve(); }, add() { return watcher; }, unwatch() { return watcher; }, getWatched() { return {}; } }; $1(); $2(value => error?.(value)); return watcher; })")>]
+let private interceptNextFailingWatch
+    (_spy: obj)
+    (_onCreated: unit -> unit)
+    (_captureError: (exn -> unit) -> unit)
+    (_onClosed: unit -> unit)
+    : unit =
+    jsNative
+
 [<Emit("$0.close = () => { $1(); return $2; }")>]
 let private replaceWatcherClose
     (_watcher: Main.Bindings.Chokidar.IWatcher)
@@ -970,6 +979,48 @@ Vitest.describe (
 
                         Vitest.expect((loadedDirectoryWatcher vault).IsSome).toBe true
                         Vitest.expect(isSameWatcher original (loadedDirectoryWatcher vault).Value).toBe false
+                    })
+            }
+        )
+
+        Vitest.test (
+            "replacement error before ready retires the candidate and preserves the active generation",
+            TestOptions(timeout = 15000),
+            fun () -> promise {
+                do!
+                    withLoadedDirectoryFixture (fun vault _ _ _ -> promise {
+                        do! vault.RefreshFileTreeDirectory "dataset"
+                        let original = (loadedDirectoryWatcher vault).Value
+
+                        let activeGeneration =
+                            vault.LoadedDirectoryWatcherController.Current.ActiveGeneration
+
+                        let candidateCreated, signalCandidateCreated = TestHelpers.deferred ()
+                        let mutable signalCandidateError: exn -> unit = ignore
+                        let mutable candidateCloseCount = 0
+
+                        interceptNextFailingWatch
+                            watchMock
+                            signalCandidateCreated
+                            (fun emitError -> signalCandidateError <- emitError)
+                            (fun () -> candidateCloseCount <- candidateCloseCount + 1)
+
+                        vault.LoadedDirectoryWatcherController.AddLoadedDirectory("dataset/nested", false)
+                        let replacement = vault.RequestLoadedDirectoryWatcherCoverage true
+                        do! candidateCreated
+                        signalCandidateError (exn "candidate failed before ready")
+
+                        let! replacementGeneration = replacement
+                        do! vault.LoadedDirectoryWatcherController.Current.WatcherTransitionTail
+
+                        Vitest.expect(replacementGeneration).toEqual (None)
+                        Vitest.expect(candidateCloseCount).toBe (1)
+
+                        Vitest
+                            .expect(vault.LoadedDirectoryWatcherController.Current.ActiveGeneration)
+                            .toEqual (activeGeneration)
+
+                        Vitest.expect(isSameWatcher original (loadedDirectoryWatcher vault).Value).toBe (true)
                     })
             }
         )

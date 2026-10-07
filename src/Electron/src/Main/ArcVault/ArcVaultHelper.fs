@@ -427,15 +427,34 @@ let createFileWatcher (path: string) (usePolling: bool option) =
     watcher
 
 /// Creates the permanent ARC watcher and captures its one initial readiness notification.
-let createFileWatcherWithReady (path: string) (usePolling: bool option) =
-    let watcher = createFileWatcher path usePolling
+let private captureWatcherReadiness (onError: exn -> unit) (watcher: Chokidar.IWatcher) =
+    JS.Constructors.Promise.Create(fun resolve _ ->
+        let mutable isSettled = false
 
-    let ready =
-        JS.Constructors.Promise.Create(fun resolve _ ->
-            watcher.on (Chokidar.Events.Ready, fun _ -> resolve ()) |> ignore
+        watcher.on (
+            Chokidar.Events.Ready,
+            fun (_: string) ->
+                if not isSettled then
+                    isSettled <- true
+                    resolve (Ok())
         )
+        |> ignore
 
-    watcher, ready
+        watcher.on (
+            Chokidar.Events.Error,
+            fun (error: exn) ->
+                onError error
+
+                if not isSettled then
+                    isSettled <- true
+                    resolve (Error error)
+        )
+        |> ignore
+    )
+
+let createFileWatcherWithReady (path: string) (usePolling: bool option) (onError: exn -> unit) =
+    let watcher = createFileWatcher path usePolling
+    watcher, captureWatcherReadiness onError watcher
 
 /// Creates the native, shallow watcher used only for FileTree directories that were explicitly loaded.
 let createLoadedDirectoryWatcher (arcPath: string) (paths: string[]) =
@@ -453,15 +472,9 @@ let createLoadedDirectoryWatcher (arcPath: string) (paths: string[]) =
 
 /// Creates a loaded-directory watcher and captures its one initial readiness notification.
 /// Chokidar emits `ready` once after the watcher's initial scan, not after later `add` calls.
-let createLoadedDirectoryWatcherWithReady (arcPath: string) (paths: string[]) =
+let createLoadedDirectoryWatcherWithReady (arcPath: string) (paths: string[]) (onError: exn -> unit) =
     let watcher = createLoadedDirectoryWatcher arcPath paths
-
-    let ready =
-        JS.Constructors.Promise.Create(fun resolve _ ->
-            watcher.on (Chokidar.Events.Ready, fun _ -> resolve ()) |> ignore
-        )
-
-    watcher, ready
+    watcher, captureWatcherReadiness onError watcher
 
 let sendArcHasUnsavedChangesUpdate (hasUnsavedChanges: bool) (window: BrowserWindow) =
     WindowSend.send<Swate.Electron.Shared.IPCTypes.MainToRendererIpc.IHasUnsavedArcChangesRendererApi>
