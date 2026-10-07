@@ -555,7 +555,7 @@ module ArcVaultExtensions =
                             then
                                 // Normalization above already turned the unlink of an existing file into a change. Directory unlinks
                                 // stay admitted, so they still need this check.
-                                removePathAndDescendants event.AbsolutePath nextFileTree
+                                removePathAndDescendantsInPlace event.AbsolutePath nextFileTree
                                 hasFileTreeChanges <- true
                         with fileTreeError ->
                             swatelogfn

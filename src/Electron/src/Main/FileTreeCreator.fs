@@ -133,8 +133,8 @@ let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary
 
     rendererFileTree
 
-/// Removes a path and all descendants from a mutable file tree.
-let internal removePathAndDescendants (targetPath: string) (fileTree: Dictionary<string, FileEntry>) : unit =
+/// Removes a path and all descendants from a mutable file tree in place.
+let internal removePathAndDescendantsInPlace (targetPath: string) (fileTree: Dictionary<string, FileEntry>) : unit =
     let normalizedTargetPath = PathHelpers.normalizePath targetPath
 
     if not (String.IsNullOrWhiteSpace normalizedTargetPath) then
@@ -238,7 +238,7 @@ let reconcileFileTreeDirectory
         let normalizedChildPath = PathHelpers.normalizePath knownChild.path
 
         if not (currentByPath.ContainsKey normalizedChildPath) then
-            removePathAndDescendants normalizedChildPath nextTree
+            removePathAndDescendantsInPlace normalizedChildPath nextTree
     )
 
     currentChildren |> Array.iter (fun entry -> nextTree.[entry.path] <- entry)

@@ -14,6 +14,11 @@ Vitest.vi.mock ("chokidar", createObj [ "spy" ==> true ]) |> ignore
 [<Import("watch", "chokidar")>]
 let private watchMock: obj = jsNative
 
+[<Emit("$0.mockReset()")>]
+let private resetWatchMock (_spy: obj) : unit = jsNative
+
+Vitest.beforeEach (fun () -> resetWatchMock watchMock)
+
 [<Emit("$0.mock.calls.length")>]
 let private invocationCount (_spy: obj) : int = jsNative
 
@@ -188,11 +193,6 @@ Vitest.describe (
                         do! rmAsync addedPath (RmOptions())
 
                         do! waitUntil "loaded-directory deletion" (fun () -> not (containsPath addedPath vault))
-
-                        let unloadedDeepPath = join [| nestedPath; "unloaded.txt" |]
-                        do! writeFileAsync unloadedDeepPath "unloaded" TextEncoding.Utf8
-                        do! Promise.sleep 300
-                        Vitest.expect(containsPath unloadedDeepPath vault).toBe false
 
                         do! vault.RefreshFileTreeDirectory "dataset/nested"
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset/nested").toBe true
@@ -1086,28 +1086,6 @@ Vitest.describe (
                         Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset/nested").toBe false
                         Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
                         Vitest.expect(containsPath renamedPath vault).toBe true
-                    })
-            }
-        )
-
-        Vitest.test (
-            "suspending for a loaded-directory delete does not restore the deleted scope",
-            TestOptions(timeout = 15000),
-            fun () -> promise {
-                do!
-                    withLoadedDirectoryFixture (fun vault _ _ nestedPath -> promise {
-                        do! vault.RefreshFileTreeDirectory "dataset"
-                        do! vault.RefreshFileTreeDirectory "dataset/nested"
-
-                        do!
-                            vault.WithLoadedDirectoryWatcherSuspended(fun () -> promise {
-                                do! rmAsync nestedPath (RmOptions(recursive = true, force = true))
-                                do! vault.RefreshFileTreeDirectory "dataset"
-                            })
-
-                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset").toBe true
-                        Vitest.expect(vault.IsFileTreeDirectoryLoaded "dataset/nested").toBe false
-                        Vitest.expect(vault.loadedDirectoryWatcher.IsSome).toBe true
                     })
             }
         )

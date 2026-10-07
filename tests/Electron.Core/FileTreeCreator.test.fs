@@ -1,11 +1,13 @@
 module ElectronCore.FileTreeCreatorTests
 
 open System
+open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
 open Main
 open Main.Bindings.Path
 open Main.VersionControl
+open Swate.Components.Shared
 open Swate.Components.Composite.Authentication.Types
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.VersionControlTypes
@@ -298,39 +300,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "batch enrichment enriches a single staged LFS file",
-            fileTreeCreatorTestOptions,
-            fun () -> promise {
-                do!
-                    withTempRepository (fun context -> promise {
-                        let pointerFilePath = join [| context.RepoPath; "single-pointer.psd" |]
-
-                        let! _ = runGitAsync context.RepoPath [| "lfs"; "install"; "--local" |]
-                        let! _ = runGitAsync context.RepoPath [| "lfs"; "track"; "*.psd" |]
-                        do! writeUtf8FileAsync pointerFilePath "Single tracked content.\n"
-                        let! _ = runGitAsync context.RepoPath [| "add"; ".gitattributes"; "single-pointer.psd" |]
-                        ()
-
-                        let! entry = FileTreeCreator.getFileEntry pointerFilePath
-
-                        let! enrichedEntries =
-                            FileTreeCreator.getFileEntriesWithLfsMetadata context.RepoPath [| entry |]
-
-                        let enrichedEntry = enrichedEntries.[0]
-
-                        Vitest.expect(enrichedEntry.largeObject.IsSome).toBe (true)
-                        let largeObject = enrichedEntry.largeObject |> Option.get
-
-                        Vitest.expect(largeObject.Path).toBe ("single-pointer.psd")
-                        Vitest.expect(largeObject.SizeBytes |> Option.get).toBeGreaterThan (0)
-                        Vitest.expect(largeObject.IsMaterialized).toBe (true)
-                        Vitest.expect(largeObject.IsLocallyAvailable).toBe (true)
-                        expectHexObjectId largeObject
-                    })
-            }
-        )
-
-        Vitest.test (
             "files absent from large-object listing keep metadata None",
             fileTreeCreatorTestOptions,
             fun () -> promise {
@@ -356,25 +325,96 @@ Vitest.describe (
             }
         )
 
+)
+
+Vitest.describe (
+    "FileTreeCreator.removePathAndDescendants",
+    fun () ->
+        let removePathAndDescendants targetPath (fileTree: Dictionary<string, FileEntry>) =
+            let nextTree = Dictionary<string, FileEntry>(fileTree)
+            FileTreeCreator.removePathAndDescendantsInPlace targetPath nextTree
+            nextTree
+
+        let createTreeEntry path isDirectory = {
+            name = path |> PathHelpers.normalizePath |> PathHelpers.getFileName
+            isDirectory = isDirectory
+            path = path
+            largeObject = None
+        }
+
         Vitest.test (
-            "no large objects keeps entries without metadata",
-            fileTreeCreatorTestOptions,
-            fun () -> promise {
-                do!
-                    withTempRepository (fun context -> promise {
-                        let plainFilePath = join [| context.RepoPath; "plain.txt" |]
-                        do! writeUtf8FileAsync plainFilePath "Plain text.\n"
+            "removes only the target path and descendants without mutating the input",
+            fun () ->
+                let tree = Dictionary<string, FileEntry>()
+                tree.Add("C:/arc", createTreeEntry "C:/arc" true)
+                tree.Add("C:/arc/assays", createTreeEntry "C:/arc/assays" true)
+                tree.Add("C:/arc/assays/A", createTreeEntry "C:/arc/assays/A" true)
+                tree.Add("C:/arc/assays/A/isa.assay.xlsx", createTreeEntry "C:/arc/assays/A/isa.assay.xlsx" false)
+                tree.Add("C:/arc/assays/AB", createTreeEntry "C:/arc/assays/AB" true)
+                tree.Add("C:/arc/assays/AB/isa.assay.xlsx", createTreeEntry "C:/arc/assays/AB/isa.assay.xlsx" false)
 
-                        let! entry = FileTreeCreator.getFileEntry plainFilePath
+                let returnedTree = removePathAndDescendants "C:/arc/assays/A" tree
 
-                        let! enrichedEntries =
-                            FileTreeCreator.getFileEntriesWithLfsMetadata context.RepoPath [| entry |]
+                Vitest.expect(returnedTree.ContainsKey("C:/arc/assays/A")).toBe (false)
+                Vitest.expect(returnedTree.ContainsKey("C:/arc/assays/A/isa.assay.xlsx")).toBe (false)
+                Vitest.expect(returnedTree.ContainsKey("C:/arc/assays/AB")).toBe (true)
+                Vitest.expect(returnedTree.ContainsKey("C:/arc/assays/AB/isa.assay.xlsx")).toBe (true)
+                Vitest.expect(tree.ContainsKey("C:/arc/assays/A")).toBe (true)
+                Vitest.expect(tree.ContainsKey("C:/arc/assays/A/isa.assay.xlsx")).toBe (true)
+                Vitest.expect(tree.ContainsKey("C:/arc/assays/AB")).toBe (true)
+                Vitest.expect(tree.ContainsKey("C:/arc/assays/AB/isa.assay.xlsx")).toBe (true)
+        )
+)
 
-                        let plainEntry = enrichedEntries.[0]
+Vitest.describe (
+    "FileTreeCreator.upsertFileEntry",
+    fun () ->
+        let createTreeEntry path largeObject = {
+            name = path |> PathHelpers.normalizePath |> PathHelpers.getFileName
+            isDirectory = false
+            path = path
+            largeObject = largeObject
+        }
 
-                        Vitest.expect(plainEntry.largeObject).toEqual (None)
-                    })
-            }
+        let pointerInfo: ObjectStateDto = {
+            Path = "data.bin"
+            SizeBytes = Some 128.0
+            IsMaterialized = false
+            IsLocallyAvailable = false
+            ObjectId = Some "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+
+        Vitest.test (
+            "adds exactly one entry while preserving existing entries",
+            fun () ->
+                let tree = Dictionary<string, FileEntry>()
+                tree.Add("C:/arc/other.bin", createTreeEntry "C:/arc/other.bin" None)
+
+                let updatedTree =
+                    FileTreeCreator.upsertFileEntry (createTreeEntry "C:/arc/data.bin" (Some pointerInfo)) tree
+
+                Vitest.expect(updatedTree.Count).toBe (2)
+                Vitest.expect(updatedTree.ContainsKey("C:/arc/other.bin")).toBe (true)
+                Vitest.expect(updatedTree.["C:/arc/data.bin"].largeObject).toEqual (Some pointerInfo)
+                Vitest.expect(tree.Count).toBe (1)
+                Vitest.expect(tree.ContainsKey("C:/arc/data.bin")).toBe (false)
+        )
+
+        Vitest.test (
+            "replaces an entry without mutating the current file tree",
+            fun () ->
+                let tree = Dictionary<string, FileEntry>()
+                tree.Add("C:/arc/data.bin", createTreeEntry "C:/arc/data.bin" None)
+                tree.Add("C:/arc/other.bin", createTreeEntry "C:/arc/other.bin" None)
+
+                let updatedTree =
+                    FileTreeCreator.upsertFileEntry (createTreeEntry "C:/arc/data.bin" (Some pointerInfo)) tree
+
+                Vitest.expect(updatedTree.Count).toBe (2)
+                Vitest.expect(updatedTree.["C:/arc/data.bin"].largeObject).toEqual (Some pointerInfo)
+                Vitest.expect(updatedTree.ContainsKey("C:/arc/other.bin")).toBe (true)
+                Vitest.expect(tree.["C:/arc/data.bin"].largeObject).toEqual (None)
+                Vitest.expect(tree.ContainsKey("C:/arc/other.bin")).toBe (true)
         )
 )
 

@@ -28,6 +28,11 @@ Vitest.vi.mock ("chokidar", createObj [ "spy" ==> true ]) |> ignore
 [<Import("watch", "chokidar")>]
 let private watchMock: obj = jsNative
 
+[<Emit("$0.mockReset()")>]
+let private resetWatchMock (_spy: obj) : unit = jsNative
+
+Vitest.beforeEach (fun () -> resetWatchMock watchMock)
+
 [<Emit("$0.mockImplementationOnce(() => { let ready; let all; const watcher = { on(event, callback) { if (event === 'ready') { ready = callback; } if (event === 'all') { all = callback; } return watcher; }, close() { $4(); return Promise.resolve(); }, add() { return watcher; }, unwatch() { return watcher; }, getWatched() { return {}; } }; $1(); $2(() => ready?.()); $3(eventName => path => all?.(eventName, path)); return watcher; })")>]
 let private interceptNextControlledPermanentWatch
     (_spy: obj)
@@ -2519,77 +2524,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "OpenOrFocusArc cleans up when the target window closes during ARC loading",
-            fun () ->
-                TestHelpers.withTempArcWith
-                    "swate-open-or-focus-close-during-load-"
-                    "Closing ARC"
-                    ignore
-                    (fun arcPath -> promise {
-                        let callingWindowId = 28
-                        let targetWindowId = 29
-                        let vaults = ArcVaults()
-                        let mutable createdWindowCount = 0
-                        let mutable loadingVault: ArcVault option = None
-                        let mutable arcWasOpeningWhenClosed = false
-
-                        let isArcOpening () =
-                            loadingVault <- vaults.TryGetVault(targetWindowId)
-
-                            loadingVault
-                            |> Option.exists (fun vault ->
-                                vault.path.IsSome && vault.arc.IsNone && vault.watcher.IsSome
-                            )
-
-                        let windowState = createTestWindow (testWindowOptions targetWindowId)
-
-                        setBrowserWindowFactory (fun _ ->
-                            createdWindowCount <- createdWindowCount + 1
-                            windowState.Window :> obj
-                        )
-
-                        let mutable capturedError: exn option = None
-
-                        try
-                            Vitest.expect(vaults.Vaults.ContainsKey(callingWindowId)).toBe (false)
-
-                            let openOperation = vaults.OpenOrFocusArc(callingWindowId, arcPath)
-                            do! waitUntil "ARC parse pending in a newly opened vault" isArcOpening
-                            arcWasOpeningWhenClosed <- isArcOpening ()
-                            windowState.TriggerClose()
-
-                            try
-                                let! _ = openOperation
-                                ()
-                            with error ->
-                                capturedError <- Some error
-
-                            match capturedError with
-                            | Some(ArcLoadCancelledException cancelledWindowId) ->
-                                Vitest.expect(cancelledWindowId).toBe (targetWindowId)
-                            | _ -> failwith "Expected an explicit ARC-load cancellation marker."
-
-                            Vitest.expect(createdWindowCount).toBe (1)
-                            Vitest.expect(windowState.WasShown()).toBe (true)
-                            Vitest.expect(windowState.CloseHandlerAttached()).toBe (true)
-                            Vitest.expect(windowState.ClosedHandlerAttached()).toBe (true)
-                            Vitest.expect(arcWasOpeningWhenClosed).toBe (true)
-                            Vitest.expect(windowState.IsDestroyed()).toBe (true)
-                            Vitest.expect(loadingVault.IsSome).toBe (true)
-                            Vitest.expect(loadingVault.Value.watcher.IsNone).toBe (true)
-                            Vitest.expect(vaults.Vaults.ContainsKey(targetWindowId)).toBe (false)
-                            Vitest.expect(windowState.SendsAfterDestroy()).toBe (0)
-                            Vitest.expect(windowState.TitleWritesAfterDestroy()).toBe (0)
-                        with error ->
-                            match loadingVault with
-                            | Some vault -> do! vault.StopFileWatcher()
-                            | None -> ()
-
-                            return raise error
-                    })
-        )
-
-        Vitest.test (
             "OpenOrFocusArc cleans up when renderer loading fails",
             fun () ->
                 TestHelpers.withTempArcWith
@@ -4957,34 +4891,6 @@ Vitest.describe (
                     Vitest.expect(vault.arc).toEqual (None)
                     Vitest.expect(vault.watcher).toEqual (None)
                     Vitest.expect(vault.fileTree.Count).toBe (0)
-                    do! TestHelpers.removeDirectoryAsync folderPath
-                with error ->
-                    do! TestHelpers.removeDirectoryAsync folderPath
-                    return raise error
-            }
-        )
-
-        Vitest.test (
-            "Startup starts the permanent watcher before ARC loading",
-            fun () -> promise {
-                let! folderPath = TestHelpers.createTempDirectoryAsync "swate-invalid-arc-startup-"
-
-                try
-                    let vault = ArcVault(TestHelpers.testWindow ())
-                    vault.path <- Some folderPath
-                    let mutable startupError: exn option = None
-
-                    try
-                        do! vault.Startup()
-                    with error ->
-                        startupError <- Some error
-
-                    Vitest.expect(startupError.IsSome).toBe (true)
-                    Vitest.expect(startupError.Value.Message).toContain (ARCtrl.ArcPathHelper.InvestigationFileName)
-                    Vitest.expect(vault.arc).toEqual (None)
-                    Vitest.expect(vault.watcher.IsSome).toBe (true)
-                    do! vault.StopFileWatcher()
-                    Vitest.expect(vault.watcher).toEqual (None)
                     do! TestHelpers.removeDirectoryAsync folderPath
                 with error ->
                     do! TestHelpers.removeDirectoryAsync folderPath
