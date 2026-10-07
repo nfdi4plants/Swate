@@ -78,12 +78,18 @@ type SettingsPage =
             Html.div [
                 prop.className "swt:join"
                 prop.children [
-                    Html.input [
-                        prop.className [ "swt:input swt:join-item" ]
-                        prop.onChange (fun (newValue: int) -> setCurrentUiScaling newValue)
-                        prop.type'.number
-                        prop.defaultValue uiScaling
-                        prop.step 5
+                    Html.label [
+                        prop.className "swt:join-item swt:input"
+                        prop.children [
+                            Html.input [
+                                prop.className "swt:w-16"
+                                prop.onChange (fun (newValue: int) -> setCurrentUiScaling newValue)
+                                prop.type'.number
+                                prop.defaultValue uiScaling
+                                prop.step 5
+                            ]
+                            Html.text "%"
+                        ]
                     ]
                     Html.div [
                         prop.text "Update"
