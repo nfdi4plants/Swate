@@ -25,6 +25,13 @@ open IPCTypesHelper
 
 type CreateArcRequest = { identifier: string; initGit: bool }
 
+/// Two Way Bridge: Renderer <-> Main
+type IUiSettingsApi = {
+    /// Persists a finite positive scale globally and applies it to all windows. 1.0 = 100%.
+    setUiScale: float -> JS.Promise<Result<unit, exn>>
+    getUiScale: unit -> JS.Promise<float>
+}
+
 [<RequireQualifiedAccess>]
 type CreateArcOutcome =
     | Created of path: string

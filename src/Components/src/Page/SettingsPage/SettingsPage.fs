@@ -69,7 +69,40 @@ type SettingsPage =
         )
 
     [<ReactComponent>]
-    static member private General(?onAutoCreateNotesFolderEnabled: unit -> unit) =
+    static member private UIScalingSetting(uiScaling: int, onUIScaling: int -> unit) =
+
+        let currentUiScaling, setCurrentUiScaling = React.useState uiScaling
+
+        SettingsPage.SettingColumnElement(
+            "UI Scaling",
+            Html.div [
+                prop.className "swt:join"
+                prop.children [
+                    Html.input [
+                        prop.className [ "swt:input swt:join-item" ]
+                        prop.onChange (fun (newValue: int) -> setCurrentUiScaling newValue)
+                        prop.type'.number
+                        prop.defaultValue uiScaling
+                        prop.step 5
+                    ]
+                    Html.div [
+                        prop.text "Update"
+                        prop.className "swt:join-item swt:btn"
+                        prop.onClick (fun _ -> onUIScaling currentUiScaling)
+                    ]
+                ]
+            ],
+            description =
+                Html.p [
+                    prop.className "swt:mt-1 swt:text-sm swt:text-base-content/70"
+                    prop.text "Allows adjusting the scaling of the user interface. 100% represents the default size."
+                ]
+        )
+
+    [<ReactComponent>]
+    static member private General
+        (?onAutoCreateNotesFolderEnabled: unit -> unit, ?uiScaling: int, ?onUIScaling: int -> unit)
+        =
         let onAutoCreateNotesFolderEnabled =
             defaultArg onAutoCreateNotesFolderEnabled ignore
 
@@ -88,6 +121,10 @@ type SettingsPage =
                 )
 
                 SettingsPage.AutoCreateNotesFolderSetting(onEnabled = onAutoCreateNotesFolderEnabled)
+
+                match onUIScaling, uiScaling with
+                | Some onUIScaling, Some uiScaling -> SettingsPage.UIScalingSetting(uiScaling, onUIScaling)
+                | _, _ -> Html.none
             ]
         )
 
@@ -107,12 +144,18 @@ type SettingsPage =
         )
 
     [<ReactComponent>]
-    static member SettingsPage(?onAutoCreateNotesFolderEnabled: unit -> unit) =
+    static member SettingsPage
+        (?onAutoCreateNotesFolderEnabled: unit -> unit, ?uiScaling: int, ?onUIScaling: int -> unit)
+        =
         let onAutoCreateNotesFolderEnabled =
             defaultArg onAutoCreateNotesFolderEnabled ignore
 
         LayoutComponents.Section [
-            SettingsPage.General(onAutoCreateNotesFolderEnabled = onAutoCreateNotesFolderEnabled)
+            SettingsPage.General(
+                onAutoCreateNotesFolderEnabled = onAutoCreateNotesFolderEnabled,
+                ?uiScaling = uiScaling,
+                ?onUIScaling = onUIScaling
+            )
 
             SettingsPage.SearchConfig()
 
