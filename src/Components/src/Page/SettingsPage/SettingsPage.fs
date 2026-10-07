@@ -70,8 +70,9 @@ type SettingsPage =
 
     [<ReactComponent>]
     static member private UIScalingSetting(uiScaling: int, onUIScaling: int -> unit) =
+        let scalingDraft, setScalingDraft = React.useState uiScaling
 
-        let currentUiScaling, setCurrentUiScaling = React.useState uiScaling
+        React.useEffect ((fun () -> setScalingDraft uiScaling), [| box uiScaling |])
 
         SettingsPage.SettingColumnElement(
             "UI Scaling",
@@ -83,9 +84,9 @@ type SettingsPage =
                         prop.children [
                             Html.input [
                                 prop.className "swt:w-16"
-                                prop.onChange (fun (newValue: int) -> setCurrentUiScaling newValue)
+                                prop.onChange setScalingDraft
                                 prop.type'.number
-                                prop.defaultValue uiScaling
+                                prop.value scalingDraft
                                 prop.step 5
                             ]
                             Html.text "%"
@@ -94,7 +95,7 @@ type SettingsPage =
                     Html.div [
                         prop.text "Update"
                         prop.className "swt:join-item swt:btn"
-                        prop.onClick (fun _ -> onUIScaling currentUiScaling)
+                        prop.onClick (fun _ -> onUIScaling scalingDraft)
                     ]
                 ]
             ],
@@ -128,8 +129,8 @@ type SettingsPage =
 
                 SettingsPage.AutoCreateNotesFolderSetting(onEnabled = onAutoCreateNotesFolderEnabled)
 
-                match onUIScaling, uiScaling with
-                | Some onUIScaling, Some uiScaling -> SettingsPage.UIScalingSetting(uiScaling, onUIScaling)
+                match uiScaling, onUIScaling with
+                | Some uiScaling, Some onUIScaling -> SettingsPage.UIScalingSetting(uiScaling, onUIScaling)
                 | _, _ -> Html.none
             ]
         )

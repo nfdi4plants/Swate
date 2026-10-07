@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Fable.Electron.Main
+open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 
 [<Literal>]
 let private settingsFileName = "ui-scale.json"
@@ -36,9 +37,12 @@ let getScale () =
         currentScale <- Some scale
         scale
 
-let applyToWindow (window: BrowserWindow) =
+let private applyScaleToWindow (scale: float) (window: BrowserWindow) =
     if not (window.isDestroyed ()) && not (window.webContents.isDestroyed ()) then
-        window.webContents.setZoomFactor (getScale ())
+        window.webContents.setZoomFactor scale
+        WindowSend.send<IUiSettingsRendererApi> window (fun api -> api.uiScaleChanged scale)
+
+let applyToWindow (window: BrowserWindow) = applyScaleToWindow (getScale ()) window
 
 let setScale (scale: float) : Result<unit, exn> =
     if not (isValidScale scale) then
@@ -49,7 +53,7 @@ let setScale (scale: float) : Result<unit, exn> =
             | Error message -> Error(exn message)
             | Ok() ->
                 currentScale <- Some scale
-                BrowserWindow.getAllWindows () |> Array.iter applyToWindow
+                BrowserWindow.getAllWindows () |> Array.iter (applyScaleToWindow scale)
                 Ok()
         with error ->
             Error error
@@ -98,4 +102,17 @@ let registerWindow (window: BrowserWindow) =
             match adjustScale delta with
             | Ok() -> ()
             | Error error -> eprintfn "Could not adjust UI scale: %s" error.Message
+    )
+
+    window.webContents.onZoomChanged (fun event direction ->
+        event.preventDefault ()
+
+        let delta =
+            match direction with
+            | Enums.WebContents.ZoomChanged.ZoomDirection.In -> 5
+            | Enums.WebContents.ZoomChanged.ZoomDirection.Out -> -5
+
+        match adjustScale delta with
+        | Ok() -> ()
+        | Error error -> eprintfn "Could not adjust UI scale: %s" error.Message
     )

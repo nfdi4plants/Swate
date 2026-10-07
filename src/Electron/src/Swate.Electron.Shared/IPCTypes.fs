@@ -200,6 +200,8 @@ module MainToRendererIpc =
         arcUnsavedChangesUpdate: bool -> unit
     }
 
+    type IUiSettingsRendererApi = { uiScaleChanged: float -> unit }
+
 // TODO: What should filewatcher do when detecting changes?
 /// One Way Bridge: Main -> Renderer
 type IArcFileWatcherApi = {
