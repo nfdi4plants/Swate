@@ -595,7 +595,7 @@ let private createTestWindow options =
     }
 
 let private waitUntilAttemptLimit = 15000
-let private waitUntilPollingIntervalMs = 1
+let private waitUntilPollingIntervalMs = 15
 
 let rec private waitUntilWithin phase predicate remaining = promise {
     if predicate () then
