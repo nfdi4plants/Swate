@@ -19,6 +19,7 @@
   <ItemGroup>
     <Content Include="@(Compile)" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
     <Compile Include="PathHelpers.fs" />
+    <Compile Include="PathChildrenIndex.fs" />
     <Compile Include="GitLfsRules.fs" />
     <Compile Include="Database.fs" />
     <Compile Include="ARCtrl\DataMapCopyWorkaround.fs" />

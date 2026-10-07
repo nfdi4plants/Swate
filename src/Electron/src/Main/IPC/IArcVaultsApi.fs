@@ -32,6 +32,11 @@ let private refreshVaultFileTree (vault: ArcVault) = promise {
     | None -> ()
 }
 
+let private parentDirectoryPath relativePath =
+    PathHelpers.normalizeCanonicalRelativePath relativePath
+    |> PathHelpers.tryGetParentPath
+    |> Option.defaultValue ""
+
 let private withLoadedArcVault<'T>
     (event: IpcMainInvokeEvent)
     (operation: ArcVault -> JS.Promise<Result<'T, exn>>)
@@ -558,9 +563,18 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                         request.targetRelativePath
                                                         sourceAbsolutePaths
 
+                                                let watchedImportedEvents =
+                                                    importedEvents
+                                                    |> Array.filter (fun importedEvent ->
+                                                        isStructuralFileWatcherPath
+                                                            vault.path.Value
+                                                            importedEvent.AbsolutePath
+                                                            None
+                                                    )
+
                                                 // Chokidar's awaitWriteFinish can emit these well after the import
                                                 // releases the busy flag, so ownership must outlive the write itself.
-                                                importedEvents
+                                                watchedImportedEvents
                                                 |> Array.iter (fun event ->
                                                     vault.importedFileWatcherPaths.Add(
                                                         PathHelpers.normalizePath (
@@ -571,7 +585,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                 )
 
                                                 let releaseImportEventOwnership () =
-                                                    importedEvents
+                                                    watchedImportedEvents
                                                     |> Array.iter (fun event ->
                                                         vault.importedFileWatcherPaths.Remove(
                                                             PathHelpers.normalizePath (
@@ -616,7 +630,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                     |> Promise.catch Error
 
                                                 match result with
-                                                | Ok ImportExternalFilesResult.Completed -> ()
+                                                | Ok ImportExternalFilesResult.Completed ->
+                                                    do! vault.RefreshFileTreeDirectory request.targetRelativePath
                                                 | _ -> releaseImportEventOwnership ()
 
                                                 vault.window.setProgressBar -1.0
@@ -669,6 +684,19 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 | Some vault ->
                     let! fileTree = vault.GetRendererFileTreeSnapshot()
                     return Ok fileTree
+            with e ->
+                return Error e
+        }
+    refreshFileTreeDirectory =
+        fun relativeDirectoryPath -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            do! vault.RefreshFileTreeDirectory relativeDirectoryPath
+                            return Ok()
+                        })
             with e ->
                 return Error e
         }
@@ -776,7 +804,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     withLoadedArcVault
                         event
                         (fun vault -> promise {
-                            return! ArcFileSystemHelper.createFileSystemItemOnDisk vault.path.Value request
+                            match! ArcFileSystemHelper.createFileSystemItemOnDisk vault.path.Value request with
+                            | Error createError -> return Error createError
+                            | Ok createdPath ->
+                                do! vault.RefreshFileTreeDirectory request.parentPath
+                                return Ok createdPath
                         })
             with e ->
                 return Error e
@@ -846,7 +878,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                         Main.Bindings.Path.join [| arcPath; normalizedDataMapPath |]
 
                                                     vault.SetFileTree(
-                                                        removePathAndDescendants absoluteDataMapPath vault.fileTree
+                                                        removePathAndDescendants
+                                                            absoluteDataMapPath
+                                                            (vault.fileTree.CopySnapshot())
                                                     )
 
                                                     return Ok()
@@ -861,10 +895,16 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                 "Deletion is only allowed for safe non-ARC filesystem items inside the ARC."
                                         )
                                 else
-                                    return!
+                                    match!
                                         ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk
                                             arcPath
                                             normalizedGenericPath
+                                    with
+                                    | Error deleteError -> return Error deleteError
+                                    | Ok() ->
+                                        do! vault.RefreshFileTreeDirectory(parentDirectoryPath normalizedGenericPath)
+
+                                        return Ok()
                             | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.InvestigationFile,
                                                                                               _) ->
                                 return Error(exn "Deleting the investigation file is not supported.")
@@ -895,7 +935,12 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                             match ArcEntityPathRules.classifyRenameTarget request.relativePath with
                             | ArcEntityPathRules.RenamePathClassification.GenericTarget _ ->
-                                return! ArcFileSystemHelper.renameGenericFileSystemItemOnDisk arcPath request
+                                match! ArcFileSystemHelper.renameGenericFileSystemItemOnDisk arcPath request with
+                                | Error renameError -> return Error renameError
+                                | Ok() ->
+                                    do! vault.RefreshFileTreeDirectory(parentDirectoryPath request.relativePath)
+
+                                    return Ok()
                             | _ ->
                                 match vault.arc with
                                 | None -> return Error(arcNotOpenError ())
@@ -924,7 +969,17 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     withLoadedArcVault
                         event
                         (fun vault -> promise {
-                            return! ArcFileSystemHelper.moveGenericFileSystemItemOnDisk vault.path.Value request
+                            match! ArcFileSystemHelper.moveGenericFileSystemItemOnDisk vault.path.Value request with
+                            | Error moveError -> return Error moveError
+                            | Ok() ->
+                                let sourceParent = parentDirectoryPath request.sourceRelativePath
+                                let targetParent = parentDirectoryPath request.targetRelativePath
+                                do! vault.RefreshFileTreeDirectory sourceParent
+
+                                if targetParent <> sourceParent then
+                                    do! vault.RefreshFileTreeDirectory targetParent
+
+                                return Ok()
                         })
             with e ->
                 return Error e
@@ -977,7 +1032,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                                             do! ARCtrl.FileSystemHelper.writeFileTextAsync absolutePath request.content
 
-                                            do! refreshVaultFileTree vault
+                                            do! vault.RefreshFileTreeDirectory(parentDirectoryPath request.path)
                                             return Ok()
                                         | FileContentType.CLI ->
                                             return Error(exn "Direct writing of CLI files is not supported.")

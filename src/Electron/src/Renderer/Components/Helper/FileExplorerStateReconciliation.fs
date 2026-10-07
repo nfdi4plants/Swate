@@ -5,16 +5,10 @@ open Swate.Electron.Shared.FileIOTypes
 open Renderer.Types
 open Swate.Components.Page.ArcFileEditor.Types
 
-let containsPath (paths: string seq) (relativePath: string) =
-    let normalizedTargetPath = PathHelpers.normalizePath relativePath
-
-    paths
-    |> Seq.exists (fun path -> PathHelpers.pathsEqual (PathHelpers.normalizePath path) normalizedTargetPath)
-
-let isSelectionMissing (paths: string seq) (selectionPath: string option) =
+let isSelectionMissing (tryFindEntry: string -> FileEntry option) (selectionPath: string option) =
     selectionPath
     |> Option.map PathHelpers.normalizePath
-    |> Option.exists (fun selectedPath -> containsPath paths selectedPath |> not)
+    |> Option.exists (tryFindEntry >> Option.isNone)
 
 let private resetsWhenSelectionIsRemoved =
     function
@@ -28,14 +22,17 @@ let private resetsWhenSelectionIsRemoved =
 let shouldResetPageStateAfterSelectionRemoval (pageState: PageState option) =
     pageState |> Option.exists resetsWhenSelectionIsRemoved
 
-let tryGetDataMapMismatchReload (fileTree: FileEntry[]) (pageState: PageState option) =
+let tryGetDataMapMismatchReload (tryFindEntry: string -> FileEntry option) (pageState: PageState option) =
     match pageState with
     | Some(PageState.ArcFilePage(ArcFiles.DataMap _, _)) -> None
     | Some(PageState.ArcFilePage(arcFile, requestedView)) ->
         match arcFile.TryGetDataMapParentInfo() with
         | Some parentInfo ->
             let treeHasDataMap =
-                containsPath (fileTree |> Array.map _.path) (DatamapParentInfo.toPath parentInfo)
+                DatamapParentInfo.toPath parentInfo
+                |> PathHelpers.normalizePath
+                |> tryFindEntry
+                |> Option.isSome
 
             let pageHasDataMap = arcFile.TryGetDataMap().IsSome
 
@@ -76,32 +73,27 @@ let private shouldReloadSelectedFile pageState entry =
         | Some state -> reloadsWhenSelectedFileChanges state
         | None -> isCheckedOutLfsFile entry
 
-let private tryFindSelectedFileEntry (fileTree: FileEntry[]) (selectionPath: string option) =
+let private tryFindSelectedFileEntry (tryFindEntry: string -> FileEntry option) (selectionPath: string option) =
     selectionPath
     |> Option.map PathHelpers.normalizePath
-    |> Option.bind (fun selectedPath ->
-        fileTree
-        |> Array.tryFind (fun entry ->
-            not entry.isDirectory
-            && PathHelpers.pathsEqual (PathHelpers.normalizePath entry.path) selectedPath
-        )
-    )
+    |> Option.bind tryFindEntry
+    |> Option.filter (fun entry -> not entry.isDirectory)
 
 let shouldClearPageStateForLfsPointerSelection
-    (fileTree: FileEntry[])
+    (tryFindEntry: string -> FileEntry option)
     (selectionPath: string option)
     (pageState: PageState option)
     =
     pageState |> Option.exists resetsWhenSelectionIsRemoved
-    && (tryFindSelectedFileEntry fileTree selectionPath
+    && (tryFindSelectedFileEntry tryFindEntry selectionPath
         |> Option.exists isPointerLfsFile)
 
 let tryGetReloadableSelectedFilePath
-    (fileTree: FileEntry[])
+    (tryFindEntry: string -> FileEntry option)
     (selectionPath: string option)
     (pageState: PageState option)
     =
-    tryFindSelectedFileEntry fileTree selectionPath
+    tryFindSelectedFileEntry tryFindEntry selectionPath
     |> Option.bind (fun entry ->
         if shouldReloadSelectedFile pageState entry then
             Some(PathHelpers.normalizePath entry.path)

@@ -8,24 +8,60 @@ open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Main.VersionControl
 open Swate.Components.Shared
+open Swate.Components.Shared.PathChildrenIndex
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.VersionControlTypes
 open VersionControlService.Abstractions
 
-let normalizeRootPath (path: string) =
-    resolve [| path |] |> PathHelpers.normalizePath
+
+/// Keeps main-process FileTree entries and their path index synchronized.
+type IndexedFileTree(entries: Dictionary<string, FileEntry>) =
+    let children = PathChildrenIndex()
+    do children.Rebuild entries.Keys
+
+    new() = IndexedFileTree(Dictionary<string, FileEntry>())
+
+    member _.Count = entries.Count
+
+    member _.Values = entries.Values
+
+    member _.ContainsKey(path: string) = entries.ContainsKey path
+
+    member _.TryGetValue(path: string) = entries.TryGetValue path
+
+    /// Creates a mutable working snapshot for an explicit replacement operation.
+    member _.CopySnapshot() = Dictionary<string, FileEntry>(entries)
+
+    member _.GetKnownDirectChildren(directoryPath: string) =
+        children.GetDirectChildPaths directoryPath
+        |> Seq.choose (fun childPath ->
+            match entries.TryGetValue childPath with
+            | true, entry -> Some(childPath, entry)
+            | false, _ -> None
+        )
+        |> Map.ofSeq
+
+    member _.CollectSubtreePaths(rootPaths: seq<string>) = children.CollectSubtreePaths rootPaths
+
+    member _.ApplyChanges(removedPaths: string[], upsertedEntries: FileEntry[]) =
+        removedPaths |> Array.iter (fun path -> entries.Remove(path) |> ignore)
+        upsertedEntries |> Array.iter (fun entry -> entries.[entry.path] <- entry)
+        removedPaths |> Seq.iter children.Remove
+        upsertedEntries |> Seq.iter (fun entry -> children.Add entry.path)
+
+    member _.ReplaceSnapshot(snapshot: Dictionary<string, FileEntry>) =
+        if not (System.Object.ReferenceEquals(entries, snapshot)) then
+            entries.Clear()
+            snapshot |> Seq.iter (fun pair -> entries.[pair.Key] <- pair.Value)
+
+        children.Rebuild entries.Keys
+
+    member _.Clear() =
+        entries.Clear()
+        children.Rebuild entries.Keys
 
 let private shouldIgnoreDirName (name: string) = name = ".git"
-
-let private shouldIgnorePath (path: string) =
-    let normalizedPath = PathHelpers.normalizeSeparators path
-    let tempXlsxPattern = """\.~\$.*\.xlsx$"""
-    let temporaryLfsBackupPattern = """\.vcs-lfs-backup-[0-9a-fA-F]{32}$"""
-
-    System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
-    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
-    || isLegacyDataMapPath normalizedPath
 
 let private tryListLargeObjects
     (repoRoot: string)
@@ -174,8 +210,120 @@ let refreshFileTreeEntry
         return upsertFileEntry entry fileTree
     }
 
+/// Reconciles only the immediate children of one ARC-relative directory.
+/// Returns None when the current snapshot already matches disk.
+let reconcileFileTreeDirectory
+    (arcPath: string)
+    (relativeDirectoryPath: string)
+    (fileTree: IndexedFileTree)
+    : Fable.Core.JS.Promise<FileTreeDirectoryUpdate option> =
+    promise {
+        let normalizedArcPath = resolve [| arcPath |] |> PathHelpers.normalizePath
+
+        let normalizedRelativePath =
+            PathHelpers.normalizeCanonicalRelativePath relativeDirectoryPath
+
+        let absoluteDirectoryPath =
+            resolve [| normalizedArcPath; normalizedRelativePath |]
+            |> PathHelpers.normalizePath
+
+        let resolvedRelativePath =
+            tryGetRepoRelativePathOrRoot normalizedArcPath absoluteDirectoryPath
+
+        if
+            PathHelpers.containsPathTraversalSegments normalizedRelativePath
+            || isAbsolute normalizedRelativePath
+            || resolvedRelativePath <> Some normalizedRelativePath
+        then
+            return raise (exn $"Directory '{relativeDirectoryPath}' is outside the open ARC.")
+        else
+            let! directoryStats = statAsync absoluteDirectoryPath
+
+            if not (directoryStats.isDirectory ()) then
+                return raise (exn $"Path '{relativeDirectoryPath}' is not a directory.")
+            else
+                let! dirents = readdirWithTypesAsync absoluteDirectoryPath (ReaddirOptions(withFileTypes = true))
+
+                let diskChildren =
+                    dirents
+                    |> Array.filter (fun dirent ->
+                        not (shouldIgnoreDirName dirent.name)
+                        && not (isIgnoredArcInventoryPath (join [| absoluteDirectoryPath; dirent.name |]))
+                    )
+                    |> Array.map (fun dirent ->
+                        let childPath =
+                            join [| absoluteDirectoryPath; dirent.name |] |> PathHelpers.normalizePath
+
+                        childPath, FileEntry.create (dirent.name, childPath, dirent.isDirectory (), None)
+                    )
+                    |> Map.ofArray
+
+                let knownDirectChildren = fileTree.GetKnownDirectChildren absoluteDirectoryPath
+
+                let hasRemovedChildren =
+                    knownDirectChildren
+                    |> Map.exists (fun path _ -> not (Map.containsKey path diskChildren))
+
+                let reconciledDiskChildren =
+                    diskChildren
+                    |> Map.map (fun path diskEntry ->
+                        match Map.tryFind path knownDirectChildren with
+                        | Some knownEntry when not diskEntry.isDirectory -> {
+                            diskEntry with
+                                largeObject = knownEntry.largeObject
+                          }
+                        | _ -> diskEntry
+                    )
+
+                let upsertedEntries =
+                    reconciledDiskChildren
+                    |> Map.toArray
+                    |> Array.choose (fun (path, reconciledEntry) ->
+                        match Map.tryFind path knownDirectChildren with
+                        | Some knownEntry when knownEntry = reconciledEntry -> None
+                        | _ -> Some reconciledEntry
+                    )
+
+                let hasAddedOrChangedChildren = upsertedEntries.Length > 0
+
+                if not hasRemovedChildren && not hasAddedOrChangedChildren then
+                    return None
+                else
+                    let missingFilePaths = ResizeArray<string>()
+
+                    let directChildDirectoryRemovalRoots = HashSet<string>()
+
+                    knownDirectChildren
+                    |> Map.iter (fun childPath knownEntry ->
+                        match Map.tryFind childPath diskChildren with
+                        | None when knownEntry.isDirectory -> directChildDirectoryRemovalRoots.Add childPath |> ignore
+                        | None -> missingFilePaths.Add childPath
+                        | Some diskEntry when knownEntry.isDirectory && not diskEntry.isDirectory ->
+                            directChildDirectoryRemovalRoots.Add childPath |> ignore
+                        | Some _ -> ()
+                    )
+
+                    let subtreeRemovalKeys =
+                        fileTree.CollectSubtreePaths directChildDirectoryRemovalRoots
+
+                    let removedPaths = Array.append (missingFilePaths.ToArray()) subtreeRemovalKeys
+                    fileTree.ApplyChanges(removedPaths, upsertedEntries)
+
+                    return
+                        Some {
+                            directoryPath = normalizedRelativePath
+                            children =
+                                reconciledDiskChildren.Values
+                                |> Seq.choose (fun entry ->
+                                    tryGetRepoRelativePath normalizedArcPath entry.path
+                                    |> Option.map (fun relativePath -> { entry with path = relativePath })
+                                )
+                                |> Seq.toArray
+                        }
+    }
+
 let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
-    let normalizedRepoRoot = normalizeRootPath repoRoot
+    let normalizedRepoRoot = resolve [| repoRoot |] |> PathHelpers.normalizePath
     let! entry = getFileEntry path
 
     if entry.isDirectory then
@@ -191,8 +339,7 @@ let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
 
 /// Finds all files and subfolders of the given filepath
 let getFileEntries (path: string) (openSession: bool) : Fable.Core.JS.Promise<FileEntry[]> = promise {
-    let repoRoot = normalizeRootPath path
-
+    let repoRoot = resolve [| path |] |> PathHelpers.normalizePath
     let! rootStats = statAsync repoRoot
     let rootIsDir = rootStats.isDirectory ()
 
@@ -227,7 +374,7 @@ let getFileEntries (path: string) (openSession: bool) : Fable.Core.JS.Promise<Fi
                 else
                     let fullPath = join [| currentDir; name |] |> PathHelpers.normalizeSeparators
 
-                    if not (shouldIgnorePath fullPath) then
+                    if not (isIgnoredArcInventoryPath fullPath) then
                         entries.Add(FileEntry.create (name, fullPath, false, None))
             )
 

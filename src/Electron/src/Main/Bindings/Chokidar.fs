@@ -3,6 +3,7 @@ module Main.Bindings.Chokidar
 
 open Fable.Core
 open Fable.Core.JS
+open Main.Bindings.Filesystem
 
 [<StringEnum(CaseRules.LowerFirst)>]
 type Events =
@@ -21,7 +22,7 @@ type Events =
 type WatchOptions
     (
         ?persistent: bool,
-        ?ignored: U3<string, ResizeArray<string>, string -> bool>,
+        ?ignored: U4<string, ResizeArray<string>, (string -> bool), System.Func<string, Stats option, bool>>,
         ?ignoreInitial: bool,
         ?followSimlinks: bool,
         ?cwd: string,
@@ -52,6 +53,13 @@ type IWatcher =
     abstract member unwatch: paths: string[] -> Promise<unit>
     abstract member on: eventName: Events * callback: (string -> unit) -> IWatcher
     abstract member on: eventName: Events * callback: (string -> string -> unit) -> IWatcher
+
+    [<Emit("$0.on('ready', $1)")>]
+    abstract member onReady: callback: (unit -> unit) -> IWatcher
+
+    [<Emit("$0.on('error', $1)")>]
+    abstract member onError: callback: (obj -> unit) -> IWatcher
+
     abstract member getWatched: unit -> IWatched
 
 

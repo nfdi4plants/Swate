@@ -14,5 +14,5 @@ let tryBuildRenameDraft (item: FileItem) : Result<ArcRenameDraft, string> =
             Ok {
                 Item = item
                 SourcePath = sourcePath
-                InitialName = PathHelpers.getNameFromPath sourcePath
+                InitialName = PathHelpers.getFileName sourcePath
             }

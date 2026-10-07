@@ -84,9 +84,6 @@ module PathHelpers =
     let pathMatchesAny (candidates: string seq) (path: string) =
         candidates |> Seq.exists (fun candidate -> pathsEqual candidate path)
 
-    let getNameFromPath (path: string) =
-        normalizePath path |> (fun normalized -> normalized.Split('/')) |> Array.last
-
     let tryGetParentPath (path: string) =
         let normalizedPath = normalizePath path
         let separatorIndex = normalizedPath.LastIndexOf('/')
@@ -463,6 +460,20 @@ module ArcEntityPathRules =
                         RenamePathClassification.InvestigationFileTarget normalizedRelativePath
                     else
                         RenamePathClassification.GenericTarget normalizedRelativePath
+
+    /// True for paths owned by the permanent bounded ARC structural watcher.
+    /// A missing directory hint is treated conservatively only for known structural path shapes.
+    let isStructuralWatcherPath (relativePath: string) (isDirectory: bool option) =
+        let normalizedRelativePath = normalizeRelativePath relativePath
+
+        match classifyRenameTarget normalizedRelativePath with
+        | RenamePathClassification.RootTarget -> true
+        | RenamePathClassification.InvestigationFileTarget _ -> isDirectory <> Some true
+        | RenamePathClassification.AddZoneRootTarget _
+        | RenamePathClassification.EntityFolderTarget _ -> isDirectory <> Some false
+        | RenamePathClassification.CanonicalEntityFileTarget _
+        | RenamePathClassification.CanonicalDataMapFileTarget _ -> isDirectory <> Some true
+        | _ -> false
 
     let isRenamePathAllowed (relativePath: string) =
         match classifyRenameTarget relativePath with

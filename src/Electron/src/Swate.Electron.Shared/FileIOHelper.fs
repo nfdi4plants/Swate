@@ -21,6 +21,15 @@ let isLegacyDataMapPath (path: string) =
     |> Array.tryLast
     |> Option.exists (fun fileName -> String.Equals(fileName, "isa_datamap", StringComparison.OrdinalIgnoreCase))
 
+let isIgnoredArcInventoryPath (path: string) =
+    let normalizedPath = PathHelpers.normalizeSeparators path
+    let tempXlsxPattern = """\.~\$.*\.xlsx$"""
+    let temporaryLfsBackupPattern = """\.vcs-lfs-backup-[0-9a-fA-F]{32}$"""
+
+    System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
+    || System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, temporaryLfsBackupPattern)
+    || isLegacyDataMapPath normalizedPath
+
 let isRootFolderPath (rootFolderName: string) (candidateRelativePath: string) =
     match getNonEmptyPathParts candidateRelativePath with
     | [| candidateRoot |] -> pathsEqual rootFolderName candidateRoot

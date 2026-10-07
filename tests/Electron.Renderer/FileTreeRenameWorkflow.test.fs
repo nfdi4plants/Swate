@@ -77,7 +77,7 @@ Vitest.describe (
 
                 protectedChildFolderPaths
                 |> List.iter (fun path ->
-                    let item = createFolderItem (PathHelpers.getNameFromPath path) path
+                    let item = createFolderItem (PathHelpers.getFileName path) path
 
                     match tryBuildRenameDraft item with
                     | Ok _ -> failwith $"Expected native structural child folder '{path}' to be non-renameable."
@@ -193,7 +193,7 @@ Vitest.describe (
 
                 entityFolderPaths
                 |> List.iter (fun path ->
-                    let item = createFolderItem (PathHelpers.getNameFromPath path) path
+                    let item = createFolderItem (PathHelpers.getFileName path) path
                     expectRenameMenuVisibility 1 item
                 )
         )
@@ -214,7 +214,7 @@ Vitest.describe (
 
                 canonicalFilePaths
                 |> List.iter (fun path ->
-                    let item = createFileItem (PathHelpers.getNameFromPath path) path
+                    let item = createFileItem (PathHelpers.getFileName path) path
                     expectRenameMenuVisibility 0 item
                 )
         )
@@ -243,7 +243,7 @@ Vitest.describe (
 
                 protectedChildFolderPaths
                 |> List.iter (fun path ->
-                    let item = createFolderItem (PathHelpers.getNameFromPath path) path
+                    let item = createFolderItem (PathHelpers.getFileName path) path
                     expectRenameMenuVisibility 0 item
                 )
         )
@@ -273,7 +273,7 @@ Vitest.describe (
 
                 unsafePaths
                 |> List.iter (fun path ->
-                    let item = createFileItem (PathHelpers.getNameFromPath path) path
+                    let item = createFileItem (PathHelpers.getFileName path) path
                     expectRenameMenuVisibility 0 item
                 )
         )
@@ -322,7 +322,7 @@ Vitest.describe (
 
                 let items =
                     entityFolderPaths
-                    |> List.map (fun path -> createFolderItem (PathHelpers.getNameFromPath path) path)
+                    |> List.map (fun path -> createFolderItem (PathHelpers.getFileName path) path)
 
                 let mutable renamedPaths: string list = []
 
@@ -341,7 +341,7 @@ Vitest.describe (
                 try
                     entityFolderPaths
                     |> List.iter (fun path ->
-                        let itemName = PathHelpers.getNameFromPath path
+                        let itemName = PathHelpers.getFileName path
                         let buttonSelector = $"button[aria-label='Rename {itemName}']"
                         let renameButton = container.querySelector buttonSelector
 
@@ -352,6 +352,41 @@ Vitest.describe (
                     do! Promise.sleep 0
 
                     Vitest.expect(renamedPaths |> List.rev).toEqual (entityFolderPaths)
+                finally
+                    cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "an unmaterialized empty directory can request refresh on expansion and still collapse locally",
+            fun () -> promise {
+                let item = createFolderItem "payload" "studies/S1/dataset/payload"
+                let expansionChanges = ResizeArray<bool>()
+
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.Page.FileExplorer.FileExplorer.FileExplorer(
+                            initialItems = [ item ],
+                            onDirectoryExpansionChange =
+                                (fun expandedItem willExpand ->
+                                    Vitest.expect(expandedItem.Path).toEqual (item.Path)
+                                    expansionChanges.Add willExpand
+                                )
+                        )
+                    )
+
+                try
+                    let expandButton = container.querySelector "button[aria-label='Expand payload']"
+                    Vitest.expect(expandButton).not.toBeNull ()
+                    (expandButton :?> HTMLElement).click ()
+                    do! Promise.sleep 0
+
+                    let collapseButton = container.querySelector "button[aria-label='Collapse payload']"
+                    Vitest.expect(collapseButton).not.toBeNull ()
+                    (collapseButton :?> HTMLElement).click ()
+                    do! Promise.sleep 0
+
+                    Vitest.expect(expansionChanges.ToArray()).toEqual ([| true; false |])
                 finally
                     cleanup ()
             }

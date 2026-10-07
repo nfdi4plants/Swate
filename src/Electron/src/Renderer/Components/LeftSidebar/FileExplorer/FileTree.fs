@@ -75,9 +75,7 @@ type FileTree =
             (runAction: string -> JS.Promise<Result<unit, string>>)
             (relativePath: string)
             : JS.Promise<Result<unit, string>> =
-            let entry =
-                fileStateCtx.state.FileTree
-                |> Array.tryFind (fun entry -> PathHelpers.pathsEqual entry.path relativePath)
+            let entry = fileStateCtx.state.TryFindFileTreeEntry relativePath
 
             lfsActivityCtx.run activity entry runAction relativePath
 
@@ -95,10 +93,10 @@ type FileTree =
 
         React.useEffect (
             (fun () ->
-                let filePaths = fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
-
                 if
-                    FileExplorerStateReconciliation.isSelectionMissing filePaths fileStateCtx.state.Selection.TreePath
+                    FileExplorerStateReconciliation.isSelectionMissing
+                        fileStateCtx.state.TryFindFileTreeEntry
+                        fileStateCtx.state.Selection.TreePath
                 then
                     fileStateCtx.setSelection ArcSelection.empty
 
@@ -114,31 +112,37 @@ type FileTree =
             |]
         )
 
-        let treeEntries =
-            React.useMemo (
-                (fun () ->
-                    Renderer.Context.LfsActivityContext.LfsActivityState.withBusyEntries
-                        lfsActivityByPath
-                        fileStateCtx.state.FileTree
-                ),
-                [| box fileStateCtx.state.FileTree; box lfsActivityByPath |]
-            )
-
         let fileTree: FileTreeNode option =
             React.useMemo (
                 (fun () ->
-                    match treeEntries with
-                    | [||] -> None
-                    | _ -> treeEntries |> toFileTreeNode |> collapseSingleChildSameName |> Some
+                    if lfsActivityByPath.IsEmpty then
+                        fileStateCtx.state.FileTreeRoot
+                    else
+                        match
+                            Renderer.Context.LfsActivityContext.LfsActivityState.withBusyEntries
+                                lfsActivityByPath
+                                (fileStateCtx.state.FileTree |> Seq.toArray)
+                        with
+                        | [||] -> None
+                        | entries -> entries |> toFileTreeNode |> collapseSingleChildSameName |> Some
                 ),
-                [| box treeEntries |]
+                [|
+                    box fileStateCtx.state.FileTreeRoot
+                    box fileStateCtx.state.FileTree
+                    box lfsActivityByPath
+                |]
             )
 
         let materializedState, setMaterializedState =
             React.useStateWithUpdater FileTreeMaterialization.empty
 
         let reconciledMaterializedState =
-            reconcileMaterializedState arcScopeId fileStateCtx.state.Selection.TreePath fileTree materializedState
+            reconcileMaterializedState
+                arcScopeId
+                fileStateCtx.state.Selection.TreePath
+                fileTree
+                fileStateCtx.state.IsFileTreeDirectory
+                materializedState
 
         React.useEffect (
             (fun () ->
@@ -173,7 +177,6 @@ type FileTree =
                     )
                     reconciledMaterializedState.Paths
                     parent
-                    true
             )
 
         let applyPreviewResult itemName result =
@@ -260,7 +263,7 @@ type FileTree =
                 if hasObservedFileTreeUpdateRef.current then
                     match
                         FileExplorerStateReconciliation.tryGetDataMapMismatchReload
-                            fileStateCtx.state.FileTree
+                            fileStateCtx.state.TryFindFileTreeEntry
                             pageStateCtx.state
                     with
                     | Some(parentPath, requestedView) ->
@@ -273,7 +276,7 @@ type FileTree =
                             )
                     | None when
                         FileExplorerStateReconciliation.shouldClearPageStateForLfsPointerSelection
-                            fileStateCtx.state.FileTree
+                            fileStateCtx.state.TryFindFileTreeEntry
                             fileStateCtx.state.Selection.TreePath
                             pageStateCtx.state
                         ->
@@ -281,7 +284,7 @@ type FileTree =
                     | None ->
                         match
                             FileExplorerStateReconciliation.tryGetReloadableSelectedFilePath
-                                fileStateCtx.state.FileTree
+                                fileStateCtx.state.TryFindFileTreeEntry
                                 fileStateCtx.state.Selection.TreePath
                                 pageStateCtx.state
                         with
@@ -296,7 +299,19 @@ type FileTree =
         let handleExpansionChange (item: FileItem) (willExpand: bool) =
             if willExpand then
                 match item.Path with
-                | Some path -> setMaterializedState (fun _ -> materialize path reconciledMaterializedState)
+                | Some path ->
+                    setMaterializedState (fun _ -> materialize path reconciledMaterializedState)
+
+                    promise {
+                        match! Api.ipcArcVaultApi.refreshFileTreeDirectory path with
+                        | Ok() -> ()
+                        | Error refreshError ->
+                            console.error ($"Could not refresh File Explorer directory '{path}'.", refreshError)
+                    }
+                    |> Promise.catch (fun refreshError ->
+                        console.error ($"Could not refresh File Explorer directory '{path}'.", refreshError)
+                    )
+                    |> Promise.start
                 | None -> ()
 
         let openDialog dialog =
@@ -377,7 +392,7 @@ type FileTree =
         let createArcEntry kind (identifier: string) =
             if not isDialogBusy then
                 let existingPaths =
-                    fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
+                    fileStateCtx.state.FileTree |> Seq.map (fun entry -> entry.path) |> Seq.toArray
 
                 match tryBuildArcCreateDraft kind identifier existingPaths with
                 | Error errorMessage -> applyCreateError errorMessage
@@ -465,8 +480,7 @@ type FileTree =
             |> Promise.start
 
         let tryFindDataMapItemByPath path =
-            fileStateCtx.state.FileTree
-            |> Array.tryFind (fun entry -> PathHelpers.pathsEqual entry.path path)
+            fileStateCtx.state.TryFindFileTreeEntry path
             |> Option.map (fun entry ->
                 let item =
                     Swate.Components.Page.FileExplorer.Types.FileTree.createFile
