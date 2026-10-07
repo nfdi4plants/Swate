@@ -53,3 +53,49 @@ let setScale (scale: float) : Result<unit, exn> =
                 Ok()
         with error ->
             Error error
+
+let adjustScale (percentagePointDelta: int) : Result<unit, exn> =
+    let currentPercentage = getScale () * 100.0 |> Math.Round |> int
+    let nextPercentage = currentPercentage + percentagePointDelta
+
+    if nextPercentage <= 0 then
+        Ok()
+    else
+        setScale (float nextPercentage / 100.0)
+
+let private tryGetKeyboardScaleDelta (input: WebContents.BeforeInputEvent.Input) =
+    let primaryModifier =
+        if Main.Bindings.Node.processPlatform () = "darwin" then
+            input.meta
+        else
+            input.control
+
+    if
+        input.``type`` <> "keyDown"
+        || input.isComposing
+        || input.alt
+        || not primaryModifier
+    then
+        None
+    elif input.key = "+" || input.key = "=" || input.code = "NumpadAdd" then
+        Some 5
+    elif input.key = "-" || input.key = "_" || input.code = "NumpadSubtract" then
+        Some -5
+    else
+        None
+
+let registerWindow (window: BrowserWindow) =
+    // Reapply the current global scale after navigation or reload.
+    window.webContents.onDidFinishLoad (fun () -> applyToWindow window)
+
+    window.webContents.onBeforeInputEvent (fun event input ->
+        match tryGetKeyboardScaleDelta input with
+        | None -> ()
+        | Some delta ->
+            // Suppress Chromium's built-in zoom, which uses a different step size.
+            event.preventDefault ()
+
+            match adjustScale delta with
+            | Ok() -> ()
+            | Error error -> eprintfn "Could not adjust UI scale: %s" error.Message
+    )

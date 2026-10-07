@@ -317,8 +317,7 @@ let createWindow () =
 
     let window = BrowserWindow(mainWindowOptions)
 
-    // Reapply the current global scale after navigation or reload.
-    window.webContents.onDidFinishLoad (fun () -> UiSettings.applyToWindow window)
+    UiSettings.registerWindow window
 
     // Prevent links from opening new Electron windows
     window.webContents.setWindowOpenHandler (fun details ->
