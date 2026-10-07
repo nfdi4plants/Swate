@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## 2.4.0 - 2026-10-07
+
 ### ✨ Added
 
 - Conflicts in files without editable text (binary files, `isa.*.xlsx` workbooks, Git LFS files) get a file-choice panel with "Keep my version" and "Use online version". It shows each version's size, object id, whether it is downloaded and the online commit.
