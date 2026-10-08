@@ -382,7 +382,6 @@ let private renderToBody element = promise {
 let private noopCallbacks: GitSidebarCallbacks = {
     OnRefresh = fun () -> ()
     OnFetch = fun () -> ()
-    OnPull = fun () -> ()
     OnPush = fun () -> ()
     OnUpdateFromOnline = fun () -> ()
     OnPrimarySaveSelection = fun _ -> ()
@@ -9045,7 +9044,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun _ -> ()
@@ -9128,7 +9126,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun _ -> ()
@@ -9185,7 +9182,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun _ -> ()
@@ -9240,7 +9236,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun _ -> ()
@@ -9295,7 +9290,6 @@ Vitest.describe (
                                     callbacks = {
                                         OnRefresh = fun () -> ()
                                         OnFetch = fun () -> ()
-                                        OnPull = fun () -> ()
                                         OnPush = fun () -> ()
                                         OnUpdateFromOnline = fun () -> ()
                                         OnPrimarySaveSelection = fun _ -> ()
@@ -9389,7 +9383,6 @@ Vitest.describe (
                                     callbacks = {
                                         OnRefresh = fun () -> ()
                                         OnFetch = fun () -> ()
-                                        OnPull = fun () -> ()
                                         OnPush = fun () -> ()
                                         OnUpdateFromOnline = fun () -> ()
                                         OnPrimarySaveSelection = fun _ -> ()
@@ -9479,7 +9472,6 @@ Vitest.describe (
                                                     callbacks = {
                                                         OnRefresh = fun () -> ()
                                                         OnFetch = fun () -> ()
-                                                        OnPull = fun () -> ()
                                                         OnPush = fun () -> ()
                                                         OnUpdateFromOnline = fun () -> ()
                                                         OnPrimarySaveSelection = fun _ -> ()
@@ -9551,7 +9543,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun _ -> ()
@@ -9613,7 +9604,6 @@ Vitest.describe (
                                     callbacks = {
                                         OnRefresh = fun () -> ()
                                         OnFetch = fun () -> ()
-                                        OnPull = fun () -> ()
                                         OnPush = fun () -> ()
                                         OnUpdateFromOnline = fun () -> ()
                                         OnPrimarySaveSelection = fun _ -> ()
@@ -9670,7 +9660,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun _ -> ()
@@ -9803,7 +9792,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun request -> capturedSelection <- Some request
@@ -9892,7 +9880,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun request -> capturedSelection <- Some request
@@ -9989,7 +9976,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun _ -> ()
@@ -10103,7 +10089,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun _ -> ()

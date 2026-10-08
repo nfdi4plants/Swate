@@ -65,7 +65,6 @@ type GitSidebarPublishRenamePrompt = { CurrentName: string; Message: string }
 type GitSidebarCallbacks = {
     OnRefresh: unit -> unit
     OnFetch: unit -> unit
-    OnPull: unit -> unit
     OnPush: unit -> unit
     OnUpdateFromOnline: unit -> unit
     OnPrimarySaveSelection: GitSidebarCommitSelectionRequest -> unit

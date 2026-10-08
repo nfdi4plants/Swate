@@ -22,7 +22,6 @@ const noopSelectChange = (_change: unknown) =>
 const baseCallbacks = {
   OnRefresh: noop,
   OnFetch: noop,
-  OnPull: noop,
   OnPush: noop,
   OnUpdateFromOnline: noop,
   OnPrimarySaveSelection: noopWithSelection,
@@ -359,7 +358,7 @@ export const AdvancedActions: Story = {
     await expect(canvas.queryByTestId("GitSidebarSyncButton")).toBeNull();
     await expect(canvas.queryByTestId("GitSidebarLocalCommitButton")).toBeNull();
     await expect(canvas.getByTestId("GitSidebarFetchButton")).toBeInTheDocument();
-    await expect(canvas.getByTestId("GitSidebarPullButton")).toBeInTheDocument();
+    await expect(canvas.queryByTestId("GitSidebarPullButton")).toBeNull();
     await expect(canvas.getByTestId("GitSidebarPushButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarLfsPruneButton")).toBeVisible();
     await expect(canvas.getByTestId("GitSidebarLfsDedupButton")).toBeVisible();

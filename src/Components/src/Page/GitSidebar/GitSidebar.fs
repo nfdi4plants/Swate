@@ -184,7 +184,6 @@ type private AdvancedActionsProps = {
     IsAdvancedActionsOpen: bool
     ToggleAdvancedActions: unit -> unit
     SubmitFetch: unit -> unit
-    SubmitPull: unit -> unit
     SubmitPush: unit -> unit
     OpenCreateBranchModal: unit -> unit
     OpenSwitchBranchModal: unit -> unit
@@ -953,15 +952,6 @@ type GitSidebar =
                                     props.SubmitFetch,
                                     testId = "GitSidebarFetchButton",
                                     tooltipText = "Check for Changes:\n- git fetch origin"
-                                )
-                                GitSidebar.ActionButton(
-                                    "Download Changes",
-                                    "swt:fluent--arrow-down-24-regular",
-                                    props.IsBusy || not props.RemoteActionsEnabled,
-                                    props.SubmitPull,
-                                    testId = "GitSidebarPullButton",
-                                    tooltipText =
-                                        "Download Changes:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git merge origin/<branch>\n- git lfs pull origin (when Download Large Files is on)"
                                 )
                                 GitSidebar.ActionButton(
                                     "Upload Changes",
@@ -1769,7 +1759,6 @@ type GitSidebar =
         let _selectedFileForCompatibility = selectedFile
         let onRefresh = callbacks.OnRefresh
         let onFetch = callbacks.OnFetch
-        let onPull = callbacks.OnPull
         let onPush = callbacks.OnPush
         let onUpdateFromOnline = callbacks.OnUpdateFromOnline
         let onPrimarySaveSelection = callbacks.OnPrimarySaveSelection
@@ -2201,10 +2190,6 @@ type GitSidebar =
                             fun () ->
                                 setLocalError None
                                 onFetch ()
-                        SubmitPull =
-                            fun () ->
-                                setLocalError None
-                                onPull ()
                         SubmitPush =
                             fun () ->
                                 setLocalError None

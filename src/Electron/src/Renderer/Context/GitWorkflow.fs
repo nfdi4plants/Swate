@@ -586,7 +586,6 @@ type Msg =
     | SaveDiffIndexingLimitRequested of int
     | SaveDownloadLargeFilesRequested of bool
     | FetchRequested
-    | PullRequested
     | PushRequested
     | CancelCurrentOperationRequested
     | CancelCurrentOperationCompleted of sessionId: int * operationKey: OperationRequestDto * Result<bool, string>
@@ -5118,7 +5117,6 @@ let private updateCore
             )
         )
     | FetchRequested -> model, Cmd.ofMsg (WriteRequested Fetch)
-    | PullRequested -> model, Cmd.ofMsg (WriteRequested(Pull GitUpdateAcceptance.RequirePreview))
     | PushRequested -> model, Cmd.ofMsg (WriteRequested(Push GitUpdateAcceptance.RequirePreview))
     | CancelCurrentOperationRequested ->
         match model.CurrentOperation with

@@ -20,7 +20,6 @@ type GitStateController = {
     sidebarVisibilityChanged: bool -> unit
     initRepository: unit -> unit
     fetch: unit -> unit
-    pull: unit -> unit
     push: unit -> unit
     cancelOperation: unit -> unit
     updateFromOnline: unit -> unit
@@ -123,7 +122,6 @@ let GitStateCtx =
             sidebarVisibilityChanged = fun _ -> ()
             initRepository = fun () -> ()
             fetch = fun () -> ()
-            pull = fun () -> ()
             push = fun () -> ()
             cancelOperation = fun () -> ()
             updateFromOnline = fun () -> ()
@@ -200,8 +198,6 @@ let GitStateCtxProvider (children: ReactElement) =
     let initRepository () = dispatch InitRepositoryRequested
 
     let fetch () = dispatch FetchRequested
-
-    let pull () = dispatch PullRequested
 
     let push () = dispatch PushRequested
 
@@ -284,7 +280,6 @@ let GitStateCtxProvider (children: ReactElement) =
                 sidebarVisibilityChanged = sidebarVisibilityChanged
                 initRepository = initRepository
                 fetch = fetch
-                pull = pull
                 push = push
                 cancelOperation = cancelOperation
                 updateFromOnline = updateFromOnline

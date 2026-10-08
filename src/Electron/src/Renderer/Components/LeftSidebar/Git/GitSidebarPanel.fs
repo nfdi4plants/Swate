@@ -190,7 +190,6 @@ let Main () =
             callbacks = {
                 OnRefresh = gitStateCtx.refresh
                 OnFetch = gitStateCtx.fetch
-                OnPull = gitStateCtx.pull
                 OnPush = gitStateCtx.push
                 OnUpdateFromOnline = gitStateCtx.updateFromOnline
                 OnPrimarySaveSelection = gitStateCtx.primarySaveSelection
