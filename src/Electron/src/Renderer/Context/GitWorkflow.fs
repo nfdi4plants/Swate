@@ -19,10 +19,6 @@ let private externalChangesRefreshDelayMs = 1500
 [<Literal>]
 let DefaultDiffIndexingLimitMb = 1024
 
-/// The free-space reserve for the temp drive of a diff, in MiB, until the main process answers with its own.
-[<Literal>]
-let DefaultDiffFreeSpaceReserveMb = 1024
-
 [<RequireQualifiedAccess>]
 type GitRefreshState =
     | Idle
@@ -41,7 +37,6 @@ type GitBusyOperation =
     | DiscardingSelectedChanges
     | SavingGitLfsThreshold
     | SavingDiffIndexingLimit
-    | SavingDiffFreeSpaceReserve
     | SavingGitLfsDownloadPreference
     | CreatingBranch
     | SwitchingBranch
@@ -155,9 +150,6 @@ type GitState = {
     /// lets the diff use temp files, and the background indexing of an open diff stops once the
     /// pages it read add up to this size.
     DiffIndexingLimitMb: int
-    /// Whole MiB. A new diff keeps its data in memory when the temp drive has less free space than
-    /// this reserve plus 5 %.
-    DiffFreeSpaceReserveMb: int
     DownloadLargeFiles: bool
     RepositoryAvailability: GitRepositoryAvailability
     RefreshState: GitRefreshState
@@ -219,7 +211,6 @@ type GitState = {
         PendingPublishForPath = None
         LfsAutoTrackThresholdMb = 1
         DiffIndexingLimitMb = DefaultDiffIndexingLimitMb
-        DiffFreeSpaceReserveMb = DefaultDiffFreeSpaceReserveMb
         DownloadLargeFiles = false
         RepositoryAvailability = GitRepositoryAvailability.Ready
         RefreshState = GitRefreshState.Idle
@@ -593,7 +584,6 @@ type Msg =
         result: Result<ConfirmMergeResolutionOutcome, ConfirmMergeResolutionError>
     | SaveLfsAutoTrackThresholdRequested of int
     | SaveDiffIndexingLimitRequested of int
-    | SaveDiffFreeSpaceReserveRequested of int
     | SaveDownloadLargeFilesRequested of bool
     | FetchRequested
     | PullRequested
@@ -707,7 +697,6 @@ let busyNoticeFromOperation =
     | GitBusyOperation.DiscardingSelectedChanges -> Some "Discarding selected changes"
     | GitBusyOperation.SavingGitLfsThreshold -> Some "Saving Git LFS threshold"
     | GitBusyOperation.SavingDiffIndexingLimit -> Some "Saving background indexing limit"
-    | GitBusyOperation.SavingDiffFreeSpaceReserve -> Some "Saving free-space reserve"
     | GitBusyOperation.SavingGitLfsDownloadPreference -> Some "Saving Git LFS download preference"
     | GitBusyOperation.CreatingBranch -> Some "Creating branch"
     | GitBusyOperation.SwitchingBranch -> Some "Switching branch"
@@ -1083,9 +1072,6 @@ let private applyRefreshResult (refreshResult: GitRefreshResult) (model: GitStat
                 DiffIndexingLimitMb =
                     settings.DiffIndexingLimitMb
                     |> Option.defaultValue GitState.Empty.DiffIndexingLimitMb
-                DiffFreeSpaceReserveMb =
-                    settings.DiffFreeSpaceReserveMb
-                    |> Option.defaultValue GitState.Empty.DiffFreeSpaceReserveMb
                 DownloadLargeFiles = settings.MaterializeLargeObjects
           }
         | Error _ -> modelWithBranches
@@ -1149,13 +1135,11 @@ let buildUpdatedLfsSettings
     (thresholdMb: int option)
     (downloadLargeFiles: bool option)
     (diffIndexingLimitMb: int option)
-    (diffFreeSpaceReserveMb: int option)
     : StoragePolicySettingsDto =
     {
         AutoPolicyThresholdMb = Some(thresholdMb |> Option.defaultValue state.LfsAutoTrackThresholdMb)
         MaterializeLargeObjects = downloadLargeFiles |> Option.defaultValue state.DownloadLargeFiles
         DiffIndexingLimitMb = Some(diffIndexingLimitMb |> Option.defaultValue state.DiffIndexingLimitMb)
-        DiffFreeSpaceReserveMb = Some(diffFreeSpaceReserveMb |> Option.defaultValue state.DiffFreeSpaceReserveMb)
     }
 
 /// Resolves a caller-provided reply callback synchronously when the command runs.
@@ -1188,7 +1172,6 @@ let private titleForWriteRequest =
     | CommitAll _ -> "Could not commit changes"
     | DiscardSelection _ -> "Could not discard changes"
     | SaveLfsSettings(GitBusyOperation.SavingDiffIndexingLimit, _) -> "Could not save the background indexing limit"
-    | SaveLfsSettings(GitBusyOperation.SavingDiffFreeSpaceReserve, _) -> "Could not save the free-space reserve"
     | SaveLfsSettings _ -> "Could not save Git LFS settings"
     | PruneLfsCache -> "Could not clean Git LFS cache"
     | DedupLfsStorage -> "Could not reduce Git LFS storage"
@@ -5110,7 +5093,7 @@ let private updateCore
             WriteRequested(
                 SaveLfsSettings(
                     GitBusyOperation.SavingGitLfsDownloadPreference,
-                    buildUpdatedLfsSettings model None (Some downloadLargeFiles) None None
+                    buildUpdatedLfsSettings model None (Some downloadLargeFiles) None
                 )
             )
         )
@@ -5120,7 +5103,7 @@ let private updateCore
             WriteRequested(
                 SaveLfsSettings(
                     GitBusyOperation.SavingGitLfsThreshold,
-                    buildUpdatedLfsSettings model (Some thresholdMb) None None None
+                    buildUpdatedLfsSettings model (Some thresholdMb) None None
                 )
             )
         )
@@ -5130,17 +5113,7 @@ let private updateCore
             WriteRequested(
                 SaveLfsSettings(
                     GitBusyOperation.SavingDiffIndexingLimit,
-                    buildUpdatedLfsSettings model None None (Some limitMb) None
-                )
-            )
-        )
-    | SaveDiffFreeSpaceReserveRequested reserveMb ->
-        model,
-        Cmd.ofMsg (
-            WriteRequested(
-                SaveLfsSettings(
-                    GitBusyOperation.SavingDiffFreeSpaceReserve,
-                    buildUpdatedLfsSettings model None None None (Some reserveMb)
+                    buildUpdatedLfsSettings model None None (Some limitMb)
                 )
             )
         )

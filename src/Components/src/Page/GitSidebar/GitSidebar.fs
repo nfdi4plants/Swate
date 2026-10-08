@@ -126,13 +126,6 @@ module private GitSidebarInternal =
     [<Literal>]
     let MaxDiffIndexingLimitMb = 1048576
 
-    /// The range of the free-space reserve in MB, the same as the main process allows.
-    [<Literal>]
-    let MinDiffFreeSpaceReserveMb = 0
-
-    [<Literal>]
-    let MaxDiffFreeSpaceReserveMb = 1048576
-
     let tryRangeBetween (orderedPaths: string[]) (anchorPath: string) (clickedPath: string) =
         match
             orderedPaths
@@ -177,10 +170,6 @@ type private DiffIndexingLimitSectionProps = {
     SetDiffIndexingLimitInput: string -> unit
     CanSaveDiffIndexingLimit: bool
     SubmitDiffIndexingLimit: unit -> unit
-    DiffFreeSpaceReserveInput: string
-    SetDiffFreeSpaceReserveInput: string -> unit
-    CanSaveDiffFreeSpaceReserve: bool
-    SubmitDiffFreeSpaceReserve: unit -> unit
 }
 
 type private AdvancedActionsProps = {
@@ -844,7 +833,7 @@ type GitSidebar =
                     prop.className "swt:mt-2 swt:wrap-break-word swt:text-xs swt:text-base-content/70"
                     prop.testId "GitSidebarDiffIndexingLimitHelp"
                     prop.text
-                        "From 64 up, a diff uses temp files and reads its remaining pages in the background until they add up to this many MB. Scrolling to the end of the pages read so far reads on. From 1 to 63, the diff stays in memory and the value is its memory budget in MB. The budget holds the committed file plus one 512 KiB page."
+                        "1-63: the diff stays in memory with this budget in MB. 64 and up: temp files, background reading stops after this many MB."
                 ]
                 Html.div [
                     prop.className "swt:mt-3 swt:flex swt:flex-wrap swt:items-end swt:gap-2"
@@ -887,64 +876,6 @@ type GitSidebar =
                             ]
                         ]
                     ]
-                ]
-                Html.div [
-                    prop.className "swt:mt-2 swt:wrap-break-word swt:text-xs swt:text-base-content/60"
-                    prop.text
-                        $"Limit setting: {GitSidebarInternal.MinDiffIndexingLimitMb}-{GitSidebarInternal.MaxDiffIndexingLimitMb} MB. From 64 on, the limit only stops the background reading, and the diff stays readable past it. Below 64, the limit is the memory budget, and the diff stops there."
-                ]
-                Html.p [
-                    prop.className "swt:mt-4 swt:wrap-break-word swt:text-xs swt:text-base-content/70"
-                    prop.testId "GitSidebarDiffFreeSpaceReserveHelp"
-                    prop.text
-                        "With a limit of 64 or more, a diff keeps its data in memory with a 64 MB budget when the temp drive has less free space than the reserve plus 5 % as the diff opens. An open diff keeps its mode."
-                ]
-                Html.div [
-                    prop.className "swt:mt-3 swt:flex swt:flex-wrap swt:items-end swt:gap-2"
-                    prop.children [
-                        Html.label [
-                            prop.className "swt:flex swt:min-w-40 swt:flex-1 swt:flex-col swt:gap-2 swt:@max-xs:min-w-0"
-                            prop.children [
-                                Html.span [
-                                    prop.className "swt:text-xs swt:font-medium swt:text-base-content/70"
-                                    prop.text "Free-space reserve (MB)"
-                                ]
-                                Html.input [
-                                    prop.testId "GitSidebarDiffFreeSpaceReserveInput"
-                                    prop.className "swt:input swt:input-bordered swt:w-full swt:min-w-0"
-                                    prop.type'.number
-                                    prop.custom ("step", "1")
-                                    prop.custom ("min", string GitSidebarInternal.MinDiffFreeSpaceReserveMb)
-                                    prop.custom ("max", string GitSidebarInternal.MaxDiffFreeSpaceReserveMb)
-                                    prop.disabled props.IsBusy
-                                    prop.value props.DiffFreeSpaceReserveInput
-                                    prop.onChange props.SetDiffFreeSpaceReserveInput
-                                ]
-                            ]
-                        ]
-                        Html.button [
-                            prop.testId "GitSidebarDiffFreeSpaceReserveSaveButton"
-                            prop.className
-                                "swt:btn swt:btn-sm swt:btn-outline swt:min-w-0 swt:gap-2 swt:overflow-hidden swt:px-2 swt:normal-case swt:@max-xs:justify-center swt:@max-xs:gap-0"
-                            prop.disabled (not props.CanSaveDiffFreeSpaceReserve)
-                            prop.title "Save Reserve"
-                            prop.onClick (fun _ -> props.SubmitDiffFreeSpaceReserve())
-                            prop.children [
-                                Html.span [
-                                    prop.className "swt:iconify swt:fluent--save-24-regular swt:size-4 swt:shrink-0"
-                                ]
-                                Html.span [
-                                    prop.className "swt:min-w-0 swt:truncate swt:@max-xs:sr-only"
-                                    prop.text "Save Reserve"
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-                Html.div [
-                    prop.className "swt:mt-2 swt:wrap-break-word swt:text-xs swt:text-base-content/60"
-                    prop.text
-                        $"Reserve setting: {GitSidebarInternal.MinDiffFreeSpaceReserveMb}-{GitSidebarInternal.MaxDiffFreeSpaceReserveMb} MB."
                 ]
             ]
         ]
@@ -1806,7 +1737,6 @@ type GitSidebar =
             downloadLargeFiles: bool,
             lfsAutoTrackThresholdMb: int,
             diffIndexingLimitMb: int,
-            diffFreeSpaceReserveMb: int,
             ?runStatus: GitSidebarRunStatus,
             ?selectedFile: string,
             ?errorNotice: string,
@@ -1852,7 +1782,6 @@ type GitSidebar =
         let onSaveDownloadLargeFiles = callbacks.OnSaveDownloadLargeFiles
         let onSaveLfsAutoTrackThreshold = callbacks.OnSaveLfsAutoTrackThreshold
         let onSaveDiffIndexingLimit = callbacks.OnSaveDiffIndexingLimit
-        let onSaveDiffFreeSpaceReserve = callbacks.OnSaveDiffFreeSpaceReserve
         let onCreateBranch = callbacks.OnCreateBranch
         let onSwitchBranch = callbacks.OnSwitchBranch
         let onSelectChange = callbacks.OnSelectChange
@@ -1875,9 +1804,6 @@ type GitSidebar =
 
         let diffIndexingLimitInput, setDiffIndexingLimitInput =
             React.useState (GitSidebarInternal.formatThresholdInput diffIndexingLimitMb)
-
-        let diffFreeSpaceReserveInput, setDiffFreeSpaceReserveInput =
-            React.useState (GitSidebarInternal.formatThresholdInput diffFreeSpaceReserveMb)
 
         let markedPaths, setMarkedPaths = React.useStateWithUpdater Set.empty<string>
 
@@ -1947,11 +1873,6 @@ type GitSidebar =
         React.useEffect (
             (fun () -> setDiffIndexingLimitInput (GitSidebarInternal.formatThresholdInput diffIndexingLimitMb)),
             [| box diffIndexingLimitMb |]
-        )
-
-        React.useEffect (
-            (fun () -> setDiffFreeSpaceReserveInput (GitSidebarInternal.formatThresholdInput diffFreeSpaceReserveMb)),
-            [| box diffFreeSpaceReserveMb |]
         )
 
         React.useEffect (
@@ -2138,24 +2059,6 @@ type GitSidebar =
                 onSaveDiffIndexingLimit parsedLimitMb
                 setDiffIndexingLimitInput (GitSidebarInternal.formatThresholdInput parsedLimitMb)
 
-        let submitDiffFreeSpaceReserve () =
-            let success, parsedReserveMb = Int32.TryParse(diffFreeSpaceReserveInput.Trim())
-
-            if not success then
-                setLocalError (Some "Free-space reserve must be a whole number.")
-            elif parsedReserveMb < GitSidebarInternal.MinDiffFreeSpaceReserveMb then
-                setLocalError (
-                    Some $"Free-space reserve must be at least {GitSidebarInternal.MinDiffFreeSpaceReserveMb} MB."
-                )
-            elif parsedReserveMb > GitSidebarInternal.MaxDiffFreeSpaceReserveMb then
-                setLocalError (
-                    Some $"Free-space reserve must not exceed {GitSidebarInternal.MaxDiffFreeSpaceReserveMb} MB."
-                )
-            else
-                setLocalError None
-                onSaveDiffFreeSpaceReserve parsedReserveMb
-                setDiffFreeSpaceReserveInput (GitSidebarInternal.formatThresholdInput parsedReserveMb)
-
         let submitDownloadLargeFiles (nextValue: bool) =
             if nextValue = downloadLargeFilesInput then
                 ()
@@ -2233,19 +2136,6 @@ type GitSidebar =
                 String.Equals(
                     normalizedDiffIndexingLimitInput,
                     GitSidebarInternal.formatThresholdInput diffIndexingLimitMb,
-                    StringComparison.Ordinal
-                )
-            )
-
-        let normalizedDiffFreeSpaceReserveInput = diffFreeSpaceReserveInput.Trim()
-
-        let canSaveDiffFreeSpaceReserve =
-            not isBusy
-            && not (String.IsNullOrWhiteSpace normalizedDiffFreeSpaceReserveInput)
-            && not (
-                String.Equals(
-                    normalizedDiffFreeSpaceReserveInput,
-                    GitSidebarInternal.formatThresholdInput diffFreeSpaceReserveMb,
                     StringComparison.Ordinal
                 )
             )
@@ -2337,10 +2227,6 @@ type GitSidebar =
                             SetDiffIndexingLimitInput = setDiffIndexingLimitInput
                             CanSaveDiffIndexingLimit = canSaveDiffIndexingLimit
                             SubmitDiffIndexingLimit = submitDiffIndexingLimit
-                            DiffFreeSpaceReserveInput = diffFreeSpaceReserveInput
-                            SetDiffFreeSpaceReserveInput = setDiffFreeSpaceReserveInput
-                            CanSaveDiffFreeSpaceReserve = canSaveDiffFreeSpaceReserve
-                            SubmitDiffFreeSpaceReserve = submitDiffFreeSpaceReserve
                         }
                     }
                 )

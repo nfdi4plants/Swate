@@ -212,7 +212,7 @@ let Main (page: GitDiffPageData) =
                         | Some(DiffStorageDto.InMemory(_, MemoryCauseDto.BySetting)) ->
                             "Raise the indexing limit to 64 or more to use temp files, then reopen the diff."
                         | Some(DiffStorageDto.InMemory(_, MemoryCauseDto.ByLowSpace)) ->
-                            "Free space on the temp drive or lower the reserve, then reopen the diff."
+                            "Free space on the temp drive, then reopen the diff."
                         | _ -> "Reopen the diff to read on."
 
                     "stopped",

@@ -12,9 +12,6 @@ type VersionControlSettings = {
     /// from 64 up lets the diff use temp files, and its background indexing stops once the pages it
     /// read add up to this size.
     DiffIndexingLimitMb: int
-    /// Whole MiB. A diff that would use temp files keeps its data in memory instead when the temp
-    /// drive has less free space than this reserve plus 5 %.
-    DiffFreeSpaceReserveMb: int
 }
 
 module VersionControlSettings =
@@ -39,15 +36,9 @@ module VersionControlSettings =
     [<Literal>]
     let DefaultDiffIndexingLimitMb = 1024
 
-    /// The reserve of free temp space is 0 MiB to 1 TiB.
+    /// The free space in MiB that Swate keeps on the temp drive for the data of a diff.
     [<Literal>]
-    let MinDiffFreeSpaceReserveMb = 0
-
-    [<Literal>]
-    let MaxDiffFreeSpaceReserveMb = 1048576
-
-    [<Literal>]
-    let DefaultDiffFreeSpaceReserveMb = 1024
+    let FreeSpaceReserveMb = 1024
 
     /// The library compares the free space against the reserve times this factor.
     [<Literal>]
@@ -61,7 +52,6 @@ module VersionControlSettings =
         AutoTrackThresholdMb = MinAutoTrackThresholdMb
         DownloadLargeFiles = false
         DiffIndexingLimitMb = DefaultDiffIndexingLimitMb
-        DiffFreeSpaceReserveMb = DefaultDiffFreeSpaceReserveMb
     }
 
     /// Ok when the values are within the allowed ranges, otherwise the failure code and the reason
@@ -87,22 +77,12 @@ module VersionControlSettings =
                 VersionControlCodes.InvalidDiffIndexingLimit,
                 $"The background indexing limit must be at most {MaxDiffIndexingLimitMb} MiB."
             )
-        elif settings.DiffFreeSpaceReserveMb < MinDiffFreeSpaceReserveMb then
-            Error(
-                VersionControlCodes.InvalidDiffFreeSpaceReserve,
-                $"The free-space reserve must be at least {MinDiffFreeSpaceReserveMb} MiB."
-            )
-        elif settings.DiffFreeSpaceReserveMb > MaxDiffFreeSpaceReserveMb then
-            Error(
-                VersionControlCodes.InvalidDiffFreeSpaceReserve,
-                $"The free-space reserve must be at most {MaxDiffFreeSpaceReserveMb} MiB."
-            )
         else
             Ok settings
 
     /// The storage policy of a new diff. A limit from 1 to 63 MiB keeps the diff in memory with that
     /// budget. Any other limit prefers temp files and asks the library to fall back to memory when the
-    /// temp drive has less free space than the reserve times the effective factor, rounded up.
+    /// temp drive has less free space than the fixed reserve times the effective factor, rounded up.
     let diffStoragePolicy (settings: VersionControlSettings) : DiffStoragePolicy =
         let mib = 1048576L
 
@@ -110,7 +90,7 @@ module VersionControlSettings =
             DiffStoragePolicy.MemoryOnly(int64 settings.DiffIndexingLimitMb * mib)
         else
             let minimumFreeBytes =
-                int64 (System.Math.Ceiling(float settings.DiffFreeSpaceReserveMb * EffectiveReserveFactor * float mib))
+                int64 (System.Math.Ceiling(float FreeSpaceReserveMb * EffectiveReserveFactor * float mib))
 
             DiffStoragePolicy.PreferDisk(minimumFreeBytes, FallbackMemoryBudgetBytes)
 

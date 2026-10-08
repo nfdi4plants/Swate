@@ -1086,7 +1086,6 @@ Vitest.describe (
                                     AutoTrackThresholdMb = 9
                                     DownloadLargeFiles = true
                                     DiffIndexingLimitMb = 2048
-                                    DiffFreeSpaceReserveMb = 1024
                                 },
                                 detached "settings-during-close"
                             )
@@ -1368,7 +1367,6 @@ Vitest.describe (
                                 AutoPolicyThresholdMb = Some 9
                                 MaterializeLargeObjects = true
                                 DiffIndexingLimitMb = None
-                                DiffFreeSpaceReserveMb = None
                             }
                         }
 
@@ -1421,7 +1419,6 @@ Vitest.describe (
                                 AutoPolicyThresholdMb = Some 9
                                 MaterializeLargeObjects = true
                                 DiffIndexingLimitMb = None
-                                DiffFreeSpaceReserveMb = None
                             }
                         }
 
@@ -1435,7 +1432,6 @@ Vitest.describe (
                                     AutoPolicyThresholdMb = Some threshold
                                     MaterializeLargeObjects = false
                                     DiffIndexingLimitMb = None
-                                    DiffFreeSpaceReserveMb = None
                                 }
                             }
 
@@ -1480,99 +1476,36 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "the indexing limit and the free-space reserve are checked against their ranges, each with its own code",
+            "the indexing limit is checked against its range",
             fun () ->
-                let settingsWith (limitMb: int) (reserveMb: int) : VersionControlSettings.VersionControlSettings = {
+                let settingsWith (limitMb: int) : VersionControlSettings.VersionControlSettings = {
                     Settings.defaults with
                         DiffIndexingLimitMb = limitMb
-                        DiffFreeSpaceReserveMb = reserveMb
                 }
 
                 for limit in [ 1; 63; 64; 1048576 ] do
-                    Vitest.expect(Settings.validate (settingsWith limit 1024) |> Result.isOk).toBe true
+                    Vitest.expect(Settings.validate (settingsWith limit) |> Result.isOk).toBe true
 
                 for limit in [ 0; -1; 1048577 ] do
-                    match Settings.validate (settingsWith limit 1024) with
+                    match Settings.validate (settingsWith limit) with
                     | Error(code, _) -> Vitest.expect(code).toBe VersionControlCodes.InvalidDiffIndexingLimit
                     | Ok _ -> failwith $"The limit {limit} was accepted."
-
-                for reserve in [ 0; 1024; 1048576 ] do
-                    Vitest.expect(Settings.validate (settingsWith 1024 reserve) |> Result.isOk).toBe true
-
-                for reserve in [ -1; 1048577 ] do
-                    match Settings.validate (settingsWith 1024 reserve) with
-                    | Error(code, _) -> Vitest.expect(code).toBe VersionControlCodes.InvalidDiffFreeSpaceReserve
-                    | Ok _ -> failwith $"The reserve {reserve} was accepted."
         )
 
         Vitest.test (
-            "a limit of 1 to 63 MB keeps a new diff in memory, and any other limit prefers disk with the reserve plus 5 %",
+            "a limit of 1 to 63 MB keeps a new diff in memory, and any other limit prefers disk with the fixed reserve plus 5 %",
             fun () ->
-                let policyOf (limitMb: int) (reserveMb: int) =
+                let policyOf (limitMb: int) =
                     Settings.diffStoragePolicy {
                         Settings.defaults with
                             DiffIndexingLimitMb = limitMb
-                            DiffFreeSpaceReserveMb = reserveMb
                     }
 
-                Vitest.expect(policyOf 1 1024).toEqual (DiffStoragePolicy.MemoryOnly 1048576L)
-                Vitest.expect(policyOf 63 1024).toEqual (DiffStoragePolicy.MemoryOnly 66060288L)
+                Vitest.expect(policyOf 1).toEqual (DiffStoragePolicy.MemoryOnly 1048576L)
+                Vitest.expect(policyOf 63).toEqual (DiffStoragePolicy.MemoryOnly 66060288L)
 
                 // 1024 MiB times 1.05 is 1075.2 MiB, which is 1127428915.2 bytes and rounds up.
-                Vitest.expect(policyOf 64 1024).toEqual (DiffStoragePolicy.PreferDisk(1127428916L, 67108864L))
-                Vitest.expect(policyOf 1024 0).toEqual (DiffStoragePolicy.PreferDisk(0L, 67108864L))
-        )
-
-        Vitest.test (
-            "a free-space reserve outside the allowed range is refused, and a session starts from the default again",
-            fun () ->
-                withFixture (fun fixture -> promise {
-                    registerVault 92 fixture.RepoRoot |> ignore
-                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 92)
-
-                    let setReserve (operationId: string) (reserveMb: int) =
-                        api.setStoragePolicySettings {
-                            OperationId = operationId
-                            Settings = {
-                                AutoPolicyThresholdMb = None
-                                MaterializeLargeObjects = false
-                                DiffIndexingLimitMb = None
-                                DiffFreeSpaceReserveMb = Some reserveMb
-                            }
-                        }
-
-                    let reserveOfSession (operationId: string) = promise {
-                        let! current = api.getStoragePolicySettings (request operationId)
-                        let settings = expectDtoValue "get storage policy" current
-                        return settings.Value.DiffFreeSpaceReserveMb
-                    }
-
-                    let! initial = reserveOfSession "get-default-reserve"
-                    Vitest.expect(initial).toEqual (Some 1024)
-
-                    for reserve in [ 0; 1048576 ] do
-                        let! accepted = setReserve $"set-reserve-{reserve}" reserve
-                        expectDtoValue $"set reserve {reserve}" accepted |> ignore
-                        let! kept = reserveOfSession $"get-reserve-{reserve}"
-                        Vitest.expect(kept).toEqual (Some reserve)
-
-                    for reserve in [ -1; 1048577 ] do
-                        let! refused = setReserve $"set-invalid-reserve-{reserve}" reserve
-                        let failure = expectDtoFailure $"set invalid reserve {reserve}" refused
-                        Vitest.expect(failure.Code).toBe VersionControlCodes.InvalidDiffFreeSpaceReserve
-                        let! kept = reserveOfSession $"get-after-invalid-reserve-{reserve}"
-                        Vitest.expect(kept).toEqual (Some 1048576)
-
-                    do! fixture.Host.CloseSession fixture.RepoRoot |> Async.StartAsPromise
-
-                    let! reopened =
-                        fixture.Host.OpenSession(fixture.RepoRoot, detached "open-after-reserve")
-                        |> Async.StartAsPromise
-
-                    expectValue "reopen" reopened |> ignore
-                    let! afterReopen = reserveOfSession "get-reserve-after-reopen"
-                    Vitest.expect(afterReopen).toEqual (Some 1024)
-                })
+                Vitest.expect(policyOf 64).toEqual (DiffStoragePolicy.PreferDisk(1127428916L, 67108864L))
         )
 
         Vitest.test (
@@ -1589,7 +1522,6 @@ Vitest.describe (
                                 AutoPolicyThresholdMb = None
                                 MaterializeLargeObjects = false
                                 DiffIndexingLimitMb = Some limitMb
-                                DiffFreeSpaceReserveMb = None
                             }
                         }
 
@@ -1644,7 +1576,6 @@ Vitest.describe (
                                 AutoPolicyThresholdMb = Some 9
                                 MaterializeLargeObjects = true
                                 DiffIndexingLimitMb = None
-                                DiffFreeSpaceReserveMb = None
                             }
                         }
 
@@ -1897,7 +1828,6 @@ Vitest.describe (
                                 AutoPolicyThresholdMb = Some 9
                                 MaterializeLargeObjects = true
                                 DiffIndexingLimitMb = None
-                                DiffFreeSpaceReserveMb = None
                             }
                         }
 
@@ -2088,7 +2018,6 @@ Vitest.describe (
                                     AutoPolicyThresholdMb = Some 4
                                     MaterializeLargeObjects = false
                                     DiffIndexingLimitMb = None
-                                    DiffFreeSpaceReserveMb = None
                                 }
                             }
 

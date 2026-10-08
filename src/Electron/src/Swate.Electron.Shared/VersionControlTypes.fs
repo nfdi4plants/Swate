@@ -171,7 +171,7 @@ type EncodingCandidateDto = { Encoding: string; Preview: string }
 type PreparationTokenDto = { Id: string }
 
 /// Why a diff keeps its data in memory. The indexing limit setting asks for it (1 to 63 MB), or
-/// the temp drive had less free space than the reserve and the library chose memory.
+/// the temp drive had less free space than Swate keeps free and the library chose memory.
 [<StringEnum(CaseRules.None); RequireQualifiedAccess>]
 type MemoryCauseDto =
     | BySetting
@@ -419,10 +419,6 @@ module VersionControlCodes =
     [<Literal>]
     let InvalidDiffIndexingLimit = "invalid_diff_indexing_limit"
 
-    /// Produced by the Swate main process when the free-space reserve of a diff is out of range.
-    [<Literal>]
-    let InvalidDiffFreeSpaceReserve = "invalid_diff_free_space_reserve"
-
     // Produced by the Swate main process (session host and IPC handler).
     [<Literal>]
     let ServiceUnavailable = "service_unavailable"
@@ -638,9 +634,6 @@ type StoragePolicySettingsDto = {
     /// Whole MiB. The background indexing of a diff stops when the pages it read add up to this
     /// size. None keeps the value the session has.
     DiffIndexingLimitMb: int option
-    /// Whole MiB. A diff keeps its data in memory when the temp drive has less free space than
-    /// this reserve plus 5 %. None keeps the value the session has.
-    DiffFreeSpaceReserveMb: int option
 }
 
 type DependencyStatusDto = {

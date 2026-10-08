@@ -136,11 +136,11 @@ let blockReasonText (reason: Renderer.Types.GitDiffBlockReason) =
         | MemoryCauseDto.BySetting ->
             $"{sizes} The indexing limit setting keeps the diff in memory. Raise the indexing limit to 64 or more to use temp files."
         | MemoryCauseDto.ByLowSpace ->
-            $"{sizes} The temp drive is low on free space, so the diff is kept in memory. Free space on the temp drive or lower the reserve."
+            $"{sizes} The temp drive is low on free space, so the diff is kept in memory. Free space on the temp drive."
     | Renderer.Types.GitDiffBlockReason.TempSpaceLow ->
-        "The temp drive has less free space than the reserve. Free space on the temp drive or lower the reserve, then open the diff again."
+        "The temp drive is low on free space. Free space on the temp drive, then open the diff again."
     | Renderer.Types.GitDiffBlockReason.MemoryBudgetReached ->
-        "The memory budget of the diff is used up. Raise the indexing limit to 64 or more to use temp files, or free space on the temp drive or lower the reserve, then open the diff again."
+        "The memory budget of the diff is used up. Raise the indexing limit to 64 or more to use temp files, or free space on the temp drive, then open the diff again."
 
 let status (value: Renderer.Types.GitDiffPageStatus) : PagedDiffStatus =
     match value with

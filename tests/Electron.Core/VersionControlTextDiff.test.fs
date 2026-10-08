@@ -1563,14 +1563,13 @@ Vitest.describe (
                 registerWindows root [ window ]
                 let api = Main.IPC.IVersionControlApi.api (TestHelpers.ipcEvent window)
 
-                let setSettings (operationId: string) (limitMb: int) (reserveMb: int) =
+                let setSettings (operationId: string) (limitMb: int) =
                     api.setStoragePolicySettings {
                         OperationId = operationId
                         Settings = {
                             AutoPolicyThresholdMb = None
                             MaterializeLargeObjects = false
                             DiffIndexingLimitMb = Some limitMb
-                            DiffFreeSpaceReserveMb = Some reserveMb
                         }
                     }
 
@@ -1580,7 +1579,7 @@ Vitest.describe (
                     | other -> failwith $"Expected an opened diff, got {other}"
 
                 try
-                    let! settings = setSettings "storage-settings-1" 5 1024
+                    let! settings = setSettings "storage-settings-1" 5
                     TestHelpers.expectDtoValue "set the limit" settings |> ignore
                     answer <- DiffStorage.InMemory 5242880L
                     let! inMemory = api.openTextDiff (openRequest "open-memory" "a.txt")
@@ -1591,12 +1590,12 @@ Vitest.describe (
                         .expect(storageOf inMemory)
                         .toEqual (DiffStorageDto.InMemory("5242880", MemoryCauseDto.BySetting))
 
-                    let! settings = setSettings "storage-settings-2" 2048 512
+                    let! settings = setSettings "storage-settings-2" 2048
                     TestHelpers.expectDtoValue "set the limit again" settings |> ignore
                     answer <- DiffStorage.OnDisk
                     let! onDisk = api.openTextDiff (openRequest "open-disk" "a.txt")
 
-                    Vitest.expect(policies.[1]).toEqual (DiffStoragePolicy.PreferDisk(563714458L, 67108864L))
+                    Vitest.expect(policies.[1]).toEqual (DiffStoragePolicy.PreferDisk(1127428916L, 67108864L))
                     Vitest.expect(storageOf onDisk).toEqual DiffStorageDto.OnDisk
 
                     // The library chose memory for a policy that preferred disk.

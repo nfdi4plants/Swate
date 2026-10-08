@@ -88,7 +88,6 @@ let private storagePolicySettingsDto (settings: VersionControlSettings) : Storag
     AutoPolicyThresholdMb = Some settings.AutoTrackThresholdMb
     MaterializeLargeObjects = settings.DownloadLargeFiles
     DiffIndexingLimitMb = Some settings.DiffIndexingLimitMb
-    DiffFreeSpaceReserveMb = Some settings.DiffFreeSpaceReserveMb
 }
 
 /// Registers and announces one operation before any await, and turns exceptions into failures.
@@ -1019,9 +1018,6 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                         DiffIndexingLimitMb =
                             request.Settings.DiffIndexingLimitMb
                             |> Option.defaultValue current.DiffIndexingLimitMb
-                        DiffFreeSpaceReserveMb =
-                            request.Settings.DiffFreeSpaceReserveMb
-                            |> Option.defaultValue current.DiffFreeSpaceReserveMb
                     }
 
                     host.SetSettings(hosted.Binding.WorkspaceRoot, settings, context)

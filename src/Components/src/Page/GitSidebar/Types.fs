@@ -78,7 +78,6 @@ type GitSidebarCallbacks = {
     OnSaveDownloadLargeFiles: bool -> unit
     OnSaveLfsAutoTrackThreshold: int -> unit
     OnSaveDiffIndexingLimit: int -> unit
-    OnSaveDiffFreeSpaceReserve: int -> unit
     OnCreateBranch: GitSidebarCreateBranchRequest -> unit
     OnSwitchBranch: string -> unit
     OnSelectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>
