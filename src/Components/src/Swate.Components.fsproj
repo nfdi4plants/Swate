@@ -70,15 +70,16 @@
     <Compile Include="Types\KeyedState.fs" />
     <Compile Include="Types\StateContext.fs" />
     <Compile Include="Types\CellCoordinate.fs" />
-    <Compile Include="Util\Download.fs" />
-    <Compile Include="Util\DateTimeExtensions.fs" />
-    <Compile Include="Util\Extensions.fs" />
-    <Compile Include="Util\ReactHooks.fs" />
     <Compile Include="JsBindings\Clipboard.fs" />
     <Compile Include="JsBindings\Navigator.fs" />
     <Compile Include="JsBindings\Virtual.fs" />
     <Compile Include="JsBindings\FloatingUI.fs" />
     <Compile Include="JsBindings\DndKit.fs" />
+    <Compile Include="Util\Download.fs" />
+    <Compile Include="Util\DateTimeExtensions.fs" />
+    <Compile Include="Util\Extensions.fs" />
+    <Compile Include="Util\ReactHooks.fs" />
+    <Compile Include="Util\UserOS.fs" />
     <Compile Include="ARCtrl\TermCollection.fs" />
     <Compile Include="ARCtrl\Helper.fs" />
     <Compile Include="ARCtrl\ArcIO.fs" />
@@ -231,11 +232,14 @@
     <Compile Include="Composite\Widgets\JsonExport\JsonExport.fs" />
     <Compile Include="Composite\Widgets\BuildingBlockWidget\Dropdown.fs" />
     <Compile Include="Composite\Widgets\BuildingBlockWidget\BuildingBlockWidget.fs" />
+    <Compile Include="Composite\Widgets\CellInsertion.fs" />
     <Compile Include="Composite\Widgets\FilePickerWidget.fs" />
     <Compile Include="Composite\Widgets\FilePickerWidget.test.rtl.fs" />
     <Compile Include="Composite\Widgets\DataAnnotator\Types.fs" />
     <Compile Include="Composite\Widgets\DataAnnotator\Helper.fs" />
+    <Compile Include="Composite\Widgets\DataAnnotator\Helper.test.fs" />
     <Compile Include="Composite\Widgets\DataAnnotator\DataAnnotator.fs" />
+    <Compile Include="Composite\Widgets\DataAnnotator\DataAnnotator.test.rtl.fs" />
     <Compile Include="Composite\Widgets\TemplateWidget.fs" />
     <Compile Include="Composite\Widgets\Widgets.fs" />
     <Compile Include="Composite\Workspace\Types.fs" />
@@ -339,6 +343,7 @@
     <Compile Include="Page\ArcFileEditor\Widgets.fs" />
     <Compile Include="Page\ArcFileEditor\ArcFileFooterTabs.fs" />
     <Compile Include="Page\ArcFileEditor\ArcFileEditor.fs" />
+    <Compile Include="Page\ArcFileEditor\ArcFileEditor.test.rtl.fs" />
 
     <Compile Include="Style.fs" />
   </ItemGroup>

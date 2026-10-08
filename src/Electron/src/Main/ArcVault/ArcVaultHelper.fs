@@ -311,10 +311,13 @@ let createWindow () =
             width = int screenSize.width,
             height = int screenSize.height,
             show = false,
-            webPreferences = WebPreferences(preload = path.join (__dirname, "preload.fs.js"))
+            webPreferences =
+                WebPreferences(preload = path.join (__dirname, "preload.fs.js"), zoomFactor = UiSettings.getScale ())
         )
 
     let window = BrowserWindow(mainWindowOptions)
+
+    UiSettings.registerWindow window
 
     // Prevent links from opening new Electron windows
     window.webContents.setWindowOpenHandler (fun details ->

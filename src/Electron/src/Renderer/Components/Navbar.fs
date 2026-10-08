@@ -173,7 +173,7 @@ module private Authentication =
             onSignIn,
             onLogout,
             isLoading = isLoading,
-            dropdownClassName = "swt:dropdown-bottom swt:dropdown-end",
+            dropdownClassName = "swt:dropdown-bottom swt:dropdown-end swt:h-8",
             onRotateToken = onRotateToken,
             onSwitchAccount = onSwitchAccount,
             onRemoveAccount = onRemoveAccount

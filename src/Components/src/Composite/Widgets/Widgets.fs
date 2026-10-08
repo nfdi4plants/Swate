@@ -137,7 +137,7 @@ type Widget =
             ?zIndex: int,
             ?onFocus: unit -> unit
         ) =
-        let zIndex = defaultArg zIndex 40
+        let zIndex = defaultArg zIndex 9999
         let onFocus = defaultArg onFocus (fun () -> ())
 
         let position, setPosition =
@@ -389,7 +389,7 @@ type Widget =
                             prefix = widget.prefix,
                             rmv = (fun _ -> closeWidget widgetType),
                             key = widgetType.ToString(),
-                            zIndex = 40 + index,
+                            zIndex = 99 + index,
                             onFocus = (fun () -> focusWidget widgetType)
                         )
                     | None -> Html.none
