@@ -43,6 +43,30 @@ let private isDisabled (id: string) =
 let private renderSample () =
     RTL.render (SortableListSample.Sample()) |> ignore
 
+let private selectableItems =
+    Array.append sampleItems [|
+        {|
+            id = "delta"
+            label = "Delta"
+            data = None
+        |}
+    |]
+
+[<ReactComponent>]
+let private SelectableSample (initialSelectedIds: string list) =
+    let selectedIds, setSelectedIds = React.useStateWithUpdater initialSelectedIds
+
+    React.Fragment [
+        SortableList.SortableList(selectableItems, ignore, selectedIds = selectedIds, setSelectedIds = setSelectedIds)
+        Html.output [
+            prop.testId "selected-ids"
+            prop.text (String.concat "," selectedIds)
+        ]
+    ]
+
+let private shiftClick (id: string) =
+    RTL.fireEvent.click (RTL.screen.getByTestId id, {| shiftKey = true |})
+
 Vitest.beforeEach (fun () -> installRowGeometry ())
 
 Vitest.afterEach (fun () ->
@@ -172,6 +196,37 @@ Vitest.test (
 
         click "sortable-list-remove-beta"
         Vitest.expect(changed |> Array.map _.id).toEqual [| "alpha"; "gamma" |]
+)
+
+Vitest.test (
+    "shift-click selects the inclusive range after the last interaction",
+    fun () ->
+        RTL.render (SelectableSample []) |> ignore
+
+        click "sortable-list-row-alpha"
+        shiftClick "sortable-list-row-gamma"
+
+        Vitest.expect((RTL.screen.getByTestId "sortable-list-row-alpha").classList.contains "swt:bg-base-300").toBe true
+
+        Vitest.expect((RTL.screen.getByTestId "sortable-list-row-beta").classList.contains "swt:bg-base-300").toBe true
+
+        Vitest.expect((RTL.screen.getByTestId "sortable-list-row-gamma").classList.contains "swt:bg-base-300").toBe true
+)
+
+Vitest.test (
+    "reverse shift-click preserves selected items outside the range without duplicates",
+    fun () ->
+        RTL.render (SelectableSample [ "alpha" ]) |> ignore
+
+        click "sortable-list-row-delta"
+        shiftClick "sortable-list-row-beta"
+
+        Vitest.expect((RTL.screen.getByTestId "selected-ids").textContent.Split(',') |> Array.sort).toEqual [|
+            "alpha"
+            "beta"
+            "delta"
+            "gamma"
+        |]
 )
 
 Vitest.test (

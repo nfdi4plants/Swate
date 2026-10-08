@@ -5,6 +5,8 @@ open ARCtrl
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Composite.Widgets.DataAnnotator.Types
+open Swate.Components.Composite.Widgets.Types
+open Swate.Components.Composite.DataMapTable.ClipboardTarget
 
 let private compareTargets (left: DataTarget) (right: DataTarget) =
     let key =
@@ -32,47 +34,6 @@ let tryParseDataFile (separator: string) (file: DataFile) =
     with exceptionValue ->
         Error exceptionValue.Message
 
-let tryGetTargetHeader (table: ArcTable) (targetColumn: TargetColumn) =
-    match targetColumn with
-    | TargetColumn.Input -> Ok(CompositeHeader.Input IOType.Data)
-    | TargetColumn.Output -> Ok(CompositeHeader.Output IOType.Data)
-    | TargetColumn.Autodetect ->
-        match table.TryGetInputColumn(), table.TryGetOutputColumn() with
-        | Some _, None
-        | None, None -> Ok(CompositeHeader.Output IOType.Data)
-        | None, Some _ -> Ok(CompositeHeader.Input IOType.Data)
-        | Some _, Some _ -> Error "Both Input and Output columns already exist. Select Input or Output explicitly."
-
-let private isSomeNonEmptyString = Option.exists (String.IsNullOrWhiteSpace >> not)
-
-let private findLastNonEmptyDataCellIndex (cells: ResizeArray<CompositeCell>) =
-    let mutable lastNonEmptyIndex = -1
-
-    for index in 0 .. cells.Count - 1 do
-        if
-            cells.[index].GetContentSwate()
-            |> Array.exists (String.IsNullOrWhiteSpace >> not)
-        then
-            lastNonEmptyIndex <- index
-
-    lastNonEmptyIndex
-
-let private findLastNonEmptyDataContextIndex (dataMap: DataMap) =
-    let mutable lastNonEmptyIndex = -1
-
-    for index in 0 .. dataMap.DataContexts.Count - 1 do
-        let dataContext = dataMap.DataContexts.[index]
-
-        if
-            isSomeNonEmptyString dataContext.FilePath
-            || isSomeNonEmptyString dataContext.Selector
-            || isSomeNonEmptyString dataContext.Format
-            || isSomeNonEmptyString dataContext.SelectorFormat
-        then
-            lastNonEmptyIndex <- index
-
-    lastNonEmptyIndex
-
 let private setDataContextFields (fileName: string) (fileType: string) (selector: string) (data: Data) =
     data.FilePath <- Some fileName
     data.Selector <- Some selector
@@ -80,101 +41,89 @@ let private setDataContextFields (fileName: string) (fileType: string) (selector
     data.SelectorFormat <- Some URLs.Data.SelectorFormat.csv
     data
 
-let applyToTable (table: ArcTable) (input: AnnotationInput) =
-    match input.Target with
-    | AnnotationTarget.DataMap _ -> Error "DataMap target cannot be applied to a table destination."
-    | AnnotationTarget.Table(targetColumn, writeMode) ->
-        let headerResult =
-            match targetColumn, writeMode with
-            | TargetColumn.Autodetect, WriteMode.Append ->
-                Error "Append mode requires selecting Input or Output explicitly."
-            | TargetColumn.Autodetect, WriteMode.Replace -> tryGetTargetHeader table targetColumn
-            | TargetColumn.Input, _ -> Ok(CompositeHeader.Input IOType.Data)
-            | TargetColumn.Output, _ -> Ok(CompositeHeader.Output IOType.Data)
+let appendAnnotation (current: AnnotationInput option) (next: AnnotationInput) =
+    match current with
+    | Some current when current.FileName = next.FileName && current.FileType = next.FileType -> {
+        next with
+            Selectors = Array.append current.Selectors next.Selectors |> Array.distinct
+      }
+    | _ -> {
+        next with
+            Selectors = Array.distinct next.Selectors
+      }
 
-        match headerResult with
-        | Error errorMessage -> Error errorMessage
-        | Ok header ->
-            try
-                let existingColumn =
-                    match targetColumn with
-                    | TargetColumn.Input -> table.TryGetInputColumn()
-                    | TargetColumn.Output -> table.TryGetOutputColumn()
-                    | TargetColumn.Autodetect -> None
+let insertAnnotationIntoSelectedCells
+    (arcFile: ArcFiles)
+    (setArcFile: ArcFiles -> unit)
+    (input: AnnotationInput)
+    (target: InsertTarget option)
+    =
+    try
+        if input.Selectors.Length = 0 then
+            Error "Select at least one selector to insert."
+        else
+            let nextArcFile = ArcFiles.refreshRef arcFile
+            let fileName = toArcRootRelativeFilePath arcFile input.FileName
 
-                let startRowIndex =
-                    match writeMode, existingColumn with
-                    | WriteMode.Append, Some column -> findLastNonEmptyDataCellIndex column.Cells + 1
-                    | WriteMode.Append, None -> 0
-                    | WriteMode.Replace, _ -> 0
+            let cells =
+                input.Selectors
+                |> Array.map (fun selector ->
+                    Data()
+                    |> setDataContextFields fileName input.FileType selector
+                    |> CompositeCell.createData
+                )
 
-                let targetRowCount =
-                    System.Math.Max(table.RowCount, startRowIndex + input.Selectors.Length)
+            match target with
+            | Some(InsertTarget.Table(tableIndex, selection)) ->
+                match nextArcFile.TryGetActiveTable(Some tableIndex) with
+                | Some(_, table) when
+                    selection.xStart >= 0
+                    && selection.xStart < table.ColumnCount
+                    && selection.yStart >= 0
+                    && selection.yStart < table.RowCount
+                    ->
+                    let cellsToInsert =
+                        cells
+                        |> Array.truncate (table.RowCount - selection.yStart)
+                        |> Array.mapi (fun offset source ->
+                            let coordinate: CellCoordinate = {|
+                                x = selection.xStart
+                                y = selection.yStart + offset
+                            |}
 
-                if targetRowCount > table.RowCount && table.ColumnCount > 0 then
-                    table.AddRowsEmpty(targetRowCount - table.RowCount)
+                            let current = table.GetCellAt(coordinate.x, coordinate.y)
 
-                let selectorEndExclusive = startRowIndex + input.Selectors.Length
+                            let next =
+                                match current with
+                                | CompositeCell.Data _ -> source
+                                | _ -> current.UpdateMainField(source.ToVisibleString())
 
-                let values =
-                    [|
-                        for rowIndex in 0 .. targetRowCount - 1 do
-                            if rowIndex >= startRowIndex && rowIndex < selectorEndExclusive then
-                                let selectorIndex = rowIndex - startRowIndex
+                            coordinate, next
+                        )
 
-                                Data()
-                                |> setDataContextFields input.FileName input.FileType input.Selectors.[selectorIndex]
-                                |> CompositeCell.createData
-                            else
-                                match writeMode, existingColumn with
-                                | WriteMode.Append, Some column when rowIndex < column.Cells.Count ->
-                                    column.Cells.[rowIndex]
-                                | _ -> CompositeCell.createData (Data())
-                    |]
-                    |> ResizeArray
+                    table.SetCellsAt cellsToInsert
+                    setArcFile nextArcFile
+                    Ok cellsToInsert.Length
+                | _ -> Error "Select a table cell to insert selectors."
+            | Some(InsertTarget.DataMap selection) ->
+                match nextArcFile.TryGetDataMap() with
+                | Some dataMap when
+                    selection.xStart > 0
+                    && selection.xStart <= dataMap.ColumnCount
+                    && selection.yStart > 0
+                    ->
+                    let anchor: CellCoordinate = {|
+                        x = selection.xStart
+                        y = selection.yStart
+                    |}
 
-                table.AddColumn(header, values, forceReplace = true)
-                Ok input.Selectors.Length
-            with exceptionValue ->
-                Error exceptionValue.Message
-
-let applyToDataMap (dataMap: DataMap) (input: AnnotationInput) =
-    match input.Target with
-    | AnnotationTarget.Table _ -> Error "Table target cannot be applied to a DataMap destination."
-    | AnnotationTarget.DataMap writeMode ->
-        try
-            let startIndex =
-                match writeMode with
-                | WriteMode.Replace -> 0
-                | WriteMode.Append -> findLastNonEmptyDataContextIndex dataMap + 1
-
-            let requiredCount = startIndex + input.Selectors.Length
-
-            if requiredCount > dataMap.DataContexts.Count then
-                let toAdd =
-                    Array.init (requiredCount - dataMap.DataContexts.Count) (fun _ -> DataContext())
-
-                dataMap.DataContexts.AddRange toAdd
-
-            if writeMode = WriteMode.Replace then
-                for index in requiredCount .. dataMap.DataContexts.Count - 1 do
-                    let dataContext = dataMap.DataContexts.[index]
-                    dataContext.FilePath <- None
-                    dataContext.Selector <- None
-                    dataContext.Format <- None
-                    dataContext.SelectorFormat <- None
-
-            for selectorOffset in 0 .. input.Selectors.Length - 1 do
-                let targetIndex = startIndex + selectorOffset
-                let selector = input.Selectors.[selectorOffset]
-
-                dataMap.DataContexts.[targetIndex]
-                |> setDataContextFields input.FileName input.FileType selector
-                |> ignore
-
-            Ok input.Selectors.Length
-        with exceptionValue ->
-            Error exceptionValue.Message
+                    dataMap.PasteStructuredCells(anchor, [| anchor |], cells |> Array.map Array.singleton)
+                    setArcFile nextArcFile
+                    Ok cells.Length
+                | _ -> Error "Select a DataMap cell to insert selectors."
+            | None -> Error "Select table or DataMap cells before inserting selectors."
+    with ex ->
+        Error ex.Message
 
 let DefaultSeparatorOptions: (string * string)[] = [|
     "\\t", "Tab (\\t)"

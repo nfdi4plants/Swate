@@ -6,6 +6,8 @@ open Swate.Components.Shared
 open global.Spreadsheet
 
 module ComponentDataAnnotatorTypes = Swate.Components.Composite.Widgets.DataAnnotator.Types
+module ComponentDataAnnotatorHelper = Swate.Components.Composite.Widgets.DataAnnotator.Helper
+module WidgetTypes = Swate.Components.Composite.Widgets.Types
 
 let private createTableState rowCount =
     let table = ArcTable.init "TestTable"
@@ -104,18 +106,22 @@ let Main =
             let arcFile = ArcFiles.Assay assay
             let mutable nextArcFile = None
 
-            Swate.Components.Page.ArcFileEditor.Helper.applyDataAnnotatorInputToArcFile
-                (ComponentDataAnnotatorTypes.AnnotationDestination.DataMap dataMap,
-                 arcFile,
-                 (fun value -> nextArcFile <- Some value))
+            ComponentDataAnnotatorHelper.insertAnnotationIntoSelectedCells
+                arcFile
+                (fun value -> nextArcFile <- Some value)
                 {
                     Selectors = [| "row=2" |]
                     FileName = "test.csv"
                     FileType = "text/csv"
-                    Target =
-                        ComponentDataAnnotatorTypes.AnnotationTarget.DataMap
-                            ComponentDataAnnotatorTypes.WriteMode.Replace
                 }
+                (Some(
+                    WidgetTypes.InsertTarget.DataMap {|
+                        xStart = 1
+                        xEnd = 1
+                        yStart = 1
+                        yEnd = 1
+                    |}
+                ))
             |> Result.defaultWith failwith
             |> ignore
 
@@ -164,25 +170,31 @@ let Main =
         <| fun _ ->
             let table = ArcTable.init "MyTable"
             table.AddColumn(CompositeHeader.FreeText "Source", ResizeArray [ CompositeCell.FreeText "sample" ])
+            table.AddColumn(CompositeHeader.Output IOType.Data, ResizeArray [ CompositeCell.emptyData ])
             let assay = ArcAssay.init "MyAssay"
             assay.AddTable table
             let arcFile = ArcFiles.Assay assay
             let mutable nextArcFile = None
 
-            Swate.Components.Page.ArcFileEditor.Helper.applyDataAnnotatorInputToArcFile
-                (ComponentDataAnnotatorTypes.AnnotationDestination.Table table,
-                 arcFile,
-                 (fun value -> nextArcFile <- Some value))
+            ComponentDataAnnotatorHelper.insertAnnotationIntoSelectedCells
+                arcFile
+                (fun value -> nextArcFile <- Some value)
                 {
                     Selectors = [| "row=2" |]
                     FileName = "test.csv"
                     FileType = "text/csv"
-                    Target =
-                        ComponentDataAnnotatorTypes.AnnotationTarget.Table(
-                            ComponentDataAnnotatorTypes.TargetColumn.Autodetect,
-                            ComponentDataAnnotatorTypes.WriteMode.Replace
-                        )
                 }
+                (Some(
+                    WidgetTypes.InsertTarget.Table(
+                        0,
+                        {|
+                            xStart = 1
+                            xEnd = 1
+                            yStart = 0
+                            yEnd = 0
+                        |}
+                    )
+                ))
             |> Result.defaultWith failwith
             |> ignore
 
