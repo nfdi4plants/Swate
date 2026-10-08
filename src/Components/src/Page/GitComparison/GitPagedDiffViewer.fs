@@ -434,12 +434,21 @@ module internal GitPagedDiffDisplay =
     /// The width of the line number column as a CSS length, wide enough for the longest line
     /// number of the rows and never narrower than 3.5rem. The cell has 0.75rem of padding on each
     /// side and a 1px border. Every row and both sides use the same width, so the columns line up.
-    let numberColumnWidth (rows: Row[]) =
+    let private numberColumnWidthOf (lines: PagedLine[]) =
+        // The widest number has the most digits, so only that one is formatted. This runs on
+        // every page that arrives.
         let digits =
-            rowLines rows
-            |> Array.fold (fun widest line -> max widest (lineNumberText line.Number).Length) 0
+            if lines.Length = 0 then
+                0
+            else
+                (lines
+                 |> Array.fold (fun widest line -> max widest line.Number) 0.0
+                 |> lineNumberText)
+                    .Length
 
         $"max(3.5rem, calc({digits}ch + 1.5rem + 1px))"
+
+    let numberColumnWidth (rows: Row[]) = numberColumnWidthOf (rowLines rows)
 
     /// The minimum width of one column as a CSS length, wide enough for the longest line of the
     /// rows. The rows use a monospace font, so the width counts characters. Controls beside a line
@@ -459,7 +468,7 @@ module internal GitPagedDiffDisplay =
             )
 
         let controls = if hasControls then " + 14rem" else ""
-        $"max(29rem, calc(1.5rem + {numberColumnWidth rows} + {characters + 2}ch{controls}))"
+        $"max(29rem, calc(1.5rem + {numberColumnWidthOf lines} + {characters + 2}ch{controls}))"
 
     let endingText ending =
         match ending with
