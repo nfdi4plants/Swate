@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### ✨ Added
 
 - Add setting to adjust UI scaling. This can also be done using the keyboard shortcuts "Ctrl + +" or "Ctrl + -" (or "⌘ + +" / "⌘ + -" on MacOS). #1165 (by @Freymaurer)
+- Add display of PDFs (read-only) in Swate using the built-in browser compatibility of Electron. #1326 (by @Rookabu)
 
 ## 2.4.0 - 2026-10-07
 

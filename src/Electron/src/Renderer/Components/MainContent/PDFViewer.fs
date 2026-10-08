@@ -21,17 +21,16 @@ type DisplayPDF =
     [<ReactComponent>]
     static member Main(filehtml) =
 
-        let pdfUrl, setPdfUrl = React.useState<string option>(None)
+        let pdfUrl, setPdfUrl = React.useState<string option> (None)
 
-        React.useEffect(
+        React.useEffect (
             (fun () ->
                 let data = PDFData.fromBase64 filehtml
                 let url = PDFData.createUrl data
 
                 setPdfUrl (Some url)
-                fun () ->
-                    PDFData.revokeUrl url
-                
+                fun () -> PDFData.revokeUrl url
+
             ),
             [| box filehtml |]
         )
@@ -40,16 +39,8 @@ type DisplayPDF =
             prop.className "swt:w-full"
             prop.children [
                 match pdfUrl with
-                | Some url ->
-                    Html.iframe [
-                        prop.src url
-                        prop.className "swt:w-full swt:h-full"
-                    ]
+                | Some url -> Html.iframe [ prop.src url; prop.className "swt:w-full swt:h-full" ]
 
-                | None ->
-                    LoadingSpinner.LoadingSpinner(
-                        "Loading PDF",
-                        size = DaisyuiSize.XL
-                    )
+                | None -> LoadingSpinner.LoadingSpinner("Loading PDF", size = DaisyuiSize.XL)
             ]
         ]
