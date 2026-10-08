@@ -8,6 +8,7 @@ open Swate.Components.Primitive.LayoutComponents
 open Swate.Components.Composite.ThemeSelector
 open Swate.Components.Composite.ThemeSelector.Context
 open Swate.Components.Composite.TermSearch
+open Swate.Components.Util.UserOS
 
 module SettingsPageDefaults =
     [<Literal>]
@@ -69,7 +70,76 @@ type SettingsPage =
         )
 
     [<ReactComponent>]
-    static member private General(?onAutoCreateNotesFolderEnabled: unit -> unit) =
+    static member private UIScalingSetting(uiScaling: int, onUIScaling: int -> unit) =
+        let scalingDraft, setScalingDraft = React.useState uiScaling
+
+        React.useEffect ((fun () -> setScalingDraft uiScaling), [| box uiScaling |])
+
+        let modifierKey =
+            match getUserOS () with
+            | MacOS
+            | IOS -> "⌘"
+            | _ -> "Ctrl"
+
+        SettingsPage.SettingColumnElement(
+            "UI Scaling",
+            Html.div [
+                prop.className "swt:join"
+                prop.children [
+                    Html.label [
+                        prop.className "swt:join-item swt:input"
+                        prop.children [
+                            Html.input [
+                                prop.className "swt:w-16"
+                                prop.onChange setScalingDraft
+                                prop.type'.number
+                                prop.value scalingDraft
+                                prop.step 5
+                            ]
+                            Html.text "%"
+                        ]
+                    ]
+                    Html.div [
+                        prop.text "Update"
+                        prop.className "swt:join-item swt:btn"
+                        prop.onClick (fun _ -> onUIScaling scalingDraft)
+                    ]
+                ]
+            ],
+            description =
+                Html.div [
+                    Html.p [
+                        prop.className "swt:mt-1 swt:text-sm swt:text-base-content/70"
+                        prop.text
+                            "Allows adjusting the scaling of the user interface. 100% represents the default size."
+                    ]
+                    Html.p [
+                        prop.className "swt:text-sm swt:text-base-content/70"
+                        prop.children [
+                            Html.text "Scale the UI globally with "
+                            Html.kbd [
+                                prop.className "swt:kbd swt:kbd-sm"
+                                prop.text modifierKey
+                            ]
+                            Html.text " + "
+                            Html.kbd [ prop.className "swt:kbd swt:kbd-sm"; prop.text "+" ]
+                            Html.text " or "
+                            Html.kbd [
+                                prop.className "swt:kbd swt:kbd-sm"
+                                prop.text modifierKey
+                            ]
+                            Html.text " + "
+                            Html.kbd [ prop.className "swt:kbd swt:kbd-sm"; prop.text "-" ]
+                            Html.text "."
+                        ]
+                    ]
+                ]
+        )
+
+    [<ReactComponent>]
+    static member private General
+        (?onAutoCreateNotesFolderEnabled: unit -> unit, ?uiScaling: int, ?onUIScaling: int -> unit)
+        =
         let onAutoCreateNotesFolderEnabled =
             defaultArg onAutoCreateNotesFolderEnabled ignore
 
@@ -88,6 +158,10 @@ type SettingsPage =
                 )
 
                 SettingsPage.AutoCreateNotesFolderSetting(onEnabled = onAutoCreateNotesFolderEnabled)
+
+                match uiScaling, onUIScaling with
+                | Some uiScaling, Some onUIScaling -> SettingsPage.UIScalingSetting(uiScaling, onUIScaling)
+                | _, _ -> Html.none
             ]
         )
 
@@ -107,12 +181,18 @@ type SettingsPage =
         )
 
     [<ReactComponent>]
-    static member SettingsPage(?onAutoCreateNotesFolderEnabled: unit -> unit) =
+    static member SettingsPage
+        (?onAutoCreateNotesFolderEnabled: unit -> unit, ?uiScaling: int, ?onUIScaling: int -> unit)
+        =
         let onAutoCreateNotesFolderEnabled =
             defaultArg onAutoCreateNotesFolderEnabled ignore
 
         LayoutComponents.Section [
-            SettingsPage.General(onAutoCreateNotesFolderEnabled = onAutoCreateNotesFolderEnabled)
+            SettingsPage.General(
+                onAutoCreateNotesFolderEnabled = onAutoCreateNotesFolderEnabled,
+                ?uiScaling = uiScaling,
+                ?onUIScaling = onUIScaling
+            )
 
             SettingsPage.SearchConfig()
 

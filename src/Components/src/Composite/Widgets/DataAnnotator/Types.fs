@@ -3,43 +3,10 @@ module Swate.Components.Composite.Widgets.DataAnnotator.Types
 open System
 open ARCtrl
 
-[<RequireQualifiedAccess>]
-type TargetColumn =
-    | Input
-    | Output
-    | Autodetect
-
-    static member fromString(value: string) =
-        match value.ToLowerInvariant() with
-        | "input" -> TargetColumn.Input
-        | "output" -> TargetColumn.Output
-        | _ -> TargetColumn.Autodetect
-
-[<RequireQualifiedAccess>]
-type WriteMode =
-    | Replace
-    | Append
-
-    static member fromString(value: string) =
-        match value.ToLowerInvariant() with
-        | "append" -> WriteMode.Append
-        | _ -> WriteMode.Replace
-
-[<RequireQualifiedAccess>]
-type AnnotationTarget =
-    | Table of targetColumn: TargetColumn * writeMode: WriteMode
-    | DataMap of writeMode: WriteMode
-
-[<RequireQualifiedAccess>]
-type AnnotationDestination =
-    | Table of ArcTable
-    | DataMap of DataMap
-
 type AnnotationInput = {
     Selectors: string[]
     FileName: string
     FileType: string
-    Target: AnnotationTarget
 }
 
 [<RequireQualifiedAccess>]
@@ -85,6 +52,49 @@ type DataFile = {
             "\t"
         else
             ","
+
+    member this.SplitBySeparator(?separator: string) =
+        let sep = defaultArg separator this.ExpectedSeparator
+
+        let sanitizedSeparator =
+            match sep with
+            | "\\t" -> "\t"
+            | "\\n" -> "\n"
+            | "\\f" -> "\f"
+            | "\\r" -> "\r"
+            | "\\r\\n" -> "\r\n"
+            | "\\v" -> "\v"
+            | _ -> sep
+
+        let rows =
+            this.DataContent.Split(
+                Swate.Components.ClipboardContract.Contract.LineBreaks,
+                StringSplitOptions.RemoveEmptyEntries
+            )
+
+        let splitRow (value: string) (separator: string) =
+            if separator.Length = 1 then
+                value.Split separator.[0]
+            else
+                value.Split([| separator |], StringSplitOptions.None)
+
+        rows |> Array.map (fun row -> splitRow row sanitizedSeparator)
+
+type DataFileParseConfig = {
+    Separator: string
+    HasHeader: bool
+} with
+
+    static member createDefault(?dataFile: DataFile) =
+        let separator =
+            match dataFile with
+            | Some df -> df.ExpectedSeparator
+            | None -> ","
+
+        {
+            Separator = separator
+            HasHeader = true
+        }
 
 type ParsedDataFile = {
     HeaderRow: string[] option

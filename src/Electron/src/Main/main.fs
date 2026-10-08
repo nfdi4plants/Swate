@@ -43,6 +43,7 @@ app
         Remoting.createIpc () |> Remoting.fromValue Main.IPC.AuthApi.api
         Remoting.createIpc () |> Remoting.fromValue Main.IPC.TemplateApi.api
         Remoting.createIpc () |> Remoting.fromValue Main.IPC.ValidationPackageApi.api
+        Remoting.createIpc () |> Remoting.fromValue Main.IPC.UiSettingsApi.api
 
         app.onActivate (fun _ ->
             if BrowserWindow.getAllWindows().Length = 0 then

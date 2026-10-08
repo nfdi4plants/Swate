@@ -73,10 +73,15 @@ type SortableList =
         (
             items: SortableListItem<'A>[],
             onItemsChange: SortableListItem<'A>[] -> unit,
+            ?selectedIds: string list,
+            ?setSelectedIds: (string list -> string list) -> unit,
             ?renderRow: SortableListRowRender<'A> -> ReactElement,
             ?rowProps: SortableListItem<'A> -> IReactProperty list,
             ?className: string
         ) =
+
+        let lastInteraction, setLastInteraction = React.useState (None: string option)
+
         let move oldIndex newIndex =
             if
                 oldIndex <> newIndex
@@ -85,9 +90,78 @@ type SortableList =
                 && oldIndex < items.Length
                 && newIndex < items.Length
             then
+                let itemId = items.[oldIndex].id
+
                 DndKit.arrayMove (ResizeArray items, oldIndex, newIndex)
                 |> Seq.toArray
                 |> onItemsChange
+
+                setLastInteraction (Some itemId)
+
+        let rowProps: (SortableListItem<'A> -> IReactProperty list) option =
+            let withOnSelect =
+                match setSelectedIds, selectedIds with
+                | Some setSelectedIds, Some selectedIds ->
+                    let defFn = rowProps |> Option.defaultValue (fun _ -> [])
+
+                    fun item ->
+                        defFn item
+                        @ [
+                            prop.className [
+                                "swt:cursor-pointer swt:table-auto"
+                                if List.contains item.id selectedIds then
+                                    "swt:bg-base-300"
+                                if lastInteraction.IsSome && item.id = lastInteraction.Value then
+                                    "swt:outline swt:outline-primary"
+                            ]
+                            prop.onClick (fun event ->
+                                let selectRange () =
+                                    match lastInteraction with
+                                    | Some lastInteractionId when event.shiftKey ->
+                                        let lastIndex =
+                                            items |> Array.tryFindIndex (fun item -> item.id = lastInteractionId)
+
+                                        let currentIndex =
+                                            items |> Array.tryFindIndex (fun currentItem -> currentItem.id = item.id)
+
+                                        match lastIndex, currentIndex with
+                                        | Some lastIndex, Some currentIndex ->
+                                            let firstIndex = min lastIndex currentIndex
+                                            let lastIndex = max lastIndex currentIndex
+
+                                            let rangeIds = items.[firstIndex..lastIndex] |> Array.map _.id
+
+                                            setSelectedIds (fun current ->
+                                                rangeIds
+                                                |> Array.fold
+                                                    (fun selected id ->
+                                                        if List.contains id selected then
+                                                            selected
+                                                        else
+                                                            id :: selected
+                                                    )
+                                                    current
+                                            )
+
+                                            true
+                                        | _ -> false
+                                    | _ -> false
+
+                                if not (selectRange ()) then
+                                    setSelectedIds (fun current ->
+                                        if List.contains item.id current then
+                                            List.filter ((<>) item.id) current
+                                        else
+                                            item.id :: current
+                                    )
+
+                                setLastInteraction (Some item.id)
+                            )
+                        ]
+                    |> Some
+                | _, _ -> rowProps
+
+            withOnSelect
 
         let remove id =
             items |> Array.filter (fun item -> item.id <> id) |> onItemsChange
@@ -111,7 +185,9 @@ type SortableList =
                     items |> Array.tryFindIndex (fun item -> item.id = string event.over.id)
 
                 match oldIndex, newIndex with
-                | Some oldIndex, Some newIndex -> move oldIndex newIndex
+                | Some oldIndex, Some newIndex ->
+                    move oldIndex newIndex
+                    setLastInteraction (Some(string event.active.id))
                 | _ -> ()
 
         let itemIds =
