@@ -19,20 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### ✨ Added
 
 - Add setting to adjust UI scaling. This can also be done using the keyboard shortcuts "Ctrl + +" or "Ctrl + -" (or "⌘ + +" / "⌘ + -" on MacOS). #1165 (by @Freymaurer)
-- The Git sidebar has a "Background indexing limit (MB)" setting, 1024 MB by default. An open diff stops reading its remaining pages in the background once the pages read add up to the limit, and scrolling to the end or the continue button reads on. A status bar above the diff shows the progress while the background reading runs. It also says when the reading stopped at the limit or paused.
-- A limit from 1 to 63 MB keeps the diff in memory, and the value is its memory budget. Swate keeps about 1 GB (plus 5 %) free on the temp drive as a policy floor, which is not an absolute guarantee. A diff that opens on a drive with less free space keeps its data in memory with a 64 MB budget, and an open disk diff stops reading when the free space falls to that level. Background reading of a memory diff stops at three quarters of the budget and keeps the rest for your actions, such as showing hidden lines. When the budget is used up, or the temp drive runs low on space while a disk diff reads, the end of the diff shows a note. After a low-space stop, Continue reads again once space is free. A committed Git file larger than min(16 MiB, budget / 2, budget - 576 KiB) is blocked with a note that names the sizes. The status bar names memory mode and each stop.
-- When reading the next page of a diff fails, the status bar shows the failure message.
+- A new Git sidebar setting, "Background indexing limit (MB)", decides how much of a large diff Swate reads ahead while you look at it. With a value from 1 to 63 the diff stays in memory and writes no temporary files. #1388 (by @caroott)
+- Swate keeps about 1 GB free on the drive that holds its temporary files. On a nearly full drive a new diff stays in memory, and an open diff pauses until you free some space and press Continue. #1388 (by @caroott)
+- When loading more of a diff fails, the status bar above the diff says why. #1388 (by @caroott)
 
 ### 🔄 Changed
 
-- Swate requires Git 2.42 or newer and Git LFS 3.7 or newer, with the Git LFS filter configured.
-- The diff of a changed file opens page by page, so Swate compares files of any size. The comparison runs in background worker threads and keeps the window responsive. The page shows progress and a preview of the lines being read, loads more rows as you scroll, and shows hidden unchanged lines on request. Long lines load in pieces with "Load more", and changed words are highlighted. Binary and other non-text content is blocked with the reason. UTF-8 is chosen without a question. A version that turns out not to be UTF-8 while the diff is read offers Windows-1252, and the diff reopens with the chosen encoding. When a request for hidden lines, more of a line or unloaded rows fails, its button shows the failure and the rows stay. After 15 minutes without use, or when a fourth open diff takes its worker, the diff loses its worker. A diff that loses its worker while it reads in the background pauses and continues on your next action. An idle diff reopens on the first request that reaches it and lands on the page that request asks for. That can be a page passed on the way (End with a row button focused, or a drag of the scrollbar thumb), and a second request, such as a second End, reaches the target.
-- The Components `GitSidebar` takes a required `diffIndexingLimitMb` argument, and `GitSidebarCallbacks` has a required `OnSaveDiffIndexingLimit` callback.
-- The Components `GitPagedDiffViewer.Viewer` takes the optional arguments `endNote` and `failureNote`. With an `endNote` the end row shows the note, the viewer never asks for the next page by itself, and the continue button shows only when `requestNext` is set. The `failureNote` is the tooltip of a failed gap or line control.
-
-### 🔥 Removed
-
-- The Components package no longer exports `GitDiffViewer`. `GitPagedDiffViewer` replaces it.
+- The diff of a changed file opens page by page and loads more lines as you scroll. Files of several gigabytes now open quickly, and Swate stays responsive while it reads the rest in the background. Files with many repeated lines, such as tables with repeating rows, show each edited line on its own. #1388 (by @caroott)
+- Swate needs Git 2.42 or newer. #1388 (by @caroott)
 
 ## 2.4.0 - 2026-10-07
 
