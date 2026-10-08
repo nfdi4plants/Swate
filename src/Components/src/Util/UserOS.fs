@@ -11,7 +11,6 @@ type UserOS =
     | Unknown
 
 let getUserOS () =
-    let navigator = navigator
     let userAgent = navigator.userAgent.ToLowerInvariant()
     let platform = navigator.platform.ToLowerInvariant()
 
