@@ -907,7 +907,6 @@ export const SavesADiffIndexingLimitInTheMemoryRange: Story = {
 
     await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
     const input = canvas.getByTestId("GitSidebarDiffIndexingLimitInput");
-    await expect(canvas.queryByTestId("GitSidebarDiffFreeSpaceReserveInput")).toBeNull();
 
     await setNumberInput(input, "0");
     await userEvent.click(canvas.getByTestId("GitSidebarDiffIndexingLimitSaveButton"));

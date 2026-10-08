@@ -1194,6 +1194,21 @@ export const LongLineStaysInItsColumn: Story = {
   },
 };
 
+// The control lies inside the client area of the scroller, and a click at its center reaches it.
+async function expectControlInView(canvas: ReturnType<typeof within>, scroll: HTMLElement, testId: string) {
+  const control = canvas.getByTestId(testId);
+  const box = control.getBoundingClientRect();
+  const view = scroll.getBoundingClientRect();
+  const left = view.left + scroll.clientLeft;
+  const top = view.top + scroll.clientTop;
+  await expect(box.left).toBeGreaterThanOrEqual(left);
+  await expect(box.right).toBeLessThanOrEqual(left + scroll.clientWidth);
+  await expect(box.top).toBeGreaterThanOrEqual(top);
+  await expect(box.bottom).toBeLessThanOrEqual(top + scroll.clientHeight);
+  const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+  await expect(control.contains(hit)).toBe(true);
+}
+
 // A diff whose line is far wider than the view, with a hidden gap above it.
 function WideLineGapHarness() {
   const [parts, setParts] = React.useState<PagedPart_$union[]>([
@@ -1227,20 +1242,7 @@ export const GapControlsStayInViewWithLongLines: Story = {
     const scroll = canvas.getByTestId("git-paged-wide-gap-content").parentElement as HTMLElement;
     await expect(scroll.scrollWidth).toBeGreaterThan(scroll.clientWidth * 2);
 
-    // The control lies inside the client area of the scroller, and a click at its center reaches it.
-    const expectInView = async (testId: string) => {
-      const control = canvas.getByTestId(testId);
-      const box = control.getBoundingClientRect();
-      const view = scroll.getBoundingClientRect();
-      const left = view.left + scroll.clientLeft;
-      const top = view.top + scroll.clientTop;
-      await expect(box.left).toBeGreaterThanOrEqual(left);
-      await expect(box.right).toBeLessThanOrEqual(left + scroll.clientWidth);
-      await expect(box.top).toBeGreaterThanOrEqual(top);
-      await expect(box.bottom).toBeLessThanOrEqual(top + scroll.clientHeight);
-      const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
-      await expect(control.contains(hit)).toBe(true);
-    };
+    const expectInView = (testId: string) => expectControlInView(canvas, scroll, testId);
 
     const start = "git-paged-wide-gap-gap-expand-start-wide-gap";
     const end = "git-paged-wide-gap-gap-expand-end-wide-gap";
@@ -1256,6 +1258,69 @@ export const GapControlsStayInViewWithLongLines: Story = {
     await userEvent.click(canvas.getByTestId(start));
     await waitFor(() => expect(canvas.queryByTestId(start)).toBeNull());
     await waitFor(() => expectInView("git-paged-wide-gap-gap-expand-start-wide-gap-right"));
+  },
+};
+
+const wideStopNextSpy = fn();
+
+// Two long lines around an evicted page. The reading stopped with a note and the host passes a
+// next callback, so the continue row shows the note and the button.
+function WideLineStopHarness() {
+  const parts = React.useMemo(
+    () => [
+      PagedPart_HunkRows("wide-stop-first", range(0, 1), range(0, 1), true, false, [
+        new PagedRow("wide-stop-row-0", "replaced", makeLine(0, "short previous line"), makeLine(0, "x".repeat(3000))),
+      ]),
+      PagedPart_EvictedPage("wide-old-page", 3),
+      PagedPart_HunkRows("wide-stop-last", range(4, 1), range(4, 1), false, true, [
+        new PagedRow("wide-stop-row-4", "replaced", makeLine(4, "short previous line"), makeLine(4, "x".repeat(3000))),
+      ]),
+    ],
+    [],
+  );
+
+  return (
+    <div style={{ height: "30rem" }}>
+      <GitPagedDiffViewerComponent
+        parts={parts}
+        status={PagedDiffStatus_Ready()}
+        progress={new PagedProgress(300, 1000, false)}
+        hasMore={true}
+        outputComplete={false}
+        endNote="The reading stopped."
+        requestNext={() => wideStopNextSpy()}
+        requestReplay={() => {}}
+        testIdPrefix="git-paged-wide-stop"
+      />
+    </div>
+  );
+}
+
+export const ContinueAndReloadControlsStayInViewWithLongLines: Story = {
+  render: () => <WideLineStopHarness />,
+  play: async ({ canvasElement }) => {
+    wideStopNextSpy.mockClear();
+    const canvas = within(canvasElement);
+    const scroll = canvas.getByTestId("git-paged-wide-stop-content").parentElement as HTMLElement;
+    await expect(scroll.scrollWidth).toBeGreaterThan(scroll.clientWidth * 2);
+
+    const expectInView = (testId: string) => expectControlInView(canvas, scroll, testId);
+    const reload = "git-paged-wide-stop-folded-replay-wide-old-page";
+    const next = "git-paged-wide-stop-continue-button";
+
+    await expect(scroll.scrollLeft).toBe(0);
+    await expectInView(reload);
+    await expectInView(next);
+
+    scroll.scrollLeft = scroll.scrollWidth;
+    await fireEvent.scroll(scroll);
+    await expect(scroll.scrollLeft).toBeGreaterThan(scroll.clientWidth);
+    await waitFor(() => expectInView(reload));
+    await expectInView(next);
+
+    await expect(wideStopNextSpy).not.toHaveBeenCalled();
+    await userEvent.click(canvas.getByTestId(next));
+    await waitFor(() => expect(wideStopNextSpy).toHaveBeenCalledTimes(1));
   },
 };
 
