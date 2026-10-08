@@ -387,6 +387,9 @@ Vitest.describe (
                         Vitest.expect(names |> Array.contains "README.md").toBe (true)
                         Vitest.expect(names |> Array.contains "dataset").toBe (true)
                         Vitest.expect(names |> Array.contains "file-0000.txt").toBe (false)
+
+                        tree.Values
+                        |> Seq.iter (fun entry -> Vitest.expect(entry.largeObject).toEqual (None))
                     })
             }
         )
@@ -410,6 +413,9 @@ Vitest.describe (
                         let! studyChildren = FileTreeCreator.readFileTreeDirectory rootPath "studies/S1"
                         let childNames = studyChildren |> Array.map _.name |> Array.sort
                         Vitest.expect(childNames).toEqual ([| "dataset"; "isa.study.xlsx" |])
+
+                        studyChildren
+                        |> Array.iter (fun entry -> Vitest.expect(entry.largeObject).toEqual (None))
 
                         Vitest
                             .expect(studyChildren |> Array.exists (fun entry -> entry.name = "sample.txt"))

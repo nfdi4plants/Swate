@@ -10,49 +10,143 @@ open Swate.Electron.Shared.FileIOHelper
 [<AutoOpen>]
 module ArcLoadExtensions =
 
-    let private discoverStructuralArcFilePathsAsync (arcPath: string) = promise {
-        let paths = ResizeArray<string>()
-        let! rootEntries = readdirWithTypesAsync arcPath (ReaddirOptions(withFileTypes = true))
+    // Limit outstanding filesystem reads without introducing threads, Web Workers, or background services.
+    // These reads still run through JavaScript promises on the existing event loop.
+    let private maxConcurrentStructuralReads = 8
 
-        rootEntries
-        |> Array.tryFind (fun entry ->
-            entry.isFile ()
-            && PathHelpers.pathsEqual entry.name ArcPathHelper.InvestigationFileName
-        )
-        |> Option.iter (fun entry -> paths.Add entry.name)
+    /// Maps an array through a fixed number of asynchronous promise loops.
+    /// Each loop claims the next input only after its current operation completes, while results are
+    /// written back to their original indices so promise completion order cannot reorder the output.
+    let internal mapBoundedAsync
+        (maxConcurrency: int)
+        (operation: 'Input -> Fable.Core.JS.Promise<'Output>)
+        (inputs: 'Input[])
+        : Fable.Core.JS.Promise<'Output[]> =
+        promise {
+            if maxConcurrency < 1 then
+                invalidArg (nameof maxConcurrency) "Concurrency must be at least one."
 
-        for zone in ArcEntityPathRules.allAddZones do
-            let zoneFolder = ArcEntityPathRules.zoneFolderName zone
+            let results = Array.zeroCreate<'Output> inputs.Length
+            let mutable nextIndex = 0
 
-            match
-                rootEntries
-                |> Array.tryFind (fun entry -> entry.isDirectory () && PathHelpers.pathsEqual entry.name zoneFolder)
-            with
-            | None -> ()
-            | Some zoneEntry ->
-                let zonePath = join [| arcPath; zoneEntry.name |]
-                let! entityEntries = readdirWithTypesAsync zonePath (ReaddirOptions(withFileTypes = true))
+            let rec runWorker () = promise {
+                let index = nextIndex
+                nextIndex <- nextIndex + 1
 
-                for entityEntry in entityEntries do
-                    if entityEntry.isDirectory () then
-                        let entityPath = join [| zonePath; entityEntry.name |]
+                if index < inputs.Length then
+                    let! result = operation inputs.[index]
+                    results.[index] <- result
+                    return! runWorker ()
+            }
 
-                        let! metadataEntries = readdirWithTypesAsync entityPath (ReaddirOptions(withFileTypes = true))
+            let workers = Array.init (min maxConcurrency inputs.Length) (fun _ -> runWorker ())
 
-                        for metadataEntry in metadataEntries do
-                            if
-                                metadataEntry.isFile ()
-                                && [|
-                                    ArcEntityPathRules.zoneEntityFileName zone
-                                    ArcPathHelper.DataMapFileName
-                                    LegacyDataMapFileName
-                                   |]
-                                   |> Array.exists (PathHelpers.pathsEqual metadataEntry.name)
-                            then
-                                paths.Add $"{zoneEntry.name}/{entityEntry.name}/{metadataEntry.name}"
+            // Await every loop so a read failure is propagated to structural discovery.
+            let! _ = Fable.Core.JS.Constructors.Promise.all workers
+            return results
+        }
 
-        return paths.ToArray()
+    type private StructuralEntityDirectory = {
+        Zone: ArcEntityPathRules.AddZone
+        ZoneName: string
+        ZonePath: string
+        EntityName: string
     }
+
+    let internal discoverStructuralArcFilePathsWithAsync
+        (readDirectory: string -> ReaddirOptions -> Fable.Core.JS.Promise<Dirent[]>)
+        (arcPath: string)
+        =
+        promise {
+            // The root snapshot is authoritative: zones absent here are optional and are never read.
+            let! rootEntries = readDirectory arcPath (ReaddirOptions(withFileTypes = true))
+
+            let investigationPath =
+                rootEntries
+                |> Array.tryFind (fun entry ->
+                    entry.isFile ()
+                    && PathHelpers.pathsEqual entry.name ArcPathHelper.InvestigationFileName
+                )
+                |> Option.map _.name
+                |> Option.toArray
+
+            let existingZones =
+                ArcEntityPathRules.allAddZones
+                |> List.choose (fun zone ->
+                    let zoneFolder = ArcEntityPathRules.zoneFolderName zone
+
+                    rootEntries
+                    |> Array.tryFind (fun entry ->
+                        entry.isDirectory () && PathHelpers.pathsEqual entry.name zoneFolder
+                    )
+                    |> Option.map (fun zoneEntry -> zone, zoneEntry.name, join [| arcPath; zoneEntry.name |])
+                )
+                |> List.toArray
+
+            let! zoneEntries =
+                existingZones
+                |> mapBoundedAsync
+                    maxConcurrentStructuralReads
+                    (fun (zone, zoneName, zonePath) -> promise {
+                        let! entries = readDirectory zonePath (ReaddirOptions(withFileTypes = true))
+                        return zone, zoneName, zonePath, entries
+                    })
+
+            // Zone reads reveal only immediate entity directories; discovery never descends into payload folders.
+            let entityDirectories =
+                zoneEntries
+                |> Array.collect (fun (zone, zoneName, zonePath, entries) ->
+                    entries
+                    |> Array.choose (fun entry ->
+                        if entry.isDirectory () then
+                            Some {
+                                Zone = zone
+                                ZoneName = zoneName
+                                ZonePath = zonePath
+                                EntityName = entry.name
+                            }
+                        else
+                            None
+                    )
+                )
+
+            let! entityMetadataPaths =
+                entityDirectories
+                |> mapBoundedAsync
+                    maxConcurrentStructuralReads
+                    (fun entity -> promise {
+                        let entityPath = join [| entity.ZonePath; entity.EntityName |]
+                        let! metadataEntries = readDirectory entityPath (ReaddirOptions(withFileTypes = true))
+
+                        let allowedFileNames = [|
+                            ArcEntityPathRules.zoneEntityFileName entity.Zone
+                            ArcPathHelper.DataMapFileName
+                            LegacyDataMapFileName
+                        |]
+
+                        return
+                            metadataEntries
+                            |> Array.choose (fun metadataEntry ->
+                                if
+                                    metadataEntry.isFile ()
+                                    && allowedFileNames |> Array.exists (PathHelpers.pathsEqual metadataEntry.name)
+                                then
+                                    Some $"{entity.ZoneName}/{entity.EntityName}/{metadataEntry.name}"
+                                else
+                                    None
+                            )
+                    })
+
+            // Normalize and sort after all reads so filesystem enumeration and promise completion order
+            // cannot affect the paths passed to ARC.fromFilePaths.
+            return
+                Array.append investigationPath (Array.concat entityMetadataPaths)
+                |> Array.map PathHelpers.normalizePath
+                |> Array.sort
+        }
+
+    let private discoverStructuralArcFilePathsAsync (arcPath: string) =
+        discoverStructuralArcFilePathsWithAsync readdirWithTypesAsync arcPath
 
     let migrateLegacyDataMapPathsAsync (arcPath: string) (paths: string[]) = promise {
         let migratedPaths = ResizeArray<string>()

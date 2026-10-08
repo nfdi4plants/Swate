@@ -517,7 +517,12 @@ module ArcVaultExtensions =
                             | _ -> None
                         )
 
-                    let! enrichedChangedFiles = getFileEntriesWithLfsMetadata arcPath changedFiles
+                    // TEMPORARILY DISABLED due to LFS problems:
+                    // FileTree LFS enrichment performs a repository-wide ListObjects operation.
+                    // Re-enable only when VersionControlService offers bounded object-state lookup
+                    // for the explicit changed paths.
+                    // let! enrichedChangedFiles = getFileEntriesWithLfsMetadata arcPath changedFiles
+                    let enrichedChangedFiles = changedFiles
                     let mutable enrichedChangedFileIndex = 0
 
                     for event, readEntry in Array.zip (normalizedEvents |> List.toArray) readEntries do

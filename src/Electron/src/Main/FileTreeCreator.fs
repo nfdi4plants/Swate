@@ -190,7 +190,14 @@ let readFileTreeDirectory (arcPath: string) (relativeDirectoryPath: string) : Fa
                 Some(FileEntry.create (name, fullPath, isDirectory, None))
         )
 
-    return! getFileEntriesWithLfsMetadata normalizedArcPath entries
+    // TEMPORARILY DISABLED due to LFS problems:
+    // FileTree LFS enrichment calls ObjectMaterialization.ListObjects, which enumerates
+    // repository-wide object state and makes this shallow read depend on repository size.
+    //
+    // TODO: Re-enable only after VersionControlService supports bounded object-state
+    // lookup for explicit repository paths. Do not restore repository-wide ListObjects here.
+    // return! getFileEntriesWithLfsMetadata normalizedArcPath entries
+    return entries
 }
 
 /// Builds the bounded startup snapshot: the ARC root and its immediate children.
