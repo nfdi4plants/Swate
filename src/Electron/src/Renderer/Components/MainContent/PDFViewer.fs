@@ -6,69 +6,50 @@ open Fable.Core
 open Swate.Components.Primitive
 open Swate.Components.Primitive.LoadingSpinner
 
-module PDFjs =
-
-    importSideEffects "react-pdf/dist/Page/TextLayer.css"
-    importSideEffects "react-pdf/dist/Page/AnnotationLayer.css"
-
-    emitJsStatement
-        ()
-        """import { pdfjs } from 'react-pdf';
-
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;"""
-
 module private PDFData =
 
     [<Emit("new Uint8Array([...atob($0)].map(c => c.charCodeAt(0)))")>]
     let fromBase64 (value: string) : obj = jsNative
 
-type ReactElements =
-    [<ReactComponent(import = "Document", from = "react-pdf")>]
-    static member Document
-        (
-            file: obj,
-            onLoadSuccess: {| numPages: int |} -> unit,
-            children: ReactElement list,
-            ?externalLinkTarget: string,
-            ?onLoadError: exn -> unit,
-            ?loading: ReactElement
-        ) =
-        React.Imported()
+    [<Emit("URL.createObjectURL(new Blob([$0], { type: 'application/pdf' }))")>]
+    let createUrl (data: obj) : string = jsNative
 
-    [<ReactComponent(import = "Page", from = "react-pdf")>]
-    static member Page(pageNumber: int, width: int, customTextRenderer: 'c -> string, ?key: string) = React.Imported()
+    [<Emit("URL.revokeObjectURL($0)")>]
+    let revokeUrl (url: string) : unit = jsNative
 
 type DisplayPDF =
-
     [<ReactComponent>]
-
     static member Main(filehtml) =
 
-        let (numPages: int option), setNumPages = React.useState (None)
-        let pdfSource = {| data = PDFData.fromBase64 filehtml |}
+        let pdfUrl, setPdfUrl = React.useState<string option>(None)
 
-        let textRender =
-            React.useCallback (
-                (fun text ->
-                    let mutable txt = text?str
-                    txt
-                )
-            )
+        React.useEffect(
+            (fun () ->
+                let data = PDFData.fromBase64 filehtml
+                let url = PDFData.createUrl data
+
+                setPdfUrl (Some url)
+                fun () ->
+                    PDFData.revokeUrl url
+                
+            ),
+            [| box filehtml |]
+        )
 
         Html.div [
-            prop.className "swt:flex swt:w-full swt:justify-center swt:overflow-auto swt:p-4"
+            prop.className "swt:w-full"
             prop.children [
-                ReactElements.Document(
-                    pdfSource,
-                    (fun (props: {| numPages: int |}) -> setNumPages (Some props.numPages)),
+                match pdfUrl with
+                | Some url ->
+                    Html.iframe [
+                        prop.src url
+                        prop.className "swt:w-full swt:h-full"
+                    ]
 
-                    [
-                        for i in 1 .. numPages |> Option.defaultValue 1 do
-                            ReactElements.Page(i, 1200, textRender, $"page-{i}")
-                    ],
-                    externalLinkTarget = "_blank",
-                    onLoadError = (fun e -> Browser.Dom.console.error ("Error loading PDF:", e)),
-                    loading = LoadingSpinner.LoadingSpinner("Loading PDF", size = DaisyuiSize.XL)
-                )
+                | None ->
+                    LoadingSpinner.LoadingSpinner(
+                        "Loading PDF",
+                        size = DaisyuiSize.XL
+                    )
             ]
         ]
