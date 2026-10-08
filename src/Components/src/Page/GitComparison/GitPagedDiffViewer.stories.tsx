@@ -1194,6 +1194,71 @@ export const LongLineStaysInItsColumn: Story = {
   },
 };
 
+// A diff whose line is far wider than the view, with a hidden gap above it.
+function WideLineGapHarness() {
+  const [parts, setParts] = React.useState<PagedPart_$union[]>([
+    PagedPart_HiddenGap("wide-gap", range(0, 12), range(0, 12)),
+    PagedPart_HunkRows("wide-hunk", range(12, 1), range(12, 1), true, true, [
+      new PagedRow("wide-row", "replaced", makeLine(12, "short previous line"), makeLine(12, "x".repeat(3000))),
+    ]),
+  ]);
+
+  return (
+    <div style={{ height: "30rem" }}>
+      <GitPagedDiffViewerComponent
+        parts={parts}
+        status={PagedDiffStatus_Ready()}
+        progress={new PagedProgress(100, 100, true)}
+        hasMore={false}
+        outputComplete={true}
+        requestExpand={(gapId: string, fromStart: boolean) =>
+          setParts((current) => expandGap(current, gapId, fromStart))
+        }
+        testIdPrefix="git-paged-wide-gap"
+      />
+    </div>
+  );
+}
+
+export const GapControlsStayInViewWithLongLines: Story = {
+  render: () => <WideLineGapHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const scroll = canvas.getByTestId("git-paged-wide-gap-content").parentElement as HTMLElement;
+    await expect(scroll.scrollWidth).toBeGreaterThan(scroll.clientWidth * 2);
+
+    // The control lies inside the client area of the scroller, and a click at its center reaches it.
+    const expectInView = async (testId: string) => {
+      const control = canvas.getByTestId(testId);
+      const box = control.getBoundingClientRect();
+      const view = scroll.getBoundingClientRect();
+      const left = view.left + scroll.clientLeft;
+      const top = view.top + scroll.clientTop;
+      await expect(box.left).toBeGreaterThanOrEqual(left);
+      await expect(box.right).toBeLessThanOrEqual(left + scroll.clientWidth);
+      await expect(box.top).toBeGreaterThanOrEqual(top);
+      await expect(box.bottom).toBeLessThanOrEqual(top + scroll.clientHeight);
+      const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      await expect(control.contains(hit)).toBe(true);
+    };
+
+    const start = "git-paged-wide-gap-gap-expand-start-wide-gap";
+    const end = "git-paged-wide-gap-gap-expand-end-wide-gap";
+    await expectInView(start);
+    await expectInView(end);
+
+    scroll.scrollLeft = scroll.scrollWidth;
+    await fireEvent.scroll(scroll);
+    await expect(scroll.scrollLeft).toBeGreaterThan(scroll.clientWidth);
+    await waitFor(() => expectInView(start));
+    await expectInView(end);
+
+    await userEvent.click(canvas.getByTestId(start));
+    await waitFor(() => expect(canvas.queryByTestId(start)).toBeNull());
+    await waitFor(() => expectInView("git-paged-wide-gap-gap-expand-start-wide-gap-right"));
+  },
+};
+
 export const EvictedPageReplaysWhenVisible: Story = {
   render: () => <EvictedHarness onRequestReplay={onRequestReplay} />,
   play: async ({ canvasElement }) => {

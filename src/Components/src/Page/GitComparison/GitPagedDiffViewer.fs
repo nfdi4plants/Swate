@@ -860,6 +860,25 @@ type GitPagedDiffViewer =
                 prop.children children
             ]
 
+        // A full-width row is as wide as the longest line. The controls of such a row sit in a
+        // wrapper that sticks to the left edge of the scroller and takes the width of its visible
+        // area (the scroller is a query container), so they stay in view at any horizontal scroll
+        // position.
+        let inView (className: string) (children: ReactElement list) : ReactElement =
+            Html.div [
+                prop.className $"swt:sticky swt:left-0 {className}"
+                prop.style [ style.custom ("width", "100cqw") ]
+                prop.children children
+            ]
+
+        // A full-width row whose controls sit in the wrapper above. The row keeps its background
+        // and borders across the whole width.
+        let controlRow (className: string) (innerClassName: string) (children: ReactElement list) : ReactElement =
+            Html.div [
+                prop.className $"swt:col-span-2 {className}"
+                prop.children [ inView innerClassName children ]
+            ]
+
         // A header row takes exactly one display row.
         let headerRow (className: string) (children: ReactElement list) : ReactElement =
             fullWidth $"swt:h-7 {className}" children
@@ -912,28 +931,24 @@ type GitPagedDiffViewer =
                 prop.custom ("data-loading", (if replaying then "true" else "false"))
                 prop.style [ style.height height ]
                 prop.children [
-                    Html.div [
-                        prop.className
-                            "swt:sticky swt:top-0 swt:flex swt:h-7 swt:items-center swt:justify-center swt:gap-3 swt:px-4"
-                        prop.children [
-                            if replaying then
-                                Html.span [
-                                    prop.className "swt:loading swt:loading-spinner swt:loading-xs"
-                                ]
-                            Html.span [ prop.text label ]
-                            Html.button [
-                                prop.testId buttonTestId
-                                GitPagedDiffDisplay.failedAttribute failed
-                                prop.className [
-                                    "swt:btn swt:btn-ghost swt:btn-xs"
-                                    GitPagedDiffDisplay.failedClass failed
-                                ]
-                                prop.disabled (replaying || props.RequestReplay.IsNone)
-                                prop.onClick (fun _ ->
-                                    props.RequestReplay |> Option.iter (fun callback -> callback nextPage)
-                                )
-                                prop.text "Reload rows"
+                    inView "swt:top-0 swt:flex swt:h-7 swt:items-center swt:justify-center swt:gap-3 swt:px-4" [
+                        if replaying then
+                            Html.span [
+                                prop.className "swt:loading swt:loading-spinner swt:loading-xs"
                             ]
+                        Html.span [ prop.text label ]
+                        Html.button [
+                            prop.testId buttonTestId
+                            GitPagedDiffDisplay.failedAttribute failed
+                            prop.className [
+                                "swt:btn swt:btn-ghost swt:btn-xs"
+                                GitPagedDiffDisplay.failedClass failed
+                            ]
+                            prop.disabled (replaying || props.RequestReplay.IsNone)
+                            prop.onClick (fun _ ->
+                                props.RequestReplay |> Option.iter (fun callback -> callback nextPage)
+                            )
+                            prop.text "Reload rows"
                         ]
                     ]
                 ]
@@ -988,10 +1003,10 @@ type GitPagedDiffViewer =
                         ]
                     ]
 
-                Html.div [
-                    prop.className
-                        "swt:col-span-2 swt:flex swt:h-7 swt:items-center swt:justify-center swt:gap-3 swt:bg-base-200/45 swt:px-4 swt:font-sans swt:text-xs swt:text-base-content/65"
-                    prop.children [
+                controlRow
+                    "swt:h-7 swt:bg-base-200/45 swt:font-sans swt:text-xs swt:text-base-content/65"
+                    "swt:flex swt:h-full swt:items-center swt:justify-center swt:gap-3 swt:px-4"
+                    [
                         expandButton true
                         Html.span [
                             prop.className "swt:whitespace-nowrap"
@@ -999,7 +1014,6 @@ type GitPagedDiffViewer =
                         ]
                         expandButton false
                     ]
-                ]
             | GitPagedDiffDisplay.UnalignedLabel(_, previous, current) ->
                 headerRow
                     "swt:border-y swt:border-base-content/10 swt:bg-warning/10 swt:font-mono swt:text-xs swt:text-base-content/70"
@@ -1044,8 +1058,9 @@ type GitPagedDiffViewer =
             | GitPagedDiffDisplay.Continue pending ->
                 let busy = props.LoadingNext
 
-                fullWidth
-                    "swt:flex-col swt:items-stretch swt:gap-2 swt:py-3 swt:font-sans swt:border-t swt:border-base-content/10 swt:bg-base-200/35"
+                controlRow
+                    "swt:font-sans swt:border-t swt:border-base-content/10 swt:bg-base-200/35"
+                    "swt:flex swt:flex-col swt:items-stretch swt:gap-2 swt:px-4 swt:py-3"
                     [
                         match pending with
                         | Some value -> GitPagedDiffViewer.PendingPanel(props.Prefix, value)
@@ -2102,6 +2117,8 @@ type GitPagedDiffViewer =
                     prop.tabIndex 0
                     prop.className
                         "swt:min-h-0 swt:flex-1 swt:overflow-auto swt:scrollbar-fade swt:focus-visible:outline swt:focus-visible:outline-2 swt:focus-visible:-outline-offset-2 swt:focus-visible:outline-primary"
+                    // The rows measure the visible width of the scroller in cqw units.
+                    prop.style [ style.custom ("containerType", "inline-size") ]
                     prop.onScroll (fun event ->
                         previousLayout.current <- Some(captureAnchor ())
                         let element = event.currentTarget :?> HTMLElement
