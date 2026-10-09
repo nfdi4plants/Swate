@@ -18,8 +18,9 @@
     <Compile Include="Notes\NoteConstants.fs" />
     <Compile Include="Notes\NoteScaffolding.fs" />
     <Compile Include="Notes\NoteSearchReader.fs" />
-    <Compile Include="SettingsStore.fs" />
-    <Compile Include="RecentArcStore.fs" />
+    <Compile Include="Services\Settings\SettingsStore.fs" />
+    <Compile Include="Services\Settings\UiSettings.fs" />
+    <Compile Include="Services\Settings\RecentArcStore.fs" />
     <Compile Include="ArcMerge\Types.fs" />
     <Compile Include="ArcMerge\ArcEntityRefHelper.fs" />
     <Compile Include="ARCtrlExtensions\InMemoryChanges.fs" />
@@ -58,6 +59,7 @@
     <Compile Include="IPC\IAuthApi.fs" />
     <Compile Include="IPC\ITemplateApi.fs" />
     <Compile Include="IPC\IValidationPackageApi.fs" />
+    <Compile Include="IPC\IUiSettingsApi.fs" />
     <Compile Include="main.fs" />
     <None Include="ChokidarTest.fsx" />
   </ItemGroup>

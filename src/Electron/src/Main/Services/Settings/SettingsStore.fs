@@ -1,17 +1,12 @@
 [<AutoOpen>]
 module Main.SettingsStore
 
-open System
-open Fable.Core
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
 
 
 [<Literal>]
 let appSettingsFolderName = "Settings"
-
-[<Literal>]
-let recentArcsSettingsFileName = "recent-arcs.json"
 
 // If appSettingsFolderName is changed in a future release, migrate or delete the old
 // folder inside app.getPath("userData") to avoid stale or split settings.

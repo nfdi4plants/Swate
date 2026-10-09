@@ -8,6 +8,9 @@ open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 
 [<Literal>]
+let private recentArcsSettingsFileName = "recent-arcs.json"
+
+[<Literal>]
 let maxNumberRecentArcs = 5
 
 module private Helpers =
