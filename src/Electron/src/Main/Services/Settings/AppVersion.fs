@@ -52,7 +52,7 @@ let initialize () =
     | Ok() -> ()
     | Error message -> Browser.Dom.console.warn message
 
-let checkForUpdate () = promise {
+let checkForUpdateWithResult () = promise {
     try
         let! releases = loadAll swateReleaseRepository
 
@@ -65,7 +65,15 @@ let checkForUpdate () = promise {
 
         for window in BrowserWindow.getAllWindows () do
             Main.WindowSend.send<IAppVersionRendererApi> window (fun api -> api.appVersionChanged state)
+
+        return Ok state
     with error ->
         // Offline startup or GitHub rate limits must never prevent the application from opening.
         Browser.Dom.console.warn ("Could not check for Swate updates", error.Message)
+        return Error error
+}
+
+let checkForUpdate () = promise {
+    let! _ = checkForUpdateWithResult ()
+    return ()
 }

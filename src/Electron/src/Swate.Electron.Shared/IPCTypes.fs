@@ -218,6 +218,8 @@ module MainToRendererIpc =
         appVersionChanged: AppVersionState -> unit
     }
 
+    type IReleaseNotesRendererApi = { showReleaseNotes: string -> unit }
+
     type IUiSettingsRendererApi = { uiScaleChanged: float -> unit }
 
 // TODO: What should filewatcher do when detecting changes?

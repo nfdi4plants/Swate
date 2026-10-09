@@ -12,6 +12,7 @@
     <Compile Include="Bindings\Filesystem.fs" />
     <Compile Include="Bindings\Path.fs" />
     <Compile Include="Bindings\NodeBindings.fs" />
+    <Compile Include="Bindings\Menu.fs" />
     <Compile Include="Bindings\PromiseRace.fs" />
     <Compile Include="Helper\Assets.fs" />
     <Compile Include="Helper\WindowSend.fs" />
@@ -62,6 +63,7 @@
     <Compile Include="IPC\IValidationPackageApi.fs" />
     <Compile Include="IPC\IUiSettingsApi.fs" />
     <Compile Include="IPC\IAppVersionApi.fs" />
+    <Compile Include="AppMenu.fs" />
     <Compile Include="main.fs" />
     <None Include="ChokidarTest.fsx" />
   </ItemGroup>

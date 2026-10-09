@@ -69,7 +69,7 @@ type PageState =
     | ErrorPage of string
     | DataHubBrowser
     | ValidationPackageBrowser
-    | Changelog of version: string
+    | Changelog of version: string * requestId: string
     | SettingsPage
 
     static member fromFileContentDTO(dto: FileContentDTO) : PageState =

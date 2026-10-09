@@ -88,8 +88,14 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                     match appRootPath, pageState with
                     | _, Some PageState.DataHubBrowser -> DataHubBrowserTarget()
                     | Some _, Some PageState.ValidationPackageBrowser -> ValidationPackageBrowserTarget()
-                    | _, Some(PageState.Changelog version) ->
-                        Swate.Components.Page.Changelog.Changelog.Changelog(MainHelper.fetchReleases, version)
+                    | _, Some(PageState.Changelog(version, requestId)) ->
+                        Html.div [
+                            prop.key requestId
+                            prop.className "swt:flex swt:grow swt:min-w-0 swt:min-h-0"
+                            prop.children [
+                                Swate.Components.Page.Changelog.Changelog.Changelog(MainHelper.fetchReleases, version)
+                            ]
+                        ]
                     | _, Some PageState.SettingsPage ->
                         React.Suspense(
                             [ LazyComponents.LazySettingPage() ],

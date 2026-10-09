@@ -188,6 +188,14 @@ type Navbar =
         let errorCtx = useErrorModalCtx ()
         let shownChangelog = React.useRef<string option> None
 
+        let showReleaseNotes current =
+            pageStateCtx.setState (Some(PageState.Changelog(current, System.Guid.NewGuid().ToString())))
+
+        Renderer.IpcReceiver.useProxyReceiver<IReleaseNotesRendererApi> (
+            (fun () -> { showReleaseNotes = showReleaseNotes }),
+            [||]
+        )
+
         let version =
             Renderer.MainSyncedState.useMainSyncedState {
                 initial = {
@@ -210,7 +218,7 @@ type Navbar =
                 match version.state.ChangelogVersion with
                 | Some current when shownChangelog.current <> Some current ->
                     shownChangelog.current <- Some current
-                    pageStateCtx.setState (Some(PageState.Changelog current))
+                    showReleaseNotes current
                 | _ -> ()
             ),
             [| box version.state.ChangelogVersion |]

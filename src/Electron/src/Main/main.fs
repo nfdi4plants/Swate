@@ -24,6 +24,7 @@ app
     .whenReady()
     .``then`` (fun () ->
         Main.Settings.AppVersion.initialize ()
+        Main.AppMenu.install ()
         Main.Settings.AppVersion.checkForUpdate () |> Promise.start
 
         // Restore persisted auth before any IPC handlers fire
