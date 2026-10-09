@@ -198,27 +198,23 @@ type Changelog =
                 ]
                 // content area
                 Html.div [
-                    prop.className "swt:flex swt:flex-col swt:grow swt:min-w-0 swt:min-h-0 swt:w-fit swt:gap-2"
+                    prop.className
+                        "swt:flex swt:flex-col swt:grow swt:min-w-0 swt:min-h-0 swt:w-fit swt:gap-2 swt:overflow-hidden"
                     prop.children [
                         // scrollable markdown content
-                        Html.div [
-                            prop.ref contentRef
-                            prop.className "swt:grow swt:flex swt:flex-col swt:gap-2 swt:overflow-hidden"
-                            prop.children [
-                                ReactMDEditor.MarkdownPreview(
-                                    markdown,
-                                    rehypePlugins = [| ReactMDEditor.rehypeSanitize |],
-                                    style = {|
-                                        padding = 16
-                                        borderRadius = 8
-                                        flex = 1
-                                        flexGrow = 1
-                                        overflow = "auto"
-                                    |},
-                                    className = "swt:prose"
-                                )
-                            ]
-                        ]
+                        ReactMDEditor.MarkdownPreview(
+                            markdown,
+                            rehypePlugins = [| ReactMDEditor.rehypeSanitize |],
+                            style = {|
+                                padding = 16
+                                borderRadius = 8
+                                flex = 1
+                                flexGrow = 1
+                                overflow = "auto"
+                            |},
+                            wrapperElement = {| ref = contentRef |},
+                            className = "swt:prose"
+                        )
                         // pagination controls
                         pagination
                     ]
