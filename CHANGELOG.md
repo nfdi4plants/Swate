@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Swate needs Git 2.42 or newer. #1388 (by @caroott)
 - The Git sidebar shows "Download Changes" (formerly "Update ARC from Online") and "Upload Changes" side by side, with More Git Actions below. #1388 (by @caroott)
 
+### 🐛 Fixed
+
+- With "Download Large Files" on, "Download Changes" also downloads missing large files when there are no online changes. #1388 (by @caroott)
+
 ## 2.4.0 - 2026-10-07
 
 ### ✨ Added
