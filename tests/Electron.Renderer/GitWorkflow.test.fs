@@ -116,6 +116,7 @@ let private makeFailure category code message recovery paths : OperationFailureD
     RecoveryAction = recovery
     Details = [||]
     RevisionEvidence = [||]
+    DiffDetail = None
 }
 
 let private failed category code message : OperationResultDto<'T> =
@@ -128,6 +129,7 @@ let private staleTokenReply<'T> message : JS.Promise<Result<OperationResultDto<'
 let private lfsSettings n materialize : StoragePolicySettingsDto = {
     AutoPolicyThresholdMb = Some n
     MaterializeLargeObjects = materialize
+    DiffIndexingLimitMb = None
 }
 
 let private sessionInfo: WorkspaceSessionInfoDto = {
@@ -282,19 +284,6 @@ let private manyChangedFiles count = [|
     for i in 0 .. count - 1 -> changedFile (sprintf "src/file-%03i.txt" i) "M" " " false
 |]
 
-let private joinLines lines = String.concat "\n" lines + "\n"
-
-let private buildAddedFileDiff path lines =
-    [
-        "new file mode 100644"
-        "--- /dev/null"
-        $"+++ b/{path}"
-        yield! lines |> Array.map (fun line -> $"+{line}")
-        "~"
-        ""
-    ]
-    |> String.concat "\n"
-
 let private buildSingleConflictDocument currentLines incomingLines =
     [
         "<<<<<<< HEAD"
@@ -306,23 +295,18 @@ let private buildSingleConflictDocument currentLines incomingLines =
     ]
     |> String.concat "\n"
 
-let private countOccurrences (needle: string) (haystack: string) =
-    let rec loop i n =
-        let j = haystack.IndexOf(needle, i, StringComparison.Ordinal)
-        if j < 0 then n else loop (j + needle.Length) (n + 1)
-
-    loop 0 0
-
 let private unexpectedPromise<'T> name : JS.Promise<Result<'T, string>> = promise { return failwith name }
 let private unexpectedGitLab<'T> name : JS.Promise<Result<'T, GitLabError>> = promise { return failwith name }
 
-let private diffPage path =
-    PageState.GitDiffPage {
+let private conflictPage path =
+    PageState.GitMergeConflictPage {
         Path = path
-        PreviousContent = "before"
-        CurrentContent = "after"
-        ChangeKind = None
-        WordDiffText = "diff"
+        ConflictContent = ""
+        Handle = {
+            SessionId = "conflict-session"
+            Version = "1"
+        }
+        WorkspaceVersion = "1"
     }
 
 let private defaultDependencies: GitDependencies = {
@@ -332,8 +316,8 @@ let private defaultDependencies: GitDependencies = {
     getRepositoryWebUrl = fun _ -> promise { return Ok(succeeded None) }
     getStoragePolicySettings = fun _ -> unexpectedPromise "getStoragePolicySettings"
     setStoragePolicySettings = fun _ -> unexpectedPromise "setStoragePolicySettings"
-    loadDiffPage = fun _ -> unexpectedPromise "loadDiffPage"
     loadConflictPage = fun _ _ _ -> unexpectedPromise "loadConflictPage"
+    updatePageState = ignore
     initializeWorkspace = fun _ -> unexpectedPromise "initializeWorkspace"
     bindWorkspace = fun _ -> unexpectedPromise "bindWorkspace"
     createRemoteProject = fun _ -> unexpectedGitLab "createRemoteProject"
@@ -357,6 +341,14 @@ let private defaultDependencies: GitDependencies = {
     pruneStorage = fun _ -> unexpectedPromise "pruneStorage"
     deduplicateStorage = fun _ -> unexpectedPromise "deduplicateStorage"
     clearStaleLock = fun _ -> unexpectedPromise "clearStaleLock"
+    textDiff = {
+        openTextDiff = fun _ -> unexpectedPromise "openTextDiff"
+        readTextDiffPage = fun _ -> unexpectedPromise "readTextDiffPage"
+        replayTextDiffPage = fun _ -> unexpectedPromise "replayTextDiffPage"
+        expandTextDiff = fun _ -> unexpectedPromise "expandTextDiff"
+        readTextDiffLine = fun _ -> unexpectedPromise "readTextDiffLine"
+        closeTextDiff = fun _ -> unexpectedPromise "closeTextDiff"
+    }
     hasUsableAccount = fun () -> true
     delay = fun milliseconds -> Promise.sleep milliseconds
     newOperationId = fun () -> "op-1"
@@ -390,7 +382,6 @@ let private renderToBody element = promise {
 let private noopCallbacks: GitSidebarCallbacks = {
     OnRefresh = fun () -> ()
     OnFetch = fun () -> ()
-    OnPull = fun () -> ()
     OnPush = fun () -> ()
     OnUpdateFromOnline = fun () -> ()
     OnPrimarySaveSelection = fun _ -> ()
@@ -402,6 +393,7 @@ let private noopCallbacks: GitSidebarCallbacks = {
     OnCancelPendingRemoteAction = fun () -> ()
     OnSaveDownloadLargeFiles = fun _ -> ()
     OnSaveLfsAutoTrackThreshold = fun _ -> ()
+    OnSaveDiffIndexingLimit = fun _ -> ()
     OnCreateBranch = fun _ -> ()
     OnSwitchBranch = fun _ -> ()
     OnSelectChange = fun _ -> promise { return Ok() }
@@ -924,20 +916,22 @@ Vitest.describe (
                 }
 
                 Vitest
-                    .expect(buildUpdatedLfsSettings state (Some 4) None)
+                    .expect(buildUpdatedLfsSettings state (Some 4) None None)
                     .toEqual (
                         {
                             AutoPolicyThresholdMb = Some 4
                             MaterializeLargeObjects = true
+                            DiffIndexingLimitMb = Some 1024
                         }
                     )
 
                 Vitest
-                    .expect(buildUpdatedLfsSettings state None (Some false))
+                    .expect(buildUpdatedLfsSettings state None (Some false) None)
                     .toEqual (
                         {
                             AutoPolicyThresholdMb = Some 7
                             MaterializeLargeObjects = false
+                            DiffIndexingLimitMb = Some 1024
                         }
                     )
         )
@@ -1499,7 +1493,7 @@ Vitest.describe (
                     update
                         defaultDependencies
                         ignore
-                        (SelectChangeCompleted(1, "A.txt", reply, Ok(GitPageChange.Set(diffPage "A.txt"))))
+                        (SelectChangeCompleted(1, "A.txt", reply, Ok(GitPageChange.Set(PageState.TextPage "late"))))
                         state
 
                 let! _ = collectMessages cmd
@@ -1592,7 +1586,7 @@ Vitest.describe (
                                     )
                             }
                         getStatus = fun _ -> promise { return Ok(succeeded (conflictedStatus [| "conflict-b.txt" |])) }
-                        loadConflictPage = fun _ _ path -> promise { return Ok(diffPage path) }
+                        loadConflictPage = fun _ _ path -> promise { return Ok(conflictPage path) }
                 }
 
                 let request = {
@@ -1963,6 +1957,7 @@ Vitest.describe (
                         {
                             AutoPolicyThresholdMb = Some 4
                             MaterializeLargeObjects = false
+                            DiffIndexingLimitMb = Some 1024
                         }
                     )
             }
@@ -6140,7 +6135,7 @@ Vitest.describe (
                         loadConflictPage =
                             fun session version path ->
                                 loaded <- Some(session, version, path)
-                                promise { return Ok(diffPage path) }
+                                promise { return Ok(conflictPage path) }
                 }
 
                 let stateAfterRequest, requestCmd =
@@ -6501,7 +6496,7 @@ Vitest.describe (
                                             )
                                     }
                         getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        loadConflictPage = fun _ _ path -> promise { return Ok(diffPage path) }
+                        loadConflictPage = fun _ _ path -> promise { return Ok(conflictPage path) }
                         finalizeConflict =
                             fun _ ->
                                 finalized <- true
@@ -6616,7 +6611,7 @@ Vitest.describe (
                                     )
                             }
                         getStatus = fun _ -> promise { return Ok(succeeded cleanStatus) }
-                        loadConflictPage = fun _ _ path -> promise { return Ok(diffPage path) }
+                        loadConflictPage = fun _ _ path -> promise { return Ok(conflictPage path) }
                 }
 
                 let request = {
@@ -6741,7 +6736,7 @@ Vitest.describe (
                                         )
                                     )
                             }
-                        loadConflictPage = fun _ _ path -> promise { return Ok(diffPage path) }
+                        loadConflictPage = fun _ _ path -> promise { return Ok(conflictPage path) }
                         finalizeConflict =
                             fun _ ->
                                 finalized <- true
@@ -8058,7 +8053,7 @@ Vitest.describe (
                                             "a conflict session is open"
                                     )
                             }
-                        loadConflictPage = fun _ _ path -> promise { return Ok(diffPage path) }
+                        loadConflictPage = fun _ _ path -> promise { return Ok(conflictPage path) }
                 }
 
                 let state = {
@@ -8126,7 +8121,7 @@ Vitest.describe (
                             }
                         listRefs = fun _ -> promise { return Ok(succeeded [| localBranch "main" true true |]) }
                         getStoragePolicySettings = fun _ -> promise { return Ok(succeeded (lfsSettings 5 true)) }
-                        loadConflictPage = fun _ _ path -> promise { return Ok(diffPage path) }
+                        loadConflictPage = fun _ _ path -> promise { return Ok(conflictPage path) }
                         resolveConflict =
                             fun _ -> promise {
                                 return
@@ -8992,62 +8987,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "GitDiffViewer virtualizes large added-file diffs instead of mounting every rendered row",
-            fun () ->
-                let lines = [|
-                    for index in 0..599 -> $"Generated renderer diff line {index + 1}"
-                |]
-
-                let markup =
-                    renderToStaticMarkup (
-                        Html.div [
-                            prop.style [ style.width 960; style.height 480 ]
-                            prop.children [
-                                Swate.Components.Page.GitDiffViewer.Viewer(
-                                    wordDiffText = buildAddedFileDiff "notes/renderer-large.txt" lines,
-                                    previousContent = "",
-                                    currentContent = joinLines lines,
-                                    testIdPrefix = "renderer-large-diff"
-                                )
-                            ]
-                        ]
-                    )
-
-                Vitest
-                    .expect(markup.Contains("data-testid=\"renderer-large-diff-comparison-scroll-virtual-content\""))
-                    .toBe (true)
-
-                Vitest
-                    .expect(markup.Contains("data-testid=\"renderer-large-diff-comparison-scroll-row-0\""))
-                    .toBe (true)
-
-                Vitest
-                    .expect(markup.Contains("data-testid=\"renderer-large-diff-comparison-scroll-row-599\""))
-                    .toBe (false)
-
-                Vitest
-                    .expect(countOccurrences "data-testid=\"renderer-large-diff-comparison-scroll-row-" markup)
-                    .toBeLessThan (120)
-        )
-
-        Vitest.test (
-            "GitDiffViewer renders synthetic new-file diff metadata without blanking the content pane",
-            fun () ->
-                let markup =
-                    renderToStaticMarkup (
-                        Swate.Components.Page.GitDiffViewer.Viewer(
-                            wordDiffText = "new file mode 100644\n--- /dev/null\n+++ b/notes/draft.txt\n",
-                            previousContent = "",
-                            currentContent = "Draft line\n",
-                            testIdPrefix = "renderer-synthetic-diff"
-                        )
-                    )
-
-                Vitest.expect(markup.Contains("Draft line")).toBe (true)
-                Vitest.expect(markup.Contains("Added")).toBe (true)
-        )
-
-        Vitest.test (
             "GitMergeConflictViewer virtualizes long conflict blocks instead of mounting every rendered row",
             fun () ->
                 let currentLines = [|
@@ -9105,7 +9044,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun _ -> ()
@@ -9117,6 +9055,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9125,7 +9064,8 @@ Vitest.describe (
                                 OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -9186,7 +9126,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun _ -> ()
@@ -9198,6 +9137,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9207,13 +9147,14 @@ Vitest.describe (
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024,
                             remoteActionsEnabled = false,
                             remoteActionsWarning = "Sign in to a DataHUB account to use fetch, pull, push, or update."
                         )
                     )
 
                 let updateButton =
-                    container.querySelector ("[data-testid='GitSidebarUpdateArcButton']") :?> HTMLButtonElement
+                    container.querySelector ("[data-testid='GitSidebarPullButton']") :?> HTMLButtonElement
 
                 Vitest.expect(updateButton.disabled).toBe (true)
                 Vitest.expect(container.textContent.Contains("Sign in to a DataHUB account")).toBe (true)
@@ -9241,7 +9182,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun _ -> ()
@@ -9253,6 +9193,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9261,7 +9202,8 @@ Vitest.describe (
                                 OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -9294,7 +9236,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun _ -> ()
@@ -9306,6 +9247,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9314,7 +9256,8 @@ Vitest.describe (
                                 OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -9347,7 +9290,6 @@ Vitest.describe (
                                     callbacks = {
                                         OnRefresh = fun () -> ()
                                         OnFetch = fun () -> ()
-                                        OnPull = fun () -> ()
                                         OnPush = fun () -> ()
                                         OnUpdateFromOnline = fun () -> ()
                                         OnPrimarySaveSelection = fun _ -> ()
@@ -9359,6 +9301,7 @@ Vitest.describe (
                                         OnCancelPendingRemoteAction = fun () -> ()
                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                        OnSaveDiffIndexingLimit = fun _ -> ()
                                         OnCreateBranch = fun _ -> ()
                                         OnSwitchBranch = fun _ -> ()
                                         OnSelectChange = fun _ -> promise { return Ok() }
@@ -9367,7 +9310,8 @@ Vitest.describe (
                                         OnCancelOperation = fun () -> ()
                                     },
                                     downloadLargeFiles = true,
-                                    lfsAutoTrackThresholdMb = 5
+                                    lfsAutoTrackThresholdMb = 5,
+                                    diffIndexingLimitMb = 1024
                                 )
                             ]
                         ]
@@ -9439,7 +9383,6 @@ Vitest.describe (
                                     callbacks = {
                                         OnRefresh = fun () -> ()
                                         OnFetch = fun () -> ()
-                                        OnPull = fun () -> ()
                                         OnPush = fun () -> ()
                                         OnUpdateFromOnline = fun () -> ()
                                         OnPrimarySaveSelection = fun _ -> ()
@@ -9451,6 +9394,7 @@ Vitest.describe (
                                         OnCancelPendingRemoteAction = fun () -> ()
                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                        OnSaveDiffIndexingLimit = fun _ -> ()
                                         OnCreateBranch = fun _ -> ()
                                         OnSwitchBranch = fun _ -> ()
                                         OnSelectChange = fun _ -> promise { return Ok() }
@@ -9459,7 +9403,8 @@ Vitest.describe (
                                         OnCancelOperation = fun () -> ()
                                     },
                                     downloadLargeFiles = true,
-                                    lfsAutoTrackThresholdMb = 5
+                                    lfsAutoTrackThresholdMb = 5,
+                                    diffIndexingLimitMb = 1024
                                 )
                             ]
                         ]
@@ -9527,7 +9472,6 @@ Vitest.describe (
                                                     callbacks = {
                                                         OnRefresh = fun () -> ()
                                                         OnFetch = fun () -> ()
-                                                        OnPull = fun () -> ()
                                                         OnPush = fun () -> ()
                                                         OnUpdateFromOnline = fun () -> ()
                                                         OnPrimarySaveSelection = fun _ -> ()
@@ -9539,6 +9483,7 @@ Vitest.describe (
                                                         OnCancelPendingRemoteAction = fun () -> ()
                                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                                        OnSaveDiffIndexingLimit = fun _ -> ()
                                                         OnCreateBranch = fun _ -> ()
                                                         OnSwitchBranch = fun _ -> ()
                                                         OnSelectChange = fun _ -> promise { return Ok() }
@@ -9547,7 +9492,8 @@ Vitest.describe (
                                                         OnCancelOperation = fun () -> ()
                                                     },
                                                     downloadLargeFiles = true,
-                                                    lfsAutoTrackThresholdMb = 5
+                                                    lfsAutoTrackThresholdMb = 5,
+                                                    diffIndexingLimitMb = 1024
                                                 )
                                             ]
                                         ]
@@ -9597,7 +9543,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun _ -> ()
@@ -9609,6 +9554,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9617,7 +9563,8 @@ Vitest.describe (
                                 OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -9657,7 +9604,6 @@ Vitest.describe (
                                     callbacks = {
                                         OnRefresh = fun () -> ()
                                         OnFetch = fun () -> ()
-                                        OnPull = fun () -> ()
                                         OnPush = fun () -> ()
                                         OnUpdateFromOnline = fun () -> ()
                                         OnPrimarySaveSelection = fun _ -> ()
@@ -9669,6 +9615,7 @@ Vitest.describe (
                                         OnCancelPendingRemoteAction = fun () -> ()
                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                        OnSaveDiffIndexingLimit = fun _ -> ()
                                         OnCreateBranch = fun _ -> ()
                                         OnSwitchBranch = fun _ -> ()
                                         OnSelectChange = fun _ -> promise { return Ok() }
@@ -9677,7 +9624,8 @@ Vitest.describe (
                                         OnCancelOperation = fun () -> ()
                                     },
                                     downloadLargeFiles = true,
-                                    lfsAutoTrackThresholdMb = 5
+                                    lfsAutoTrackThresholdMb = 5,
+                                    diffIndexingLimitMb = 1024
                                 )
                             ]
                         ]
@@ -9712,7 +9660,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun _ -> ()
@@ -9724,6 +9671,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9732,7 +9680,8 @@ Vitest.describe (
                                 OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -9785,7 +9734,8 @@ Vitest.describe (
                                     OnDiscardSelection = fun paths -> discardedPaths <- Some paths
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -9842,7 +9792,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun request -> capturedSelection <- Some request
@@ -9854,6 +9803,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9862,7 +9812,8 @@ Vitest.describe (
                                 OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -9929,7 +9880,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun request -> capturedSelection <- Some request
@@ -9941,6 +9891,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -9949,7 +9900,8 @@ Vitest.describe (
                                 OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -10024,7 +9976,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun _ -> ()
@@ -10036,6 +9987,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Error "Diff failed to load." }
@@ -10044,7 +9996,8 @@ Vitest.describe (
                                 OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -10083,6 +10036,7 @@ Vitest.describe (
                             callbacks = noopCallbacks,
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024,
                             publishRenamePrompt = {
                                 CurrentName = "Existing ARC"
                                 Message = "A DataHUB repository named 'Existing ARC' already exists."
@@ -10135,7 +10089,6 @@ Vitest.describe (
                             callbacks = {
                                 OnRefresh = fun () -> ()
                                 OnFetch = fun () -> ()
-                                OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
                                 OnPrimarySaveSelection = fun _ -> ()
@@ -10147,6 +10100,7 @@ Vitest.describe (
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnSaveDiffIndexingLimit = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
@@ -10155,7 +10109,8 @@ Vitest.describe (
                                 OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -10208,7 +10163,8 @@ Vitest.describe (
                                             promise { return Ok() }
                             },
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -10244,7 +10200,8 @@ Vitest.describe (
                             branchOptions = [| sidebarLocalBranch "main" true true |],
                             callbacks = noopCallbacks,
                             downloadLargeFiles = true,
-                            lfsAutoTrackThresholdMb = 5
+                            lfsAutoTrackThresholdMb = 5,
+                            diffIndexingLimitMb = 1024
                         )
                     )
 
@@ -10257,341 +10214,5 @@ Vitest.describe (
 
                 cleanup ()
             }
-        )
-)
-
-Vitest.describe (
-    "GitDiffPageLoader",
-    fun () ->
-        let change path index : GitSidebarChange = {
-            Path = path
-            OriginalPath = None
-            IndexStatus = index
-            WorkingTreeStatus = "."
-            IsConflicted = false
-        }
-
-        Vitest.test (
-            "An added file shows an empty previous side",
-            fun () -> promise {
-                let path = "new.txt"
-
-                let getBaseContent =
-                    fun _ -> promise { return Ok(failed NotFound VersionControlCodes.BaseContentNotFound "absent") }
-
-                let getWordDiff = fun _ -> promise { return Ok(succeeded (ContentViewDto.Text "")) }
-
-                let readCurrentContent = fun _ -> promise { return Ok "new content" }
-
-                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "A")
-
-                match result with
-                | Ok(PageState.GitDiffPage page) ->
-                    Vitest.expect(page.PreviousContent).toBe ("")
-                    Vitest.expect(page.CurrentContent).toBe ("new content")
-                    Vitest.expect(page.ChangeKind).toEqual (Some Swate.Components.Page.GitDiffChangeKind.Added)
-                | _ -> failwith "Expected an added-file diff page."
-            }
-        )
-
-        Vitest.test (
-            "A deleted file shows an empty current side without reading the file",
-            fun () -> promise {
-                let path = "deleted.txt"
-                let mutable currentRead = false
-
-                let getBaseContent =
-                    fun _ -> promise { return Ok(succeeded (ContentViewDto.Text "old")) }
-
-                let getWordDiff =
-                    fun _ -> promise { return Ok(succeeded (ContentViewDto.Text "-old")) }
-
-                let readCurrentContent =
-                    fun _ ->
-                        currentRead <- true
-                        promise { return Ok "must not be read" }
-
-                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "D")
-
-                match result with
-                | Ok(PageState.GitDiffPage page) ->
-                    Vitest.expect(page.PreviousContent).toBe ("old")
-                    Vitest.expect(page.CurrentContent).toBe ("")
-                    Vitest.expect(page.ChangeKind).toEqual (Some Swate.Components.Page.GitDiffChangeKind.Deleted)
-                    Vitest.expect(currentRead).toBe (false)
-                | _ -> failwith "Expected a deleted-file diff page."
-            }
-        )
-
-        Vitest.test (
-            "A change with neither side is an error",
-            fun () -> promise {
-                let path = "empty.txt"
-
-                let getBaseContent =
-                    fun _ -> promise { return Ok(failed NotFound VersionControlCodes.BaseContentNotFound "absent") }
-
-                let getWordDiff = fun _ -> promise { return Ok(succeeded (ContentViewDto.Text "")) }
-
-                let readCurrentContent = fun _ -> promise { return Ok "must not be read" }
-
-                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "D")
-
-                match result with
-                | Error message -> Vitest.expect(message.Contains(path)).toBe (true)
-                | _ -> failwith "Expected a missing-content error."
-            }
-        )
-
-        Vitest.test (
-            "A failed read of the current file is an error",
-            fun () -> promise {
-                let path = "changed.txt"
-
-                let getBaseContent =
-                    fun _ -> promise { return Ok(succeeded (ContentViewDto.Text "old")) }
-
-                let getWordDiff = fun _ -> promise { return Ok(succeeded (ContentViewDto.Text "")) }
-
-                let readCurrentContent = fun _ -> promise { return Error "EACCES" }
-
-                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "M")
-
-                match result with
-                | Error message -> Vitest.expect(message.Contains("EACCES")).toBe (true)
-                | _ -> failwith "Expected a current-content read error."
-            }
-        )
-
-        Vitest.test (
-            "A base failure other than not found is an error",
-            fun () -> promise {
-                let path = "failed-base.txt"
-
-                let getBaseContent =
-                    fun _ -> promise { return Ok(failed ProviderError "git_failure" "boom") }
-
-                let getWordDiff = fun _ -> promise { return Ok(succeeded (ContentViewDto.Text "")) }
-
-                let readCurrentContent = fun _ -> promise { return Ok "x" }
-
-                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "M")
-
-                match result with
-                | Error message -> Vitest.expect(message.Contains("boom")).toBe (true)
-                | _ -> failwith "Expected a base-content error."
-            }
-        )
-
-        Vitest.test (
-            "An unsupported base content result skips the word diff and current file readers",
-            fun () -> promise {
-                let path = "binary.dat"
-                let mutable wordDiffCalls = 0
-                let mutable currentReadCalls = 0
-
-                let getBaseContent =
-                    fun _ -> promise { return Ok(failed Unsupported "binary" "binary content") }
-
-                let getWordDiff =
-                    fun _ ->
-                        wordDiffCalls <- wordDiffCalls + 1
-                        promise { return Ok(succeeded (ContentViewDto.Text "")) }
-
-                let readCurrentContent =
-                    fun _ ->
-                        currentReadCalls <- currentReadCalls + 1
-                        promise { return Ok "must not be read" }
-
-                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "M")
-
-                match result with
-                | Ok(PageState.GitUnsupportedPage _) -> ()
-                | _ -> failwith "Expected an unsupported diff page."
-
-                Vitest.expect(wordDiffCalls).toBe (0)
-                Vitest.expect(currentReadCalls).toBe (0)
-            }
-        )
-
-        Vitest.test (
-            "An unsupported word diff opens the unsupported page",
-            fun () -> promise {
-                let path = "binary.dat"
-
-                let getBaseContent =
-                    fun _ -> promise { return Ok(succeeded (ContentViewDto.Text "a")) }
-
-                let getWordDiff =
-                    fun _ -> promise { return Ok(failed Unsupported "binary" "binary content") }
-
-                let readCurrentContent = fun _ -> promise { return Ok "b" }
-
-                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "M")
-
-                match result with
-                | Ok(PageState.GitUnsupportedPage _) -> ()
-                | _ -> failwith "Expected an unsupported diff page."
-            }
-        )
-
-        Vitest.test (
-            "A previous version that is only an LFS pointer opens the unsupported page without comparing",
-            fun () -> promise {
-                let path = "runs/data2.bin"
-                let mutable wordDiffCalls = 0
-                let mutable currentReadCalls = 0
-
-                let oid = String.replicate 64 "a"
-
-                let pointer =
-                    $"version https://git-lfs.github.com/spec/v1\noid sha256:{oid}\nsize 24577\n"
-
-                let getBaseContent =
-                    fun _ -> promise { return Ok(succeeded (ContentViewDto.Text pointer)) }
-
-                let getWordDiff =
-                    fun _ ->
-                        wordDiffCalls <- wordDiffCalls + 1
-                        promise { return Ok(succeeded (ContentViewDto.Text "")) }
-
-                let readCurrentContent =
-                    fun _ ->
-                        currentReadCalls <- currentReadCalls + 1
-                        promise { return Ok "binary bytes" }
-
-                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "M")
-
-                match result with
-                | Ok(PageState.GitUnsupportedPage page) ->
-                    Vitest.expect(page.Path).toBe (path)
-                    Vitest.expect(page.Reason.IsSome).toBe (true)
-                | _ -> failwith "Expected an unsupported diff page."
-
-                Vitest.expect(wordDiffCalls).toBe (0)
-                Vitest.expect(currentReadCalls).toBe (0)
-            }
-        )
-
-        // The provider also returns the pointer when the object is local but above its base diff
-        // size limit. The loader only sees the pointer text, so the page stays unsupported.
-        Vitest.test (
-            "A previous version held as an LFS pointer whose object is local and large opens the unsupported page",
-            fun () -> promise {
-                let path = "runs/large.bin"
-                let mutable wordDiffCalls = 0
-                let mutable currentReadCalls = 0
-
-                let oid = String.replicate 64 "b"
-
-                let pointer =
-                    $"version https://git-lfs.github.com/spec/v1\noid sha256:{oid}\nsize 52428800\n"
-
-                let getBaseContent =
-                    fun _ -> promise { return Ok(succeeded (ContentViewDto.Text pointer)) }
-
-                let getWordDiff =
-                    fun _ ->
-                        wordDiffCalls <- wordDiffCalls + 1
-                        promise { return Ok(succeeded (ContentViewDto.Text "")) }
-
-                let readCurrentContent =
-                    fun _ ->
-                        currentReadCalls <- currentReadCalls + 1
-                        promise { return Ok "large binary bytes" }
-
-                let! result = GitDiffPageLoader.load getBaseContent getWordDiff readCurrentContent (change path "M")
-
-                match result with
-                | Ok(PageState.GitUnsupportedPage page) ->
-                    Vitest.expect(page.Path).toBe (path)
-                    Vitest.expect(page.Reason.IsSome).toBe (true)
-                | _ -> failwith "Expected an unsupported diff page."
-
-                Vitest.expect(wordDiffCalls).toBe (0)
-                Vitest.expect(currentReadCalls).toBe (0)
-            }
-        )
-)
-
-Vitest.describe (
-    "GitDiffPageLoader.isLfsPointerText",
-    fun () ->
-        let oid = String.replicate 32 "0" + String.replicate 32 "f"
-
-        let pointerLines = [
-            "version https://git-lfs.github.com/spec/v1"
-            $"oid sha256:{oid}"
-            "size 53687091200"
-        ]
-
-        Vitest.test (
-            "A pointer file is detected",
-            fun () ->
-                let text = (pointerLines |> String.concat "\n") + "\n"
-                Vitest.expect(GitDiffPageLoader.isLfsPointerText text).toBe (true)
-        )
-
-        Vitest.test (
-            "A pointer file with extension lines is detected",
-            fun () ->
-                let text =
-                    [
-                        pointerLines.[0]
-                        $"ext-0-foo sha256:{oid}"
-                        $"ext-1-bar sha256:{oid}"
-                        pointerLines.[1]
-                        pointerLines.[2]
-                    ]
-                    |> String.concat "\n"
-
-                Vitest.expect(GitDiffPageLoader.isLfsPointerText (text + "\n")).toBe (true)
-        )
-
-        Vitest.test (
-            "A pointer file with any extension name git-lfs accepts is detected",
-            fun () ->
-                let text =
-                    [
-                        pointerLines.[0]
-                        $"ext-0-env-test sha256:{oid}"
-                        $"ext-1-Env_Test sha256:{oid}"
-                        $"ext-2-env.test sha256:{oid}"
-                        pointerLines.[1]
-                        pointerLines.[2]
-                    ]
-                    |> String.concat "\n"
-
-                Vitest.expect(GitDiffPageLoader.isLfsPointerText (text + "\n")).toBe (true)
-        )
-
-        Vitest.test (
-            "A pointer file with CRLF line endings is detected",
-            fun () ->
-                let text = (pointerLines |> String.concat "\r\n") + "\r\n"
-                Vitest.expect(GitDiffPageLoader.isLfsPointerText text).toBe (true)
-        )
-
-        Vitest.test (
-            "Text that only starts like a pointer is not a pointer",
-            fun () ->
-                let text =
-                    (pointerLines |> String.concat "\n") + "\nfirst line of the real content\n"
-
-                Vitest.expect(GitDiffPageLoader.isLfsPointerText text).toBe (false)
-        )
-
-        Vitest.test (
-            "A pointer without its size line is not a pointer",
-            fun () ->
-                let text = pointerLines |> List.take 2 |> String.concat "\n"
-                Vitest.expect(GitDiffPageLoader.isLfsPointerText text).toBe (false)
-        )
-
-        Vitest.test (
-            "A real text file is not a pointer",
-            fun () ->
-                let text = "sample\tvalue\nA\t1\nB\t2\n"
-                Vitest.expect(GitDiffPageLoader.isLfsPointerText text).toBe (false)
         )
 )

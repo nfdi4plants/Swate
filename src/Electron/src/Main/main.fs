@@ -33,7 +33,10 @@ app
         // The provider catalog needs the settings root, which exists only once the app is
         // ready. A failure here must not take the IPC registrations below with it.
         try
-            let runtime = Main.VersionControl.VersionControlRuntime.createProduction ()
+            let runtime =
+                Main.VersionControl.VersionControlRuntime.createProduction
+                    Main.VersionControl.WorkspaceSessionHost.windowOwnerOf
+
             let host = Main.VersionControl.WorkspaceSessionHost.WorkspaceSessionHost(runtime)
             Main.VersionControl.WorkspaceSessionHost.initialize host
         with error ->
@@ -64,7 +67,12 @@ app.onWindowAllClosed (fun () ->
 
 app.onBeforeQuit (fun _ -> Browser.Dom.console.log ("Quitting"))
 
-app.onWillQuit (fun _ ->
+[<Literal>]
+let private textDiffDisposeTimeoutMilliseconds = 5000
+
+let mutable private textDiffWorkersReleased = false
+
+app.onWillQuit (fun event ->
     // The before-quit event runs before the windows' close handlers, which may still wait for running operations.
     match Main.VersionControl.WorkspaceSessionHost.tryCurrent () with
     | Some host ->
@@ -73,4 +81,20 @@ app.onWillQuit (fun _ ->
         |> Promise.catch (fun _ -> ())
         |> Promise.start
     | None -> ()
+
+    // The diff workers own Git child processes and temp folders. The first will-quit holds
+    // the quit until the pool is disposed or 5 s have passed, then quits again.
+    if not textDiffWorkersReleased then
+        textDiffWorkersReleased <- true
+        event.preventDefault ()
+
+        let timeout =
+            Promise.create (fun resolve _ -> JS.setTimeout resolve textDiffDisposeTimeoutMilliseconds |> ignore)
+
+        Main.Bindings.PromiseRace.race [|
+            Main.VersionControl.TextDiffWorkers.dispose ()
+            timeout
+        |]
+        |> Promise.catch ignore
+        |> Promise.iter (fun () -> app.quit ())
 )

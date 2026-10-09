@@ -74,7 +74,8 @@ export { default as ArcFileEditor } from './dist/Page/ArcFileEditor/ArcFileEdito
 export { default as EmptyTableView } from './dist/Page/ArcFileEditor/EmptyTableView/Main.fs';
 export { default as DataHubBrowser } from './dist/Page/DataHubBrowser/DataHubBrowser.fs';
 export { default as FileExplorer } from './dist/Page/FileExplorer/FileExplorer.fs';
-export { default as GitDiffViewer } from './dist/Page/GitComparison/GitDiffViewer.fs';
+export { default as GitPagedDiffViewer } from './dist/Page/GitComparison/GitPagedDiffViewer.fs';
+export * from './dist/Page/GitComparison/GitPagedDiff.Types.fs';
 export { default as GitSidebar } from './dist/Page/GitSidebar/GitSidebar.fs';
 export { default as Landing } from './dist/Page/Landing/Landing.fs';
 export { default as Changelog } from './dist/Page/Changelog/Changelog.fs';

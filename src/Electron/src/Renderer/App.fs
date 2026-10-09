@@ -35,6 +35,7 @@ type private Msg =
     | ArcRootPathSnapshotLoaded of requestVersion: int * liveUpdateVersionAtStart: int * Result<ArcRootPath, exn>
     | ArcRootPathChanged of ArcRootPath
     | PageStateChanged of PageState option
+    | PageStateUpdated of (PageState option -> PageState option)
     | SetLeftSidebarTarget of LeftSidebarPage
 
 let private init () : Model * Cmd<Msg> = Model.Empty, Cmd.none
@@ -45,6 +46,7 @@ let private msgName =
     | ArcRootPathSnapshotLoaded _ -> "ArcRootPathSnapshotLoaded"
     | ArcRootPathChanged _ -> "ArcRootPathChanged"
     | PageStateChanged _ -> "PageStateChanged"
+    | PageStateUpdated _ -> "PageStateUpdated"
     | SetLeftSidebarTarget _ -> "SetLeftSidebarTarget"
 
 let private traceUpdateMsg (msg: Msg) =
@@ -102,6 +104,12 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         {
             model with
                 PageState = pageStateOption
+        },
+        Cmd.none
+    | PageStateUpdated update ->
+        {
+            model with
+                PageState = update model.PageState
         },
         Cmd.none
     | SetLeftSidebarTarget leftSidebarTarget ->
@@ -184,6 +192,12 @@ let Main () =
 
     let setPageState (pageState: PageState option) = dispatch (PageStateChanged pageState)
 
+    let updatePageState =
+        React.useCallback (
+            (fun (update: PageState option -> PageState option) -> dispatch (PageStateUpdated update)),
+            [||]
+        )
+
     let pageCtx: StateContext<PageState option> =
         React.useMemo (
             (fun _ -> {
@@ -237,31 +251,34 @@ let Main () =
                     },
                     Renderer.Context.PageStateContext.PageStateCtx.Provider(
                         pageCtx,
-                        ErrorModalProvider.ErrorModalProvider(
-                            Renderer.Context.AuthStateContext.Provider(
-                                Renderer.Context.LfsActivityContext.LfsActivityCtxProvider(
-                                    Renderer.Context.GitStateContext.GitStateCtxProvider(
-                                        Swate
-                                            .Components
-                                            .Composite
-                                            .AnnotationTable
-                                            .AnnotationTableContextProvider
-                                            .AnnotationTableContextProvider(
-                                                Layout.Main(
-                                                    children =
-                                                        React.Fragment [|
-                                                            children
-                                                            CloseWindowController.CloseWindowController()
-                                                        |],
-                                                    navbar = Renderer.Components.Navbar.Main(),
-                                                    ?leftSidebar = leftSidebar,
-                                                    ?leftActions = leftActions
+                        Renderer.Context.PageStateContext.PageStateUpdateCtx.Provider(
+                            updatePageState,
+                            ErrorModalProvider.ErrorModalProvider(
+                                Renderer.Context.AuthStateContext.Provider(
+                                    Renderer.Context.LfsActivityContext.LfsActivityCtxProvider(
+                                        Renderer.Context.GitStateContext.GitStateCtxProvider(
+                                            Swate
+                                                .Components
+                                                .Composite
+                                                .AnnotationTable
+                                                .AnnotationTableContextProvider
+                                                .AnnotationTableContextProvider(
+                                                    Layout.Main(
+                                                        children =
+                                                            React.Fragment [|
+                                                                children
+                                                                CloseWindowController.CloseWindowController()
+                                                            |],
+                                                        navbar = Renderer.Components.Navbar.Main(),
+                                                        ?leftSidebar = leftSidebar,
+                                                        ?leftActions = leftActions
+                                                    )
                                                 )
-                                            )
+                                        )
                                     )
-                                )
-                            ),
-                            ?scopeId = currentArcScopeId
+                                ),
+                                ?scopeId = currentArcScopeId
+                            )
                         )
                     )
                 )

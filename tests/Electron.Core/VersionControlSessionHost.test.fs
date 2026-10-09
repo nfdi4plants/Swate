@@ -13,6 +13,8 @@ open VersionControlService.Abstractions
 open Vitest
 open ElectronCore.TestHelpers
 
+module Settings = Main.VersionControl.VersionControlSettings.VersionControlSettings
+
 let private electron: obj = importAll "electron"
 
 [<Emit("$0.mockResolvedValue($1)")>]
@@ -284,11 +286,11 @@ Vitest.describe (
                     Vitest.expect(fixture.Host.IsIdle otherRoot).toBe false
                     Vitest.expect(fixture.Host.RunningOperationIds fixture.RepoRoot).toEqual [| "op-1" |]
                     Vitest.expect(fixture.Host.RunningOperationIds otherRoot).toEqual [| "op-other-root" |]
-                    Vitest.expect(fixture.Host.Cancel "op-other-root").toBe true
+                    Vitest.expect(fixture.Host.Cancel("op-other-root", None)).toBe true
                     Vitest.expect(otherWorkspaceOperation.Context.Cancellation.IsCancellationRequested()).toBe true
                     Vitest.expect(tracked.Context.Cancellation.IsCancellationRequested()).toBe false
                     otherWorkspaceOperation.Complete()
-                    Vitest.expect(fixture.Host.Cancel "op-1").toBe true
+                    Vitest.expect(fixture.Host.Cancel("op-1", None)).toBe true
                     Vitest.expect(tracked.Context.Cancellation.IsCancellationRequested()).toBe true
 
                     tracked.Context.ReportProgress {
@@ -303,8 +305,38 @@ Vitest.describe (
 
                     tracked.Complete()
                     Vitest.expect(fixture.Host.IsIdle fixture.RepoRoot).toBe true
-                    Vitest.expect(fixture.Host.Cancel "op-1").toBe false
+                    Vitest.expect(fixture.Host.Cancel("op-1", None)).toBe false
                 })
+        )
+
+        Vitest.test (
+            "the diff window owner is the window registered for the operation, else unknown",
+            fun () ->
+                let runtime =
+                    createRuntime
+                        "settings"
+                        VersionControlService.LakeFs.LakeFsCredentials.unconfigured
+                        (memoryBindings ())
+
+                let host = WorkspaceSessionHost.WorkspaceSessionHost(runtime)
+                WorkspaceSessionHost.initialize host
+
+                try
+                    let tracked = host.BeginOperation("op-window-7", None, Some 7, false, ignore)
+                    let withoutWindow = host.BeginOperation("op-no-window", None, None, false, ignore)
+
+                    let unregistered =
+                        OperationContext.create "op-unregistered" OperationCancellation.none ignore
+
+                    Vitest.expect(WorkspaceSessionHost.windowOwnerOf tracked.Context).toBe "window:7"
+                    Vitest.expect(WorkspaceSessionHost.windowOwnerOf withoutWindow.Context).toBe "unknown"
+                    Vitest.expect(WorkspaceSessionHost.windowOwnerOf unregistered).toBe "unknown"
+
+                    tracked.Complete()
+                    withoutWindow.Complete()
+                    Vitest.expect(WorkspaceSessionHost.windowOwnerOf tracked.Context).toBe "unknown"
+                finally
+                    WorkspaceSessionHost.resetForTests ()
         )
 
         Vitest.test (
@@ -387,7 +419,7 @@ Vitest.describe (
                             ignore
                         )
 
-                    fixture.Host.Cancel "op-cancel" |> ignore
+                    fixture.Host.Cancel("op-cancel", None) |> ignore
 
                     let synchronization =
                         hosted.Session.Synchronization
@@ -1053,6 +1085,7 @@ Vitest.describe (
                                 {
                                     AutoTrackThresholdMb = 9
                                     DownloadLargeFiles = true
+                                    DiffIndexingLimitMb = 2048
                                 },
                                 detached "settings-during-close"
                             )
@@ -1333,6 +1366,7 @@ Vitest.describe (
                             Settings = {
                                 AutoPolicyThresholdMb = Some 9
                                 MaterializeLargeObjects = true
+                                DiffIndexingLimitMb = None
                             }
                         }
 
@@ -1384,6 +1418,7 @@ Vitest.describe (
                             Settings = {
                                 AutoPolicyThresholdMb = Some 9
                                 MaterializeLargeObjects = true
+                                DiffIndexingLimitMb = None
                             }
                         }
 
@@ -1396,6 +1431,7 @@ Vitest.describe (
                                 Settings = {
                                     AutoPolicyThresholdMb = Some threshold
                                     MaterializeLargeObjects = false
+                                    DiffIndexingLimitMb = None
                                 }
                             }
 
@@ -1440,6 +1476,93 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "the indexing limit is checked against its range",
+            fun () ->
+                let settingsWith (limitMb: int) : VersionControlSettings.VersionControlSettings = {
+                    Settings.defaults with
+                        DiffIndexingLimitMb = limitMb
+                }
+
+                for limit in [ 1; 63; 64; 1048576 ] do
+                    Vitest.expect(Settings.validate (settingsWith limit) |> Result.isOk).toBe true
+
+                for limit in [ 0; -1; 1048577 ] do
+                    match Settings.validate (settingsWith limit) with
+                    | Error(code, _) -> Vitest.expect(code).toBe VersionControlCodes.InvalidDiffIndexingLimit
+                    | Ok _ -> failwith $"The limit {limit} was accepted."
+        )
+
+        Vitest.test (
+            "a limit of 1 to 63 MB keeps a new diff in memory, and any other limit prefers disk with the fixed reserve plus 5 %",
+            fun () ->
+                let policyOf (limitMb: int) =
+                    Settings.diffStoragePolicy {
+                        Settings.defaults with
+                            DiffIndexingLimitMb = limitMb
+                    }
+
+                Vitest.expect(policyOf 1).toEqual (DiffStoragePolicy.MemoryOnly 1048576L)
+                Vitest.expect(policyOf 63).toEqual (DiffStoragePolicy.MemoryOnly 66060288L)
+
+                // 1024 MiB times 1.05 is 1075.2 MiB, which is 1127428915.2 bytes and rounds up.
+                Vitest.expect(policyOf 64).toEqual (DiffStoragePolicy.PreferDisk(1127428916L, 67108864L))
+        )
+
+        Vitest.test (
+            "a background indexing limit outside the allowed range is refused, and a session starts from the default again",
+            fun () ->
+                withFixture (fun fixture -> promise {
+                    registerVault 91 fixture.RepoRoot |> ignore
+                    let api = Main.IPC.IVersionControlApi.api (ipcEvent 91)
+
+                    let setLimit (operationId: string) (limitMb: int) =
+                        api.setStoragePolicySettings {
+                            OperationId = operationId
+                            Settings = {
+                                AutoPolicyThresholdMb = None
+                                MaterializeLargeObjects = false
+                                DiffIndexingLimitMb = Some limitMb
+                            }
+                        }
+
+                    let limitOfSession (operationId: string) = promise {
+                        let! current = api.getStoragePolicySettings (request operationId)
+                        let settings = expectDtoValue "get storage policy" current
+                        return settings.Value.DiffIndexingLimitMb
+                    }
+
+                    let! initial = limitOfSession "get-default-limit"
+                    Vitest.expect(initial).toEqual (Some 1024)
+
+                    // The bounds themselves are allowed.
+                    for limit in [ 1; 63; 64; 1048576 ] do
+                        let! accepted = setLimit $"set-limit-{limit}" limit
+                        expectDtoValue $"set limit {limit}" accepted |> ignore
+                        let! kept = limitOfSession $"get-limit-{limit}"
+                        Vitest.expect(kept).toEqual (Some limit)
+
+                    // Values outside the bounds are refused and change nothing.
+                    for limit in [ 0; -5; 1048577 ] do
+                        let! refused = setLimit $"set-invalid-limit-{limit}" limit
+                        let failure = expectDtoFailure $"set invalid limit {limit}" refused
+                        Vitest.expect(failure.Code).toBe VersionControlCodes.InvalidDiffIndexingLimit
+                        let! kept = limitOfSession $"get-after-invalid-limit-{limit}"
+                        Vitest.expect(kept).toEqual (Some 1048576)
+
+                    // A new session starts from the default again.
+                    do! fixture.Host.CloseSession fixture.RepoRoot |> Async.StartAsPromise
+
+                    let! reopened =
+                        fixture.Host.OpenSession(fixture.RepoRoot, detached "open-after-limit")
+                        |> Async.StartAsPromise
+
+                    expectValue "reopen" reopened |> ignore
+                    let! afterReopen = limitOfSession "get-limit-after-reopen"
+                    Vitest.expect(afterReopen).toEqual (Some 1024)
+                })
+        )
+
+        Vitest.test (
             "a closed and reopened session starts from the defaults again",
             fun () ->
                 withFixture (fun fixture -> promise {
@@ -1452,6 +1575,7 @@ Vitest.describe (
                             Settings = {
                                 AutoPolicyThresholdMb = Some 9
                                 MaterializeLargeObjects = true
+                                DiffIndexingLimitMb = None
                             }
                         }
 
@@ -1703,6 +1827,7 @@ Vitest.describe (
                             Settings = {
                                 AutoPolicyThresholdMb = Some 9
                                 MaterializeLargeObjects = true
+                                DiffIndexingLimitMb = None
                             }
                         }
 
@@ -1892,6 +2017,7 @@ Vitest.describe (
                                 Settings = {
                                     AutoPolicyThresholdMb = Some 4
                                     MaterializeLargeObjects = false
+                                    DiffIndexingLimitMb = None
                                 }
                             }
 
