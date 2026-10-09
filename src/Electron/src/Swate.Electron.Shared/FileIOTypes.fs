@@ -62,6 +62,7 @@ type FileContentType =
     | CWL
     | PlainText
     | Markdown
+    | PDF
     | ISA_Investigation
     | ISA_Study
     | ISA_Assay

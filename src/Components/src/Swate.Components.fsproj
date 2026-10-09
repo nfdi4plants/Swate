@@ -316,9 +316,10 @@
     <Compile Include="Page\GitSidebar\Types.fs" />
     <Compile Include="Page\GitSidebar\GitSidebar.fs" />
     <Compile Include="Page\GitComparison\GitTextComparison.Core.fs" />
+    <Compile Include="Page\GitComparison\GitPagedDiff.Types.fs" />
     <Compile Include="Page\GitComparison\GitTextComparison.fs" />
     <Compile Include="Page\GitComparison\GitComparisonView.fs" />
-    <Compile Include="Page\GitComparison\GitDiffViewer.fs" />
+    <Compile Include="Page\GitComparison\GitPagedDiffViewer.fs" />
     <Compile Include="Page\GitComparison\GitMergeConflictViewer.fs" />
     <Compile Include="Page\FileExplorer\Types.fs" />
     <Compile Include="Page\FileExplorer\Helper.fs" />

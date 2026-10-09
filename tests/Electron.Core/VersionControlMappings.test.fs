@@ -24,6 +24,7 @@ let private sampleFailure: OperationFailure = {
             Instructions = Some "Refresh and retry."
         }
     Details = [| "detail line" |]
+    DiffDetail = None
     RevisionEvidence = [|
         "expected_target", revision "abc"
         "observed_target", revision "def"
@@ -181,6 +182,7 @@ Vitest.describe (
                 }
             Details = [||]
             RevisionEvidence = [||]
+            DiffDetail = None
         }
 
         let outcome: OperationOutcomeDto<int> = {

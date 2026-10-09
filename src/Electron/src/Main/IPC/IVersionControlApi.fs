@@ -87,9 +87,11 @@ let private validationFailed (code: string) (message: string) : OperationResult<
 let private storagePolicySettingsDto (settings: VersionControlSettings) : StoragePolicySettingsDto = {
     AutoPolicyThresholdMb = Some settings.AutoTrackThresholdMb
     MaterializeLargeObjects = settings.DownloadLargeFiles
+    DiffIndexingLimitMb = Some settings.DiffIndexingLimitMb
 }
 
 /// Registers and announces one operation before any await, and turns exceptions into failures.
+/// An operation id that a running operation already has is answered with a failure and runs nothing.
 let private runTracked
     (host: WorkspaceSessionHost.WorkspaceSessionHost)
     (bridge: RendererBridge)
@@ -101,39 +103,44 @@ let private runTracked
     (operation: OperationContext -> Async<OperationResult<'T>>)
     : JS.Promise<OperationResult<'T>> =
     promise {
-        let tracked =
-            host.BeginOperation(
+        match
+            host.TryBeginOperation(
                 operationId,
                 workspaceRoot,
                 windowId,
                 mutating,
                 fun progress -> bridge.Progress(Mappings.progress operationId progress)
             )
+        with
+        | Error failure ->
+            let result: OperationResult<'T> = Failed failure
+            logOperationFinished operationName operationId result 0L
+            return result
+        | Ok tracked ->
+            let startedAt = System.DateTime.UtcNow
 
-        let startedAt = System.DateTime.UtcNow
+            if mutating then
+                logOperationStarted operationName operationId
 
-        if mutating then
-            logOperationStarted operationName operationId
-
-        let! result = promise {
-            try
+            let! result = promise {
                 try
-                    bridge.Started { OperationId = operationId }
-                    return! operation tracked.Context |> Async.StartAsPromise
-                with error ->
-                    return Failed(unexpectedFailure error)
-            finally
-                tracked.Complete()
-        }
+                    try
+                        bridge.Started { OperationId = operationId }
+                        return! operation tracked.Context |> Async.StartAsPromise
+                    with error ->
+                        return Failed(unexpectedFailure error)
+                finally
+                    tracked.Complete()
+            }
 
-        let durationMilliseconds =
-            int64 (System.DateTime.UtcNow.Subtract(startedAt).TotalMilliseconds)
+            let durationMilliseconds =
+                int64 (System.DateTime.UtcNow.Subtract(startedAt).TotalMilliseconds)
 
-        match mutating, result with
-        | false, Succeeded _ -> ()
-        | _ -> logOperationFinished operationName operationId result durationMilliseconds
+            match mutating, result with
+            | false, Succeeded _ -> ()
+            | _ -> logOperationFinished operationName operationId result durationMilliseconds
 
-        return result
+            return result
     }
 
 /// Opens the vault session of the calling window and runs the operation in it. The
@@ -264,6 +271,50 @@ let private withService
     match select hosted.Session with
     | Some service -> call service context
     | None -> async { return serviceUnavailable serviceName }
+
+/// Runs one text diff call in the session of the calling window. An invalid request is
+/// answered before the operation is registered, and every failure of the reply is bounded.
+/// The calls are reads, so they use the tracked operation without the busy flag.
+let private withTextDiff
+    (operationName: string)
+    (event: IpcMainInvokeEvent)
+    (operationId: string)
+    (request: Result<'R, OperationFailure>)
+    (call: WorkspaceSessionHost.HostedSession -> TextDiffService -> 'R -> OperationContext -> Async<OperationResult<'T>>)
+    (mapValue: 'T -> 'U)
+    : JS.Promise<Result<OperationResultDto<'U>, exn>> =
+    promise {
+        match request with
+        | Error failure -> return Ok(Mappings.textDiffResult mapValue (Failed failure))
+        | Ok converted ->
+            let! result =
+                withSession
+                    operationName
+                    event
+                    operationId
+                    false
+                    (fun hosted context ->
+                        withService
+                            _.TextDiff
+                            "text diffs"
+                            (fun service serviceContext -> call hosted service converted serviceContext)
+                            hosted
+                            context
+                    )
+                    mapValue
+
+            return result |> Result.map Mappings.boundTextDiffResult
+    }
+
+/// The storage policy a diff opened now gets, from the settings of the session of the calling window.
+let private diffStoragePolicyOf (event: IpcMainInvokeEvent) : DiffStoragePolicy =
+    match tryGetVaultAndArcPath event with
+    | Ok(_, arcPath) -> VersionControlSettings.diffStoragePolicy (WorkspaceSessionHost.get().GetSettings arcPath)
+    | Error _ -> VersionControlSettings.diffStoragePolicy VersionControlSettings.defaults
+
+/// The window of the IPC call. Electron supplies it, so the renderer cannot choose it.
+let private callingWindowId (event: IpcMainInvokeEvent) : int option =
+    windowFromIpcEvent event |> Option.map _.id
 
 let private withPath (path: string) (call: RepositoryPath -> Async<OperationResult<'T>>) : Async<OperationResult<'T>> =
     match Mappings.tryRepositoryPath path with
@@ -576,7 +627,8 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
             logOperationStarted operationName key.OperationId
 
             let host = WorkspaceSessionHost.get ()
-            let canceled = host.Cancel key.OperationId
+            // A window cancels only the operations it started.
+            let canceled = host.Cancel(key.OperationId, callingWindowId event)
 
             let durationMilliseconds =
                 int64 (System.DateTime.UtcNow.Subtract(startedAt).TotalMilliseconds)
@@ -797,30 +849,6 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                         )
                 )
                 id
-    getWordDiff =
-        fun request ->
-            withSession
-                "getWordDiff"
-                event
-                request.OperationId
-                false
-                (withService
-                    _.TextDiff
-                    "text diffs"
-                    (fun service context -> withPath request.Path (fun path -> service.GetWordDiff path context)))
-                Mappings.contentView
-    getBaseContent =
-        fun request ->
-            withSession
-                "getBaseContent"
-                event
-                request.OperationId
-                false
-                (withService
-                    _.TextDiff
-                    "text diffs"
-                    (fun service context -> withPath request.Path (fun path -> service.GetBaseContent path context)))
-                Mappings.contentView
     refreshSynchronization =
         fun request ->
             withSession
@@ -987,6 +1015,9 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                             request.Settings.AutoPolicyThresholdMb
                             |> Option.defaultValue current.AutoTrackThresholdMb
                         DownloadLargeFiles = request.Settings.MaterializeLargeObjects
+                        DiffIndexingLimitMb =
+                            request.Settings.DiffIndexingLimitMb
+                            |> Option.defaultValue current.DiffIndexingLimitMb
                     }
 
                     host.SetSettings(hosted.Binding.WorkspaceRoot, settings, context)
@@ -1142,4 +1173,97 @@ let api (event: IpcMainInvokeEvent) : IVersionControlApi = {
                             | Failed failure -> Failed failure
                 })
                 Mappings.workspaceStatus
+    // Every handle an open returns is recorded with the window of the operation, so its
+    // handles close with the window. The library keeps each window to its own handles. A
+    // handle that arrives after its window closed is closed at once.
+    openTextDiff =
+        fun request ->
+            // The settings of the session decide where the diff keeps its data.
+            let policy = diffStoragePolicyOf event
+
+            withTextDiff
+                "openTextDiff"
+                event
+                request.OperationId
+                (Mappings.tryOpenDiffRequest policy request)
+                (fun hosted service openRequest context -> async {
+                    let windowId = callingWindowId event
+                    let! opened = service.Open openRequest context
+
+                    match opened with
+                    | Succeeded outcome
+                    | PartiallySucceeded(outcome, _) ->
+                        match outcome.Value with
+                        | Resumable.Ready(OpenDiffResult.Opened(handle, _, _, _, _)) ->
+                            TextDiffHandles.recordOrClose windowId hosted.Binding.WorkspaceRoot service handle
+                        | _ -> ()
+                    | Failed _ -> ()
+
+                    return opened
+                })
+                (Mappings.resumableOpen policy)
+    readTextDiffPage =
+        fun request ->
+            withTextDiff
+                "readTextDiffPage"
+                event
+                request.OperationId
+                (Mappings.tryReadPageRequest request)
+                (fun _ service pageRequest context -> service.ReadPage pageRequest context)
+                Mappings.resumablePage
+    replayTextDiffPage =
+        fun request ->
+            withTextDiff
+                "replayTextDiffPage"
+                event
+                request.OperationId
+                (Mappings.tryReplayPageRequest request)
+                (fun _ service replayRequest context -> service.ReplayPage replayRequest context)
+                Mappings.diffPage
+    expandTextDiff =
+        fun request ->
+            withTextDiff
+                "expandTextDiff"
+                event
+                request.OperationId
+                (Mappings.tryExpandRequest request)
+                (fun _ service expandRequest context -> service.Expand expandRequest context)
+                Mappings.resumableParts
+    readTextDiffLine =
+        fun request ->
+            withTextDiff
+                "readTextDiffLine"
+                event
+                request.OperationId
+                (Mappings.tryReadLineRequest request)
+                (fun _ service lineRequest context -> service.ReadLine lineRequest context)
+                Mappings.resumableLine
+    getTextDiffSourceInfo =
+        fun request ->
+            withTextDiff
+                "getTextDiffSourceInfo"
+                event
+                request.OperationId
+                (Mappings.tryDiffHandle request)
+                (fun _ service handle context -> service.GetSourceInfo { SourceInfoRequest.Handle = handle } context)
+                Mappings.diffSourceInfoPair
+    // A failed close keeps the registry entry, so the window close retries it.
+    closeTextDiff =
+        fun request ->
+            withTextDiff
+                "closeTextDiff"
+                event
+                request.OperationId
+                (Mappings.tryDiffHandle request)
+                (fun _ service handle context -> async {
+                    let! closed = service.Close handle context
+
+                    match closed with
+                    | Failed _ -> ()
+                    | Succeeded _
+                    | PartiallySucceeded _ -> TextDiffHandles.remove handle.Id
+
+                    return closed
+                })
+                id
 }

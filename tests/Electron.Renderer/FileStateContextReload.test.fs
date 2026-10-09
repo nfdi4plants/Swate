@@ -268,6 +268,14 @@ Vitest.describe (
                 Vitest
                     .expect(
                         FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval (
+                            Some(RendererPageState.PDFPage "pdf")
+                        )
+                    )
+                    .toBe (true)
+
+                Vitest
+                    .expect(
+                        FileExplorerStateReconciliation.shouldResetPageStateAfterSelectionRemoval (
                             Some(RendererPageState.TextPage "txt")
                         )
                     )
@@ -372,6 +380,22 @@ Vitest.describe (
                 match pageState with
                 | RendererPageState.MarkdownPage markdownContent -> Vitest.expect(markdownContent).toBe ("# My Note")
                 | _ -> failwith "Expected MarkdownPage for markdown file content DTO."
+        )
+
+        Vitest.test (
+            "fromFileContentDTO maps markdown files to MarkdownPage",
+            fun () ->
+                let dto: FileContentDTO = {|
+                    fileType = FileContentType.PDF
+                    content = "PDF content"
+                    path = "protocols/my-protocol.pdf"
+                |}
+
+                let pageState = RendererPageState.fromFileContentDTO dto
+
+                match pageState with
+                | RendererPageState.PDFPage pdfContent -> Vitest.expect(pdfContent).toBe ("PDF content")
+                | _ -> failwith "Expected PDFPage for PDF file content DTO."
         )
 
         Vitest.test (

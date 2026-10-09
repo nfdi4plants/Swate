@@ -287,6 +287,7 @@ module FileContentType =
         | FileContentType.ISA_Datamap -> Some DTOType.ISA_Datamap
         | FileContentType.CLI -> Some DTOType.CLI
         | FileContentType.Markdown -> None
+        | FileContentType.PDF -> None
 
     /// Maps ARCtrl DTOType values to custom file content types.
     let ofArcContractDTOType (dtoType: DTOType) : FileContentType =
@@ -333,6 +334,9 @@ module FileContentDTO =
 
         if normalizedPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase) then
             FileContentType.Markdown
+
+        elif normalizedPath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) then
+            FileContentType.PDF
         else
             FileContentType.PlainText
 

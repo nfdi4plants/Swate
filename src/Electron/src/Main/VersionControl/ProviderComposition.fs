@@ -53,9 +53,23 @@ let dataHubRevisionPolicy: RevisionPolicyStrategy = {
                 RevisionPathPolicy.Automatic
 }
 
-let createGitFactory (source: DataHubStrategies.DataHubAccountSource) : ProviderFactory =
-    GitWorkspaceSession.createFactoryWithCredentialsIdentityAndPolicy
-        GitWorkspaceSession.GitSessionHooks.none
+/// The Git factory whose sessions diff text in the shared worker pool. A session asks for the
+/// pool on each diff Open until the pool is set up, so a failed setup fails only that Open
+/// with diff_worker_failed and the next Open tries the setup again. `windowOwnerOf` names the
+/// window that started an operation, and the pool keeps each window's diff handles apart.
+let createGitFactory
+    (source: DataHubStrategies.DataHubAccountSource)
+    (windowOwnerOf: OperationContext -> string)
+    : ProviderFactory =
+    GitWorkspaceSession.createFactoryWithOptions
+        {
+            Hooks = GitWorkspaceSession.GitSessionHooks.none
+            TextDiff =
+                Some {
+                    Pool = TextDiffWorkers.pool
+                    WindowOwnerOf = windowOwnerOf
+                }
+        }
         (DataHubStrategies.createCredentialStrategy source)
         (DataHubStrategies.createIdentityStrategy source)
         dataHubRevisionPolicy
@@ -83,11 +97,14 @@ let createCatalog (factories: ProviderFactory list) : ProviderResolver.ProviderC
 /// The production catalog: Git over the DataHUB accounts, lakeFS without any
 /// configured connection until lakeFS accounts exist in Swate. The caller passes the
 /// path case sensitivity it also hands to the resolver and the binding store.
-let createProductionCatalog (sensitivity: PathCaseSensitivity) : ProviderResolver.ProviderCatalog =
+let createProductionCatalog
+    (sensitivity: PathCaseSensitivity)
+    (windowOwnerOf: OperationContext -> string)
+    : ProviderResolver.ProviderCatalog =
     let settingsRoot = Main.SettingsStore.getSettingsRootPath ()
 
     createCatalog [
-        createGitFactory dataHubAccountSource
+        createGitFactory dataHubAccountSource windowOwnerOf
         createLakeFsFactory (lakeFsOptions settingsRoot sensitivity) LakeFsCredentials.unconfigured
     ]
 
