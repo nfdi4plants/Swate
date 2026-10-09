@@ -76,6 +76,7 @@ module private LazyComponents =
 /// This can be further reduced by using the actual contexts instead of passing down the states and setters as props, but this is good enough for now
 [<ReactMemoComponent>]
 let Main (appRootPath: ArcRootPath, pageState: PageState option) =
+
     Swate.Components.Composite.Template.TemplateCacheProvider.TemplateCacheProvider(
         loadTemplates = MainHelper.loadTemplates,
         children =
@@ -102,6 +103,11 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                         React.Suspense(
                             [ LazyComponents.LazyMarkdownEditorTarget(content) ],
                             fallback = LazyComponents.FullPageLoadingSpinner("Loading markdown editor...")
+                        )
+                    | Some _, Some(PageState.PDFPage content) ->
+                        React.Suspense(
+                            [ PDFViewer.DisplayPDF.Main(content) ],
+                            fallback = LazyComponents.FullPageLoadingSpinner("Loading pdf...")
                         )
                     | Some _, Some(PageState.TextPage content) -> TextPreviewTarget content
                     | Some _, Some PageState.UnknownPage -> UnknownPreviewTarget()

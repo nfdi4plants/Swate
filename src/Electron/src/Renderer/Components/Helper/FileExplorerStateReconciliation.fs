@@ -20,6 +20,7 @@ let private resetsWhenSelectionIsRemoved =
     function
     | PageState.ArcFilePage _
     | PageState.MarkdownPage _
+    | PageState.PDFPage _
     | PageState.TextPage _
     | PageState.UnknownPage
     | PageState.ErrorPage _ -> true
@@ -57,6 +58,7 @@ let tryGetDataMapMismatchReload (fileTree: FileEntry[]) (pageState: PageState op
 let private reloadsWhenSelectedFileChanges =
     function
     | PageState.MarkdownPage _
+    | PageState.PDFPage _
     | PageState.TextPage _
     | PageState.UnknownPage
     | PageState.ErrorPage _ -> true

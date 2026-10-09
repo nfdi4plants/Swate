@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### ✨ Added
 
 - Add setting to adjust UI scaling. This can also be done using the keyboard shortcuts "Ctrl + +" or "Ctrl + -" (or "⌘ + +" / "⌘ + -" on MacOS). #1165 (by @Freymaurer)
+- Add display of PDFs (read-only) in Swate using the built-in browser compatibility of Electron. #1326 (by @Rookabu)
 - A new Git sidebar setting, "Background indexing limit (MB)", decides how much of a large diff Swate reads ahead while you look at it. With a value from 1 to 63 the diff stays in memory and writes no temporary files. #1388 (by @caroott)
 - Swate keeps about 1 GB free on the drive that holds its temporary files. On a nearly full drive a new diff stays in memory, and an open diff pauses until you free some space and press Continue. #1388 (by @caroott)
 - When loading more of a diff fails, the status bar above the diff says why. #1388 (by @caroott)
