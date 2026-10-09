@@ -335,7 +335,8 @@ type ArcVault(window: BrowserWindow) =
     member internal _.FileTreeDirectoryCursors = fileTreeDirectoryCursors
 
     member internal this.CloseFileTreeDirectoryCursor(relativeDirectoryPath: string) = promise {
-        let normalizedPath = PathHelpers.normalizeCanonicalRelativePath relativeDirectoryPath
+        let normalizedPath =
+            PathHelpers.normalizeCanonicalRelativePath relativeDirectoryPath
 
         match fileTreeDirectoryCursors.TryGetValue normalizedPath with
         | false, _ -> ()
@@ -358,9 +359,7 @@ type ArcVault(window: BrowserWindow) =
                 let normalizedPath = PathHelpers.normalizeCanonicalRelativePath path
 
                 cursorPaths
-                |> Array.filter (fun cursorPath ->
-                    PathHelpers.isSameOrDescendantPath cursorPath normalizedPath
-                )
+                |> Array.filter (fun cursorPath -> PathHelpers.isSameOrDescendantPath cursorPath normalizedPath)
 
         for cursorPath in pathsToClose do
             do! this.CloseFileTreeDirectoryCursor cursorPath
@@ -476,9 +475,7 @@ module ArcVaultExtensions =
             queuedUpdate
 
         member internal this.CloseFileTreeDirectoryCursorsUnderPath(relativeDirectoryPath: string) =
-            this.EnqueueFileTreeUpdate(fun () ->
-                this.CloseFileTreeDirectoryCursors(underPath = relativeDirectoryPath)
-            )
+            this.EnqueueFileTreeUpdate(fun () -> this.CloseFileTreeDirectoryCursors(underPath = relativeDirectoryPath))
 
         member private this.LoadWatcherSnapshot() : Fable.Core.JS.Promise<Result<ARC, exn>> = promise {
             try
@@ -1414,8 +1411,7 @@ module ArcVaultExtensions =
 
                                 return directoryPath, cursor
                             | false, _ ->
-                                let! directoryPath, cursor =
-                                    openFileTreeDirectoryCursor arcPath normalizedRelativePath
+                                let! directoryPath, cursor = openFileTreeDirectoryCursor arcPath normalizedRelativePath
 
                                 this.FileTreeDirectoryCursors.[normalizedRelativePath] <- cursor
                                 return directoryPath, cursor
@@ -1426,9 +1422,7 @@ module ArcVaultExtensions =
 
                             if
                                 capturedWatcherEpoch <> this.WatcherEpoch
-                                || this.path
-                                   |> Option.exists (PathHelpers.pathsEqual arcPath)
-                                   |> not
+                                || this.path |> Option.exists (PathHelpers.pathsEqual arcPath) |> not
                             then
                                 do! this.CloseFileTreeDirectoryCursor normalizedRelativePath
                                 return raise (ArcLoadCancelledException this.window.id)

@@ -179,7 +179,13 @@ let openFileTreeDirectoryCursor (arcPath: string) (relativeDirectoryPath: string
     let normalizedArcPath = normalizeRootPath arcPath
     let directoryPath = resolveFileTreeDirectory normalizedArcPath relativeDirectoryPath
     let! directory = openDirectoryAsync directoryPath
-    return directoryPath, { Directory = directory; Lookahead = None }
+
+    return
+        directoryPath,
+        {
+            Directory = directory
+            Lookahead = None
+        }
 }
 
 /// Advances an already-open directory cursor by one bounded batch. The accepted lookahead is

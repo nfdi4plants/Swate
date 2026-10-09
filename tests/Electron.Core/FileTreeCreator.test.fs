@@ -403,14 +403,16 @@ Vitest.describe (
                 let mutable nextIndex = 0
 
                 let dirents =
-                    Array.init 5 (fun index ->
-                        { new Dirent with
-                            member _.name = $"entry-{index}"
-                            member _.isDirectory() = false
-                            member _.isFile() = true
-                            member _.isSymbolicLink() = false
-                        }
-                    )
+                    Array.init
+                        5
+                        (fun index ->
+                            { new Dirent with
+                                member _.name = $"entry-{index}"
+                                member _.isDirectory() = false
+                                member _.isFile() = true
+                                member _.isSymbolicLink() = false
+                            }
+                        )
 
                 let directory =
                     { new Directory with
