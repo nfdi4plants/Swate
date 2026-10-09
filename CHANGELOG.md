@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The diff of a changed file opens page by page and loads more lines as you scroll. Files of several gigabytes now open quickly, and Swate stays responsive while it reads the rest in the background. Files with many repeated lines, such as tables with repeating rows, show each edited line on its own. #1388 (by @caroott)
 - Swate needs Git 2.42 or newer. #1388 (by @caroott)
+- The Git sidebar shows "Download Changes" (formerly "Update ARC from Online") and "Upload Changes" side by side, with More Git Actions below. #1388 (by @caroott)
 
 ## 2.4.0 - 2026-10-07
 

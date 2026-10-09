@@ -352,14 +352,14 @@ export const AdvancedActions: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByTestId("GitSidebarOpenRemoteRepositoryButton")).toBeEnabled();
+    await expect(canvas.getByTestId("GitSidebarPullButton")).toBeEnabled();
+    await expect(canvas.getByTestId("GitSidebarPushButton")).toBeEnabled();
     await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
     await expect(canvas.getByTestId("GitSidebarAdvancedActionsButton")).toHaveClass("swt:btn-primary");
     await expect(canvas.getByTestId("GitSidebarAdvancedActionsDivider")).toBeInTheDocument();
     await expect(canvas.queryByTestId("GitSidebarSyncButton")).toBeNull();
     await expect(canvas.queryByTestId("GitSidebarLocalCommitButton")).toBeNull();
     await expect(canvas.getByTestId("GitSidebarFetchButton")).toBeInTheDocument();
-    await expect(canvas.queryByTestId("GitSidebarPullButton")).toBeNull();
-    await expect(canvas.getByTestId("GitSidebarPushButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarLfsPruneButton")).toBeVisible();
     await expect(canvas.getByTestId("GitSidebarLfsDedupButton")).toBeVisible();
     const downloadLargeFilesCheckbox = canvas.getByTestId("GitSidebarDownloadLargeFilesCheckbox");
@@ -389,8 +389,8 @@ export const ResponsiveActionLabels: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await expect(canvas.getByTestId("GitSidebarUpdateArcButtonLabel")).toHaveClass("swt:truncate");
-    await expect(canvas.getByTestId("GitSidebarUpdateArcButtonLabel")).toHaveClass(
+    await expect(canvas.getByTestId("GitSidebarPullButtonLabel")).toHaveClass("swt:truncate");
+    await expect(canvas.getByTestId("GitSidebarPullButtonLabel")).toHaveClass(
       "swt:@max-3xs/gitSidebar:sr-only",
     );
   },
@@ -833,7 +833,8 @@ export const RemoteActionsDisabled: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByTestId("GitSidebarOpenRemoteRepositoryButton")).toBeDisabled();
-    await expect(canvas.getByTestId("GitSidebarUpdateArcButton")).toBeDisabled();
+    await expect(canvas.getByTestId("GitSidebarPullButton")).toBeDisabled();
+    await expect(canvas.getByTestId("GitSidebarPushButton")).toBeDisabled();
     await expect(
       canvas.getByTestId("GitSidebarRemoteAuthWarning"),
     ).toHaveTextContent(

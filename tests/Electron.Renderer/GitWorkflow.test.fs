@@ -9154,7 +9154,7 @@ Vitest.describe (
                     )
 
                 let updateButton =
-                    container.querySelector ("[data-testid='GitSidebarUpdateArcButton']") :?> HTMLButtonElement
+                    container.querySelector ("[data-testid='GitSidebarPullButton']") :?> HTMLButtonElement
 
                 Vitest.expect(updateButton.disabled).toBe (true)
                 Vitest.expect(container.textContent.Contains("Sign in to a DataHUB account")).toBe (true)

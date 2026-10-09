@@ -888,14 +888,29 @@ type GitSidebar =
                 prop.className "swt:grid swt:grid-cols-2 swt:gap-2 swt:px-3 swt:@max-xs:gap-1 swt:@max-xs:px-2"
                 prop.children [
                     GitSidebar.ActionButton(
-                        "Update ARC from Online",
-                        "swt:fluent--arrow-sync-24-regular",
+                        "Download Changes",
+                        "swt:fluent--arrow-down-24-regular",
                         props.IsBusy || not props.RemoteActionsEnabled,
                         props.SubmitUpdateFromOnline,
-                        testId = "GitSidebarUpdateArcButton",
+                        testId = "GitSidebarPullButton",
                         tooltipText =
-                            "Update ARC from Online:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git merge origin/<branch>\n- git lfs pull origin (when Download Large Files is on)"
+                            "Download Changes:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git merge origin/<branch>\n- git lfs pull origin (when Download Large Files is on)"
                     )
+                    GitSidebar.ActionButton(
+                        "Upload Changes",
+                        "swt:fluent--arrow-up-24-regular",
+                        props.IsBusy || not props.RemoteActionsEnabled,
+                        props.SubmitPush,
+                        testId = "GitSidebarPushButton",
+                        tooltipText =
+                            "Upload Changes:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git merge origin/<branch> (when the online copy is ahead)\n- git push origin"
+                    )
+                ]
+            ]
+
+            Html.div [
+                prop.className "swt:px-3 swt:pt-2 swt:@max-xs:px-2 swt:@max-xs:pt-1"
+                prop.children [
                     GitSidebar.ActionButton(
                         "More Git Actions",
                         (if props.IsAdvancedActionsOpen then
@@ -952,14 +967,6 @@ type GitSidebar =
                                     props.SubmitFetch,
                                     testId = "GitSidebarFetchButton",
                                     tooltipText = "Check for Changes:\n- git fetch origin"
-                                )
-                                GitSidebar.ActionButton(
-                                    "Upload Changes",
-                                    "swt:fluent--arrow-up-24-regular",
-                                    props.IsBusy || not props.RemoteActionsEnabled,
-                                    props.SubmitPush,
-                                    testId = "GitSidebarPushButton",
-                                    tooltipText = "Upload Changes:\n- git push origin"
                                 )
                                 GitSidebar.ActionButton(
                                     "Create Work Copy",
