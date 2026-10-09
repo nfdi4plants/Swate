@@ -18,6 +18,12 @@ type FileTreeSnapshot = {
     directoryHasMore: System.Collections.Generic.Dictionary<string, bool>
 }
 
+type ArcActivityState = {
+    isInitializing: bool
+    isBusyWriting: bool
+    hasUnsavedChanges: bool
+}
+
 module IPCTypesHelper =
 
     [<RequireQualifiedAccess>]
@@ -72,6 +78,7 @@ type IArcVaultsApi = {
     tryImportExternalFiles: ImportExternalFilesRequest -> JS.Promise<Result<ImportExternalFilesResult, exn>>
     cancelImportExternalFiles: string -> JS.Promise<Result<unit, exn>>
     getActiveFileImport: unit -> JS.Promise<Result<ActiveFileImportState option, exn>>
+    getArcActivityState: unit -> JS.Promise<Result<ArcActivityState, exn>>
     getFileTree: unit -> JS.Promise<Result<FileTreeSnapshot, exn>>
     loadNextFileTreeDirectoryPage: string -> JS.Promise<Result<unit, exn>>
     pathExists: string -> JS.Promise<Result<bool, exn>>
@@ -91,7 +98,6 @@ type IArcVaultsApi = {
     /// Creates a generic file or folder inside a safe ARC directory.
     createFileSystemItem: CreateFileSystemItemRequest -> JS.Promise<Result<string, exn>>
     /// Checks if there are unsaved changes in the in-memory ARC scaffold compared to the last saved state on disk. Does not trigger a save or write to disk.
-    getHasUnsavedArcChanges: unit -> JS.Promise<Result<bool, exn>>
     deletePath: string -> JS.Promise<Result<unit, exn>>
     renamePath: RenamePathRequest -> JS.Promise<Result<unit, exn>>
     movePath: MovePathRequest -> JS.Promise<Result<unit, exn>>
@@ -168,6 +174,10 @@ type IAuthApi = {
 /// One Way Bridge: Main -> Renderer
 module MainToRendererIpc =
 
+    type IArcActivityRendererApi = {
+        arcActivityChanged: ArcActivityState -> unit
+    }
+
     type IPathChangeRendererApi = { pathChange: string option -> unit }
 
     type IRecentArcsRendererApi = {
@@ -193,10 +203,6 @@ module MainToRendererIpc =
     type IVersionControlRendererApi = {
         versionControlProgress: VersionControlProgressDto -> unit
         versionControlOperationStarted: OperationRequestDto -> unit
-    }
-
-    type IHasUnsavedArcChangesRendererApi = {
-        arcUnsavedChangesUpdate: bool -> unit
     }
 
 // TODO: What should filewatcher do when detecting changes?

@@ -681,6 +681,18 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    getArcActivityState =
+        fun () -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+
+                return
+                    match ARC_VAULTS.TryGetVault(windowId) with
+                    | Some vault -> Ok vault.arcActivityState
+                    | None -> Error(exn $"The ARC for window id {windowId} should exist")
+            with e ->
+                return Error e
+        }
     getFileTree =
         fun () -> promise {
             try
@@ -811,13 +823,6 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                             return result
                         })
-            with e ->
-                return Error e
-        }
-    getHasUnsavedArcChanges =
-        fun () -> promise {
-            try
-                return! withLoadedArcVault event (fun vault -> promise { return Ok vault.hasUnsavedArcChanges })
             with e ->
                 return Error e
         }

@@ -285,7 +285,7 @@ type ArcVault(window: BrowserWindow) =
     member val activeFileImport: ActiveFileImport option = None with get, set
     member val isWaitingForImportCleanup = false with get, set
     /// True only while an ARC is being opened or initially created in this vault.
-    member val isInitializingArc = false with get, set
+    member val isInitializingArc = false with get, private set
     member val isWaitingForOperationsOnClose = false with get, set
     member val isOperationCloseApproved = false with get, set
     member val internal FileWatcherReady: Fable.Core.JS.Promise<FileWatcherReadyOutcome> option = None with get, set
@@ -331,6 +331,23 @@ type ArcVault(window: BrowserWindow) =
         with get () = pendingFileTreeReset
         and set value = pendingFileTreeReset <- value
 
+    member this.arcActivityState: ArcActivityState = {
+        isInitializing = this.isInitializingArc
+        isBusyWriting = this.isBusyWritingValue
+        hasUnsavedChanges = this.hasUnsavedArcChanges
+    }
+
+    member internal this.PublishArcActivityState() =
+        if not (this.window.isDestroyed ()) then
+            WindowSend.send<IArcActivityRendererApi>
+                this.window
+                (fun api -> api.arcActivityChanged this.arcActivityState)
+
+    member internal this.SetArcInitializationState(isInitializing: bool) =
+        if this.isInitializingArc <> isInitializing then
+            this.isInitializingArc <- isInitializing
+            this.PublishArcActivityState()
+
     /// Indicates whether the vault is currently busy writing changes to disk.
     /// When a write finishes, watcher ARC merges stay suppressed briefly to cover delayed own-write events.
     member this.isBusyWriting
@@ -338,6 +355,9 @@ type ArcVault(window: BrowserWindow) =
         and private set value =
             let wasBusyWriting = this.isBusyWritingValue
             this.isBusyWritingValue <- value
+
+            if wasBusyWriting <> value then
+                this.PublishArcActivityState()
 
             if wasBusyWriting && not value then
                 this.fileWatcherOwnWriteArcMergeSuppressionTimeout <-
@@ -388,11 +408,15 @@ type ArcVault(window: BrowserWindow) =
             this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle (Some arc.Identifier)
 
     member this.ClearArc() =
+        let dirtyStateChanged = this.hasUnsavedArcChanges
         this.arc <- None
         this.hasUnsavedArcChanges <- false
 
         if not (this.window.isDestroyed ()) then
             this.window.title <- Swate.Electron.Shared.ApplicationVersion.windowTitle None
+
+        if dirtyStateChanged then
+            this.PublishArcActivityState()
 
     /// Sets the dirty marker for unsaved in-memory ARC mutations.
     member this.RefreshHasUnsavedArcChangesFlag() =
@@ -403,7 +427,7 @@ type ArcVault(window: BrowserWindow) =
             this.hasUnsavedArcChanges <- hasNewChanges
 
             if valueIsChanging then
-                sendArcHasUnsavedChangesUpdate hasNewChanges this.window
+                this.PublishArcActivityState()
 
 [<AutoOpen>]
 module ArcVaultExtensions =
@@ -1490,18 +1514,6 @@ module ArcVaultExtensions =
             else
                 swatefailfn this.window.id "No path set for StartFileWatcher."
 
-        member this.StartFileWatcherAndWaitUntilReady(?usePolling: bool) = promise {
-            this.StartFileWatcher(?usePolling = usePolling)
-
-            match this.FileWatcherReady with
-            | Some ready ->
-                match! ready with
-                | FileWatcherReadyOutcome.Ready -> ()
-                | FileWatcherReadyOutcome.WatcherError error -> return raise error
-                | FileWatcherReadyOutcome.Cancelled -> return raise (ArcLoadCancelledException this.window.id)
-            | None -> ()
-        }
-
         member this.ClearPendingFileWatcherState() =
             this.IncrementWatcherEpoch()
             this.ResetWatcherDeferralCount()
@@ -1546,9 +1558,7 @@ module ArcVaultExtensions =
         member internal this.RestoreEmptyVaultAfterFailedInitialization() = promise {
             do! this.StopFileWatcher()
 
-            let hadUnsavedArcChanges = this.hasUnsavedArcChanges
-
-            this.isInitializingArc <- false
+            this.SetArcInitializationState false
             this.path <- None
             this.fileTree.Clear()
             this.fileTreeDirectoryHasMore.Clear()
@@ -1561,18 +1571,32 @@ module ArcVaultExtensions =
             if not (this.window.isDestroyed ()) then
                 WindowSend.send<IPathChangeRendererApi> this.window (fun api -> api.pathChange None)
                 this.SetFileTree(Dictionary<string, FileEntry>())
-
-                if hadUnsavedArcChanges then
-                    try
-                        sendArcHasUnsavedChangesUpdate false this.window
-                    with error ->
-                        swatelogfn this.window.id "Failed to reset ARC dirty state in renderer: %s" error.Message
         }
 
-        /// Starts permanent observation before loading either initialization snapshot.
+        /// Starts permanent observation and ARC loading together. The watcher is attached
+        /// synchronously before LoadArc begins, so initialization can safely buffer events without
+        /// putting the watcher's initial scan on the model-loading critical path.
         member this.Startup() = promise {
-            do! this.StartFileWatcherAndWaitUntilReady()
-            do! this.LoadArc()
+            this.StartFileWatcher()
+
+            let watcherReady = promise {
+                match this.FileWatcherReady with
+                | Some ready ->
+                    match! ready with
+                    | FileWatcherReadyOutcome.Ready -> ()
+                    | FileWatcherReadyOutcome.WatcherError error -> return raise error
+                    | FileWatcherReadyOutcome.Cancelled -> return raise (ArcLoadCancelledException this.window.id)
+                | None -> ()
+            }
+
+            let! _ =
+                [|
+                    watcherReady
+                    this.LoadArc()
+                |]
+                |> Promise.all
+
+            return ()
         }
 
         /// Publishes the bounded root snapshot while ARC metadata continues loading in the background.
@@ -1589,7 +1613,7 @@ module ArcVaultExtensions =
 
         /// Finalizes a prepared ARC after every asynchronous initialization step succeeded.
         member internal this.FinalizeArcInitialization() =
-            this.isInitializingArc <- false
+            this.SetArcInitializationState false
 
             if
                 this.fileWatcherPendingEvents.Count > 0
@@ -1605,7 +1629,7 @@ module ArcVaultExtensions =
                 let normalizedPath = PathHelpers.normalizePath path
 
                 swatelogfn this.window.id "path: %s" normalizedPath
-                this.isInitializingArc <- true
+                this.SetArcInitializationState true
                 this.path <- Some normalizedPath
 
                 try
@@ -1629,7 +1653,7 @@ module ArcVaultExtensions =
                 let normalizedPath = PathHelpers.normalizePath path
 
                 try
-                    this.isInitializingArc <- true
+                    this.SetArcInitializationState true
                     let arc = ARC(identifier)
                     this.path <- Some normalizedPath
                     this.SetArc(arc)

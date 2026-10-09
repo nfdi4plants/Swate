@@ -21,6 +21,11 @@ let dematerialize path state = {
         Paths = state.Paths.Remove(PathHelpers.normalizePath path)
 }
 
+let shouldLoadNextDirectoryPage path (directoryHasMore: Map<string, bool>) =
+    directoryHasMore
+    |> Map.tryFind (PathHelpers.normalizeCanonicalRelativePath path)
+    |> Option.defaultValue true
+
 let rec private collectDirectoryPaths (node: FileTreeNode) (directoryPaths: Set<string>) =
     if node.isDirectory then
         node.children.Values

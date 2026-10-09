@@ -475,8 +475,3 @@ let createLoadedDirectoryWatcher (arcPath: string) (paths: string[]) =
 let createLoadedDirectoryWatcherWithReady (arcPath: string) (paths: string[]) (onError: exn -> unit) =
     let watcher = createLoadedDirectoryWatcher arcPath paths
     watcher, captureWatcherReadiness onError watcher
-
-let sendArcHasUnsavedChangesUpdate (hasUnsavedChanges: bool) (window: BrowserWindow) =
-    WindowSend.send<Swate.Electron.Shared.IPCTypes.MainToRendererIpc.IHasUnsavedArcChangesRendererApi>
-        window
-        (fun api -> api.arcUnsavedChangesUpdate hasUnsavedChanges)

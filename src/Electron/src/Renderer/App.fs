@@ -226,41 +226,43 @@ let Main () =
         Swate.Components.Composite.TermSearch.TermSearchConfigProvider.TIBQueryProvider(
             Context.AppStateContext.AppStateCtx.Provider(
                 model.ArcRootPath,
-                Renderer.Context.FileStateContext.FileStateCtxProviderWithSnapshots(
-                    Api.ipcArcVaultApi.getFileTree,
-                    {
-                        loadActiveImport = fun () -> Api.ipcArcVaultApi.getActiveFileImport ()
-                        pickAbsolutePaths = fun () -> Api.ipcArcVaultApi.pickAbsolutePaths ()
-                        runImport = Api.ipcArcVaultApi.tryImportExternalFiles
-                        cancelImport = Api.ipcArcVaultApi.cancelImportExternalFiles
-                    },
-                    Renderer.Context.PageStateContext.PageStateCtx.Provider(
-                        pageCtx,
-                        ErrorModalProvider.ErrorModalProvider(
-                            Renderer.Context.AuthStateContext.Provider(
-                                Renderer.Context.LfsActivityContext.LfsActivityCtxProvider(
-                                    Renderer.Context.GitStateContext.GitStateCtxProvider(
-                                        Swate
-                                            .Components
-                                            .Composite
-                                            .AnnotationTable
-                                            .AnnotationTableContextProvider
-                                            .AnnotationTableContextProvider(
-                                                Layout.Main(
-                                                    children =
-                                                        React.Fragment [|
-                                                            children
-                                                            CloseWindowController.CloseWindowController()
-                                                        |],
-                                                    navbar = Renderer.Components.Navbar.Main(),
-                                                    ?leftSidebar = leftSidebar,
-                                                    ?leftActions = leftActions
+                Renderer.Context.ArcActivityContext.ArcActivityCtxProvider(
+                    Renderer.Context.FileStateContext.FileStateCtxProviderWithSnapshots(
+                        Api.ipcArcVaultApi.getFileTree,
+                        {
+                            loadActiveImport = fun () -> Api.ipcArcVaultApi.getActiveFileImport ()
+                            pickAbsolutePaths = fun () -> Api.ipcArcVaultApi.pickAbsolutePaths ()
+                            runImport = Api.ipcArcVaultApi.tryImportExternalFiles
+                            cancelImport = Api.ipcArcVaultApi.cancelImportExternalFiles
+                        },
+                        Renderer.Context.PageStateContext.PageStateCtx.Provider(
+                            pageCtx,
+                            ErrorModalProvider.ErrorModalProvider(
+                                Renderer.Context.AuthStateContext.Provider(
+                                    Renderer.Context.LfsActivityContext.LfsActivityCtxProvider(
+                                        Renderer.Context.GitStateContext.GitStateCtxProvider(
+                                            Swate
+                                                .Components
+                                                .Composite
+                                                .AnnotationTable
+                                                .AnnotationTableContextProvider
+                                                .AnnotationTableContextProvider(
+                                                    Layout.Main(
+                                                        children =
+                                                            React.Fragment [|
+                                                                children
+                                                                CloseWindowController.CloseWindowController()
+                                                            |],
+                                                        navbar = Renderer.Components.Navbar.Main(),
+                                                        ?leftSidebar = leftSidebar,
+                                                        ?leftActions = leftActions
+                                                    )
                                                 )
-                                            )
+                                        )
                                     )
-                                )
-                            ),
-                            ?scopeId = currentArcScopeId
+                                ),
+                                ?scopeId = currentArcScopeId
+                            )
                         )
                     )
                 )

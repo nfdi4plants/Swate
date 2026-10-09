@@ -323,7 +323,9 @@ type FileTree =
             match item.Path with
             | Some path when willExpand ->
                 setMaterializedState (fun _ -> materialize path reconciledMaterializedState)
-                loadNextDirectoryPage item
+
+                if shouldLoadNextDirectoryPage path fileStateCtx.state.FileTreeDirectoryHasMore then
+                    loadNextDirectoryPage item
             | Some path -> setMaterializedState (fun _ -> dematerialize path reconciledMaterializedState)
             | None -> ()
 
@@ -645,7 +647,6 @@ type FileTree =
                         Swate.Components.Page.FileExplorer.FileExplorer.FileExplorer(
                             initialItems = visibleItems,
                             onItemClick = openPreview,
-                            directoryChevronToggleOnlyForItem = isArcEntityDirectory,
                             onDirectoryExpansionChange = handleExpansionChange,
                             onContextMenu = createContextMenuItems,
                             getItemIconClass = getItemIconClass,

@@ -1033,7 +1033,7 @@ Vitest.describe (
                     (fun arcPath -> promise {
                         let vault = ArcVault(TestHelpers.testWindow ())
                         vault.path <- Some arcPath
-                        vault.isInitializingArc <- true
+                        vault.SetArcInitializationState true
 
                         let initialTree = System.Collections.Generic.Dictionary<string, FileEntry>()
                         let rootEntry = FileEntry.create ("arc", arcPath, true)
@@ -1421,10 +1421,25 @@ let private addDataMapToAllEntityTypes (arc: ARC) =
     arc.AddRun(run)
 
 let private tryGetDirtyStateMessage (args: obj array) =
-    if args.Length = 2 && (string args.[0]).Contains("arcUnsavedChangesUpdate") then
-        Some(unbox<bool> args.[1])
+    if args.Length = 2 && (string args.[0]).Contains("arcActivityChanged") then
+        Some((unbox<Swate.Electron.Shared.IPCTypes.ArcActivityState> args.[1]).hasUnsavedChanges)
     else
         None
+
+let private getDirtyStateTransitions (messages: ResizeArray<obj array>) =
+    messages
+    |> Seq.choose tryGetDirtyStateMessage
+    |> Seq.fold
+        (fun (previous, transitions) current ->
+            if current = previous then
+                previous, transitions
+            else
+                current, current :: transitions
+        )
+        (false, [])
+    |> snd
+    |> List.rev
+    |> List.toArray
 
 let private isPathChangeMessage (args: obj array) =
     args.Length > 0 && (string args.[0]).Contains("pathChange")
@@ -2250,7 +2265,7 @@ Vitest.describe (
                 let vault = ArcVault(TestHelpers.testWindow ())
                 let arcPath = "C:/arc"
                 vault.path <- Some arcPath
-                vault.isInitializingArc <- true
+                vault.SetArcInitializationState true
 
                 let handleFileEvent =
                     vault._FileEventController (recordingWatcherApi (ResizeArray()))
@@ -2272,6 +2287,44 @@ Vitest.describe (
                 Vitest.expect(mergePaths.Contains ".gitattributes").toBe (false)
                 Vitest.expect(mergePaths.Contains "dataset").toBe (false)
             }
+        )
+
+        Vitest.test (
+            "ARC model loading overlaps permanent watcher readiness",
+            TestOptions(timeout = 15000),
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        let watcherCreated, signalWatcherCreated = TestHelpers.deferred ()
+                        let mutable signalReady = ignore
+
+                        interceptNextControlledPermanentWatch
+                            watchMock
+                            signalWatcherCreated
+                            (fun ready -> signalReady <- ready)
+                            ignore
+                            ignore
+
+                        let cleanup () = vault.StopFileWatcher()
+
+                        let operation () = promise {
+                            let opening = vault.OpenARC arcPath
+                            do! watcherCreated
+
+                            do!
+                                waitUntil
+                                    "ARC model loaded before permanent watcher readiness"
+                                    (fun () -> vault.arc.IsSome)
+
+                            Vitest.expect(vault.isInitializingArc).toBe (true)
+                            signalReady ()
+                            do! opening
+                        }
+
+                        return! withAsyncCleanup cleanup operation
+                    })
         )
 
         Vitest.test (
@@ -2328,7 +2381,7 @@ Vitest.describe (
                         let cleanup () = vault.StopFileWatcher()
 
                         let operation () = promise {
-                            vault.isInitializingArc <- true
+                            vault.SetArcInitializationState true
                             vault.path <- Some(PathHelpers.normalizePath arcPath)
 
                             // Startup resolves only after the permanent watcher reports ready.
@@ -3338,7 +3391,7 @@ Vitest.describe (
                 ARC_VAULTS.OnCloseWindow(windowState.Window, vault, windowId)
 
                 try
-                    vault.isInitializingArc <- true
+                    vault.SetArcInitializationState true
                     vault.path <- Some expectedPath
                     vault.SetArc(ARC("Close During Initial Write ARC"))
                     vault.RefreshHasUnsavedArcChangesFlag()
@@ -4762,8 +4815,7 @@ Vitest.describe (
                         )
                         .toBe (false)
 
-                    let dirtyStateMessages =
-                        sentMessages |> Seq.choose tryGetDirtyStateMessage |> Seq.toArray
+                    let dirtyStateMessages = getDirtyStateTransitions sentMessages
 
                     Vitest.expect(dirtyStateMessages).toEqual ([| true; false |])
 
@@ -4793,6 +4845,7 @@ Vitest.describe (
                 let blockedParent = join [| rootPath; "not-a-directory" |]
                 let failedArcPath = join [| blockedParent; "failed-arc" |]
                 let rollbackError = exn "Expected rollback renderer notification failure."
+                let mutable lastDirtyState = false
 
                 let windowState =
                     createTestWindow {
@@ -4800,7 +4853,11 @@ Vitest.describe (
                             OnSend =
                                 fun args ->
                                     match tryGetDirtyStateMessage args with
-                                    | Some false -> raise rollbackError
+                                    | Some dirtyState when dirtyState <> lastDirtyState ->
+                                        lastDirtyState <- dirtyState
+
+                                        if not dirtyState then
+                                            raise rollbackError
                                     | _ -> ()
                     }
 
@@ -4828,8 +4885,7 @@ Vitest.describe (
                     Vitest.expect(creationError.Value.Message).toContain ("Could not write ARC")
                     Vitest.expect(creationError.Value.Message).not.toContain (rollbackError.Message)
 
-                    let dirtyStateMessages =
-                        sentMessages |> Seq.choose tryGetDirtyStateMessage |> Seq.toArray
+                    let dirtyStateMessages = getDirtyStateTransitions sentMessages
 
                     Vitest.expect(dirtyStateMessages).toEqual ([| true; false |])
 

@@ -8,8 +8,9 @@ open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Electron.Shared.FileIOTypes
 
 [<ReactComponent>]
-let private FileImportStatusNotice () =
+let private FileOperationStatusNotice () =
     let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
+    let arcActivity = Renderer.Context.ArcActivityContext.useArcActivityCtx ()
     let errorModal = useErrorModalCtx ()
 
     let cancelImport () =
@@ -25,9 +26,28 @@ let private FileImportStatusNotice () =
         )
         |> Promise.start
 
-    match fileStateCtx.activeFileImport with
+    let status =
+        match fileStateCtx.activeFileImport with
+        | Some activeImport ->
+            let text =
+                if fileStateCtx.isCancellingFileImport then
+                    "Cancelling import..."
+                elif activeImport.phase = FileImportPhase.Finalizing then
+                    "Finalizing import..."
+                else
+                    "Importing files..."
+
+            let canCancel =
+                not fileStateCtx.isCancellingFileImport
+                && activeImport.phase = FileImportPhase.Copying
+
+            Some(text, canCancel)
+        | None when arcActivity.state.isBusyWriting -> Some("Saving changes...", false)
+        | None -> None
+
+    match status with
     | None -> Html.none
-    | Some activeImport ->
+    | Some(text, canCancel) ->
         Html.div [
             prop.className
                 "swt:fixed swt:inset-0 swt:z-50 swt:flex swt:items-center swt:justify-center swt:bg-base-100/20"
@@ -38,19 +58,8 @@ let private FileImportStatusNotice () =
                     prop.className
                         "swt:alert swt:alert-info swt:w-fit swt:max-w-md swt:shadow-lg swt:pointer-events-auto"
                     prop.children [
-                        Swate.Components.Primitive.LoadingSpinner.LoadingSpinner.LoadingSpinner(
-                            text =
-                                if fileStateCtx.isCancellingFileImport then
-                                    "Cancelling import..."
-                                elif activeImport.phase = FileImportPhase.Finalizing then
-                                    "Finalizing import..."
-                                else
-                                    "Importing files..."
-                        )
-                        if
-                            not fileStateCtx.isCancellingFileImport
-                            && activeImport.phase = FileImportPhase.Copying
-                        then
+                        Swate.Components.Primitive.LoadingSpinner.LoadingSpinner.LoadingSpinner(text = text)
+                        if canCancel then
                             Html.button [
                                 prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:shrink-0 swt:gap-1 swt:normal-case"
                                 prop.title "Cancel"
@@ -86,6 +95,6 @@ let Main (leftSidebarTarget: LeftSidebarPage) =
             match leftSidebarTarget with
             | LeftSidebarPage.FileExplorer -> Renderer.Components.LeftSidebar.FileExplorer.Main.Main()
             | LeftSidebarPage.Git -> Git.GitSidebarPanel.Main()
-            FileImportStatusNotice()
+            FileOperationStatusNotice()
         |]
     ]

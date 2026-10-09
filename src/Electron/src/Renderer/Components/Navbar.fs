@@ -225,31 +225,14 @@ type Navbar =
 
         let errorCtx = useErrorModalCtx ()
         let isSaving, setIsSaving = React.useState false
-
-        let hasUnsavedChanges =
-            Renderer.MainSyncedState.useMainSyncedState {
-                initial = false
-                load =
-                    fun () -> promise {
-                        match! Api.ipcArcVaultApi.getHasUnsavedArcChanges () with
-                        | Ok hasUnsavedChanges -> return hasUnsavedChanges
-                        | Error _ -> return false
-                    }
-                subscribe =
-                    fun setHasUnsavedChanges ->
-                        Renderer.IpcReceiver.subscribeProxyReceiver<IHasUnsavedArcChangesRendererApi> {
-                            arcUnsavedChangesUpdate = setHasUnsavedChanges
-                        }
-                onError =
-                    fun ex ->
-                        errorCtx.enqueue (
-                            ErrorModalRequest.create (ex.Message, title = "Error checking for unsaved changes")
-                        )
-                dependencies = [||]
-            }
+        let activity = Renderer.Context.ArcActivityContext.useArcActivityCtx ()
 
         let onSaveArc _ =
-            if hasUnsavedChanges.state && not isSaving then
+            if
+                activity.state.hasUnsavedChanges
+                && not activity.state.isInitializing
+                && not isSaving
+            then
                 setIsSaving true
 
                 promise {
@@ -268,14 +251,34 @@ type Navbar =
 
         Html.button [
             prop.type'.button
-            prop.disabled (isSaving || not hasUnsavedChanges.state)
+            prop.disabled (
+                activity.state.isInitializing
+                || isSaving
+                || not activity.state.hasUnsavedChanges
+            )
             prop.className "swt:btn swt:btn-square swt:btn-info swt:btn-sm"
             prop.onClick onSaveArc
-            prop.title "Save ARC"
-            prop.ariaLabel "Save ARC"
+            prop.title (
+                if activity.state.isInitializing then
+                    "ARC loading still in progress."
+                else
+                    "Save ARC"
+            )
+            prop.ariaLabel (
+                if activity.state.isInitializing then
+                    "ARC loading still in progress."
+                else
+                    "Save ARC"
+            )
             prop.children [
                 Html.i [
-                    prop.className "swt:iconify swt:fluent--save-16-filled swt:size-5"
+                    prop.className [
+                        "swt:iconify swt:size-5"
+                        if activity.state.isInitializing then
+                            "swt:fluent--arrow-sync-16-regular swt:animate-spin"
+                        else
+                            "swt:fluent--save-16-filled"
+                    ]
                 ]
             ]
         ]

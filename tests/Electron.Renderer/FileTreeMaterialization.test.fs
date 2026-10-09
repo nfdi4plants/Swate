@@ -64,6 +64,16 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "loads directory pages only for new or incomplete directories",
+            fun () ->
+                let paging = Map.ofList [ "assays/complete", false; "assays/incomplete", true ]
+
+                Vitest.expect(shouldLoadNextDirectoryPage "assays/new" paging).toBe true
+                Vitest.expect(shouldLoadNextDirectoryPage "assays\\incomplete" paging).toBe true
+                Vitest.expect(shouldLoadNextDirectoryPage "assays/complete" paging).toBe false
+        )
+
+        Vitest.test (
             "maps an unmaterialized non-empty directory without children or expansion state",
             fun () ->
                 let directory =
